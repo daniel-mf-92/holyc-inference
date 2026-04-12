@@ -51,3 +51,8 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_12","type":"todo_list","items":[{"text":"Assess queue depth and pick IQ","completed":true},{"text":"Implement IQ-008 softmax HolyC file","completed":true},{"text":"Run focused host-side validation","completed":true},{"text":"Update MASTER_TASKS queue and ledger","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":589308,"cached_input_tokens":534144,"output_tokens":5195}}
 Codex final exit code: 0
+[main 5b3a22c] feat(inference): codex iteration 20260412-145314
+ 5 files changed, 133 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260412-145314.final.txt
+ create mode 100644 src/math/softmax.HC
+=== End iteration 8 (outcome=ok) ===
