@@ -111,6 +111,57 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] WS8-05 Performance tuning: identify and optimize top-5 hottest functions
 - [ ] WS8-06 Documentation: user guide for loading models and running inference
 
+### WS9 — GPU Compute Partition (IOMMU-Safe, Book-of-Truth-Audited)
+- Philosophy: GPU acceleration is allowed ONLY under strict isolation. The GPU is a
+  powerful but untrustworthy co-processor — it has DMA, opaque firmware, and its own
+  execution engine. It must be caged, monitored, and logged.
+- [ ] WS9-01 GPU threat model: DMA risks, firmware opacity, MMIO attack surface, IOMMU bypass vectors
+- [ ] WS9-02 IOMMU (VT-d/AMD-Vi) initialization and enforcement — mandatory, no GPU without it
+- [ ] WS9-03 GPU memory partition design — dedicated physical region, never overlaps kernel/log pages
+- [ ] WS9-04 Explicit copy-in/copy-out protocol — CPU copies tensors to GPU region, triggers compute, copies results
+- [ ] WS9-05 PCIe device enumeration in HolyC — discover GPU via config space, map BARs
+- [ ] WS9-06 GPU command submission interface — minimal ring buffer, no proprietary driver
+- [ ] WS9-07 MMIO register map for target GPU compute dispatch (start with virtio-gpu or simple compute)
+- [ ] WS9-08 Book of Truth hooks: log every DMA mapping, every GPU command, every MMIO write
+- [ ] WS9-09 GPU compute shader/kernel format — simple dispatachable compute tasks
+- [ ] WS9-10 Matmul offload: move quantized matrix multiply to GPU, keep results in GPU partition
+- [ ] WS9-11 Attention score computation offload to GPU
+- [ ] WS9-12 GPU error handling: timeout, hang detection, forced reset, logged to Book of Truth
+- [ ] WS9-13 Benchmark: GPU vs CPU inference speed for TinyLlama 1.1B Q4_0
+- [ ] WS9-14 Fallback: if no IOMMU available, GPU disabled entirely — CPU-only mode, no exceptions
+
+### WS10 — Multi-Architecture Model Support
+- [ ] WS10-01 Abstract forward pass interface — model-agnostic layer dispatch
+- [ ] WS10-02 Mistral architecture support (sliding window attention, different GQA config)
+- [ ] WS10-03 Qwen2 architecture support (different FFN layout, tied embeddings)
+- [ ] WS10-04 Phi-3 architecture support (different attention pattern, block structure)
+- [ ] WS10-05 Architecture auto-detection from GGUF metadata keys
+- [ ] WS10-06 Model registry: map GGUF architecture string to forward pass implementation
+
+### WS11 — Extended Quantization Support
+- [ ] WS11-01 Q5_0 and Q5_1 quantization (5-bit, wider dynamic range)
+- [ ] WS11-02 Q2_K, Q3_K, Q4_K, Q5_K, Q6_K (k-quant family, mixed precision)
+- [ ] WS11-03 IQ quantization formats (importance-based, variable bit-width per weight)
+- [ ] WS11-04 Quantization format auto-selection from GGUF tensor type field
+- [ ] WS11-05 Performance comparison matrix: tok/s vs quantization level vs model size
+
+### WS12 — Model Conversion & Preparation Tooling (Host-Side)
+- Host-side Python/C tools — NOT part of the HolyC runtime. Used to prepare models
+  for TempleOS consumption from standard Hugging Face / Ollama sources.
+- [ ] WS12-01 GGUF model validator — verify file integrity, tensor checksums, format version
+- [ ] WS12-02 Model preparation guide: download from Hugging Face → quantize → copy to TempleOS disk
+- [ ] WS12-03 Ollama model extraction: pull Ollama blob → extract GGUF → validate
+- [ ] WS12-04 Model size calculator: predict RAM/disk requirements before loading
+- [ ] WS12-05 Reference output generator: run llama.cpp on known prompts, save expected outputs
+
+### WS13 — Advanced Inference Features
+- [ ] WS13-01 Multi-turn conversation context management
+- [ ] WS13-02 System prompt / instruction template support (ChatML, Alpaca, Llama-style)
+- [ ] WS13-03 Batch inference: process multiple prompts efficiently
+- [ ] WS13-04 Speculative decoding: use small model to draft, large model to verify
+- [ ] WS13-05 Persistent KV cache across sessions (save/load to disk)
+- [ ] WS13-06 Token streaming callback for real-time display
+
 ## Queue Semantics
 
 - Rolling work queue, keep at least 15 unchecked IQ items at all times.
@@ -128,7 +179,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-007 Implement integer sqrt approximation in `src/math/intsqrt.HC` (WS1-02)
 - [x] IQ-008 Implement integer softmax in `src/math/softmax.HC` (WS1-03)
 - [x] IQ-009 Implement RMSNorm (integer path) in `src/math/rmsnorm.HC` (WS1-04)
-- [ ] IQ-010 Implement GGUF magic/version/header parser in `src/gguf/header.HC` (WS2-01)
+- [x] IQ-010 Implement GGUF magic/version/header parser in `src/gguf/header.HC` (WS2-01)
 - [ ] IQ-011 Implement GGUF metadata KV reader in `src/gguf/metadata.HC` (WS2-02)
 - [ ] IQ-012 Implement GGUF tensor info reader in `src/gguf/tensorinfo.HC` (WS2-03)
 - [ ] IQ-013 Implement Q4_0 block struct and dequantize in `src/quant/q4_0.HC` (WS3-01, WS3-02)
@@ -143,6 +194,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] IQ-022 Implement GGUF header constants and struct layout notes in `src/gguf/header.HC` before parser logic (WS2-01)
 - [ ] IQ-023 Create `src/math/rmsnorm.HC` skeleton with Q16 constants, tensor shape assumptions, and TODO stubs for scale/variance accumulation (WS1-04)
 - [ ] IQ-024 Create `src/gguf/header.HC` skeleton with `GGUFHeader` struct and endian-safe integer read helper stubs (WS2-01)
+- [ ] IQ-025 Add host-side GGUF header parser parity fixture in `tests/test_gguf_header_parse.py` covering valid/magic/version/truncation cases (WS2-01, WS2-05)
 
 ## Progress Ledger
 
@@ -158,6 +210,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 | 2026-04-12 | loop-007 | IQ-007 integer sqrt approximation | done | Added `src/math/intsqrt.HC` with bitwise `IntSqrtU64` + `FPQ16Sqrt`; validated via host parity checks (`intsqrt_exact_checks=ok`, `max_rel_err=0.007690%`) |
 | 2026-04-12 | loop-008 | IQ-008 integer softmax | done | Added `src/math/softmax.HC` with stable max-shifted Q16 softmax and sum-to-one correction; validated host-side parity (`softmax_q16_checks=ok`, `max_abs_err=0.003334`) |
 | 2026-04-12 | loop-009 | IQ-009 integer RMSNorm | done | Added `src/math/rmsnorm.HC` with Q16 RMSNorm (`mean(x^2)+eps`, rsqrt via `FPQ16Sqrt`, per-channel scale); validated host-side parity (`rmsnorm_q16_checks=ok`, `max_abs_err=0.000075`) |
+| 2026-04-12 | loop-010 | IQ-010 GGUF header parser | done | Added `src/gguf/header.HC` with little-endian U32/U64 readers and `GGUFParseHeader` validation (magic/version/count/truncation); validated via focused host parity check (`gguf_header_reference_checks=ok`) |
 
 ## Blockers & Decisions
 

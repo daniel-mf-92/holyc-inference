@@ -18,19 +18,27 @@ Philosophy: MAXIMUM TERRY DAVIS PURITY.
   correctness against llama.cpp reference outputs. They are not part of the engine.
 
 Execution contract for THIS iteration:
-1. Read MASTER_TASKS.md.
+1. Read MASTER_TASKS.md. Read any Sanhedrin research at ~/Documents/local-codebases/temple-sanhedrin/research/ if it exists.
 2. Ensure the Inference Queue is rolling and deep:
    - If fewer than 15 unchecked `IQ-` items exist, append enough new `IQ-` items to bring it to at least 15.
-   - Derive new queue items from the next unchecked WS* items by breaking them into small, implementable tasks.
+   - Derive new queue items from the next unchecked WS* items by breaking them into substantial, implementable tasks.
    - Keep queue IDs monotonic (never reuse IDs).
-3. Pick exactly ONE highest-priority unchecked `IQ-` item.
-4. Implement it with minimal, reviewable changes.
-5. Run a focused validation command relevant to your change.
+   - Prefer queue items that produce REAL CODE (.HC files) or detailed technical specs over doc-structure tasks.
+3. Pick the highest-priority unchecked `IQ-` item. If it's small, you MAY complete 2-3 related items in one iteration.
+4. DO DEEP WORK. This is not a 2-minute doc edit. You have up to 20 minutes per iteration.
+   - Write complete .HC implementations with working logic, not just stubs
+   - Include inline comments explaining the math/algorithm
+   - Write actual validation scripts in tests/ that can verify correctness
+   - Research llama.cpp source, GGML internals, and Intel intrinsics docs when needed
+   - If implementing a quantization kernel, get the bit-level math RIGHT — reference the GGML source
+   - If implementing a GPU interface, study PCIe config space, BAR mapping, MMIO register layouts
+5. Run focused validation commands relevant to your changes.
 6. Update MASTER_TASKS.md:
-   - mark the completed queue item
-   - add one Progress Ledger row with today's date
+   - mark completed queue items
+   - add Progress Ledger rows with today's date
    - add blockers/decisions if any
-7. If blocked, document blocker in MASTER_TASKS and complete a smaller prerequisite task instead.
+7. If blocked, document blocker and do research — check llama.cpp source, OSDev wiki, Intel SDM,
+   or any reference that could unblock you. Write findings to docs/ for future iterations.
 
 Safety constraints:
 - Do not introduce non-HolyC implementation languages into the inference engine runtime.

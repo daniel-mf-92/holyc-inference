@@ -1,0 +1,20 @@
+Done — one full unattended iteration completed with exactly one `IQ-` item progressed.
+
+**What Changed**
+- Implemented `IQ-010` in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/gguf/header.HC:1` with direct HolyC header parsing:
+  - `GGUFHeader` struct, endian-safe `U32/U64` readers, bounds checks, and `GGUFParseHeader` error-code returns.
+  - Validates magic (`GGUF`), versions (`2`/`3`), truncation, and nonzero `tensor_count`.
+- Updated queue/ledger in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:131`:
+  - Marked `IQ-010` checked.
+  - Added `IQ-025` so unchecked queue depth remains rolling and >=15.
+  - Added Progress Ledger row for `loop-010`.
+
+**Queue Policy**
+- Unchecked `IQ-` count after update: `15` (policy satisfied).
+
+**Focused Validation**
+- Command run: `python3` inline parity check for GGUF header logic (valid/magic/version/zero-count/truncation cases).
+- Output: `gguf_header_reference_checks=ok`
+
+**Notes**
+- Working-tree also shows unrelated automation heartbeat/log file updates: `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/automation/logs/20260412-150222.log` and `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/automation/logs/loop.heartbeat`.
