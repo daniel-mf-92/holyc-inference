@@ -12,6 +12,7 @@ GGUF_TDBASE_ERR_OVERFLOW = 3
 GGUF_TDBASE_ERR_MISALIGNED_BASE = 4
 GGUF_TDBASE_ERR_MISALIGNED_TENSOR_OFFSET = 5
 GGUF_TDBASE_ERR_BAD_TYPE = 6
+GGUF_TDBASE_ERR_OUT_OF_BOUNDS = 7
 
 GGUF_DEFAULT_ALIGNMENT = 32
 U64_MAX = (1 << 64) - 1
@@ -97,6 +98,42 @@ def tensor_data_base_offset(tensor_data_base: int, tensor_rel_offset: int, align
 
 def tensor_data_base_offset_default(tensor_data_base: int, tensor_rel_offset: int):
     return tensor_data_base_offset(tensor_data_base, tensor_rel_offset, GGUF_DEFAULT_ALIGNMENT)
+
+
+def tensor_resolve_range(
+    tensor_data_base: int,
+    tensor_rel_offset: int,
+    tensor_nbytes: int,
+    gguf_file_nbytes: int,
+    alignment: int,
+):
+    err, abs_start = tensor_data_base_offset(tensor_data_base, tensor_rel_offset, alignment)
+    if err != GGUF_TDBASE_OK:
+        return err, 0, 0
+
+    if abs_start > U64_MAX - tensor_nbytes:
+        return GGUF_TDBASE_ERR_OVERFLOW, 0, 0
+
+    abs_end = abs_start + tensor_nbytes
+    if abs_end > gguf_file_nbytes:
+        return GGUF_TDBASE_ERR_OUT_OF_BOUNDS, 0, 0
+
+    return GGUF_TDBASE_OK, abs_start, abs_end
+
+
+def tensor_resolve_range_default(
+    tensor_data_base: int,
+    tensor_rel_offset: int,
+    tensor_nbytes: int,
+    gguf_file_nbytes: int,
+):
+    return tensor_resolve_range(
+        tensor_data_base,
+        tensor_rel_offset,
+        tensor_nbytes,
+        gguf_file_nbytes,
+        GGUF_DEFAULT_ALIGNMENT,
+    )
 
 
 def test_default_alignment_examples() -> None:
@@ -219,6 +256,83 @@ def test_tensor_data_base_offset_random_aligned_cases() -> None:
         assert tensor_data_base_is_aligned(got, alignment)
 
 
+def test_tensor_resolve_range_happy_path() -> None:
+    err, abs_start, abs_end = tensor_resolve_range(0x2000, 0x80, 0x120, 0x3000, 32)
+    assert err == GGUF_TDBASE_OK
+    assert abs_start == 0x2080
+    assert abs_end == 0x21A0
+
+
+def test_tensor_resolve_range_default_alignment() -> None:
+    err, abs_start, abs_end = tensor_resolve_range_default(0x100, 0x40, 0x10, 0x1000)
+    assert err == GGUF_TDBASE_OK
+    assert abs_start == 0x140
+    assert abs_end == 0x150
+
+
+def test_tensor_resolve_range_reject_bad_alignment() -> None:
+    err, _, _ = tensor_resolve_range(0x100, 0x20, 0x10, 0x1000, 24)
+    assert err == GGUF_TDBASE_ERR_BAD_ALIGNMENT
+
+
+def test_tensor_resolve_range_reject_misaligned_base() -> None:
+    err, _, _ = tensor_resolve_range(0x110, 0x20, 0x10, 0x1000, 32)
+    assert err == GGUF_TDBASE_ERR_MISALIGNED_BASE
+
+
+def test_tensor_resolve_range_reject_misaligned_offset() -> None:
+    err, _, _ = tensor_resolve_range(0x100, 0x18, 0x10, 0x1000, 32)
+    assert err == GGUF_TDBASE_ERR_MISALIGNED_TENSOR_OFFSET
+
+
+def test_tensor_resolve_range_overflow_guard() -> None:
+    err, _, _ = tensor_resolve_range(U64_MAX - 0x1F, 0x20, 0x40, U64_MAX, 32)
+    assert err == GGUF_TDBASE_ERR_OVERFLOW
+
+
+def test_tensor_resolve_range_out_of_bounds() -> None:
+    err, _, _ = tensor_resolve_range(0x200, 0x40, 0xC0, 0x2F0, 32)
+    assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+
+
+def test_tensor_resolve_range_allows_exact_eof() -> None:
+    err, abs_start, abs_end = tensor_resolve_range(0x400, 0x80, 0x100, 0x580, 32)
+    assert err == GGUF_TDBASE_OK
+    assert abs_start == 0x480
+    assert abs_end == 0x580
+
+
+def test_tensor_resolve_range_random_valid_cases() -> None:
+    rng = random.Random(761499)
+
+    for _ in range(1000):
+        alignment = 1 << rng.randint(0, 15)
+        base_units = rng.randrange(0, 1 << 20)
+        rel_units = rng.randrange(0, 1 << 20)
+        tensor_nbytes = rng.randrange(0, 1 << 16)
+
+        base = base_units * alignment
+        rel = rel_units * alignment
+        start = base + rel
+        if start > U64_MAX - tensor_nbytes:
+            continue
+        end = start + tensor_nbytes
+
+        file_pad = rng.randrange(0, 1 << 12)
+        file_nbytes = end + file_pad
+
+        err, got_start, got_end = tensor_resolve_range(
+            base,
+            rel,
+            tensor_nbytes,
+            file_nbytes,
+            alignment,
+        )
+        assert err == GGUF_TDBASE_OK
+        assert got_start == start
+        assert got_end == end
+
+
 def run() -> None:
     test_default_alignment_examples()
     test_tensor_type_block_size_known_types()
@@ -235,6 +349,15 @@ def run() -> None:
     test_tensor_data_base_offset_reject_misaligned_rel()
     test_tensor_data_base_offset_overflow_guard()
     test_tensor_data_base_offset_random_aligned_cases()
+    test_tensor_resolve_range_happy_path()
+    test_tensor_resolve_range_default_alignment()
+    test_tensor_resolve_range_reject_bad_alignment()
+    test_tensor_resolve_range_reject_misaligned_base()
+    test_tensor_resolve_range_reject_misaligned_offset()
+    test_tensor_resolve_range_overflow_guard()
+    test_tensor_resolve_range_out_of_bounds()
+    test_tensor_resolve_range_allows_exact_eof()
+    test_tensor_resolve_range_random_valid_cases()
     print("gguf_tensor_data_base_reference_checks=ok")
 
 

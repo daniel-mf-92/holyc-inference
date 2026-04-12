@@ -8,6 +8,7 @@
 #define GGUF_TDBASE_ERR_MISALIGNED_BASE 4
 #define GGUF_TDBASE_ERR_MISALIGNED_TENSOR_OFFSET 5
 #define GGUF_TDBASE_ERR_BAD_TYPE 6
+#define GGUF_TDBASE_ERR_OUT_OF_BOUNDS 7
 
 // GGUF default tensor alignment when metadata key `general.alignment`
 // is absent.
@@ -183,4 +184,59 @@ I64 GGUFTensorDataBaseOffsetDefault(U64 tensor_data_base,
                                     tensor_rel_offset,
                                     GGUF_DEFAULT_ALIGNMENT,
                                     out_tensor_abs);
+}
+
+I64 GGUFTensorResolveRange(U64 tensor_data_base,
+                           U64 tensor_rel_offset,
+                           U64 tensor_nbytes,
+                           U64 gguf_file_nbytes,
+                           U32 alignment,
+                           U64 *out_tensor_abs_start,
+                           U64 *out_tensor_abs_end)
+{
+    U64 abs_start;
+    U64 abs_end;
+    I64 err;
+
+    if (!out_tensor_abs_start || !out_tensor_abs_end)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    // Resolve and validate the absolute tensor start offset first.
+    err = GGUFTensorDataBaseOffset(tensor_data_base,
+                                   tensor_rel_offset,
+                                   alignment,
+                                   &abs_start);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    // Tensor byte-range is [abs_start, abs_start + tensor_nbytes).
+    // Guard add overflow before constructing the exclusive end.
+    if (abs_start > 0xFFFFFFFFFFFFFFFF - tensor_nbytes)
+        return GGUF_TDBASE_ERR_OVERFLOW;
+    abs_end = abs_start + tensor_nbytes;
+
+    // Reject ranges that run past the file boundary.
+    // A tensor may legally end exactly at gguf_file_nbytes.
+    if (abs_end > gguf_file_nbytes)
+        return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+
+    *out_tensor_abs_start = abs_start;
+    *out_tensor_abs_end   = abs_end;
+    return GGUF_TDBASE_OK;
+}
+
+I64 GGUFTensorResolveRangeDefault(U64 tensor_data_base,
+                                  U64 tensor_rel_offset,
+                                  U64 tensor_nbytes,
+                                  U64 gguf_file_nbytes,
+                                  U64 *out_tensor_abs_start,
+                                  U64 *out_tensor_abs_end)
+{
+    return GGUFTensorResolveRange(tensor_data_base,
+                                  tensor_rel_offset,
+                                  tensor_nbytes,
+                                  gguf_file_nbytes,
+                                  GGUF_DEFAULT_ALIGNMENT,
+                                  out_tensor_abs_start,
+                                  out_tensor_abs_end);
 }
