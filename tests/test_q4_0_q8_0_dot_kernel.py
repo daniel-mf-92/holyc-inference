@@ -121,6 +121,20 @@ def dot_product_blocks_q32(lhs_blocks, rhs_blocks) -> tuple[int, int]:
     return Q4_0_Q8_0_OK, total
 
 
+def dot_product_blocks_q16_accumulate(lhs_blocks, rhs_blocks, initial_accum_q16: int) -> tuple[int, int]:
+    if len(lhs_blocks) != len(rhs_blocks):
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN, 0
+
+    total_q16 = initial_accum_q16
+    for (l_scale, l_q4), (r_scale, r_q8) in zip(lhs_blocks, rhs_blocks):
+        err, block_dot_q32 = dot_product_block_q32(l_scale, l_q4, r_scale, r_q8)
+        if err != Q4_0_Q8_0_OK:
+            return err, 0
+        total_q16 += dot_q32_to_q16(block_dot_q32)
+
+    return Q4_0_Q8_0_OK, total_q16
+
+
 def dot_q32_to_q16(dot_q32: int) -> int:
     return round_shift_right_signed(dot_q32, 16)
 
@@ -200,11 +214,49 @@ def test_error_on_bad_lengths() -> None:
     assert err == Q4_0_Q8_0_ERR_BAD_DST_LEN
 
 
+def test_q16_accumulator_helper_matches_blockwise_rounding() -> None:
+    rng = random.Random(2026041217)
+
+    for _ in range(250):
+        block_count = rng.randint(1, 6)
+        lhs_blocks = []
+        rhs_blocks = []
+
+        for _ in range(block_count):
+            l_scale = half_bits(rng.uniform(-3.0, 3.0))
+            r_scale = half_bits(rng.uniform(-3.0, 3.0))
+            l_q4 = pack_q4_from_signed([rng.randrange(-8, 8) for _ in range(32)])
+            r_q8 = pack_q8_signed([rng.randrange(-128, 128) for _ in range(32)])
+            lhs_blocks.append((l_scale, l_q4))
+            rhs_blocks.append((r_scale, r_q8))
+
+        initial_accum = rng.randint(-(1 << 30), (1 << 30))
+        err, got_q16 = dot_product_blocks_q16_accumulate(lhs_blocks, rhs_blocks, initial_accum)
+        assert err == Q4_0_Q8_0_OK
+
+        expected_q16 = initial_accum
+        for lhs_block, rhs_block in zip(lhs_blocks, rhs_blocks):
+            err, block_dot_q32 = dot_product_block_q32(*lhs_block, *rhs_block)
+            assert err == Q4_0_Q8_0_OK
+            expected_q16 += dot_q32_to_q16(block_dot_q32)
+
+        assert got_q16 == expected_q16
+
+
+def test_q16_accumulator_bad_length_error() -> None:
+    lhs_blocks = [(half_bits(1.0), pack_q4_from_signed([0] * 32))]
+    rhs_blocks = []
+    err, _ = dot_product_blocks_q16_accumulate(lhs_blocks, rhs_blocks, 0)
+    assert err == Q4_0_Q8_0_ERR_BAD_DST_LEN
+
+
 def run() -> None:
     test_identity_mixed_block()
     test_random_blocks_match_integer_reference()
     test_multiblock_accumulation()
     test_error_on_bad_lengths()
+    test_q16_accumulator_helper_matches_blockwise_rounding()
+    test_q16_accumulator_bad_length_error()
     print("q4_0_q8_0_dot_kernel_reference_checks=ok")
 
 

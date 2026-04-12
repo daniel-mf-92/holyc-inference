@@ -169,6 +169,36 @@ I32 Q4_0_Q8_0DotProductBlocksQ32(Q4_0Block *lhs_q4, Q8_0Block *rhs_q8, I64 block
     return Q4_0_Q8_0_OK;
 }
 
+I32 Q4_0_Q8_0DotProductBlocksQ16Accumulate(Q4_0Block *lhs_q4, Q8_0Block *rhs_q8, I64 block_count, I64 *io_accum_q16)
+{
+    I64 block_index;
+    I64 block_dot_q32;
+    I64 total_q16;
+    I32 status;
+
+    if (!lhs_q4 || !rhs_q8 || !io_accum_q16)
+        return Q4_0_Q8_0_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    total_q16 = *io_accum_q16;
+
+    // Matmul callers accumulate rows in Q16 lanes.
+    // Keep each block explicit and auditable:
+    //   block_q32 -> rounded block_q16 -> add to running accumulator.
+    for (block_index = 0; block_index < block_count; ++block_index)
+    {
+        status = Q4_0_Q8_0DotProductBlockQ32(&lhs_q4[block_index], &rhs_q8[block_index], &block_dot_q32);
+        if (status != Q4_0_Q8_0_OK)
+            return status;
+
+        total_q16 += Q4_0_Q8_0DotQ32ToQ16(block_dot_q32);
+    }
+
+    *io_accum_q16 = total_q16;
+    return Q4_0_Q8_0_OK;
+}
+
 I64 Q4_0_Q8_0DotQ32ToQ16(I64 dot_q32)
 {
     return Q4_0_Q8_0RoundShiftRightSigned(dot_q32, 16);
