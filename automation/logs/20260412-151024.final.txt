@@ -1,0 +1,15 @@
+Completed one deep iteration on `IQ-011` end-to-end.
+
+**What Changed**
+- Implemented full HolyC GGUF metadata parser in `src/gguf/metadata.HC:1` with strict bounds checks, LE integer readers, string decode, scalar decode, array decode, nested-array rejection, and explicit error codes.
+- Added metadata table lifecycle/memory helpers (`GGUFFreeMetadataTable`) for safe cleanup on parse failure in `src/gguf/metadata.HC:491`.
+- Added focused host-side parity fixture covering mixed scalar/string/array metadata, nested-array rejection, and truncation detection in `tests/test_gguf_metadata_parse.py:1`.
+- Updated queue/ledger: marked `IQ-011` done, appended new monotonic queue items `IQ-026..IQ-028`, and recorded loop result in `MASTER_TASKS.md:183` and `MASTER_TASKS.md:217`.
+
+**Queue Policy**
+- Unchecked queue depth is maintained at 17 (>=15), with monotonic IDs through `IQ-028` in `MASTER_TASKS.md:200`.
+- Exactly one queue item progressed this iteration: `IQ-011`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_parse.py`
+- Output: `gguf_metadata_reference_checks=ok`
