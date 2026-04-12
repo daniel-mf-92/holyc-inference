@@ -458,6 +458,134 @@ def tensor_range_find_by_rel_offset_default(
     )
 
 
+def _abs_range_greater(
+    starts: list[int],
+    ends: list[int],
+    indices: list[int],
+    i: int,
+    j: int,
+) -> bool:
+    if starts[i] > starts[j]:
+        return True
+    if starts[i] < starts[j]:
+        return False
+    if ends[i] > ends[j]:
+        return True
+    if ends[i] < ends[j]:
+        return False
+    return indices[i] > indices[j]
+
+
+def _abs_range_sift_down(
+    starts: list[int],
+    ends: list[int],
+    indices: list[int],
+    root: int,
+    end: int,
+) -> None:
+    while True:
+        child = root * 2 + 1
+        if child > end:
+            return
+
+        swap_idx = root
+        if _abs_range_greater(starts, ends, indices, child, swap_idx):
+            swap_idx = child
+        if child + 1 <= end and _abs_range_greater(starts, ends, indices, child + 1, swap_idx):
+            swap_idx = child + 1
+
+        if swap_idx == root:
+            return
+
+        starts[root], starts[swap_idx] = starts[swap_idx], starts[root]
+        ends[root], ends[swap_idx] = ends[swap_idx], ends[root]
+        indices[root], indices[swap_idx] = indices[swap_idx], indices[root]
+        root = swap_idx
+
+
+def _sort_abs_ranges_with_indices(
+    starts: list[int],
+    ends: list[int],
+    indices: list[int],
+) -> None:
+    count = len(starts)
+    if count < 2:
+        return
+
+    start = ((count - 2) // 2) + 1
+    while start > 0:
+        start -= 1
+        _abs_range_sift_down(starts, ends, indices, start, count - 1)
+
+    end = count - 1
+    while end > 0:
+        starts[0], starts[end] = starts[end], starts[0]
+        ends[0], ends[end] = ends[end], ends[0]
+        indices[0], indices[end] = indices[end], indices[0]
+        end -= 1
+        _abs_range_sift_down(starts, ends, indices, 0, end)
+
+
+def tensor_info_build_offset_index(
+    tensor_data_base: int,
+    alignment: int,
+    gguf_file_nbytes: int,
+    tensor_rel_offsets: list[int],
+    tensor_element_counts: list[int],
+    tensor_ggml_types: list[int],
+    out_abs_starts: list[int],
+    out_abs_ends: list[int],
+    out_sorted_tensor_indices: list[int],
+):
+    count = len(tensor_rel_offsets)
+
+    if len(tensor_element_counts) != count:
+        return GGUF_TDBASE_ERR_NULL_PTR, 0
+    if len(tensor_ggml_types) != count:
+        return GGUF_TDBASE_ERR_NULL_PTR, 0
+    if len(out_abs_starts) != count:
+        return GGUF_TDBASE_ERR_NULL_PTR, 0
+    if len(out_abs_ends) != count:
+        return GGUF_TDBASE_ERR_NULL_PTR, 0
+    if len(out_sorted_tensor_indices) != count:
+        return GGUF_TDBASE_ERR_NULL_PTR, 0
+
+    for i in range(count):
+        err, nbytes = tensor_bytes_for_type(tensor_ggml_types[i], tensor_element_counts[i])
+        if err != GGUF_TDBASE_OK:
+            return err, i
+
+        err, abs_start, abs_end = tensor_resolve_range(
+            tensor_data_base=tensor_data_base,
+            tensor_rel_offset=tensor_rel_offsets[i],
+            tensor_nbytes=nbytes,
+            gguf_file_nbytes=gguf_file_nbytes,
+            alignment=alignment,
+        )
+        if err != GGUF_TDBASE_OK:
+            return err, i
+
+        out_abs_starts[i] = abs_start
+        out_abs_ends[i] = abs_end
+        out_sorted_tensor_indices[i] = i
+
+    if count < 2:
+        return GGUF_TDBASE_OK, 0
+
+    _sort_abs_ranges_with_indices(out_abs_starts, out_abs_ends, out_sorted_tensor_indices)
+
+    max_end = out_abs_ends[0]
+    for i in range(1, count):
+        if out_abs_ends[i] < out_abs_starts[i]:
+            return GGUF_TDBASE_ERR_OVERFLOW, out_sorted_tensor_indices[i]
+        if out_abs_starts[i] < max_end:
+            return GGUF_TDBASE_ERR_OVERLAP, out_sorted_tensor_indices[i]
+        if out_abs_ends[i] > max_end:
+            max_end = out_abs_ends[i]
+
+    return GGUF_TDBASE_OK, 0
+
+
 
 
 def test_tensor_bytes_for_type_scalars() -> None:
@@ -1178,6 +1306,127 @@ def test_tensor_range_find_by_rel_offset_default_alignment_propagates_error() ->
     assert idx == 0
 
 
+def test_tensor_info_build_offset_index_happy_path() -> None:
+    rel_offsets = [0xC0, 0x00, 0x40]
+    elem_counts = [32, 64, 32]
+    ggml_types = [GGML_TYPE_Q8_0, GGML_TYPE_Q4_0, GGML_TYPE_F16]
+    starts = [0, 0, 0]
+    ends = [0, 0, 0]
+    sorted_idx = [0, 0, 0]
+
+    err, bad = tensor_info_build_offset_index(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x2000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_element_counts=elem_counts,
+        tensor_ggml_types=ggml_types,
+        out_abs_starts=starts,
+        out_abs_ends=ends,
+        out_sorted_tensor_indices=sorted_idx,
+    )
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+    assert starts == [0x1000, 0x1040, 0x10C0]
+    assert ends == [0x1024, 0x1080, 0x10E2]
+    assert sorted_idx == [1, 2, 0]
+
+
+def test_tensor_info_build_offset_index_propagates_bad_block_multiple() -> None:
+    starts = [0, 0]
+    ends = [0, 0]
+    sorted_idx = [0, 0]
+
+    err, bad = tensor_info_build_offset_index(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x3000,
+        tensor_rel_offsets=[0x00, 0x40],
+        tensor_element_counts=[31, 32],
+        tensor_ggml_types=[GGML_TYPE_Q4_0, GGML_TYPE_Q8_0],
+        out_abs_starts=starts,
+        out_abs_ends=ends,
+        out_sorted_tensor_indices=sorted_idx,
+    )
+    assert err == GGUF_TDBASE_ERR_BAD_BLOCK_MULTIPLE
+    assert bad == 0
+
+
+def test_tensor_info_build_offset_index_detects_overlap() -> None:
+    starts = [0, 0]
+    ends = [0, 0]
+    sorted_idx = [0, 0]
+
+    err, bad = tensor_info_build_offset_index(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x3000,
+        tensor_rel_offsets=[0x00, 0x20],
+        tensor_element_counts=[32, 32],
+        tensor_ggml_types=[GGML_TYPE_Q8_0, GGML_TYPE_Q8_0],
+        out_abs_starts=starts,
+        out_abs_ends=ends,
+        out_sorted_tensor_indices=sorted_idx,
+    )
+    assert err == GGUF_TDBASE_ERR_OVERLAP
+    assert bad == 1
+
+
+def test_tensor_info_build_offset_index_random_non_overlapping() -> None:
+    rng = random.Random(764021)
+
+    for _ in range(200):
+        count = rng.randint(1, 12)
+        rel_offsets: list[int] = []
+        elem_counts: list[int] = []
+        ggml_types: list[int] = []
+
+        cursor = 0
+        for _ in range(count):
+            gap_units = rng.randint(0, 4)
+            cursor += gap_units * 32
+
+            ggml_type = rng.choice([GGML_TYPE_Q4_0, GGML_TYPE_Q8_0, GGML_TYPE_F16, GGML_TYPE_F32])
+            if ggml_type in (GGML_TYPE_Q4_0, GGML_TYPE_Q8_0):
+                blocks = rng.randint(1, 4)
+                elem_count = blocks * 32
+            else:
+                elem_count = rng.randint(1, 128)
+
+            err, nbytes = tensor_bytes_for_type(ggml_type, elem_count)
+            assert err == GGUF_TDBASE_OK
+
+            rel_offsets.append(cursor)
+            elem_counts.append(elem_count)
+            ggml_types.append(ggml_type)
+
+            span_units = (nbytes + 31) // 32
+            cursor += span_units * 32
+
+        starts = [0] * count
+        ends = [0] * count
+        sorted_idx = [0] * count
+        file_nbytes = 0x1000 + cursor + 0x100
+
+        err, bad = tensor_info_build_offset_index(
+            tensor_data_base=0x1000,
+            alignment=32,
+            gguf_file_nbytes=file_nbytes,
+            tensor_rel_offsets=rel_offsets,
+            tensor_element_counts=elem_counts,
+            tensor_ggml_types=ggml_types,
+            out_abs_starts=starts,
+            out_abs_ends=ends,
+            out_sorted_tensor_indices=sorted_idx,
+        )
+        assert err == GGUF_TDBASE_OK
+        assert bad == 0
+        assert starts == sorted(starts)
+        for i in range(1, count):
+            assert starts[i] >= ends[i - 1]
+        assert sorted(sorted_idx) == list(range(count))
+
+
 
 
 def run() -> None:
@@ -1238,6 +1487,10 @@ def run() -> None:
     test_tensor_range_find_by_rel_offset_gap_and_out_of_bounds()
     test_tensor_range_find_by_rel_offset_default_alignment_happy_path()
     test_tensor_range_find_by_rel_offset_default_alignment_propagates_error()
+    test_tensor_info_build_offset_index_happy_path()
+    test_tensor_info_build_offset_index_propagates_bad_block_multiple()
+    test_tensor_info_build_offset_index_detects_overlap()
+    test_tensor_info_build_offset_index_random_non_overlapping()
     print("gguf_tensor_data_base_reference_checks=ok")
 
 

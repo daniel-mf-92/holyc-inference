@@ -458,6 +458,111 @@ U0 GGUFTensorSortRangesByOffset(U64 tensor_count,
     }
 }
 
+Bool GGUFTensorAbsRangeGreater(U64 a_start,
+                               U64 a_end,
+                               U64 a_index,
+                               U64 b_start,
+                               U64 b_end,
+                               U64 b_index)
+{
+    if (a_start > b_start)
+        return TRUE;
+    if (a_start < b_start)
+        return FALSE;
+
+    if (a_end > b_end)
+        return TRUE;
+    if (a_end < b_end)
+        return FALSE;
+
+    // Final tie-break on original tensor index keeps ordering deterministic
+    // for exact-equal ranges from degenerate zero-byte tensors.
+    return a_index > b_index;
+}
+
+U0 GGUFTensorAbsRangeSiftDown(U64 *tensor_abs_starts,
+                              U64 *tensor_abs_ends,
+                              U64 *tensor_indices,
+                              U64 root,
+                              U64 end)
+{
+    U64 child;
+    U64 swap_idx;
+
+    while (TRUE)
+    {
+        child = root * 2 + 1;
+        if (child > end)
+            return;
+
+        swap_idx = root;
+
+        if (GGUFTensorAbsRangeGreater(tensor_abs_starts[child],
+                                      tensor_abs_ends[child],
+                                      tensor_indices[child],
+                                      tensor_abs_starts[swap_idx],
+                                      tensor_abs_ends[swap_idx],
+                                      tensor_indices[swap_idx]))
+            swap_idx = child;
+
+        if (child + 1 <= end &&
+            GGUFTensorAbsRangeGreater(tensor_abs_starts[child + 1],
+                                      tensor_abs_ends[child + 1],
+                                      tensor_indices[child + 1],
+                                      tensor_abs_starts[swap_idx],
+                                      tensor_abs_ends[swap_idx],
+                                      tensor_indices[swap_idx]))
+            swap_idx = child + 1;
+
+        if (swap_idx == root)
+            return;
+
+        GGUFSwapU64(&tensor_abs_starts[root], &tensor_abs_starts[swap_idx]);
+        GGUFSwapU64(&tensor_abs_ends[root], &tensor_abs_ends[swap_idx]);
+        GGUFSwapU64(&tensor_indices[root], &tensor_indices[swap_idx]);
+        root = swap_idx;
+    }
+}
+
+U0 GGUFTensorSortAbsRangesWithIndices(U64 tensor_count,
+                                      U64 *tensor_abs_starts,
+                                      U64 *tensor_abs_ends,
+                                      U64 *tensor_indices)
+{
+    U64 start;
+    U64 end;
+
+    if (tensor_count < 2)
+        return;
+
+    // In-place heapsort over (abs_start, abs_end, original_index) tuples.
+    start = (tensor_count - 2) / 2 + 1;
+    while (start > 0)
+    {
+        --start;
+        GGUFTensorAbsRangeSiftDown(tensor_abs_starts,
+                                   tensor_abs_ends,
+                                   tensor_indices,
+                                   start,
+                                   tensor_count - 1);
+    }
+
+    end = tensor_count - 1;
+    while (end > 0)
+    {
+        GGUFSwapU64(&tensor_abs_starts[0], &tensor_abs_starts[end]);
+        GGUFSwapU64(&tensor_abs_ends[0], &tensor_abs_ends[end]);
+        GGUFSwapU64(&tensor_indices[0], &tensor_indices[end]);
+
+        --end;
+        GGUFTensorAbsRangeSiftDown(tensor_abs_starts,
+                                   tensor_abs_ends,
+                                   tensor_indices,
+                                   0,
+                                   end);
+    }
+}
+
 I64 GGUFValidateTensorRangesSorted(U64 tensor_data_base,
                                    U32 alignment,
                                    U64 gguf_file_nbytes,
@@ -644,6 +749,95 @@ I64 GGUFTensorInfoResolveAbsRanges(U64 tensor_data_base,
 
         out_abs_starts[i] = abs_start;
         out_abs_ends[i] = abs_start + out_tensor_nbytes[i];
+    }
+
+    return GGUF_TDBASE_OK;
+}
+
+I64 GGUFTensorInfoBuildOffsetIndex(U64 tensor_data_base,
+                                   U32 alignment,
+                                   U64 gguf_file_nbytes,
+                                   U64 tensor_count,
+                                   U64 *tensor_rel_offsets,
+                                   U64 *tensor_element_counts,
+                                   U32 *tensor_ggml_types,
+                                   U64 *out_abs_starts,
+                                   U64 *out_abs_ends,
+                                   U64 *out_sorted_tensor_indices,
+                                   U64 *out_bad_index)
+{
+    U64 i;
+    U64 tensor_nbytes;
+    U64 max_end;
+    I64 err;
+
+    if (!tensor_rel_offsets || !tensor_element_counts || !tensor_ggml_types ||
+        !out_abs_starts || !out_abs_ends || !out_sorted_tensor_indices)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    if (out_bad_index)
+        *out_bad_index = 0;
+
+    // Build per-tensor absolute ranges and preserve each tensor's original
+    // index position before sorting.
+    for (i = 0; i < tensor_count; ++i)
+    {
+        err = GGUFTensorBytesForType(tensor_ggml_types[i],
+                                     tensor_element_counts[i],
+                                     &tensor_nbytes);
+        if (err != GGUF_TDBASE_OK)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return err;
+        }
+
+        err = GGUFTensorResolveRange(tensor_data_base,
+                                     tensor_rel_offsets[i],
+                                     tensor_nbytes,
+                                     gguf_file_nbytes,
+                                     alignment,
+                                     &out_abs_starts[i],
+                                     &out_abs_ends[i]);
+        if (err != GGUF_TDBASE_OK)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return err;
+        }
+
+        out_sorted_tensor_indices[i] = i;
+    }
+
+    if (tensor_count < 2)
+        return GGUF_TDBASE_OK;
+
+    // Sort absolute ranges and carry their original tensor indices.
+    GGUFTensorSortAbsRangesWithIndices(tensor_count,
+                                       out_abs_starts,
+                                       out_abs_ends,
+                                       out_sorted_tensor_indices);
+
+    // Validate non-overlap after sorting.
+    max_end = out_abs_ends[0];
+    for (i = 1; i < tensor_count; ++i)
+    {
+        if (out_abs_ends[i] < out_abs_starts[i])
+        {
+            if (out_bad_index)
+                *out_bad_index = out_sorted_tensor_indices[i];
+            return GGUF_TDBASE_ERR_OVERFLOW;
+        }
+
+        if (out_abs_starts[i] < max_end)
+        {
+            if (out_bad_index)
+                *out_bad_index = out_sorted_tensor_indices[i];
+            return GGUF_TDBASE_ERR_OVERLAP;
+        }
+
+        if (out_abs_ends[i] > max_end)
+            max_end = out_abs_ends[i];
     }
 
     return GGUF_TDBASE_OK;
