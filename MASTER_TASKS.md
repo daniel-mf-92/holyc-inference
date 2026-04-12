@@ -127,7 +127,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-006 Implement integer exp approximation in `src/math/intexp.HC` (WS1-02)
 - [x] IQ-007 Implement integer sqrt approximation in `src/math/intsqrt.HC` (WS1-02)
 - [x] IQ-008 Implement integer softmax in `src/math/softmax.HC` (WS1-03)
-- [ ] IQ-009 Implement RMSNorm (integer path) in `src/math/rmsnorm.HC` (WS1-04)
+- [x] IQ-009 Implement RMSNorm (integer path) in `src/math/rmsnorm.HC` (WS1-04)
 - [ ] IQ-010 Implement GGUF magic/version/header parser in `src/gguf/header.HC` (WS2-01)
 - [ ] IQ-011 Implement GGUF metadata KV reader in `src/gguf/metadata.HC` (WS2-02)
 - [ ] IQ-012 Implement GGUF tensor info reader in `src/gguf/tensorinfo.HC` (WS2-03)
@@ -142,6 +142,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] IQ-021 Add host-side Q16 exp parity harness in `tests/test_intexp_q16.py` against `math.exp` samples (WS1-05)
 - [ ] IQ-022 Implement GGUF header constants and struct layout notes in `src/gguf/header.HC` before parser logic (WS2-01)
 - [ ] IQ-023 Create `src/math/rmsnorm.HC` skeleton with Q16 constants, tensor shape assumptions, and TODO stubs for scale/variance accumulation (WS1-04)
+- [ ] IQ-024 Create `src/gguf/header.HC` skeleton with `GGUFHeader` struct and endian-safe integer read helper stubs (WS2-01)
 
 ## Progress Ledger
 
@@ -156,6 +157,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 | 2026-04-12 | loop-006 | IQ-006 integer exp approximation | done | Added `src/math/intexp.HC` with Q16 range reduction + 4th-order polynomial; validated host-side over x∈[-8,8] (`max_rel_err=4.48%`) |
 | 2026-04-12 | loop-007 | IQ-007 integer sqrt approximation | done | Added `src/math/intsqrt.HC` with bitwise `IntSqrtU64` + `FPQ16Sqrt`; validated via host parity checks (`intsqrt_exact_checks=ok`, `max_rel_err=0.007690%`) |
 | 2026-04-12 | loop-008 | IQ-008 integer softmax | done | Added `src/math/softmax.HC` with stable max-shifted Q16 softmax and sum-to-one correction; validated host-side parity (`softmax_q16_checks=ok`, `max_abs_err=0.003334`) |
+| 2026-04-12 | loop-009 | IQ-009 integer RMSNorm | done | Added `src/math/rmsnorm.HC` with Q16 RMSNorm (`mean(x^2)+eps`, rsqrt via `FPQ16Sqrt`, per-channel scale); validated host-side parity (`rmsnorm_q16_checks=ok`, `max_abs_err=0.000075`) |
 
 ## Blockers & Decisions
 
