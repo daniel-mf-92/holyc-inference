@@ -57,3 +57,9 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_9","type":"todo_list","items":[{"text":"Inspect GGUF parser context","completed":true},{"text":"Implement HolyC metadata reader","completed":true},{"text":"Add focused host parity test","completed":true},{"text":"Update queue and ledger","completed":true},{"text":"Run focused validation","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":895721,"cached_input_tokens":815360,"output_tokens":13124}}
 Codex final exit code: 0
+[main c2b11ab] feat(inference): codex iteration 20260412-151024
+ 6 files changed, 890 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260412-151024.final.txt
+ create mode 100644 src/gguf/metadata.HC
+ create mode 100644 tests/test_gguf_metadata_parse.py
+=== End iteration 11 (outcome=ok) ===
