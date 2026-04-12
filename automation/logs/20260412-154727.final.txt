@@ -1,0 +1,16 @@
+Completed one full loop iteration on `IQ-029` with queue maintenance and validation.
+
+**What I Changed**
+- Implemented naive integer-only `Q8_0` dot kernels in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/quant/q8_0_dot.HC:95` (`Q8_0DotProductBlockQ32`, multi-block accumulate, `Q8_0DotQ32ToQ16`).
+- Added host parity harness in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_q8_0_dot.py:147` with deterministic random coverage and float-reference error bounds.
+- Marked `IQ-029` done and appended new rolling queue items `IQ-031` and `IQ-032` in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:201`.
+- Added one ledger line (`loop-016`) in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:226`.
+
+**Validation**
+- Ran: `python3 tests/test_q8_0_dot.py && python3 tests/test_q8_0_dequant.py`
+- Output: `q8_0_dot_reference_checks=ok` and `q8_0_dequant_reference_checks=ok`
+
+**Contract Checks**
+- Queue depth maintained at 15+ unchecked (`unchecked_iq=16`).
+- Central DB logged: inserted `IQ-029` pass row into `~/Documents/local-codebases/temple-central.db`.
+- Air-gap and HolyC-only runtime constraints preserved (no networking or non-HolyC runtime code introduced).

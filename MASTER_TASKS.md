@@ -154,6 +154,22 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] WS12-04 Model size calculator: predict RAM/disk requirements before loading
 - [ ] WS12-05 Reference output generator: run llama.cpp on known prompts, save expected outputs
 
+### WS14 — safetensors Format Support (Hugging Face Native)
+- [ ] WS14-01 Document safetensors binary format (header JSON + raw tensor data, no pickle)
+- [ ] WS14-02 Implement safetensors header parser in HolyC (JSON key-value, tensor offsets)
+- [ ] WS14-03 Implement safetensors tensor loader (mmap-friendly, direct read to memory)
+- [ ] WS14-04 Model format auto-detection: GGUF vs safetensors from magic bytes
+- [ ] WS14-05 Conversion tool (host-side): safetensors → quantized GGUF for TempleOS
+
+### WS15 — Local LLM Ecosystem Compatibility
+- Compatibility with other local LLM systems — same models, interoperable formats.
+- [ ] WS15-01 Ollama blob extraction: parse Ollama manifests, extract GGUF from blobs
+- [ ] WS15-02 llama.cpp CLI parity: match command-line args for model/prompt/params
+- [ ] WS15-03 LM Studio model directory layout compatibility (scan and list available models)
+- [ ] WS15-04 OpenAI-compatible local API (CLI-based, serial-port accessible, no HTTP)
+- [ ] WS15-05 Model card parser: extract metadata from Hugging Face model cards for display
+- [ ] WS15-06 Benchmark suite: compare tok/s against llama.cpp, Ollama, LM Studio for same model
+
 ### WS13 — Advanced Inference Features
 - [ ] WS13-01 Multi-turn conversation context management
 - [ ] WS13-02 System prompt / instruction template support (ChatML, Alpaca, Llama-style)
@@ -198,8 +214,10 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] IQ-026 Implement metadata key lookup helpers (`GGUFMetaFindByKey`, scalar extractors) in `src/gguf/metadata.HC` (WS2-02)
 - [ ] IQ-027 Add host-side metadata parser parity fixture for scalar/string/array/nested-array cases in `tests/test_gguf_metadata_parse.py` (WS2-02, WS2-05)
 - [ ] IQ-028 Implement GGUF tensor data base alignment helper in `src/gguf/tensor_data_base.HC` (WS2-04)
-- [ ] IQ-029 Implement Q8_0 dot product (naive, integer-only accumulator) in `src/quant/q8_0_dot.HC` (WS3-05)
+- [x] IQ-029 Implement Q8_0 dot product (naive, integer-only accumulator) in `src/quant/q8_0_dot.HC` (WS3-05)
 - [ ] IQ-030 Implement mixed Q4_0 x Q8_0 dot product kernel in `src/quant/q4_0_q8_0_dot.HC` (WS3-05)
+- [ ] IQ-031 Implement Q8_0 blockwise dot-to-Q16 accumulation helper in `src/quant/q8_0_dot.HC` for matmul callers (WS4-01)
+- [ ] IQ-032 Add mixed Q4_0 x Q8_0 dot parity harness in `tests/test_q4_0_q8_0_dot.py` with GGML-math bounds (WS3-05)
 
 ## Progress Ledger
 
@@ -221,6 +239,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 | 2026-04-12 | loop-013 | IQ-013 Q4_0 block struct + dequant | done | Added `src/quant/q4_0.HC` with Q4_0 block layout, fp16->Q16 integer scale conversion, nibble unpack (`q-8`), single/multi-block dequant helpers; validated with `python3 tests/test_q4_0_dequant.py` + regression parsers (`q4_0_dequant_reference_checks=ok`) |
 | 2026-04-12 | loop-014 | IQ-014 Q4_0 dot product (naive) | done | Added `src/quant/q4_0_dot.HC` with per-block and multi-block integer dot kernels (`Q4_0DotProductBlockQ32`, `Q4_0DotProductBlocksQ32`, `Q4_0DotQ32ToQ16`); validated with `python3 tests/test_q4_0_dot.py` + `python3 tests/test_q4_0_dequant.py` (`q4_0_dot_reference_checks=ok`, `q4_0_dequant_reference_checks=ok`) |
 | 2026-04-12 | loop-015 | IQ-015 Q8_0 block struct + dequant | done | Added `src/quant/q8_0.HC` with Q8_0 block layout, fp16->Q16 integer scale conversion, signed-byte unpack, single/multi-block dequant helpers; added `tests/test_q8_0_dequant.py`; validated with `python3 tests/test_q8_0_dequant.py && python3 tests/test_q4_0_dequant.py && python3 tests/test_q4_0_dot.py` (`q8_0_dequant_reference_checks=ok`, `q4_0_dequant_reference_checks=ok`, `q4_0_dot_reference_checks=ok`) |
+| 2026-04-12 | loop-016 | IQ-029 Q8_0 dot product (naive) | done | Added `src/quant/q8_0_dot.HC` integer block/multi-block dot kernels + `tests/test_q8_0_dot.py`; validated with `python3 tests/test_q8_0_dot.py && python3 tests/test_q8_0_dequant.py` (`q8_0_dot_reference_checks=ok`, `q8_0_dequant_reference_checks=ok`) |
 
 ## Blockers & Decisions
 
