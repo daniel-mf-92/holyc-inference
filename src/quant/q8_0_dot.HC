@@ -143,8 +143,37 @@ I32 Q8_0DotProductBlocksQ32(Q8_0Block *lhs, Q8_0Block *rhs, I64 block_count, I64
     return Q8_0_OK;
 }
 
+I32 Q8_0DotProductBlocksQ16Accumulate(Q8_0Block *lhs, Q8_0Block *rhs, I64 block_count, I64 *io_accum_q16)
+{
+    I64 block_index;
+    I64 block_dot_q32;
+    I64 total_q16;
+    I32 status;
+
+    if (!lhs || !rhs || !io_accum_q16)
+        return Q8_0_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    total_q16 = *io_accum_q16;
+
+    // Matmul callers usually hold accumulators in Q16 lanes.
+    // Keep per-block rounding explicit: Q32 block dot -> rounded Q16 -> add.
+    // This avoids hidden scale changes and makes every block contribution auditable.
+    for (block_index = 0; block_index < block_count; ++block_index)
+    {
+        status = Q8_0DotProductBlockQ32(&lhs[block_index], &rhs[block_index], &block_dot_q32);
+        if (status != Q8_0_OK)
+            return status;
+
+        total_q16 += Q8_0DotQ32ToQ16(block_dot_q32);
+    }
+
+    *io_accum_q16 = total_q16;
+    return Q8_0_OK;
+}
+
 I64 Q8_0DotQ32ToQ16(I64 dot_q32)
 {
     return Q8_0RoundShiftRightSigned(dot_q32, 16);
 }
-
