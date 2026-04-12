@@ -359,3 +359,185 @@ I64 GGUFValidateTensorRanges(U64 tensor_data_base,
 
     return GGUF_TDBASE_OK;
 }
+
+U0 GGUFSwapU64(U64 *a, U64 *b)
+{
+    U64 tmp;
+
+    tmp = *a;
+    *a = *b;
+    *b = tmp;
+}
+
+Bool GGUFTensorRangeGreater(U64 a_off,
+                            U64 a_nbytes,
+                            U64 b_off,
+                            U64 b_nbytes)
+{
+    if (a_off > b_off)
+        return TRUE;
+    if (a_off < b_off)
+        return FALSE;
+
+    // Tie-break by nbytes so equal offsets are ordered shortest-first.
+    // This preserves GGUFValidateTensorRanges behavior for zero-byte ranges.
+    return a_nbytes > b_nbytes;
+}
+
+U0 GGUFTensorRangeSiftDown(U64 *tensor_rel_offsets,
+                           U64 *tensor_nbytes,
+                           U64 root,
+                           U64 end)
+{
+    U64 child;
+    U64 swap_idx;
+
+    while (TRUE)
+    {
+        child = root * 2 + 1;
+        if (child > end)
+            return;
+
+        swap_idx = root;
+
+        if (GGUFTensorRangeGreater(tensor_rel_offsets[child],
+                                   tensor_nbytes[child],
+                                   tensor_rel_offsets[swap_idx],
+                                   tensor_nbytes[swap_idx]))
+            swap_idx = child;
+
+        if (child + 1 <= end &&
+            GGUFTensorRangeGreater(tensor_rel_offsets[child + 1],
+                                   tensor_nbytes[child + 1],
+                                   tensor_rel_offsets[swap_idx],
+                                   tensor_nbytes[swap_idx]))
+            swap_idx = child + 1;
+
+        if (swap_idx == root)
+            return;
+
+        GGUFSwapU64(&tensor_rel_offsets[root], &tensor_rel_offsets[swap_idx]);
+        GGUFSwapU64(&tensor_nbytes[root], &tensor_nbytes[swap_idx]);
+        root = swap_idx;
+    }
+}
+
+U0 GGUFTensorSortRangesByOffset(U64 tensor_count,
+                                U64 *tensor_rel_offsets,
+                                U64 *tensor_nbytes)
+{
+    U64 start;
+    U64 end;
+
+    if (tensor_count < 2)
+        return;
+
+    // In-place heapsort by relative offset so overlap detection can scan once.
+    // We swap offset and nbytes together to preserve each tensor range pair.
+    start = (tensor_count - 2) / 2 + 1;
+    while (start > 0)
+    {
+        --start;
+        GGUFTensorRangeSiftDown(tensor_rel_offsets,
+                                tensor_nbytes,
+                                start,
+                                tensor_count - 1);
+    }
+
+    end = tensor_count - 1;
+    while (end > 0)
+    {
+        GGUFSwapU64(&tensor_rel_offsets[0], &tensor_rel_offsets[end]);
+        GGUFSwapU64(&tensor_nbytes[0], &tensor_nbytes[end]);
+
+        --end;
+        GGUFTensorRangeSiftDown(tensor_rel_offsets,
+                                tensor_nbytes,
+                                0,
+                                end);
+    }
+}
+
+I64 GGUFValidateTensorRangesSorted(U64 tensor_data_base,
+                                   U32 alignment,
+                                   U64 gguf_file_nbytes,
+                                   U64 tensor_count,
+                                   U64 *tensor_rel_offsets,
+                                   U64 *tensor_nbytes,
+                                   U64 *out_bad_index)
+{
+    U64 i;
+    U64 start_i;
+    U64 end_i;
+    U64 max_end;
+    I64 err;
+
+    if (!tensor_rel_offsets || !tensor_nbytes)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    if (out_bad_index)
+        *out_bad_index = 0;
+
+    // Pass 1: preserve strict per-range validation behavior from
+    // GGUFValidateTensorRanges before any in-place reordering.
+    for (i = 0; i < tensor_count; ++i)
+    {
+        err = GGUFTensorResolveRange(tensor_data_base,
+                                     tensor_rel_offsets[i],
+                                     tensor_nbytes[i],
+                                     gguf_file_nbytes,
+                                     alignment,
+                                     &start_i,
+                                     &end_i);
+        if (err != GGUF_TDBASE_OK)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return err;
+        }
+    }
+
+    if (tensor_count < 2)
+        return GGUF_TDBASE_OK;
+
+    // Sort in-place by tensor relative offsets.
+    GGUFTensorSortRangesByOffset(tensor_count,
+                                 tensor_rel_offsets,
+                                 tensor_nbytes);
+
+    // Single linear overlap scan over half-open ranges [start, end).
+    err = GGUFTensorResolveRange(tensor_data_base,
+                                 tensor_rel_offsets[0],
+                                 tensor_nbytes[0],
+                                 gguf_file_nbytes,
+                                 alignment,
+                                 &start_i,
+                                 &max_end);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    for (i = 1; i < tensor_count; ++i)
+    {
+        err = GGUFTensorResolveRange(tensor_data_base,
+                                     tensor_rel_offsets[i],
+                                     tensor_nbytes[i],
+                                     gguf_file_nbytes,
+                                     alignment,
+                                     &start_i,
+                                     &end_i);
+        if (err != GGUF_TDBASE_OK)
+            return err;
+
+        if (start_i < max_end)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return GGUF_TDBASE_ERR_OVERLAP;
+        }
+
+        if (end_i > max_end)
+            max_end = end_i;
+    }
+
+    return GGUF_TDBASE_OK;
+}

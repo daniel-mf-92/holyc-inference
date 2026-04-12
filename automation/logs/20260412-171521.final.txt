@@ -1,0 +1,15 @@
+Completed one full unattended iteration on `IQ-041` end-to-end.
+
+**What Changed**
+- Implemented `GGUFValidateTensorRangesSorted` with in-place heapsort and single-pass overlap scan in `src/gguf/tensor_data_base.HC:461`.
+- Added deterministic sort tie-break logic `(offset, nbytes)` to preserve overlap semantics in `src/gguf/tensor_data_base.HC:372`.
+- Added/expanded parity harness for sorted validation paths in `tests/test_gguf_tensor_data_base.py:254` and `tests/test_gguf_tensor_data_base.py:674`.
+- Marked `IQ-041` done, appended new unchecked `IQ-042`, and added one ledger line `loop-027` in `MASTER_TASKS.md:229`, `MASTER_TASKS.md:230`, `MASTER_TASKS.md:263`.
+
+**Validation**
+- `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py`
+- Output: `gguf_tensor_data_base_reference_checks=ok`, `gguf_tensorinfo_reference_checks=ok`, `gguf_metadata_reference_checks=ok`.
+
+**Queue + Central DB**
+- Queue depth policy maintained: 15 unchecked IQ items remain after closing `IQ-041` and adding `IQ-042`.
+- Logged to central DB `~/Documents/local-codebases/temple-central.db` as `iterations.id=38` with `task_id=IQ-041`, `status=pass`.

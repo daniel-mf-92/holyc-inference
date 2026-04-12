@@ -206,6 +206,107 @@ def validate_tensor_ranges(
     return GGUF_TDBASE_OK, 0
 
 
+def _sift_down(rel_offsets: list[int], nbytes: list[int], root: int, end: int) -> None:
+    def greater(i: int, j: int) -> bool:
+        if rel_offsets[i] > rel_offsets[j]:
+            return True
+        if rel_offsets[i] < rel_offsets[j]:
+            return False
+        return nbytes[i] > nbytes[j]
+
+    while True:
+        child = root * 2 + 1
+        if child > end:
+            return
+
+        swap_idx = root
+        if greater(child, swap_idx):
+            swap_idx = child
+        if child + 1 <= end and greater(child + 1, swap_idx):
+            swap_idx = child + 1
+
+        if swap_idx == root:
+            return
+
+        rel_offsets[root], rel_offsets[swap_idx] = rel_offsets[swap_idx], rel_offsets[root]
+        nbytes[root], nbytes[swap_idx] = nbytes[swap_idx], nbytes[root]
+        root = swap_idx
+
+
+def _heapsort_ranges_in_place(rel_offsets: list[int], nbytes: list[int]) -> None:
+    count = len(rel_offsets)
+    if count < 2:
+        return
+
+    start = ((count - 2) // 2) + 1
+    while start > 0:
+        start -= 1
+        _sift_down(rel_offsets, nbytes, start, count - 1)
+
+    end = count - 1
+    while end > 0:
+        rel_offsets[0], rel_offsets[end] = rel_offsets[end], rel_offsets[0]
+        nbytes[0], nbytes[end] = nbytes[end], nbytes[0]
+        end -= 1
+        _sift_down(rel_offsets, nbytes, 0, end)
+
+
+def validate_tensor_ranges_sorted(
+    tensor_data_base: int,
+    alignment: int,
+    gguf_file_nbytes: int,
+    tensor_rel_offsets: list[int],
+    tensor_nbytes: list[int],
+):
+    if len(tensor_rel_offsets) != len(tensor_nbytes):
+        return GGUF_TDBASE_ERR_NULL_PTR, 0
+
+    count = len(tensor_rel_offsets)
+
+    for i in range(count):
+        err, _, _ = tensor_resolve_range(
+            tensor_data_base,
+            tensor_rel_offsets[i],
+            tensor_nbytes[i],
+            gguf_file_nbytes,
+            alignment,
+        )
+        if err != GGUF_TDBASE_OK:
+            return err, i
+
+    if count < 2:
+        return GGUF_TDBASE_OK, 0
+
+    _heapsort_ranges_in_place(tensor_rel_offsets, tensor_nbytes)
+
+    err, _, max_end = tensor_resolve_range(
+        tensor_data_base,
+        tensor_rel_offsets[0],
+        tensor_nbytes[0],
+        gguf_file_nbytes,
+        alignment,
+    )
+    assert err == GGUF_TDBASE_OK
+
+    for i in range(1, count):
+        err, start_i, end_i = tensor_resolve_range(
+            tensor_data_base,
+            tensor_rel_offsets[i],
+            tensor_nbytes[i],
+            gguf_file_nbytes,
+            alignment,
+        )
+        assert err == GGUF_TDBASE_OK
+
+        if start_i < max_end:
+            return GGUF_TDBASE_ERR_OVERLAP, i
+
+        if end_i > max_end:
+            max_end = end_i
+
+    return GGUF_TDBASE_OK, 0
+
+
 
 
 def test_tensor_bytes_for_type_scalars() -> None:
@@ -553,6 +654,139 @@ def test_validate_tensor_ranges_random_overlap_cases() -> None:
         assert bad == 1
 
 
+def test_validate_tensor_ranges_sorted_non_overlapping_happy_path() -> None:
+    rel_offsets = [0x200, 0x00, 0x100, 0x80]
+    nbytes = [0x20, 0x40, 0x40, 0x40]
+
+    err, bad = validate_tensor_ranges_sorted(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x5000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_nbytes=nbytes,
+    )
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+    assert rel_offsets == [0x00, 0x80, 0x100, 0x200]
+    assert nbytes == [0x40, 0x40, 0x40, 0x20]
+
+
+def test_validate_tensor_ranges_sorted_tie_breaks_equal_offsets_by_size() -> None:
+    rel_offsets = [0x80, 0x80, 0x80]
+    nbytes = [0x20, 0x00, 0x08]
+
+    err, bad = validate_tensor_ranges_sorted(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x5000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_nbytes=nbytes,
+    )
+    assert err == GGUF_TDBASE_ERR_OVERLAP
+    assert bad == 2
+    assert rel_offsets == [0x80, 0x80, 0x80]
+    assert nbytes == [0x00, 0x08, 0x20]
+
+
+def test_validate_tensor_ranges_sorted_detect_overlap() -> None:
+    rel_offsets = [0x100, 0x00, 0x20]
+    nbytes = [0x20, 0x40, 0x40]
+
+    err, bad = validate_tensor_ranges_sorted(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x5000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_nbytes=nbytes,
+    )
+    assert err == GGUF_TDBASE_ERR_OVERLAP
+    assert bad == 1
+    assert rel_offsets == [0x00, 0x20, 0x100]
+    assert nbytes == [0x40, 0x40, 0x20]
+
+
+def test_validate_tensor_ranges_sorted_propagates_bad_alignment_without_sort() -> None:
+    rel_offsets = [0x80, 0x00]
+    nbytes = [0x20, 0x20]
+
+    err, bad = validate_tensor_ranges_sorted(
+        tensor_data_base=0x1000,
+        alignment=24,
+        gguf_file_nbytes=0x5000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_nbytes=nbytes,
+    )
+    assert err == GGUF_TDBASE_ERR_BAD_ALIGNMENT
+    assert bad == 0
+    assert rel_offsets == [0x80, 0x00]
+    assert nbytes == [0x20, 0x20]
+
+
+def test_validate_tensor_ranges_sorted_random_matches_quadratic_validator() -> None:
+    rng = random.Random(762199)
+
+    for _ in range(500):
+        alignment = 1 << rng.randint(0, 10)
+        count = rng.randint(1, 24)
+        base = rng.randint(0, 1024) * alignment
+
+        rel_offsets = []
+        nbytes = []
+        cursor = 0
+
+        force_overlap = rng.random() < 0.5 and count >= 2
+        overlap_i = rng.randint(0, count - 2) if force_overlap else -1
+
+        for i in range(count):
+            gap = rng.randint(0, 6) * alignment
+            cursor += gap
+            span = rng.randint(0, 6) * alignment
+
+            start = cursor
+            if force_overlap and i == overlap_i + 1:
+                prev_start = rel_offsets[-1]
+                prev_span = nbytes[-1]
+                if prev_span == 0:
+                    start = prev_start
+                else:
+                    start = prev_start + rng.randint(0, max(0, (prev_span // alignment) - 1)) * alignment
+
+            rel_offsets.append(start)
+            nbytes.append(span)
+            cursor = max(cursor, start + span)
+
+        file_nbytes = base + cursor + rng.randint(0, 8) * alignment + alignment
+
+        rel_a = rel_offsets.copy()
+        nbytes_a = nbytes.copy()
+        err_quad, bad_quad = validate_tensor_ranges(
+            tensor_data_base=base,
+            alignment=alignment,
+            gguf_file_nbytes=file_nbytes,
+            tensor_rel_offsets=rel_a,
+            tensor_nbytes=nbytes_a,
+        )
+
+        rel_b = rel_offsets.copy()
+        nbytes_b = nbytes.copy()
+        err_sorted, bad_sorted = validate_tensor_ranges_sorted(
+            tensor_data_base=base,
+            alignment=alignment,
+            gguf_file_nbytes=file_nbytes,
+            tensor_rel_offsets=rel_b,
+            tensor_nbytes=nbytes_b,
+        )
+
+        assert err_sorted == err_quad
+        if err_sorted == GGUF_TDBASE_ERR_OVERLAP:
+            assert bad_sorted >= 1
+        elif err_sorted == GGUF_TDBASE_OK:
+            assert bad_sorted == 0
+            assert rel_b == sorted(rel_offsets)
+
+
+
+
 def run() -> None:
     test_default_alignment_examples()
     test_tensor_bytes_for_type_scalars()
@@ -589,6 +823,11 @@ def run() -> None:
     test_validate_tensor_ranges_propagates_out_of_bounds_with_index()
     test_validate_tensor_ranges_random_non_overlapping()
     test_validate_tensor_ranges_random_overlap_cases()
+    test_validate_tensor_ranges_sorted_non_overlapping_happy_path()
+    test_validate_tensor_ranges_sorted_tie_breaks_equal_offsets_by_size()
+    test_validate_tensor_ranges_sorted_detect_overlap()
+    test_validate_tensor_ranges_sorted_propagates_bad_alignment_without_sort()
+    test_validate_tensor_ranges_sorted_random_matches_quadratic_validator()
     print("gguf_tensor_data_base_reference_checks=ok")
 
 
