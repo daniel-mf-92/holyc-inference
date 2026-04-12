@@ -737,3 +737,21 @@ I64 GGUFTensorRangeFindByRelOffset(U64 tensor_rel_offset,
                                           tensor_abs_ends,
                                           out_tensor_index);
 }
+
+I64 GGUFTensorRangeFindByRelOffsetDefault(U64 tensor_rel_offset,
+                                          U64 tensor_data_base,
+                                          U64 tensor_count,
+                                          U64 *tensor_abs_starts,
+                                          U64 *tensor_abs_ends,
+                                          U64 *out_tensor_index)
+{
+    // GGUF default tensor payload alignment is 32 bytes when
+    // `general.alignment` metadata key is absent.
+    return GGUFTensorRangeFindByRelOffset(tensor_rel_offset,
+                                          tensor_data_base,
+                                          GGUF_DEFAULT_ALIGNMENT,
+                                          tensor_count,
+                                          tensor_abs_starts,
+                                          tensor_abs_ends,
+                                          out_tensor_index);
+}

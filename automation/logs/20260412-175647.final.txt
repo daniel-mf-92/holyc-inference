@@ -1,0 +1,14 @@
+Completed one full iteration on `IQ-046` with HolyC runtime code + focused parity validation.
+
+**What Changed**
+- Added `GGUFTensorRangeFindByRelOffsetDefault` in `src/gguf/tensor_data_base.HC:741`, delegating to `GGUFTensorRangeFindByRelOffset` with `GGUF_DEFAULT_ALIGNMENT`.
+- Added host-side parity helper/tests in `tests/test_gguf_tensor_data_base.py:446` and coverage at `tests/test_gguf_tensor_data_base.py:1163` + `tests/test_gguf_tensor_data_base.py:1172`.
+- Marked queue item done at `MASTER_TASKS.md:234` and appended one ledger line at `MASTER_TASKS.md:242`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py`
+- Output: `gguf_tensor_data_base_reference_checks=ok`, `gguf_tensorinfo_reference_checks=ok`, `gguf_metadata_reference_checks=ok`.
+
+**Queue + DB**
+- Queue depth policy maintained: `16` unchecked `IQ-` items remain (>=15).
+- Logged central DB row in `~/Documents/local-codebases/temple-central.db` as `task_id=IQ-046`, `status=pass` (row id `49`).

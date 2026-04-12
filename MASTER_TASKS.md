@@ -231,7 +231,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-043 Implement `GGUFTensorInfoResolveAbsRanges` in `src/gguf/tensor_data_base.HC` to output per-tensor absolute `[start,end)` spans after byte-size derivation and range validation (WS2-04)
 - [x] IQ-044 Implement `GGUFTensorRangeFindByAbsOffset` in `src/gguf/tensor_data_base.HC` (binary search over sorted `[start,end)` spans) for O(log n) tensor payload lookup (WS2-04)
 - [x] IQ-045 Implement `GGUFTensorRangeFindByRelOffset` in `src/gguf/tensor_data_base.HC` by translating relative offset to absolute and delegating to `GGUFTensorRangeFindByAbsOffset` (WS2-04)
-- [ ] IQ-046 Implement `GGUFTensorRangeFindByRelOffsetDefault` in `src/gguf/tensor_data_base.HC` using `GGUF_DEFAULT_ALIGNMENT` and delegate to `GGUFTensorRangeFindByRelOffset` (WS2-04)
+- [x] IQ-046 Implement `GGUFTensorRangeFindByRelOffsetDefault` in `src/gguf/tensor_data_base.HC` using `GGUF_DEFAULT_ALIGNMENT` and delegate to `GGUFTensorRangeFindByRelOffset` (WS2-04)
 - [ ] IQ-047 Implement `GGUFTensorInfoBuildOffsetIndex` in `src/gguf/tensor_data_base.HC` to build sorted absolute ranges + original tensor indices for stable lookup (WS2-04)
 - [ ] IQ-048 Add indexed tensor lookup helpers (`GGUFTensorRangeFindIndexByAbsOffset`, `GGUFTensorRangeFindIndexByRelOffset`) in `src/gguf/tensor_data_base.HC` returning original tensor index (WS2-04)
 
@@ -239,6 +239,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-12 | loop-032 | IQ-046 tensor range default relative-offset lookup | done | Added `GGUFTensorRangeFindByRelOffsetDefault`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-12 | loop-031 | IQ-045 tensor range relative-offset lookup | done | Added `GGUFTensorRangeFindByRelOffset` + parity cases; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-12 | bootstrap | MASTER_TASKS init | done | Initial roadmap + queue created |
 | 2026-04-12 | loop-001 | IQ-001 directory structure | done | Verified `src/`, `tests/`, `docs/`, `automation/`, `models/` exist locally |
