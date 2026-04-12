@@ -85,3 +85,9 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_1","type":"todo_list","items":[{"text":"Read tasks and local instructions","completed":true},{"text":"Maintain IQ queue depth >=15","completed":true},{"text":"Implement top IQ item deeply","completed":true},{"text":"Run focused validations","completed":true},{"text":"Update ledger and queue status","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":1129788,"cached_input_tokens":1034240,"output_tokens":7933}}
 Codex final exit code: 0
+[main c1e048e] feat(inference): codex iteration 20260412-152701
+ 6 files changed, 461 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260412-152701.final.txt
+ create mode 100644 src/quant/q4_0.HC
+ create mode 100644 tests/test_q4_0_dequant.py
+=== End iteration 13 (outcome=ok) ===
