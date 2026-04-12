@@ -1,0 +1,15 @@
+Completed one full iteration and progressed exactly `IQ-012`.
+
+**What Changed**
+- Implemented GGUF tensor-info parser in pure HolyC at `src/gguf/tensorinfo.HC:1` with strict LE readers, tensor-name parsing, dim validation (`n_dims<=8`, nonzero dims), `U64` overflow-checked `n_elements`, known GGML type validation, and table/free helpers.
+- Added focused host-side parity harness at `tests/test_gguf_tensorinfo_parse.py:1` covering success path, bad dims, dim overflow, unknown type, and truncation.
+- Updated queue + ledger in `MASTER_TASKS.md:184` and `MASTER_TASKS.md:218` to mark `IQ-012` done (`loop-012` entry added).
+
+**Queue Policy**
+- Unchecked queue depth is maintained at 16 (`>=15`), top unchecked is now `IQ-013` (no replenishment needed this iteration).
+
+**Validation Output**
+- `python3 tests/test_gguf_tensorinfo_parse.py` → `gguf_tensorinfo_reference_checks=ok`
+- `python3 tests/test_gguf_metadata_parse.py` → `gguf_metadata_reference_checks=ok`
+
+(There are unrelated pre-existing changes in `automation/logs/*` left untouched.)
