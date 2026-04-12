@@ -1,0 +1,14 @@
+Done — I completed one full unattended iteration for `IQ-026` with queue maintenance, validation, DB logging, and ledger update.
+
+**What Changed**
+- Implemented metadata lookup + typed scalar extractors in HolyC at `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/gguf/metadata.HC:13` and `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/gguf/metadata.HC:604`.
+- Added host-side parity checks for lookup/extractor behavior at `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_gguf_metadata_parse.py:30` and `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_gguf_metadata_parse.py:289`.
+- Marked `IQ-026` done, appended new queue item `IQ-036`, and added one progress ledger line at `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:214` and `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:251`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_parse.py`
+- Output: `gguf_metadata_reference_checks=ok`
+
+**Queue/DB Contract**
+- Queue depth is maintained at `15` unchecked `IQ-*` items after completion/replenish.
+- Logged to central DB: inserted iteration row `id=17` for `task_id=IQ-026`, `status=pass`, `validation_result=gguf_metadata_reference_checks=ok`.

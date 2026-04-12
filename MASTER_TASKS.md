@@ -211,7 +211,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] IQ-023 Create `src/math/rmsnorm.HC` skeleton with Q16 constants, tensor shape assumptions, and TODO stubs for scale/variance accumulation (WS1-04)
 - [ ] IQ-024 Create `src/gguf/header.HC` skeleton with `GGUFHeader` struct and endian-safe integer read helper stubs (WS2-01)
 - [ ] IQ-025 Add host-side GGUF header parser parity fixture in `tests/test_gguf_header_parse.py` covering valid/magic/version/truncation cases (WS2-01, WS2-05)
-- [ ] IQ-026 Implement metadata key lookup helpers (`GGUFMetaFindByKey`, scalar extractors) in `src/gguf/metadata.HC` (WS2-02)
+- [x] IQ-026 Implement metadata key lookup helpers (`GGUFMetaFindByKey`, scalar extractors) in `src/gguf/metadata.HC` (WS2-02)
 - [ ] IQ-027 Add host-side metadata parser parity fixture for scalar/string/array/nested-array cases in `tests/test_gguf_metadata_parse.py` (WS2-02, WS2-05)
 - [ ] IQ-028 Implement GGUF tensor data base alignment helper in `src/gguf/tensor_data_base.HC` (WS2-04)
 - [x] IQ-029 Implement Q8_0 dot product (naive, integer-only accumulator) in `src/quant/q8_0_dot.HC` (WS3-05)
@@ -221,6 +221,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-033 Implement Q4_0 row-dot helper (`Q4_0DotRowBlocksQ16`) in `src/quant/q4_0_dot.HC` for quant matmul row kernels (WS4-01)
 - [x] IQ-034 Implement Q4_0 x Q8_0 blockwise Q16 accumulation helper in `src/quant/q4_0_q8_0_dot.HC` for mixed matmul callers (WS4-01)
 - [ ] IQ-035 Add Q8_0 Q16-accumulator parity harness in `tests/test_q8_0_dot_accum_q16.py` with seeded blockwise rounding checks (WS4-01)
+- [ ] IQ-036 Implement GGUF tensor data offset resolver (`GGUFTensorDataBaseOffset`) in `src/gguf/tensor_data_base.HC` with alignment validation (WS2-04)
 
 ## Progress Ledger
 
@@ -247,6 +248,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 | 2026-04-12 | loop-018 | IQ-031 Q8_0 Q16 accumulator | done | Added Q16 blockwise accumulator helper + parity checks; `python3 tests/test_q8_0_dot.py && python3 tests/test_q8_0_dequant.py` passed |
 | 2026-04-12 | loop-019 | IQ-033 Q4_0 row-dot helper | done | Added `Q4_0DotRowBlocksQ16` + parity rounding tests; `python3 tests/test_q4_0_dot.py && python3 tests/test_q4_0_dequant.py && python3 tests/test_q4_0_q8_0_dot_kernel.py` passed |
 | 2026-04-12 | loop-020 | IQ-034 Q4_0 x Q8_0 Q16 accumulator | done | Added mixed Q16 blockwise accumulator helper + parity checks; `python3 tests/test_q4_0_q8_0_dot_kernel.py && python3 tests/test_q4_0_dot.py && python3 tests/test_q8_0_dot.py` passed |
+| 2026-04-12 | loop-021 | IQ-026 metadata key lookup helpers | done | Added `GGUFMetaFindByKey` + typed scalar extractors; `python3 tests/test_gguf_metadata_parse.py` passed |
 
 ## Blockers & Decisions
 

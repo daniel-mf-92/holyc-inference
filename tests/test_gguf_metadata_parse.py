@@ -27,6 +27,8 @@ GGUF_META_PARSE_OK = 0
 GGUF_META_PARSE_ERR_TRUNCATED = 2
 GGUF_META_PARSE_ERR_BAD_TYPE = 3
 GGUF_META_PARSE_ERR_NESTED_ARRAY = 7
+GGUF_META_PARSE_ERR_NOT_FOUND = 9
+GGUF_META_PARSE_ERR_TYPE_MISMATCH = 10
 
 
 def u8(v: int) -> bytes:
@@ -193,6 +195,69 @@ def parse_metadata_table(buf: bytes, count: int):
     return GGUF_META_PARSE_OK, cursor, items
 
 
+def meta_find_by_key(items, key: str):
+    for k, v in items:
+        if k == key:
+            return v
+    return None
+
+
+def meta_get_u64(items, key: str):
+    v = meta_find_by_key(items, key)
+    if v is None:
+        return GGUF_META_PARSE_ERR_NOT_FOUND, None
+    if v["type"] not in (GGUF_TYPE_UINT8, GGUF_TYPE_UINT16, GGUF_TYPE_UINT32, GGUF_TYPE_UINT64):
+        return GGUF_META_PARSE_ERR_TYPE_MISMATCH, None
+    return GGUF_META_PARSE_OK, int.from_bytes(v["raw"], "little", signed=False)
+
+
+def meta_get_i64(items, key: str):
+    v = meta_find_by_key(items, key)
+    if v is None:
+        return GGUF_META_PARSE_ERR_NOT_FOUND, None
+    ty = v["type"]
+    if ty not in (GGUF_TYPE_INT8, GGUF_TYPE_INT16, GGUF_TYPE_INT32, GGUF_TYPE_INT64):
+        return GGUF_META_PARSE_ERR_TYPE_MISMATCH, None
+    size = {GGUF_TYPE_INT8: 1, GGUF_TYPE_INT16: 2, GGUF_TYPE_INT32: 4, GGUF_TYPE_INT64: 8}[ty]
+    return GGUF_META_PARSE_OK, int.from_bytes(v["raw"][:size], "little", signed=True)
+
+
+def meta_get_bool(items, key: str):
+    v = meta_find_by_key(items, key)
+    if v is None:
+        return GGUF_META_PARSE_ERR_NOT_FOUND, None
+    if v["type"] != GGUF_TYPE_BOOL:
+        return GGUF_META_PARSE_ERR_TYPE_MISMATCH, None
+    return GGUF_META_PARSE_OK, v["raw"][0] != 0
+
+
+def meta_get_string(items, key: str):
+    v = meta_find_by_key(items, key)
+    if v is None:
+        return GGUF_META_PARSE_ERR_NOT_FOUND, None
+    if v["type"] != GGUF_TYPE_STRING:
+        return GGUF_META_PARSE_ERR_TYPE_MISMATCH, None
+    return GGUF_META_PARSE_OK, v["value"]
+
+
+def meta_get_f32_bits(items, key: str):
+    v = meta_find_by_key(items, key)
+    if v is None:
+        return GGUF_META_PARSE_ERR_NOT_FOUND, None
+    if v["type"] != GGUF_TYPE_FLOAT32:
+        return GGUF_META_PARSE_ERR_TYPE_MISMATCH, None
+    return GGUF_META_PARSE_OK, int.from_bytes(v["raw"], "little", signed=False)
+
+
+def meta_get_f64_bits(items, key: str):
+    v = meta_find_by_key(items, key)
+    if v is None:
+        return GGUF_META_PARSE_ERR_NOT_FOUND, None
+    if v["type"] != GGUF_TYPE_FLOAT64:
+        return GGUF_META_PARSE_ERR_TYPE_MISMATCH, None
+    return GGUF_META_PARSE_OK, int.from_bytes(v["raw"], "little", signed=False)
+
+
 def test_mixed_scalar_and_arrays() -> None:
     buf = b"".join(
         [
@@ -240,10 +305,54 @@ def test_truncation_detected() -> None:
     assert err == GGUF_META_PARSE_ERR_TRUNCATED
 
 
+def test_lookup_and_scalar_extractors() -> None:
+    buf = b"".join(
+        [
+            meta_entry("general.architecture", GGUF_TYPE_STRING, gguf_string("llama")),
+            meta_entry("llama.block_count", GGUF_TYPE_UINT32, scalar_payload(GGUF_TYPE_UINT32, 22)),
+            meta_entry("tokenizer.ggml.bos_token_id", GGUF_TYPE_INT32, scalar_payload(GGUF_TYPE_INT32, 1)),
+            meta_entry("tokenizer.ggml.add_bos_token", GGUF_TYPE_BOOL, scalar_payload(GGUF_TYPE_BOOL, 1)),
+            meta_entry("llama.rope.freq_base_train", GGUF_TYPE_FLOAT32, scalar_payload(GGUF_TYPE_FLOAT32, 10000.0)),
+            meta_entry("llama.attention.scale_hint", GGUF_TYPE_FLOAT64, scalar_payload(GGUF_TYPE_FLOAT64, 0.125)),
+        ]
+    )
+
+    err, cursor, items = parse_metadata_table(buf, 6)
+    assert err == GGUF_META_PARSE_OK
+    assert cursor == len(buf)
+
+    err, value = meta_get_u64(items, "llama.block_count")
+    assert err == GGUF_META_PARSE_OK and value == 22
+
+    err, value = meta_get_i64(items, "tokenizer.ggml.bos_token_id")
+    assert err == GGUF_META_PARSE_OK and value == 1
+
+    err, value = meta_get_bool(items, "tokenizer.ggml.add_bos_token")
+    assert err == GGUF_META_PARSE_OK and value is True
+
+    err, value = meta_get_string(items, "general.architecture")
+    assert err == GGUF_META_PARSE_OK and value == "llama"
+
+    err, f32_bits = meta_get_f32_bits(items, "llama.rope.freq_base_train")
+    assert err == GGUF_META_PARSE_OK
+    assert f32_bits == int.from_bytes(struct.pack("<f", 10000.0), "little", signed=False)
+
+    err, f64_bits = meta_get_f64_bits(items, "llama.attention.scale_hint")
+    assert err == GGUF_META_PARSE_OK
+    assert f64_bits == int.from_bytes(struct.pack("<d", 0.125), "little", signed=False)
+
+    err, _ = meta_get_u64(items, "general.architecture")
+    assert err == GGUF_META_PARSE_ERR_TYPE_MISMATCH
+
+    err, _ = meta_get_string(items, "missing.key")
+    assert err == GGUF_META_PARSE_ERR_NOT_FOUND
+
+
 def run() -> None:
     test_mixed_scalar_and_arrays()
     test_nested_array_rejected()
     test_truncation_detected()
+    test_lookup_and_scalar_extractors()
     print("gguf_metadata_reference_checks=ok")
 
 

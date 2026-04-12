@@ -10,6 +10,8 @@
 #define GGUF_META_PARSE_ERR_ALLOC 6
 #define GGUF_META_PARSE_ERR_NESTED_ARRAY 7
 #define GGUF_META_PARSE_ERR_BAD_COUNT 8
+#define GGUF_META_PARSE_ERR_NOT_FOUND 9
+#define GGUF_META_PARSE_ERR_TYPE_MISMATCH 10
 
 #define GGUF_MAX_METADATA_COUNT (1 << 20)
 #define GGUF_MAX_STRING_BYTES   (1 << 20)
@@ -559,5 +561,177 @@ I64 GGUFParseMetadata(U8 *buf,
     }
 
     out->count = metadata_kv_count;
+    return GGUF_META_PARSE_OK;
+}
+
+U64 GGUFMetaCStrLen(U8 *s)
+{
+    U64 n;
+
+    if (!s)
+        return 0;
+
+    n = 0;
+    while (s[n])
+        ++n;
+    return n;
+}
+
+Bool GGUFMetaStringEqCStr(GGUFString *lhs, U8 *rhs)
+{
+    U64 rhs_len;
+    U64 i;
+
+    if (!lhs || !rhs)
+        return FALSE;
+    if (!lhs->data)
+        return FALSE;
+
+    rhs_len = GGUFMetaCStrLen(rhs);
+    if (lhs->len != rhs_len)
+        return FALSE;
+
+    // Byte-wise compare keeps lookup deterministic and avoids libc helpers.
+    for (i = 0; i < lhs->len; ++i)
+    {
+        if (lhs->data[i] != rhs[i])
+            return FALSE;
+    }
+
+    return TRUE;
+}
+
+GGUFMetadataKV *GGUFMetaFindByKey(GGUFMetadataTable *table, U8 *key)
+{
+    U64 i;
+
+    if (!table || !key)
+        return NULL;
+    if (!table->items)
+        return NULL;
+
+    // GGUF metadata order is stable and small enough for a linear scan.
+    for (i = 0; i < table->count; ++i)
+    {
+        if (GGUFMetaStringEqCStr(&table->items[i].key, key))
+            return &table->items[i];
+    }
+
+    return NULL;
+}
+
+I64 GGUFMetaGetU64ByKey(GGUFMetadataTable *table, U8 *key, U64 *out)
+{
+    GGUFMetadataKV *kv;
+
+    if (!table || !key || !out)
+        return GGUF_META_PARSE_ERR_NULL_PTR;
+
+    kv = GGUFMetaFindByKey(table, key);
+    if (!kv)
+        return GGUF_META_PARSE_ERR_NOT_FOUND;
+
+    switch (kv->value.type)
+    {
+        case GGUF_TYPE_UINT8:
+        case GGUF_TYPE_UINT16:
+        case GGUF_TYPE_UINT32:
+        case GGUF_TYPE_UINT64:
+            *out = kv->value.u64;
+            return GGUF_META_PARSE_OK;
+    }
+
+    return GGUF_META_PARSE_ERR_TYPE_MISMATCH;
+}
+
+I64 GGUFMetaGetI64ByKey(GGUFMetadataTable *table, U8 *key, I64 *out)
+{
+    GGUFMetadataKV *kv;
+
+    if (!table || !key || !out)
+        return GGUF_META_PARSE_ERR_NULL_PTR;
+
+    kv = GGUFMetaFindByKey(table, key);
+    if (!kv)
+        return GGUF_META_PARSE_ERR_NOT_FOUND;
+
+    switch (kv->value.type)
+    {
+        case GGUF_TYPE_INT8:
+        case GGUF_TYPE_INT16:
+        case GGUF_TYPE_INT32:
+        case GGUF_TYPE_INT64:
+            *out = kv->value.i64;
+            return GGUF_META_PARSE_OK;
+    }
+
+    return GGUF_META_PARSE_ERR_TYPE_MISMATCH;
+}
+
+I64 GGUFMetaGetBoolByKey(GGUFMetadataTable *table, U8 *key, Bool *out)
+{
+    GGUFMetadataKV *kv;
+
+    if (!table || !key || !out)
+        return GGUF_META_PARSE_ERR_NULL_PTR;
+
+    kv = GGUFMetaFindByKey(table, key);
+    if (!kv)
+        return GGUF_META_PARSE_ERR_NOT_FOUND;
+    if (kv->value.type != GGUF_TYPE_BOOL)
+        return GGUF_META_PARSE_ERR_TYPE_MISMATCH;
+
+    *out = kv->value.b;
+    return GGUF_META_PARSE_OK;
+}
+
+I64 GGUFMetaGetStringByKey(GGUFMetadataTable *table, U8 *key, GGUFString **out)
+{
+    GGUFMetadataKV *kv;
+
+    if (!table || !key || !out)
+        return GGUF_META_PARSE_ERR_NULL_PTR;
+
+    kv = GGUFMetaFindByKey(table, key);
+    if (!kv)
+        return GGUF_META_PARSE_ERR_NOT_FOUND;
+    if (kv->value.type != GGUF_TYPE_STRING)
+        return GGUF_META_PARSE_ERR_TYPE_MISMATCH;
+
+    *out = &kv->value.str;
+    return GGUF_META_PARSE_OK;
+}
+
+I64 GGUFMetaGetF32BitsByKey(GGUFMetadataTable *table, U8 *key, U32 *out_bits)
+{
+    GGUFMetadataKV *kv;
+
+    if (!table || !key || !out_bits)
+        return GGUF_META_PARSE_ERR_NULL_PTR;
+
+    kv = GGUFMetaFindByKey(table, key);
+    if (!kv)
+        return GGUF_META_PARSE_ERR_NOT_FOUND;
+    if (kv->value.type != GGUF_TYPE_FLOAT32)
+        return GGUF_META_PARSE_ERR_TYPE_MISMATCH;
+
+    *out_bits = kv->value.u64;
+    return GGUF_META_PARSE_OK;
+}
+
+I64 GGUFMetaGetF64BitsByKey(GGUFMetadataTable *table, U8 *key, U64 *out_bits)
+{
+    GGUFMetadataKV *kv;
+
+    if (!table || !key || !out_bits)
+        return GGUF_META_PARSE_ERR_NULL_PTR;
+
+    kv = GGUFMetaFindByKey(table, key);
+    if (!kv)
+        return GGUF_META_PARSE_ERR_NOT_FOUND;
+    if (kv->value.type != GGUF_TYPE_FLOAT64)
+        return GGUF_META_PARSE_ERR_TYPE_MISMATCH;
+
+    *out_bits = kv->value.u64;
     return GGUF_META_PARSE_OK;
 }
