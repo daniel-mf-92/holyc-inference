@@ -1,0 +1,75 @@
+// tensor_data_base.HC
+// GGUF tensor-data base alignment helpers for HolyC inference runtime.
+
+#define GGUF_TDBASE_OK 0
+#define GGUF_TDBASE_ERR_NULL_PTR 1
+#define GGUF_TDBASE_ERR_BAD_ALIGNMENT 2
+#define GGUF_TDBASE_ERR_OVERFLOW 3
+
+// GGUF default tensor alignment when metadata key `general.alignment`
+// is absent.
+#define GGUF_DEFAULT_ALIGNMENT 32
+
+Bool GGUFIsPow2U32(U32 value)
+{
+    if (!value)
+        return FALSE;
+    return (value & (value - 1)) == 0;
+}
+
+I64 GGUFValidateAlignment(U32 alignment)
+{
+    if (!GGUFIsPow2U32(alignment))
+        return GGUF_TDBASE_ERR_BAD_ALIGNMENT;
+    return GGUF_TDBASE_OK;
+}
+
+I64 GGUFAlignUpU64(U64 value, U32 alignment, U64 *out)
+{
+    U64 mask;
+
+    if (!out)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    if (GGUFValidateAlignment(alignment) != GGUF_TDBASE_OK)
+        return GGUF_TDBASE_ERR_BAD_ALIGNMENT;
+
+    // For power-of-two alignments, align-up is:
+    //   (value + (alignment - 1)) & ~(alignment - 1)
+    // Keep overflow checks explicit so giant malformed offsets are rejected.
+    mask = (U64)alignment - 1;
+    if (value > 0xFFFFFFFFFFFFFFFF - mask)
+        return GGUF_TDBASE_ERR_OVERFLOW;
+
+    *out = (value + mask) & ~mask;
+    return GGUF_TDBASE_OK;
+}
+
+I64 GGUFTensorDataBaseAlign(U64 cursor_after_tensor_info,
+                            U32 alignment,
+                            U64 *out_tensor_data_base)
+{
+    return GGUFAlignUpU64(cursor_after_tensor_info,
+                          alignment,
+                          out_tensor_data_base);
+}
+
+I64 GGUFTensorDataBaseAlignDefault(U64 cursor_after_tensor_info,
+                                   U64 *out_tensor_data_base)
+{
+    return GGUFTensorDataBaseAlign(cursor_after_tensor_info,
+                                   GGUF_DEFAULT_ALIGNMENT,
+                                   out_tensor_data_base);
+}
+
+Bool GGUFTensorDataBaseIsAligned(U64 offset, U32 alignment)
+{
+    U64 mask;
+
+    if (GGUFValidateAlignment(alignment) != GGUF_TDBASE_OK)
+        return FALSE;
+
+    mask = (U64)alignment - 1;
+    return (offset & mask) == 0;
+}
+
