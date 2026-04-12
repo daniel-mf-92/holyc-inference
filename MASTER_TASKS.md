@@ -235,12 +235,14 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-047 Implement `GGUFTensorInfoBuildOffsetIndex` in `src/gguf/tensor_data_base.HC` to build sorted absolute ranges + original tensor indices for stable lookup (WS2-04)
 - [x] IQ-048 Add indexed tensor lookup helpers (`GGUFTensorRangeFindIndexByAbsOffset`, `GGUFTensorRangeFindIndexByRelOffset`) in `src/gguf/tensor_data_base.HC` returning original tensor index (WS2-04)
 - [x] IQ-049 Add default-alignment indexed lookup helper `GGUFTensorRangeFindIndexByRelOffsetDefault` in `src/gguf/tensor_data_base.HC` and parity tests in `tests/test_gguf_tensor_data_base.py` (WS2-04)
-- [ ] IQ-050 Add offset-index integrity validator `GGUFValidateSortedTensorIndex` (permutation+range checks) in `src/gguf/tensor_data_base.HC` with adversarial host parity tests (WS2-04)
+- [x] IQ-050 Add offset-index integrity validator `GGUFValidateSortedTensorIndex` (permutation+range checks) in `src/gguf/tensor_data_base.HC` with adversarial host parity tests (WS2-04)
+- [ ] IQ-051 Add sorted-index inverse map builder `GGUFBuildTensorSortedPositionMap` in `src/gguf/tensor_data_base.HC` (original index -> sorted position) with parity checks in `tests/test_gguf_tensor_data_base.py` (WS2-04)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-12 | loop-036 | IQ-050 sorted index integrity validator | done | Added `GGUFValidateSortedTensorIndex` in `src/gguf/tensor_data_base.HC` plus adversarial integrity tests in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py` passed |
 | 2026-04-12 | loop-035 | IQ-049 default-alignment indexed lookup | done | Added `GGUFTensorRangeFindIndexByRelOffsetDefault` + default-alignment parity tests; `python3 tests/test_gguf_tensor_data_base.py` passed |
 | 2026-04-12 | loop-034 | IQ-048 indexed tensor lookup helpers | done | Added indexed abs/rel lookup in `src/gguf/tensor_data_base.HC` + parity coverage in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-12 | loop-032 | IQ-046 tensor range default relative-offset lookup | done | Added `GGUFTensorRangeFindByRelOffsetDefault`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |

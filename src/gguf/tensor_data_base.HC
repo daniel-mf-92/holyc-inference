@@ -1039,3 +1039,92 @@ I64 GGUFTensorRangeFindIndexByRelOffsetDefault(U64 tensor_rel_offset,
                                                sorted_tensor_indices,
                                                out_tensor_index);
 }
+
+I64 GGUFValidateSortedTensorIndex(U64 tensor_count,
+                                  U64 *tensor_abs_starts,
+                                  U64 *tensor_abs_ends,
+                                  U64 *sorted_tensor_indices,
+                                  U64 *out_bad_index)
+{
+    U64 i;
+    U64 j;
+    U64 start_i;
+    U64 end_i;
+    U64 prev_start;
+    U64 prev_end;
+    U64 sorted_idx_i;
+
+    if (!tensor_abs_starts || !tensor_abs_ends || !sorted_tensor_indices)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    if (out_bad_index)
+        *out_bad_index = 0;
+
+    if (!tensor_count)
+        return GGUF_TDBASE_OK;
+
+    for (i = 0; i < tensor_count; ++i)
+    {
+        start_i = tensor_abs_starts[i];
+        end_i = tensor_abs_ends[i];
+        sorted_idx_i = sorted_tensor_indices[i];
+
+        // Ranges are half-open [start,end). End before start means
+        // malformed table arithmetic or corrupted caller memory.
+        if (end_i < start_i)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return GGUF_TDBASE_ERR_OVERFLOW;
+        }
+
+        // Binary search helpers require starts to be non-decreasing.
+        // We also reject overlapping ranges up-front.
+        if (i)
+        {
+            prev_start = tensor_abs_starts[i - 1];
+            prev_end = tensor_abs_ends[i - 1];
+
+            if (start_i < prev_start)
+            {
+                if (out_bad_index)
+                    *out_bad_index = i;
+                return GGUF_TDBASE_ERR_OVERLAP;
+            }
+
+            if (start_i == prev_start && end_i < prev_end)
+            {
+                if (out_bad_index)
+                    *out_bad_index = i;
+                return GGUF_TDBASE_ERR_OVERLAP;
+            }
+
+            if (start_i < prev_end)
+            {
+                if (out_bad_index)
+                    *out_bad_index = i;
+                return GGUF_TDBASE_ERR_OVERLAP;
+            }
+        }
+
+        // The sorted->original map must be a permutation in [0, tensor_count).
+        if (sorted_idx_i >= tensor_count)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+        }
+
+        for (j = 0; j < i; ++j)
+        {
+            if (sorted_tensor_indices[j] == sorted_idx_i)
+            {
+                if (out_bad_index)
+                    *out_bad_index = i;
+                return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+            }
+        }
+    }
+
+    return GGUF_TDBASE_OK;
+}

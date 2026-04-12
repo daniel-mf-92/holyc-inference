@@ -1,0 +1,14 @@
+Done — this iteration fully progressed `IQ-050` with HolyC runtime code plus host-side adversarial parity coverage.
+
+**What Changed**
+- Added `GGUFValidateSortedTensorIndex` to validate sorted absolute ranges and index-permutation integrity in `src/gguf/tensor_data_base.HC:1043`.
+- Added parity reference helper `validate_sorted_tensor_index` and 10 focused tests (happy, overflow, overlap/order, OOB, duplicates, randomized adversarial) in `tests/test_gguf_tensor_data_base.py:532`.
+- Marked `IQ-050` complete, appended new unchecked `IQ-051`, and added one ledger line (`loop-036`) in `MASTER_TASKS.md:238`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_tensor_data_base.py`
+- Output: `gguf_tensor_data_base_reference_checks=ok`
+
+**Queue + DB**
+- Queue depth maintained: `unchecked_count=15` (policy satisfied, rolling queue preserved).
+- Inserted central DB iteration row for this pass: `task_id=IQ-050`, `status=pass`, validation captured (`id=59`).

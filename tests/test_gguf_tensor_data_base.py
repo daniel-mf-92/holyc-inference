@@ -529,6 +529,46 @@ def tensor_range_find_index_by_rel_offset_default(
     )
 
 
+def validate_sorted_tensor_index(
+    tensor_abs_starts: list[int],
+    tensor_abs_ends: list[int],
+    sorted_tensor_indices: list[int],
+):
+    count = len(tensor_abs_starts)
+    if len(tensor_abs_ends) != count:
+        return GGUF_TDBASE_ERR_NULL_PTR, 0
+    if len(sorted_tensor_indices) != count:
+        return GGUF_TDBASE_ERR_NULL_PTR, 0
+
+    for i in range(count):
+        start_i = tensor_abs_starts[i]
+        end_i = tensor_abs_ends[i]
+        idx_i = sorted_tensor_indices[i]
+
+        if end_i < start_i:
+            return GGUF_TDBASE_ERR_OVERFLOW, i
+
+        if i > 0:
+            prev_start = tensor_abs_starts[i - 1]
+            prev_end = tensor_abs_ends[i - 1]
+
+            if start_i < prev_start:
+                return GGUF_TDBASE_ERR_OVERLAP, i
+            if start_i == prev_start and end_i < prev_end:
+                return GGUF_TDBASE_ERR_OVERLAP, i
+            if start_i < prev_end:
+                return GGUF_TDBASE_ERR_OVERLAP, i
+
+        if idx_i >= count:
+            return GGUF_TDBASE_ERR_OUT_OF_BOUNDS, i
+
+        for j in range(i):
+            if sorted_tensor_indices[j] == idx_i:
+                return GGUF_TDBASE_ERR_OUT_OF_BOUNDS, i
+
+    return GGUF_TDBASE_OK, 0
+
+
 def _abs_range_greater(
     starts: list[int],
     ends: list[int],
@@ -1631,6 +1671,168 @@ def test_tensor_info_build_offset_index_random_non_overlapping() -> None:
         assert sorted(sorted_idx) == list(range(count))
 
 
+def test_validate_sorted_tensor_index_happy_path() -> None:
+    starts = [0x1000, 0x1040, 0x1080]
+    ends = [0x1020, 0x1062, 0x1092]
+    sorted_idx = [2, 0, 1]
+
+    err, bad = validate_sorted_tensor_index(starts, ends, sorted_idx)
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+
+def test_validate_sorted_tensor_index_empty_ok() -> None:
+    err, bad = validate_sorted_tensor_index([], [], [])
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+
+def test_validate_sorted_tensor_index_detects_overflow_range() -> None:
+    starts = [0x1000, 0x1080]
+    ends = [0x1020, 0x107F]
+    sorted_idx = [0, 1]
+
+    err, bad = validate_sorted_tensor_index(starts, ends, sorted_idx)
+    assert err == GGUF_TDBASE_ERR_OVERFLOW
+    assert bad == 1
+
+
+def test_validate_sorted_tensor_index_detects_unsorted_starts() -> None:
+    starts = [0x1000, 0x1100, 0x1080]
+    ends = [0x1020, 0x1120, 0x10A0]
+    sorted_idx = [0, 1, 2]
+
+    err, bad = validate_sorted_tensor_index(starts, ends, sorted_idx)
+    assert err == GGUF_TDBASE_ERR_OVERLAP
+    assert bad == 2
+
+
+def test_validate_sorted_tensor_index_detects_overlap() -> None:
+    starts = [0x1000, 0x1040]
+    ends = [0x1060, 0x1080]
+    sorted_idx = [0, 1]
+
+    err, bad = validate_sorted_tensor_index(starts, ends, sorted_idx)
+    assert err == GGUF_TDBASE_ERR_OVERLAP
+    assert bad == 1
+
+
+def test_validate_sorted_tensor_index_rejects_bad_mapped_index() -> None:
+    starts = [0x1000, 0x1040, 0x1080]
+    ends = [0x1020, 0x1060, 0x10A0]
+    sorted_idx = [1, 3, 0]
+
+    err, bad = validate_sorted_tensor_index(starts, ends, sorted_idx)
+    assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert bad == 1
+
+
+def test_validate_sorted_tensor_index_rejects_duplicate_mapped_index() -> None:
+    starts = [0x1000, 0x1040, 0x1080]
+    ends = [0x1020, 0x1060, 0x10A0]
+    sorted_idx = [1, 0, 1]
+
+    err, bad = validate_sorted_tensor_index(starts, ends, sorted_idx)
+    assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert bad == 2
+
+
+def test_validate_sorted_tensor_index_with_built_index() -> None:
+    rel_offsets = [0xC0, 0x00, 0x40]
+    elem_counts = [32, 64, 32]
+    ggml_types = [GGML_TYPE_Q8_0, GGML_TYPE_Q4_0, GGML_TYPE_F16]
+    starts = [0, 0, 0]
+    ends = [0, 0, 0]
+    sorted_idx = [0, 0, 0]
+
+    err, bad = tensor_info_build_offset_index(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x2000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_element_counts=elem_counts,
+        tensor_ggml_types=ggml_types,
+        out_abs_starts=starts,
+        out_abs_ends=ends,
+        out_sorted_tensor_indices=sorted_idx,
+    )
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+    err, bad = validate_sorted_tensor_index(starts, ends, sorted_idx)
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+
+def test_validate_sorted_tensor_index_random_valid_permutations() -> None:
+    rng = random.Random(764069)
+
+    for _ in range(300):
+        count = rng.randint(1, 20)
+        starts: list[int] = []
+        ends: list[int] = []
+        cursor = rng.randint(0, 32) * 32
+        for _ in range(count):
+            cursor += rng.randint(0, 4) * 32
+            span = rng.randint(0, 6) * 32
+            starts.append(cursor)
+            ends.append(cursor + span)
+            cursor += span
+
+        perm = list(range(count))
+        rng.shuffle(perm)
+
+        err, bad = validate_sorted_tensor_index(starts, ends, perm)
+        assert err == GGUF_TDBASE_OK
+        assert bad == 0
+
+
+def test_validate_sorted_tensor_index_random_adversarial_mutations() -> None:
+    rng = random.Random(764077)
+
+    for _ in range(240):
+        count = rng.randint(3, 18)
+        starts: list[int] = []
+        ends: list[int] = []
+        cursor = rng.randint(0, 32) * 32
+        for _ in range(count):
+            cursor += rng.randint(0, 3) * 32
+            span = max(32, rng.randint(1, 6) * 32)
+            starts.append(cursor)
+            ends.append(cursor + span)
+            cursor += span
+
+        sorted_idx = list(range(count))
+        case = rng.randint(0, 3)
+
+        if case == 0:
+            i = rng.randint(1, count - 1)
+            starts[i], starts[i - 1] = starts[i - 1], starts[i]
+            ends[i], ends[i - 1] = ends[i - 1], ends[i]
+            err, bad = validate_sorted_tensor_index(starts, ends, sorted_idx)
+            assert err == GGUF_TDBASE_ERR_OVERLAP
+            assert bad == i
+        elif case == 1:
+            i = rng.randint(1, count - 1)
+            starts[i] = max(starts[i - 1], starts[i] - 32)
+            ends[i - 1] = starts[i] + 32
+            err, bad = validate_sorted_tensor_index(starts, ends, sorted_idx)
+            assert err == GGUF_TDBASE_ERR_OVERLAP
+            assert bad == i
+        elif case == 2:
+            i = rng.randint(0, count - 1)
+            sorted_idx[i] = count + rng.randint(0, 10)
+            err, bad = validate_sorted_tensor_index(starts, ends, sorted_idx)
+            assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+            assert bad == i
+        else:
+            i = rng.randint(1, count - 1)
+            sorted_idx[i] = sorted_idx[rng.randint(0, i - 1)]
+            err, bad = validate_sorted_tensor_index(starts, ends, sorted_idx)
+            assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+            assert bad == i
+
+
 
 
 def run() -> None:
@@ -1703,6 +1905,16 @@ def run() -> None:
     test_tensor_info_build_offset_index_propagates_bad_block_multiple()
     test_tensor_info_build_offset_index_detects_overlap()
     test_tensor_info_build_offset_index_random_non_overlapping()
+    test_validate_sorted_tensor_index_happy_path()
+    test_validate_sorted_tensor_index_empty_ok()
+    test_validate_sorted_tensor_index_detects_overflow_range()
+    test_validate_sorted_tensor_index_detects_unsorted_starts()
+    test_validate_sorted_tensor_index_detects_overlap()
+    test_validate_sorted_tensor_index_rejects_bad_mapped_index()
+    test_validate_sorted_tensor_index_rejects_duplicate_mapped_index()
+    test_validate_sorted_tensor_index_with_built_index()
+    test_validate_sorted_tensor_index_random_valid_permutations()
+    test_validate_sorted_tensor_index_random_adversarial_mutations()
     print("gguf_tensor_data_base_reference_checks=ok")
 
 
