@@ -421,6 +421,28 @@ def tensor_range_find_by_abs_offset(
     return GGUF_TDBASE_ERR_OUT_OF_BOUNDS, 0
 
 
+def tensor_range_find_by_rel_offset(
+    tensor_rel_offset: int,
+    tensor_data_base: int,
+    alignment: int,
+    tensor_abs_starts: list[int],
+    tensor_abs_ends: list[int],
+):
+    err, abs_offset = tensor_data_base_offset(
+        tensor_data_base=tensor_data_base,
+        tensor_rel_offset=tensor_rel_offset,
+        alignment=alignment,
+    )
+    if err != GGUF_TDBASE_OK:
+        return err, 0
+
+    return tensor_range_find_by_abs_offset(
+        abs_offset=abs_offset,
+        tensor_abs_starts=tensor_abs_starts,
+        tensor_abs_ends=tensor_abs_ends,
+    )
+
+
 
 
 def test_tensor_bytes_for_type_scalars() -> None:
@@ -1083,6 +1105,46 @@ def test_tensor_range_find_by_abs_offset_empty_table() -> None:
     assert idx == 0
 
 
+def test_tensor_range_find_by_rel_offset_happy_path() -> None:
+    starts = [0x1000, 0x1040, 0x1080]
+    ends = [0x1020, 0x1062, 0x1092]
+
+    assert tensor_range_find_by_rel_offset(0x00, 0x1000, 32, starts, ends) == (GGUF_TDBASE_OK, 0)
+    assert tensor_range_find_by_rel_offset(0x40, 0x1000, 32, starts, ends) == (GGUF_TDBASE_OK, 1)
+    assert tensor_range_find_by_rel_offset(0x80, 0x1000, 32, starts, ends) == (GGUF_TDBASE_OK, 2)
+
+
+def test_tensor_range_find_by_rel_offset_propagates_alignment_error() -> None:
+    starts = [0x1000, 0x1040]
+    ends = [0x1020, 0x1060]
+
+    err, idx = tensor_range_find_by_rel_offset(0x40, 0x1000, 24, starts, ends)
+    assert err == GGUF_TDBASE_ERR_BAD_ALIGNMENT
+    assert idx == 0
+
+
+def test_tensor_range_find_by_rel_offset_propagates_misaligned_rel() -> None:
+    starts = [0x1000, 0x1040]
+    ends = [0x1020, 0x1060]
+
+    err, idx = tensor_range_find_by_rel_offset(0x48, 0x1000, 32, starts, ends)
+    assert err == GGUF_TDBASE_ERR_MISALIGNED_TENSOR_OFFSET
+    assert idx == 0
+
+
+def test_tensor_range_find_by_rel_offset_gap_and_out_of_bounds() -> None:
+    starts = [0x1000, 0x1040, 0x1080]
+    ends = [0x1020, 0x1062, 0x1092]
+
+    err, idx = tensor_range_find_by_rel_offset(0x20, 0x1000, 32, starts, ends)
+    assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert idx == 0
+
+    err, idx = tensor_range_find_by_rel_offset(0xA0, 0x1000, 32, starts, ends)
+    assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert idx == 0
+
+
 
 
 def run() -> None:
@@ -1137,6 +1199,10 @@ def run() -> None:
     test_tensor_range_find_by_abs_offset_gap_and_end_exclusive()
     test_tensor_range_find_by_abs_offset_rejects_malformed_range()
     test_tensor_range_find_by_abs_offset_empty_table()
+    test_tensor_range_find_by_rel_offset_happy_path()
+    test_tensor_range_find_by_rel_offset_propagates_alignment_error()
+    test_tensor_range_find_by_rel_offset_propagates_misaligned_rel()
+    test_tensor_range_find_by_rel_offset_gap_and_out_of_bounds()
     print("gguf_tensor_data_base_reference_checks=ok")
 
 

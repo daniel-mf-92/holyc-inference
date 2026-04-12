@@ -703,3 +703,37 @@ I64 GGUFTensorRangeFindByAbsOffset(U64 abs_offset,
 
     return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
 }
+
+I64 GGUFTensorRangeFindByRelOffset(U64 tensor_rel_offset,
+                                   U64 tensor_data_base,
+                                   U32 alignment,
+                                   U64 tensor_count,
+                                   U64 *tensor_abs_starts,
+                                   U64 *tensor_abs_ends,
+                                   U64 *out_tensor_index)
+{
+    U64 abs_offset;
+    I64 err;
+
+    if (!out_tensor_index)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    // Preserve deterministic output even when offset translation fails.
+    *out_tensor_index = 0;
+
+    // Translate relative tensor offset to absolute file offset using the
+    // same alignment + overflow checks as tensor range resolution.
+    err = GGUFTensorDataBaseOffset(tensor_data_base,
+                                   tensor_rel_offset,
+                                   alignment,
+                                   &abs_offset);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    // Delegate lookup to the binary search helper over sorted absolute ranges.
+    return GGUFTensorRangeFindByAbsOffset(abs_offset,
+                                          tensor_count,
+                                          tensor_abs_starts,
+                                          tensor_abs_ends,
+                                          out_tensor_index);
+}
