@@ -79,3 +79,7 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_10","type":"todo_list","items":[{"text":"Audit quant kernels and harnesses","completed":true},{"text":"Implement IQ-033 HolyC row helper","completed":true},{"text":"Add focused parity validation","completed":true},{"text":"Log iteration to central SQLite","completed":true},{"text":"Update task queue and ledger","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":1436983,"cached_input_tokens":1351296,"output_tokens":7998}}
 Codex final exit code: 0
+[main 11dd5a4] feat(inference): codex iteration 20260412-160858
+ 6 files changed, 188 insertions(+), 3 deletions(-)
+ create mode 100644 automation/logs/20260412-160858.final.txt
+=== End iteration 19 (outcome=ok) ===
