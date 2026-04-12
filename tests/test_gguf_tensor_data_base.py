@@ -387,6 +387,40 @@ def tensor_info_resolve_abs_ranges(
     return GGUF_TDBASE_OK, 0
 
 
+def tensor_range_find_by_abs_offset(
+    abs_offset: int,
+    tensor_abs_starts: list[int],
+    tensor_abs_ends: list[int],
+):
+    count = len(tensor_abs_starts)
+    if len(tensor_abs_ends) != count:
+        return GGUF_TDBASE_ERR_NULL_PTR, 0
+    if count == 0:
+        return GGUF_TDBASE_ERR_OUT_OF_BOUNDS, 0
+
+    lo = 0
+    hi = count
+    while lo < hi:
+        mid = lo + ((hi - lo) >> 1)
+        start_mid = tensor_abs_starts[mid]
+        end_mid = tensor_abs_ends[mid]
+
+        if end_mid < start_mid:
+            return GGUF_TDBASE_ERR_OVERFLOW, 0
+
+        if abs_offset < start_mid:
+            hi = mid
+            continue
+
+        if abs_offset >= end_mid:
+            lo = mid + 1
+            continue
+
+        return GGUF_TDBASE_OK, mid
+
+    return GGUF_TDBASE_ERR_OUT_OF_BOUNDS, 0
+
+
 
 
 def test_tensor_bytes_for_type_scalars() -> None:
@@ -1014,6 +1048,41 @@ def test_tensor_info_resolve_abs_ranges_reject_null_outputs() -> None:
     assert bad == 0
 
 
+def test_tensor_range_find_by_abs_offset_happy_path() -> None:
+    starts = [0x1000, 0x1040, 0x1080]
+    ends = [0x1020, 0x1062, 0x1092]
+
+    assert tensor_range_find_by_abs_offset(0x1000, starts, ends) == (GGUF_TDBASE_OK, 0)
+    assert tensor_range_find_by_abs_offset(0x101F, starts, ends) == (GGUF_TDBASE_OK, 0)
+    assert tensor_range_find_by_abs_offset(0x1040, starts, ends) == (GGUF_TDBASE_OK, 1)
+    assert tensor_range_find_by_abs_offset(0x1061, starts, ends) == (GGUF_TDBASE_OK, 1)
+    assert tensor_range_find_by_abs_offset(0x1080, starts, ends) == (GGUF_TDBASE_OK, 2)
+
+
+def test_tensor_range_find_by_abs_offset_gap_and_end_exclusive() -> None:
+    starts = [0x1000, 0x1040, 0x1080]
+    ends = [0x1020, 0x1062, 0x1092]
+
+    assert tensor_range_find_by_abs_offset(0x1020, starts, ends)[0] == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert tensor_range_find_by_abs_offset(0x107F, starts, ends)[0] == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert tensor_range_find_by_abs_offset(0x1092, starts, ends)[0] == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+
+
+def test_tensor_range_find_by_abs_offset_rejects_malformed_range() -> None:
+    starts = [0x1000, 0x1040]
+    ends = [0x1020, 0x1030]
+
+    err, idx = tensor_range_find_by_abs_offset(0x1040, starts, ends)
+    assert err == GGUF_TDBASE_ERR_OVERFLOW
+    assert idx == 0
+
+
+def test_tensor_range_find_by_abs_offset_empty_table() -> None:
+    err, idx = tensor_range_find_by_abs_offset(0x1000, [], [])
+    assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert idx == 0
+
+
 
 
 def run() -> None:
@@ -1064,6 +1133,10 @@ def run() -> None:
     test_tensor_info_resolve_abs_ranges_happy_path()
     test_tensor_info_resolve_abs_ranges_propagates_bad_block_multiple()
     test_tensor_info_resolve_abs_ranges_reject_null_outputs()
+    test_tensor_range_find_by_abs_offset_happy_path()
+    test_tensor_range_find_by_abs_offset_gap_and_end_exclusive()
+    test_tensor_range_find_by_abs_offset_rejects_malformed_range()
+    test_tensor_range_find_by_abs_offset_empty_table()
     print("gguf_tensor_data_base_reference_checks=ok")
 
 

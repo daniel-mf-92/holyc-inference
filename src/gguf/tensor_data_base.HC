@@ -648,3 +648,58 @@ I64 GGUFTensorInfoResolveAbsRanges(U64 tensor_data_base,
 
     return GGUF_TDBASE_OK;
 }
+
+I64 GGUFTensorRangeFindByAbsOffset(U64 abs_offset,
+                                   U64 tensor_count,
+                                   U64 *tensor_abs_starts,
+                                   U64 *tensor_abs_ends,
+                                   U64 *out_tensor_index)
+{
+    U64 lo;
+    U64 hi;
+    U64 mid;
+    U64 start_mid;
+    U64 end_mid;
+
+    if (!tensor_abs_starts || !tensor_abs_ends || !out_tensor_index)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    // Preserve deterministic output even on misses.
+    *out_tensor_index = 0;
+
+    if (!tensor_count)
+        return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+
+    // Binary search over sorted half-open ranges [start, end).
+    // If abs_offset is below the current range, search left.
+    // If abs_offset is at/after current range end, search right.
+    lo = 0;
+    hi = tensor_count;
+    while (lo < hi)
+    {
+        mid = lo + ((hi - lo) >> 1);
+        start_mid = tensor_abs_starts[mid];
+        end_mid = tensor_abs_ends[mid];
+
+        // Reject malformed range tables from corrupt callers.
+        if (end_mid < start_mid)
+            return GGUF_TDBASE_ERR_OVERFLOW;
+
+        if (abs_offset < start_mid)
+        {
+            hi = mid;
+            continue;
+        }
+
+        if (abs_offset >= end_mid)
+        {
+            lo = mid + 1;
+            continue;
+        }
+
+        *out_tensor_index = mid;
+        return GGUF_TDBASE_OK;
+    }
+
+    return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+}

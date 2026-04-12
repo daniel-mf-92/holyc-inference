@@ -229,7 +229,8 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-041 Implement `GGUFValidateTensorRangesSorted` in `src/gguf/tensor_data_base.HC` using in-place sort + single-pass overlap scan for large tensor tables (WS2-04)
 - [x] IQ-042 Implement `GGUFTensorInfoResolveByteSpans` in `src/gguf/tensor_data_base.HC` to derive per-tensor payload bytes from dims+type and feed sorted range validation (WS2-04)
 - [x] IQ-043 Implement `GGUFTensorInfoResolveAbsRanges` in `src/gguf/tensor_data_base.HC` to output per-tensor absolute `[start,end)` spans after byte-size derivation and range validation (WS2-04)
-- [ ] IQ-044 Implement `GGUFTensorRangeFindByAbsOffset` in `src/gguf/tensor_data_base.HC` (binary search over sorted `[start,end)` spans) for O(log n) tensor payload lookup (WS2-04)
+- [x] IQ-044 Implement `GGUFTensorRangeFindByAbsOffset` in `src/gguf/tensor_data_base.HC` (binary search over sorted `[start,end)` spans) for O(log n) tensor payload lookup (WS2-04)
+- [ ] IQ-045 Implement `GGUFTensorRangeFindByRelOffset` in `src/gguf/tensor_data_base.HC` by translating relative offset to absolute and delegating to `GGUFTensorRangeFindByAbsOffset` (WS2-04)
 
 ## Progress Ledger
 
@@ -265,6 +266,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 | 2026-04-12 | loop-027 | IQ-041 sorted tensor-table range validator | done | Added `GGUFValidateTensorRangesSorted` + in-place heapsort tie-broken by `(offset,nbytes)` in `src/gguf/tensor_data_base.HC`; validated with `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` |
 | 2026-04-12 | loop-028 | IQ-042 tensor info byte-span resolver | done | Added `GGUFTensorInfoResolveByteSpans` + parity tests in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-12 | loop-029 | IQ-043 tensor info absolute range resolver | done | Added `GGUFTensorInfoResolveAbsRanges` in `src/gguf/tensor_data_base.HC` + parity tests for sorted absolute `[start,end)` output and failure propagation; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
+| 2026-04-12 | loop-030 | IQ-044 tensor range binary lookup | done | Added `GGUFTensorRangeFindByAbsOffset` in `src/gguf/tensor_data_base.HC` + binary-search parity tests; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 
 ## Blockers & Decisions
 
