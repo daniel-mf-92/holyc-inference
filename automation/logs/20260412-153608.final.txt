@@ -1,0 +1,25 @@
+Completed — one deep iteration is done end-to-end on `IQ-014`.
+
+**What Changed**
+- Implemented naive integer-only Q4_0 dot-product kernels in `src/quant/q4_0_dot.HC:1`.
+- Added block and multi-block APIs with explicit Q-format semantics:
+  - `Q4_0DotProductBlockQ32`
+  - `Q4_0DotProductBlocksQ32`
+  - `Q4_0DotQ32ToQ16`
+- Added host-side parity harness in `tests/test_q4_0_dot.py:1` covering known vectors, sign/scale behavior, randomized checks, and input-length error cases.
+- Updated queue/ledger in `MASTER_TASKS.md:171`:
+  - Marked `IQ-014` complete.
+  - Appended new rolling item `IQ-029` (monotonic ID).
+  - Added `loop-014` row to Progress Ledger.
+
+**Queue Policy Check**
+- `unchecked_iq_count=15` (meets minimum rolling depth requirement).
+- Highest unchecked item is now `IQ-015`.
+
+**Validation Run Output**
+- `python3 tests/test_q4_0_dot.py` → `q4_0_dot_reference_checks=ok`
+- `python3 tests/test_q4_0_dequant.py` → `q4_0_dequant_reference_checks=ok`
+
+**Notes**
+- No networking features added; air-gap policy preserved.
+- Runtime implementation remains HolyC-only (`.HC` for inference core).
