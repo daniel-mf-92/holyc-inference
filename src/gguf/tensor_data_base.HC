@@ -1183,3 +1183,74 @@ I64 GGUFBuildTensorSortedPositionMap(U64 tensor_count,
 
     return GGUF_TDBASE_OK;
 }
+
+I64 GGUFValidateSortedPositionMap(U64 tensor_count,
+                                  U64 *sorted_tensor_indices,
+                                  U64 *sorted_position_by_tensor,
+                                  U64 *out_bad_index)
+{
+    U64 i;
+    U64 j;
+    U64 sorted_pos;
+    U64 orig_idx;
+
+    if (!sorted_tensor_indices || !sorted_position_by_tensor)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    if (out_bad_index)
+        *out_bad_index = 0;
+
+    // Pass 1: validate original->sorted map bounds, enforce uniqueness,
+    // and check round-trip consistency through sorted_tensor_indices.
+    for (i = 0; i < tensor_count; ++i)
+    {
+        sorted_pos = sorted_position_by_tensor[i];
+
+        if (sorted_pos >= tensor_count)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+        }
+
+        for (j = 0; j < i; ++j)
+        {
+            if (sorted_position_by_tensor[j] == sorted_pos)
+            {
+                if (out_bad_index)
+                    *out_bad_index = i;
+                return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+            }
+        }
+
+        if (sorted_tensor_indices[sorted_pos] != i)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+        }
+    }
+
+    // Pass 2: validate sorted->original entries are in-range and that
+    // each sorted position points back to itself via inverse map.
+    for (i = 0; i < tensor_count; ++i)
+    {
+        orig_idx = sorted_tensor_indices[i];
+
+        if (orig_idx >= tensor_count)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+        }
+
+        if (sorted_position_by_tensor[orig_idx] != i)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+        }
+    }
+
+    return GGUF_TDBASE_OK;
+}

@@ -598,6 +598,39 @@ def build_tensor_sorted_position_map(
     return GGUF_TDBASE_OK, 0
 
 
+def validate_sorted_position_map(
+    sorted_tensor_indices: list[int],
+    sorted_position_by_tensor: list[int],
+):
+    count = len(sorted_tensor_indices)
+    if len(sorted_position_by_tensor) != count:
+        return GGUF_TDBASE_ERR_NULL_PTR, 0
+
+    for i in range(count):
+        sorted_pos = sorted_position_by_tensor[i]
+
+        if sorted_pos >= count:
+            return GGUF_TDBASE_ERR_OUT_OF_BOUNDS, i
+
+        for j in range(i):
+            if sorted_position_by_tensor[j] == sorted_pos:
+                return GGUF_TDBASE_ERR_OUT_OF_BOUNDS, i
+
+        if sorted_tensor_indices[sorted_pos] != i:
+            return GGUF_TDBASE_ERR_OUT_OF_BOUNDS, i
+
+    for i in range(count):
+        orig_idx = sorted_tensor_indices[i]
+
+        if orig_idx >= count:
+            return GGUF_TDBASE_ERR_OUT_OF_BOUNDS, i
+
+        if sorted_position_by_tensor[orig_idx] != i:
+            return GGUF_TDBASE_ERR_OUT_OF_BOUNDS, i
+
+    return GGUF_TDBASE_OK, 0
+
+
 def _abs_range_greater(
     starts: list[int],
     ends: list[int],
@@ -1966,6 +1999,156 @@ def test_build_tensor_sorted_position_map_random_adversarial() -> None:
             err, bad = build_tensor_sorted_position_map(sorted_idx, inverse_map)
             assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
             assert bad == i
+
+
+def test_validate_sorted_position_map_happy_path() -> None:
+    sorted_idx = [2, 0, 3, 1]
+    inverse_map = [1, 3, 0, 2]
+
+    err, bad = validate_sorted_position_map(sorted_idx, inverse_map)
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+
+def test_validate_sorted_position_map_empty_ok() -> None:
+    err, bad = validate_sorted_position_map([], [])
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+
+def test_validate_sorted_position_map_rejects_bad_input_len() -> None:
+    err, bad = validate_sorted_position_map([0, 1, 2], [0, 1])
+    assert err == GGUF_TDBASE_ERR_NULL_PTR
+    assert bad == 0
+
+
+def test_validate_sorted_position_map_rejects_out_of_range_sorted_pos() -> None:
+    sorted_idx = [0, 2, 1, 3]
+    inverse_map = [0, 4, 1, 3]
+
+    err, bad = validate_sorted_position_map(sorted_idx, inverse_map)
+    assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert bad == 1
+
+
+def test_validate_sorted_position_map_rejects_duplicate_sorted_pos() -> None:
+    sorted_idx = [2, 0, 3, 1]
+    inverse_map = [1, 3, 1, 2]
+
+    err, bad = validate_sorted_position_map(sorted_idx, inverse_map)
+    assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert bad == 2
+
+
+def test_validate_sorted_position_map_rejects_roundtrip_mismatch() -> None:
+    sorted_idx = [2, 0, 3, 1]
+    inverse_map = [1, 2, 0, 3]
+
+    err, bad = validate_sorted_position_map(sorted_idx, inverse_map)
+    assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert bad == 1
+
+
+def test_validate_sorted_position_map_rejects_bad_sorted_tensor_index() -> None:
+    sorted_idx = [2, 0, 5, 1]
+    inverse_map = [1, 3, 0, 2]
+
+    err, bad = validate_sorted_position_map(sorted_idx, inverse_map)
+    assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert bad == 3
+
+
+def test_validate_sorted_position_map_with_built_index() -> None:
+    rel_offsets = [0xC0, 0x00, 0x40]
+    elem_counts = [32, 64, 32]
+    ggml_types = [GGML_TYPE_Q8_0, GGML_TYPE_Q4_0, GGML_TYPE_F16]
+    starts = [0, 0, 0]
+    ends = [0, 0, 0]
+    sorted_idx = [0, 0, 0]
+    inverse_map = [0, 0, 0]
+
+    err, bad = tensor_info_build_offset_index(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x2000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_element_counts=elem_counts,
+        tensor_ggml_types=ggml_types,
+        out_abs_starts=starts,
+        out_abs_ends=ends,
+        out_sorted_tensor_indices=sorted_idx,
+    )
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+    err, bad = build_tensor_sorted_position_map(sorted_idx, inverse_map)
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+    err, bad = validate_sorted_position_map(sorted_idx, inverse_map)
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+
+def test_validate_sorted_position_map_random_permutations() -> None:
+    rng = random.Random(764201)
+
+    for _ in range(400):
+        count = rng.randint(1, 32)
+        sorted_idx = list(range(count))
+        rng.shuffle(sorted_idx)
+        inverse_map = [0] * count
+
+        err, bad = build_tensor_sorted_position_map(sorted_idx, inverse_map)
+        assert err == GGUF_TDBASE_OK
+        assert bad == 0
+
+        err, bad = validate_sorted_position_map(sorted_idx, inverse_map)
+        assert err == GGUF_TDBASE_OK
+        assert bad == 0
+
+
+def test_validate_sorted_position_map_random_adversarial() -> None:
+    rng = random.Random(764211)
+
+    for _ in range(320):
+        count = rng.randint(2, 28)
+        sorted_idx = list(range(count))
+        rng.shuffle(sorted_idx)
+        inverse_map = [0] * count
+
+        err, bad = build_tensor_sorted_position_map(sorted_idx, inverse_map)
+        assert err == GGUF_TDBASE_OK
+        assert bad == 0
+
+        case = rng.randint(0, 3)
+        if case == 0:
+            i = rng.randint(0, count - 1)
+            inverse_map[i] = count + rng.randint(0, 7)
+            err, bad = validate_sorted_position_map(sorted_idx, inverse_map)
+            assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+            assert bad == i
+        elif case == 1:
+            i = rng.randint(1, count - 1)
+            inverse_map[i] = inverse_map[rng.randint(0, i - 1)]
+            err, bad = validate_sorted_position_map(sorted_idx, inverse_map)
+            assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+            assert bad == i
+        elif case == 2:
+            i = rng.randint(0, count - 1)
+            inverse_map[i] = (inverse_map[i] + 1) % count
+            err, bad = validate_sorted_position_map(sorted_idx, inverse_map)
+            assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+            assert bad == i
+        else:
+            i = rng.randint(0, count - 1)
+            sorted_pos = inverse_map[i]
+            sorted_idx[sorted_pos] = count + rng.randint(0, 7)
+            err, bad = validate_sorted_position_map(sorted_idx, inverse_map)
+            assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+            assert 0 <= bad < count
+
+
 def run() -> None:
     test_default_alignment_examples()
     test_tensor_bytes_for_type_scalars()
@@ -2054,6 +2237,16 @@ def run() -> None:
     test_build_tensor_sorted_position_map_with_built_index()
     test_build_tensor_sorted_position_map_random_permutations()
     test_build_tensor_sorted_position_map_random_adversarial()
+    test_validate_sorted_position_map_happy_path()
+    test_validate_sorted_position_map_empty_ok()
+    test_validate_sorted_position_map_rejects_bad_input_len()
+    test_validate_sorted_position_map_rejects_out_of_range_sorted_pos()
+    test_validate_sorted_position_map_rejects_duplicate_sorted_pos()
+    test_validate_sorted_position_map_rejects_roundtrip_mismatch()
+    test_validate_sorted_position_map_rejects_bad_sorted_tensor_index()
+    test_validate_sorted_position_map_with_built_index()
+    test_validate_sorted_position_map_random_permutations()
+    test_validate_sorted_position_map_random_adversarial()
     print("gguf_tensor_data_base_reference_checks=ok")
 
 
