@@ -1128,3 +1128,58 @@ I64 GGUFValidateSortedTensorIndex(U64 tensor_count,
 
     return GGUF_TDBASE_OK;
 }
+
+I64 GGUFBuildTensorSortedPositionMap(U64 tensor_count,
+                                     U64 *sorted_tensor_indices,
+                                     U64 *out_sorted_position_by_tensor,
+                                     U64 *out_bad_index)
+{
+    U64 i;
+    U64 tensor_index;
+
+    if (!sorted_tensor_indices || !out_sorted_position_by_tensor)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    if (out_bad_index)
+        *out_bad_index = 0;
+
+    // Initialize to sentinel `tensor_count` so duplicates and missing entries
+    // can be detected in one forward pass without extra allocations.
+    for (i = 0; i < tensor_count; ++i)
+        out_sorted_position_by_tensor[i] = tensor_count;
+
+    // Invert sorted->original map into original->sorted position map.
+    for (i = 0; i < tensor_count; ++i)
+    {
+        tensor_index = sorted_tensor_indices[i];
+
+        if (tensor_index >= tensor_count)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+        }
+
+        if (out_sorted_position_by_tensor[tensor_index] != tensor_count)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+        }
+
+        out_sorted_position_by_tensor[tensor_index] = i;
+    }
+
+    // Confirm every original tensor index appeared exactly once.
+    for (i = 0; i < tensor_count; ++i)
+    {
+        if (out_sorted_position_by_tensor[i] == tensor_count)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+        }
+    }
+
+    return GGUF_TDBASE_OK;
+}

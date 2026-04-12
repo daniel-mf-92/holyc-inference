@@ -236,7 +236,10 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-048 Add indexed tensor lookup helpers (`GGUFTensorRangeFindIndexByAbsOffset`, `GGUFTensorRangeFindIndexByRelOffset`) in `src/gguf/tensor_data_base.HC` returning original tensor index (WS2-04)
 - [x] IQ-049 Add default-alignment indexed lookup helper `GGUFTensorRangeFindIndexByRelOffsetDefault` in `src/gguf/tensor_data_base.HC` and parity tests in `tests/test_gguf_tensor_data_base.py` (WS2-04)
 - [x] IQ-050 Add offset-index integrity validator `GGUFValidateSortedTensorIndex` (permutation+range checks) in `src/gguf/tensor_data_base.HC` with adversarial host parity tests (WS2-04)
-- [ ] IQ-051 Add sorted-index inverse map builder `GGUFBuildTensorSortedPositionMap` in `src/gguf/tensor_data_base.HC` (original index -> sorted position) with parity checks in `tests/test_gguf_tensor_data_base.py` (WS2-04)
+- [x] IQ-051 Add sorted-index inverse map builder `GGUFBuildTensorSortedPositionMap` in `src/gguf/tensor_data_base.HC` (original index -> sorted position) with parity checks in `tests/test_gguf_tensor_data_base.py` (WS2-04)
+- [ ] IQ-052 Implement `GGUFValidateSortedPositionMap` in `src/gguf/tensor_data_base.HC` to verify original->sorted inverse map bounds/permutation consistency against `sorted_tensor_indices` (WS2-04)
+- [ ] IQ-053 Implement `GGUFTensorIndexToAbsRange` in `src/gguf/tensor_data_base.HC` using inverse map + sorted span arrays for O(1)+lookup tensor range retrieval by original index (WS2-04)
+- [ ] IQ-054 Add host-side parity harnesses for inverse-map/range-index helpers in `tests/test_gguf_tensor_data_base.py` with randomized permutation adversarial cases (WS2-04)
 
 ## Progress Ledger
 
@@ -279,6 +282,8 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 | 2026-04-12 | loop-028 | IQ-042 tensor info byte-span resolver | done | Added `GGUFTensorInfoResolveByteSpans` + parity tests in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-12 | loop-029 | IQ-043 tensor info absolute range resolver | done | Added `GGUFTensorInfoResolveAbsRanges` in `src/gguf/tensor_data_base.HC` + parity tests for sorted absolute `[start,end)` output and failure propagation; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-12 | loop-030 | IQ-044 tensor range binary lookup | done | Added `GGUFTensorRangeFindByAbsOffset` in `src/gguf/tensor_data_base.HC` + binary-search parity tests; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
+
+| 2026-04-12 | loop-031 | IQ-051 sorted-index inverse map builder | done | Added `GGUFBuildTensorSortedPositionMap` in `src/gguf/tensor_data_base.HC` + parity tests in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 
 ## Blockers & Decisions
 
