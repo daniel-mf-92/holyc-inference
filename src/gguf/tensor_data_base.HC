@@ -5,6 +5,8 @@
 #define GGUF_TDBASE_ERR_NULL_PTR 1
 #define GGUF_TDBASE_ERR_BAD_ALIGNMENT 2
 #define GGUF_TDBASE_ERR_OVERFLOW 3
+#define GGUF_TDBASE_ERR_MISALIGNED_BASE 4
+#define GGUF_TDBASE_ERR_MISALIGNED_TENSOR_OFFSET 5
 
 // GGUF default tensor alignment when metadata key `general.alignment`
 // is absent.
@@ -73,3 +75,39 @@ Bool GGUFTensorDataBaseIsAligned(U64 offset, U32 alignment)
     return (offset & mask) == 0;
 }
 
+I64 GGUFTensorDataBaseOffset(U64 tensor_data_base,
+                             U64 tensor_rel_offset,
+                             U32 alignment,
+                             U64 *out_tensor_abs)
+{
+    if (!out_tensor_abs)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    if (GGUFValidateAlignment(alignment) != GGUF_TDBASE_OK)
+        return GGUF_TDBASE_ERR_BAD_ALIGNMENT;
+
+    // Both base and relative tensor offsets must preserve GGUF alignment.
+    // Enforcing this here keeps every downstream payload read auditable.
+    if (!GGUFTensorDataBaseIsAligned(tensor_data_base, alignment))
+        return GGUF_TDBASE_ERR_MISALIGNED_BASE;
+    if (!GGUFTensorDataBaseIsAligned(tensor_rel_offset, alignment))
+        return GGUF_TDBASE_ERR_MISALIGNED_TENSOR_OFFSET;
+
+    // Absolute payload pointer is base + relative offset.
+    // Keep overflow check explicit for malformed large files.
+    if (tensor_data_base > 0xFFFFFFFFFFFFFFFF - tensor_rel_offset)
+        return GGUF_TDBASE_ERR_OVERFLOW;
+
+    *out_tensor_abs = tensor_data_base + tensor_rel_offset;
+    return GGUF_TDBASE_OK;
+}
+
+I64 GGUFTensorDataBaseOffsetDefault(U64 tensor_data_base,
+                                    U64 tensor_rel_offset,
+                                    U64 *out_tensor_abs)
+{
+    return GGUFTensorDataBaseOffset(tensor_data_base,
+                                    tensor_rel_offset,
+                                    GGUF_DEFAULT_ALIGNMENT,
+                                    out_tensor_abs);
+}
