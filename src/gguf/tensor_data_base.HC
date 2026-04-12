@@ -7,10 +7,83 @@
 #define GGUF_TDBASE_ERR_OVERFLOW 3
 #define GGUF_TDBASE_ERR_MISALIGNED_BASE 4
 #define GGUF_TDBASE_ERR_MISALIGNED_TENSOR_OFFSET 5
+#define GGUF_TDBASE_ERR_BAD_TYPE 6
 
 // GGUF default tensor alignment when metadata key `general.alignment`
 // is absent.
 #define GGUF_DEFAULT_ALIGNMENT 32
+
+// Subset of ggml tensor types currently enabled in HolyC inference runtime.
+// Keep this list strict and explicit so sizing math never silently accepts
+// unknown quantization tags from malformed GGUF files.
+#define GGML_TYPE_F32   0
+#define GGML_TYPE_F16   1
+#define GGML_TYPE_Q4_0  2
+#define GGML_TYPE_Q8_0  8
+
+// GGML quantization blocks for runtime-critical formats:
+// - F32/F16 are scalar types (block size 1).
+// - Q4_0 and Q8_0 are packed in 32-element blocks.
+#define GGML_BLCK_SIZE_F32   1
+#define GGML_BLCK_SIZE_F16   1
+#define GGML_BLCK_SIZE_Q4_0  32
+#define GGML_BLCK_SIZE_Q8_0  32
+
+// Block payload byte widths from ggml struct layouts:
+// - Q4_0: fp16 scale (2 bytes) + 16 packed nibbles = 18 bytes.
+// - Q8_0: fp16 scale (2 bytes) + 32 signed bytes = 34 bytes.
+#define GGML_TYPE_SIZE_F32   4
+#define GGML_TYPE_SIZE_F16   2
+#define GGML_TYPE_SIZE_Q4_0  18
+#define GGML_TYPE_SIZE_Q8_0  34
+
+I64 GGUFTensorTypeBlockSize(U32 ggml_type, U64 *out_block_size)
+{
+    if (!out_block_size)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    switch (ggml_type)
+    {
+        case GGML_TYPE_F32:
+            *out_block_size = GGML_BLCK_SIZE_F32;
+            return GGUF_TDBASE_OK;
+        case GGML_TYPE_F16:
+            *out_block_size = GGML_BLCK_SIZE_F16;
+            return GGUF_TDBASE_OK;
+        case GGML_TYPE_Q4_0:
+            *out_block_size = GGML_BLCK_SIZE_Q4_0;
+            return GGUF_TDBASE_OK;
+        case GGML_TYPE_Q8_0:
+            *out_block_size = GGML_BLCK_SIZE_Q8_0;
+            return GGUF_TDBASE_OK;
+    }
+
+    return GGUF_TDBASE_ERR_BAD_TYPE;
+}
+
+I64 GGUFTensorTypeBlockBytes(U32 ggml_type, U64 *out_block_bytes)
+{
+    if (!out_block_bytes)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    switch (ggml_type)
+    {
+        case GGML_TYPE_F32:
+            *out_block_bytes = GGML_TYPE_SIZE_F32;
+            return GGUF_TDBASE_OK;
+        case GGML_TYPE_F16:
+            *out_block_bytes = GGML_TYPE_SIZE_F16;
+            return GGUF_TDBASE_OK;
+        case GGML_TYPE_Q4_0:
+            *out_block_bytes = GGML_TYPE_SIZE_Q4_0;
+            return GGUF_TDBASE_OK;
+        case GGML_TYPE_Q8_0:
+            *out_block_bytes = GGML_TYPE_SIZE_Q8_0;
+            return GGUF_TDBASE_OK;
+    }
+
+    return GGUF_TDBASE_ERR_BAD_TYPE;
+}
 
 Bool GGUFIsPow2U32(U32 value)
 {

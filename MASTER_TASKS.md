@@ -222,7 +222,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-034 Implement Q4_0 x Q8_0 blockwise Q16 accumulation helper in `src/quant/q4_0_q8_0_dot.HC` for mixed matmul callers (WS4-01)
 - [ ] IQ-035 Add Q8_0 Q16-accumulator parity harness in `tests/test_q8_0_dot_accum_q16.py` with seeded blockwise rounding checks (WS4-01)
 - [x] IQ-036 Implement GGUF tensor data offset resolver (`GGUFTensorDataBaseOffset`) in `src/gguf/tensor_data_base.HC` with alignment validation (WS2-04)
-- [ ] IQ-037 Implement GGML tensor block-size/byte-size helpers in `src/gguf/tensor_data_base.HC` for F32/F16/Q4_0/Q8_0 sizing math (WS2-04)
+- [x] IQ-037 Implement GGML tensor block-size/byte-size helpers in `src/gguf/tensor_data_base.HC` for F32/F16/Q4_0/Q8_0 sizing math (WS2-04)
 - [ ] IQ-038 Implement GGUF tensor absolute range validator (`GGUFTensorResolveRange`) in `src/gguf/tensor_data_base.HC` with overflow-safe `abs+size` checks (WS2-04)
 - [ ] IQ-039 Implement GGUF tensor payload byte-size helper (`GGUFTensorBytesForType`) in `src/gguf/tensor_data_base.HC` for F32/F16/Q4_0/Q8_0 (WS2-04)
 
@@ -254,6 +254,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 | 2026-04-12 | loop-021 | IQ-026 metadata key lookup helpers | done | Added `GGUFMetaFindByKey` + typed scalar extractors; `python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-12 | loop-022 | IQ-028 tensor data base alignment helper | done | Added `src/gguf/tensor_data_base.HC` alignment/overflow checks + `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_metadata_parse.py && python3 tests/test_gguf_tensorinfo_parse.py` passed |
 | 2026-04-12 | loop-023 | IQ-036 tensor data offset resolver | done | Added `GGUFTensorDataBaseOffset`/default in `src/gguf/tensor_data_base.HC` with base/relative alignment and overflow guards; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
+| 2026-04-12 | loop-024 | IQ-037 tensor block-size/byte-size helpers | done | Added `GGUFTensorTypeBlockSize`/`GGUFTensorTypeBlockBytes` in `src/gguf/tensor_data_base.HC`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 
 ## Blockers & Decisions
 

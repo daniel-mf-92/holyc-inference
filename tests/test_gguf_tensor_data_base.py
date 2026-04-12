@@ -11,9 +11,39 @@ GGUF_TDBASE_ERR_BAD_ALIGNMENT = 2
 GGUF_TDBASE_ERR_OVERFLOW = 3
 GGUF_TDBASE_ERR_MISALIGNED_BASE = 4
 GGUF_TDBASE_ERR_MISALIGNED_TENSOR_OFFSET = 5
+GGUF_TDBASE_ERR_BAD_TYPE = 6
 
 GGUF_DEFAULT_ALIGNMENT = 32
 U64_MAX = (1 << 64) - 1
+
+GGML_TYPE_F32 = 0
+GGML_TYPE_F16 = 1
+GGML_TYPE_Q4_0 = 2
+GGML_TYPE_Q8_0 = 8
+
+
+def tensor_type_block_size(ggml_type: int):
+    if ggml_type == GGML_TYPE_F32:
+        return GGUF_TDBASE_OK, 1
+    if ggml_type == GGML_TYPE_F16:
+        return GGUF_TDBASE_OK, 1
+    if ggml_type == GGML_TYPE_Q4_0:
+        return GGUF_TDBASE_OK, 32
+    if ggml_type == GGML_TYPE_Q8_0:
+        return GGUF_TDBASE_OK, 32
+    return GGUF_TDBASE_ERR_BAD_TYPE, 0
+
+
+def tensor_type_block_bytes(ggml_type: int):
+    if ggml_type == GGML_TYPE_F32:
+        return GGUF_TDBASE_OK, 4
+    if ggml_type == GGML_TYPE_F16:
+        return GGUF_TDBASE_OK, 2
+    if ggml_type == GGML_TYPE_Q4_0:
+        return GGUF_TDBASE_OK, 18
+    if ggml_type == GGML_TYPE_Q8_0:
+        return GGUF_TDBASE_OK, 34
+    return GGUF_TDBASE_ERR_BAD_TYPE, 0
 
 
 def is_pow2_u32(value: int) -> bool:
@@ -75,6 +105,25 @@ def test_default_alignment_examples() -> None:
     assert tensor_data_base_align_default(31) == (GGUF_TDBASE_OK, 32)
     assert tensor_data_base_align_default(32) == (GGUF_TDBASE_OK, 32)
     assert tensor_data_base_align_default(33) == (GGUF_TDBASE_OK, 64)
+
+
+def test_tensor_type_block_size_known_types() -> None:
+    assert tensor_type_block_size(GGML_TYPE_F32) == (GGUF_TDBASE_OK, 1)
+    assert tensor_type_block_size(GGML_TYPE_F16) == (GGUF_TDBASE_OK, 1)
+    assert tensor_type_block_size(GGML_TYPE_Q4_0) == (GGUF_TDBASE_OK, 32)
+    assert tensor_type_block_size(GGML_TYPE_Q8_0) == (GGUF_TDBASE_OK, 32)
+
+
+def test_tensor_type_block_bytes_known_types() -> None:
+    assert tensor_type_block_bytes(GGML_TYPE_F32) == (GGUF_TDBASE_OK, 4)
+    assert tensor_type_block_bytes(GGML_TYPE_F16) == (GGUF_TDBASE_OK, 2)
+    assert tensor_type_block_bytes(GGML_TYPE_Q4_0) == (GGUF_TDBASE_OK, 18)
+    assert tensor_type_block_bytes(GGML_TYPE_Q8_0) == (GGUF_TDBASE_OK, 34)
+
+
+def test_tensor_type_helpers_reject_unknown_type() -> None:
+    assert tensor_type_block_size(999) == (GGUF_TDBASE_ERR_BAD_TYPE, 0)
+    assert tensor_type_block_bytes(999) == (GGUF_TDBASE_ERR_BAD_TYPE, 0)
 
 
 def test_custom_power_of_two_alignment() -> None:
@@ -172,6 +221,9 @@ def test_tensor_data_base_offset_random_aligned_cases() -> None:
 
 def run() -> None:
     test_default_alignment_examples()
+    test_tensor_type_block_size_known_types()
+    test_tensor_type_block_bytes_known_types()
+    test_tensor_type_helpers_reject_unknown_type()
     test_custom_power_of_two_alignment()
     test_reject_non_power_of_two_alignment()
     test_overflow_guard_near_u64_max()
