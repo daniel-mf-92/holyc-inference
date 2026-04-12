@@ -307,6 +307,39 @@ def validate_tensor_ranges_sorted(
     return GGUF_TDBASE_OK, 0
 
 
+def tensor_info_resolve_byte_spans(
+    tensor_data_base: int,
+    alignment: int,
+    gguf_file_nbytes: int,
+    tensor_rel_offsets: list[int],
+    tensor_element_counts: list[int],
+    tensor_ggml_types: list[int],
+    out_tensor_nbytes: list[int],
+):
+    count = len(tensor_rel_offsets)
+
+    if len(tensor_element_counts) != count:
+        return GGUF_TDBASE_ERR_NULL_PTR, 0
+    if len(tensor_ggml_types) != count:
+        return GGUF_TDBASE_ERR_NULL_PTR, 0
+    if len(out_tensor_nbytes) != count:
+        return GGUF_TDBASE_ERR_NULL_PTR, 0
+
+    for i in range(count):
+        err, nbytes = tensor_bytes_for_type(tensor_ggml_types[i], tensor_element_counts[i])
+        if err != GGUF_TDBASE_OK:
+            return err, i
+        out_tensor_nbytes[i] = nbytes
+
+    return validate_tensor_ranges_sorted(
+        tensor_data_base=tensor_data_base,
+        alignment=alignment,
+        gguf_file_nbytes=gguf_file_nbytes,
+        tensor_rel_offsets=tensor_rel_offsets,
+        tensor_nbytes=out_tensor_nbytes,
+    )
+
+
 
 
 def test_tensor_bytes_for_type_scalars() -> None:
@@ -785,6 +818,84 @@ def test_validate_tensor_ranges_sorted_random_matches_quadratic_validator() -> N
             assert rel_b == sorted(rel_offsets)
 
 
+def test_tensor_info_resolve_byte_spans_happy_path() -> None:
+    rel_offsets = [0x80, 0x00, 0x40]
+    element_counts = [32, 8, 32]
+    ggml_types = [GGML_TYPE_Q4_0, GGML_TYPE_F32, GGML_TYPE_Q8_0]
+    out_nbytes = [0, 0, 0]
+
+    err, bad = tensor_info_resolve_byte_spans(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x4000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_element_counts=element_counts,
+        tensor_ggml_types=ggml_types,
+        out_tensor_nbytes=out_nbytes,
+    )
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+    assert rel_offsets == [0x00, 0x40, 0x80]
+    assert out_nbytes == [32, 34, 18]
+
+
+def test_tensor_info_resolve_byte_spans_reject_bad_block_multiple() -> None:
+    rel_offsets = [0x00, 0x20]
+    element_counts = [32, 31]
+    ggml_types = [GGML_TYPE_Q8_0, GGML_TYPE_Q4_0]
+    out_nbytes = [0, 0]
+
+    err, bad = tensor_info_resolve_byte_spans(
+        tensor_data_base=0x2000,
+        alignment=32,
+        gguf_file_nbytes=0x5000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_element_counts=element_counts,
+        tensor_ggml_types=ggml_types,
+        out_tensor_nbytes=out_nbytes,
+    )
+    assert err == GGUF_TDBASE_ERR_BAD_BLOCK_MULTIPLE
+    assert bad == 1
+
+
+def test_tensor_info_resolve_byte_spans_reject_unknown_type() -> None:
+    rel_offsets = [0x00]
+    element_counts = [32]
+    ggml_types = [999]
+    out_nbytes = [0]
+
+    err, bad = tensor_info_resolve_byte_spans(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x2000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_element_counts=element_counts,
+        tensor_ggml_types=ggml_types,
+        out_tensor_nbytes=out_nbytes,
+    )
+    assert err == GGUF_TDBASE_ERR_BAD_TYPE
+    assert bad == 0
+
+
+def test_tensor_info_resolve_byte_spans_detect_overlap_after_sizing() -> None:
+    rel_offsets = [0x00, 0x20]
+    element_counts = [16, 8]
+    ggml_types = [GGML_TYPE_F32, GGML_TYPE_F32]
+    out_nbytes = [0, 0]
+
+    err, bad = tensor_info_resolve_byte_spans(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x5000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_element_counts=element_counts,
+        tensor_ggml_types=ggml_types,
+        out_tensor_nbytes=out_nbytes,
+    )
+    assert err == GGUF_TDBASE_ERR_OVERLAP
+    assert bad == 1
+
+
 
 
 def run() -> None:
@@ -828,6 +939,10 @@ def run() -> None:
     test_validate_tensor_ranges_sorted_detect_overlap()
     test_validate_tensor_ranges_sorted_propagates_bad_alignment_without_sort()
     test_validate_tensor_ranges_sorted_random_matches_quadratic_validator()
+    test_tensor_info_resolve_byte_spans_happy_path()
+    test_tensor_info_resolve_byte_spans_reject_bad_block_multiple()
+    test_tensor_info_resolve_byte_spans_reject_unknown_type()
+    test_tensor_info_resolve_byte_spans_detect_overlap_after_sizing()
     print("gguf_tensor_data_base_reference_checks=ok")
 
 

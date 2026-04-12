@@ -541,3 +541,49 @@ I64 GGUFValidateTensorRangesSorted(U64 tensor_data_base,
 
     return GGUF_TDBASE_OK;
 }
+
+I64 GGUFTensorInfoResolveByteSpans(U64 tensor_data_base,
+                                   U32 alignment,
+                                   U64 gguf_file_nbytes,
+                                   U64 tensor_count,
+                                   U64 *tensor_rel_offsets,
+                                   U64 *tensor_element_counts,
+                                   U32 *tensor_ggml_types,
+                                   U64 *out_tensor_nbytes,
+                                   U64 *out_bad_index)
+{
+    U64 i;
+    I64 err;
+
+    if (!tensor_rel_offsets || !tensor_element_counts ||
+        !tensor_ggml_types || !out_tensor_nbytes)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    if (out_bad_index)
+        *out_bad_index = 0;
+
+    // Pass 1: compute payload byte spans directly from ggml type + element count.
+    // This keeps tensor sizing math centralized in GGUFTensorBytesForType.
+    for (i = 0; i < tensor_count; ++i)
+    {
+        err = GGUFTensorBytesForType(tensor_ggml_types[i],
+                                     tensor_element_counts[i],
+                                     &out_tensor_nbytes[i]);
+        if (err != GGUF_TDBASE_OK)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return err;
+        }
+    }
+
+    // Pass 2: validate and sort ranges using the computed byte spans.
+    // GGUFValidateTensorRangesSorted reorders offsets and nbytes in-place.
+    return GGUFValidateTensorRangesSorted(tensor_data_base,
+                                          alignment,
+                                          gguf_file_nbytes,
+                                          tensor_count,
+                                          tensor_rel_offsets,
+                                          out_tensor_nbytes,
+                                          out_bad_index);
+}

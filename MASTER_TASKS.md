@@ -227,7 +227,8 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] IQ-039 Implement GGUF tensor payload byte-size helper (`GGUFTensorBytesForType`) in `src/gguf/tensor_data_base.HC` for F32/F16/Q4_0/Q8_0 (WS2-04)
 - [x] IQ-040 Implement GGUF tensor-table range validator (`GGUFValidateTensorRanges`) in `src/gguf/tensor_data_base.HC` to enforce non-overlap and EOF bounds (WS2-04)
 - [x] IQ-041 Implement `GGUFValidateTensorRangesSorted` in `src/gguf/tensor_data_base.HC` using in-place sort + single-pass overlap scan for large tensor tables (WS2-04)
-- [ ] IQ-042 Implement `GGUFTensorInfoResolveByteSpans` in `src/gguf/tensor_data_base.HC` to derive per-tensor payload bytes from dims+type and feed sorted range validation (WS2-04)
+- [x] IQ-042 Implement `GGUFTensorInfoResolveByteSpans` in `src/gguf/tensor_data_base.HC` to derive per-tensor payload bytes from dims+type and feed sorted range validation (WS2-04)
+- [ ] IQ-043 Implement `GGUFTensorInfoResolveAbsRanges` in `src/gguf/tensor_data_base.HC` to output per-tensor absolute `[start,end)` spans after byte-size derivation and range validation (WS2-04)
 
 ## Progress Ledger
 
@@ -261,6 +262,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 | 2026-04-12 | loop-025 | IQ-038 tensor absolute range validator | done | Added `GGUFTensorResolveRange`/default in `src/gguf/tensor_data_base.HC` with overflow + file-bound checks and expanded parity harness; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-12 | loop-026 | IQ-040 tensor-table range validator | done | Added `GGUFValidateTensorRanges` in `src/gguf/tensor_data_base.HC` with per-range validation + non-overlap enforcement; validated with `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` |
 | 2026-04-12 | loop-027 | IQ-041 sorted tensor-table range validator | done | Added `GGUFValidateTensorRangesSorted` + in-place heapsort tie-broken by `(offset,nbytes)` in `src/gguf/tensor_data_base.HC`; validated with `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` |
+| 2026-04-12 | loop-028 | IQ-042 tensor info byte-span resolver | done | Added `GGUFTensorInfoResolveByteSpans` + parity tests in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 
 ## Blockers & Decisions
 
