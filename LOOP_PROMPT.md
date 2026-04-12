@@ -55,3 +55,18 @@ Definition of done:
 - Queue depth policy was maintained (rolling, not fixed at seed size).
 - Files are consistent and readable.
 - Validation command output is captured in your final message.
+
+## TEST VM — Real TempleOS for Compilation Testing
+
+Azure VM 52.157.85.234 has QEMU + TempleOS ISO ready for testing.
+
+SSH: ssh -o StrictHostKeyChecking=no azureuser@52.157.85.234
+ISO: /home/azureuser/TempleOS.ISO
+Repo: /home/azureuser/holyc-inference (branch: main)
+
+You CAN SSH in and test .HC files compile inside real TempleOS.
+Create a FAT disk image with your .HC files, boot TempleOS with it attached,
+TempleOS will #include from the second drive at runtime.
+Serial output captures compilation results.
+
+Use this to verify your math, GGUF parser, and quant kernels actually compile in HolyC.
