@@ -13,6 +13,8 @@ GGUF_TDBASE_ERR_MISALIGNED_BASE = 4
 GGUF_TDBASE_ERR_MISALIGNED_TENSOR_OFFSET = 5
 GGUF_TDBASE_ERR_BAD_TYPE = 6
 GGUF_TDBASE_ERR_OUT_OF_BOUNDS = 7
+GGUF_TDBASE_ERR_BAD_BLOCK_MULTIPLE = 8
+GGUF_TDBASE_ERR_OVERLAP = 9
 
 GGUF_DEFAULT_ALIGNMENT = 32
 U64_MAX = (1 << 64) - 1
@@ -49,6 +51,25 @@ def tensor_type_block_bytes(ggml_type: int):
 
 def is_pow2_u32(value: int) -> bool:
     return value > 0 and (value & (value - 1)) == 0
+
+
+def tensor_bytes_for_type(ggml_type: int, element_count: int):
+    err, block_size = tensor_type_block_size(ggml_type)
+    if err != GGUF_TDBASE_OK:
+        return err, 0
+
+    err, block_bytes = tensor_type_block_bytes(ggml_type)
+    if err != GGUF_TDBASE_OK:
+        return err, 0
+
+    if element_count % block_size != 0:
+        return GGUF_TDBASE_ERR_BAD_BLOCK_MULTIPLE, 0
+
+    block_count = element_count // block_size
+    if block_count > U64_MAX // block_bytes:
+        return GGUF_TDBASE_ERR_OVERFLOW, 0
+
+    return GGUF_TDBASE_OK, block_count * block_bytes
 
 
 def validate_alignment(alignment: int) -> int:
@@ -135,6 +156,92 @@ def tensor_resolve_range_default(
         GGUF_DEFAULT_ALIGNMENT,
     )
 
+
+def validate_tensor_ranges(
+    tensor_data_base: int,
+    alignment: int,
+    gguf_file_nbytes: int,
+    tensor_rel_offsets: list[int],
+    tensor_nbytes: list[int],
+):
+    if len(tensor_rel_offsets) != len(tensor_nbytes):
+        return GGUF_TDBASE_ERR_NULL_PTR, 0
+
+    count = len(tensor_rel_offsets)
+
+    for i in range(count):
+        err, _, _ = tensor_resolve_range(
+            tensor_data_base,
+            tensor_rel_offsets[i],
+            tensor_nbytes[i],
+            gguf_file_nbytes,
+            alignment,
+        )
+        if err != GGUF_TDBASE_OK:
+            return err, i
+
+    for i in range(count):
+        err, start_i, end_i = tensor_resolve_range(
+            tensor_data_base,
+            tensor_rel_offsets[i],
+            tensor_nbytes[i],
+            gguf_file_nbytes,
+            alignment,
+        )
+        assert err == GGUF_TDBASE_OK
+
+        for j in range(i + 1, count):
+            err, start_j, end_j = tensor_resolve_range(
+                tensor_data_base,
+                tensor_rel_offsets[j],
+                tensor_nbytes[j],
+                gguf_file_nbytes,
+                alignment,
+            )
+            assert err == GGUF_TDBASE_OK
+
+            if (start_i < end_j) and (start_j < end_i):
+                return GGUF_TDBASE_ERR_OVERLAP, j
+
+    return GGUF_TDBASE_OK, 0
+
+
+
+
+def test_tensor_bytes_for_type_scalars() -> None:
+    assert tensor_bytes_for_type(GGML_TYPE_F32, 0) == (GGUF_TDBASE_OK, 0)
+    assert tensor_bytes_for_type(GGML_TYPE_F32, 7) == (GGUF_TDBASE_OK, 28)
+    assert tensor_bytes_for_type(GGML_TYPE_F16, 7) == (GGUF_TDBASE_OK, 14)
+
+
+def test_tensor_bytes_for_type_quantized_exact_blocks() -> None:
+    assert tensor_bytes_for_type(GGML_TYPE_Q4_0, 32) == (GGUF_TDBASE_OK, 18)
+    assert tensor_bytes_for_type(GGML_TYPE_Q4_0, 64) == (GGUF_TDBASE_OK, 36)
+    assert tensor_bytes_for_type(GGML_TYPE_Q8_0, 32) == (GGUF_TDBASE_OK, 34)
+    assert tensor_bytes_for_type(GGML_TYPE_Q8_0, 96) == (GGUF_TDBASE_OK, 102)
+
+
+def test_tensor_bytes_for_type_reject_non_multiple_block() -> None:
+    assert tensor_bytes_for_type(GGML_TYPE_Q4_0, 31) == (GGUF_TDBASE_ERR_BAD_BLOCK_MULTIPLE, 0)
+    assert tensor_bytes_for_type(GGML_TYPE_Q8_0, 33) == (GGUF_TDBASE_ERR_BAD_BLOCK_MULTIPLE, 0)
+
+
+def test_tensor_bytes_for_type_reject_unknown_type() -> None:
+    assert tensor_bytes_for_type(999, 32) == (GGUF_TDBASE_ERR_BAD_TYPE, 0)
+
+
+def test_tensor_bytes_for_type_overflow_guard() -> None:
+    q8_block = 32
+    q8_bytes = 34
+    max_blocks = U64_MAX // q8_bytes
+    ok_elements = max_blocks * q8_block
+    err, nbytes = tensor_bytes_for_type(GGML_TYPE_Q8_0, ok_elements)
+    assert err == GGUF_TDBASE_OK
+    assert nbytes == max_blocks * q8_bytes
+
+    overflow_elements = (max_blocks + 1) * q8_block
+    err, _ = tensor_bytes_for_type(GGML_TYPE_Q8_0, overflow_elements)
+    assert err == GGUF_TDBASE_ERR_OVERFLOW
 
 def test_default_alignment_examples() -> None:
     assert tensor_data_base_align_default(0) == (GGUF_TDBASE_OK, 0)
@@ -333,8 +440,126 @@ def test_tensor_resolve_range_random_valid_cases() -> None:
         assert got_end == end
 
 
+def test_validate_tensor_ranges_non_overlapping_happy_path() -> None:
+    err, bad = validate_tensor_ranges(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x5000,
+        tensor_rel_offsets=[0x00, 0x80, 0x100, 0x200],
+        tensor_nbytes=[0x40, 0x40, 0x80, 0x20],
+    )
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+
+def test_validate_tensor_ranges_detect_overlap() -> None:
+    err, bad = validate_tensor_ranges(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x5000,
+        tensor_rel_offsets=[0x00, 0x20, 0x200],
+        tensor_nbytes=[0x40, 0x40, 0x20],
+    )
+    assert err == GGUF_TDBASE_ERR_OVERLAP
+    assert bad == 1
+
+
+def test_validate_tensor_ranges_propagates_bad_alignment() -> None:
+    err, bad = validate_tensor_ranges(
+        tensor_data_base=0x1000,
+        alignment=24,
+        gguf_file_nbytes=0x5000,
+        tensor_rel_offsets=[0x00, 0x20],
+        tensor_nbytes=[0x20, 0x20],
+    )
+    assert err == GGUF_TDBASE_ERR_BAD_ALIGNMENT
+    assert bad == 0
+
+
+def test_validate_tensor_ranges_propagates_out_of_bounds_with_index() -> None:
+    err, bad = validate_tensor_ranges(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x1100,
+        tensor_rel_offsets=[0x00, 0x80],
+        tensor_nbytes=[0x20, 0x120],
+    )
+    assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert bad == 1
+
+
+def test_validate_tensor_ranges_random_non_overlapping() -> None:
+    rng = random.Random(761991)
+
+    for _ in range(300):
+        alignment = 1 << rng.randint(0, 10)
+        count = rng.randint(1, 12)
+        cursor = 0
+
+        rel_offsets = []
+        nbytes = []
+        for _ in range(count):
+            gap_units = rng.randint(0, 8)
+            gap = gap_units * alignment
+            cursor += gap
+
+            span_units = rng.randint(0, 6)
+            span = span_units * alignment
+
+            rel_offsets.append(cursor)
+            nbytes.append(span)
+            cursor += span
+
+        base_units = rng.randint(0, 1024)
+        base = base_units * alignment
+        file_nbytes = base + cursor + (rng.randint(0, 16) * alignment)
+
+        err, bad = validate_tensor_ranges(
+            tensor_data_base=base,
+            alignment=alignment,
+            gguf_file_nbytes=file_nbytes,
+            tensor_rel_offsets=rel_offsets,
+            tensor_nbytes=nbytes,
+        )
+        assert err == GGUF_TDBASE_OK
+        assert bad == 0
+
+
+def test_validate_tensor_ranges_random_overlap_cases() -> None:
+    rng = random.Random(762007)
+
+    for _ in range(200):
+        alignment = 1 << rng.randint(0, 10)
+        base = rng.randint(0, 1024) * alignment
+
+        a_start = rng.randint(0, 128) * alignment
+        a_len = max(alignment, rng.randint(1, 8) * alignment)
+        b_start = a_start + rng.randint(0, (a_len // alignment) - 1) * alignment
+        b_len = max(alignment, rng.randint(1, 8) * alignment)
+
+        rel_offsets = [a_start, b_start]
+        nbytes = [a_len, b_len]
+        max_end = max(a_start + a_len, b_start + b_len)
+        file_nbytes = base + max_end + alignment
+
+        err, bad = validate_tensor_ranges(
+            tensor_data_base=base,
+            alignment=alignment,
+            gguf_file_nbytes=file_nbytes,
+            tensor_rel_offsets=rel_offsets,
+            tensor_nbytes=nbytes,
+        )
+        assert err == GGUF_TDBASE_ERR_OVERLAP
+        assert bad == 1
+
+
 def run() -> None:
     test_default_alignment_examples()
+    test_tensor_bytes_for_type_scalars()
+    test_tensor_bytes_for_type_quantized_exact_blocks()
+    test_tensor_bytes_for_type_reject_non_multiple_block()
+    test_tensor_bytes_for_type_reject_unknown_type()
+    test_tensor_bytes_for_type_overflow_guard()
     test_tensor_type_block_size_known_types()
     test_tensor_type_block_bytes_known_types()
     test_tensor_type_helpers_reject_unknown_type()
@@ -358,6 +583,12 @@ def run() -> None:
     test_tensor_resolve_range_out_of_bounds()
     test_tensor_resolve_range_allows_exact_eof()
     test_tensor_resolve_range_random_valid_cases()
+    test_validate_tensor_ranges_non_overlapping_happy_path()
+    test_validate_tensor_ranges_detect_overlap()
+    test_validate_tensor_ranges_propagates_bad_alignment()
+    test_validate_tensor_ranges_propagates_out_of_bounds_with_index()
+    test_validate_tensor_ranges_random_non_overlapping()
+    test_validate_tensor_ranges_random_overlap_cases()
     print("gguf_tensor_data_base_reference_checks=ok")
 
 

@@ -9,6 +9,8 @@
 #define GGUF_TDBASE_ERR_MISALIGNED_TENSOR_OFFSET 5
 #define GGUF_TDBASE_ERR_BAD_TYPE 6
 #define GGUF_TDBASE_ERR_OUT_OF_BOUNDS 7
+#define GGUF_TDBASE_ERR_BAD_BLOCK_MULTIPLE 8
+#define GGUF_TDBASE_ERR_OVERLAP 9
 
 // GGUF default tensor alignment when metadata key `general.alignment`
 // is absent.
@@ -84,6 +86,42 @@ I64 GGUFTensorTypeBlockBytes(U32 ggml_type, U64 *out_block_bytes)
     }
 
     return GGUF_TDBASE_ERR_BAD_TYPE;
+}
+
+I64 GGUFTensorBytesForType(U32 ggml_type,
+                           U64 element_count,
+                           U64 *out_tensor_nbytes)
+{
+    U64 block_size;
+    U64 block_bytes;
+    U64 block_count;
+    I64 err;
+
+    if (!out_tensor_nbytes)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    err = GGUFTensorTypeBlockSize(ggml_type, &block_size);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    err = GGUFTensorTypeBlockBytes(ggml_type, &block_bytes);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    // Quantized formats are stored in fixed-size element blocks.
+    // Reject non-multiples instead of silently rounding/truncating.
+    if (element_count % block_size)
+        return GGUF_TDBASE_ERR_BAD_BLOCK_MULTIPLE;
+
+    block_count = element_count / block_size;
+
+    // Byte size = number of blocks * bytes per block.
+    // Guard overflow before multiplication for malformed giant tensors.
+    if (block_count > 0xFFFFFFFFFFFFFFFF / block_bytes)
+        return GGUF_TDBASE_ERR_OVERFLOW;
+
+    *out_tensor_nbytes = block_count * block_bytes;
+    return GGUF_TDBASE_OK;
 }
 
 Bool GGUFIsPow2U32(U32 value)
@@ -239,4 +277,85 @@ I64 GGUFTensorResolveRangeDefault(U64 tensor_data_base,
                                   GGUF_DEFAULT_ALIGNMENT,
                                   out_tensor_abs_start,
                                   out_tensor_abs_end);
+}
+
+I64 GGUFValidateTensorRanges(U64 tensor_data_base,
+                             U32 alignment,
+                             U64 gguf_file_nbytes,
+                             U64 tensor_count,
+                             U64 *tensor_rel_offsets,
+                             U64 *tensor_nbytes,
+                             U64 *out_bad_index)
+{
+    U64 i;
+    U64 j;
+    U64 start_i;
+    U64 end_i;
+    U64 start_j;
+    U64 end_j;
+    I64 err;
+
+    if (!tensor_rel_offsets || !tensor_nbytes)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    if (out_bad_index)
+        *out_bad_index = 0;
+
+    // Pass 1: each tensor range must be individually valid.
+    // This enforces aligned offsets, add-overflow safety, and EOF bounds.
+    for (i = 0; i < tensor_count; ++i)
+    {
+        err = GGUFTensorResolveRange(tensor_data_base,
+                                     tensor_rel_offsets[i],
+                                     tensor_nbytes[i],
+                                     gguf_file_nbytes,
+                                     alignment,
+                                     &start_i,
+                                     &end_i);
+        if (err != GGUF_TDBASE_OK)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return err;
+        }
+    }
+
+    // Pass 2: pairwise overlap check.
+    // Explicit O(n^2) keeps logic simple and fully auditable in HolyC.
+    for (i = 0; i < tensor_count; ++i)
+    {
+        err = GGUFTensorResolveRange(tensor_data_base,
+                                     tensor_rel_offsets[i],
+                                     tensor_nbytes[i],
+                                     gguf_file_nbytes,
+                                     alignment,
+                                     &start_i,
+                                     &end_i);
+        if (err != GGUF_TDBASE_OK)
+            return err;
+
+        for (j = i + 1; j < tensor_count; ++j)
+        {
+            err = GGUFTensorResolveRange(tensor_data_base,
+                                         tensor_rel_offsets[j],
+                                         tensor_nbytes[j],
+                                         gguf_file_nbytes,
+                                         alignment,
+                                         &start_j,
+                                         &end_j);
+            if (err != GGUF_TDBASE_OK)
+                return err;
+
+            // Half-open intervals [start, end) overlap when each interval starts
+            // before the other ends. Exact touching boundaries are legal.
+            if ((start_i < end_j) && (start_j < end_i))
+            {
+                if (out_bad_index)
+                    *out_bad_index = j;
+                return GGUF_TDBASE_ERR_OVERLAP;
+            }
+        }
+    }
+
+    return GGUF_TDBASE_OK;
 }
