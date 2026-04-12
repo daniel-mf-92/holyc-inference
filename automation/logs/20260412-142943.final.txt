@@ -1,0 +1,16 @@
+Done — I completed one queue item end-to-end and kept the queue rolling.
+
+**What Changed**
+- Implemented `IQ-003` by adding `docs/QUANTIZATION.md:1`.
+- Documented integer-only Q4_0/Q8_0 block layouts, fixed-point scale conversion, dot-product formulas, overflow policy, and HolyC runtime constraints.
+- Updated `MASTER_TASKS.md:124` to mark `IQ-003` complete.
+- Appended a new queue item `IQ-018` at `MASTER_TASKS.md:139` to keep IDs monotonic and queue depth healthy.
+- Added Progress Ledger row `loop-003` at `MASTER_TASKS.md:148`.
+
+**Validation Run**
+- Command: `test -s docs/QUANTIZATION.md && rg -n "Q4_0|Q8_0|SCALE_SHIFT|integer" docs/QUANTIZATION.md | head -n 20`
+- Result: passed (`exit code 0`), confirmed key quantization sections and integer-only terms are present.
+
+**Notes**
+- No blockers this iteration.
+- Air-gap policy preserved; no networking features or VM/network commands were introduced.

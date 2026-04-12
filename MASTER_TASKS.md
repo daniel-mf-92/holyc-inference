@@ -121,7 +121,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 
 - [x] IQ-001 Create project directory structure: `src/`, `tests/`, `docs/`, `automation/`, `models/` (WS0-01)
 - [x] IQ-002 Write GGUF format reference doc at `docs/GGUF_FORMAT.md` from llama.cpp spec (WS0-02)
-- [ ] IQ-003 Write Q4_0/Q8_0 quantization reference doc at `docs/QUANTIZATION.md` (WS0-03)
+- [x] IQ-003 Write Q4_0/Q8_0 quantization reference doc at `docs/QUANTIZATION.md` (WS0-03)
 - [ ] IQ-004 Write LLaMA architecture reference doc at `docs/LLAMA_ARCH.md` (WS0-04)
 - [ ] IQ-005 Implement fixed-point multiply/divide helpers in `src/math/fixedpoint.HC` (WS1-01)
 - [ ] IQ-006 Implement integer exp approximation in `src/math/intexp.HC` (WS1-02)
@@ -136,6 +136,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] IQ-015 Implement Q8_0 block struct and dequantize in `src/quant/q8_0.HC` (WS3-04)
 - [ ] IQ-016 Draft `docs/GGUF_FORMAT.md` skeleton with sections for header, metadata, tensor info, and alignment rules (WS0-02)
 - [ ] IQ-017 Write host-side GGUF header/tensor dump fixture plan in `tests/README.md` for llama.cpp parity checks (WS0-05, WS2-05)
+- [ ] IQ-018 Create `tests/README.md` skeleton for llama.cpp parity fixtures (header, metadata, tensor offsets) (WS0-05, WS2-05)
 
 ## Progress Ledger
 
@@ -144,6 +145,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 | 2026-04-12 | bootstrap | MASTER_TASKS init | done | Initial roadmap + queue created |
 | 2026-04-12 | loop-001 | IQ-001 directory structure | done | Verified `src/`, `tests/`, `docs/`, `automation/`, `models/` exist locally |
 | 2026-04-12 | loop-002 | IQ-002 GGUF format reference doc | done | Added `docs/GGUF_FORMAT.md` with header/metadata/tensor/alignment rules and HolyC parser safety checks |
+| 2026-04-12 | loop-003 | IQ-003 quantization reference doc | done | Added `docs/QUANTIZATION.md` with integer-only Q4_0/Q8_0 decode, fixed-point scaling, and dot-product formulas |
 
 ## Blockers & Decisions
 
