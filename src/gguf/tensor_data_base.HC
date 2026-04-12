@@ -587,3 +587,64 @@ I64 GGUFTensorInfoResolveByteSpans(U64 tensor_data_base,
                                           out_tensor_nbytes,
                                           out_bad_index);
 }
+
+I64 GGUFTensorInfoResolveAbsRanges(U64 tensor_data_base,
+                                   U32 alignment,
+                                   U64 gguf_file_nbytes,
+                                   U64 tensor_count,
+                                   U64 *tensor_rel_offsets,
+                                   U64 *tensor_element_counts,
+                                   U32 *tensor_ggml_types,
+                                   U64 *out_tensor_nbytes,
+                                   U64 *out_abs_starts,
+                                   U64 *out_abs_ends,
+                                   U64 *out_bad_index)
+{
+    U64 i;
+    U64 abs_start;
+    I64 err;
+
+    if (!out_abs_starts || !out_abs_ends)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    // First derive byte spans, enforce alignment/EOF safety, and sort
+    // tensor_rel_offsets + out_tensor_nbytes in-place for monotonic scanning.
+    err = GGUFTensorInfoResolveByteSpans(tensor_data_base,
+                                         alignment,
+                                         gguf_file_nbytes,
+                                         tensor_count,
+                                         tensor_rel_offsets,
+                                         tensor_element_counts,
+                                         tensor_ggml_types,
+                                         out_tensor_nbytes,
+                                         out_bad_index);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    // With validated sorted ranges, resolve absolute [start,end) spans.
+    for (i = 0; i < tensor_count; ++i)
+    {
+        err = GGUFTensorDataBaseOffset(tensor_data_base,
+                                       tensor_rel_offsets[i],
+                                       alignment,
+                                       &abs_start);
+        if (err != GGUF_TDBASE_OK)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return err;
+        }
+
+        if (abs_start > 0xFFFFFFFFFFFFFFFF - out_tensor_nbytes[i])
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return GGUF_TDBASE_ERR_OVERFLOW;
+        }
+
+        out_abs_starts[i] = abs_start;
+        out_abs_ends[i] = abs_start + out_tensor_nbytes[i];
+    }
+
+    return GGUF_TDBASE_OK;
+}

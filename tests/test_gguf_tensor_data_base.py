@@ -340,6 +340,53 @@ def tensor_info_resolve_byte_spans(
     )
 
 
+def tensor_info_resolve_abs_ranges(
+    tensor_data_base: int,
+    alignment: int,
+    gguf_file_nbytes: int,
+    tensor_rel_offsets: list[int],
+    tensor_element_counts: list[int],
+    tensor_ggml_types: list[int],
+    out_tensor_nbytes: list[int],
+    out_abs_starts: list[int],
+    out_abs_ends: list[int],
+):
+    count = len(tensor_rel_offsets)
+
+    if len(out_abs_starts) != count:
+        return GGUF_TDBASE_ERR_NULL_PTR, 0
+    if len(out_abs_ends) != count:
+        return GGUF_TDBASE_ERR_NULL_PTR, 0
+
+    err, bad = tensor_info_resolve_byte_spans(
+        tensor_data_base=tensor_data_base,
+        alignment=alignment,
+        gguf_file_nbytes=gguf_file_nbytes,
+        tensor_rel_offsets=tensor_rel_offsets,
+        tensor_element_counts=tensor_element_counts,
+        tensor_ggml_types=tensor_ggml_types,
+        out_tensor_nbytes=out_tensor_nbytes,
+    )
+    if err != GGUF_TDBASE_OK:
+        return err, bad
+
+    for i in range(count):
+        err_off, abs_start = tensor_data_base_offset(
+            tensor_data_base, tensor_rel_offsets[i], alignment
+        )
+        if err_off != GGUF_TDBASE_OK:
+            return err_off, i
+
+        nbytes = out_tensor_nbytes[i]
+        if abs_start > U64_MAX - nbytes:
+            return GGUF_TDBASE_ERR_OVERFLOW, i
+
+        out_abs_starts[i] = abs_start
+        out_abs_ends[i] = abs_start + nbytes
+
+    return GGUF_TDBASE_OK, 0
+
+
 
 
 def test_tensor_bytes_for_type_scalars() -> None:
@@ -896,6 +943,77 @@ def test_tensor_info_resolve_byte_spans_detect_overlap_after_sizing() -> None:
     assert bad == 1
 
 
+def test_tensor_info_resolve_abs_ranges_happy_path() -> None:
+    rel_offsets = [0x80, 0x00, 0x40]
+    element_counts = [32, 8, 32]
+    ggml_types = [GGML_TYPE_Q4_0, GGML_TYPE_F32, GGML_TYPE_Q8_0]
+    out_nbytes = [0, 0, 0]
+    out_abs_starts = [0, 0, 0]
+    out_abs_ends = [0, 0, 0]
+
+    err, bad = tensor_info_resolve_abs_ranges(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x4000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_element_counts=element_counts,
+        tensor_ggml_types=ggml_types,
+        out_tensor_nbytes=out_nbytes,
+        out_abs_starts=out_abs_starts,
+        out_abs_ends=out_abs_ends,
+    )
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+    assert rel_offsets == [0x00, 0x40, 0x80]
+    assert out_nbytes == [32, 34, 18]
+    assert out_abs_starts == [0x1000, 0x1040, 0x1080]
+    assert out_abs_ends == [0x1020, 0x1062, 0x1092]
+
+
+def test_tensor_info_resolve_abs_ranges_propagates_bad_block_multiple() -> None:
+    rel_offsets = [0x00, 0x20]
+    element_counts = [32, 31]
+    ggml_types = [GGML_TYPE_Q8_0, GGML_TYPE_Q4_0]
+    out_nbytes = [0, 0]
+    out_abs_starts = [0, 0]
+    out_abs_ends = [0, 0]
+
+    err, bad = tensor_info_resolve_abs_ranges(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x5000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_element_counts=element_counts,
+        tensor_ggml_types=ggml_types,
+        out_tensor_nbytes=out_nbytes,
+        out_abs_starts=out_abs_starts,
+        out_abs_ends=out_abs_ends,
+    )
+    assert err == GGUF_TDBASE_ERR_BAD_BLOCK_MULTIPLE
+    assert bad == 1
+
+
+def test_tensor_info_resolve_abs_ranges_reject_null_outputs() -> None:
+    rel_offsets = [0x00]
+    element_counts = [8]
+    ggml_types = [GGML_TYPE_F32]
+    out_nbytes = [0]
+
+    err, bad = tensor_info_resolve_abs_ranges(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x2000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_element_counts=element_counts,
+        tensor_ggml_types=ggml_types,
+        out_tensor_nbytes=out_nbytes,
+        out_abs_starts=[],
+        out_abs_ends=[0],
+    )
+    assert err == GGUF_TDBASE_ERR_NULL_PTR
+    assert bad == 0
+
+
 
 
 def run() -> None:
@@ -943,6 +1061,9 @@ def run() -> None:
     test_tensor_info_resolve_byte_spans_reject_bad_block_multiple()
     test_tensor_info_resolve_byte_spans_reject_unknown_type()
     test_tensor_info_resolve_byte_spans_detect_overlap_after_sizing()
+    test_tensor_info_resolve_abs_ranges_happy_path()
+    test_tensor_info_resolve_abs_ranges_propagates_bad_block_multiple()
+    test_tensor_info_resolve_abs_ranges_reject_null_outputs()
     print("gguf_tensor_data_base_reference_checks=ok")
 
 
