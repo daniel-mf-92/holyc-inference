@@ -949,3 +949,73 @@ I64 GGUFTensorRangeFindByRelOffsetDefault(U64 tensor_rel_offset,
                                           tensor_abs_ends,
                                           out_tensor_index);
 }
+
+I64 GGUFTensorRangeFindIndexByAbsOffset(U64 abs_offset,
+                                        U64 tensor_count,
+                                        U64 *tensor_abs_starts,
+                                        U64 *tensor_abs_ends,
+                                        U64 *sorted_tensor_indices,
+                                        U64 *out_tensor_index)
+{
+    U64 sorted_pos;
+    I64 err;
+
+    if (!sorted_tensor_indices || !out_tensor_index)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    // Preserve deterministic output even on misses/errors.
+    *out_tensor_index = 0;
+
+    // Find sorted range slot first, then translate to the caller-visible
+    // original tensor index captured by GGUFTensorInfoBuildOffsetIndex.
+    err = GGUFTensorRangeFindByAbsOffset(abs_offset,
+                                         tensor_count,
+                                         tensor_abs_starts,
+                                         tensor_abs_ends,
+                                         &sorted_pos);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    if (sorted_pos >= tensor_count)
+        return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+
+    if (sorted_tensor_indices[sorted_pos] >= tensor_count)
+        return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+
+    *out_tensor_index = sorted_tensor_indices[sorted_pos];
+    return GGUF_TDBASE_OK;
+}
+
+I64 GGUFTensorRangeFindIndexByRelOffset(U64 tensor_rel_offset,
+                                        U64 tensor_data_base,
+                                        U32 alignment,
+                                        U64 tensor_count,
+                                        U64 *tensor_abs_starts,
+                                        U64 *tensor_abs_ends,
+                                        U64 *sorted_tensor_indices,
+                                        U64 *out_tensor_index)
+{
+    U64 abs_offset;
+    I64 err;
+
+    if (!out_tensor_index)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    // Preserve deterministic output even when relative->absolute translation
+    // fails before lookup.
+    *out_tensor_index = 0;
+
+    err = GGUFTensorDataBaseOffset(tensor_data_base,
+                                   tensor_rel_offset,
+                                   alignment,
+                                   &abs_offset);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    return GGUFTensorRangeFindIndexByAbsOffset(abs_offset,
+                                               tensor_count,
+                                               tensor_abs_starts,
+                                               tensor_abs_ends,
+                                               sorted_tensor_indices,
+                                               out_tensor_index);
+}

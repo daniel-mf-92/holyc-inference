@@ -458,6 +458,60 @@ def tensor_range_find_by_rel_offset_default(
     )
 
 
+def tensor_range_find_index_by_abs_offset(
+    abs_offset: int,
+    tensor_abs_starts: list[int],
+    tensor_abs_ends: list[int],
+    sorted_tensor_indices: list[int],
+):
+    count = len(tensor_abs_starts)
+    if len(tensor_abs_ends) != count:
+        return GGUF_TDBASE_ERR_NULL_PTR, 0
+    if len(sorted_tensor_indices) != count:
+        return GGUF_TDBASE_ERR_NULL_PTR, 0
+
+    err, sorted_pos = tensor_range_find_by_abs_offset(
+        abs_offset=abs_offset,
+        tensor_abs_starts=tensor_abs_starts,
+        tensor_abs_ends=tensor_abs_ends,
+    )
+    if err != GGUF_TDBASE_OK:
+        return err, 0
+
+    if sorted_pos >= count:
+        return GGUF_TDBASE_ERR_OUT_OF_BOUNDS, 0
+
+    orig_idx = sorted_tensor_indices[sorted_pos]
+    if orig_idx >= count:
+        return GGUF_TDBASE_ERR_OUT_OF_BOUNDS, 0
+
+    return GGUF_TDBASE_OK, orig_idx
+
+
+def tensor_range_find_index_by_rel_offset(
+    tensor_rel_offset: int,
+    tensor_data_base: int,
+    alignment: int,
+    tensor_abs_starts: list[int],
+    tensor_abs_ends: list[int],
+    sorted_tensor_indices: list[int],
+):
+    err, abs_offset = tensor_data_base_offset(
+        tensor_data_base=tensor_data_base,
+        tensor_rel_offset=tensor_rel_offset,
+        alignment=alignment,
+    )
+    if err != GGUF_TDBASE_OK:
+        return err, 0
+
+    return tensor_range_find_index_by_abs_offset(
+        abs_offset=abs_offset,
+        tensor_abs_starts=tensor_abs_starts,
+        tensor_abs_ends=tensor_abs_ends,
+        sorted_tensor_indices=sorted_tensor_indices,
+    )
+
+
 def _abs_range_greater(
     starts: list[int],
     ends: list[int],
@@ -1306,6 +1360,110 @@ def test_tensor_range_find_by_rel_offset_default_alignment_propagates_error() ->
     assert idx == 0
 
 
+def test_tensor_range_find_index_by_abs_offset_happy_path() -> None:
+    starts = [0x1000, 0x1040, 0x1080]
+    ends = [0x1020, 0x1062, 0x1092]
+    sorted_idx = [2, 0, 1]
+
+    assert tensor_range_find_index_by_abs_offset(0x1000, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_OK,
+        2,
+    )
+    assert tensor_range_find_index_by_abs_offset(0x1050, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_OK,
+        0,
+    )
+    assert tensor_range_find_index_by_abs_offset(0x1085, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_OK,
+        1,
+    )
+
+
+def test_tensor_range_find_index_by_abs_offset_rejects_bad_index_table() -> None:
+    starts = [0x1000, 0x1040]
+    ends = [0x1020, 0x1060]
+    sorted_idx = [0, 9]
+
+    err, idx = tensor_range_find_index_by_abs_offset(0x1050, starts, ends, sorted_idx)
+    assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert idx == 0
+
+
+def test_tensor_range_find_index_by_abs_offset_gap_propagates_miss() -> None:
+    starts = [0x1000, 0x1040]
+    ends = [0x1020, 0x1060]
+    sorted_idx = [1, 0]
+
+    err, idx = tensor_range_find_index_by_abs_offset(0x1030, starts, ends, sorted_idx)
+    assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert idx == 0
+
+
+def test_tensor_range_find_index_by_rel_offset_happy_path() -> None:
+    starts = [0x1000, 0x1040, 0x1080]
+    ends = [0x1020, 0x1062, 0x1092]
+    sorted_idx = [2, 0, 1]
+
+    assert tensor_range_find_index_by_rel_offset(0x00, 0x1000, 32, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_OK,
+        2,
+    )
+    assert tensor_range_find_index_by_rel_offset(0x40, 0x1000, 32, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_OK,
+        0,
+    )
+    assert tensor_range_find_index_by_rel_offset(0x80, 0x1000, 32, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_OK,
+        1,
+    )
+
+
+def test_tensor_range_find_index_by_rel_offset_propagates_alignment_error() -> None:
+    starts = [0x1000, 0x1040]
+    ends = [0x1020, 0x1060]
+    sorted_idx = [0, 1]
+
+    err, idx = tensor_range_find_index_by_rel_offset(0x40, 0x1000, 24, starts, ends, sorted_idx)
+    assert err == GGUF_TDBASE_ERR_BAD_ALIGNMENT
+    assert idx == 0
+
+
+def test_tensor_range_find_index_by_rel_offset_with_built_index() -> None:
+    rel_offsets = [0xC0, 0x00, 0x40]
+    elem_counts = [32, 64, 32]
+    ggml_types = [GGML_TYPE_Q8_0, GGML_TYPE_Q4_0, GGML_TYPE_F16]
+    starts = [0, 0, 0]
+    ends = [0, 0, 0]
+    sorted_idx = [0, 0, 0]
+
+    err, bad = tensor_info_build_offset_index(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x2000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_element_counts=elem_counts,
+        tensor_ggml_types=ggml_types,
+        out_abs_starts=starts,
+        out_abs_ends=ends,
+        out_sorted_tensor_indices=sorted_idx,
+    )
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+    assert tensor_range_find_index_by_rel_offset(0x00, 0x1000, 32, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_OK,
+        1,
+    )
+    assert tensor_range_find_index_by_rel_offset(0x40, 0x1000, 32, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_OK,
+        2,
+    )
+    assert tensor_range_find_index_by_rel_offset(0xC0, 0x1000, 32, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_OK,
+        0,
+    )
+
+
 def test_tensor_info_build_offset_index_happy_path() -> None:
     rel_offsets = [0xC0, 0x00, 0x40]
     elem_counts = [32, 64, 32]
@@ -1487,6 +1645,12 @@ def run() -> None:
     test_tensor_range_find_by_rel_offset_gap_and_out_of_bounds()
     test_tensor_range_find_by_rel_offset_default_alignment_happy_path()
     test_tensor_range_find_by_rel_offset_default_alignment_propagates_error()
+    test_tensor_range_find_index_by_abs_offset_happy_path()
+    test_tensor_range_find_index_by_abs_offset_rejects_bad_index_table()
+    test_tensor_range_find_index_by_abs_offset_gap_propagates_miss()
+    test_tensor_range_find_index_by_rel_offset_happy_path()
+    test_tensor_range_find_index_by_rel_offset_propagates_alignment_error()
+    test_tensor_range_find_index_by_rel_offset_with_built_index()
     test_tensor_info_build_offset_index_happy_path()
     test_tensor_info_build_offset_index_propagates_bad_block_multiple()
     test_tensor_info_build_offset_index_detects_overlap()
