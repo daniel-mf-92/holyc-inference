@@ -86,6 +86,20 @@ def dot_q32_to_q16(dot_q32: int) -> int:
     return round_shift_right_signed(dot_q32, 16)
 
 
+def dot_row_blocks_q16(lhs_blocks, rhs_blocks):
+    if len(lhs_blocks) != len(rhs_blocks):
+        return Q4_0_ERR_BAD_DST_LEN, 0
+
+    total_q16 = 0
+    for (lhs_scale, lhs_qs), (rhs_scale, rhs_qs) in zip(lhs_blocks, rhs_blocks):
+        err, block_q32 = dot_product_block_q32(lhs_scale, lhs_qs, rhs_scale, rhs_qs)
+        if err != Q4_0_OK:
+            return err, 0
+        total_q16 += dot_q32_to_q16(block_q32)
+
+    return Q4_0_OK, total_q16
+
+
 def unpack_signed(qs: bytes) -> list[int]:
     out: list[int] = []
     for packed in qs:
@@ -169,11 +183,62 @@ def test_error_on_bad_input_length() -> None:
     assert err == Q4_0_ERR_BAD_DST_LEN
 
 
+def test_row_blocks_q16_matches_per_block_rounding() -> None:
+    rng = random.Random(9001)
+
+    lhs_blocks = []
+    rhs_blocks = []
+    for _ in range(9):
+        lhs_scale_fp16 = half_bits(rng.uniform(-3.5, 3.5))
+        rhs_scale_fp16 = half_bits(rng.uniform(-3.5, 3.5))
+        lhs_qs = bytes(rng.randrange(256) for _ in range(Q4_0_PACKED_BYTES))
+        rhs_qs = bytes(rng.randrange(256) for _ in range(Q4_0_PACKED_BYTES))
+        lhs_blocks.append((lhs_scale_fp16, lhs_qs))
+        rhs_blocks.append((rhs_scale_fp16, rhs_qs))
+
+    err, got_row_q16 = dot_row_blocks_q16(lhs_blocks, rhs_blocks)
+    assert err == Q4_0_OK
+
+    expected = 0
+    for (lhs_scale, lhs_qs), (rhs_scale, rhs_qs) in zip(lhs_blocks, rhs_blocks):
+        _, block_q32 = dot_product_block_q32(lhs_scale, lhs_qs, rhs_scale, rhs_qs)
+        expected += dot_q32_to_q16(block_q32)
+
+    assert got_row_q16 == expected
+
+
+def test_row_blocks_q16_distinct_from_round_at_end() -> None:
+    lhs_scale = half_bits(129.0 / 65536.0)
+    rhs_scale = half_bits(129.0 / 65536.0)
+
+    # Build two identical blocks with q_dot_q0 = 1.
+    # Here scale_q16=129 so each block contributes 129*129/2^16 = 0.2539 Q16 units.
+    # Per-block rounding gives 0 + 0, while round-at-end gives 1.
+    lhs_qs = bytes([0x89] + [0x88] * 15)
+    rhs_qs = bytes([0x89] + [0x88] * 15)
+
+    lhs_blocks = [(lhs_scale, lhs_qs), (lhs_scale, lhs_qs)]
+    rhs_blocks = [(rhs_scale, rhs_qs), (rhs_scale, rhs_qs)]
+
+    err, got_row_q16 = dot_row_blocks_q16(lhs_blocks, rhs_blocks)
+    assert err == Q4_0_OK
+
+    _, total_q32 = dot_product_block_q32(lhs_scale, lhs_qs, rhs_scale, rhs_qs)
+    total_q32 *= 2
+
+    round_at_end_q16 = dot_q32_to_q16(total_q32)
+    assert got_row_q16 != round_at_end_q16
+    assert got_row_q16 == 0
+    assert round_at_end_q16 == 1
+
+
 def run() -> None:
     test_identity_block()
     test_opposite_sign_scales()
     test_random_blocks_match_float_reference_bounds()
     test_error_on_bad_input_length()
+    test_row_blocks_q16_matches_per_block_rounding()
+    test_row_blocks_q16_distinct_from_round_at_end()
     print("q4_0_dot_reference_checks=ok")
 
 

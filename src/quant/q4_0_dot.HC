@@ -162,8 +162,36 @@ I32 Q4_0DotProductBlocksQ32(Q4_0Block *lhs, Q4_0Block *rhs, I64 block_count, I64
     return Q4_0_OK;
 }
 
+I32 Q4_0DotRowBlocksQ16(Q4_0Block *row_blocks, Q4_0Block *vec_blocks, I64 block_count, I64 *out_dot_q16)
+{
+    I64 block_index;
+    I64 block_dot_q32;
+    I64 total_dot_q16;
+    I32 status;
+
+    if (!row_blocks || !vec_blocks || !out_dot_q16)
+        return Q4_0_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q4_0_ERR_BAD_DST_LEN;
+
+    // Matmul row kernels usually keep accumulators in Q16 lanes.
+    // Convert each block dot Q32->Q16 with explicit rounding before summation,
+    // so every 32-value block contribution stays auditable and deterministic.
+    total_dot_q16 = 0;
+    for (block_index = 0; block_index < block_count; ++block_index)
+    {
+        status = Q4_0DotProductBlockQ32(&row_blocks[block_index], &vec_blocks[block_index], &block_dot_q32);
+        if (status != Q4_0_OK)
+            return status;
+
+        total_dot_q16 += Q4_0DotQ32ToQ16(block_dot_q32);
+    }
+
+    *out_dot_q16 = total_dot_q16;
+    return Q4_0_OK;
+}
+
 I64 Q4_0DotQ32ToQ16(I64 dot_q32)
 {
     return Q4_0RoundShiftRightSigned(dot_q32, 16);
 }
-

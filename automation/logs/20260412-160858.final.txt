@@ -1,0 +1,14 @@
+Completed one full unattended iteration: `IQ-033` is now implemented, validated, and logged.
+
+**What Changed**
+- Added HolyC row-dot helper `Q4_0DotRowBlocksQ16` with explicit per-block `Q32 -> Q16` rounding semantics for matmul row accumulators in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/quant/q4_0_dot.HC:165`.
+- Added parity harness helpers/tests for row-block Q16 behavior (including explicit “per-block rounding differs from round-at-end” invariant) in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_q4_0_dot.py:89` and `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_q4_0_dot.py:186`.
+- Marked `IQ-033` done and appended one ledger line (`loop-019`) in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:221` and `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:248`.
+
+**Validation**
+- Ran: `python3 tests/test_q4_0_dot.py && python3 tests/test_q4_0_dequant.py && python3 tests/test_q4_0_q8_0_dot_kernel.py`
+- Output: `q4_0_dot_reference_checks=ok`, `q4_0_dequant_reference_checks=ok`, `q4_0_q8_0_dot_kernel_reference_checks=ok`.
+
+**Queue + Central DB**
+- Unchecked queue depth is maintained at `16` (policy `>=15` satisfied; no queue expansion required this iteration).
+- Inserted central log row in `~/Documents/local-codebases/temple-central.db` for `IQ-033` (`id=10`, `status=pass`, `validation_result=ok`).
