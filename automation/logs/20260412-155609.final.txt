@@ -1,0 +1,9 @@
+Done — one full unattended iteration is complete for `IQ-030`.
+
+- Implemented mixed integer kernel in `src/quant/q4_0_q8_0_dot.HC:1` (`Q4_0_Q8_0DotProductBlockQ32`, multi-block accumulation, Q32→Q16 rounding).
+- Added focused parity harness in `tests/test_q4_0_q8_0_dot_kernel.py:1` (identity, randomized bounds, multiblock accumulation, bad-length errors).
+- Updated queue/ledger in `MASTER_TASKS.md:218` and `MASTER_TASKS.md:243` (marked `IQ-030` done; added `loop-017` line).
+- Queue depth policy satisfied without adding items: `unchecked=15`, `maxid=32`.
+- Logged central DB iteration row in `~/Documents/local-codebases/temple-central.db` (`task_id='IQ-030'`, `status='pass'`).
+- Validation command: `python3 tests/test_q4_0_q8_0_dot_kernel.py && python3 tests/test_q4_0_dot.py && python3 tests/test_q8_0_dot.py`.
+- Validation output: `q4_0_q8_0_dot_kernel_reference_checks=ok`, `q4_0_dot_reference_checks=ok`, `q8_0_dot_reference_checks=ok`.
