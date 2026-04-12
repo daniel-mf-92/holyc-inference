@@ -124,7 +124,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-003 Write Q4_0/Q8_0 quantization reference doc at `docs/QUANTIZATION.md` (WS0-03)
 - [x] IQ-004 Write LLaMA architecture reference doc at `docs/LLAMA_ARCH.md` (WS0-04)
 - [x] IQ-005 Implement fixed-point multiply/divide helpers in `src/math/fixedpoint.HC` (WS1-01)
-- [ ] IQ-006 Implement integer exp approximation in `src/math/intexp.HC` (WS1-02)
+- [x] IQ-006 Implement integer exp approximation in `src/math/intexp.HC` (WS1-02)
 - [ ] IQ-007 Implement integer sqrt approximation in `src/math/intsqrt.HC` (WS1-02)
 - [ ] IQ-008 Implement integer softmax in `src/math/softmax.HC` (WS1-03)
 - [ ] IQ-009 Implement RMSNorm (integer path) in `src/math/rmsnorm.HC` (WS1-04)
@@ -139,6 +139,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] IQ-018 Create `tests/README.md` skeleton for llama.cpp parity fixtures (header, metadata, tensor offsets) (WS0-05, WS2-05)
 - [ ] IQ-019 Create `src/math/fixedpoint.HC` skeleton with Q16 constants, core type aliases, and TODO stubs for mul/div helpers (WS1-01)
 - [ ] IQ-020 Implement Q16 integer exponent range clamp and base constants in `src/math/intexp.HC` (WS1-02)
+- [ ] IQ-021 Add host-side Q16 exp parity harness in `tests/test_intexp_q16.py` against `math.exp` samples (WS1-05)
 
 ## Progress Ledger
 
@@ -150,6 +151,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 | 2026-04-12 | loop-003 | IQ-003 quantization reference doc | done | Added `docs/QUANTIZATION.md` with integer-only Q4_0/Q8_0 decode, fixed-point scaling, and dot-product formulas |
 | 2026-04-12 | loop-004 | IQ-004 LLaMA architecture reference doc | done | Added `docs/LLAMA_ARCH.md` covering decoder flow, RMSNorm, RoPE, GQA, SwiGLU, KV cache, and required GGUF fields |
 | 2026-04-12 | loop-005 | IQ-005 fixed-point mul/div helpers | done | Added `src/math/fixedpoint.HC` with Q16 helpers (`FPQ16Mul`, `FPQ16Div`, conversions); validated host-side with `python3` arithmetic parity checks |
+| 2026-04-12 | loop-006 | IQ-006 integer exp approximation | done | Added `src/math/intexp.HC` with Q16 range reduction + 4th-order polynomial; validated host-side over x∈[-8,8] (`max_rel_err=4.48%`) |
 
 ## Blockers & Decisions
 
