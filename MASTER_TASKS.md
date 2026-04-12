@@ -184,7 +184,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-012 Implement GGUF tensor info reader in `src/gguf/tensorinfo.HC` (WS2-03)
 - [x] IQ-013 Implement Q4_0 block struct and dequantize in `src/quant/q4_0.HC` (WS3-01, WS3-02)
 - [x] IQ-014 Implement Q4_0 dot product (naive) in `src/quant/q4_0_dot.HC` (WS3-03)
-- [ ] IQ-015 Implement Q8_0 block struct and dequantize in `src/quant/q8_0.HC` (WS3-04)
+- [x] IQ-015 Implement Q8_0 block struct and dequantize in `src/quant/q8_0.HC` (WS3-04)
 - [ ] IQ-016 Draft `docs/GGUF_FORMAT.md` skeleton with sections for header, metadata, tensor info, and alignment rules (WS0-02)
 - [ ] IQ-017 Write host-side GGUF header/tensor dump fixture plan in `tests/README.md` for llama.cpp parity checks (WS0-05, WS2-05)
 - [ ] IQ-018 Create `tests/README.md` skeleton for llama.cpp parity fixtures (header, metadata, tensor offsets) (WS0-05, WS2-05)
@@ -199,6 +199,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] IQ-027 Add host-side metadata parser parity fixture for scalar/string/array/nested-array cases in `tests/test_gguf_metadata_parse.py` (WS2-02, WS2-05)
 - [ ] IQ-028 Implement GGUF tensor data base alignment helper in `src/gguf/tensor_data_base.HC` (WS2-04)
 - [ ] IQ-029 Implement Q8_0 dot product (naive, integer-only accumulator) in `src/quant/q8_0_dot.HC` (WS3-05)
+- [ ] IQ-030 Implement mixed Q4_0 x Q8_0 dot product kernel in `src/quant/q4_0_q8_0_dot.HC` (WS3-05)
 
 ## Progress Ledger
 
@@ -219,6 +220,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 | 2026-04-12 | loop-012 | IQ-012 GGUF tensor info reader | done | Added `src/gguf/tensorinfo.HC` with tensor-name parsing, dim/product overflow guards, GGML type validation, and table lifetime helpers; validated with `python3 tests/test_gguf_tensorinfo_parse.py` + `python3 tests/test_gguf_metadata_parse.py` (`gguf_tensorinfo_reference_checks=ok`, `gguf_metadata_reference_checks=ok`) |
 | 2026-04-12 | loop-013 | IQ-013 Q4_0 block struct + dequant | done | Added `src/quant/q4_0.HC` with Q4_0 block layout, fp16->Q16 integer scale conversion, nibble unpack (`q-8`), single/multi-block dequant helpers; validated with `python3 tests/test_q4_0_dequant.py` + regression parsers (`q4_0_dequant_reference_checks=ok`) |
 | 2026-04-12 | loop-014 | IQ-014 Q4_0 dot product (naive) | done | Added `src/quant/q4_0_dot.HC` with per-block and multi-block integer dot kernels (`Q4_0DotProductBlockQ32`, `Q4_0DotProductBlocksQ32`, `Q4_0DotQ32ToQ16`); validated with `python3 tests/test_q4_0_dot.py` + `python3 tests/test_q4_0_dequant.py` (`q4_0_dot_reference_checks=ok`, `q4_0_dequant_reference_checks=ok`) |
+| 2026-04-12 | loop-015 | IQ-015 Q8_0 block struct + dequant | done | Added `src/quant/q8_0.HC` with Q8_0 block layout, fp16->Q16 integer scale conversion, signed-byte unpack, single/multi-block dequant helpers; added `tests/test_q8_0_dequant.py`; validated with `python3 tests/test_q8_0_dequant.py && python3 tests/test_q4_0_dequant.py && python3 tests/test_q4_0_dot.py` (`q8_0_dequant_reference_checks=ok`, `q4_0_dequant_reference_checks=ok`, `q4_0_dot_reference_checks=ok`) |
 
 ## Blockers & Decisions
 
