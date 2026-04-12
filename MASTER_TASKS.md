@@ -182,7 +182,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-010 Implement GGUF magic/version/header parser in `src/gguf/header.HC` (WS2-01)
 - [x] IQ-011 Implement GGUF metadata KV reader in `src/gguf/metadata.HC` (WS2-02)
 - [x] IQ-012 Implement GGUF tensor info reader in `src/gguf/tensorinfo.HC` (WS2-03)
-- [ ] IQ-013 Implement Q4_0 block struct and dequantize in `src/quant/q4_0.HC` (WS3-01, WS3-02)
+- [x] IQ-013 Implement Q4_0 block struct and dequantize in `src/quant/q4_0.HC` (WS3-01, WS3-02)
 - [ ] IQ-014 Implement Q4_0 dot product (naive) in `src/quant/q4_0_dot.HC` (WS3-03)
 - [ ] IQ-015 Implement Q8_0 block struct and dequantize in `src/quant/q8_0.HC` (WS3-04)
 - [ ] IQ-016 Draft `docs/GGUF_FORMAT.md` skeleton with sections for header, metadata, tensor info, and alignment rules (WS0-02)
@@ -216,6 +216,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 | 2026-04-12 | loop-010 | IQ-010 GGUF header parser | done | Added `src/gguf/header.HC` with little-endian U32/U64 readers and `GGUFParseHeader` validation (magic/version/count/truncation); validated via focused host parity check (`gguf_header_reference_checks=ok`) |
 | 2026-04-12 | loop-011 | IQ-011 GGUF metadata KV reader | done | Added `src/gguf/metadata.HC` with full key/value parsing (scalar, string, array), strict bounds/type checks, and metadata table lifetime helpers; validated with `python3 tests/test_gguf_metadata_parse.py` (`gguf_metadata_reference_checks=ok`) |
 | 2026-04-12 | loop-012 | IQ-012 GGUF tensor info reader | done | Added `src/gguf/tensorinfo.HC` with tensor-name parsing, dim/product overflow guards, GGML type validation, and table lifetime helpers; validated with `python3 tests/test_gguf_tensorinfo_parse.py` + `python3 tests/test_gguf_metadata_parse.py` (`gguf_tensorinfo_reference_checks=ok`, `gguf_metadata_reference_checks=ok`) |
+| 2026-04-12 | loop-013 | IQ-013 Q4_0 block struct + dequant | done | Added `src/quant/q4_0.HC` with Q4_0 block layout, fp16->Q16 integer scale conversion, nibble unpack (`q-8`), single/multi-block dequant helpers; validated with `python3 tests/test_q4_0_dequant.py` + regression parsers (`q4_0_dequant_reference_checks=ok`) |
 
 ## Blockers & Decisions
 

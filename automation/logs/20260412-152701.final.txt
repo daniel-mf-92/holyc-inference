@@ -1,0 +1,15 @@
+Completed loop iteration end-to-end: `IQ-013` is implemented, validated, and logged.
+
+**What Changed**
+- Added HolyC Q4_0 runtime implementation in `src/quant/q4_0.HC:1` with `Q4_0Block`, fp16→Q16 integer conversion, nibble unpack (`q-8`), and single/multi-block dequant APIs.
+- Added host-side parity harness in `tests/test_q4_0_dequant.py:1` covering known-pattern unpack, fixed-scale dequant, fp16→Q16 conversion checks, and randomized block validation.
+- Updated queue + ledger in `MASTER_TASKS.md:185` and `MASTER_TASKS.md:219` (`IQ-013` marked complete, `loop-013` row added).
+
+**Queue Policy**
+- Unchecked queue depth is maintained at 15 (meets the rolling minimum).
+- Exactly one queue item progressed this iteration: `IQ-013`.
+
+**Validation Output**
+- `python3 tests/test_q4_0_dequant.py` → `q4_0_dequant_reference_checks=ok`
+- `python3 tests/test_gguf_tensorinfo_parse.py` → `gguf_tensorinfo_reference_checks=ok`
+- `python3 tests/test_gguf_metadata_parse.py` → `gguf_metadata_reference_checks=ok`
