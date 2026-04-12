@@ -1254,3 +1254,44 @@ I64 GGUFValidateSortedPositionMap(U64 tensor_count,
 
     return GGUF_TDBASE_OK;
 }
+
+I64 GGUFTensorIndexToAbsRange(U64 tensor_index,
+                              U64 tensor_count,
+                              U64 *tensor_abs_starts,
+                              U64 *tensor_abs_ends,
+                              U64 *sorted_position_by_tensor,
+                              U64 *out_abs_start,
+                              U64 *out_abs_end)
+{
+    U64 sorted_pos;
+    U64 abs_start;
+    U64 abs_end;
+
+    if (!tensor_abs_starts || !tensor_abs_ends || !sorted_position_by_tensor ||
+        !out_abs_start || !out_abs_end)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    // Keep deterministic outputs for callers even on invalid inputs.
+    *out_abs_start = 0;
+    *out_abs_end = 0;
+
+    // Caller uses original tensor index space [0, tensor_count).
+    if (tensor_index >= tensor_count)
+        return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+
+    // Inverse map gives O(1) jump from original index to sorted span slot.
+    sorted_pos = sorted_position_by_tensor[tensor_index];
+    if (sorted_pos >= tensor_count)
+        return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+
+    abs_start = tensor_abs_starts[sorted_pos];
+    abs_end = tensor_abs_ends[sorted_pos];
+
+    // Spans are half-open [start,end); end before start is malformed.
+    if (abs_end < abs_start)
+        return GGUF_TDBASE_ERR_OVERFLOW;
+
+    *out_abs_start = abs_start;
+    *out_abs_end = abs_end;
+    return GGUF_TDBASE_OK;
+}

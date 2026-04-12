@@ -238,13 +238,14 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-050 Add offset-index integrity validator `GGUFValidateSortedTensorIndex` (permutation+range checks) in `src/gguf/tensor_data_base.HC` with adversarial host parity tests (WS2-04)
 - [x] IQ-051 Add sorted-index inverse map builder `GGUFBuildTensorSortedPositionMap` in `src/gguf/tensor_data_base.HC` (original index -> sorted position) with parity checks in `tests/test_gguf_tensor_data_base.py` (WS2-04)
 - [x] IQ-052 Implement `GGUFValidateSortedPositionMap` in `src/gguf/tensor_data_base.HC` to verify original->sorted inverse map bounds/permutation consistency against `sorted_tensor_indices` (WS2-04)
-- [ ] IQ-053 Implement `GGUFTensorIndexToAbsRange` in `src/gguf/tensor_data_base.HC` using inverse map + sorted span arrays for O(1)+lookup tensor range retrieval by original index (WS2-04)
+- [x] IQ-053 Implement `GGUFTensorIndexToAbsRange` in `src/gguf/tensor_data_base.HC` using inverse map + sorted span arrays for O(1)+lookup tensor range retrieval by original index (WS2-04)
 - [ ] IQ-054 Add host-side parity harnesses for inverse-map/range-index helpers in `tests/test_gguf_tensor_data_base.py` with randomized permutation adversarial cases (WS2-04)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-12 | loop-038 | IQ-053 tensor index→abs range lookup | done | Added `GGUFTensorIndexToAbsRange` + focused parity checks; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-12 | loop-037 | IQ-052 sorted position-map validator | done | Added `GGUFValidateSortedPositionMap` in `src/gguf/tensor_data_base.HC` + adversarial parity coverage in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-12 | loop-036 | IQ-050 sorted index integrity validator | done | Added `GGUFValidateSortedTensorIndex` in `src/gguf/tensor_data_base.HC` plus adversarial integrity tests in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py` passed |
 | 2026-04-12 | loop-035 | IQ-049 default-alignment indexed lookup | done | Added `GGUFTensorRangeFindIndexByRelOffsetDefault` + default-alignment parity tests; `python3 tests/test_gguf_tensor_data_base.py` passed |
