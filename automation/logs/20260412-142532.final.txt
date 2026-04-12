@@ -1,0 +1,13 @@
+Completed one full iteration: `IQ-002` is now done with queue depth preserved.
+
+**What Changed**
+- Added `docs/GGUF_FORMAT.md:1` as a practical HolyC parser reference covering header, metadata KV layout, tensor info, alignment math, bounds checks, and Q4_0/Q8_0 handling.
+- Marked `IQ-002` complete in `MASTER_TASKS.md:123`.
+- Appended one new queue item `IQ-017` in `MASTER_TASKS.md:138` to keep the rolling queue deep and monotonic.
+- Added Progress Ledger row for this iteration (`loop-002`) in `MASTER_TASKS.md:146`.
+
+**Validation**
+- Ran: `rg -n '^- \[ \] IQ-' MASTER_TASKS.md | wc -l` → `Unchecked IQ count: 15`.
+- Ran targeted checks confirming queue/task/doc updates and required GGUF sections:
+  - `IQ-002` checked, `IQ-017` present, `loop-002` present.
+  - `docs/GGUF_FORMAT.md` contains Header, Metadata, Tensor Info, and Tensor Data/Alignment sections.
