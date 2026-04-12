@@ -1,7 +1,8 @@
 You are running an unattended loop building a pure HolyC inference engine for TempleOS.
 
 Repository: ~/Documents/local-codebases/holyc-inference
-Primary plan: MASTER_TASKS.md
+Plan: MASTER_TASKS.md
+Central DB: ~/Documents/local-codebases/temple-central.db
 
 Philosophy: MAXIMUM TERRY DAVIS PURITY.
 - Every line of inference code is HolyC. No C, no C++, no Rust, no Go, no Python in the runtime.
@@ -33,12 +34,13 @@ Execution contract for THIS iteration:
    - If implementing a quantization kernel, get the bit-level math RIGHT — reference the GGML source
    - If implementing a GPU interface, study PCIe config space, BAR mapping, MMIO register layouts
 5. Run focused validation commands relevant to your changes.
-6. Update MASTER_TASKS.md:
-   - mark completed queue items
-   - add Progress Ledger rows with today's date
-   - add blockers/decisions if any
-7. If blocked, document blocker and do research — check llama.cpp source, OSDev wiki, Intel SDM,
-   or any reference that could unblock you. Write findings to docs/ for future iterations.
+6. Log to central DB:
+   ```
+   sqlite3 ~/Documents/local-codebases/temple-central.db "INSERT INTO iterations (agent,task_id,status,files_changed,lines_added,validation_cmd,validation_result,notes) VALUES ('inference','IQ-XXX','pass','src/quant/q4_0.HC',85,'python3 tests/test_q4.py','ok','Q4_0 dequant working');"
+   ```
+7. Update MASTER_TASKS.md: mark IQ item done. ONE line in progress ledger. No verbose notes.
+8. Keep queue at 15+ unchecked items. New items MUST target .HC code, not docs.
+9. If blocked, research online — llama.cpp source, GGML internals, Intel SDM, OSDev wiki.
 
 Safety constraints:
 - Do not introduce non-HolyC implementation languages into the inference engine runtime.
