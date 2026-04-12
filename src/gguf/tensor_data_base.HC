@@ -1019,3 +1019,23 @@ I64 GGUFTensorRangeFindIndexByRelOffset(U64 tensor_rel_offset,
                                                sorted_tensor_indices,
                                                out_tensor_index);
 }
+
+I64 GGUFTensorRangeFindIndexByRelOffsetDefault(U64 tensor_rel_offset,
+                                               U64 tensor_data_base,
+                                               U64 tensor_count,
+                                               U64 *tensor_abs_starts,
+                                               U64 *tensor_abs_ends,
+                                               U64 *sorted_tensor_indices,
+                                               U64 *out_tensor_index)
+{
+    // Default GGUF tensor payload alignment when `general.alignment`
+    // metadata is absent.
+    return GGUFTensorRangeFindIndexByRelOffset(tensor_rel_offset,
+                                               tensor_data_base,
+                                               GGUF_DEFAULT_ALIGNMENT,
+                                               tensor_count,
+                                               tensor_abs_starts,
+                                               tensor_abs_ends,
+                                               sorted_tensor_indices,
+                                               out_tensor_index);
+}
