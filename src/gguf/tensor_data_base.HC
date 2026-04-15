@@ -1255,6 +1255,110 @@ I64 GGUFValidateSortedPositionMap(U64 tensor_count,
     return GGUF_TDBASE_OK;
 }
 
+I64 GGUFValidateTensorLookupTables(U64 tensor_count,
+                                   U64 *tensor_abs_starts,
+                                   U64 *tensor_abs_ends,
+                                   U64 *sorted_tensor_indices,
+                                   U64 *sorted_position_by_tensor,
+                                   U64 *out_bad_index)
+{
+    U64 i;
+    U64 sorted_pos;
+    U64 orig_idx;
+    U64 abs_start;
+    U64 abs_end;
+    U64 cross_start;
+    U64 cross_end;
+    U64 bad_index;
+    I64 err;
+
+    if (!tensor_abs_starts || !tensor_abs_ends || !sorted_tensor_indices ||
+        !sorted_position_by_tensor)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    if (out_bad_index)
+        *out_bad_index = 0;
+
+    // Phase 1: validate sorted absolute ranges + sorted->original permutation.
+    err = GGUFValidateSortedTensorIndex(tensor_count,
+                                        tensor_abs_starts,
+                                        tensor_abs_ends,
+                                        sorted_tensor_indices,
+                                        &bad_index);
+    if (err != GGUF_TDBASE_OK)
+    {
+        if (out_bad_index)
+            *out_bad_index = bad_index;
+        return err;
+    }
+
+    // Phase 2: validate original->sorted inverse permutation consistency.
+    err = GGUFValidateSortedPositionMap(tensor_count,
+                                        sorted_tensor_indices,
+                                        sorted_position_by_tensor,
+                                        &bad_index);
+    if (err != GGUF_TDBASE_OK)
+    {
+        if (out_bad_index)
+            *out_bad_index = bad_index;
+        return err;
+    }
+
+    // Phase 3: cross-check every sorted slot against O(1) index lookup path.
+    // This proves the composed lookup tables are mutually consistent and that
+    // tensor_index -> sorted_pos -> [abs_start, abs_end) remains stable.
+    for (i = 0; i < tensor_count; ++i)
+    {
+        orig_idx = sorted_tensor_indices[i];
+        if (orig_idx >= tensor_count)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+        }
+
+        sorted_pos = sorted_position_by_tensor[orig_idx];
+        if (sorted_pos != i)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+        }
+
+        abs_start = tensor_abs_starts[i];
+        abs_end = tensor_abs_ends[i];
+        if (abs_end < abs_start)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return GGUF_TDBASE_ERR_OVERFLOW;
+        }
+
+        err = GGUFTensorIndexToAbsRange(orig_idx,
+                                        tensor_count,
+                                        tensor_abs_starts,
+                                        tensor_abs_ends,
+                                        sorted_position_by_tensor,
+                                        &cross_start,
+                                        &cross_end);
+        if (err != GGUF_TDBASE_OK)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return err;
+        }
+
+        if (cross_start != abs_start || cross_end != abs_end)
+        {
+            if (out_bad_index)
+                *out_bad_index = i;
+            return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+        }
+    }
+
+    return GGUF_TDBASE_OK;
+}
+
 I64 GGUFTensorIndexToAbsRange(U64 tensor_index,
                               U64 tensor_count,
                               U64 *tensor_abs_starts,
