@@ -1862,3 +1862,60 @@ I64 GGUFTensorLookupByIndexWithRelOffset(U64 tensor_index,
                                                   out_abs_end,
                                                   out_offset_in_tensor);
 }
+
+I64 GGUFTensorLookupSpanByAbsRange(U64 span_abs_start,
+                                   U64 span_abs_end,
+                                   U64 tensor_count,
+                                   U64 *tensor_abs_starts,
+                                   U64 *tensor_abs_ends,
+                                   U64 *sorted_tensor_indices,
+                                   U64 *out_tensor_index,
+                                   U64 *out_tensor_abs_start,
+                                   U64 *out_tensor_abs_end,
+                                   U64 *out_span_start_in_tensor,
+                                   U64 *out_span_end_in_tensor)
+{
+    U64 tensor_index;
+    U64 tensor_abs_start;
+    U64 tensor_abs_end;
+    I64 err;
+
+    if (!out_tensor_index || !out_tensor_abs_start || !out_tensor_abs_end ||
+        !out_span_start_in_tensor || !out_span_end_in_tensor)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    // Deterministic outputs for all failure paths.
+    *out_tensor_index = 0;
+    *out_tensor_abs_start = 0;
+    *out_tensor_abs_end = 0;
+    *out_span_start_in_tensor = 0;
+    *out_span_end_in_tensor = 0;
+
+    // Half-open ranges require end >= start; treat underflowed caller windows
+    // as malformed arithmetic from upstream size/offset math.
+    if (span_abs_end < span_abs_start)
+        return GGUF_TDBASE_ERR_OVERFLOW;
+
+    // Resolve the window start into a containing tensor span.
+    err = GGUFTensorLookupByAbsOffset(span_abs_start,
+                                      tensor_count,
+                                      tensor_abs_starts,
+                                      tensor_abs_ends,
+                                      sorted_tensor_indices,
+                                      &tensor_index,
+                                      &tensor_abs_start,
+                                      &tensor_abs_end);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    // Entire caller window must remain inside the same tensor payload.
+    if (span_abs_end > tensor_abs_end)
+        return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+
+    *out_tensor_index = tensor_index;
+    *out_tensor_abs_start = tensor_abs_start;
+    *out_tensor_abs_end = tensor_abs_end;
+    *out_span_start_in_tensor = span_abs_start - tensor_abs_start;
+    *out_span_end_in_tensor = span_abs_end - tensor_abs_start;
+    return GGUF_TDBASE_OK;
+}

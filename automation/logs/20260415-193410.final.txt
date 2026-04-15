@@ -1,0 +1,34 @@
+Completed a full unattended iteration with deep code work and queue maintenance.
+
+**What Changed**
+- Implemented `IQ-067` in `src/gguf/tensor_data_base.HC:1866`:
+  - Added `GGUFTensorLookupSpanByAbsRange(...)`.
+  - Resolves a caller `[span_abs_start, span_abs_end)` window to:
+    - containing original tensor index,
+    - containing tensor absolute `[start,end)`,
+    - in-tensor span `[start_offset,end_offset)`.
+  - Enforces deterministic outputs on failure, checks `end < start` overflow, and rejects cross-tensor spans.
+- Added host-side parity logic in `tests/test_gguf_tensor_data_base.py:953`.
+- Added focused tests:
+  - `test_tensor_lookup_span_by_abs_range_happy_path` at `tests/test_gguf_tensor_data_base.py:4186`
+  - `test_tensor_lookup_span_by_abs_range_propagates_errors` at `tests/test_gguf_tensor_data_base.py:4220`
+  - `test_tensor_lookup_span_by_abs_range_with_built_offset_index` at `tests/test_gguf_tensor_data_base.py:4254`
+- Wired new tests into runner at `tests/test_gguf_tensor_data_base.py:4422`.
+
+**Queue + Ledger**
+- Maintained rolling queue depth policy:
+  - Added `IQ-068` and `IQ-069` in `MASTER_TASKS.md:257` and `MASTER_TASKS.md:258`.
+- Marked `IQ-067` done in `MASTER_TASKS.md:256`.
+- Added one-line progress ledger entry in `MASTER_TASKS.md:263`.
+
+**Validation Output**
+- `python3 tests/test_gguf_tensor_data_base.py`
+  - `gguf_tensor_data_base_reference_checks=ok`
+- `python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py`
+  - `gguf_tensorinfo_reference_checks=ok`
+  - `gguf_metadata_reference_checks=ok`
+
+**Central DB Log**
+- Inserted iteration record into `~/Documents/local-codebases/temple-central.db` for `IQ-067` (status `pass`).
+- Verified latest row: `792|inference|IQ-067|pass`.
+
