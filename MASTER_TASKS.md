@@ -268,11 +268,12 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-079 Implement HolyC helper `FPQ16LnRatio` in `src/math/intlog.HC` for `ln(num/den)` with positive-domain validation and shared core range reduction (WS1-02)
 - [x] IQ-080 Implement HolyC helper `FPQ16EntropyFromProbs` in `src/math/softmax.HC` using `FPQ16Ln` to compute Shannon entropy diagnostics from Q16 probabilities (WS1-03)
 - [ ] IQ-081 Add host-side parity harness `tests/test_intlog_ratio_q16.py` covering `FPQ16Log2` + `FPQ16LnRatio` against `math.log2`/`math.log` bounds (WS1-05)
-- [ ] IQ-082 Add host-side parity harness `tests/test_softmax_entropy_q16.py` validating Q16 entropy helper against float reference vectors and edge-case clamps (WS1-05)
+- [x] IQ-082 Add host-side parity harness `tests/test_softmax_entropy_q16.py` validating Q16 entropy helper against float reference vectors and edge-case clamps (WS1-05)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
+| 2026-04-15 | loop-063 | IQ-082 softmax entropy parity harness | done | Added `tests/test_softmax_entropy_q16.py` with Q16 entropy clamp/known-vector/random-simplex parity checks against float references; `python3 tests/test_softmax_entropy_q16.py` passed |
 | 2026-04-15 | loop-062 | IQ-079 FPQ16LnRatio helper | done | Added `FPQ16LnRatio` in `src/math/intlog.HC` with positive-domain checks + shared range-reduction polynomial path and parity coverage in `tests/test_intlog_q16.py`; `python3 tests/test_intlog_q16.py` passed |
 | 2026-04-15 | loop-061 | IQ-077 intlog Q16 core | done | Added `src/math/intlog.HC` (`FPQ16LnReduce`, `FPQ16Ln1pPoly`, `FPQ16Ln`) with integer-only domain clamps/range reduction/piecewise polynomial and added `tests/test_intlog_q16.py`; `python3 tests/test_intlog_q16.py` passed |
 | 2026-04-15 | loop-060 | IQ-076 abs-span payload-window loader | done | Added `GGUFTensorInfoLoadPayloadWindowByAbsSpan` in `src/gguf/tensor_data_base.HC` with parity/adversarial coverage in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |

@@ -1,0 +1,15 @@
+Completed one full unattended iteration for `IQ-082` end-to-end.
+
+**What I Changed**
+- Added a new host-side parity harness at `tests/test_softmax_entropy_q16.py:1` for `FPQ16EntropyFromProbs` behavior (clamps, degenerate inputs, known vectors, randomized simplex cases).
+- Marked `IQ-082` done in `MASTER_TASKS.md:271`.
+- Added one progress-ledger line in `MASTER_TASKS.md:276` (`loop-063`, IQ-082).
+
+**Validation**
+- Ran: `python3 tests/test_softmax_entropy_q16.py`
+- Output: `softmax_entropy_q16_reference_checks=ok`
+
+**Queue/DB Contract**
+- Queue depth policy satisfied without refill: unchecked IQ count is `15` (meets `>=15`).
+- Exactly one queue item progressed: `IQ-082`.
+- Logged central DB iteration row in `~/Documents/local-codebases/temple-central.db` with status `pass` and validation result `softmax_entropy_q16_reference_checks=ok`.
