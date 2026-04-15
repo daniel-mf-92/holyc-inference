@@ -5,6 +5,7 @@
 #define FP_Q16_ONE   (1 << FP_Q16_SHIFT)
 
 #define LOG_Q16_LN2  45426 // round(ln(2) * 65536)
+#define LOG_Q16_INV_LN2 94549 // round((1/ln(2)) * 65536)
 #define LOG_Q16_HALF (1 << (FP_Q16_SHIFT - 1))
 #define LOG_Q16_SPLIT ((FP_Q16_ONE * 3) / 2) // 1.5 in Q16
 
@@ -100,3 +101,39 @@ I64 FPQ16Ln(I64 x_q16)
     return ln_q16;
 }
 
+I64 FPQ16Log2(I64 x_q16)
+{
+    I64 ln_q16;
+    I64 abs_ln;
+    I64 abs_inv;
+    I64 max_abs_ln;
+    I64 prod;
+
+    ln_q16 = FPQ16Ln(x_q16);
+
+    // Preserve ln(x<=0) deterministic domain floor.
+    if (ln_q16 == I64_MIN_VALUE)
+        return I64_MIN_VALUE;
+
+    // log2(x) = ln(x) * (1/ln(2)).
+    // Keep overflow checks explicit before multiply.
+    abs_ln = ln_q16;
+    if (abs_ln < 0)
+        abs_ln = -abs_ln;
+
+    abs_inv = LOG_Q16_INV_LN2;
+    max_abs_ln = I64_MAX_VALUE / abs_inv;
+    if (abs_ln > max_abs_ln)
+    {
+        if (ln_q16 < 0)
+            return I64_MIN_VALUE;
+        return I64_MAX_VALUE;
+    }
+
+    prod = ln_q16 * LOG_Q16_INV_LN2;
+
+    // Q16*Q16 -> Q32. Round to Q16 with sign-aware half-up policy.
+    if (prod >= 0)
+        return (prod + LOG_Q16_HALF) >> FP_Q16_SHIFT;
+    return -(((-prod) + LOG_Q16_HALF) >> FP_Q16_SHIFT);
+}

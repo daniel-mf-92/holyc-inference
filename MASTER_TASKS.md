@@ -264,7 +264,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-075 Implement HolyC helper `GGUFTensorInfoLoadPayloadWindowByRelSpan` in `src/gguf/tensor_data_base.HC` to resolve relative payload windows (caller alignment) to owning original tensor index plus validated absolute/in-tensor spans (WS2-04)
 - [x] IQ-076 Implement HolyC helper `GGUFTensorInfoLoadPayloadWindowByAbsSpan` in `src/gguf/tensor_data_base.HC` to resolve absolute payload windows to owning original tensor index plus validated in-tensor spans for direct stream readers (WS2-04)
 - [x] IQ-077 Implement HolyC integer natural-log approximation core in `src/math/intlog.HC` (Q16 input/output, overflow-safe domain clamps, monotonicity-preserving piecewise polynomial) with parity-target hooks for WS1-02/WS1-05 harnesses (WS1-02)
-- [ ] IQ-078 Implement HolyC helper `FPQ16Log2` in `src/math/intlog.HC` via `FPQ16Ln` and fixed-point `1/ln(2)` scaling with overflow-safe rounding (WS1-02)
+- [x] IQ-078 Implement HolyC helper `FPQ16Log2` in `src/math/intlog.HC` via `FPQ16Ln` and fixed-point `1/ln(2)` scaling with overflow-safe rounding (WS1-02)
 - [ ] IQ-079 Implement HolyC helper `FPQ16LnRatio` in `src/math/intlog.HC` for `ln(num/den)` with positive-domain validation and shared core range reduction (WS1-02)
 - [ ] IQ-080 Implement HolyC helper `FPQ16EntropyFromProbs` in `src/math/softmax.HC` using `FPQ16Ln` to compute Shannon entropy diagnostics from Q16 probabilities (WS1-03)
 - [ ] IQ-081 Add host-side parity harness `tests/test_intlog_ratio_q16.py` covering `FPQ16Log2` + `FPQ16LnRatio` against `math.log2`/`math.log` bounds (WS1-05)
@@ -339,6 +339,8 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 | 2026-04-12 | loop-030 | IQ-044 tensor range binary lookup | done | Added `GGUFTensorRangeFindByAbsOffset` in `src/gguf/tensor_data_base.HC` + binary-search parity tests; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 
 | 2026-04-12 | loop-031 | IQ-051 sorted-index inverse map builder | done | Added `GGUFBuildTensorSortedPositionMap` in `src/gguf/tensor_data_base.HC` + parity tests in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
+
+| 2026-04-15 | loop-032 | IQ-078 FPQ16Log2 helper | done | Added `FPQ16Log2` in `src/math/intlog.HC` with overflow-safe Q16 scaling via `1/ln(2)`; expanded `tests/test_intlog_q16.py`; `python3 tests/test_intlog_q16.py` passed |
 
 ## Blockers & Decisions
 

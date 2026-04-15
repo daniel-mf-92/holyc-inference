@@ -1,0 +1,11 @@
+Done — one full iteration is complete with `IQ-078` progressed end-to-end.
+
+- Implemented `FPQ16Log2` in `src/math/intlog.HC:104` using `FPQ16Ln` + fixed-point `1/ln(2)` scaling (`LOG_Q16_INV_LN2`) with explicit overflow guards and signed Q16 rounding.
+- Added/extended parity coverage for `log2` domain floor, exact powers-of-two, and random error bounds in `tests/test_intlog_q16.py:180`.
+- Marked queue item complete in `MASTER_TASKS.md:267` and added one progress-ledger line in `MASTER_TASKS.md:343`.
+- Queue depth policy is satisfied: unchecked `IQ-` items = `18` (>=15), so no refill was required this iteration.
+- Logged iteration to central DB (`temple-central.db`) as row `id=914`, `task_id=IQ-078`, `status=pass`.
+
+Validation run:
+- `python3 tests/test_intlog_q16.py`
+- Output: `intlog_q16_reference_checks=ok`
