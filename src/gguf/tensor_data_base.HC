@@ -1448,3 +1448,25 @@ I64 GGUFTensorLookupByAbsOffset(U64 abs_offset,
     *out_abs_end = abs_end;
     return GGUF_TDBASE_OK;
 }
+
+I64 GGUFTensorLookupByAbsOffsetDefault(U64 abs_offset,
+                                       U64 tensor_count,
+                                       U64 *tensor_abs_starts,
+                                       U64 *tensor_abs_ends,
+                                       U64 *sorted_tensor_indices,
+                                       U64 *out_tensor_index,
+                                       U64 *out_abs_start,
+                                       U64 *out_abs_end)
+{
+    // Absolute-offset lookup does not depend on alignment metadata,
+    // but provide the default wrapper for API symmetry with rel-offset
+    // callers that branch on `general.alignment` presence.
+    return GGUFTensorLookupByAbsOffset(abs_offset,
+                                       tensor_count,
+                                       tensor_abs_starts,
+                                       tensor_abs_ends,
+                                       sorted_tensor_indices,
+                                       out_tensor_index,
+                                       out_abs_start,
+                                       out_abs_end);
+}
