@@ -1675,3 +1675,30 @@ I64 GGUFTensorLookupByRelOffsetWithInnerOffset(U64 tensor_rel_offset,
     *out_offset_in_tensor = abs_offset - abs_start;
     return GGUF_TDBASE_OK;
 }
+
+I64 GGUFTensorLookupByRelOffsetWithInnerOffsetDefault(U64 tensor_rel_offset,
+                                                      U64 tensor_data_base,
+                                                      U64 tensor_count,
+                                                      U64 *tensor_abs_starts,
+                                                      U64 *tensor_abs_ends,
+                                                      U64 *sorted_tensor_indices,
+                                                      U64 *out_tensor_index,
+                                                      U64 *out_abs_start,
+                                                      U64 *out_abs_end,
+                                                      U64 *out_offset_in_tensor)
+{
+    // Metadata-absent GGUF readers use `general.alignment = 32` by default.
+    // Keep default wrapper behavior identical to checked core helper so
+    // misalignment, bounds, and malformed-range semantics stay centralized.
+    return GGUFTensorLookupByRelOffsetWithInnerOffset(tensor_rel_offset,
+                                                      tensor_data_base,
+                                                      GGUF_DEFAULT_ALIGNMENT,
+                                                      tensor_count,
+                                                      tensor_abs_starts,
+                                                      tensor_abs_ends,
+                                                      sorted_tensor_indices,
+                                                      out_tensor_index,
+                                                      out_abs_start,
+                                                      out_abs_end,
+                                                      out_offset_in_tensor);
+}

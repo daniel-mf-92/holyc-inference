@@ -1,0 +1,16 @@
+Completed one deep iteration on `IQ-061` end-to-end with queue depth preserved.
+
+**Implemented**
+- Added HolyC default wrapper `GGUFTensorLookupByRelOffsetWithInnerOffsetDefault(...)` delegating to checked core with `GGUF_DEFAULT_ALIGNMENT` in `src/gguf/tensor_data_base.HC:1679`.
+- Added Python parity wrapper + new default-alignment tests in `tests/test_gguf_tensor_data_base.py:889` and `tests/test_gguf_tensor_data_base.py:3343`.
+- Registered those new tests in suite runner `run()` at `tests/test_gguf_tensor_data_base.py:3719`.
+
+**Task/Queue/DB Updates**
+- Marked `IQ-061` done and added new unchecked `IQ-063` (monotonic ID) in `MASTER_TASKS.md:250`.
+- Added one progress-ledger line for this iteration in `MASTER_TASKS.md:258`.
+- Inserted central DB record in `~/Documents/local-codebases/temple-central.db` (`iterations.id=748`, `task_id=IQ-061`, `status=pass`, `lines_added=161`).
+- Queue depth policy satisfied: `unchecked=15` after completion and refill.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py`
+- Output: `gguf_tensor_data_base_reference_checks=ok`, `gguf_tensorinfo_reference_checks=ok`, `gguf_metadata_reference_checks=ok`.

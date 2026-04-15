@@ -886,6 +886,23 @@ def tensor_lookup_by_rel_offset_with_inner_offset(
     return GGUF_TDBASE_OK, tensor_index, abs_start, abs_end, abs_offset - abs_start
 
 
+def tensor_lookup_by_rel_offset_with_inner_offset_default(
+    tensor_rel_offset: int,
+    tensor_data_base: int,
+    tensor_abs_starts: list[int],
+    tensor_abs_ends: list[int],
+    sorted_tensor_indices: list[int],
+):
+    return tensor_lookup_by_rel_offset_with_inner_offset(
+        tensor_rel_offset=tensor_rel_offset,
+        tensor_data_base=tensor_data_base,
+        alignment=GGUF_DEFAULT_ALIGNMENT,
+        tensor_abs_starts=tensor_abs_starts,
+        tensor_abs_ends=tensor_abs_ends,
+        sorted_tensor_indices=sorted_tensor_indices,
+    )
+
+
 def _abs_range_greater(
     starts: list[int],
     ends: list[int],
@@ -3323,6 +3340,117 @@ def test_tensor_lookup_by_rel_offset_with_inner_offset_with_built_offset_index()
             assert inner == (nbytes // 2)
 
 
+def test_tensor_lookup_by_rel_offset_with_inner_offset_default_happy_path() -> None:
+    starts = [0x2000, 0x2060, 0x2100]
+    ends = [0x2040, 0x20A0, 0x2140]
+    sorted_idx = [1, 2, 0]
+
+    assert tensor_lookup_by_rel_offset_with_inner_offset_default(0x00, 0x2000, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_OK,
+        1,
+        0x2000,
+        0x2040,
+        0,
+    )
+    assert tensor_lookup_by_rel_offset_with_inner_offset_default(0x80, 0x2000, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_OK,
+        2,
+        0x2060,
+        0x20A0,
+        0x20,
+    )
+    assert tensor_lookup_by_rel_offset_with_inner_offset_default(0x120, 0x2000, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_OK,
+        0,
+        0x2100,
+        0x2140,
+        0x20,
+    )
+
+
+def test_tensor_lookup_by_rel_offset_with_inner_offset_default_propagates_errors() -> None:
+    starts = [0x3000, 0x3080]
+    ends = [0x3040, 0x30A0]
+    sorted_idx = [0, 1]
+
+    # Misaligned for default alignment=32.
+    assert tensor_lookup_by_rel_offset_with_inner_offset_default(0x4C, 0x3000, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_ERR_MISALIGNED_TENSOR_OFFSET,
+        0,
+        0,
+        0,
+        0,
+    )
+
+    # Aligned but outside any tensor payload span.
+    assert tensor_lookup_by_rel_offset_with_inner_offset_default(0x40, 0x3000, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_ERR_OUT_OF_BOUNDS,
+        0,
+        0,
+        0,
+        0,
+    )
+
+
+def test_tensor_lookup_by_rel_offset_with_inner_offset_default_with_built_offset_index() -> None:
+    rel_offsets = [0x280, 0x00, 0x2C0, 0x40]
+    elem_counts = [32, 64, 32, 128]
+    ggml_types = [GGML_TYPE_Q8_0, GGML_TYPE_Q4_0, GGML_TYPE_F16, GGML_TYPE_F32]
+    starts = [0, 0, 0, 0]
+    ends = [0, 0, 0, 0]
+    sorted_idx = [0, 0, 0, 0]
+
+    err, bad = tensor_info_build_offset_index(
+        tensor_data_base=0x7000,
+        alignment=GGUF_DEFAULT_ALIGNMENT,
+        gguf_file_nbytes=0xA000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_element_counts=elem_counts,
+        tensor_ggml_types=ggml_types,
+        out_abs_starts=starts,
+        out_abs_ends=ends,
+        out_sorted_tensor_indices=sorted_idx,
+    )
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+    for original_idx in range(len(rel_offsets)):
+        rel_start = rel_offsets[original_idx]
+        abs_start = 0x7000 + rel_start
+        err, tensor_index, out_start, out_end, inner = tensor_lookup_by_rel_offset_with_inner_offset_default(
+            rel_start,
+            0x7000,
+            starts,
+            ends,
+            sorted_idx,
+        )
+        assert err == GGUF_TDBASE_OK
+        assert tensor_index == original_idx
+        assert out_start == abs_start
+        assert inner == 0
+        err_n, nbytes = tensor_bytes_for_type(ggml_types[original_idx], elem_counts[original_idx])
+        assert err_n == GGUF_TDBASE_OK
+        assert out_end == abs_start + nbytes
+
+        if nbytes > 1:
+            mid_rel = rel_start + (nbytes // 2)
+            # Mid probes under default wrapper still must respect default alignment.
+            if (mid_rel % GGUF_DEFAULT_ALIGNMENT) != 0:
+                continue
+            err, tensor_index, out_start, out_end, inner = tensor_lookup_by_rel_offset_with_inner_offset_default(
+                mid_rel,
+                0x7000,
+                starts,
+                ends,
+                sorted_idx,
+            )
+            assert err == GGUF_TDBASE_OK
+            assert tensor_index == original_idx
+            assert out_start == abs_start
+            assert out_end == abs_start + nbytes
+            assert inner == (nbytes // 2)
+
+
 def test_inverse_map_and_range_index_random_permutation_parity() -> None:
     rng = random.Random(764311)
 
@@ -3588,6 +3716,9 @@ def run() -> None:
     test_tensor_lookup_by_rel_offset_with_inner_offset_happy_path()
     test_tensor_lookup_by_rel_offset_with_inner_offset_propagates_errors()
     test_tensor_lookup_by_rel_offset_with_inner_offset_with_built_offset_index()
+    test_tensor_lookup_by_rel_offset_with_inner_offset_default_happy_path()
+    test_tensor_lookup_by_rel_offset_with_inner_offset_default_propagates_errors()
+    test_tensor_lookup_by_rel_offset_with_inner_offset_default_with_built_offset_index()
     test_tensor_info_build_offset_index_happy_path()
     test_tensor_info_build_offset_index_propagates_bad_block_multiple()
     test_tensor_info_build_offset_index_detects_overlap()
