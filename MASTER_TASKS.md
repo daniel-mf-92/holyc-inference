@@ -263,11 +263,17 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-074 Implement HolyC helper `GGUFTensorInfoLoadPayloadWindowByIndexRel` in `src/gguf/tensor_data_base.HC` with caller-specified alignment (non-default) and shared absolute-window validation for parser paths that honor `general.alignment` (WS2-04)
 - [x] IQ-075 Implement HolyC helper `GGUFTensorInfoLoadPayloadWindowByRelSpan` in `src/gguf/tensor_data_base.HC` to resolve relative payload windows (caller alignment) to owning original tensor index plus validated absolute/in-tensor spans (WS2-04)
 - [x] IQ-076 Implement HolyC helper `GGUFTensorInfoLoadPayloadWindowByAbsSpan` in `src/gguf/tensor_data_base.HC` to resolve absolute payload windows to owning original tensor index plus validated in-tensor spans for direct stream readers (WS2-04)
-- [ ] IQ-077 Implement HolyC integer natural-log approximation core in `src/math/intlog.HC` (Q16 input/output, overflow-safe domain clamps, monotonicity-preserving piecewise polynomial) with parity-target hooks for WS1-02/WS1-05 harnesses (WS1-02)
+- [x] IQ-077 Implement HolyC integer natural-log approximation core in `src/math/intlog.HC` (Q16 input/output, overflow-safe domain clamps, monotonicity-preserving piecewise polynomial) with parity-target hooks for WS1-02/WS1-05 harnesses (WS1-02)
+- [ ] IQ-078 Implement HolyC helper `FPQ16Log2` in `src/math/intlog.HC` via `FPQ16Ln` and fixed-point `1/ln(2)` scaling with overflow-safe rounding (WS1-02)
+- [ ] IQ-079 Implement HolyC helper `FPQ16LnRatio` in `src/math/intlog.HC` for `ln(num/den)` with positive-domain validation and shared core range reduction (WS1-02)
+- [ ] IQ-080 Implement HolyC helper `FPQ16EntropyFromProbs` in `src/math/softmax.HC` using `FPQ16Ln` to compute Shannon entropy diagnostics from Q16 probabilities (WS1-03)
+- [ ] IQ-081 Add host-side parity harness `tests/test_intlog_ratio_q16.py` covering `FPQ16Log2` + `FPQ16LnRatio` against `math.log2`/`math.log` bounds (WS1-05)
+- [ ] IQ-082 Add host-side parity harness `tests/test_softmax_entropy_q16.py` validating Q16 entropy helper against float reference vectors and edge-case clamps (WS1-05)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
+| 2026-04-15 | loop-061 | IQ-077 intlog Q16 core | done | Added `src/math/intlog.HC` (`FPQ16LnReduce`, `FPQ16Ln1pPoly`, `FPQ16Ln`) with integer-only domain clamps/range reduction/piecewise polynomial and added `tests/test_intlog_q16.py`; `python3 tests/test_intlog_q16.py` passed |
 | 2026-04-15 | loop-060 | IQ-076 abs-span payload-window loader | done | Added `GGUFTensorInfoLoadPayloadWindowByAbsSpan` in `src/gguf/tensor_data_base.HC` with parity/adversarial coverage in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-15 | loop-058 | IQ-074 index+rel payload-window loader (custom alignment) | done | Added `GGUFTensorInfoLoadPayloadWindowByIndexRel` + parity/adversarial coverage in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-15 | loop-059 | IQ-075 rel-span payload-window loader | done | Added `GGUFTensorInfoLoadPayloadWindowByRelSpan` + parity/adversarial coverage in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |

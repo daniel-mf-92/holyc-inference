@@ -1,0 +1,15 @@
+Done — I completed one full unattended iteration for `IQ-077`.
+
+**Completed**
+- Implemented HolyC integer ln core in `src/math/intlog.HC:16` (`FPQ16Ln1pPoly`), `src/math/intlog.HC:34` (`FPQ16LnReduce`), and `src/math/intlog.HC:66` (`FPQ16Ln`) with integer-only domain clamp, range reduction, piecewise polynomial, and overflow-safe accumulation.
+- Added focused parity harness at `tests/test_intlog_q16.py:164` with deterministic checks for domain floor, powers-of-two identity, monotonicity, random error bounds vs `math.log`, and reduction recomposition.
+
+**Validation**
+- Ran: `python3 tests/test_intlog_q16.py`
+- Output: `intlog_q16_reference_checks=ok`
+
+**Queue / Ledger / DB**
+- Marked `IQ-077` done in `MASTER_TASKS.md:266`.
+- Appended new unchecked IQ items `IQ-078`..`IQ-082` (HolyC/test-focused) to keep queue rolling; unchecked depth is now 19 (`>=15` policy satisfied), starting at `MASTER_TASKS.md:267`.
+- Added one-line ledger entry for this iteration at `MASTER_TASKS.md:276`.
+- Logged central DB iteration row: `iterations.id=905`, `task_id=IQ-077`, `status=pass`, `validation_result=intlog_q16_reference_checks=ok`.
