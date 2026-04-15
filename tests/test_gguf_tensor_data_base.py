@@ -925,6 +925,32 @@ def tensor_lookup_by_index_with_inner_offset(
     return GGUF_TDBASE_OK, abs_start, abs_end, abs_offset - abs_start
 
 
+def tensor_lookup_by_index_with_rel_offset(
+    tensor_index: int,
+    tensor_rel_offset: int,
+    tensor_data_base: int,
+    alignment: int,
+    tensor_abs_starts: list[int],
+    tensor_abs_ends: list[int],
+    sorted_position_by_tensor: list[int],
+):
+    err, abs_offset = tensor_data_base_offset(
+        tensor_data_base=tensor_data_base,
+        tensor_rel_offset=tensor_rel_offset,
+        alignment=alignment,
+    )
+    if err != GGUF_TDBASE_OK:
+        return err, 0, 0, 0
+
+    return tensor_lookup_by_index_with_inner_offset(
+        tensor_index=tensor_index,
+        abs_offset=abs_offset,
+        tensor_abs_starts=tensor_abs_starts,
+        tensor_abs_ends=tensor_abs_ends,
+        sorted_position_by_tensor=sorted_position_by_tensor,
+    )
+
+
 def _abs_range_greater(
     starts: list[int],
     ends: list[int],
@@ -3189,6 +3215,152 @@ def test_tensor_lookup_by_index_with_inner_offset_with_built_offset_index() -> N
             assert inner == (nbytes // 2)
 
 
+def test_tensor_lookup_by_index_with_rel_offset_happy_path() -> None:
+    starts = [0x1200, 0x1400, 0x1500, 0x1700]
+    ends = [0x1280, 0x1480, 0x1680, 0x17C0]
+    sorted_idx = [2, 0, 3, 1]
+    inverse_map = [0, 0, 0, 0]
+
+    err, bad = build_tensor_sorted_position_map(sorted_idx, inverse_map)
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+    assert tensor_lookup_by_index_with_rel_offset(0, 0x0400, 0x1000, 32, starts, ends, inverse_map) == (
+        GGUF_TDBASE_OK,
+        0x1400,
+        0x1480,
+        0,
+    )
+    assert tensor_lookup_by_index_with_rel_offset(1, 0x07A0, 0x1000, 32, starts, ends, inverse_map) == (
+        GGUF_TDBASE_OK,
+        0x1700,
+        0x17C0,
+        0xA0,
+    )
+    assert tensor_lookup_by_index_with_rel_offset(2, 0x0240, 0x1000, 32, starts, ends, inverse_map) == (
+        GGUF_TDBASE_OK,
+        0x1200,
+        0x1280,
+        0x40,
+    )
+
+
+def test_tensor_lookup_by_index_with_rel_offset_propagates_errors() -> None:
+    starts = [0x1000, 0x1100]
+    ends = [0x1040, 0x1180]
+    sorted_idx = [1, 0]
+    inverse_map = [0, 0]
+
+    err, bad = build_tensor_sorted_position_map(sorted_idx, inverse_map)
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+    assert tensor_lookup_by_index_with_rel_offset(0, 0x1000, 0x0FFF, 32, starts, ends, inverse_map) == (
+        GGUF_TDBASE_ERR_MISALIGNED_BASE,
+        0,
+        0,
+        0,
+    )
+    assert tensor_lookup_by_index_with_rel_offset(0, 0x1001, 0x1000, 32, starts, ends, inverse_map) == (
+        GGUF_TDBASE_ERR_MISALIGNED_TENSOR_OFFSET,
+        0,
+        0,
+        0,
+    )
+    assert tensor_lookup_by_index_with_rel_offset(2, 0x0000, 0x1000, 32, starts, ends, inverse_map) == (
+        GGUF_TDBASE_ERR_OUT_OF_BOUNDS,
+        0,
+        0,
+        0,
+    )
+    assert tensor_lookup_by_index_with_rel_offset(1, 0x0100, 0x1000, 32, starts, ends, inverse_map) == (
+        GGUF_TDBASE_ERR_OUT_OF_BOUNDS,
+        0,
+        0,
+        0,
+    )
+
+
+def test_tensor_lookup_by_index_with_rel_offset_with_built_offset_index() -> None:
+    rel_offsets = [0x280, 0x00, 0x2C0, 0x40]
+    elem_counts = [32, 64, 32, 128]
+    ggml_types = [GGML_TYPE_Q8_0, GGML_TYPE_Q4_0, GGML_TYPE_F16, GGML_TYPE_F32]
+    starts = [0, 0, 0, 0]
+    ends = [0, 0, 0, 0]
+    sorted_idx = [0, 0, 0, 0]
+    inverse_map = [0, 0, 0, 0]
+
+    err, bad = tensor_info_build_offset_index(
+        tensor_data_base=0x7000,
+        alignment=32,
+        gguf_file_nbytes=0xA000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_element_counts=elem_counts,
+        tensor_ggml_types=ggml_types,
+        out_abs_starts=starts,
+        out_abs_ends=ends,
+        out_sorted_tensor_indices=sorted_idx,
+    )
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+    err, bad = build_tensor_sorted_position_map(sorted_idx, inverse_map)
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+    for original_idx in range(len(rel_offsets)):
+        rel_start = rel_offsets[original_idx]
+        abs_start = 0x7000 + rel_start
+        err_n, nbytes = tensor_bytes_for_type(ggml_types[original_idx], elem_counts[original_idx])
+        assert err_n == GGUF_TDBASE_OK
+
+        err, out_start, out_end, inner = tensor_lookup_by_index_with_rel_offset(
+            original_idx,
+            rel_start,
+            0x7000,
+            32,
+            starts,
+            ends,
+            inverse_map,
+        )
+        assert err == GGUF_TDBASE_OK
+        assert out_start == abs_start
+        assert out_end == abs_start + nbytes
+        assert inner == 0
+
+        if nbytes > 1:
+            assert tensor_lookup_by_index_with_rel_offset(
+                original_idx,
+                rel_start + 1,
+                0x7000,
+                32,
+                starts,
+                ends,
+                inverse_map,
+            ) == (
+                GGUF_TDBASE_ERR_MISALIGNED_TENSOR_OFFSET,
+                0,
+                0,
+                0,
+            )
+
+        if nbytes > 32:
+            rel_mid = rel_start + 32
+            err, out_start, out_end, inner = tensor_lookup_by_index_with_rel_offset(
+                original_idx,
+                rel_mid,
+                0x7000,
+                32,
+                starts,
+                ends,
+                inverse_map,
+            )
+            assert err == GGUF_TDBASE_OK
+            assert out_start == abs_start
+            assert out_end == abs_start + nbytes
+            assert inner == 32
+
+
 def test_tensor_lookup_by_abs_offset_propagates_miss() -> None:
     starts = [0x1000, 0x1080]
     ends = [0x1020, 0x10A0]
@@ -3908,6 +4080,9 @@ def run() -> None:
     test_tensor_lookup_by_index_with_inner_offset_happy_path()
     test_tensor_lookup_by_index_with_inner_offset_propagates_errors()
     test_tensor_lookup_by_index_with_inner_offset_with_built_offset_index()
+    test_tensor_lookup_by_index_with_rel_offset_happy_path()
+    test_tensor_lookup_by_index_with_rel_offset_propagates_errors()
+    test_tensor_lookup_by_index_with_rel_offset_with_built_offset_index()
     test_inverse_map_and_range_index_random_permutation_parity()
     test_inverse_map_and_range_index_random_adversarial_cases()
     print("gguf_tensor_data_base_reference_checks=ok")

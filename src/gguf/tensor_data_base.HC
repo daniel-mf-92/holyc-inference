@@ -1746,3 +1746,47 @@ I64 GGUFTensorLookupByIndexWithInnerOffset(U64 tensor_index,
     *out_offset_in_tensor = abs_offset - abs_start;
     return GGUF_TDBASE_OK;
 }
+
+I64 GGUFTensorLookupByIndexWithRelOffset(U64 tensor_index,
+                                         U64 tensor_rel_offset,
+                                         U64 tensor_data_base,
+                                         U32 alignment,
+                                         U64 tensor_count,
+                                         U64 *tensor_abs_starts,
+                                         U64 *tensor_abs_ends,
+                                         U64 *sorted_position_by_tensor,
+                                         U64 *out_abs_start,
+                                         U64 *out_abs_end,
+                                         U64 *out_offset_in_tensor)
+{
+    U64 abs_offset;
+    I64 err;
+
+    if (!out_offset_in_tensor || !out_abs_start || !out_abs_end)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    // Keep deterministic outputs for parser/runtime callers on every failure.
+    *out_abs_start = 0;
+    *out_abs_end = 0;
+    *out_offset_in_tensor = 0;
+
+    // Translate relative payload offset with explicit GGUF alignment checks.
+    err = GGUFTensorDataBaseOffset(tensor_data_base,
+                                   tensor_rel_offset,
+                                   alignment,
+                                   &abs_offset);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    // Reuse checked index+absolute helper to keep tensor-index table
+    // validation and [start,end) containment semantics centralized.
+    return GGUFTensorLookupByIndexWithInnerOffset(tensor_index,
+                                                  abs_offset,
+                                                  tensor_count,
+                                                  tensor_abs_starts,
+                                                  tensor_abs_ends,
+                                                  sorted_position_by_tensor,
+                                                  out_abs_start,
+                                                  out_abs_end,
+                                                  out_offset_in_tensor);
+}

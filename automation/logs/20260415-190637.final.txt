@@ -1,0 +1,28 @@
+Completed one full iteration for `IQ-064` end-to-end with HolyC runtime changes and parity validation.
+
+**Implemented**
+- Added `GGUFTensorLookupByIndexWithRelOffset` in `src/gguf/tensor_data_base.HC:1750`.
+- Logic is alignment-checked `rel -> abs` via `GGUFTensorDataBaseOffset`, then delegated to existing checked index+inner-offset path for `[abs_start, abs_end)` and `offset_in_tensor`.
+
+**Tests**
+- Added Python parity helper + coverage in `tests/test_gguf_tensor_data_base.py:928`.
+- Added new tests:
+  - `tests/test_gguf_tensor_data_base.py:3218`
+  - `tests/test_gguf_tensor_data_base.py:3248`
+  - `tests/test_gguf_tensor_data_base.py:3284`
+
+**Validation output**
+- Ran: `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py`
+- Result:
+  - `gguf_tensor_data_base_reference_checks=ok`
+  - `gguf_tensorinfo_reference_checks=ok`
+  - `gguf_metadata_reference_checks=ok`
+
+**Queue/ledger/DB**
+- Marked done: `IQ-064` in `MASTER_TASKS.md:253`.
+- Replenished queue with new unchecked items:
+  - `IQ-065` at `MASTER_TASKS.md:254`
+  - `IQ-066` at `MASTER_TASKS.md:255`
+- Queue depth now: `16` unchecked `IQ-` items (policy satisfied).
+- Added one progress ledger line at `MASTER_TASKS.md:261`.
+- Logged iteration to central DB (`temple-central.db`) for task `IQ-064` with status `pass`.
