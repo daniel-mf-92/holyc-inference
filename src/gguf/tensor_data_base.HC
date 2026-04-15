@@ -1359,6 +1359,78 @@ I64 GGUFValidateTensorLookupTables(U64 tensor_count,
     return GGUF_TDBASE_OK;
 }
 
+I64 GGUFTensorInfoBuildLookupTables(U64 tensor_data_base,
+                                    U32 alignment,
+                                    U64 gguf_file_nbytes,
+                                    U64 tensor_count,
+                                    U64 *tensor_rel_offsets,
+                                    U64 *tensor_element_counts,
+                                    U32 *tensor_ggml_types,
+                                    U64 *out_abs_starts,
+                                    U64 *out_abs_ends,
+                                    U64 *out_sorted_tensor_indices,
+                                    U64 *out_sorted_position_by_tensor,
+                                    U64 *out_bad_index)
+{
+    U64 bad_index;
+    I64 err;
+
+    if (!tensor_rel_offsets || !tensor_element_counts || !tensor_ggml_types ||
+        !out_abs_starts || !out_abs_ends || !out_sorted_tensor_indices ||
+        !out_sorted_position_by_tensor)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    if (out_bad_index)
+        *out_bad_index = 0;
+
+    // Phase 1: build sorted absolute ranges + sorted->original tensor mapping.
+    err = GGUFTensorInfoBuildOffsetIndex(tensor_data_base,
+                                         alignment,
+                                         gguf_file_nbytes,
+                                         tensor_count,
+                                         tensor_rel_offsets,
+                                         tensor_element_counts,
+                                         tensor_ggml_types,
+                                         out_abs_starts,
+                                         out_abs_ends,
+                                         out_sorted_tensor_indices,
+                                         &bad_index);
+    if (err != GGUF_TDBASE_OK)
+    {
+        if (out_bad_index)
+            *out_bad_index = bad_index;
+        return err;
+    }
+
+    // Phase 2: build original->sorted inverse map from sorted permutation.
+    err = GGUFBuildTensorSortedPositionMap(tensor_count,
+                                           out_sorted_tensor_indices,
+                                           out_sorted_position_by_tensor,
+                                           &bad_index);
+    if (err != GGUF_TDBASE_OK)
+    {
+        if (out_bad_index)
+            *out_bad_index = bad_index;
+        return err;
+    }
+
+    // Phase 3: verify both lookup tables and sorted ranges agree.
+    err = GGUFValidateTensorLookupTables(tensor_count,
+                                         out_abs_starts,
+                                         out_abs_ends,
+                                         out_sorted_tensor_indices,
+                                         out_sorted_position_by_tensor,
+                                         &bad_index);
+    if (err != GGUF_TDBASE_OK)
+    {
+        if (out_bad_index)
+            *out_bad_index = bad_index;
+        return err;
+    }
+
+    return GGUF_TDBASE_OK;
+}
+
 I64 GGUFTensorIndexToAbsRange(U64 tensor_index,
                               U64 tensor_count,
                               U64 *tensor_abs_starts,
