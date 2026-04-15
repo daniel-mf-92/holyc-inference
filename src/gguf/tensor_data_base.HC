@@ -2038,3 +2038,66 @@ I64 GGUFTensorLookupSpanByIndexAndAbsRange(U64 tensor_index,
     *out_span_end_in_tensor = span_abs_end - tensor_abs_start;
     return GGUF_TDBASE_OK;
 }
+
+I64 GGUFTensorLookupSpanByIndexAndRelRange(U64 tensor_index,
+                                           U64 span_rel_start,
+                                           U64 span_rel_end,
+                                           U64 tensor_data_base,
+                                           U32 alignment,
+                                           U64 tensor_count,
+                                           U64 *tensor_abs_starts,
+                                           U64 *tensor_abs_ends,
+                                           U64 *sorted_position_by_tensor,
+                                           U64 *out_tensor_abs_start,
+                                           U64 *out_tensor_abs_end,
+                                           U64 *out_span_start_in_tensor,
+                                           U64 *out_span_end_in_tensor)
+{
+    U64 span_abs_start;
+    U64 span_abs_end;
+    I64 err;
+
+    if (!out_tensor_abs_start || !out_tensor_abs_end ||
+        !out_span_start_in_tensor || !out_span_end_in_tensor)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    // Deterministic outputs for all failure paths.
+    *out_tensor_abs_start = 0;
+    *out_tensor_abs_end = 0;
+    *out_span_start_in_tensor = 0;
+    *out_span_end_in_tensor = 0;
+
+    // Keep half-open range arithmetic explicit in relative space before
+    // translating to absolute offsets.
+    if (span_rel_end < span_rel_start)
+        return GGUF_TDBASE_ERR_OVERFLOW;
+
+    // Translate relative range boundaries with strict GGUF alignment checks.
+    err = GGUFTensorDataBaseOffset(tensor_data_base,
+                                   span_rel_start,
+                                   alignment,
+                                   &span_abs_start);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    err = GGUFTensorDataBaseOffset(tensor_data_base,
+                                   span_rel_end,
+                                   alignment,
+                                   &span_abs_end);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    // Reuse checked index+absolute span resolver so containment and in-tensor
+    // span math remain centralized.
+    return GGUFTensorLookupSpanByIndexAndAbsRange(tensor_index,
+                                                  span_abs_start,
+                                                  span_abs_end,
+                                                  tensor_count,
+                                                  tensor_abs_starts,
+                                                  tensor_abs_ends,
+                                                  sorted_position_by_tensor,
+                                                  out_tensor_abs_start,
+                                                  out_tensor_abs_end,
+                                                  out_span_start_in_tensor,
+                                                  out_span_end_in_tensor);
+}
