@@ -143,6 +143,10 @@ def dot_product_blocks_q16_accumulate(lhs_blocks, rhs_blocks, initial_accum_q16:
     return Q4_0_Q8_0_OK, total_q16
 
 
+def dot_row_blocks_q16(lhs_blocks, rhs_blocks) -> tuple[int, int]:
+    return dot_product_blocks_q16_accumulate(lhs_blocks, rhs_blocks, 0)
+
+
 def dot_q32_to_q16(dot_q32: int) -> int:
     return round_shift_right_signed(dot_q32, 16)
 
@@ -300,6 +304,47 @@ def test_q16_accumulator_bad_length_error() -> None:
     assert err == Q4_0_Q8_0_ERR_BAD_DST_LEN
 
 
+def test_row_helper_matches_zero_init_accumulate() -> None:
+    rng = random.Random(2026041527)
+
+    for _ in range(220):
+        block_count = rng.randint(1, 8)
+        lhs_blocks = []
+        rhs_blocks = []
+
+        for _ in range(block_count):
+            l_scale = half_bits(rng.uniform(-3.25, 3.25))
+            r_scale = half_bits(rng.uniform(-3.25, 3.25))
+            l_q4 = pack_q4_from_signed([rng.randrange(-8, 8) for _ in range(32)])
+            r_q8 = pack_q8_signed([rng.randrange(-128, 128) for _ in range(32)])
+            lhs_blocks.append((l_scale, l_q4))
+            rhs_blocks.append((r_scale, r_q8))
+
+        err, got_row_q16 = dot_row_blocks_q16(lhs_blocks, rhs_blocks)
+        assert err == Q4_0_Q8_0_OK
+
+        err, expected_q16 = dot_product_blocks_q16_accumulate(lhs_blocks, rhs_blocks, 0)
+        assert err == Q4_0_Q8_0_OK
+        assert got_row_q16 == expected_q16
+
+
+def test_row_helper_can_differ_from_full_dot_single_rounding() -> None:
+    b0 = (half_bits(0.125), pack_q4_from_signed([7] * 32))
+    b1 = (half_bits(0.125), pack_q4_from_signed([-8] * 32))
+    r0 = (half_bits(0.125), pack_q8_signed([127] * 32))
+    r1 = (half_bits(0.125), pack_q8_signed([127] * 32))
+
+    err, row_q16 = dot_row_blocks_q16([b0, b1], [r0, r1])
+    assert err == Q4_0_Q8_0_OK
+
+    err, single_round_q16 = dot_product_blocks_q32_to_q16([b0, b1], [r0, r1])
+    assert err == Q4_0_Q8_0_OK
+
+    # Row helper intentionally rounds each block contribution before summation.
+    # Keep tolerance tight so any hidden semantic drift is caught quickly.
+    assert abs(row_q16 - single_round_q16) <= 2
+
+
 def run() -> None:
     test_identity_mixed_block()
     test_random_blocks_match_integer_reference()
@@ -309,6 +354,8 @@ def run() -> None:
     test_q32_to_q16_helper_rounds_once_after_full_accumulation()
     test_q32_to_q16_helper_matches_full_dot_reference()
     test_q16_accumulator_bad_length_error()
+    test_row_helper_matches_zero_init_accumulate()
+    test_row_helper_can_differ_from_full_dot_single_rounding()
     print("q4_0_q8_0_dot_kernel_reference_checks=ok")
 
 

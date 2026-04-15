@@ -167,6 +167,13 @@ I32 Q4_0_Q8_0DotProductBlocksQ32(Q4_0Block *lhs_q4, Q8_0Block *rhs_q8, I64 block
     return Q4_0Q8_0DotProductBlocksQ32(lhs_q4, rhs_q8, block_count, out_dot_q32);
 }
 
+I32 Q4_0Q8_0DotRowBlocksQ16(Q4_0Block *row_blocks_q4, Q8_0Block *vec_blocks_q8, I64 block_count, I64 *out_dot_q16);
+
+I32 Q4_0_Q8_0DotRowBlocksQ16(Q4_0Block *row_blocks_q4, Q8_0Block *vec_blocks_q8, I64 block_count, I64 *out_dot_q16)
+{
+    return Q4_0Q8_0DotRowBlocksQ16(row_blocks_q4, vec_blocks_q8, block_count, out_dot_q16);
+}
+
 I32 Q4_0Q8_0DotProductBlocksQ32(Q4_0Block *lhs_q4, Q8_0Block *rhs_q8, I64 block_count, I64 *out_dot_q32)
 {
     I64 block_index;
@@ -244,6 +251,28 @@ I32 Q4_0_Q8_0DotProductBlocksQ16Accumulate(Q4_0Block *lhs_q4, Q8_0Block *rhs_q8,
     }
 
     *io_accum_q16 = total_q16;
+    return Q4_0_Q8_0_OK;
+}
+
+I32 Q4_0Q8_0DotRowBlocksQ16(Q4_0Block *row_blocks_q4, Q8_0Block *vec_blocks_q8, I64 block_count, I64 *out_dot_q16)
+{
+    I64 accum_q16;
+    I32 status;
+
+    if (!row_blocks_q4 || !vec_blocks_q8 || !out_dot_q16)
+        return Q4_0_Q8_0_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    // WS4 row kernels consume Q16 lanes directly.
+    // Keep each 32-value block contribution visible: block Q32 dot -> rounded Q16 -> sum.
+    // This is intentionally different from full-dot single-rounding helper Q32ToQ16.
+    accum_q16 = 0;
+    status = Q4_0_Q8_0DotProductBlocksQ16Accumulate(row_blocks_q4, vec_blocks_q8, block_count, &accum_q16);
+    if (status != Q4_0_Q8_0_OK)
+        return status;
+
+    *out_dot_q16 = accum_q16;
     return Q4_0_Q8_0_OK;
 }
 

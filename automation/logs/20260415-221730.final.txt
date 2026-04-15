@@ -1,0 +1,15 @@
+Done — I completed one full iteration for `IQ-086` with code, tests, ledger update, and queue maintenance.
+
+**What Changed**
+- Added HolyC mixed-kernel row helper `Q4_0Q8_0DotRowBlocksQ16` (plus alias wrapper) in `src/quant/q4_0_q8_0_dot.HC:170` and `src/quant/q4_0_q8_0_dot.HC:257`.
+- Added row-helper parity utilities/tests in `tests/test_q4_0_q8_0_dot_kernel.py:146`, `tests/test_q4_0_q8_0_dot_kernel.py:307`, and `tests/test_q4_0_q8_0_dot_kernel.py:331`.
+- Marked `IQ-086` complete, added next monotonic queue item `IQ-087`, and appended one ledger line in `MASTER_TASKS.md:275`, `MASTER_TASKS.md:276`, and `MASTER_TASKS.md:282`.
+
+**Validation Output**
+- `python3 tests/test_q4_0_q8_0_dot_kernel.py` → `q4_0_q8_0_dot_kernel_reference_checks=ok`
+- `python3 tests/test_q4_0_dot.py` → `q4_0_dot_reference_checks=ok`
+- `python3 tests/test_q8_0_dot.py` → `q8_0_dot_reference_checks=ok`
+
+**Iteration Log + Queue**
+- Inserted DB row in `~/Documents/local-codebases/temple-central.db` for `IQ-086` (`id=987`, `status=pass`).
+- Unchecked queue depth is maintained at `15` (policy satisfied).
