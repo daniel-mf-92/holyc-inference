@@ -1,0 +1,14 @@
+Done — I completed one full iteration end-to-end (`IQ-063`) with queue depth preserved.
+
+**Changes**
+- Implemented HolyC helper `GGUFTensorLookupByIndexWithInnerOffset` in `src/gguf/tensor_data_base.HC:1706` (index→validated `[abs_start,abs_end)` + `offset_in_tensor`, deterministic error outputs, bounds checks).
+- Added host parity helper + tests in `tests/test_gguf_tensor_data_base.py:906` and `tests/test_gguf_tensor_data_base.py:3073` (happy path, error propagation, built-index randomized-style coverage).
+- Updated queue/ledger in `MASTER_TASKS.md:252` (`IQ-063` checked), `MASTER_TASKS.md:253` (new `IQ-064` appended), and `MASTER_TASKS.md:259` (single-line progress ledger entry).
+
+**Validation**
+- `python3 tests/test_gguf_tensor_data_base.py` → `gguf_tensor_data_base_reference_checks=ok`
+- `python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` → `gguf_tensorinfo_reference_checks=ok` and `gguf_metadata_reference_checks=ok`
+
+**Iteration Logging**
+- Inserted central DB row in `~/Documents/local-codebases/temple-central.db` for `IQ-063` with status `pass` (`db_insert_ok`).
+- Queue policy satisfied: unchecked IQ items remain `15` after completion and replenishment.

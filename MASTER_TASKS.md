@@ -249,12 +249,14 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-060 Implement HolyC helper `GGUFTensorLookupByRelOffsetWithInnerOffset` in `src/gguf/tensor_data_base.HC` to resolve relative payload offsets into original tensor index, absolute span, and inner offset bytes (WS2-04)
 - [x] IQ-061 Implement HolyC helper `GGUFTensorLookupByRelOffsetWithInnerOffsetDefault` in `src/gguf/tensor_data_base.HC` as a `GGUF_DEFAULT_ALIGNMENT` wrapper for metadata-absent callers (WS2-04)
 - [x] IQ-062 Implement HolyC lookup-table validator `GGUFValidateTensorLookupTables` in `src/gguf/tensor_data_base.HC` to check sorted ranges + sorted-index permutation + inverse-map consistency in one pass (WS2-04)
-- [ ] IQ-063 Implement HolyC helper `GGUFTensorLookupByIndexWithInnerOffset` in `src/gguf/tensor_data_base.HC` to resolve original tensor index + caller absolute offset into validated `[abs_start,abs_end)` plus `offset_in_tensor` (WS2-04)
+- [x] IQ-063 Implement HolyC helper `GGUFTensorLookupByIndexWithInnerOffset` in `src/gguf/tensor_data_base.HC` to resolve original tensor index + caller absolute offset into validated `[abs_start,abs_end)` plus `offset_in_tensor` (WS2-04)
+- [ ] IQ-064 Implement HolyC helper `GGUFTensorLookupByIndexWithRelOffset` in `src/gguf/tensor_data_base.HC` to resolve original tensor index + caller relative offset into validated `[abs_start,abs_end)` plus `offset_in_tensor` with alignment checks (WS2-04)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-15 | loop-048 | IQ-063 index+inner-offset lookup helper | done | Added `GGUFTensorLookupByIndexWithInnerOffset` in `src/gguf/tensor_data_base.HC` + parity/adversarial coverage in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-15 | loop-047 | IQ-061 rel-offset default inner-offset wrapper | done | Added `GGUFTensorLookupByRelOffsetWithInnerOffsetDefault` in `src/gguf/tensor_data_base.HC` + default-alignment parity coverage in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-15 | loop-046 | IQ-062 lookup-table consistency validator | done | Added `GGUFValidateTensorLookupTables` in `src/gguf/tensor_data_base.HC` + parity/adversarial coverage in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-15 | loop-045 | IQ-060 rel-offset lookup with inner offset | done | Added `GGUFTensorLookupByRelOffsetWithInnerOffset` + parity coverage in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |

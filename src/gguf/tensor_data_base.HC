@@ -1702,3 +1702,47 @@ I64 GGUFTensorLookupByRelOffsetWithInnerOffsetDefault(U64 tensor_rel_offset,
                                                       out_abs_end,
                                                       out_offset_in_tensor);
 }
+
+I64 GGUFTensorLookupByIndexWithInnerOffset(U64 tensor_index,
+                                           U64 abs_offset,
+                                           U64 tensor_count,
+                                           U64 *tensor_abs_starts,
+                                           U64 *tensor_abs_ends,
+                                           U64 *sorted_position_by_tensor,
+                                           U64 *out_abs_start,
+                                           U64 *out_abs_end,
+                                           U64 *out_offset_in_tensor)
+{
+    U64 abs_start;
+    U64 abs_end;
+    I64 err;
+
+    if (!out_offset_in_tensor || !out_abs_start || !out_abs_end)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    // Deterministic outputs on error keep parser/runtime call sites stable.
+    *out_abs_start = 0;
+    *out_abs_end = 0;
+    *out_offset_in_tensor = 0;
+
+    // Resolve original tensor index to its validated absolute payload span.
+    err = GGUFTensorIndexToAbsRange(tensor_index,
+                                    tensor_count,
+                                    tensor_abs_starts,
+                                    tensor_abs_ends,
+                                    sorted_position_by_tensor,
+                                    &abs_start,
+                                    &abs_end);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    // Caller absolute offset must land inside this tensor's half-open
+    // payload range [abs_start, abs_end).
+    if (abs_offset < abs_start || abs_offset >= abs_end)
+        return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+
+    *out_abs_start = abs_start;
+    *out_abs_end = abs_end;
+    *out_offset_in_tensor = abs_offset - abs_start;
+    return GGUF_TDBASE_OK;
+}
