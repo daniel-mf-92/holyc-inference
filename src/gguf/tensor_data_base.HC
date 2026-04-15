@@ -1919,3 +1919,68 @@ I64 GGUFTensorLookupSpanByAbsRange(U64 span_abs_start,
     *out_span_end_in_tensor = span_abs_end - tensor_abs_start;
     return GGUF_TDBASE_OK;
 }
+
+I64 GGUFTensorLookupSpanByRelRange(U64 span_rel_start,
+                                   U64 span_rel_end,
+                                   U64 tensor_data_base,
+                                   U32 alignment,
+                                   U64 tensor_count,
+                                   U64 *tensor_abs_starts,
+                                   U64 *tensor_abs_ends,
+                                   U64 *sorted_tensor_indices,
+                                   U64 *out_tensor_index,
+                                   U64 *out_tensor_abs_start,
+                                   U64 *out_tensor_abs_end,
+                                   U64 *out_span_start_in_tensor,
+                                   U64 *out_span_end_in_tensor)
+{
+    U64 span_abs_start;
+    U64 span_abs_end;
+    I64 err;
+
+    if (!out_tensor_index || !out_tensor_abs_start || !out_tensor_abs_end ||
+        !out_span_start_in_tensor || !out_span_end_in_tensor)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    // Deterministic outputs for all failure paths.
+    *out_tensor_index = 0;
+    *out_tensor_abs_start = 0;
+    *out_tensor_abs_end = 0;
+    *out_span_start_in_tensor = 0;
+    *out_span_end_in_tensor = 0;
+
+    // Keep half-open range arithmetic explicit in relative space before
+    // translating to absolute offsets. This catches underflow windows early.
+    if (span_rel_end < span_rel_start)
+        return GGUF_TDBASE_ERR_OVERFLOW;
+
+    // Translate relative range boundaries to absolute file offsets with
+    // GGUF alignment checks and overflow guards.
+    err = GGUFTensorDataBaseOffset(tensor_data_base,
+                                   span_rel_start,
+                                   alignment,
+                                   &span_abs_start);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    err = GGUFTensorDataBaseOffset(tensor_data_base,
+                                   span_rel_end,
+                                   alignment,
+                                   &span_abs_end);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    // Reuse checked absolute-range resolver so window containment and
+    // in-tensor span math stay centralized and consistent.
+    return GGUFTensorLookupSpanByAbsRange(span_abs_start,
+                                          span_abs_end,
+                                          tensor_count,
+                                          tensor_abs_starts,
+                                          tensor_abs_ends,
+                                          sorted_tensor_indices,
+                                          out_tensor_index,
+                                          out_tensor_abs_start,
+                                          out_tensor_abs_end,
+                                          out_span_start_in_tensor,
+                                          out_span_end_in_tensor);
+}

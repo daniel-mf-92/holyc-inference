@@ -254,12 +254,13 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-065 Implement HolyC helper `GGUFTensorInfoBuildLookupTables` in `src/gguf/tensor_data_base.HC` to compose offset index build + inverse-map build + lookup-table validation in one checked setup path (WS2-04)
 - [x] IQ-066 Add host-side parity/adversarial harness for `GGUFTensorInfoBuildLookupTables` in `tests/test_gguf_tensor_data_base.py` with malformed permutation and overlap cases (WS2-04)
 - [x] IQ-067 Implement HolyC helper `GGUFTensorLookupSpanByAbsRange` in `src/gguf/tensor_data_base.HC` to resolve `[abs_start,abs_end)` windows into containing tensor index plus validated in-tensor span offsets (WS2-04)
-- [ ] IQ-068 Implement HolyC helper `GGUFTensorLookupSpanByRelRange` in `src/gguf/tensor_data_base.HC` to resolve relative `[start,end)` windows via tensor-data base offset and return tensor index + in-tensor span offsets (WS2-04)
+- [x] IQ-068 Implement HolyC helper `GGUFTensorLookupSpanByRelRange` in `src/gguf/tensor_data_base.HC` to resolve relative `[start,end)` windows via tensor-data base offset and return tensor index + in-tensor span offsets (WS2-04)
 - [ ] IQ-069 Implement HolyC helper `GGUFTensorLookupSpanByIndexAndAbsRange` in `src/gguf/tensor_data_base.HC` to validate caller-selected tensor index against an absolute byte window and return checked in-tensor span offsets (WS2-04)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
+| 2026-04-15 | loop-052 | IQ-068 rel-range span lookup helper | done | Added `GGUFTensorLookupSpanByRelRange` + parity coverage; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-15 | loop-046 | IQ-067 abs-range span lookup helper | done | Added `GGUFTensorLookupSpanByAbsRange` in `src/gguf/tensor_data_base.HC` + parity coverage in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 |---|---|---|---|---|
 | 2026-04-15 | loop-051 | IQ-066 build-lookup-table adversarial harness | done | Added staged malformed-permutation + randomized overlap-matrix adversarial coverage for `tensor_info_build_lookup_tables` in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py` passed |
