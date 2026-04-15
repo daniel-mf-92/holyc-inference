@@ -1512,3 +1512,62 @@ I64 GGUFTensorLookupByAbsOffsetWithInnerOffset(U64 abs_offset,
     *out_offset_in_tensor = abs_offset - abs_start;
     return GGUF_TDBASE_OK;
 }
+
+I64 GGUFTensorLookupByRelOffsetWithInnerOffset(U64 tensor_rel_offset,
+                                               U64 tensor_data_base,
+                                               U32 alignment,
+                                               U64 tensor_count,
+                                               U64 *tensor_abs_starts,
+                                               U64 *tensor_abs_ends,
+                                               U64 *sorted_tensor_indices,
+                                               U64 *out_tensor_index,
+                                               U64 *out_abs_start,
+                                               U64 *out_abs_end,
+                                               U64 *out_offset_in_tensor)
+{
+    U64 tensor_index;
+    U64 abs_start;
+    U64 abs_end;
+    U64 abs_offset;
+    I64 err;
+
+    if (!out_offset_in_tensor)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    // Deterministic failure output for callers that always read inner offset.
+    *out_offset_in_tensor = 0;
+
+    // Reuse relative-offset lookup so range-search, alignment checks,
+    // sorted-index mapping, and malformed-range handling stay identical.
+    err = GGUFTensorLookupByRelOffset(tensor_rel_offset,
+                                      tensor_data_base,
+                                      alignment,
+                                      tensor_count,
+                                      tensor_abs_starts,
+                                      tensor_abs_ends,
+                                      sorted_tensor_indices,
+                                      &tensor_index,
+                                      &abs_start,
+                                      &abs_end);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    // Convert caller-provided relative offset to absolute byte position.
+    // This preserves the same alignment/misalignment semantics as the core
+    // range resolver used by GGUF parser paths.
+    err = GGUFTensorDataBaseOffset(tensor_data_base,
+                                   tensor_rel_offset,
+                                   alignment,
+                                   &abs_offset);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    if (abs_offset < abs_start || abs_offset >= abs_end)
+        return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+
+    *out_tensor_index = tensor_index;
+    *out_abs_start = abs_start;
+    *out_abs_end = abs_end;
+    *out_offset_in_tensor = abs_offset - abs_start;
+    return GGUF_TDBASE_OK;
+}
