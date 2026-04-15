@@ -19,12 +19,29 @@
 #define Q8_0_OK               0
 #define Q8_0_ERR_NULL_PTR     1
 #define Q8_0_ERR_BAD_DST_LEN  2
+#define Q8_0_ERR_OVERFLOW     3
+#define Q8_0_I64_MAX          0x7FFFFFFFFFFFFFFF
+#define Q8_0_I64_MIN          (-0x7FFFFFFFFFFFFFFF - 1)
 
 class Q8_0Block
 {
     U16 d_fp16;
     I8 qs[Q8_0_PACKED_BYTES];
 };
+
+Bool Q8_0TryAddI64(I64 lhs, I64 rhs, I64 *out_sum)
+{
+    if (!out_sum)
+        return FALSE;
+
+    if (rhs > 0 && lhs > Q8_0_I64_MAX - rhs)
+        return FALSE;
+    if (rhs < 0 && lhs < Q8_0_I64_MIN - rhs)
+        return FALSE;
+
+    *out_sum = lhs + rhs;
+    return TRUE;
+}
 
 I64 Q8_0RoundShiftRightUnsigned(I64 value, I64 shift)
 {
@@ -137,6 +154,35 @@ I32 Q8_0DotProductBlocksQ32(Q8_0Block *lhs, Q8_0Block *rhs, I64 block_count, I64
             return status;
 
         total_dot_q32 += block_dot_q32;
+    }
+
+    *out_dot_q32 = total_dot_q32;
+    return Q8_0_OK;
+}
+
+I32 Q8_0DotProductBlocksQ32Checked(Q8_0Block *lhs, Q8_0Block *rhs, I64 block_count, I64 *out_dot_q32)
+{
+    I64 block_index;
+    I64 block_dot_q32;
+    I64 total_dot_q32;
+    I32 status;
+
+    if (!lhs || !rhs || !out_dot_q32)
+        return Q8_0_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    total_dot_q32 = 0;
+    for (block_index = 0; block_index < block_count; ++block_index)
+    {
+        status = Q8_0DotProductBlockQ32(&lhs[block_index], &rhs[block_index], &block_dot_q32);
+        if (status != Q8_0_OK)
+            return status;
+
+        // Keep hostile stream handling explicit.
+        // A malicious block sequence can drive total_dot_q32 beyond I64; reject early.
+        if (!Q8_0TryAddI64(total_dot_q32, block_dot_q32, &total_dot_q32))
+            return Q8_0_ERR_OVERFLOW;
     }
 
     *out_dot_q32 = total_dot_q32;

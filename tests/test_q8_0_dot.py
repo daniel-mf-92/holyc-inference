@@ -12,6 +12,9 @@ Q8_0_PACKED_BYTES = 32
 Q8_0_OK = 0
 Q8_0_ERR_NULL_PTR = 1
 Q8_0_ERR_BAD_DST_LEN = 2
+Q8_0_ERR_OVERFLOW = 3
+Q8_0_I64_MAX = (1 << 63) - 1
+Q8_0_I64_MIN = -(1 << 63)
 
 
 def round_shift_right_unsigned(value: int, shift: int) -> int:
@@ -101,6 +104,35 @@ def dot_product_blocks_q32(
         if err != Q8_0_OK:
             return err, 0
         total += block_dot
+
+    return Q8_0_OK, total
+
+
+def try_add_i64(lhs: int, rhs: int) -> tuple[bool, int]:
+    if rhs > 0 and lhs > Q8_0_I64_MAX - rhs:
+        return False, 0
+    if rhs < 0 and lhs < Q8_0_I64_MIN - rhs:
+        return False, 0
+    return True, lhs + rhs
+
+
+def dot_product_blocks_q32_checked(
+    lhs_blocks: list[tuple[int, bytes]],
+    rhs_blocks: list[tuple[int, bytes]],
+) -> tuple[int, int]:
+    if len(lhs_blocks) != len(rhs_blocks):
+        return Q8_0_ERR_BAD_DST_LEN, 0
+
+    total = 0
+    for (lhs_scale, lhs_qs), (rhs_scale, rhs_qs) in zip(lhs_blocks, rhs_blocks):
+        err, block_dot = dot_product_block_q32(lhs_scale, lhs_qs, rhs_scale, rhs_qs)
+        if err != Q8_0_OK:
+            return err, 0
+
+        ok, checked_sum = try_add_i64(total, block_dot)
+        if not ok:
+            return Q8_0_ERR_OVERFLOW, 0
+        total = checked_sum
 
     return Q8_0_OK, total
 
@@ -437,6 +469,52 @@ def test_matrix_vector_rejects_stride_smaller_than_vector_span() -> None:
     assert err == Q8_0_ERR_BAD_DST_LEN
 
 
+def test_checked_q32_matches_unchecked_on_normal_ranges() -> None:
+    rng = random.Random(2026041509)
+
+    for _ in range(250):
+        block_count = rng.randint(1, 8)
+        lhs_blocks: list[tuple[int, bytes]] = []
+        rhs_blocks: list[tuple[int, bytes]] = []
+
+        for _ in range(block_count):
+            lhs_scale = half_bits(rng.uniform(-2.0, 2.0))
+            rhs_scale = half_bits(rng.uniform(-2.0, 2.0))
+            lhs_qs = pack_signed([rng.randint(-128, 127) for _ in range(Q8_0_VALUES_PER_BLOCK)])
+            rhs_qs = pack_signed([rng.randint(-128, 127) for _ in range(Q8_0_VALUES_PER_BLOCK)])
+            lhs_blocks.append((lhs_scale, lhs_qs))
+            rhs_blocks.append((rhs_scale, rhs_qs))
+
+        err_unchecked, got_unchecked = dot_product_blocks_q32(lhs_blocks, rhs_blocks)
+        err_checked, got_checked = dot_product_blocks_q32_checked(lhs_blocks, rhs_blocks)
+        assert err_unchecked == Q8_0_OK
+        assert err_checked == Q8_0_OK
+        assert got_checked == got_unchecked
+
+
+def test_checked_q32_reports_positive_overflow() -> None:
+    scale_max = 0x7C00  # +inf in fp16 -> saturated large q16 in this kernel
+    plus_one = pack_signed([1] + [0] * (Q8_0_VALUES_PER_BLOCK - 1))
+
+    lhs_blocks = [(scale_max, plus_one), (scale_max, plus_one)]
+    rhs_blocks = [(scale_max, plus_one), (scale_max, plus_one)]
+
+    err_checked, _ = dot_product_blocks_q32_checked(lhs_blocks, rhs_blocks)
+    assert err_checked == Q8_0_ERR_OVERFLOW
+
+
+def test_checked_q32_reports_negative_overflow() -> None:
+    scale_pos_max = 0x7C00  # +inf
+    scale_neg_max = 0xFC00  # -inf
+    plus_one = pack_signed([1] + [0] * (Q8_0_VALUES_PER_BLOCK - 1))
+
+    lhs_blocks = [(scale_pos_max, plus_one), (scale_pos_max, plus_one)]
+    rhs_blocks = [(scale_neg_max, plus_one), (scale_neg_max, plus_one)]
+
+    err_checked, _ = dot_product_blocks_q32_checked(lhs_blocks, rhs_blocks)
+    assert err_checked == Q8_0_ERR_OVERFLOW
+
+
 def run() -> None:
     test_identity_block()
     test_negative_scale_sign()
@@ -452,6 +530,9 @@ def run() -> None:
     test_q32_to_q16_length_mismatch_error()
     test_matrix_vector_rows_stride_and_values()
     test_matrix_vector_rejects_stride_smaller_than_vector_span()
+    test_checked_q32_matches_unchecked_on_normal_ranges()
+    test_checked_q32_reports_positive_overflow()
+    test_checked_q32_reports_negative_overflow()
     print("q8_0_dot_reference_checks=ok")
 
 
