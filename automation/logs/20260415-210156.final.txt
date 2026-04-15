@@ -1,0 +1,14 @@
+Done — I completed one full iteration on `IQ-076` and kept the queue depth policy satisfied.
+
+**What Changed**
+- Implemented `GGUFTensorInfoLoadPayloadWindowByAbsSpan` in `src/gguf/tensor_data_base.HC:2351` (absolute-window → owning tensor index + validated in-tensor span offsets, deterministic failure outputs, centralized checked path).
+- Added host parity helper `tensor_info_load_payload_window_by_abs_span` in `tests/test_gguf_tensor_data_base.py:1238`.
+- Added new coverage (happy path, adversarial/error propagation, built-table randomized-style checks) starting at `tests/test_gguf_tensor_data_base.py:5799`, wired into `run()` at `tests/test_gguf_tensor_data_base.py:6237`.
+- Marked `IQ-076` complete and added `IQ-077` (HolyC `.HC` implementation task) in `MASTER_TASKS.md:265` and `MASTER_TASKS.md:266`; added one-line ledger entry at `MASTER_TASKS.md:271`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py`
+- Output: `gguf_tensor_data_base_reference_checks=ok`, `gguf_tensorinfo_reference_checks=ok`, `gguf_metadata_reference_checks=ok`
+
+**Iteration Log**
+- Inserted central DB row for this iteration: `agent=inference`, `task_id=IQ-076`, `status=pass` (verified in `iterations` table).

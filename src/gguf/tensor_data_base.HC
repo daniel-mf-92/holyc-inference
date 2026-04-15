@@ -2347,3 +2347,53 @@ I64 GGUFTensorInfoLoadPayloadWindowByRelSpan(U64 payload_rel_start,
 
     return GGUF_TDBASE_OK;
 }
+
+I64 GGUFTensorInfoLoadPayloadWindowByAbsSpan(U64 payload_abs_start,
+                                             U64 payload_abs_end,
+                                             U64 tensor_count,
+                                             U64 *tensor_abs_starts,
+                                             U64 *tensor_abs_ends,
+                                             U64 *sorted_tensor_indices,
+                                             U64 *out_tensor_index,
+                                             U64 *out_abs_start,
+                                             U64 *out_abs_end,
+                                             U64 *out_span_start_in_tensor,
+                                             U64 *out_span_end_in_tensor)
+{
+    U64 tensor_abs_start;
+    U64 tensor_abs_end;
+    I64 err;
+
+    if (!out_tensor_index || !out_abs_start || !out_abs_end ||
+        !out_span_start_in_tensor || !out_span_end_in_tensor)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    // Deterministic outputs for all failure paths.
+    *out_tensor_index = 0;
+    *out_abs_start = 0;
+    *out_abs_end = 0;
+    *out_span_start_in_tensor = 0;
+    *out_span_end_in_tensor = 0;
+
+    // Reuse absolute-span lookup so range ordering, tensor containment, and
+    // in-tensor span math remain centralized in one checked path.
+    err = GGUFTensorLookupSpanByAbsRange(payload_abs_start,
+                                         payload_abs_end,
+                                         tensor_count,
+                                         tensor_abs_starts,
+                                         tensor_abs_ends,
+                                         sorted_tensor_indices,
+                                         out_tensor_index,
+                                         &tensor_abs_start,
+                                         &tensor_abs_end,
+                                         out_span_start_in_tensor,
+                                         out_span_end_in_tensor);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    // Return validated absolute payload boundaries for direct stream reads.
+    *out_abs_start = payload_abs_start;
+    *out_abs_end = payload_abs_end;
+
+    return GGUF_TDBASE_OK;
+}
