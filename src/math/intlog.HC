@@ -137,3 +137,79 @@ I64 FPQ16Log2(I64 x_q16)
         return (prod + LOG_Q16_HALF) >> FP_Q16_SHIFT;
     return -(((-prod) + LOG_Q16_HALF) >> FP_Q16_SHIFT);
 }
+
+I64 FPQ16LnRatio(I64 num_q16, I64 den_q16)
+{
+    I64 num_k;
+    I64 den_k;
+    I64 num_m_q16;
+    I64 den_m_q16;
+    I64 num_y_q16;
+    I64 den_y_q16;
+    I64 num_poly_q16;
+    I64 den_poly_q16;
+    I64 poly_delta_q16;
+    I64 k_delta;
+    I64 abs_k_delta;
+    I64 max_k_delta;
+    I64 base_q16;
+    I64 ln_ratio_q16;
+
+    // ln(num/den) is undefined when either side is non-positive.
+    if (num_q16 <= 0 || den_q16 <= 0)
+        return I64_MIN_VALUE;
+
+    num_m_q16 = FPQ16LnReduce(num_q16, &num_k);
+    den_m_q16 = FPQ16LnReduce(den_q16, &den_k);
+
+    // Mirror FPQ16Ln split to keep polynomial range tightly bounded.
+    if (num_m_q16 >= LOG_Q16_SPLIT)
+    {
+        num_m_q16 = (num_m_q16 + 1) >> 1;
+        num_k++;
+    }
+    if (den_m_q16 >= LOG_Q16_SPLIT)
+    {
+        den_m_q16 = (den_m_q16 + 1) >> 1;
+        den_k++;
+    }
+
+    num_y_q16 = num_m_q16 - FP_Q16_ONE;
+    den_y_q16 = den_m_q16 - FP_Q16_ONE;
+    num_poly_q16 = FPQ16Ln1pPoly(num_y_q16);
+    den_poly_q16 = FPQ16Ln1pPoly(den_y_q16);
+
+    // poly_delta = ln(m_num) - ln(m_den) with explicit overflow guards.
+    if (den_poly_q16 < 0 && num_poly_q16 > I64_MAX_VALUE + den_poly_q16)
+        return I64_MAX_VALUE;
+    if (den_poly_q16 > 0 && num_poly_q16 < I64_MIN_VALUE + den_poly_q16)
+        return I64_MIN_VALUE;
+    poly_delta_q16 = num_poly_q16 - den_poly_q16;
+
+    // base = (k_num - k_den) * ln(2) in Q16.
+    if (den_k < 0 && num_k > I64_MAX_VALUE + den_k)
+        return I64_MAX_VALUE;
+    if (den_k > 0 && num_k < I64_MIN_VALUE + den_k)
+        return I64_MIN_VALUE;
+    k_delta = num_k - den_k;
+
+    abs_k_delta = k_delta;
+    if (abs_k_delta < 0)
+        abs_k_delta = -abs_k_delta;
+    max_k_delta = I64_MAX_VALUE / LOG_Q16_LN2;
+    if (abs_k_delta > max_k_delta)
+    {
+        if (k_delta < 0)
+            return I64_MIN_VALUE;
+        return I64_MAX_VALUE;
+    }
+    base_q16 = k_delta * LOG_Q16_LN2;
+
+    if (base_q16 > 0 && poly_delta_q16 > I64_MAX_VALUE - base_q16)
+        return I64_MAX_VALUE;
+    if (base_q16 < 0 && poly_delta_q16 < I64_MIN_VALUE - base_q16)
+        return I64_MIN_VALUE;
+
+    ln_ratio_q16 = base_q16 + poly_delta_q16;
+    return ln_ratio_q16;
+}

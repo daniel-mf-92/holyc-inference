@@ -94,6 +94,33 @@ def fpq16_log2(x_q16: int) -> int:
     return round_shift_right_signed(prod, FP_Q16_SHIFT)
 
 
+def fpq16_ln_ratio(num_q16: int, den_q16: int) -> int:
+    if num_q16 <= 0 or den_q16 <= 0:
+        return I64_MIN_VALUE
+
+    num_m_q16, num_k = fpq16_ln_reduce(num_q16)
+    den_m_q16, den_k = fpq16_ln_reduce(den_q16)
+
+    if num_m_q16 >= LOG_Q16_SPLIT:
+        num_m_q16 = (num_m_q16 + 1) >> 1
+        num_k += 1
+    if den_m_q16 >= LOG_Q16_SPLIT:
+        den_m_q16 = (den_m_q16 + 1) >> 1
+        den_k += 1
+
+    num_y_q16 = num_m_q16 - FP_Q16_ONE
+    den_y_q16 = den_m_q16 - FP_Q16_ONE
+
+    num_poly_q16 = fpq16_ln1p_poly(num_y_q16)
+    den_poly_q16 = fpq16_ln1p_poly(den_y_q16)
+
+    poly_delta_q16 = num_poly_q16 - den_poly_q16
+    k_delta = num_k - den_k
+    base_q16 = k_delta * LOG_Q16_LN2
+
+    return base_q16 + poly_delta_q16
+
+
 def q16_from_float(value: float) -> int:
     return round(value * FP_Q16_ONE)
 
@@ -212,6 +239,52 @@ def test_log2_random_reference_error_bounds_vs_math_log2() -> None:
     assert max_abs_err > 0.0
 
 
+def test_ln_ratio_domain_floor_for_non_positive_inputs() -> None:
+    assert fpq16_ln_ratio(0, FP_Q16_ONE) == I64_MIN_VALUE
+    assert fpq16_ln_ratio(FP_Q16_ONE, 0) == I64_MIN_VALUE
+    assert fpq16_ln_ratio(-1, FP_Q16_ONE) == I64_MIN_VALUE
+    assert fpq16_ln_ratio(FP_Q16_ONE, -1) == I64_MIN_VALUE
+
+
+def test_ln_ratio_identity_and_reciprocal_symmetry() -> None:
+    rng = random.Random(220421)
+
+    for _ in range(1000):
+        num_q16 = rng.randint(1, 1 << 24)
+        den_q16 = rng.randint(1, 1 << 24)
+
+        same = fpq16_ln_ratio(num_q16, num_q16)
+        assert abs(same) <= 3
+
+        ab = fpq16_ln_ratio(num_q16, den_q16)
+        ba = fpq16_ln_ratio(den_q16, num_q16)
+        assert abs(ab + ba) <= 8
+
+
+def test_ln_ratio_random_reference_error_bounds_vs_math_log() -> None:
+    rng = random.Random(20260415)
+
+    max_abs_err = 0.0
+    for _ in range(2500):
+        num = rng.uniform(1.0 / 256.0, 256.0)
+        den = rng.uniform(1.0 / 256.0, 256.0)
+
+        num_q16 = q16_from_float(num)
+        den_q16 = q16_from_float(den)
+
+        got_q16 = fpq16_ln_ratio(num_q16, den_q16)
+        got = q16_to_float(got_q16)
+        want = math.log((num_q16 / FP_Q16_ONE) / (den_q16 / FP_Q16_ONE))
+
+        abs_err = abs(got - want)
+        if abs_err > max_abs_err:
+            max_abs_err = abs_err
+
+        assert abs_err <= 0.0125
+
+    assert max_abs_err > 0.0
+
+
 def run() -> None:
     test_domain_floor_for_non_positive_inputs()
     test_exact_powers_of_two_are_k_ln2()
@@ -221,6 +294,9 @@ def run() -> None:
     test_log2_domain_floor_for_non_positive_inputs()
     test_log2_exact_powers_of_two()
     test_log2_random_reference_error_bounds_vs_math_log2()
+    test_ln_ratio_domain_floor_for_non_positive_inputs()
+    test_ln_ratio_identity_and_reciprocal_symmetry()
+    test_ln_ratio_random_reference_error_bounds_vs_math_log()
     print("intlog_q16_reference_checks=ok")
 
 

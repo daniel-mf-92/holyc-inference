@@ -1,0 +1,20 @@
+Completed one full iteration on `IQ-079` with queue policy preserved and validation/logging done.
+
+**What changed**
+- Implemented `FPQ16LnRatio(num_q16, den_q16)` in `src/math/intlog.HC:140`.
+- Logic is integer-only HolyC, reuses shared range reduction + `ln(1+y)` polynomial path, enforces positive-domain validation, and includes explicit overflow/saturation guards.
+- Extended host parity checks in `tests/test_intlog_q16.py:97`:
+  - `fpq16_ln_ratio` reference mirror.
+  - Domain-floor checks for non-positive numerator/denominator.
+  - Identity/symmetry invariants (`ln(a/a)≈0`, `ln(a/b)+ln(b/a)≈0`).
+  - Random error-bound checks vs `math.log`.
+
+**Validation**
+- Ran: `python3 tests/test_intlog_q16.py`
+- Output: `intlog_q16_reference_checks=ok`
+
+**Queue + ledger updates**
+- Marked complete: `IQ-079` in `MASTER_TASKS.md:268`.
+- Added one-line progress ledger entry for loop-062 in `MASTER_TASKS.md:275`.
+- Queue depth check after completion: `17` unchecked `IQ-` items (>=15, compliant).
+- Logged central DB row in `~/Documents/local-codebases/temple-central.db` for `IQ-079` with status `pass`.
