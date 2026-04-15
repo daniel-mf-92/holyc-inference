@@ -269,7 +269,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-080 Implement HolyC helper `FPQ16EntropyFromProbs` in `src/math/softmax.HC` using `FPQ16Ln` to compute Shannon entropy diagnostics from Q16 probabilities (WS1-03)
 - [x] IQ-081 Add host-side parity harness `tests/test_intlog_ratio_q16.py` covering `FPQ16Log2` + `FPQ16LnRatio` against `math.log2`/`math.log` bounds (WS1-05)
 - [x] IQ-082 Add host-side parity harness `tests/test_softmax_entropy_q16.py` validating Q16 entropy helper against float reference vectors and edge-case clamps (WS1-05)
-- [ ] IQ-083 Implement HolyC `Q8_0DotProductBlocksQ32` in `src/quant/q8_0_dot.HC` with widened I64 accumulator and Q16 output rounding for WS4 matmul callers (WS4-01)
+- [x] IQ-083 Implement HolyC `Q8_0DotProductBlocksQ32` in `src/quant/q8_0_dot.HC` with widened I64 accumulator and Q16 output rounding for WS4 matmul callers (WS4-01)
 - [ ] IQ-084 Implement HolyC `Q4_0DotProductBlocksQ32` in `src/quant/q4_0_dot.HC` with widened I64 accumulator and Q16 output rounding for WS4 matmul callers (WS4-01)
 - [ ] IQ-085 Implement HolyC `Q4_0Q8_0DotProductBlocksQ32` in `src/quant/q4_0_q8_0_dot.HC` with widened I64 accumulator and Q16 output rounding for mixed-kernel WS4 matmul callers (WS4-01)
 
@@ -358,3 +358,5 @@ from a locally-loaded language model, with every token logged to the Book of Tru
   harnesses may use Python/C to validate outputs against llama.cpp reference.
 - Air-gap mandate: networking stack work is out-of-scope for TempleOS guest; any VM run
   command must explicitly disable NICs (`-nic none`, legacy fallback `-net none`).
+
+| 2026-04-15 | loop-035 | IQ-083 Q8_0 Q32->Q16 matmul helper | done | Added `Q8_0DotProductBlocksQ32ToQ16` in `src/quant/q8_0_dot.HC` + parity cases in `tests/test_q8_0_dot.py`; `python3 tests/test_q8_0_dot.py && python3 tests/test_q8_0_dequant.py` passed |

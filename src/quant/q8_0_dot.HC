@@ -143,6 +143,26 @@ I32 Q8_0DotProductBlocksQ32(Q8_0Block *lhs, Q8_0Block *rhs, I64 block_count, I64
     return Q8_0_OK;
 }
 
+I32 Q8_0DotProductBlocksQ32ToQ16(Q8_0Block *lhs, Q8_0Block *rhs, I64 block_count, I64 *out_dot_q16)
+{
+    I64 total_dot_q32;
+    I32 status;
+
+    if (!lhs || !rhs || !out_dot_q16)
+        return Q8_0_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    // WS4 callers can keep the full multi-block dot in widened I64 Q32,
+    // then round once to Q16 for deterministic lane hand-off.
+    status = Q8_0DotProductBlocksQ32(lhs, rhs, block_count, &total_dot_q32);
+    if (status != Q8_0_OK)
+        return status;
+
+    *out_dot_q16 = Q8_0DotQ32ToQ16(total_dot_q32);
+    return Q8_0_OK;
+}
+
 I32 Q8_0DotProductBlocksQ16Accumulate(Q8_0Block *lhs, Q8_0Block *rhs, I64 block_count, I64 *io_accum_q16)
 {
     I64 block_index;
