@@ -252,12 +252,14 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-063 Implement HolyC helper `GGUFTensorLookupByIndexWithInnerOffset` in `src/gguf/tensor_data_base.HC` to resolve original tensor index + caller absolute offset into validated `[abs_start,abs_end)` plus `offset_in_tensor` (WS2-04)
 - [x] IQ-064 Implement HolyC helper `GGUFTensorLookupByIndexWithRelOffset` in `src/gguf/tensor_data_base.HC` to resolve original tensor index + caller relative offset into validated `[abs_start,abs_end)` plus `offset_in_tensor` with alignment checks (WS2-04)
 - [x] IQ-065 Implement HolyC helper `GGUFTensorInfoBuildLookupTables` in `src/gguf/tensor_data_base.HC` to compose offset index build + inverse-map build + lookup-table validation in one checked setup path (WS2-04)
-- [ ] IQ-066 Add host-side parity/adversarial harness for `GGUFTensorInfoBuildLookupTables` in `tests/test_gguf_tensor_data_base.py` with malformed permutation and overlap cases (WS2-04)
+- [x] IQ-066 Add host-side parity/adversarial harness for `GGUFTensorInfoBuildLookupTables` in `tests/test_gguf_tensor_data_base.py` with malformed permutation and overlap cases (WS2-04)
+- [ ] IQ-067 Implement HolyC helper `GGUFTensorLookupSpanByAbsRange` in `src/gguf/tensor_data_base.HC` to resolve `[abs_start,abs_end)` windows into containing tensor index plus validated in-tensor span offsets (WS2-04)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-15 | loop-051 | IQ-066 build-lookup-table adversarial harness | done | Added staged malformed-permutation + randomized overlap-matrix adversarial coverage for `tensor_info_build_lookup_tables` in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py` passed |
 | 2026-04-15 | loop-050 | IQ-065 lookup-table setup helper | done | Added `GGUFTensorInfoBuildLookupTables` in `src/gguf/tensor_data_base.HC` with composed checked build+validate path; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-15 | loop-049 | IQ-064 index+rel-offset lookup helper | done | Added `GGUFTensorLookupByIndexWithRelOffset` in `src/gguf/tensor_data_base.HC` + parity coverage in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-15 | loop-048 | IQ-063 index+inner-offset lookup helper | done | Added `GGUFTensorLookupByIndexWithInnerOffset` in `src/gguf/tensor_data_base.HC` + parity/adversarial coverage in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |

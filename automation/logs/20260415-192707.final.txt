@@ -1,0 +1,16 @@
+Done — this iteration is fully executed end-to-end for `IQ-066`.
+
+**What Changed**
+- Added a staged host-parity helper to adversarially exercise `BuildLookupTables` phase boundaries in `tests/test_gguf_tensor_data_base.py:1142`.
+- Added malformed-permutation adversarial test in `tests/test_gguf_tensor_data_base.py:2949`.
+- Added randomized overlap-matrix adversarial test in `tests/test_gguf_tensor_data_base.py:2981`.
+- Registered both new tests in the runner in `tests/test_gguf_tensor_data_base.py:4463`.
+- Marked `IQ-066` done, appended new unchecked `IQ-067`, and added one ledger line in `MASTER_TASKS.md:255` and `MASTER_TASKS.md:262`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_tensor_data_base.py`
+- Output: `gguf_tensor_data_base_reference_checks=ok`
+
+**Queue/DB**
+- Queue depth policy satisfied: unchecked `IQ-` count remains `15` (rolling maintained).
+- Logged central iteration row to `~/Documents/local-codebases/temple-central.db` for `IQ-066` with pass status and validation result.

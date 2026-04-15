@@ -1139,6 +1139,59 @@ def tensor_info_build_lookup_tables(
     return GGUF_TDBASE_OK, 0
 
 
+def tensor_info_build_lookup_tables_staged(
+    tensor_data_base: int,
+    alignment: int,
+    gguf_file_nbytes: int,
+    tensor_rel_offsets: list[int],
+    tensor_element_counts: list[int],
+    tensor_ggml_types: list[int],
+    out_abs_starts: list[int],
+    out_abs_ends: list[int],
+    out_sorted_tensor_indices: list[int],
+    out_sorted_position_by_tensor: list[int],
+    mutate_sorted_tensor_indices=None,
+):
+    """
+    Host-side staged mirror for adversarial testing of
+    GGUFTensorInfoBuildLookupTables phase boundaries.
+    """
+    err, bad = tensor_info_build_offset_index(
+        tensor_data_base=tensor_data_base,
+        alignment=alignment,
+        gguf_file_nbytes=gguf_file_nbytes,
+        tensor_rel_offsets=tensor_rel_offsets,
+        tensor_element_counts=tensor_element_counts,
+        tensor_ggml_types=tensor_ggml_types,
+        out_abs_starts=out_abs_starts,
+        out_abs_ends=out_abs_ends,
+        out_sorted_tensor_indices=out_sorted_tensor_indices,
+    )
+    if err != GGUF_TDBASE_OK:
+        return err, bad
+
+    if mutate_sorted_tensor_indices is not None:
+        mutate_sorted_tensor_indices(out_sorted_tensor_indices)
+
+    err, bad = build_tensor_sorted_position_map(
+        sorted_tensor_indices=out_sorted_tensor_indices,
+        out_sorted_position_by_tensor=out_sorted_position_by_tensor,
+    )
+    if err != GGUF_TDBASE_OK:
+        return err, bad
+
+    err, bad = validate_tensor_lookup_tables(
+        tensor_abs_starts=out_abs_starts,
+        tensor_abs_ends=out_abs_ends,
+        sorted_tensor_indices=out_sorted_tensor_indices,
+        sorted_position_by_tensor=out_sorted_position_by_tensor,
+    )
+    if err != GGUF_TDBASE_OK:
+        return err, bad
+
+    return GGUF_TDBASE_OK, 0
+
+
 
 
 def test_tensor_bytes_for_type_scalars() -> None:
@@ -2893,6 +2946,89 @@ def test_tensor_info_build_lookup_tables_rejects_bad_inverse_map_output_len() ->
     assert bad == 0
 
 
+def test_tensor_info_build_lookup_tables_staged_rejects_malformed_permutation() -> None:
+    rel_offsets = [0x00, 0x80, 0x140, 0x1C0]
+    element_counts = [32, 64, 32, 32]
+    ggml_types = [GGML_TYPE_Q8_0, GGML_TYPE_Q4_0, GGML_TYPE_F16, GGML_TYPE_F32]
+
+    count = len(rel_offsets)
+    starts = [0] * count
+    ends = [0] * count
+    sorted_idx = [0] * count
+    inverse_map = [0] * count
+
+    def corrupt_with_duplicate_permutation(indices: list[int]) -> None:
+        indices[2] = indices[1]
+
+    err, bad = tensor_info_build_lookup_tables_staged(
+        tensor_data_base=0x2400,
+        alignment=32,
+        gguf_file_nbytes=0x20000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_element_counts=element_counts,
+        tensor_ggml_types=ggml_types,
+        out_abs_starts=starts,
+        out_abs_ends=ends,
+        out_sorted_tensor_indices=sorted_idx,
+        out_sorted_position_by_tensor=inverse_map,
+        mutate_sorted_tensor_indices=corrupt_with_duplicate_permutation,
+    )
+
+    assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert bad == 2
+
+
+def test_tensor_info_build_lookup_tables_adversarial_overlap_matrix() -> None:
+    rng = random.Random(0xC0FFEE66)
+
+    for _ in range(120):
+        count = rng.randint(2, 8)
+        rel_offsets = []
+        element_counts = []
+        ggml_types = []
+
+        cursor = rng.randrange(0, 128) * 32
+        for _i in range(count):
+            ggml_type = rng.choice([GGML_TYPE_Q4_0, GGML_TYPE_Q8_0, GGML_TYPE_F16, GGML_TYPE_F32])
+            if ggml_type in (GGML_TYPE_Q4_0, GGML_TYPE_Q8_0):
+                elements = rng.randint(1, 6) * 32
+            else:
+                elements = rng.randint(8, 256)
+
+            err, nbytes = tensor_bytes_for_type(ggml_type, elements)
+            assert err == GGUF_TDBASE_OK
+
+            rel_offsets.append(cursor)
+            element_counts.append(elements)
+            ggml_types.append(ggml_type)
+
+            cursor += ((nbytes + 31) // 32) * 32 + rng.randrange(0, 4) * 32
+
+        victim = rng.randint(1, count - 1)
+        rel_offsets[victim] = rel_offsets[victim - 1]
+
+        starts = [0] * count
+        ends = [0] * count
+        sorted_idx = [0] * count
+        inverse_map = [0] * count
+
+        err, bad = tensor_info_build_lookup_tables(
+            tensor_data_base=0x1000,
+            alignment=1,
+            gguf_file_nbytes=0x400000,
+            tensor_rel_offsets=rel_offsets,
+            tensor_element_counts=element_counts,
+            tensor_ggml_types=ggml_types,
+            out_abs_starts=starts,
+            out_abs_ends=ends,
+            out_sorted_tensor_indices=sorted_idx,
+            out_sorted_position_by_tensor=inverse_map,
+        )
+
+        assert err == GGUF_TDBASE_ERR_OVERLAP
+        assert 0 <= bad < count
+
+
 def test_tensor_index_to_abs_range_happy_path() -> None:
     starts = [0x1200, 0x1400, 0x1500, 0x1700]
     ends = [0x1280, 0x1480, 0x1680, 0x17C0]
@@ -4324,6 +4460,8 @@ def run() -> None:
     test_tensor_info_build_lookup_tables_detects_overlap()
     test_tensor_info_build_lookup_tables_random_non_overlapping()
     test_tensor_info_build_lookup_tables_rejects_bad_inverse_map_output_len()
+    test_tensor_info_build_lookup_tables_staged_rejects_malformed_permutation()
+    test_tensor_info_build_lookup_tables_adversarial_overlap_matrix()
     test_tensor_index_to_abs_range_happy_path()
     test_tensor_index_to_abs_range_rejects_bad_lengths()
     test_tensor_index_to_abs_range_rejects_out_of_bounds_index()
