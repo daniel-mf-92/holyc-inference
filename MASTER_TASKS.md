@@ -242,12 +242,15 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-054 Add host-side parity harnesses for inverse-map/range-index helpers in `tests/test_gguf_tensor_data_base.py` with randomized permutation adversarial cases (WS2-04)
 - [x] IQ-055 Implement HolyC helper `GGUFTensorRangeFindByIndex` in `src/gguf/tensor_data_base.HC` to resolve original tensor index directly to `[abs_start,abs_end)` via sorted-position map (WS2-04)
 - [x] IQ-056 Implement HolyC helper `GGUFTensorLookupByRelOffset` in `src/gguf/tensor_data_base.HC` returning original tensor index plus `[abs_start,abs_end)` for a relative tensor offset via existing offset-index maps (WS2-04)
-- [ ] IQ-057 Implement HolyC helper `GGUFTensorLookupByAbsOffset` in `src/gguf/tensor_data_base.HC` returning original tensor index plus `[abs_start,abs_end)` for an absolute payload offset via sorted offset-index maps (WS2-04)
+- [x] IQ-057 Implement HolyC helper `GGUFTensorLookupByAbsOffset` in `src/gguf/tensor_data_base.HC` returning original tensor index plus `[abs_start,abs_end)` for an absolute payload offset via sorted offset-index maps (WS2-04)
+
+- [ ] IQ-058 Implement HolyC helper `GGUFTensorLookupByAbsOffsetDefault` in `src/gguf/tensor_data_base.HC` as default-alignment wrapper over absolute lookup for metadata-absent callers (WS2-04)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-15 | loop-042 | IQ-057 abs-offset tensor lookup helper | done | Added `GGUFTensorLookupByAbsOffset` + parity coverage in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-15 | loop-041 | IQ-056 rel-offset tensor lookup helper | done | Added `GGUFTensorLookupByRelOffset` (+ default) in `src/gguf/tensor_data_base.HC` and parity coverage in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` passed |
 | 2026-04-15 | loop-040 | IQ-055 tensor index direct range helper | done | Added `GGUFTensorRangeFindByIndex` + parity coverage in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py` passed |
 | 2026-04-12 | loop-039 | IQ-054 inverse-map/range-index parity harnesses | done | Added randomized permutation + adversarial parity coverage in `tests/test_gguf_tensor_data_base.py`; `python3 tests/test_gguf_tensor_data_base.py` passed |

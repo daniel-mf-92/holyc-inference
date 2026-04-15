@@ -1,0 +1,15 @@
+Completed one full iteration for `IQ-057` with HolyC runtime code + host parity tests.
+
+**Changed**
+- Added `GGUFTensorLookupByAbsOffset` in `src/gguf/tensor_data_base.HC:1399` (sorted-range lookup → original tensor index + `[abs_start, abs_end)` with deterministic error outputs).
+- Added host parity helper and 5 focused tests for abs-offset lookup in `tests/test_gguf_tensor_data_base.py:732` and `tests/test_gguf_tensor_data_base.py:2651`.
+- Hooked new lookup tests into the test runner in `tests/test_gguf_tensor_data_base.py:3002`.
+
+**Validation**
+- `python3 tests/test_gguf_tensor_data_base.py` → `gguf_tensor_data_base_reference_checks=ok`
+- `python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` → `gguf_tensorinfo_reference_checks=ok`, `gguf_metadata_reference_checks=ok`
+
+**Queue + Ledger + DB**
+- Marked `IQ-057` done and added new unchecked `IQ-058` to keep queue depth at 15 in `MASTER_TASKS.md:245` and `MASTER_TASKS.md:247`.
+- Added one progress-ledger line for this iteration at `MASTER_TASKS.md:253` (`loop-042`).
+- Logged central DB iteration row: `iterations.id=696` for `IQ-057` with status `pass`.
