@@ -162,6 +162,26 @@ I32 Q4_0DotProductBlocksQ32(Q4_0Block *lhs, Q4_0Block *rhs, I64 block_count, I64
     return Q4_0_OK;
 }
 
+I32 Q4_0DotProductBlocksQ32ToQ16(Q4_0Block *lhs, Q4_0Block *rhs, I64 block_count, I64 *out_dot_q16)
+{
+    I64 total_dot_q32;
+    I32 status;
+
+    if (!lhs || !rhs || !out_dot_q16)
+        return Q4_0_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q4_0_ERR_BAD_DST_LEN;
+
+    // WS4 matmul callers can keep a widened I64 Q32 path for the full dot,
+    // then round once to Q16 at the hand-off boundary.
+    status = Q4_0DotProductBlocksQ32(lhs, rhs, block_count, &total_dot_q32);
+    if (status != Q4_0_OK)
+        return status;
+
+    *out_dot_q16 = Q4_0DotQ32ToQ16(total_dot_q32);
+    return Q4_0_OK;
+}
+
 I32 Q4_0DotRowBlocksQ16(Q4_0Block *row_blocks, Q4_0Block *vec_blocks, I64 block_count, I64 *out_dot_q16)
 {
     I64 block_index;

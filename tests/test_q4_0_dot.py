@@ -100,6 +100,27 @@ def dot_row_blocks_q16(lhs_blocks, rhs_blocks):
     return Q4_0_OK, total_q16
 
 
+def dot_product_blocks_q32(lhs_blocks, rhs_blocks):
+    if len(lhs_blocks) != len(rhs_blocks):
+        return Q4_0_ERR_BAD_DST_LEN, 0
+
+    total_q32 = 0
+    for (lhs_scale, lhs_qs), (rhs_scale, rhs_qs) in zip(lhs_blocks, rhs_blocks):
+        err, block_q32 = dot_product_block_q32(lhs_scale, lhs_qs, rhs_scale, rhs_qs)
+        if err != Q4_0_OK:
+            return err, 0
+        total_q32 += block_q32
+
+    return Q4_0_OK, total_q32
+
+
+def dot_product_blocks_q32_to_q16(lhs_blocks, rhs_blocks):
+    err, total_q32 = dot_product_blocks_q32(lhs_blocks, rhs_blocks)
+    if err != Q4_0_OK:
+        return err, 0
+    return Q4_0_OK, dot_q32_to_q16(total_q32)
+
+
 def unpack_signed(qs: bytes) -> list[int]:
     out: list[int] = []
     for packed in qs:
@@ -232,6 +253,37 @@ def test_row_blocks_q16_distinct_from_round_at_end() -> None:
     assert round_at_end_q16 == 1
 
 
+def test_q32_to_q16_single_rounding_matches_total_q32_rounding() -> None:
+    rng = random.Random(20260415)
+
+    for _ in range(250):
+        block_count = rng.randint(1, 10)
+        lhs_blocks = []
+        rhs_blocks = []
+
+        for _ in range(block_count):
+            lhs_scale = half_bits(rng.uniform(-3.5, 3.5))
+            rhs_scale = half_bits(rng.uniform(-3.5, 3.5))
+            lhs_qs = bytes(rng.randrange(256) for _ in range(Q4_0_PACKED_BYTES))
+            rhs_qs = bytes(rng.randrange(256) for _ in range(Q4_0_PACKED_BYTES))
+            lhs_blocks.append((lhs_scale, lhs_qs))
+            rhs_blocks.append((rhs_scale, rhs_qs))
+
+        err, got_q16 = dot_product_blocks_q32_to_q16(lhs_blocks, rhs_blocks)
+        assert err == Q4_0_OK
+
+        err, total_q32 = dot_product_blocks_q32(lhs_blocks, rhs_blocks)
+        assert err == Q4_0_OK
+        assert got_q16 == dot_q32_to_q16(total_q32)
+
+
+def test_q32_to_q16_length_mismatch_error() -> None:
+    lhs_blocks = [(half_bits(1.0), bytes([0x88] * Q4_0_PACKED_BYTES))]
+    rhs_blocks = []
+    err, _ = dot_product_blocks_q32_to_q16(lhs_blocks, rhs_blocks)
+    assert err == Q4_0_ERR_BAD_DST_LEN
+
+
 def run() -> None:
     test_identity_block()
     test_opposite_sign_scales()
@@ -239,6 +291,8 @@ def run() -> None:
     test_error_on_bad_input_length()
     test_row_blocks_q16_matches_per_block_rounding()
     test_row_blocks_q16_distinct_from_round_at_end()
+    test_q32_to_q16_single_rounding_matches_total_q32_rounding()
+    test_q32_to_q16_length_mismatch_error()
     print("q4_0_dot_reference_checks=ok")
 
 
