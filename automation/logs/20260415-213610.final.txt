@@ -1,0 +1,22 @@
+Done — one full iteration completed on `IQ-080` with queue depth maintained.
+
+**What changed**
+- Implemented `FPQ16EntropyFromProbs` in `src/math/softmax.HC:72`.
+- Added HolyC declarations needed by the helper (`FPQ16Mul`, `FPQ16Ln`) and local `I64` bound constants in `src/math/softmax.HC:7`.
+- Marked `IQ-080` complete in `MASTER_TASKS.md:269`.
+- Added one progress-ledger line for this loop in `MASTER_TASKS.md` (loop-033 entry near the existing loop table).
+
+**Validation**
+- Command run:
+  - `python3 - <<'PY' ... PY`
+- Result:
+  - `softmax_entropy_q16_reference_checks=ok`
+- Scope:
+  - Randomized softmax probability vectors (sizes 2..32), Q16 normalization correction, entropy vs float reference within tolerance.
+
+**Central DB log**
+- Inserted into `~/Documents/local-codebases/temple-central.db`:
+  - `agent='inference'`, `task_id='IQ-080'`, `status='pass'`, `files_changed='src/math/softmax.HC'`, `lines_added=55`, `validation_result='softmax_entropy_q16_reference_checks=ok'`.
+
+**Queue policy**
+- Unchecked `IQ-` count is `16` (>=15), so no new queue items were required this iteration.
