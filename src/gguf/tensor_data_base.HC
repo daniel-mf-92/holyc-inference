@@ -2148,6 +2148,8 @@ I64 GGUFTensorInfoLoadPayloadWindowByIndexRelDefault(U64 tensor_index,
 {
     U64 payload_abs_start;
     U64 payload_abs_end;
+    U64 tensor_abs_start;
+    U64 tensor_abs_end;
     I64 err;
 
     if (!out_abs_start || !out_abs_end ||
@@ -2185,12 +2187,66 @@ I64 GGUFTensorInfoLoadPayloadWindowByIndexRelDefault(U64 tensor_index,
                                                  tensor_abs_starts,
                                                  tensor_abs_ends,
                                                  sorted_position_by_tensor,
-                                                 out_abs_start,
-                                                 out_abs_end,
+                                                 &tensor_abs_start,
+                                                 &tensor_abs_end,
                                                  out_span_start_in_tensor,
                                                  out_span_end_in_tensor);
     if (err != GGUF_TDBASE_OK)
         return err;
+
+    // Report the caller window `[abs_start, abs_end)` so direct file-pointer
+    // readers can seek and read immediately after this validation call.
+    *out_abs_start = payload_abs_start;
+    *out_abs_end = payload_abs_end;
+
+    return GGUF_TDBASE_OK;
+}
+
+I64 GGUFTensorInfoLoadPayloadWindowByIndexAbs(U64 tensor_index,
+                                              U64 payload_abs_start,
+                                              U64 payload_abs_end,
+                                              U64 tensor_count,
+                                              U64 *tensor_abs_starts,
+                                              U64 *tensor_abs_ends,
+                                              U64 *sorted_position_by_tensor,
+                                              U64 *out_abs_start,
+                                              U64 *out_abs_end,
+                                              U64 *out_span_start_in_tensor,
+                                              U64 *out_span_end_in_tensor)
+{
+    U64 tensor_abs_start;
+    U64 tensor_abs_end;
+    I64 err;
+
+    if (!out_abs_start || !out_abs_end ||
+        !out_span_start_in_tensor || !out_span_end_in_tensor)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    // Deterministic outputs on every failure path.
+    *out_abs_start = 0;
+    *out_abs_end = 0;
+    *out_span_start_in_tensor = 0;
+    *out_span_end_in_tensor = 0;
+
+    // Reuse the checked index+absolute span resolver to enforce half-open
+    // window math and in-tensor containment on caller absolute file offsets.
+    err = GGUFTensorLookupSpanByIndexAndAbsRange(tensor_index,
+                                                 payload_abs_start,
+                                                 payload_abs_end,
+                                                 tensor_count,
+                                                 tensor_abs_starts,
+                                                 tensor_abs_ends,
+                                                 sorted_position_by_tensor,
+                                                 &tensor_abs_start,
+                                                 &tensor_abs_end,
+                                                 out_span_start_in_tensor,
+                                                 out_span_end_in_tensor);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    // Return validated payload window boundaries for direct file-pointer reads.
+    *out_abs_start = payload_abs_start;
+    *out_abs_end = payload_abs_end;
 
     return GGUF_TDBASE_OK;
 }

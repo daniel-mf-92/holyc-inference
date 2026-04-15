@@ -1,0 +1,15 @@
+Completed one full unattended iteration on `IQ-073` with queue policy preserved.
+
+**What Changed**
+- Implemented `GGUFTensorInfoLoadPayloadWindowByIndexAbs` for validated absolute payload windows and in-tensor span offsets in `src/gguf/tensor_data_base.HC:2205`.
+- Tightened `GGUFTensorInfoLoadPayloadWindowByIndexRelDefault` semantics to return caller payload window `[abs_start, abs_end)` (not full tensor span), while reusing centralized containment checks in `src/gguf/tensor_data_base.HC:2136`.
+- Added overflow parity guards + new abs-window reference helper/tests in `tests/test_gguf_tensor_data_base.py:1099`, `tests/test_gguf_tensor_data_base.py:1135`, `tests/test_gguf_tensor_data_base.py:5121`.
+
+**Task/Queue/Ledger**
+- Marked `IQ-073` done and appended new unchecked `IQ-074` to keep rolling depth at 15+ in `MASTER_TASKS.md:262`.
+- Added one-line progress ledger entry for this loop in `MASTER_TASKS.md:268`.
+- Logged central DB iteration record (`id=855`, `agent=inference`, `task_id=IQ-073`, `status=pass`) in `~/Documents/local-codebases/temple-central.db`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_tensor_data_base.py` → `gguf_tensor_data_base_reference_checks=ok`
+- Ran: `python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_metadata_parse.py` → `gguf_tensorinfo_reference_checks=ok`, `gguf_metadata_reference_checks=ok`

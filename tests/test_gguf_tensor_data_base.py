@@ -1109,6 +1109,10 @@ def tensor_info_load_payload_window_by_index_rel_default(
         return GGUF_TDBASE_ERR_MISALIGNED_BASE, 0, 0, 0, 0
     if payload_rel_end < payload_rel_start:
         return GGUF_TDBASE_ERR_OVERFLOW, 0, 0, 0, 0
+    if tensor_data_base > U64_MAX - payload_rel_start:
+        return GGUF_TDBASE_ERR_OVERFLOW, 0, 0, 0, 0
+    if tensor_data_base > U64_MAX - payload_rel_end:
+        return GGUF_TDBASE_ERR_OVERFLOW, 0, 0, 0, 0
 
     abs_start = tensor_data_base + payload_rel_start
     abs_end = tensor_data_base + payload_rel_end
@@ -1126,6 +1130,28 @@ def tensor_info_load_payload_window_by_index_rel_default(
 
     _ = tensor_abs_start
     return GGUF_TDBASE_OK, abs_start, abs_end, span_start, span_end
+
+
+def tensor_info_load_payload_window_by_index_abs(
+    tensor_index: int,
+    payload_abs_start: int,
+    payload_abs_end: int,
+    tensor_abs_starts: list[int],
+    tensor_abs_ends: list[int],
+    sorted_position_by_tensor: list[int],
+):
+    err, _tensor_abs_start, _tensor_abs_end, span_start, span_end = tensor_lookup_span_by_index_and_abs_range(
+        tensor_index=tensor_index,
+        span_abs_start=payload_abs_start,
+        span_abs_end=payload_abs_end,
+        tensor_abs_starts=tensor_abs_starts,
+        tensor_abs_ends=tensor_abs_ends,
+        sorted_position_by_tensor=sorted_position_by_tensor,
+    )
+    if err != GGUF_TDBASE_OK:
+        return err, 0, 0, 0, 0
+
+    return GGUF_TDBASE_OK, payload_abs_start, payload_abs_end, span_start, span_end
 
 
 def _abs_range_greater(
@@ -5038,6 +5064,22 @@ def test_tensor_info_load_payload_window_by_index_rel_default_happy_path() -> No
         0x20,
     )
 
+    assert tensor_info_load_payload_window_by_index_rel_default(
+        1,
+        0x80,
+        0x80,
+        tensor_data_base,
+        starts,
+        ends,
+        sorted_pos,
+    ) == (
+        GGUF_TDBASE_OK,
+        0x7080,
+        0x7080,
+        0,
+        0,
+    )
+
 
 def test_tensor_info_load_payload_window_by_index_rel_default_propagates_errors() -> None:
     tensor_data_base = 0x7000
@@ -5064,6 +5106,158 @@ def test_tensor_info_load_payload_window_by_index_rel_default_propagates_errors(
         ends,
         sorted_pos,
     ) == (GGUF_TDBASE_ERR_OUT_OF_BOUNDS, 0, 0, 0, 0)
+
+    assert tensor_info_load_payload_window_by_index_rel_default(
+        0,
+        U64_MAX - (tensor_data_base - 1),
+        U64_MAX,
+        tensor_data_base,
+        starts,
+        ends,
+        sorted_pos,
+    ) == (GGUF_TDBASE_ERR_OVERFLOW, 0, 0, 0, 0)
+
+
+def test_tensor_info_load_payload_window_by_index_abs_happy_path() -> None:
+    starts = [0x7000, 0x7080, 0x7100]
+    ends = [0x7040, 0x70C0, 0x7140]
+    sorted_pos = [0, 1, 2]
+
+    assert tensor_info_load_payload_window_by_index_abs(
+        1,
+        0x7090,
+        0x70A0,
+        starts,
+        ends,
+        sorted_pos,
+    ) == (
+        GGUF_TDBASE_OK,
+        0x7090,
+        0x70A0,
+        0x10,
+        0x20,
+    )
+
+    assert tensor_info_load_payload_window_by_index_abs(
+        1,
+        0x7080,
+        0x7080,
+        starts,
+        ends,
+        sorted_pos,
+    ) == (
+        GGUF_TDBASE_OK,
+        0x7080,
+        0x7080,
+        0,
+        0,
+    )
+
+
+def test_tensor_info_load_payload_window_by_index_abs_propagates_errors() -> None:
+    starts = [0x7000, 0x7080]
+    ends = [0x7040, 0x70C0]
+    sorted_pos = [0, 1]
+
+    assert tensor_info_load_payload_window_by_index_abs(
+        1,
+        0x70B0,
+        0x70D0,
+        starts,
+        ends,
+        sorted_pos,
+    ) == (GGUF_TDBASE_ERR_OUT_OF_BOUNDS, 0, 0, 0, 0)
+
+    assert tensor_info_load_payload_window_by_index_abs(
+        0,
+        0x7010,
+        0x7000,
+        starts,
+        ends,
+        sorted_pos,
+    ) == (GGUF_TDBASE_ERR_OVERFLOW, 0, 0, 0, 0)
+
+
+def test_tensor_info_load_payload_window_by_index_abs_with_built_lookup_tables() -> None:
+    rel_offsets = [0x280, 0x00, 0x2C0, 0x40]
+    elem_counts = [32, 64, 32, 128]
+    ggml_types = [GGML_TYPE_Q8_0, GGML_TYPE_Q4_0, GGML_TYPE_F16, GGML_TYPE_F32]
+    starts = [0, 0, 0, 0]
+    ends = [0, 0, 0, 0]
+    sorted_idx = [0, 0, 0, 0]
+    sorted_pos = [0, 0, 0, 0]
+
+    err, bad = tensor_info_build_lookup_tables(
+        tensor_data_base=0x7000,
+        alignment=GGUF_DEFAULT_ALIGNMENT,
+        gguf_file_nbytes=0xB000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_element_counts=elem_counts,
+        tensor_ggml_types=ggml_types,
+        out_abs_starts=starts,
+        out_abs_ends=ends,
+        out_sorted_tensor_indices=sorted_idx,
+        out_sorted_position_by_tensor=sorted_pos,
+    )
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+    for original_idx in range(len(rel_offsets)):
+        err_n, nbytes = tensor_bytes_for_type(ggml_types[original_idx], elem_counts[original_idx])
+        assert err_n == GGUF_TDBASE_OK
+
+        tensor_abs_start = starts[sorted_pos[original_idx]]
+        tensor_abs_end = ends[sorted_pos[original_idx]]
+
+        out = tensor_info_load_payload_window_by_index_abs(
+            original_idx,
+            tensor_abs_start,
+            tensor_abs_start,
+            starts,
+            ends,
+            sorted_pos,
+        )
+        assert out == (
+            GGUF_TDBASE_OK,
+            tensor_abs_start,
+            tensor_abs_start,
+            0,
+            0,
+        )
+
+        out_full = tensor_info_load_payload_window_by_index_abs(
+            original_idx,
+            tensor_abs_start,
+            tensor_abs_end,
+            starts,
+            ends,
+            sorted_pos,
+        )
+        assert out_full == (
+            GGUF_TDBASE_OK,
+            tensor_abs_start,
+            tensor_abs_end,
+            0,
+            nbytes,
+        )
+
+        if nbytes >= 2:
+            mid = tensor_abs_start + (nbytes // 2)
+            out_mid = tensor_info_load_payload_window_by_index_abs(
+                original_idx,
+                mid,
+                mid,
+                starts,
+                ends,
+                sorted_pos,
+            )
+            assert out_mid == (
+                GGUF_TDBASE_OK,
+                mid,
+                mid,
+                mid - tensor_abs_start,
+                mid - tensor_abs_start,
+            )
 
 
 def test_tensor_info_load_payload_window_by_index_rel_default_with_built_lookup_tables() -> None:
@@ -5436,6 +5630,9 @@ def run() -> None:
     test_tensor_info_load_payload_window_by_index_rel_default_happy_path()
     test_tensor_info_load_payload_window_by_index_rel_default_propagates_errors()
     test_tensor_info_load_payload_window_by_index_rel_default_with_built_lookup_tables()
+    test_tensor_info_load_payload_window_by_index_abs_happy_path()
+    test_tensor_info_load_payload_window_by_index_abs_propagates_errors()
+    test_tensor_info_load_payload_window_by_index_abs_with_built_lookup_tables()
     test_tensor_info_build_offset_index_happy_path()
     test_tensor_info_build_offset_index_propagates_bad_block_multiple()
     test_tensor_info_build_offset_index_detects_overlap()
