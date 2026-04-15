@@ -2273,3 +2273,77 @@ I64 GGUFTensorInfoLoadPayloadWindowByIndexAbs(U64 tensor_index,
 
     return GGUF_TDBASE_OK;
 }
+
+I64 GGUFTensorInfoLoadPayloadWindowByRelSpan(U64 payload_rel_start,
+                                             U64 payload_rel_end,
+                                             U64 tensor_data_base,
+                                             U32 alignment,
+                                             U64 tensor_count,
+                                             U64 *tensor_abs_starts,
+                                             U64 *tensor_abs_ends,
+                                             U64 *sorted_tensor_indices,
+                                             U64 *out_tensor_index,
+                                             U64 *out_abs_start,
+                                             U64 *out_abs_end,
+                                             U64 *out_span_start_in_tensor,
+                                             U64 *out_span_end_in_tensor)
+{
+    U64 payload_abs_start;
+    U64 payload_abs_end;
+    U64 tensor_abs_start;
+    U64 tensor_abs_end;
+    I64 err;
+
+    if (!out_tensor_index || !out_abs_start || !out_abs_end ||
+        !out_span_start_in_tensor || !out_span_end_in_tensor)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    // Deterministic outputs for all failure paths.
+    *out_tensor_index = 0;
+    *out_abs_start = 0;
+    *out_abs_end = 0;
+    *out_span_start_in_tensor = 0;
+    *out_span_end_in_tensor = 0;
+
+    // Honor caller-provided GGUF alignment for tensor-data base pointer while
+    // allowing byte-granular payload windows inside resolved tensor spans.
+    err = GGUFValidateAlignment(alignment);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    if (!GGUFTensorDataBaseIsAligned(tensor_data_base, alignment))
+        return GGUF_TDBASE_ERR_MISALIGNED_BASE;
+
+    if (payload_rel_end < payload_rel_start)
+        return GGUF_TDBASE_ERR_OVERFLOW;
+
+    if (tensor_data_base > 0xFFFFFFFFFFFFFFFF - payload_rel_start)
+        return GGUF_TDBASE_ERR_OVERFLOW;
+    payload_abs_start = tensor_data_base + payload_rel_start;
+
+    if (tensor_data_base > 0xFFFFFFFFFFFFFFFF - payload_rel_end)
+        return GGUF_TDBASE_ERR_OVERFLOW;
+    payload_abs_end = tensor_data_base + payload_rel_end;
+
+    // Resolve absolute payload window into owning original tensor and checked
+    // in-tensor span offsets.
+    err = GGUFTensorLookupSpanByAbsRange(payload_abs_start,
+                                         payload_abs_end,
+                                         tensor_count,
+                                         tensor_abs_starts,
+                                         tensor_abs_ends,
+                                         sorted_tensor_indices,
+                                         out_tensor_index,
+                                         &tensor_abs_start,
+                                         &tensor_abs_end,
+                                         out_span_start_in_tensor,
+                                         out_span_end_in_tensor);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    // Return validated absolute payload boundaries for direct stream reads.
+    *out_abs_start = payload_abs_start;
+    *out_abs_end = payload_abs_end;
+
+    return GGUF_TDBASE_OK;
+}
