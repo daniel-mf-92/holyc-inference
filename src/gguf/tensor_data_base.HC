@@ -1314,3 +1314,84 @@ I64 GGUFTensorRangeFindByIndex(U64 tensor_index,
                                      out_abs_start,
                                      out_abs_end);
 }
+
+I64 GGUFTensorLookupByRelOffset(U64 tensor_rel_offset,
+                                U64 tensor_data_base,
+                                U32 alignment,
+                                U64 tensor_count,
+                                U64 *tensor_abs_starts,
+                                U64 *tensor_abs_ends,
+                                U64 *sorted_tensor_indices,
+                                U64 *out_tensor_index,
+                                U64 *out_abs_start,
+                                U64 *out_abs_end)
+{
+    U64 sorted_pos;
+    U64 tensor_index;
+    U64 abs_start;
+    U64 abs_end;
+    I64 err;
+
+    if (!sorted_tensor_indices || !out_tensor_index || !out_abs_start ||
+        !out_abs_end)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    // Preserve deterministic output contract on all failures.
+    *out_tensor_index = 0;
+    *out_abs_start = 0;
+    *out_abs_end = 0;
+
+    // Step 1: locate sorted range slot for caller-provided relative offset.
+    err = GGUFTensorRangeFindByRelOffset(tensor_rel_offset,
+                                         tensor_data_base,
+                                         alignment,
+                                         tensor_count,
+                                         tensor_abs_starts,
+                                         tensor_abs_ends,
+                                         &sorted_pos);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    if (sorted_pos >= tensor_count)
+        return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+
+    // Step 2: map sorted slot back to original tensor index via
+    // tensor table permutation produced by GGUFTensorInfoBuildOffsetIndex.
+    tensor_index = sorted_tensor_indices[sorted_pos];
+    if (tensor_index >= tensor_count)
+        return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+
+    abs_start = tensor_abs_starts[sorted_pos];
+    abs_end = tensor_abs_ends[sorted_pos];
+    if (abs_end < abs_start)
+        return GGUF_TDBASE_ERR_OVERFLOW;
+
+    *out_tensor_index = tensor_index;
+    *out_abs_start = abs_start;
+    *out_abs_end = abs_end;
+    return GGUF_TDBASE_OK;
+}
+
+I64 GGUFTensorLookupByRelOffsetDefault(U64 tensor_rel_offset,
+                                       U64 tensor_data_base,
+                                       U64 tensor_count,
+                                       U64 *tensor_abs_starts,
+                                       U64 *tensor_abs_ends,
+                                       U64 *sorted_tensor_indices,
+                                       U64 *out_tensor_index,
+                                       U64 *out_abs_start,
+                                       U64 *out_abs_end)
+{
+    // Default GGUF tensor payload alignment when `general.alignment`
+    // metadata key is absent.
+    return GGUFTensorLookupByRelOffset(tensor_rel_offset,
+                                       tensor_data_base,
+                                       GGUF_DEFAULT_ALIGNMENT,
+                                       tensor_count,
+                                       tensor_abs_starts,
+                                       tensor_abs_ends,
+                                       sorted_tensor_indices,
+                                       out_tensor_index,
+                                       out_abs_start,
+                                       out_abs_end);
+}

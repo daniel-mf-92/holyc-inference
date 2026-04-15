@@ -673,6 +673,62 @@ def tensor_range_find_by_index(
     )
 
 
+def tensor_lookup_by_rel_offset(
+    tensor_rel_offset: int,
+    tensor_data_base: int,
+    alignment: int,
+    tensor_abs_starts: list[int],
+    tensor_abs_ends: list[int],
+    sorted_tensor_indices: list[int],
+):
+    count = len(tensor_abs_starts)
+    if len(tensor_abs_ends) != count:
+        return GGUF_TDBASE_ERR_NULL_PTR, 0, 0, 0
+    if len(sorted_tensor_indices) != count:
+        return GGUF_TDBASE_ERR_NULL_PTR, 0, 0, 0
+
+    err, sorted_pos = tensor_range_find_by_rel_offset(
+        tensor_rel_offset=tensor_rel_offset,
+        tensor_data_base=tensor_data_base,
+        alignment=alignment,
+        tensor_abs_starts=tensor_abs_starts,
+        tensor_abs_ends=tensor_abs_ends,
+    )
+    if err != GGUF_TDBASE_OK:
+        return err, 0, 0, 0
+
+    if sorted_pos >= count:
+        return GGUF_TDBASE_ERR_OUT_OF_BOUNDS, 0, 0, 0
+
+    tensor_index = sorted_tensor_indices[sorted_pos]
+    if tensor_index >= count:
+        return GGUF_TDBASE_ERR_OUT_OF_BOUNDS, 0, 0, 0
+
+    abs_start = tensor_abs_starts[sorted_pos]
+    abs_end = tensor_abs_ends[sorted_pos]
+    if abs_end < abs_start:
+        return GGUF_TDBASE_ERR_OVERFLOW, 0, 0, 0
+
+    return GGUF_TDBASE_OK, tensor_index, abs_start, abs_end
+
+
+def tensor_lookup_by_rel_offset_default(
+    tensor_rel_offset: int,
+    tensor_data_base: int,
+    tensor_abs_starts: list[int],
+    tensor_abs_ends: list[int],
+    sorted_tensor_indices: list[int],
+):
+    return tensor_lookup_by_rel_offset(
+        tensor_rel_offset=tensor_rel_offset,
+        tensor_data_base=tensor_data_base,
+        alignment=GGUF_DEFAULT_ALIGNMENT,
+        tensor_abs_starts=tensor_abs_starts,
+        tensor_abs_ends=tensor_abs_ends,
+        sorted_tensor_indices=sorted_tensor_indices,
+    )
+
+
 def _abs_range_greater(
     starts: list[int],
     ends: list[int],
@@ -2392,6 +2448,165 @@ def test_tensor_range_find_by_index_with_built_offset_index() -> None:
             inverse_map,
         )
         assert err == GGUF_TDBASE_OK
+        assert abs_start == 0x1000 + rel_offsets[original_idx]
+        err_n, nbytes = tensor_bytes_for_type(ggml_types[original_idx], elem_counts[original_idx])
+        assert err_n == GGUF_TDBASE_OK
+        assert abs_end == abs_start + nbytes
+
+
+def test_tensor_lookup_by_rel_offset_happy_path() -> None:
+    starts = [0x1000, 0x1040, 0x10C0]
+    ends = [0x1020, 0x1080, 0x1100]
+    sorted_idx = [2, 0, 1]
+
+    assert tensor_lookup_by_rel_offset(0x00, 0x1000, 32, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_OK,
+        2,
+        0x1000,
+        0x1020,
+    )
+    assert tensor_lookup_by_rel_offset(0x40, 0x1000, 32, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_OK,
+        0,
+        0x1040,
+        0x1080,
+    )
+    assert tensor_lookup_by_rel_offset(0xC0, 0x1000, 32, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_OK,
+        1,
+        0x10C0,
+        0x1100,
+    )
+
+
+def test_tensor_lookup_by_rel_offset_default_happy_path() -> None:
+    starts = [0x2000, 0x2040]
+    ends = [0x2020, 0x2060]
+    sorted_idx = [1, 0]
+
+    assert tensor_lookup_by_rel_offset_default(0x00, 0x2000, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_OK,
+        1,
+        0x2000,
+        0x2020,
+    )
+    assert tensor_lookup_by_rel_offset_default(0x40, 0x2000, starts, ends, sorted_idx) == (
+        GGUF_TDBASE_OK,
+        0,
+        0x2040,
+        0x2060,
+    )
+
+
+def test_tensor_lookup_by_rel_offset_propagates_alignment_error() -> None:
+    starts = [0x1000]
+    ends = [0x1020]
+    sorted_idx = [0]
+
+    err, tensor_index, abs_start, abs_end = tensor_lookup_by_rel_offset(
+        0x00,
+        0x1000,
+        24,
+        starts,
+        ends,
+        sorted_idx,
+    )
+    assert err == GGUF_TDBASE_ERR_BAD_ALIGNMENT
+    assert tensor_index == 0
+    assert abs_start == 0
+    assert abs_end == 0
+
+
+def test_tensor_lookup_by_rel_offset_propagates_miss() -> None:
+    starts = [0x1000, 0x1080]
+    ends = [0x1020, 0x10A0]
+    sorted_idx = [0, 1]
+
+    err, tensor_index, abs_start, abs_end = tensor_lookup_by_rel_offset(
+        0x40,
+        0x1000,
+        32,
+        starts,
+        ends,
+        sorted_idx,
+    )
+    assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert tensor_index == 0
+    assert abs_start == 0
+    assert abs_end == 0
+
+
+def test_tensor_lookup_by_rel_offset_rejects_sorted_index_out_of_bounds() -> None:
+    starts = [0x1000, 0x1040]
+    ends = [0x1020, 0x1060]
+    sorted_idx = [0, 9]
+
+    err, tensor_index, abs_start, abs_end = tensor_lookup_by_rel_offset(
+        0x40,
+        0x1000,
+        32,
+        starts,
+        ends,
+        sorted_idx,
+    )
+    assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert tensor_index == 0
+    assert abs_start == 0
+    assert abs_end == 0
+
+
+def test_tensor_lookup_by_rel_offset_rejects_bad_end_before_start() -> None:
+    starts = [0x1000]
+    ends = [0x0FFF]
+    sorted_idx = [0]
+
+    err, tensor_index, abs_start, abs_end = tensor_lookup_by_rel_offset(
+        0x00,
+        0x1000,
+        32,
+        starts,
+        ends,
+        sorted_idx,
+    )
+    assert err == GGUF_TDBASE_ERR_OVERFLOW
+    assert tensor_index == 0
+    assert abs_start == 0
+    assert abs_end == 0
+
+
+def test_tensor_lookup_by_rel_offset_with_built_offset_index() -> None:
+    rel_offsets = [0xC0, 0x00, 0x40, 0x100]
+    elem_counts = [32, 64, 32, 128]
+    ggml_types = [GGML_TYPE_Q8_0, GGML_TYPE_Q4_0, GGML_TYPE_F16, GGML_TYPE_F32]
+    starts = [0, 0, 0, 0]
+    ends = [0, 0, 0, 0]
+    sorted_idx = [0, 0, 0, 0]
+
+    err, bad = tensor_info_build_offset_index(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x4000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_element_counts=elem_counts,
+        tensor_ggml_types=ggml_types,
+        out_abs_starts=starts,
+        out_abs_ends=ends,
+        out_sorted_tensor_indices=sorted_idx,
+    )
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+    for original_idx in range(len(rel_offsets)):
+        err, tensor_index, abs_start, abs_end = tensor_lookup_by_rel_offset(
+            tensor_rel_offset=rel_offsets[original_idx],
+            tensor_data_base=0x1000,
+            alignment=32,
+            tensor_abs_starts=starts,
+            tensor_abs_ends=ends,
+            sorted_tensor_indices=sorted_idx,
+        )
+        assert err == GGUF_TDBASE_OK
+        assert tensor_index == original_idx
         assert abs_start == 0x1000 + rel_offsets[original_idx]
         err_n, nbytes = tensor_bytes_for_type(ggml_types[original_idx], elem_counts[original_idx])
         assert err_n == GGUF_TDBASE_OK
