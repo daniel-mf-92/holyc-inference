@@ -2101,3 +2101,34 @@ I64 GGUFTensorLookupSpanByIndexAndRelRange(U64 tensor_index,
                                                   out_span_start_in_tensor,
                                                   out_span_end_in_tensor);
 }
+
+I64 GGUFTensorLookupSpanByIndexAndRelRangeDefault(U64 tensor_index,
+                                                  U64 span_rel_start,
+                                                  U64 span_rel_end,
+                                                  U64 tensor_data_base,
+                                                  U64 tensor_count,
+                                                  U64 *tensor_abs_starts,
+                                                  U64 *tensor_abs_ends,
+                                                  U64 *sorted_position_by_tensor,
+                                                  U64 *out_tensor_abs_start,
+                                                  U64 *out_tensor_abs_end,
+                                                  U64 *out_span_start_in_tensor,
+                                                  U64 *out_span_end_in_tensor)
+{
+    // Metadata-absent GGUF readers use `general.alignment = 32` by default.
+    // Keep default wrapper behavior identical to checked core helper so
+    // range translation, containment checks, and span math stay centralized.
+    return GGUFTensorLookupSpanByIndexAndRelRange(tensor_index,
+                                                  span_rel_start,
+                                                  span_rel_end,
+                                                  tensor_data_base,
+                                                  GGUF_DEFAULT_ALIGNMENT,
+                                                  tensor_count,
+                                                  tensor_abs_starts,
+                                                  tensor_abs_ends,
+                                                  sorted_position_by_tensor,
+                                                  out_tensor_abs_start,
+                                                  out_tensor_abs_end,
+                                                  out_span_start_in_tensor,
+                                                  out_span_end_in_tensor);
+}
