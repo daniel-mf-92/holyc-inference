@@ -223,6 +223,38 @@ I32 Q8_0DotRowBlocksQ16(Q8_0Block *row_blocks, Q8_0Block *vec_blocks, I64 block_
     return Q8_0_OK;
 }
 
+I32 Q8_0DotRowsQ16MatrixVector(Q8_0Block *matrix_blocks, I64 row_count, I64 row_stride_blocks, Q8_0Block *vec_blocks, I64 vec_block_count, I64 *out_rows_q16)
+{
+    I64 row_index;
+    I64 row_dot_q16;
+    Q8_0Block *row_ptr;
+    I32 status;
+
+    if (!matrix_blocks || !vec_blocks || !out_rows_q16)
+        return Q8_0_ERR_NULL_PTR;
+    if (row_count < 0 || row_stride_blocks < 0 || vec_block_count < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    // Each row begins at:
+    //   matrix_blocks + row_index * row_stride_blocks
+    // and consumes vec_block_count contiguous blocks.
+    // Require stride >= active vector span so row windows are valid and auditable.
+    if (row_count > 0 && row_stride_blocks < vec_block_count)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    for (row_index = 0; row_index < row_count; ++row_index)
+    {
+        row_ptr = &matrix_blocks[row_index * row_stride_blocks];
+        status = Q8_0DotRowBlocksQ16(row_ptr, vec_blocks, vec_block_count, &row_dot_q16);
+        if (status != Q8_0_OK)
+            return status;
+
+        out_rows_q16[row_index] = row_dot_q16;
+    }
+
+    return Q8_0_OK;
+}
+
 I64 Q8_0DotQ32ToQ16(I64 dot_q32)
 {
     return Q8_0RoundShiftRightSigned(dot_q32, 16);

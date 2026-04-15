@@ -274,13 +274,14 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-085 Implement HolyC `Q4_0Q8_0DotProductBlocksQ32` in `src/quant/q4_0_q8_0_dot.HC` with widened I64 accumulator and Q16 output rounding for mixed-kernel WS4 matmul callers (WS4-01)
 - [x] IQ-086 Implement HolyC `Q4_0Q8_0DotProductBlocksQ32ToQ16` row-helper integration tests in `src/quant/q4_0_q8_0_dot.HC` + `tests/test_q4_0_q8_0_dot_kernel.py` for single-rounding-vs-blockwise invariants (WS4-01)
 - [x] IQ-087 Implement HolyC `Q8_0DotRowBlocksQ16` in `src/quant/q8_0_dot.HC` with parity/semantic tests in `tests/test_q8_0_dot.py` (blockwise rounding lane contract for WS4 matmul row kernels) (WS4-01)
-- [ ] IQ-088 Implement HolyC `Q8_0DotRowsQ16MatrixVector` in `src/quant/q8_0_dot.HC` for contiguous row-block matrix×vector kernels with explicit `row_stride_blocks` (WS4-02)
+- [x] IQ-088 Implement HolyC `Q8_0DotRowsQ16MatrixVector` in `src/quant/q8_0_dot.HC` for contiguous row-block matrix×vector kernels with explicit `row_stride_blocks` (WS4-02)
 - [ ] IQ-089 Add host-side parity harness `tests/test_q8_0_dot_matrix_vector.py` for `Q8_0DotRowsQ16MatrixVector` covering stride, sign, and per-row rounding semantics (WS4-02)
 - [ ] IQ-090 Implement HolyC `Q8_0DotProductBlocksQ32Checked` in `src/quant/q8_0_dot.HC` with overflow-safe accumulation and parity/adversarial tests for hostile block streams (WS4-01)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
+| 2026-04-15 | loop-069 | IQ-088 Q8_0 matrix×vector row kernel | done | Added `Q8_0DotRowsQ16MatrixVector` in `src/quant/q8_0_dot.HC` with explicit `row_stride_blocks` validation and row-wise Q16 outputs; `python3 tests/test_q8_0_dot.py` passed |
 | 2026-04-15 | loop-066 | IQ-085 mixed Q4_0xQ8_0 Q32->Q16 matmul helper | done | Added canonical `Q4_0Q8_0DotProductBlocksQ32` + `Q4_0Q8_0DotProductBlocksQ32ToQ16` in `src/quant/q4_0_q8_0_dot.HC` (I64 checked accumulation) and parity coverage in `tests/test_q4_0_q8_0_dot_kernel.py`; `python3 tests/test_q4_0_q8_0_dot_kernel.py && python3 tests/test_q4_0_dot.py && python3 tests/test_q8_0_dot.py` passed |
 | 2026-04-15 | loop-067 | IQ-086 mixed Q4_0xQ8_0 row-helper integration | done | Added `Q4_0Q8_0DotRowBlocksQ16`/`Q4_0_Q8_0DotRowBlocksQ16` in `src/quant/q4_0_q8_0_dot.HC` and new row semantic parity checks in `tests/test_q4_0_q8_0_dot_kernel.py`; `python3 tests/test_q4_0_q8_0_dot_kernel.py && python3 tests/test_q4_0_dot.py && python3 tests/test_q8_0_dot.py` passed |
 | 2026-04-15 | loop-065 | IQ-084 Q4_0 Q32->Q16 matmul helper | done | Added `Q4_0DotProductBlocksQ32ToQ16` in `src/quant/q4_0_dot.HC` + parity cases in `tests/test_q4_0_dot.py`; `python3 tests/test_q4_0_dot.py && python3 tests/test_q4_0_q8_0_dot_kernel.py && python3 tests/test_q8_0_dot.py` passed |

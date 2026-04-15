@@ -1,0 +1,17 @@
+Completed — I ran one full unattended iteration and progressed exactly `IQ-088`.
+
+**What Changed**
+- Implemented `Q8_0DotRowsQ16MatrixVector` with explicit `row_stride_blocks` validation and per-row Q16 outputs in `src/quant/q8_0_dot.HC:226`.
+- Added host-side matrix×vector row semantics/parity checks (stride behavior + reject bad stride) in `tests/test_q8_0_dot.py:137` and `tests/test_q8_0_dot.py:392`.
+- Marked `IQ-088` done and added one progress ledger line in `MASTER_TASKS.md:277` and `MASTER_TASKS.md:284`.
+
+**Queue Policy**
+- Unchecked queue depth is maintained at `16` (>=15), so no queue top-up was required this iteration.
+
+**Validation**
+- Ran: `python3 tests/test_q8_0_dot.py`
+- Output: `q8_0_dot_reference_checks=ok`
+
+**Central DB Log**
+- Inserted iteration row into `~/Documents/local-codebases/temple-central.db` for `IQ-088`.
+- Verified latest row: `inference|IQ-088|pass|ok`.

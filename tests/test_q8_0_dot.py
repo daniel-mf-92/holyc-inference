@@ -134,6 +134,34 @@ def dot_row_blocks_q16(
     return dot_product_blocks_q16_accumulate(lhs_blocks, rhs_blocks, 0)
 
 
+def dot_rows_q16_matrix_vector(
+    matrix_blocks: list[tuple[int, bytes]],
+    row_count: int,
+    row_stride_blocks: int,
+    vec_blocks: list[tuple[int, bytes]],
+    vec_block_count: int,
+) -> tuple[int, list[int]]:
+    if row_count < 0 or row_stride_blocks < 0 or vec_block_count < 0:
+        return Q8_0_ERR_BAD_DST_LEN, []
+    if row_count > 0 and row_stride_blocks < vec_block_count:
+        return Q8_0_ERR_BAD_DST_LEN, []
+
+    out_rows_q16 = [0] * row_count
+    for row_index in range(row_count):
+        row_base = row_index * row_stride_blocks
+        row_slice = matrix_blocks[row_base : row_base + vec_block_count]
+        if len(row_slice) != vec_block_count:
+            return Q8_0_ERR_BAD_DST_LEN, []
+
+        err, row_dot_q16 = dot_row_blocks_q16(row_slice, vec_blocks[:vec_block_count])
+        if err != Q8_0_OK:
+            return err, []
+
+        out_rows_q16[row_index] = row_dot_q16
+
+    return Q8_0_OK, out_rows_q16
+
+
 def dot_product_blocks_q32_to_q16(
     lhs_blocks: list[tuple[int, bytes]],
     rhs_blocks: list[tuple[int, bytes]],
@@ -361,6 +389,54 @@ def test_q32_to_q16_length_mismatch_error() -> None:
     assert err == Q8_0_ERR_BAD_DST_LEN
 
 
+def test_matrix_vector_rows_stride_and_values() -> None:
+    row_count = 3
+    vec_block_count = 2
+    row_stride_blocks = 3
+
+    vec_blocks = [
+        (half_bits(1.0), pack_signed([1] * Q8_0_VALUES_PER_BLOCK)),
+        (half_bits(-0.5), pack_signed([2] * Q8_0_VALUES_PER_BLOCK)),
+    ]
+
+    matrix_blocks: list[tuple[int, bytes]] = []
+    expected_rows: list[int] = []
+    for row_index in range(row_count):
+        active_blocks: list[tuple[int, bytes]] = []
+        for block_index in range(vec_block_count):
+            scale = half_bits(1.0 + 0.25 * (row_index + block_index))
+            q = (row_index + 1) * (block_index + 1)
+            packed = pack_signed([q] * Q8_0_VALUES_PER_BLOCK)
+            block = (scale, packed)
+            matrix_blocks.append(block)
+            active_blocks.append(block)
+
+        # Padding block that must never affect row result.
+        matrix_blocks.append((half_bits(2.0), pack_signed([127] * Q8_0_VALUES_PER_BLOCK)))
+
+        err, expected_q16 = dot_row_blocks_q16(active_blocks, vec_blocks)
+        assert err == Q8_0_OK
+        expected_rows.append(expected_q16)
+
+    err, got_rows = dot_rows_q16_matrix_vector(
+        matrix_blocks,
+        row_count,
+        row_stride_blocks,
+        vec_blocks,
+        vec_block_count,
+    )
+    assert err == Q8_0_OK
+    assert got_rows == expected_rows
+
+
+def test_matrix_vector_rejects_stride_smaller_than_vector_span() -> None:
+    matrix_blocks = [(half_bits(1.0), pack_signed([1] * Q8_0_VALUES_PER_BLOCK))]
+    vec_blocks = [(half_bits(1.0), pack_signed([1] * Q8_0_VALUES_PER_BLOCK))]
+
+    err, _ = dot_rows_q16_matrix_vector(matrix_blocks, 1, 0, vec_blocks, 1)
+    assert err == Q8_0_ERR_BAD_DST_LEN
+
+
 def run() -> None:
     test_identity_block()
     test_negative_scale_sign()
@@ -374,6 +450,8 @@ def run() -> None:
     test_row_blocks_q16_bad_length_error()
     test_q32_to_q16_single_rounding_matches_total_q32_rounding()
     test_q32_to_q16_length_mismatch_error()
+    test_matrix_vector_rows_stride_and_values()
+    test_matrix_vector_rejects_stride_smaller_than_vector_span()
     print("q8_0_dot_reference_checks=ok")
 
 
