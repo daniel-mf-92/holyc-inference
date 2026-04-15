@@ -1295,3 +1295,22 @@ I64 GGUFTensorIndexToAbsRange(U64 tensor_index,
     *out_abs_end = abs_end;
     return GGUF_TDBASE_OK;
 }
+
+I64 GGUFTensorRangeFindByIndex(U64 tensor_index,
+                               U64 tensor_count,
+                               U64 *tensor_abs_starts,
+                               U64 *tensor_abs_ends,
+                               U64 *sorted_position_by_tensor,
+                               U64 *out_abs_start,
+                               U64 *out_abs_end)
+{
+    // Public helper alias for index->range resolution. Keep one canonical
+    // implementation path so validation/overflow checks stay identical.
+    return GGUFTensorIndexToAbsRange(tensor_index,
+                                     tensor_count,
+                                     tensor_abs_starts,
+                                     tensor_abs_ends,
+                                     sorted_position_by_tensor,
+                                     out_abs_start,
+                                     out_abs_end);
+}

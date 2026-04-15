@@ -659,6 +659,20 @@ def tensor_index_to_abs_range(
     return GGUF_TDBASE_OK, abs_start, abs_end
 
 
+def tensor_range_find_by_index(
+    tensor_index: int,
+    tensor_abs_starts: list[int],
+    tensor_abs_ends: list[int],
+    sorted_position_by_tensor: list[int],
+):
+    return tensor_index_to_abs_range(
+        tensor_index=tensor_index,
+        tensor_abs_starts=tensor_abs_starts,
+        tensor_abs_ends=tensor_abs_ends,
+        sorted_position_by_tensor=sorted_position_by_tensor,
+    )
+
+
 def _abs_range_greater(
     starts: list[int],
     ends: list[int],
@@ -2304,6 +2318,86 @@ def test_tensor_index_to_abs_range_with_built_offset_index() -> None:
         assert abs_end == ends[sorted_pos]
 
 
+def test_tensor_range_find_by_index_matches_tensor_index_to_abs_range() -> None:
+    starts = [0x1200, 0x1400, 0x1500, 0x1700]
+    ends = [0x1280, 0x1480, 0x1680, 0x17C0]
+    sorted_idx = [2, 0, 3, 1]
+    inverse_map = [0, 0, 0, 0]
+
+    err, bad = build_tensor_sorted_position_map(sorted_idx, inverse_map)
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+    for tensor_index in range(4):
+        err_a, start_a, end_a = tensor_index_to_abs_range(
+            tensor_index,
+            starts,
+            ends,
+            inverse_map,
+        )
+        err_b, start_b, end_b = tensor_range_find_by_index(
+            tensor_index,
+            starts,
+            ends,
+            inverse_map,
+        )
+        assert err_b == err_a
+        assert start_b == start_a
+        assert end_b == end_a
+
+
+def test_tensor_range_find_by_index_propagates_bounds_error() -> None:
+    starts = [0x1000, 0x1100, 0x1300]
+    ends = [0x1080, 0x1180, 0x1380]
+    inverse_map = [1, 2, 0]
+
+    err, abs_start, abs_end = tensor_range_find_by_index(3, starts, ends, inverse_map)
+    assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert abs_start == 0
+    assert abs_end == 0
+
+
+def test_tensor_range_find_by_index_with_built_offset_index() -> None:
+    rel_offsets = [0xC0, 0x00, 0x40, 0x100]
+    elem_counts = [32, 64, 32, 128]
+    ggml_types = [GGML_TYPE_Q8_0, GGML_TYPE_Q4_0, GGML_TYPE_F16, GGML_TYPE_F32]
+    starts = [0, 0, 0, 0]
+    ends = [0, 0, 0, 0]
+    sorted_idx = [0, 0, 0, 0]
+    inverse_map = [0, 0, 0, 0]
+
+    err, bad = tensor_info_build_offset_index(
+        tensor_data_base=0x1000,
+        alignment=32,
+        gguf_file_nbytes=0x4000,
+        tensor_rel_offsets=rel_offsets,
+        tensor_element_counts=elem_counts,
+        tensor_ggml_types=ggml_types,
+        out_abs_starts=starts,
+        out_abs_ends=ends,
+        out_sorted_tensor_indices=sorted_idx,
+    )
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+    err, bad = build_tensor_sorted_position_map(sorted_idx, inverse_map)
+    assert err == GGUF_TDBASE_OK
+    assert bad == 0
+
+    for original_idx in range(len(rel_offsets)):
+        err, abs_start, abs_end = tensor_range_find_by_index(
+            original_idx,
+            starts,
+            ends,
+            inverse_map,
+        )
+        assert err == GGUF_TDBASE_OK
+        assert abs_start == 0x1000 + rel_offsets[original_idx]
+        err_n, nbytes = tensor_bytes_for_type(ggml_types[original_idx], elem_counts[original_idx])
+        assert err_n == GGUF_TDBASE_OK
+        assert abs_end == abs_start + nbytes
+
+
 def test_inverse_map_and_range_index_random_permutation_parity() -> None:
     rng = random.Random(764311)
 
@@ -2587,6 +2681,9 @@ def run() -> None:
     test_tensor_index_to_abs_range_rejects_bad_inverse_map_slot()
     test_tensor_index_to_abs_range_rejects_malformed_range()
     test_tensor_index_to_abs_range_with_built_offset_index()
+    test_tensor_range_find_by_index_matches_tensor_index_to_abs_range()
+    test_tensor_range_find_by_index_propagates_bounds_error()
+    test_tensor_range_find_by_index_with_built_offset_index()
     test_inverse_map_and_range_index_random_permutation_parity()
     test_inverse_map_and_range_index_random_adversarial_cases()
     print("gguf_tensor_data_base_reference_checks=ok")
