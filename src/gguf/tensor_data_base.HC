@@ -2133,23 +2133,22 @@ I64 GGUFTensorLookupSpanByIndexAndRelRangeDefault(U64 tensor_index,
                                                   out_span_end_in_tensor);
 }
 
-I64 GGUFTensorInfoLoadPayloadWindowByIndexRelDefault(U64 tensor_index,
-                                                     U64 payload_rel_start,
-                                                     U64 payload_rel_end,
-                                                     U64 tensor_data_base,
-                                                     U64 tensor_count,
-                                                     U64 *tensor_abs_starts,
-                                                     U64 *tensor_abs_ends,
-                                                     U64 *sorted_position_by_tensor,
-                                                     U64 *out_abs_start,
-                                                     U64 *out_abs_end,
-                                                     U64 *out_span_start_in_tensor,
-                                                     U64 *out_span_end_in_tensor)
+I64 GGUFTensorInfoLoadPayloadWindowByIndexRel(U64 tensor_index,
+                                              U64 payload_rel_start,
+                                              U64 payload_rel_end,
+                                              U64 tensor_data_base,
+                                              U32 alignment,
+                                              U64 tensor_count,
+                                              U64 *tensor_abs_starts,
+                                              U64 *tensor_abs_ends,
+                                              U64 *sorted_position_by_tensor,
+                                              U64 *out_abs_start,
+                                              U64 *out_abs_end,
+                                              U64 *out_span_start_in_tensor,
+                                              U64 *out_span_end_in_tensor)
 {
     U64 payload_abs_start;
     U64 payload_abs_end;
-    U64 tensor_abs_start;
-    U64 tensor_abs_end;
     I64 err;
 
     if (!out_abs_start || !out_abs_end ||
@@ -2162,9 +2161,14 @@ I64 GGUFTensorInfoLoadPayloadWindowByIndexRelDefault(U64 tensor_index,
     *out_span_start_in_tensor = 0;
     *out_span_end_in_tensor = 0;
 
-    // Maintain GGUF default-alignment discipline for the tensor-data base
-    // itself, while allowing byte-granular windows inside tensor payloads.
-    if (!GGUFTensorDataBaseIsAligned(tensor_data_base, GGUF_DEFAULT_ALIGNMENT))
+    // Honor caller-provided GGUF alignment (usually metadata key
+    // `general.alignment`) for the tensor-data base pointer itself, while
+    // still allowing byte-granular payload windows inside tensor ranges.
+    err = GGUFValidateAlignment(alignment);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    if (!GGUFTensorDataBaseIsAligned(tensor_data_base, alignment))
         return GGUF_TDBASE_ERR_MISALIGNED_BASE;
 
     if (payload_rel_end < payload_rel_start)
@@ -2178,28 +2182,47 @@ I64 GGUFTensorInfoLoadPayloadWindowByIndexRelDefault(U64 tensor_index,
         return GGUF_TDBASE_ERR_OVERFLOW;
     payload_abs_end = tensor_data_base + payload_rel_end;
 
-    // Validate that the caller-chosen tensor index owns the full absolute
-    // payload window and compute in-tensor span offsets.
-    err = GGUFTensorLookupSpanByIndexAndAbsRange(tensor_index,
-                                                 payload_abs_start,
-                                                 payload_abs_end,
-                                                 tensor_count,
-                                                 tensor_abs_starts,
-                                                 tensor_abs_ends,
-                                                 sorted_position_by_tensor,
-                                                 &tensor_abs_start,
-                                                 &tensor_abs_end,
-                                                 out_span_start_in_tensor,
-                                                 out_span_end_in_tensor);
-    if (err != GGUF_TDBASE_OK)
-        return err;
+    // Reuse absolute-window validator to keep span containment/in-tensor math
+    // centralized in one checked helper.
+    return GGUFTensorInfoLoadPayloadWindowByIndexAbs(tensor_index,
+                                                     payload_abs_start,
+                                                     payload_abs_end,
+                                                     tensor_count,
+                                                     tensor_abs_starts,
+                                                     tensor_abs_ends,
+                                                     sorted_position_by_tensor,
+                                                     out_abs_start,
+                                                     out_abs_end,
+                                                     out_span_start_in_tensor,
+                                                     out_span_end_in_tensor);
+}
 
-    // Report the caller window `[abs_start, abs_end)` so direct file-pointer
-    // readers can seek and read immediately after this validation call.
-    *out_abs_start = payload_abs_start;
-    *out_abs_end = payload_abs_end;
-
-    return GGUF_TDBASE_OK;
+I64 GGUFTensorInfoLoadPayloadWindowByIndexRelDefault(U64 tensor_index,
+                                                     U64 payload_rel_start,
+                                                     U64 payload_rel_end,
+                                                     U64 tensor_data_base,
+                                                     U64 tensor_count,
+                                                     U64 *tensor_abs_starts,
+                                                     U64 *tensor_abs_ends,
+                                                     U64 *sorted_position_by_tensor,
+                                                     U64 *out_abs_start,
+                                                     U64 *out_abs_end,
+                                                     U64 *out_span_start_in_tensor,
+                                                     U64 *out_span_end_in_tensor)
+{
+    return GGUFTensorInfoLoadPayloadWindowByIndexRel(tensor_index,
+                                                     payload_rel_start,
+                                                     payload_rel_end,
+                                                     tensor_data_base,
+                                                     GGUF_DEFAULT_ALIGNMENT,
+                                                     tensor_count,
+                                                     tensor_abs_starts,
+                                                     tensor_abs_ends,
+                                                     sorted_position_by_tensor,
+                                                     out_abs_start,
+                                                     out_abs_end,
+                                                     out_span_start_in_tensor,
+                                                     out_span_end_in_tensor);
 }
 
 I64 GGUFTensorInfoLoadPayloadWindowByIndexAbs(U64 tensor_index,
