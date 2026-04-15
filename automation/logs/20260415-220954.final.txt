@@ -1,0 +1,17 @@
+Done — I completed one full iteration on `IQ-085` and kept the queue rolling.
+
+**What Changed**
+- Implemented canonical mixed-kernel Q32 path in `src/quant/q4_0_q8_0_dot.HC:170` with `Q4_0Q8_0DotProductBlocksQ32(...)`.
+- Added explicit I64 checked accumulation (`Q4_0Q8_0TryAddI64`) and overflow codepath in `src/quant/q4_0_q8_0_dot.HC:118`.
+- Added Q32→Q16 single-round handoff helper `Q4_0Q8_0DotProductBlocksQ32ToQ16(...)` in `src/quant/q4_0_q8_0_dot.HC:200`.
+- Extended parity coverage for this contract in `tests/test_q4_0_q8_0_dot_kernel.py:254` and `tests/test_q4_0_q8_0_dot_kernel.py:272`.
+
+**Task/Queue/Ledger**
+- Marked `IQ-085` done and appended one new unchecked item `IQ-086` to keep monotonic IDs and queue depth policy in `MASTER_TASKS.md:274` and `MASTER_TASKS.md:275`.
+- Added one-line progress ledger entry for this loop in `MASTER_TASKS.md:280`.
+- Unchecked `IQ-` count is maintained at `15`.
+
+**Validation + DB**
+- Ran: `python3 tests/test_q4_0_q8_0_dot_kernel.py && python3 tests/test_q4_0_dot.py && python3 tests/test_q8_0_dot.py`
+- Output: `q4_0_q8_0_dot_kernel_reference_checks=ok`, `q4_0_dot_reference_checks=ok`, `q8_0_dot_reference_checks=ok`.
+- Logged iteration to central DB: row `id=979`, `agent=inference`, `task_id=IQ-085`, `status=pass`.

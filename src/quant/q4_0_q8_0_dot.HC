@@ -21,6 +21,9 @@
 #define Q4_0_Q8_0_OK               0
 #define Q4_0_Q8_0_ERR_NULL_PTR     1
 #define Q4_0_Q8_0_ERR_BAD_DST_LEN  2
+#define Q4_0_Q8_0_ERR_OVERFLOW     3
+#define Q4_0_Q8_0_I64_MAX          0x7FFFFFFFFFFFFFFF
+#define Q4_0_Q8_0_I64_MIN          (-0x7FFFFFFFFFFFFFFF - 1)
 
 class Q4_0Block
 {
@@ -112,6 +115,20 @@ I64 Q4_0_Q8_0NibbleToSigned(U8 packed, Bool upper_nibble)
     return q_unsigned - 8;
 }
 
+Bool Q4_0Q8_0TryAddI64(I64 lhs, I64 rhs, I64 *out_sum)
+{
+    if (!out_sum)
+        return FALSE;
+
+    if (rhs > 0 && lhs > Q4_0_Q8_0_I64_MAX - rhs)
+        return FALSE;
+    if (rhs < 0 && lhs < Q4_0_Q8_0_I64_MIN - rhs)
+        return FALSE;
+
+    *out_sum = lhs + rhs;
+    return TRUE;
+}
+
 I32 Q4_0_Q8_0DotProductBlockQ32(Q4_0Block *lhs_q4, Q8_0Block *rhs_q8, I64 *out_dot_q32)
 {
     I64 lhs_scale_q16;
@@ -143,7 +160,14 @@ I32 Q4_0_Q8_0DotProductBlockQ32(Q4_0Block *lhs_q4, Q8_0Block *rhs_q8, I64 *out_d
     return Q4_0_Q8_0_OK;
 }
 
+I32 Q4_0Q8_0DotProductBlocksQ32(Q4_0Block *lhs_q4, Q8_0Block *rhs_q8, I64 block_count, I64 *out_dot_q32);
+
 I32 Q4_0_Q8_0DotProductBlocksQ32(Q4_0Block *lhs_q4, Q8_0Block *rhs_q8, I64 block_count, I64 *out_dot_q32)
+{
+    return Q4_0Q8_0DotProductBlocksQ32(lhs_q4, rhs_q8, block_count, out_dot_q32);
+}
+
+I32 Q4_0Q8_0DotProductBlocksQ32(Q4_0Block *lhs_q4, Q8_0Block *rhs_q8, I64 block_count, I64 *out_dot_q32)
 {
     I64 block_index;
     I64 block_dot_q32;
@@ -162,10 +186,34 @@ I32 Q4_0_Q8_0DotProductBlocksQ32(Q4_0Block *lhs_q4, Q8_0Block *rhs_q8, I64 block
         if (status != Q4_0_Q8_0_OK)
             return status;
 
-        total_dot_q32 += block_dot_q32;
+        // Keep the widened Q32 accumulation explicit and checked.
+        // For realistic LLaMA dimensions this stays far inside I64,
+        // but we still hard-fail if a hostile input tries to overflow.
+        if (!Q4_0Q8_0TryAddI64(total_dot_q32, block_dot_q32, &total_dot_q32))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
     }
 
     *out_dot_q32 = total_dot_q32;
+    return Q4_0_Q8_0_OK;
+}
+
+I32 Q4_0Q8_0DotProductBlocksQ32ToQ16(Q4_0Block *lhs_q4, Q8_0Block *rhs_q8, I64 block_count, I64 *out_dot_q16)
+{
+    I64 total_dot_q32;
+    I32 status;
+
+    if (!lhs_q4 || !rhs_q8 || !out_dot_q16)
+        return Q4_0_Q8_0_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    // Mixed-kernel WS4 matmul callers can keep the full dot in I64 Q32,
+    // then round once when handing the lane back to Q16 accumulation.
+    status = Q4_0Q8_0DotProductBlocksQ32(lhs_q4, rhs_q8, block_count, &total_dot_q32);
+    if (status != Q4_0_Q8_0_OK)
+        return status;
+
+    *out_dot_q16 = Q4_0_Q8_0DotQ32ToQ16(total_dot_q32);
     return Q4_0_Q8_0_OK;
 }
 

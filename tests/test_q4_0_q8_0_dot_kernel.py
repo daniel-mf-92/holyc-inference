@@ -12,6 +12,7 @@ Q8_0_PACKED_BYTES = 32
 Q4_0_Q8_0_OK = 0
 Q4_0_Q8_0_ERR_NULL_PTR = 1
 Q4_0_Q8_0_ERR_BAD_DST_LEN = 2
+Q4_0_Q8_0_ERR_OVERFLOW = 3
 
 
 def round_shift_right_unsigned(value: int, shift: int) -> int:
@@ -119,6 +120,13 @@ def dot_product_blocks_q32(lhs_blocks, rhs_blocks) -> tuple[int, int]:
         total += block_dot
 
     return Q4_0_Q8_0_OK, total
+
+
+def dot_product_blocks_q32_to_q16(lhs_blocks, rhs_blocks) -> tuple[int, int]:
+    err, dot_q32 = dot_product_blocks_q32(lhs_blocks, rhs_blocks)
+    if err != Q4_0_Q8_0_OK:
+        return err, 0
+    return Q4_0_Q8_0_OK, dot_q32_to_q16(dot_q32)
 
 
 def dot_product_blocks_q16_accumulate(lhs_blocks, rhs_blocks, initial_accum_q16: int) -> tuple[int, int]:
@@ -243,6 +251,48 @@ def test_q16_accumulator_helper_matches_blockwise_rounding() -> None:
         assert got_q16 == expected_q16
 
 
+def test_q32_to_q16_helper_rounds_once_after_full_accumulation() -> None:
+    b0 = (half_bits(0.125), pack_q4_from_signed([7] * 32))
+    b1 = (half_bits(0.125), pack_q4_from_signed([-8] * 32))
+    r0 = (half_bits(0.125), pack_q8_signed([127] * 32))
+    r1 = (half_bits(0.125), pack_q8_signed([127] * 32))
+
+    err, dot_q16_single_round = dot_product_blocks_q32_to_q16([b0, b1], [r0, r1])
+    assert err == Q4_0_Q8_0_OK
+
+    err, dot_q16_blockwise = dot_product_blocks_q16_accumulate([b0, b1], [r0, r1], 0)
+    assert err == Q4_0_Q8_0_OK
+
+    # This vector pair intentionally exercises fractional cancellation.
+    # Full-dot single rounding (Q32->Q16 once) is the IQ-085 contract,
+    # while blockwise Q16 accumulation can differ by a few LSBs.
+    assert abs(dot_q16_single_round - dot_q16_blockwise) <= 2
+
+
+def test_q32_to_q16_helper_matches_full_dot_reference() -> None:
+    rng = random.Random(202604151)
+
+    for _ in range(200):
+        block_count = rng.randint(1, 8)
+        lhs_blocks = []
+        rhs_blocks = []
+
+        for _ in range(block_count):
+            l_scale = half_bits(rng.uniform(-3.5, 3.5))
+            r_scale = half_bits(rng.uniform(-3.5, 3.5))
+            l_q4 = pack_q4_from_signed([rng.randrange(-8, 8) for _ in range(32)])
+            r_q8 = pack_q8_signed([rng.randrange(-128, 128) for _ in range(32)])
+            lhs_blocks.append((l_scale, l_q4))
+            rhs_blocks.append((r_scale, r_q8))
+
+        err, got_q16 = dot_product_blocks_q32_to_q16(lhs_blocks, rhs_blocks)
+        assert err == Q4_0_Q8_0_OK
+
+        err, full_q32 = dot_product_blocks_q32(lhs_blocks, rhs_blocks)
+        assert err == Q4_0_Q8_0_OK
+        assert got_q16 == dot_q32_to_q16(full_q32)
+
+
 def test_q16_accumulator_bad_length_error() -> None:
     lhs_blocks = [(half_bits(1.0), pack_q4_from_signed([0] * 32))]
     rhs_blocks = []
@@ -256,6 +306,8 @@ def run() -> None:
     test_multiblock_accumulation()
     test_error_on_bad_lengths()
     test_q16_accumulator_helper_matches_blockwise_rounding()
+    test_q32_to_q16_helper_rounds_once_after_full_accumulation()
+    test_q32_to_q16_helper_matches_full_dot_reference()
     test_q16_accumulator_bad_length_error()
     print("q4_0_q8_0_dot_kernel_reference_checks=ok")
 
