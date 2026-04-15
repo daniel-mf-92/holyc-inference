@@ -1,0 +1,15 @@
+Completed full iteration for `IQ-087` end-to-end.
+
+**What Changed**
+- Implemented HolyC row helper `Q8_0DotRowBlocksQ16` with explicit per-block `Q32 -> Q16` rounding semantics in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/quant/q8_0_dot.HC:196`.
+- Added parity/reference row-path helpers + tests in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_q8_0_dot.py:130`, `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_q8_0_dot.py:275`, `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_q8_0_dot.py:303`, `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_q8_0_dot.py:326`.
+- Marked `IQ-087` done and added new unchecked queue items `IQ-088..IQ-090` to keep depth rolling in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:276` and `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:277`.
+- Appended one progress-ledger line for this iteration in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:371`.
+
+**Validation**
+- Ran: `python3 tests/test_q8_0_dot.py`
+- Output: `q8_0_dot_reference_checks=ok`
+
+**Central DB**
+- Logged iteration to `~/Documents/local-codebases/temple-central.db` as `task_id=IQ-087`, status `pass` (row id `999`).
+- Queue depth after update: `17` unchecked `IQ-` items (policy satisfied: `>=15`).

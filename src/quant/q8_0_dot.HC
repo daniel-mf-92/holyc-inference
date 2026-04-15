@@ -193,6 +193,36 @@ I32 Q8_0DotProductBlocksQ16Accumulate(Q8_0Block *lhs, Q8_0Block *rhs, I64 block_
     return Q8_0_OK;
 }
 
+I32 Q8_0DotRowBlocksQ16(Q8_0Block *row_blocks, Q8_0Block *vec_blocks, I64 block_count, I64 *out_dot_q16)
+{
+    I64 block_index;
+    I64 block_dot_q32;
+    I64 total_dot_q16;
+    I32 status;
+
+    if (!row_blocks || !vec_blocks || !out_dot_q16)
+        return Q8_0_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    // WS4 row kernels consume Q16 lanes.
+    // Keep block contributions visible and deterministic:
+    //   each block dot in Q32 -> rounded Q16 -> accumulated row total.
+    // This intentionally preserves per-block rounding semantics.
+    total_dot_q16 = 0;
+    for (block_index = 0; block_index < block_count; ++block_index)
+    {
+        status = Q8_0DotProductBlockQ32(&row_blocks[block_index], &vec_blocks[block_index], &block_dot_q32);
+        if (status != Q8_0_OK)
+            return status;
+
+        total_dot_q16 += Q8_0DotQ32ToQ16(block_dot_q32);
+    }
+
+    *out_dot_q16 = total_dot_q16;
+    return Q8_0_OK;
+}
+
 I64 Q8_0DotQ32ToQ16(I64 dot_q32)
 {
     return Q8_0RoundShiftRightSigned(dot_q32, 16);

@@ -127,6 +127,13 @@ def dot_product_blocks_q16_accumulate(
     return Q8_0_OK, total_q16
 
 
+def dot_row_blocks_q16(
+    lhs_blocks: list[tuple[int, bytes]],
+    rhs_blocks: list[tuple[int, bytes]],
+) -> tuple[int, int]:
+    return dot_product_blocks_q16_accumulate(lhs_blocks, rhs_blocks, 0)
+
+
 def dot_product_blocks_q32_to_q16(
     lhs_blocks: list[tuple[int, bytes]],
     rhs_blocks: list[tuple[int, bytes]],
@@ -265,6 +272,64 @@ def test_q16_accumulator_bad_length_error() -> None:
     assert err == Q8_0_ERR_BAD_DST_LEN
 
 
+def test_row_blocks_q16_matches_per_block_rounding() -> None:
+    rng = random.Random(321909)
+
+    for _ in range(250):
+        block_count = rng.randint(1, 8)
+        lhs_blocks: list[tuple[int, bytes]] = []
+        rhs_blocks: list[tuple[int, bytes]] = []
+
+        for _ in range(block_count):
+            lhs_scale = half_bits(rng.uniform(-2.5, 2.5))
+            rhs_scale = half_bits(rng.uniform(-2.5, 2.5))
+            lhs_qs = pack_signed([rng.randint(-128, 127) for _ in range(Q8_0_VALUES_PER_BLOCK)])
+            rhs_qs = pack_signed([rng.randint(-128, 127) for _ in range(Q8_0_VALUES_PER_BLOCK)])
+            lhs_blocks.append((lhs_scale, lhs_qs))
+            rhs_blocks.append((rhs_scale, rhs_qs))
+
+        err, got_row_q16 = dot_row_blocks_q16(lhs_blocks, rhs_blocks)
+        assert err == Q8_0_OK
+
+        expected_q16 = 0
+        for lhs_block, rhs_block in zip(lhs_blocks, rhs_blocks):
+            err, block_q32 = dot_product_block_q32(*lhs_block, *rhs_block)
+            assert err == Q8_0_OK
+            expected_q16 += dot_q32_to_q16(block_q32)
+
+        assert got_row_q16 == expected_q16
+
+
+def test_row_blocks_q16_distinct_from_round_at_end() -> None:
+    # Make each block contribute +0.5 Q16 units:
+    # q_dot_q0=1 and scale_q16=181 so (181*181)>>16 rounds to 0 per block,
+    # while summing two blocks before rounding gives 1.
+    scale_fp16 = half_bits(181.0 / 65536.0)
+    lhs_qs = pack_signed([1] + [0] * 31)
+    rhs_qs = pack_signed([1] + [0] * 31)
+
+    lhs_blocks = [(scale_fp16, lhs_qs), (scale_fp16, lhs_qs)]
+    rhs_blocks = [(scale_fp16, rhs_qs), (scale_fp16, rhs_qs)]
+
+    err, got_row_q16 = dot_row_blocks_q16(lhs_blocks, rhs_blocks)
+    assert err == Q8_0_OK
+
+    err, total_q32 = dot_product_blocks_q32(lhs_blocks, rhs_blocks)
+    assert err == Q8_0_OK
+    round_at_end_q16 = dot_q32_to_q16(total_q32)
+
+    assert got_row_q16 != round_at_end_q16
+    assert got_row_q16 == 0
+    assert round_at_end_q16 == 1
+
+
+def test_row_blocks_q16_bad_length_error() -> None:
+    lhs_blocks = [(half_bits(1.0), pack_signed([1] * Q8_0_VALUES_PER_BLOCK))]
+    rhs_blocks: list[tuple[int, bytes]] = []
+    err, _ = dot_row_blocks_q16(lhs_blocks, rhs_blocks)
+    assert err == Q8_0_ERR_BAD_DST_LEN
+
+
 def test_q32_to_q16_single_rounding_matches_total_q32_rounding() -> None:
     rng = random.Random(20260415)
 
@@ -304,6 +369,9 @@ def run() -> None:
     test_error_on_bad_input_length()
     test_q16_accumulator_helper_matches_blockwise_rounding()
     test_q16_accumulator_bad_length_error()
+    test_row_blocks_q16_matches_per_block_rounding()
+    test_row_blocks_q16_distinct_from_round_at_end()
+    test_row_blocks_q16_bad_length_error()
     test_q32_to_q16_single_rounding_matches_total_q32_rounding()
     test_q32_to_q16_length_mismatch_error()
     print("q8_0_dot_reference_checks=ok")
