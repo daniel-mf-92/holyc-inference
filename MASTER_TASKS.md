@@ -267,12 +267,16 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-078 Implement HolyC helper `FPQ16Log2` in `src/math/intlog.HC` via `FPQ16Ln` and fixed-point `1/ln(2)` scaling with overflow-safe rounding (WS1-02)
 - [x] IQ-079 Implement HolyC helper `FPQ16LnRatio` in `src/math/intlog.HC` for `ln(num/den)` with positive-domain validation and shared core range reduction (WS1-02)
 - [x] IQ-080 Implement HolyC helper `FPQ16EntropyFromProbs` in `src/math/softmax.HC` using `FPQ16Ln` to compute Shannon entropy diagnostics from Q16 probabilities (WS1-03)
-- [ ] IQ-081 Add host-side parity harness `tests/test_intlog_ratio_q16.py` covering `FPQ16Log2` + `FPQ16LnRatio` against `math.log2`/`math.log` bounds (WS1-05)
+- [x] IQ-081 Add host-side parity harness `tests/test_intlog_ratio_q16.py` covering `FPQ16Log2` + `FPQ16LnRatio` against `math.log2`/`math.log` bounds (WS1-05)
 - [x] IQ-082 Add host-side parity harness `tests/test_softmax_entropy_q16.py` validating Q16 entropy helper against float reference vectors and edge-case clamps (WS1-05)
+- [ ] IQ-083 Implement HolyC `Q8_0DotProductBlocksQ32` in `src/quant/q8_0_dot.HC` with widened I64 accumulator and Q16 output rounding for WS4 matmul callers (WS4-01)
+- [ ] IQ-084 Implement HolyC `Q4_0DotProductBlocksQ32` in `src/quant/q4_0_dot.HC` with widened I64 accumulator and Q16 output rounding for WS4 matmul callers (WS4-01)
+- [ ] IQ-085 Implement HolyC `Q4_0Q8_0DotProductBlocksQ32` in `src/quant/q4_0_q8_0_dot.HC` with widened I64 accumulator and Q16 output rounding for mixed-kernel WS4 matmul callers (WS4-01)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
+| 2026-04-15 | loop-064 | IQ-081 intlog ratio/log2 parity harness | done | Added `tests/test_intlog_ratio_q16.py` covering FPQ16Log2/FPQ16LnRatio domain floors, powers-of-two identities, reciprocal symmetry, ln/log2-delta consistency, and random float parity bounds; `python3 tests/test_intlog_ratio_q16.py && python3 tests/test_intlog_q16.py` passed |
 | 2026-04-15 | loop-063 | IQ-082 softmax entropy parity harness | done | Added `tests/test_softmax_entropy_q16.py` with Q16 entropy clamp/known-vector/random-simplex parity checks against float references; `python3 tests/test_softmax_entropy_q16.py` passed |
 | 2026-04-15 | loop-062 | IQ-079 FPQ16LnRatio helper | done | Added `FPQ16LnRatio` in `src/math/intlog.HC` with positive-domain checks + shared range-reduction polynomial path and parity coverage in `tests/test_intlog_q16.py`; `python3 tests/test_intlog_q16.py` passed |
 | 2026-04-15 | loop-061 | IQ-077 intlog Q16 core | done | Added `src/math/intlog.HC` (`FPQ16LnReduce`, `FPQ16Ln1pPoly`, `FPQ16Ln`) with integer-only domain clamps/range reduction/piecewise polynomial and added `tests/test_intlog_q16.py`; `python3 tests/test_intlog_q16.py` passed |
