@@ -292,11 +292,17 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-103 Implement HolyC AVX2 horizontal-sum helper `Q8_0HSumI32PairsAVX2` in `src/quant/q8_0_avx2.HC` (16 pairwise I32 products -> scalar I64) with explicit signed overflow checks for WS4 dot/matmul reductions (WS4-03)
 - [x] IQ-104 Implement HolyC AVX2 lane-dot helper `Q8_0DotI16LanesAVX2` in `src/quant/q8_0_avx2.HC` by composing pairwise multiply + checked horizontal reduction for fixed 32-lane inner loops (WS4-03)
 - [x] IQ-105 Add host-side parity/adversarial harness `tests/test_q8_0_avx2_dot_lanes.py` for `Q8_0MulI16LanesToI32PairsAVX2` + planned lane-dot reduction helpers (signed-edge vectors, lane-order invariants, overflow probes) (WS4-03)
-- [ ] IQ-106 Implement HolyC `Q8_0DotBlocksAVX2Q32Checked` in `src/quant/q8_0_avx2.HC` to compose lane-pack + lane-dot helpers across N Q8_0 blocks with explicit accumulator overflow guards (WS4-03)
+- [x] IQ-106 Implement HolyC `Q8_0DotBlocksAVX2Q32Checked` in `src/quant/q8_0_avx2.HC` to compose lane-pack + lane-dot helpers across N Q8_0 blocks with explicit accumulator overflow guards (WS4-03)
+- [ ] IQ-107 Add host-side parity harness `tests/test_q8_0_avx2_blocks_q32.py` for multi-block AVX2 Q32 dot composition (scale conversion, lane-dot parity, checked accumulation) (WS4-03)
+- [ ] IQ-108 Implement HolyC `Q8_0DotRowsAVX2Q32Checked` in `src/quant/q8_0_avx2.HC` for row-wise matrix×vector AVX2 block-dot accumulation with stride/capacity guards (WS4-03)
+- [ ] IQ-109 Implement HolyC `Q8_0MatMulQ32TiledAVX2Checked` in `src/matmul/q8_0_matmul.HC` using AVX2 block-dot inner loops and checked tile bounds (WS4-03)
+- [ ] IQ-110 Add host-side parity harness `tests/test_q8_0_matmul_tiled_avx2_q32.py` for AVX2 tiled Q32 matmul against scalar checked reference (WS4-03)
+- [ ] IQ-111 Implement HolyC `Q8_0DotBlocksAVX2Q32ToQ16Checked` in `src/quant/q8_0_avx2.HC` for single-rounding Q32->Q16 handoff used by Q16 row kernels (WS4-03)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
+| 2026-04-16 | loop-086 | IQ-106 AVX2 multi-block Q32 dot helper | done | Added `Q8_0DotBlocksAVX2Q32Checked` in `src/quant/q8_0_avx2.HC` with checked scale+block accumulation and added parity harness `tests/test_q8_0_avx2_blocks_q32.py`; `python3 tests/test_q8_0_avx2_blocks_q32.py && python3 tests/test_q8_0_avx2_dot_lanes.py && python3 tests/test_q8_0_dot.py` passed |
 | 2026-04-16 | loop-085 | IQ-105 AVX2 lane-dot adversarial parity harness | done | Expanded `tests/test_q8_0_avx2_dot_lanes.py` with pair-grouping composition checks (`mul_pairs`→`hsum` parity), lane-order mismatch sensitivity, and explicit reduction overflow probes; `python3 tests/test_q8_0_avx2_dot_lanes.py && python3 tests/test_q8_0_avx2_mul_pairs.py && python3 tests/test_q8_0_avx2_hsum_pairs.py` passed |
 | 2026-04-16 | loop-084 | IQ-104 AVX2 lane-dot helper | done | Added `Q8_0DotI16LanesAVX2` in `src/quant/q8_0_avx2.HC` with composed pairwise multiply + checked horizontal reduction; added parity harness `tests/test_q8_0_avx2_dot_lanes.py`; `python3 tests/test_q8_0_avx2_dot_lanes.py && python3 tests/test_q8_0_avx2_mul_pairs.py && python3 tests/test_q8_0_avx2_hsum_pairs.py && python3 tests/test_q8_0_dot.py` passed |
 | 2026-04-16 | loop-083 | IQ-103 AVX2 horizontal-sum helper | done | Added `Q8_0HSumI32PairsAVX2` in `src/quant/q8_0_avx2.HC` with signed I64 overflow checks and parity harness `tests/test_q8_0_avx2_hsum_pairs.py`; `python3 tests/test_q8_0_avx2_mul_pairs.py && python3 tests/test_q8_0_avx2_hsum_pairs.py` passed |

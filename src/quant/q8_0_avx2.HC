@@ -25,6 +25,122 @@ class Q8_0Block
     I8 qs[Q8_0_AVX2_VALUES_PER_BLOCK];
 };
 
+Bool Q8_0AVX2TryAddI64(I64 lhs, I64 rhs, I64 *out_sum)
+{
+    if (!out_sum)
+        return FALSE;
+
+    if (rhs > 0 && lhs > Q8_0_AVX2_I64_MAX - rhs)
+        return FALSE;
+    if (rhs < 0 && lhs < Q8_0_AVX2_I64_MIN - rhs)
+        return FALSE;
+
+    *out_sum = lhs + rhs;
+    return TRUE;
+}
+
+Bool Q8_0AVX2TryMulI64(I64 lhs, I64 rhs, I64 *out_prod)
+{
+    if (!out_prod)
+        return FALSE;
+
+    if (!lhs || !rhs)
+    {
+        *out_prod = 0;
+        return TRUE;
+    }
+
+    if (lhs == -1 && rhs == Q8_0_AVX2_I64_MIN)
+        return FALSE;
+    if (rhs == -1 && lhs == Q8_0_AVX2_I64_MIN)
+        return FALSE;
+
+    if (lhs > 0)
+    {
+        if (rhs > 0)
+        {
+            if (lhs > Q8_0_AVX2_I64_MAX / rhs)
+                return FALSE;
+        }
+        else
+        {
+            if (rhs < Q8_0_AVX2_I64_MIN / lhs)
+                return FALSE;
+        }
+    }
+    else
+    {
+        if (rhs > 0)
+        {
+            if (lhs < Q8_0_AVX2_I64_MIN / rhs)
+                return FALSE;
+        }
+        else
+        {
+            if (lhs < Q8_0_AVX2_I64_MAX / rhs)
+                return FALSE;
+        }
+    }
+
+    *out_prod = lhs * rhs;
+    return TRUE;
+}
+
+I64 Q8_0AVX2RoundShiftRightUnsigned(I64 value, I64 shift)
+{
+    I64 round_bias;
+
+    if (shift <= 0)
+        return value;
+
+    round_bias = 1 << (shift - 1);
+    return (value + round_bias) >> shift;
+}
+
+I64 Q8_0AVX2F16ToQ16(U16 fp16_bits)
+{
+    I64 sign_bit;
+    I64 exponent_bits;
+    I64 fraction_bits;
+    I64 mantissa;
+    I64 shift_amount;
+    I64 magnitude_q16;
+
+    sign_bit = (fp16_bits >> 15) & 1;
+    exponent_bits = (fp16_bits >> 10) & 0x1F;
+    fraction_bits = fp16_bits & 0x03FF;
+
+    if (!exponent_bits)
+    {
+        if (!fraction_bits)
+            return 0;
+
+        magnitude_q16 = Q8_0AVX2RoundShiftRightUnsigned(fraction_bits, 8);
+        if (sign_bit)
+            return -magnitude_q16;
+        return magnitude_q16;
+    }
+
+    if (exponent_bits == 0x1F)
+    {
+        if (sign_bit)
+            return -0x3FFFFFFFFFFFFFFF;
+        return 0x3FFFFFFFFFFFFFFF;
+    }
+
+    mantissa = 1024 + fraction_bits;
+    shift_amount = exponent_bits - 9;
+
+    if (shift_amount >= 0)
+        magnitude_q16 = mantissa << shift_amount;
+    else
+        magnitude_q16 = Q8_0AVX2RoundShiftRightUnsigned(mantissa, -shift_amount);
+
+    if (sign_bit)
+        return -magnitude_q16;
+    return magnitude_q16;
+}
+
 I32 Q8_0Pack32ToI16LanesAVX2(I8 *src_q8, I64 src_len, I16 *dst_i16, I64 dst_len)
 {
     I64 lane;
@@ -167,5 +283,65 @@ I32 Q8_0DotI16LanesAVX2(I16 *lhs_i16,
         return status;
 
     *out_dot_i64 = dot_i64;
+    return Q8_0_AVX2_OK;
+}
+
+I32 Q8_0DotBlocksAVX2Q32Checked(Q8_0Block *lhs,
+                                Q8_0Block *rhs,
+                                I64 block_count,
+                                I64 *out_dot_q32)
+{
+    I64 block_index;
+    I16 lhs_lanes_i16[Q8_0_AVX2_VALUES_PER_BLOCK];
+    I16 rhs_lanes_i16[Q8_0_AVX2_VALUES_PER_BLOCK];
+    I64 q_dot_q0;
+    I64 lhs_scale_q16;
+    I64 rhs_scale_q16;
+    I64 scale_prod_q32;
+    I64 block_dot_q32;
+    I64 total_dot_q32;
+    I32 status;
+
+    if (!lhs || !rhs || !out_dot_q32)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    // Kernel contract for IQ-106:
+    // - Each Q8_0 block is widened with AVX2-shape lane packing.
+    // - Dot is reduced in integer lane domain (q_dot_q0).
+    // - Block scales are applied in Q16 domain: block_dot_q32 = dA_q16*dB_q16*q_dot_q0.
+    // - Multi-block accumulation is checked for I64 overflow at every step.
+    total_dot_q32 = 0;
+    for (block_index = 0; block_index < block_count; ++block_index)
+    {
+        status = Q8_0PackBlockToI16LanesAVX2(&lhs[block_index], lhs_lanes_i16, Q8_0_AVX2_VALUES_PER_BLOCK);
+        if (status != Q8_0_AVX2_OK)
+            return status;
+
+        status = Q8_0PackBlockToI16LanesAVX2(&rhs[block_index], rhs_lanes_i16, Q8_0_AVX2_VALUES_PER_BLOCK);
+        if (status != Q8_0_AVX2_OK)
+            return status;
+
+        status = Q8_0DotI16LanesAVX2(lhs_lanes_i16,
+                                     Q8_0_AVX2_VALUES_PER_BLOCK,
+                                     rhs_lanes_i16,
+                                     Q8_0_AVX2_VALUES_PER_BLOCK,
+                                     &q_dot_q0);
+        if (status != Q8_0_AVX2_OK)
+            return status;
+
+        lhs_scale_q16 = Q8_0AVX2F16ToQ16(lhs[block_index].d_fp16);
+        rhs_scale_q16 = Q8_0AVX2F16ToQ16(rhs[block_index].d_fp16);
+
+        if (!Q8_0AVX2TryMulI64(lhs_scale_q16, rhs_scale_q16, &scale_prod_q32))
+            return Q8_0_AVX2_ERR_OVERFLOW;
+        if (!Q8_0AVX2TryMulI64(scale_prod_q32, q_dot_q0, &block_dot_q32))
+            return Q8_0_AVX2_ERR_OVERFLOW;
+        if (!Q8_0AVX2TryAddI64(total_dot_q32, block_dot_q32, &total_dot_q32))
+            return Q8_0_AVX2_ERR_OVERFLOW;
+    }
+
+    *out_dot_q32 = total_dot_q32;
     return Q8_0_AVX2_OK;
 }
