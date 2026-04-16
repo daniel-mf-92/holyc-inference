@@ -14,6 +14,10 @@
 #define Q8_0_AVX2_OK                 0
 #define Q8_0_AVX2_ERR_NULL_PTR       1
 #define Q8_0_AVX2_ERR_BAD_LEN        2
+#define Q8_0_AVX2_ERR_OVERFLOW       3
+
+#define Q8_0_AVX2_I64_MAX            0x7FFFFFFFFFFFFFFF
+#define Q8_0_AVX2_I64_MIN            (-0x7FFFFFFFFFFFFFFF - 1)
 
 class Q8_0Block
 {
@@ -90,5 +94,41 @@ I32 Q8_0MulI16LanesToI32PairsAVX2(I16 *lhs_i16,
         dst_i32[pair_index] = product0 + product1;
     }
 
+    return Q8_0_AVX2_OK;
+}
+
+I32 Q8_0HSumI32PairsAVX2(I32 *pairs_i32,
+                         I64 pairs_len,
+                         I64 *out_sum_i64)
+{
+    I64 pair_index;
+    I64 running_sum;
+    I64 term;
+
+    if (!pairs_i32 || !out_sum_i64)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+    if (pairs_len < Q8_0_AVX2_PAIR_COUNT)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    // Horizontal reduction contract:
+    // - Sum all 16 pairwise I32 partial products into one signed I64 scalar.
+    // - Preserve deterministic lane order (0..15) for auditability parity
+    //   against the scalar reference path.
+    // - Explicit overflow checks keep reduction safe if this helper is reused
+    //   for wider accumulation streams in future kernels.
+    running_sum = 0;
+    for (pair_index = 0; pair_index < Q8_0_AVX2_PAIR_COUNT; ++pair_index)
+    {
+        term = (I64)pairs_i32[pair_index];
+
+        if (term > 0 && running_sum > Q8_0_AVX2_I64_MAX - term)
+            return Q8_0_AVX2_ERR_OVERFLOW;
+        if (term < 0 && running_sum < Q8_0_AVX2_I64_MIN - term)
+            return Q8_0_AVX2_ERR_OVERFLOW;
+
+        running_sum += term;
+    }
+
+    *out_sum_i64 = running_sum;
     return Q8_0_AVX2_OK;
 }
