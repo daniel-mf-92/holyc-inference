@@ -24,6 +24,8 @@
 #define Q4_0_Q8_0_ERR_OVERFLOW     3
 #define Q4_0_Q8_0_I64_MAX          0x7FFFFFFFFFFFFFFF
 #define Q4_0_Q8_0_I64_MIN          (-0x7FFFFFFFFFFFFFFF - 1)
+#define Q4_0_Q8_0_AVX2_LANES       32
+#define Q4_0_Q8_0_AVX2_PAIR_COUNT  16
 
 class Q4_0Block
 {
@@ -148,6 +150,244 @@ Bool Q4_0Q8_0TryMulI64NonNeg(I64 lhs, I64 rhs, I64 *out_prod)
 
     *out_prod = lhs * rhs;
     return TRUE;
+}
+
+Bool Q4_0Q8_0TryMulI64(I64 lhs, I64 rhs, I64 *out_prod)
+{
+    if (!out_prod)
+        return FALSE;
+
+    if (!lhs || !rhs)
+    {
+        *out_prod = 0;
+        return TRUE;
+    }
+
+    if (lhs == -1 && rhs == Q4_0_Q8_0_I64_MIN)
+        return FALSE;
+    if (rhs == -1 && lhs == Q4_0_Q8_0_I64_MIN)
+        return FALSE;
+
+    if (lhs > 0)
+    {
+        if (rhs > 0)
+        {
+            if (lhs > Q4_0_Q8_0_I64_MAX / rhs)
+                return FALSE;
+        }
+        else
+        {
+            if (rhs < Q4_0_Q8_0_I64_MIN / lhs)
+                return FALSE;
+        }
+    }
+    else
+    {
+        if (rhs > 0)
+        {
+            if (lhs < Q4_0_Q8_0_I64_MIN / rhs)
+                return FALSE;
+        }
+        else
+        {
+            if (lhs < Q4_0_Q8_0_I64_MAX / rhs)
+                return FALSE;
+        }
+    }
+
+    *out_prod = lhs * rhs;
+    return TRUE;
+}
+
+I32 Q4_0Q8_0PackQ4BlockToI16LanesAVX2(Q4_0Block *src_q4, I16 *dst_i16, I64 dst_len)
+{
+    I64 byte_index;
+    U8 packed_q4;
+
+    if (!src_q4 || !dst_i16)
+        return Q4_0_Q8_0_ERR_NULL_PTR;
+    if (dst_len < Q4_0_Q8_0_AVX2_LANES)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    // AVX2-shape lane contract for mixed Q4_0 blocks:
+    //   lane[2*i]   = low nibble signed value from qs[i]
+    //   lane[2*i+1] = high nibble signed value from qs[i]
+    // This preserves ggml nibble ordering exactly while widening to I16.
+    for (byte_index = 0; byte_index < Q4_0_PACKED_BYTES; ++byte_index)
+    {
+        packed_q4 = src_q4->qs[byte_index];
+        dst_i16[byte_index << 1] = (I16)Q4_0_Q8_0NibbleToSigned(packed_q4, FALSE);
+        dst_i16[(byte_index << 1) + 1] = (I16)Q4_0_Q8_0NibbleToSigned(packed_q4, TRUE);
+    }
+
+    return Q4_0_Q8_0_OK;
+}
+
+I32 Q4_0Q8_0PackQ8BlockToI16LanesAVX2(Q8_0Block *src_q8, I16 *dst_i16, I64 dst_len)
+{
+    I64 lane;
+
+    if (!src_q8 || !dst_i16)
+        return Q4_0_Q8_0_ERR_NULL_PTR;
+    if (dst_len < Q4_0_Q8_0_AVX2_LANES)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    // Widen each signed 8-bit Q8 lane to signed I16 lane in-place order.
+    for (lane = 0; lane < Q4_0_Q8_0_AVX2_LANES; ++lane)
+        dst_i16[lane] = (I16)src_q8->qs[lane];
+
+    return Q4_0_Q8_0_OK;
+}
+
+I32 Q4_0Q8_0MulI16LanesToI32PairsAVX2(
+    I16 *lhs_i16,
+    I64 lhs_len,
+    I16 *rhs_i16,
+    I64 rhs_len,
+    I32 *out_pairs_i32,
+    I64 out_len)
+{
+    I64 pair_index;
+    I64 lane_base;
+
+    if (!lhs_i16 || !rhs_i16 || !out_pairs_i32)
+        return Q4_0_Q8_0_ERR_NULL_PTR;
+    if (lhs_len < Q4_0_Q8_0_AVX2_LANES || rhs_len < Q4_0_Q8_0_AVX2_LANES)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+    if (out_len < Q4_0_Q8_0_AVX2_PAIR_COUNT)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    // Mirrors AVX2 `vpmaddwd`: multiply adjacent I16 pairs, then add each pair.
+    for (pair_index = 0; pair_index < Q4_0_Q8_0_AVX2_PAIR_COUNT; ++pair_index)
+    {
+        lane_base = pair_index << 1;
+        out_pairs_i32[pair_index] =
+            lhs_i16[lane_base] * rhs_i16[lane_base] +
+            lhs_i16[lane_base + 1] * rhs_i16[lane_base + 1];
+    }
+
+    return Q4_0_Q8_0_OK;
+}
+
+I32 Q4_0Q8_0HSumI32PairsAVX2(I32 *pairs_i32, I64 pair_len, I64 *out_sum_i64)
+{
+    I64 pair_index;
+    I64 sum_i64;
+    I64 term;
+
+    if (!pairs_i32 || !out_sum_i64)
+        return Q4_0_Q8_0_ERR_NULL_PTR;
+    if (pair_len < Q4_0_Q8_0_AVX2_PAIR_COUNT)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    sum_i64 = 0;
+    for (pair_index = 0; pair_index < Q4_0_Q8_0_AVX2_PAIR_COUNT; ++pair_index)
+    {
+        term = (I64)pairs_i32[pair_index];
+        if (!Q4_0Q8_0TryAddI64(sum_i64, term, &sum_i64))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+    }
+
+    *out_sum_i64 = sum_i64;
+    return Q4_0_Q8_0_OK;
+}
+
+I32 Q4_0Q8_0DotI16LanesAVX2(I16 *lhs_i16, I64 lhs_len, I16 *rhs_i16, I64 rhs_len, I64 *out_dot_i64)
+{
+    I32 pair_sums_i32[Q4_0_Q8_0_AVX2_PAIR_COUNT];
+    I32 status;
+
+    if (!lhs_i16 || !rhs_i16 || !out_dot_i64)
+        return Q4_0_Q8_0_ERR_NULL_PTR;
+
+    status = Q4_0Q8_0MulI16LanesToI32PairsAVX2(
+        lhs_i16,
+        lhs_len,
+        rhs_i16,
+        rhs_len,
+        pair_sums_i32,
+        Q4_0_Q8_0_AVX2_PAIR_COUNT);
+    if (status != Q4_0_Q8_0_OK)
+        return status;
+
+    return Q4_0Q8_0HSumI32PairsAVX2(pair_sums_i32,
+                                    Q4_0_Q8_0_AVX2_PAIR_COUNT,
+                                    out_dot_i64);
+}
+
+I32 Q4_0Q8_0DotBlocksAVX2Q32Checked(
+    Q4_0Block *lhs_q4,
+    Q8_0Block *rhs_q8,
+    I64 block_count,
+    I64 *out_dot_q32)
+{
+    I64 block_index;
+    I16 lhs_q4_lanes_i16[Q4_0_Q8_0_AVX2_LANES];
+    I16 rhs_q8_lanes_i16[Q4_0_Q8_0_AVX2_LANES];
+    I64 lhs_scale_q16;
+    I64 rhs_scale_q16;
+    I64 q_dot_q0;
+    I64 scale_prod_q32;
+    I64 block_dot_q32;
+    I64 total_dot_q32;
+    I32 status;
+
+    if (!lhs_q4 || !rhs_q8 || !out_dot_q32)
+        return Q4_0_Q8_0_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    // IQ-115 mixed AVX2-shape contract:
+    // - Expand Q4_0 nibbles and Q8_0 bytes to 32 signed I16 lanes.
+    // - Dot those lanes with pairwise-multiply + horizontal reduction.
+    // - Apply Q16 scales to produce block Q32, then checked-add across blocks.
+    total_dot_q32 = 0;
+    for (block_index = 0; block_index < block_count; ++block_index)
+    {
+        status = Q4_0Q8_0PackQ4BlockToI16LanesAVX2(&lhs_q4[block_index],
+                                                   lhs_q4_lanes_i16,
+                                                   Q4_0_Q8_0_AVX2_LANES);
+        if (status != Q4_0_Q8_0_OK)
+            return status;
+
+        status = Q4_0Q8_0PackQ8BlockToI16LanesAVX2(&rhs_q8[block_index],
+                                                   rhs_q8_lanes_i16,
+                                                   Q4_0_Q8_0_AVX2_LANES);
+        if (status != Q4_0_Q8_0_OK)
+            return status;
+
+        status = Q4_0Q8_0DotI16LanesAVX2(lhs_q4_lanes_i16,
+                                         Q4_0_Q8_0_AVX2_LANES,
+                                         rhs_q8_lanes_i16,
+                                         Q4_0_Q8_0_AVX2_LANES,
+                                         &q_dot_q0);
+        if (status != Q4_0_Q8_0_OK)
+            return status;
+
+        lhs_scale_q16 = Q4_0_Q8_0F16ToQ16(lhs_q4[block_index].d_fp16);
+        rhs_scale_q16 = Q4_0_Q8_0F16ToQ16(rhs_q8[block_index].d_fp16);
+
+        if (!Q4_0Q8_0TryMulI64(lhs_scale_q16, rhs_scale_q16, &scale_prod_q32))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+        if (!Q4_0Q8_0TryMulI64(scale_prod_q32, q_dot_q0, &block_dot_q32))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+        if (!Q4_0Q8_0TryAddI64(total_dot_q32, block_dot_q32, &total_dot_q32))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+    }
+
+    *out_dot_q32 = total_dot_q32;
+    return Q4_0_Q8_0_OK;
+}
+
+I32 Q4_0_Q8_0DotBlocksAVX2Q32Checked(Q4_0Block *lhs_q4,
+                                     Q8_0Block *rhs_q8,
+                                     I64 block_count,
+                                     I64 *out_dot_q32)
+{
+    return Q4_0Q8_0DotBlocksAVX2Q32Checked(lhs_q4,
+                                           rhs_q8,
+                                           block_count,
+                                           out_dot_q32);
 }
 
 I32 Q4_0_Q8_0DotProductBlockQ32(Q4_0Block *lhs_q4, Q8_0Block *rhs_q8, I64 *out_dot_q32)
