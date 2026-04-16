@@ -423,6 +423,126 @@ I32 Q8_0DotRowsAVX2Q32Checked(
     return Q8_0_AVX2_OK;
 }
 
+I32 Q8_0MatMulTiledAVX2Q32Checked(
+    Q8_0Block *lhs_matrix_blocks,
+    I64 lhs_block_capacity,
+    I64 lhs_rows,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_col_blocks,
+    I64 rhs_block_capacity,
+    I64 rhs_cols,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 tile_rows,
+    I64 tile_cols,
+    I64 *out_mat_q32,
+    I64 out_capacity,
+    I64 out_row_stride_cols)
+{
+    I64 required_lhs_blocks;
+    I64 required_rhs_blocks;
+    I64 required_out_cells;
+    I64 tile_row_start;
+    I64 tile_col_start;
+    I64 tile_row_end;
+    I64 tile_col_end;
+    I64 row_index;
+    I64 col_index;
+    I64 lhs_row_base;
+    I64 rhs_col_base;
+    I64 out_index;
+    I64 dot_q32;
+    I32 status;
+
+    if (!lhs_matrix_blocks || !rhs_col_blocks || !out_mat_q32)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+
+    if (lhs_block_capacity < 0 || rhs_block_capacity < 0 || out_capacity < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (lhs_rows < 0 || lhs_row_stride_blocks < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (rhs_cols < 0 || rhs_col_stride_blocks < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (k_block_count < 0 || out_row_stride_cols < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (tile_rows <= 0 || tile_cols <= 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    // Matrix layout contracts:
+    // - lhs_matrix_blocks stores A as row-major rows, each row consuming
+    //   k_block_count active Q8_0 blocks inside lhs_row_stride_blocks stride.
+    // - rhs_col_blocks stores B as pre-transposed columns, each column
+    //   consuming k_block_count active Q8_0 blocks inside rhs_col_stride_blocks.
+    // - out_mat_q32 stores C as row-major Q32 cells with out_row_stride_cols.
+    if (lhs_rows > 0 && lhs_row_stride_blocks < k_block_count)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (rhs_cols > 0 && rhs_col_stride_blocks < k_block_count)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (lhs_rows > 0 && out_row_stride_cols < rhs_cols)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    if (!Q8_0AVX2TryMulI64(lhs_rows, lhs_row_stride_blocks, &required_lhs_blocks))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+    if (required_lhs_blocks > lhs_block_capacity)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    if (!Q8_0AVX2TryMulI64(rhs_cols, rhs_col_stride_blocks, &required_rhs_blocks))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+    if (required_rhs_blocks > rhs_block_capacity)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    if (!Q8_0AVX2TryMulI64(lhs_rows, out_row_stride_cols, &required_out_cells))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+    if (required_out_cells > out_capacity)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    // Tiled traversal keeps hot row/column windows local for later AVX2 asm.
+    // Dot primitive remains the checked AVX2-shape kernel so arithmetic and
+    // overflow behavior are identical to the audited block-level path.
+    for (tile_row_start = 0; tile_row_start < lhs_rows; tile_row_start += tile_rows)
+    {
+        tile_row_end = tile_row_start + tile_rows;
+        if (tile_row_end > lhs_rows)
+            tile_row_end = lhs_rows;
+
+        for (tile_col_start = 0; tile_col_start < rhs_cols; tile_col_start += tile_cols)
+        {
+            tile_col_end = tile_col_start + tile_cols;
+            if (tile_col_end > rhs_cols)
+                tile_col_end = rhs_cols;
+
+            for (row_index = tile_row_start; row_index < tile_row_end; ++row_index)
+            {
+                if (!Q8_0AVX2TryMulI64(row_index, lhs_row_stride_blocks, &lhs_row_base))
+                    return Q8_0_AVX2_ERR_OVERFLOW;
+
+                for (col_index = tile_col_start; col_index < tile_col_end; ++col_index)
+                {
+                    if (!Q8_0AVX2TryMulI64(col_index, rhs_col_stride_blocks, &rhs_col_base))
+                        return Q8_0_AVX2_ERR_OVERFLOW;
+
+                    status = Q8_0DotBlocksAVX2Q32Checked(
+                        &lhs_matrix_blocks[lhs_row_base],
+                        &rhs_col_blocks[rhs_col_base],
+                        k_block_count,
+                        &dot_q32);
+                    if (status != Q8_0_AVX2_OK)
+                        return status;
+
+                    if (!Q8_0AVX2TryMulI64(row_index, out_row_stride_cols, &out_index))
+                        return Q8_0_AVX2_ERR_OVERFLOW;
+                    if (!Q8_0AVX2TryAddI64(out_index, col_index, &out_index))
+                        return Q8_0_AVX2_ERR_OVERFLOW;
+
+                    out_mat_q32[out_index] = dot_q32;
+                }
+            }
+        }
+    }
+
+    return Q8_0_AVX2_OK;
+}
+
 I32 Q8_0DotBlocksAVX2Q32ToQ16Checked(Q8_0Block *lhs,
                                      Q8_0Block *rhs,
                                      I64 block_count,
