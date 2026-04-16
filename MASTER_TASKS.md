@@ -305,7 +305,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-115 Implement HolyC `Q4_0Q8_0DotBlocksAVX2Q32Checked` in `src/quant/q4_0_q8_0_dot.HC` by extending AVX2 lane-pack/multiply/reduce flow to mixed-nibble Q4_0 and signed Q8_0 blocks with checked I64 accumulation (WS4-03)
 - [x] IQ-116 Implement HolyC `Q4_0Q8_0MatMulQ32TiledAVX2Checked` in `src/matmul/q4_0_q8_0_matmul.HC` using mixed AVX2 block dots with explicit tile/stride/capacity overflow guards (WS4-03)
 - [x] IQ-117 Add host-side parity harness `tests/test_q4_0_q8_0_matmul_tiled_avx2_q32.py` for mixed AVX2 tiled Q32 matmul against scalar checked reference outputs (WS4-03)
-- [ ] IQ-118 Implement HolyC `Q8_0MatMulTiledValidateArgsChecked` helper in `src/matmul/q8_0_matmul.HC` and route both AVX2 tiled entrypoints through the shared checked preflight contract (WS4-03)
+- [x] IQ-118 Implement HolyC `Q8_0MatMulTiledValidateArgsChecked` helper in `src/matmul/q8_0_matmul.HC` and route both AVX2 tiled entrypoints through the shared checked preflight contract (WS4-03)
 - [ ] IQ-119 Add host-side parity harness `tests/test_q8_0_matmul_tiled_avx2_preflight.py` to assert Q32/Q16 tiled entrypoints return identical BAD_LEN/OVERFLOW surfaces for shared preflight invariants (WS4-03)
 
 ## Progress Ledger
@@ -432,3 +432,4 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 
 | 2026-04-16 | loop-069 | IQ-092 Q4_0 row-matrix×vector helper | done | Added Q4_0DotRowsQ16MatrixVector in src/quant/q4_0_dot.HC + stride/length parity coverage in tests/test_q4_0_dot.py; python3 tests/test_q4_0_dot.py && python3 tests/test_q4_0_dequant.py && python3 tests/test_q4_0_q8_0_dot_kernel.py passed |
 | 2026-04-16 | loop-077 | IQ-097 Q8_0 checked matrix wrapper compat | done | Added `Q8_0_DotRowsQ16MatrixVectorChecked` alias in `src/quant/q8_0_dot.HC` with parity test in `tests/test_q8_0_dot.py`; `python3 tests/test_q8_0_dot.py && python3 tests/test_q8_0_dot_matrix_vector.py` passed |
+| 2026-04-16 | loop-099 | IQ-118 AVX2 tiled preflight unification | done | Unified AVX2 tiled Q32/Q16 preflight through `Q8_0MatMulTiledValidateArgsChecked` in `src/matmul/q8_0_matmul.HC`; `python3 tests/test_q8_0_matmul_tiled_avx2_q32.py && python3 tests/test_q8_0_matmul_tiled_avx2_q16.py` passed |

@@ -69,7 +69,7 @@ I64 Q8_0MatMulMinI64(I64 lhs, I64 rhs)
     return rhs;
 }
 
-I32 Q8_0MatMulValidateTiledArgsChecked(
+I32 Q8_0MatMulTiledValidateArgsChecked(
     Q8_0Block *lhs_blocks,
     I64 lhs_block_capacity,
     I64 row_count,
@@ -126,6 +126,45 @@ I32 Q8_0MatMulValidateTiledArgsChecked(
         return Q8_0_MATMUL_ERR_BAD_DST_LEN;
 
     return Q8_0_MATMUL_OK;
+}
+
+// Compatibility alias for existing callers during matmul preflight unification.
+I32 Q8_0MatMulValidateTiledArgsChecked(
+    Q8_0Block *lhs_blocks,
+    I64 lhs_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_col_blocks,
+    I64 rhs_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 tile_rows,
+    I64 tile_cols,
+    I64 *out_cells,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells,
+    I64 *out_lhs_required_blocks,
+    I64 *out_rhs_required_blocks,
+    I64 *out_required_cells)
+{
+    return Q8_0MatMulTiledValidateArgsChecked(lhs_blocks,
+                                              lhs_block_capacity,
+                                              row_count,
+                                              lhs_row_stride_blocks,
+                                              rhs_col_blocks,
+                                              rhs_block_capacity,
+                                              col_count,
+                                              rhs_col_stride_blocks,
+                                              k_block_count,
+                                              tile_rows,
+                                              tile_cols,
+                                              out_cells,
+                                              out_cell_capacity,
+                                              out_row_stride_cells,
+                                              out_lhs_required_blocks,
+                                              out_rhs_required_blocks,
+                                              out_required_cells);
 }
 
 I32 Q8_0MatMulQ16TiledChecked(
@@ -282,7 +321,7 @@ I32 Q8_0MatMulQ32TiledAVX2Checked(
     Q8_0Block *rhs_col_ptr;
     I32 status;
 
-    status = Q8_0MatMulValidateTiledArgsChecked(lhs_blocks,
+    status = Q8_0MatMulTiledValidateArgsChecked(lhs_blocks,
                                                 lhs_block_capacity,
                                                 row_count,
                                                 lhs_row_stride_blocks,
@@ -389,7 +428,7 @@ I32 Q8_0MatMulQ16TiledAVX2Checked(
     Q8_0Block *rhs_col_ptr;
     I32 status;
 
-    status = Q8_0MatMulValidateTiledArgsChecked(lhs_blocks,
+    status = Q8_0MatMulTiledValidateArgsChecked(lhs_blocks,
                                                 lhs_block_capacity,
                                                 row_count,
                                                 lhs_row_stride_blocks,
