@@ -107,6 +107,53 @@ I32 FPQ16RMSNormApplyInvDenomWeightedChecked(I64 *input_q16,
     return 0;
 }
 
+// In-place variant of weighted inverse-denominator RMSNorm scaling:
+//   input[i] = round_half_up(round_half_up((input[i] * inv_denom_q16) / den_q16)
+//                            * gamma[i] / FP_Q16_ONE)
+// This preserves the same checked contracts as the out-of-place helper while
+// explicitly supporting alias-safe writes when caller uses one buffer.
+I32 FPQ16RMSNormApplyInvDenomWeightedInPlaceChecked(I64 *input_q16,
+                                                    I64 *gamma_q16,
+                                                    I64 count,
+                                                    I64 inv_denom_q16,
+                                                    I64 den_q16)
+{
+    I64 i;
+    I64 scaled_q16;
+    I64 weighted_q16;
+    I32 status;
+
+    if (!input_q16 || !gamma_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (inv_denom_q16 <= 0)
+        return FP_Q16_ERR_DOMAIN;
+
+    for (i = 0; i < count; i++)
+    {
+        // Read one element, compute checked scaling, then write back to the
+        // same slot. No later iteration depends on previous slot values.
+        status = FPQ16MulDivRoundedByPositiveIntFromQ16DenChecked(input_q16[i],
+                                                                   inv_denom_q16,
+                                                                   den_q16,
+                                                                   &scaled_q16);
+        if (status)
+            return status;
+
+        status = FPQ16MulDivRoundedChecked(scaled_q16,
+                                           gamma_q16[i],
+                                           FP_Q16_ONE,
+                                           &weighted_q16);
+        if (status)
+            return status;
+
+        input_q16[i] = weighted_q16;
+    }
+
+    return 0;
+}
+
 U0 FPQ16RMSNorm(I64 *input, I64 *weight, I64 *output, I64 count, I64 eps_q16)
 {
     I64 i;

@@ -1,0 +1,14 @@
+Completed one full loop iteration and progressed exactly `IQ-156`.
+
+**What Changed**
+- Implemented HolyC in-place weighted RMSNorm helper `FPQ16RMSNormApplyInvDenomWeightedInPlaceChecked` with checked domain/overflow behavior in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/math/rmsnorm.HC:115`.
+- Added host-side parity/adversarial harness in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_rmsnorm_apply_inv_denom_weighted_inplace_checked.py:2`.
+- Updated queue/ledger in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:347` (marked `IQ-156` done, added `IQ-157`, added one progress-ledger line at `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:354`).
+
+**Validation**
+- Ran: `python3 tests/test_rmsnorm_apply_inv_denom_weighted_inplace_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_weighted_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_checked.py`
+- Output: `rmsnorm_apply_inv_denom_weighted_inplace_checked_reference_checks=ok`, `rmsnorm_apply_inv_denom_weighted_checked_reference_checks=ok`, `rmsnorm_apply_inv_denom_checked_reference_checks=ok`.
+
+**Queue/DB**
+- Unchecked queue depth is maintained at `15` (policy satisfied).
+- Logged to central DB: inserted iteration row `id=1795`, `task_id=IQ-156`, `status=pass` in `~/Documents/local-codebases/temple-central.db`.
