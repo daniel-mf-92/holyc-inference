@@ -43,6 +43,26 @@ Bool Q8_0TryAddI64(I64 lhs, I64 rhs, I64 *out_sum)
     return TRUE;
 }
 
+Bool Q8_0TryMulI64NonNeg(I64 lhs, I64 rhs, I64 *out_prod)
+{
+    if (!out_prod)
+        return FALSE;
+    if (lhs < 0 || rhs < 0)
+        return FALSE;
+
+    if (!lhs || !rhs)
+    {
+        *out_prod = 0;
+        return TRUE;
+    }
+
+    if (lhs > Q8_0_I64_MAX / rhs)
+        return FALSE;
+
+    *out_prod = lhs * rhs;
+    return TRUE;
+}
+
 I64 Q8_0RoundShiftRightUnsigned(I64 value, I64 shift)
 {
     I64 round_bias;
@@ -239,6 +259,35 @@ I32 Q8_0DotProductBlocksQ16Accumulate(Q8_0Block *lhs, Q8_0Block *rhs, I64 block_
     return Q8_0_OK;
 }
 
+I32 Q8_0DotProductBlocksQ16AccumulateChecked(Q8_0Block *lhs, Q8_0Block *rhs, I64 block_count, I64 *io_accum_q16)
+{
+    I64 block_index;
+    I64 block_dot_q32;
+    I64 block_dot_q16;
+    I64 total_q16;
+    I32 status;
+
+    if (!lhs || !rhs || !io_accum_q16)
+        return Q8_0_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    total_q16 = *io_accum_q16;
+    for (block_index = 0; block_index < block_count; ++block_index)
+    {
+        status = Q8_0DotProductBlockQ32(&lhs[block_index], &rhs[block_index], &block_dot_q32);
+        if (status != Q8_0_OK)
+            return status;
+
+        block_dot_q16 = Q8_0DotQ32ToQ16(block_dot_q32);
+        if (!Q8_0TryAddI64(total_q16, block_dot_q16, &total_q16))
+            return Q8_0_ERR_OVERFLOW;
+    }
+
+    *io_accum_q16 = total_q16;
+    return Q8_0_OK;
+}
+
 I32 Q8_0DotRowBlocksQ16(Q8_0Block *row_blocks, Q8_0Block *vec_blocks, I64 block_count, I64 *out_dot_q16)
 {
     I64 block_index;
@@ -292,6 +341,58 @@ I32 Q8_0DotRowsQ16MatrixVector(Q8_0Block *matrix_blocks, I64 row_count, I64 row_
     {
         row_ptr = &matrix_blocks[row_index * row_stride_blocks];
         status = Q8_0DotRowBlocksQ16(row_ptr, vec_blocks, vec_block_count, &row_dot_q16);
+        if (status != Q8_0_OK)
+            return status;
+
+        out_rows_q16[row_index] = row_dot_q16;
+    }
+
+    return Q8_0_OK;
+}
+
+I32 Q8_0DotRowsQ16MatrixVectorChecked(
+    Q8_0Block *matrix_blocks,
+    I64 matrix_block_capacity,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q8_0Block *vec_blocks,
+    I64 vec_block_capacity,
+    I64 vec_block_count,
+    I64 *out_rows_q16)
+{
+    I64 row_index;
+    I64 row_dot_q16;
+    I64 required_matrix_blocks;
+    I64 row_base;
+    Q8_0Block *row_ptr;
+    I32 status;
+
+    if (!matrix_blocks || !vec_blocks || !out_rows_q16)
+        return Q8_0_ERR_NULL_PTR;
+    if (matrix_block_capacity < 0 || vec_block_capacity < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (row_count < 0 || row_stride_blocks < 0 || vec_block_count < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if (row_count > 0 && row_stride_blocks < vec_block_count)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (vec_block_count > vec_block_capacity)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    // Hard bounds for caller-provided matrix extent.
+    if (!Q8_0TryMulI64NonNeg(row_count, row_stride_blocks, &required_matrix_blocks))
+        return Q8_0_ERR_OVERFLOW;
+    if (required_matrix_blocks > matrix_block_capacity)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    for (row_index = 0; row_index < row_count; ++row_index)
+    {
+        if (!Q8_0TryMulI64NonNeg(row_index, row_stride_blocks, &row_base))
+            return Q8_0_ERR_OVERFLOW;
+
+        row_ptr = &matrix_blocks[row_base];
+        row_dot_q16 = 0;
+        status = Q8_0DotProductBlocksQ16AccumulateChecked(row_ptr, vec_blocks, vec_block_count, &row_dot_q16);
         if (status != Q8_0_OK)
             return status;
 

@@ -1,0 +1,16 @@
+Completed one full loop iteration on `IQ-095` with HolyC runtime code + parity/adversarial validation.
+
+**What Changed**
+- Implemented checked non-negative multiply helper `Q8_0TryMulI64NonNeg` in `src/quant/q8_0_dot.HC:46`.
+- Added checked row-accumulator path `Q8_0DotProductBlocksQ16AccumulateChecked` in `src/quant/q8_0_dot.HC:262`.
+- Implemented `Q8_0DotRowsQ16MatrixVectorChecked` with matrix/vector capacity guards, stride checks, and overflow-safe row-base math in `src/quant/q8_0_dot.HC:353`.
+- Added host parity model + adversarial tests for checked path in `tests/test_q8_0_dot.py:162`, `tests/test_q8_0_dot.py:220`, `tests/test_q8_0_dot.py:542`.
+
+**Validation**
+- Ran `python3 tests/test_q8_0_dot.py` → `q8_0_dot_reference_checks=ok`.
+
+**Queue + Ledger**
+- Marked `IQ-095` done and appended new monotonic unchecked items `IQ-096`..`IQ-098` in `MASTER_TASKS.md:284`.
+- Added one-line progress ledger entry for loop-075 in `MASTER_TASKS.md:292`.
+- Queue depth is maintained at 17 unchecked `IQ-` items (≥15 policy satisfied).
+- Logged central DB iteration row in `~/Documents/local-codebases/temple-central.db` for `IQ-095` with pass status and validation command/output.

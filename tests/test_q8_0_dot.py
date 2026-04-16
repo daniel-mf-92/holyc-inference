@@ -159,6 +159,29 @@ def dot_product_blocks_q16_accumulate(
     return Q8_0_OK, total_q16
 
 
+def dot_product_blocks_q16_accumulate_checked(
+    lhs_blocks: list[tuple[int, bytes]],
+    rhs_blocks: list[tuple[int, bytes]],
+    initial_accum_q16: int,
+) -> tuple[int, int]:
+    if len(lhs_blocks) != len(rhs_blocks):
+        return Q8_0_ERR_BAD_DST_LEN, 0
+
+    total_q16 = initial_accum_q16
+    for (lhs_scale, lhs_qs), (rhs_scale, rhs_qs) in zip(lhs_blocks, rhs_blocks):
+        err, block_dot_q32 = dot_product_block_q32(lhs_scale, lhs_qs, rhs_scale, rhs_qs)
+        if err != Q8_0_OK:
+            return err, 0
+
+        block_dot_q16 = dot_q32_to_q16(block_dot_q32)
+        ok, checked_sum = try_add_i64(total_q16, block_dot_q16)
+        if not ok:
+            return Q8_0_ERR_OVERFLOW, 0
+        total_q16 = checked_sum
+
+    return Q8_0_OK, total_q16
+
+
 def dot_row_blocks_q16(
     lhs_blocks: list[tuple[int, bytes]],
     rhs_blocks: list[tuple[int, bytes]],
@@ -186,6 +209,53 @@ def dot_rows_q16_matrix_vector(
             return Q8_0_ERR_BAD_DST_LEN, []
 
         err, row_dot_q16 = dot_row_blocks_q16(row_slice, vec_blocks[:vec_block_count])
+        if err != Q8_0_OK:
+            return err, []
+
+        out_rows_q16[row_index] = row_dot_q16
+
+    return Q8_0_OK, out_rows_q16
+
+
+def dot_rows_q16_matrix_vector_checked(
+    matrix_blocks: list[tuple[int, bytes]],
+    matrix_block_capacity: int,
+    row_count: int,
+    row_stride_blocks: int,
+    vec_blocks: list[tuple[int, bytes]],
+    vec_block_capacity: int,
+    vec_block_count: int,
+) -> tuple[int, list[int]]:
+    if matrix_block_capacity < 0 or vec_block_capacity < 0:
+        return Q8_0_ERR_BAD_DST_LEN, []
+    if row_count < 0 or row_stride_blocks < 0 or vec_block_count < 0:
+        return Q8_0_ERR_BAD_DST_LEN, []
+    if row_count > 0 and row_stride_blocks < vec_block_count:
+        return Q8_0_ERR_BAD_DST_LEN, []
+    if vec_block_count > vec_block_capacity:
+        return Q8_0_ERR_BAD_DST_LEN, []
+
+    required_matrix_blocks = row_count * row_stride_blocks
+    if required_matrix_blocks > Q8_0_I64_MAX:
+        return Q8_0_ERR_OVERFLOW, []
+    if required_matrix_blocks > matrix_block_capacity:
+        return Q8_0_ERR_BAD_DST_LEN, []
+
+    out_rows_q16 = [0] * row_count
+    for row_index in range(row_count):
+        row_base = row_index * row_stride_blocks
+        if row_base > Q8_0_I64_MAX:
+            return Q8_0_ERR_OVERFLOW, []
+
+        row_slice = matrix_blocks[row_base : row_base + vec_block_count]
+        if len(row_slice) != vec_block_count:
+            return Q8_0_ERR_BAD_DST_LEN, []
+
+        err, row_dot_q16 = dot_product_blocks_q16_accumulate_checked(
+            row_slice,
+            vec_blocks[:vec_block_count],
+            0,
+        )
         if err != Q8_0_OK:
             return err, []
 
@@ -469,6 +539,83 @@ def test_matrix_vector_rejects_stride_smaller_than_vector_span() -> None:
     assert err == Q8_0_ERR_BAD_DST_LEN
 
 
+def test_matrix_vector_checked_matches_unchecked_on_normal_ranges() -> None:
+    rng = random.Random(2026041601)
+
+    for _ in range(180):
+        row_count = rng.randint(1, 6)
+        vec_block_count = rng.randint(1, 6)
+        row_stride_blocks = vec_block_count + rng.randint(0, 3)
+        matrix_block_capacity = row_count * row_stride_blocks
+        vec_block_capacity = vec_block_count
+
+        vec_blocks: list[tuple[int, bytes]] = []
+        for _ in range(vec_block_count):
+            vec_scale = half_bits(rng.uniform(-2.0, 2.0))
+            vec_qs = pack_signed([rng.randint(-128, 127) for _ in range(Q8_0_VALUES_PER_BLOCK)])
+            vec_blocks.append((vec_scale, vec_qs))
+
+        matrix_blocks: list[tuple[int, bytes]] = []
+        for _row in range(row_count):
+            for _ in range(vec_block_count):
+                row_scale = half_bits(rng.uniform(-2.0, 2.0))
+                row_qs = pack_signed([rng.randint(-128, 127) for _ in range(Q8_0_VALUES_PER_BLOCK)])
+                matrix_blocks.append((row_scale, row_qs))
+            for _ in range(row_stride_blocks - vec_block_count):
+                matrix_blocks.append((half_bits(2.0), pack_signed([127] * Q8_0_VALUES_PER_BLOCK)))
+
+        err_unchecked, rows_unchecked = dot_rows_q16_matrix_vector(
+            matrix_blocks,
+            row_count,
+            row_stride_blocks,
+            vec_blocks,
+            vec_block_count,
+        )
+        err_checked, rows_checked = dot_rows_q16_matrix_vector_checked(
+            matrix_blocks,
+            matrix_block_capacity,
+            row_count,
+            row_stride_blocks,
+            vec_blocks,
+            vec_block_capacity,
+            vec_block_count,
+        )
+        assert err_unchecked == Q8_0_OK
+        assert err_checked == Q8_0_OK
+        assert rows_checked == rows_unchecked
+
+
+def test_matrix_vector_checked_rejects_bad_capacities() -> None:
+    matrix_blocks = [(half_bits(1.0), pack_signed([1] * Q8_0_VALUES_PER_BLOCK))] * 4
+    vec_blocks = [(half_bits(1.0), pack_signed([1] * Q8_0_VALUES_PER_BLOCK))] * 2
+
+    err, _ = dot_rows_q16_matrix_vector_checked(matrix_blocks, 3, 2, 2, vec_blocks, 2, 2)
+    assert err == Q8_0_ERR_BAD_DST_LEN
+
+    err, _ = dot_rows_q16_matrix_vector_checked(matrix_blocks, 4, 2, 2, vec_blocks, 1, 2)
+    assert err == Q8_0_ERR_BAD_DST_LEN
+
+
+def test_matrix_vector_checked_reports_row_accumulator_overflow() -> None:
+    scale_max = 0x7C00  # +inf in fp16 -> saturated large q16 in this kernel
+    plus_one = pack_signed([1] + [0] * (Q8_0_VALUES_PER_BLOCK - 1))
+
+    # One block contributes huge positive Q16; two blocks overflow checked row accumulation.
+    row_blocks = [(scale_max, plus_one), (scale_max, plus_one)]
+    vec_blocks = [(scale_max, plus_one), (scale_max, plus_one)]
+
+    err, _ = dot_rows_q16_matrix_vector_checked(
+        row_blocks,
+        2,
+        1,
+        2,
+        vec_blocks,
+        2,
+        2,
+    )
+    assert err == Q8_0_ERR_OVERFLOW
+
+
 def test_checked_q32_matches_unchecked_on_normal_ranges() -> None:
     rng = random.Random(2026041509)
 
@@ -530,6 +677,9 @@ def run() -> None:
     test_q32_to_q16_length_mismatch_error()
     test_matrix_vector_rows_stride_and_values()
     test_matrix_vector_rejects_stride_smaller_than_vector_span()
+    test_matrix_vector_checked_matches_unchecked_on_normal_ranges()
+    test_matrix_vector_checked_rejects_bad_capacities()
+    test_matrix_vector_checked_reports_row_accumulator_overflow()
     test_checked_q32_matches_unchecked_on_normal_ranges()
     test_checked_q32_reports_positive_overflow()
     test_checked_q32_reports_negative_overflow()
