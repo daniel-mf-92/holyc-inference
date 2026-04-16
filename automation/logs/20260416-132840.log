@@ -69,3 +69,8 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_9","type":"todo_list","items":[{"text":"Inspect AVX2 helper code paths","completed":true},{"text":"Implement IQ-103 in HolyC","completed":true},{"text":"Add focused parity validation","completed":true},{"text":"Update tasks and central DB","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":1178721,"cached_input_tokens":1052160,"output_tokens":5554}}
 Codex final exit code: 0
+[main 3ba5b42] feat(inference): codex iteration 20260416-132840
+ 6 files changed, 230 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260416-132840.final.txt
+ create mode 100644 tests/test_q8_0_avx2_hsum_pairs.py
+=== End iteration 12 (outcome=ok) ===
