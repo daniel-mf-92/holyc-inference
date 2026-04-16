@@ -1206,6 +1206,120 @@ I32 RoPEQ16RotateHeadRangeByTokenWindowPreflightedChecked(I64 *head_cells_q16,
     return ROPE_Q16_OK;
 }
 
+// Rotate one head-range across a token window with precomputed head bases.
+//
+// This variant is built for caller-owned scratch buffers so head-base index
+// math is done once:
+//   head_base_cache[h] = range_base_index + h*head_stride_cells
+// Then every token iteration only performs checked position stepping plus
+// per-head pair rotation using cached base indices.
+I32 RoPEQ16RotateHeadRangeByTokenWindowPreflightedHeadBasesChecked(I64 *head_cells_q16,
+                                                                   I64 head_cell_capacity,
+                                                                   I64 range_base_index,
+                                                                   I64 head_count,
+                                                                   I64 head_stride_cells,
+                                                                   I64 head_dim,
+                                                                   I64 pair_stride_cells,
+                                                                   I64 freq_base_q16,
+                                                                   I64 position_start,
+                                                                   I64 token_count,
+                                                                   I64 position_step,
+                                                                   I64 *head_base_cache,
+                                                                   I64 head_base_cache_capacity)
+{
+    I64 token_index;
+    I64 head_index;
+    I64 token_position_offset;
+    I64 token_position;
+    I64 head_base_index;
+    I64 last_head_base_index;
+    I64 last_head_last_pair_y_index;
+    I32 status;
+
+    if (!head_cells_q16 || !head_base_cache)
+        return ROPE_Q16_ERR_NULL_PTR;
+    if (token_count < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (head_base_cache_capacity < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    status = RoPEQ16ValidateHeadRangeCapacityChecked(head_cell_capacity,
+                                                     range_base_index,
+                                                     head_count,
+                                                     head_stride_cells,
+                                                     &last_head_base_index);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPEQ16ValidateHeadRangeSpanForDimChecked(head_cell_capacity,
+                                                       range_base_index,
+                                                       head_count,
+                                                       head_stride_cells,
+                                                       head_dim,
+                                                       pair_stride_cells,
+                                                       &last_head_last_pair_y_index);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    if (head_count > head_base_cache_capacity)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    if (!token_count || !head_count)
+        return ROPE_Q16_OK;
+
+    for (head_index = 0; head_index < head_count; head_index++)
+    {
+        status = RoPEQ16ComputeHeadBaseIndexChecked(range_base_index,
+                                                    head_index,
+                                                    head_stride_cells,
+                                                    &head_base_index);
+        if (status != ROPE_Q16_OK)
+            return status;
+
+        if (head_base_index > last_head_base_index)
+            return ROPE_Q16_ERR_BAD_PARAM;
+
+        head_base_cache[head_index] = head_base_index;
+    }
+
+    for (token_index = 0; token_index < token_count; token_index++)
+    {
+        status = RoPETryMulI64Checked(token_index,
+                                      position_step,
+                                      &token_position_offset);
+        if (status != ROPE_Q16_OK)
+            return status;
+
+        status = RoPETryAddI64Checked(position_start,
+                                      token_position_offset,
+                                      &token_position);
+        if (status != ROPE_Q16_OK)
+            return status;
+
+        for (head_index = 0; head_index < head_count; head_index++)
+        {
+            head_base_index = head_base_cache[head_index];
+            if (head_base_index < 0 || head_base_index > last_head_base_index)
+                return ROPE_Q16_ERR_BAD_PARAM;
+
+            status = RoPEQ16RotateHeadByPositionChecked(head_cells_q16,
+                                                        head_cell_capacity,
+                                                        head_base_index,
+                                                        head_dim,
+                                                        pair_stride_cells,
+                                                        freq_base_q16,
+                                                        token_position);
+            if (status != ROPE_Q16_OK)
+                return status;
+        }
+    }
+
+    if (last_head_last_pair_y_index >= head_cell_capacity)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    return ROPE_Q16_OK;
+}
+
 // Compatibility wrapper preserving existing API name while routing all callers
 // through the explicit preflighted implementation.
 I32 RoPEQ16RotateHeadRangeByTokenWindowChecked(I64 *head_cells_q16,
