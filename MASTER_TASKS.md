@@ -304,12 +304,13 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-114 Add host-side parity harness `tests/test_q8_0_matmul_tiled_avx2_q16.py` for `Q8_0MatMulQ16TiledAVX2Checked` against scalar checked Q16 reference (WS4-03)
 - [x] IQ-115 Implement HolyC `Q4_0Q8_0DotBlocksAVX2Q32Checked` in `src/quant/q4_0_q8_0_dot.HC` by extending AVX2 lane-pack/multiply/reduce flow to mixed-nibble Q4_0 and signed Q8_0 blocks with checked I64 accumulation (WS4-03)
 - [x] IQ-116 Implement HolyC `Q4_0Q8_0MatMulQ32TiledAVX2Checked` in `src/matmul/q4_0_q8_0_matmul.HC` using mixed AVX2 block dots with explicit tile/stride/capacity overflow guards (WS4-03)
-- [ ] IQ-117 Add host-side parity harness `tests/test_q4_0_q8_0_matmul_tiled_avx2_q32.py` for mixed AVX2 tiled Q32 matmul against scalar checked reference outputs (WS4-03)
+- [x] IQ-117 Add host-side parity harness `tests/test_q4_0_q8_0_matmul_tiled_avx2_q32.py` for mixed AVX2 tiled Q32 matmul against scalar checked reference outputs (WS4-03)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-16 | loop-097 | IQ-117 mixed AVX2 tiled Q32 matmul parity harness | done | Added `tests/test_q4_0_q8_0_matmul_tiled_avx2_q32.py` covering known-vector parity, randomized tile/stride shapes, BAD_LEN/NULL checks, and overflow propagation from the mixed AVX2 dot kernel; `python3 tests/test_q4_0_q8_0_matmul_tiled_avx2_q32.py && python3 tests/test_q4_0_q8_0_avx2_blocks_q32.py && python3 tests/test_q4_0_q8_0_matmul_tiled_checked.py` passed |
 | 2026-04-16 | loop-096 | IQ-116 mixed AVX2 tiled Q32 matmul kernel | done | Added `Q4_0Q8_0MatMulQ32TiledAVX2Checked` in `src/matmul/q4_0_q8_0_matmul.HC` with checked tile/stride/capacity overflow guards over mixed AVX2 block dots; `python3 tests/test_q4_0_q8_0_dot_kernel.py && python3 tests/test_q4_0_q8_0_matmul_tiled_checked.py && python3 - <<'PY' ... PY` (`q4_0_q8_0_matmul_tiled_avx2_q32_reference_checks=ok`) passed |
 | 2026-04-16 | loop-095 | IQ-115 mixed AVX2 Q32 dot kernel | done | Added `Q4_0Q8_0DotBlocksAVX2Q32Checked` plus mixed AVX2 lane-pack/pairwise/hsum helpers in `src/quant/q4_0_q8_0_dot.HC` and parity harness `tests/test_q4_0_q8_0_avx2_blocks_q32.py`; `python3 tests/test_q4_0_q8_0_avx2_blocks_q32.py && python3 tests/test_q4_0_q8_0_dot_kernel.py && python3 tests/test_q8_0_avx2_blocks_q32.py` passed |
 | 2026-04-16 | loop-094 | IQ-113 AVX2 tiled Q16 matmul kernel | done | Verified `Q8_0MatMulQ16TiledAVX2Checked` in `src/matmul/q8_0_matmul.HC` matches single-rounding Q32->Q16 contract with focused parity suite; `python3 tests/test_q8_0_matmul_tiled_avx2_q16.py && python3 tests/test_q8_0_matmul_tiled_avx2_q32.py && python3 tests/test_q8_0_avx2_rows_q32_to_q16.py` passed |
