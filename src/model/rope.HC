@@ -898,6 +898,71 @@ I32 RoPEQ16ValidateHeadRangeCapacityChecked(I64 head_cell_capacity,
     return ROPE_Q16_OK;
 }
 
+// Preflight full per-head RoPE span bounds across a contiguous head range.
+// For each head `h` in `[0, head_count)` this validates:
+//   head_base(h) = range_base_index + h*head_stride_cells
+//   last_pair_y(h) = head_base(h) + ((head_dim/2)-1)*pair_stride_cells + 1
+// with checked arithmetic and `last_pair_y(h) < head_cell_capacity`.
+//
+// This runs before multi-head rotation loops so callers can fail fast on
+// malformed head ranges/dimensions without mutating tensor cells.
+I32 RoPEQ16ValidateHeadRangeSpanForDimChecked(I64 head_cell_capacity,
+                                              I64 range_base_index,
+                                              I64 head_count,
+                                              I64 head_stride_cells,
+                                              I64 head_dim,
+                                              I64 pair_stride_cells,
+                                              I64 *out_last_head_last_pair_y_index)
+{
+    I64 head_index;
+    I64 head_base_index;
+    I64 last_head_base_index;
+    I64 last_pair_y_index;
+    I32 status;
+
+    if (!out_last_head_last_pair_y_index)
+        return ROPE_Q16_ERR_NULL_PTR;
+
+    status = RoPEQ16ValidateHeadRangeCapacityChecked(head_cell_capacity,
+                                                     range_base_index,
+                                                     head_count,
+                                                     head_stride_cells,
+                                                     &last_head_base_index);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    if (!head_count)
+    {
+        // Empty range is a no-op and has no per-head pair span.
+        *out_last_head_last_pair_y_index = range_base_index;
+        return ROPE_Q16_OK;
+    }
+
+    for (head_index = 0; head_index < head_count; head_index++)
+    {
+        status = RoPEQ16ComputeHeadBaseIndexChecked(range_base_index,
+                                                    head_index,
+                                                    head_stride_cells,
+                                                    &head_base_index);
+        if (status != ROPE_Q16_OK)
+            return status;
+
+        if (head_base_index > last_head_base_index)
+            return ROPE_Q16_ERR_BAD_PARAM;
+
+        status = RoPEQ16ValidateHeadSpanForDimChecked(head_cell_capacity,
+                                                      head_base_index,
+                                                      head_dim,
+                                                      pair_stride_cells,
+                                                      &last_pair_y_index);
+        if (status != ROPE_Q16_OK)
+            return status;
+    }
+
+    *out_last_head_last_pair_y_index = last_pair_y_index;
+    return ROPE_Q16_OK;
+}
+
 // Rotate a contiguous range of attention heads in-place at one token position.
 // For head index `h` in `[0, head_count)`, this derives:
 //   head_base = range_base_index + h*head_stride_cells
