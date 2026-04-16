@@ -139,6 +139,124 @@ def test_lane_order_invariant_pair_sensitivity() -> None:
     assert got2 == -396114
 
 
+def test_pair_grouping_contract_matches_mul_then_hsum() -> None:
+    # Adversarial signed edge pattern keeps every pair distinct so lane grouping
+    # bugs show up immediately (wrong lane stride/order changes pair sequence).
+    lhs = [
+        -32768,
+        32767,
+        -30000,
+        29999,
+        -20000,
+        19999,
+        -16384,
+        16383,
+        -8192,
+        8191,
+        -4096,
+        4095,
+        -2048,
+        2047,
+        -1024,
+        1023,
+        -512,
+        511,
+        -255,
+        254,
+        -128,
+        127,
+        -64,
+        63,
+        -32,
+        31,
+        -16,
+        15,
+        -8,
+        7,
+        -2,
+        1,
+    ]
+    rhs = [
+        1,
+        -2,
+        7,
+        -8,
+        15,
+        -16,
+        31,
+        -32,
+        63,
+        -64,
+        127,
+        -128,
+        254,
+        -255,
+        511,
+        -512,
+        1023,
+        -1024,
+        2047,
+        -2048,
+        4095,
+        -4096,
+        8191,
+        -8192,
+        16383,
+        -16384,
+        19999,
+        -20000,
+        29999,
+        -30000,
+        32767,
+        -32768,
+    ]
+
+    err_pairs, pair_terms = q8_0_mul_i16_lanes_to_i32_pairs_avx2(lhs, rhs)
+    assert err_pairs == Q8_0_AVX2_OK
+
+    err_hsum, reduced = q8_0_hsum_i32_pairs_avx2(pair_terms)
+    assert err_hsum == Q8_0_AVX2_OK
+
+    err_dot, direct_dot = q8_0_dot_i16_lanes_avx2(lhs, rhs)
+    assert err_dot == Q8_0_AVX2_OK
+
+    assert reduced == direct_dot
+    assert direct_dot == sum(int(a) * int(b) for a, b in zip(lhs, rhs))
+
+
+def test_lane_order_mismatch_changes_dot_predictably() -> None:
+    # Dot helper must preserve lane order: rotating one side changes output.
+    lhs = list(range(-16, 16))
+    rhs = [v * 3 for v in range(-16, 16)]
+
+    err_base, base_dot = q8_0_dot_i16_lanes_avx2(lhs, rhs)
+    assert err_base == Q8_0_AVX2_OK
+
+    rotated_rhs = rhs[1:] + rhs[:1]
+    err_rot, rot_dot = q8_0_dot_i16_lanes_avx2(lhs, rotated_rhs)
+    assert err_rot == Q8_0_AVX2_OK
+
+    assert base_dot == sum(int(a) * int(b) for a, b in zip(lhs, rhs))
+    assert rot_dot == sum(int(a) * int(b) for a, b in zip(lhs, rotated_rhs))
+    assert rot_dot != base_dot
+
+
+def test_reduction_overflow_probe_path() -> None:
+    # Lane dot itself cannot overflow I64 with 16 I32 terms, but the reduction
+    # helper is designed for future wider streams and must keep guards correct.
+    probe = [0] * Q8_0_AVX2_PAIR_COUNT
+    probe[0] = Q8_0_AVX2_I64_MAX
+    probe[1] = 1
+
+    err, _ = q8_0_hsum_i32_pairs_avx2(probe)
+    assert err == Q8_0_AVX2_ERR_OVERFLOW
+
+    probe[0] = Q8_0_AVX2_I64_MIN
+    probe[1] = -1
+    err, _ = q8_0_hsum_i32_pairs_avx2(probe)
+    assert err == Q8_0_AVX2_ERR_OVERFLOW
+
+
 def test_len_and_null_errors() -> None:
     err, _ = q8_0_dot_i16_lanes_avx2(None, [0] * 32)
     assert err == Q8_0_AVX2_ERR_NULL_PTR
@@ -157,6 +275,9 @@ def run() -> None:
     test_known_signed_edge_contract()
     test_randomized_matches_scalar_reference()
     test_lane_order_invariant_pair_sensitivity()
+    test_pair_grouping_contract_matches_mul_then_hsum()
+    test_lane_order_mismatch_changes_dot_predictably()
+    test_reduction_overflow_probe_path()
     test_len_and_null_errors()
     print("q8_0_avx2_dot_lanes_reference_checks=ok")
 

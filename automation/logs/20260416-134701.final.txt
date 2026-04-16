@@ -1,0 +1,17 @@
+Done — one full unattended iteration is complete.
+
+**What Changed**
+- Completed `IQ-105` by expanding adversarial AVX2 lane-dot parity coverage in `tests/test_q8_0_avx2_dot_lanes.py:1`.
+- Added stronger checks: pair-grouping composition parity (`mul_pairs`→`hsum`), lane-order mismatch sensitivity, and explicit reduction overflow probes.
+- Updated queue/ledger in `MASTER_TASKS.md:294` (`IQ-105` checked), `MASTER_TASKS.md:295` (new `IQ-106` added), and `MASTER_TASKS.md:300` (single-line progress entry).
+
+**Validation**
+- Ran: `python3 tests/test_q8_0_avx2_dot_lanes.py && python3 tests/test_q8_0_avx2_mul_pairs.py && python3 tests/test_q8_0_avx2_hsum_pairs.py`
+- Output:
+  - `q8_0_avx2_dot_lanes_reference_checks=ok`
+  - `q8_0_avx2_mul_pairs_reference_checks=ok`
+  - `q8_0_avx2_hsum_pairs_reference_checks=ok`
+
+**Bookkeeping**
+- Logged central DB iteration in `~/Documents/local-codebases/temple-central.db` as `id=1187`, `agent=inference`, `task_id=IQ-105`, `status=pass`.
+- Queue depth policy satisfied: unchecked `IQ-` count is `15` after completion.
