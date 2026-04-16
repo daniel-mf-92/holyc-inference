@@ -1,0 +1,24 @@
+Completed one full iteration for `IQ-128` end-to-end.
+
+**What Changed**
+- Added new parity harness `tests/test_q8_0_matmul_tiled_rhs_base_preflight.py:1` covering helper parity (targeted + randomized) and entrypoint parity for RHS-base-related BAD_LEN/OVERFLOW surfaces.
+- Added shared scalar helper `compute_rhs_col_base_checked` in `tests/test_q8_0_matmul_tiled_checked.py:59`.
+- Routed scalar tiled Q16 path through that helper in `tests/test_q8_0_matmul_tiled_checked.py:145`.
+- Marked `IQ-128` done and appended `IQ-129` to keep queue depth policy satisfied in `MASTER_TASKS.md:319` and `MASTER_TASKS.md:320`.
+- Added one progress ledger line in `MASTER_TASKS.md:440`.
+
+**Validation**
+- Ran:
+  - `python3 tests/test_q8_0_matmul_tiled_rhs_base_preflight.py`
+  - `python3 tests/test_q8_0_matmul_tiled_out_index_preflight.py`
+  - `python3 tests/test_q8_0_matmul_tiled_avx2_preflight.py`
+- Output:
+  - `q8_0_matmul_tiled_rhs_base_preflight=ok`
+  - `q8_0_matmul_tiled_out_index_preflight=ok`
+  - `q8_0_matmul_tiled_avx2_preflight_parity=ok`
+
+**DB Log**
+- Inserted iteration row into `~/Documents/local-codebases/temple-central.db` with `task_id='IQ-128'`, `status='pass'`, validation result `ok` (record id `1477`).
+
+**Queue Policy**
+- Unchecked queue count is maintained at `15` after completion (`IQ-128` checked, `IQ-129` appended).

@@ -316,7 +316,8 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 
 - [x] IQ-126 Implement HolyC helper `Q8_0MatMulTiledComputeRhsColBaseChecked` in `src/matmul/q8_0_matmul.HC` to centralize checked `col_index*rhs_col_stride_blocks` math across scalar/AVX2 tiled paths (WS4-03)
 - [x] IQ-127 Implement HolyC helper `Q8_0MatMulTiledComputeSpanBoundsChecked` in `src/matmul/q8_0_matmul.HC` to unify tile span validation and `min(start+span,len)` semantics for row/col loops (WS4-03)
-- [ ] IQ-128 Add host-side parity harness `tests/test_q8_0_matmul_tiled_rhs_base_preflight.py` asserting scalar/AVX2 parity for checked RHS column-base overflow surfaces (WS4-03)
+- [x] IQ-128 Add host-side parity harness `tests/test_q8_0_matmul_tiled_rhs_base_preflight.py` asserting scalar/AVX2 parity for checked RHS column-base overflow surfaces (WS4-03)
+- [ ] IQ-129 Add host-side parity harness `tests/test_q8_0_matmul_tiled_row_base_preflight.py` asserting scalar/AVX2 parity for checked row-base overflow surfaces (`row_index*row_stride`) across tiled Q16/Q32 entrypoints (WS4-03)
 
 ## Progress Ledger
 
@@ -436,6 +437,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 | 2026-04-15 | loop-032 | IQ-078 FPQ16Log2 helper | done | Added `FPQ16Log2` in `src/math/intlog.HC` with overflow-safe Q16 scaling via `1/ln(2)`; expanded `tests/test_intlog_q16.py`; `python3 tests/test_intlog_q16.py` passed |
 | 2026-04-15 | loop-033 | IQ-080 FPQ16 entropy helper | done | Added `FPQ16EntropyFromProbs` in `src/math/softmax.HC`; validated with `python3 - <<'PY' ... PY` (`softmax_entropy_q16_reference_checks=ok`) |
 
+| 2026-04-16 | loop-100 | IQ-128 RHS column-base preflight parity | done | Added `tests/test_q8_0_matmul_tiled_rhs_base_preflight.py` + scalar helper reuse in `tests/test_q8_0_matmul_tiled_checked.py`; `python3 tests/test_q8_0_matmul_tiled_rhs_base_preflight.py && python3 tests/test_q8_0_matmul_tiled_out_index_preflight.py && python3 tests/test_q8_0_matmul_tiled_avx2_preflight.py` passed |
 ## Blockers & Decisions
 
 - HolyC float support: deferred. Use integer-only quantized inference (Q4_0, Q8_0).

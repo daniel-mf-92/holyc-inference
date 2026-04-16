@@ -56,6 +56,17 @@ def compute_out_index_checked(out_row_base: int, col_index: int) -> tuple[int, i
     return Q8_0_OK, out_index
 
 
+def compute_rhs_col_base_checked(col_index: int, rhs_col_stride_blocks: int) -> tuple[int, int]:
+    if col_index < 0 or rhs_col_stride_blocks < 0:
+        return Q8_0_ERR_BAD_DST_LEN, 0
+
+    ok, rhs_col_base = try_mul_i64_nonneg(col_index, rhs_col_stride_blocks)
+    if not ok:
+        return Q8_0_ERR_OVERFLOW, 0
+
+    return Q8_0_OK, rhs_col_base
+
+
 def q8_0_matmul_q16_tiled_checked(
     lhs_blocks: list[tuple[int, bytes]],
     lhs_block_capacity: int,
@@ -131,9 +142,9 @@ def q8_0_matmul_q16_tiled_checked(
                     return Q8_0_ERR_BAD_DST_LEN, []
 
                 for col_index in range(col_tile_start, col_tile_end):
-                    ok, rhs_col_base = try_mul_i64_nonneg(col_index, rhs_col_stride_blocks)
-                    if not ok:
-                        return Q8_0_ERR_OVERFLOW, []
+                    err, rhs_col_base = compute_rhs_col_base_checked(col_index, rhs_col_stride_blocks)
+                    if err != Q8_0_OK:
+                        return err, []
                     err, out_index = compute_out_index_checked(out_row_base, col_index)
                     if err != Q8_0_OK:
                         return err, []
@@ -268,9 +279,9 @@ def q8_0_matmul_q32_tiled_avx2_checked(
                     return Q8_0_ERR_BAD_DST_LEN, []
 
                 for col_index in range(col_tile_start, col_tile_end):
-                    ok, rhs_col_base = try_mul_i64_nonneg(col_index, rhs_col_stride_blocks)
-                    if not ok:
-                        return Q8_0_ERR_OVERFLOW, []
+                    err, rhs_col_base = compute_rhs_col_base_checked(col_index, rhs_col_stride_blocks)
+                    if err != Q8_0_OK:
+                        return err, []
                     ok, out_index = try_add_i64_nonneg(out_row_base, col_index)
                     if not ok:
                         return Q8_0_ERR_OVERFLOW, []
@@ -441,9 +452,9 @@ def q8_0_matmul_q16_tiled_avx2_checked(
                     return Q8_0_ERR_BAD_DST_LEN, []
 
                 for col_index in range(col_tile_start, col_tile_end):
-                    ok, rhs_col_base = try_mul_i64_nonneg(col_index, rhs_col_stride_blocks)
-                    if not ok:
-                        return Q8_0_ERR_OVERFLOW, []
+                    err, rhs_col_base = compute_rhs_col_base_checked(col_index, rhs_col_stride_blocks)
+                    if err != Q8_0_OK:
+                        return err, []
                     ok, out_index = try_add_i64_nonneg(out_row_base, col_index)
                     if not ok:
                         return Q8_0_ERR_OVERFLOW, []
