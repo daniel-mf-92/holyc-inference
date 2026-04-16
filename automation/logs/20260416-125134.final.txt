@@ -1,0 +1,18 @@
+Completed one full loop iteration for `IQ-099` with HolyC runtime code + focused validation.
+
+**What Changed**
+- Implemented checked tiled Q8_0 matmul kernel `Q8_0MatMulQ16TiledChecked` with explicit tile traversal, stride/capacity contracts, and I64 overflow guards in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/matmul/q8_0_matmul.HC:69`.
+- Added overflow helper primitives used by the kernel (`Q8_0MatMulTryMulI64NonNeg`, `Q8_0MatMulTryAddI64NonNeg`) in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/matmul/q8_0_matmul.HC:29`.
+- Added host-side parity harness for tiled-vs-untiled correctness, bounds rejection, and overflow adversarial cases in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_q8_0_matmul_tiled_checked.py:42`.
+- Marked queue item done and added one ledger line in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:288` and `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:295`.
+
+**Validation**
+- Ran: `python3 tests/test_q8_0_matmul_tiled_checked.py && python3 tests/test_q8_0_dot.py && python3 tests/test_q8_0_dot_matrix_vector_checked.py`
+- Output:
+  - `q8_0_matmul_tiled_checked_reference_checks=ok`
+  - `q8_0_dot_reference_checks=ok`
+  - `q8_0_dot_matrix_vector_checked_checks=ok`
+
+**Queue + DB**
+- Queue depth policy satisfied: unchecked `IQ-` items now `16` (>=15).
+- Logged to central DB `~/Documents/local-codebases/temple-central.db` as iteration row `id=1127`, `task_id=IQ-099`, `status=pass`.

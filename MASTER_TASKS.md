@@ -285,13 +285,14 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-096 Implement HolyC `Q8_0DotRowBlocksQ16Checked` alias helper in `src/quant/q8_0_dot.HC` for explicit checked row-dot call-sites reusing `Q8_0DotProductBlocksQ16AccumulateChecked` semantics (WS4-02)
 - [x] IQ-097 Implement HolyC compatibility wrapper `Q8_0_DotRowsQ16MatrixVectorChecked` in `src/quant/q8_0_dot.HC` for mixed kernel naming parity with checked extent/overflow path (WS4-02)
 - [x] IQ-098 Add host-side parity harness `tests/test_q8_0_dot_matrix_vector_checked.py` for `Q8_0DotRowsQ16MatrixVectorChecked` covering capacity bounds, row-base overflow guards, and adversarial accumulator overflow vectors (WS4-02)
-- [ ] IQ-099 Implement HolyC checked Q8_0 tiled matmul kernel `Q8_0MatMulQ16TiledChecked` in `src/matmul/q8_0_matmul.HC` (explicit tile bounds, row/col stride, and I64 overflow guards) (WS4-03)
+- [x] IQ-099 Implement HolyC checked Q8_0 tiled matmul kernel `Q8_0MatMulQ16TiledChecked` in `src/matmul/q8_0_matmul.HC` (explicit tile bounds, row/col stride, and I64 overflow guards) (WS4-03)
 - [ ] IQ-100 Implement HolyC checked mixed tiled matmul kernel `Q4_0Q8_0MatMulQ16TiledChecked` in `src/matmul/q4_0_q8_0_matmul.HC` reusing mixed dot kernels with explicit K-block contracts (WS4-03)
 - [ ] IQ-101 Implement HolyC AVX2 lane-pack helper `Q8_0Pack32ToI16LanesAVX2` in `src/quant/q8_0_avx2.HC` as a preparatory primitive for WS4 tiled AVX2 matmul inner loops (WS4-03)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
+| 2026-04-16 | loop-079 | IQ-099 checked Q8_0 tiled matmul kernel | done | Added `Q8_0MatMulQ16TiledChecked` in `src/matmul/q8_0_matmul.HC` + parity harness `tests/test_q8_0_matmul_tiled_checked.py`; `python3 tests/test_q8_0_matmul_tiled_checked.py && python3 tests/test_q8_0_dot.py && python3 tests/test_q8_0_dot_matrix_vector_checked.py` passed |
 | 2026-04-16 | loop-078 | IQ-098 checked Q8_0 matrix×vector parity harness | done | Added `tests/test_q8_0_dot_matrix_vector_checked.py`; `python3 tests/test_q8_0_dot_matrix_vector_checked.py && python3 tests/test_q8_0_dot.py` passed |
 | 2026-04-16 | loop-076 | IQ-096 checked Q8_0 row-dot alias helper | done | Added `Q8_0DotRowBlocksQ16Checked` in `src/quant/q8_0_dot.HC` and checked-row parity/overflow coverage in `tests/test_q8_0_dot.py`; `python3 tests/test_q8_0_dot.py` passed |
 | 2026-04-16 | loop-075 | IQ-095 Q8_0 checked matrix×vector kernel | done | Added `Q8_0DotProductBlocksQ16AccumulateChecked` + `Q8_0DotRowsQ16MatrixVectorChecked` in `src/quant/q8_0_dot.HC` with explicit capacity/overflow guards and adversarial parity coverage in `tests/test_q8_0_dot.py`; `python3 tests/test_q8_0_dot.py` passed |
