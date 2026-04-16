@@ -1,0 +1,18 @@
+Implemented a full IQ-100 iteration end-to-end with HolyC runtime code plus host-side parity validation.
+
+**What Changed**
+- Added checked mixed tiled matmul kernel `Q4_0Q8_0MatMulQ16TiledChecked` with explicit extent/capacity/overflow guards and tiled row/col traversal in `src/matmul/q4_0_q8_0_matmul.HC:75`.
+- Added non-negative checked multiply/add helpers used by all extent/index proofs in `src/matmul/q4_0_q8_0_matmul.HC:35`.
+- Wired inner cell compute to checked mixed dot accumulation (`Q4_0_Q8_0DotProductBlocksQ16AccumulateChecked`) in `src/matmul/q4_0_q8_0_matmul.HC:179`.
+- Added focused parity/overflow harness for tiled-vs-untiled equivalence in `tests/test_q4_0_q8_0_matmul_tiled_checked.py:137`.
+
+**Validation**
+- Ran: `python3 tests/test_q4_0_q8_0_matmul_tiled_checked.py && python3 tests/test_q4_0_q8_0_dot_kernel.py`
+- Output: `q4_0_q8_0_matmul_tiled_checked_reference_checks=ok`
+- Output: `q4_0_q8_0_dot_kernel_reference_checks=ok`
+
+**Task/Queue/DB Updates**
+- Marked IQ complete: `MASTER_TASKS.md:289`.
+- Added one progress ledger line: `MASTER_TASKS.md:295`.
+- Queue depth policy satisfied: 15 unchecked `IQ-` items remain (meets 15+ contract).
+- Logged central DB iteration row for `IQ-100` as `pass` in `~/Documents/local-codebases/temple-central.db`.
