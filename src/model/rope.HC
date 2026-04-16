@@ -573,3 +573,49 @@ I32 RoPEQ16RotatePairChecked(I64 x_q16,
                                 y_cos,
                                 out_y_rot_q16);
 }
+
+// Compose full one-step rotary application for one pair at one token position:
+//   step  = base^(-(2*pair_index)/head_dim)
+//   angle = position * step
+//   (x',y') = rotate((x,y), angle)
+//
+// Contracts:
+//   - freq_base_q16 must be > 0.
+//   - head_dim must be positive and even.
+//   - pair_index must be in [0, head_dim/2).
+//   - position must be >= 0.
+I32 RoPEQ16RotatePairByPositionChecked(I64 x_q16,
+                                       I64 y_q16,
+                                       I64 freq_base_q16,
+                                       I64 head_dim,
+                                       I64 pair_index,
+                                       I64 position,
+                                       I64 *out_x_rot_q16,
+                                       I64 *out_y_rot_q16)
+{
+    I64 angle_step_q16;
+    I64 angle_q16;
+    I32 status;
+
+    if (!out_x_rot_q16 || !out_y_rot_q16)
+        return ROPE_Q16_ERR_NULL_PTR;
+
+    status = RoPEQ16AngleStepChecked(freq_base_q16,
+                                     head_dim,
+                                     pair_index,
+                                     &angle_step_q16);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPEQ16AngleForPositionChecked(angle_step_q16,
+                                            position,
+                                            &angle_q16);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    return RoPEQ16RotatePairChecked(x_q16,
+                                    y_q16,
+                                    angle_q16,
+                                    out_x_rot_q16,
+                                    out_y_rot_q16);
+}

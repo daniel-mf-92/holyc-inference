@@ -324,12 +324,14 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-133 Implement HolyC `RoPEQ16AngleStepChecked` in `src/model/rope.HC` to compute per-head rotary angle increments with checked Q16 fixed-point multiply/divide and explicit overflow domain guards before WS5 attention integration (WS5-01)
 - [ ] IQ-134 Implement HolyC `RoPEQ16AngleForPositionChecked` in `src/model/rope.HC` to compute checked `pos * angle_step` radians in Q16 with explicit overflow/domain guards for WS5 attention rotation kernels (WS5-01)
 - [x] IQ-135 Implement HolyC `RoPEQ16RotatePairChecked` in `src/model/rope.HC` to rotate `(x_q16,y_q16)` by `angle_q16` using integer sin/cos Q16 helpers with checked mul/add overflow guards for WS5 rotary application (WS5-01)
-- [ ] IQ-136 Implement HolyC `RoPEQ16RotatePairByPositionChecked` in `src/model/rope.HC` that composes `RoPEQ16AngleStepChecked` + `RoPEQ16AngleForPositionChecked` + `RoPEQ16RotatePairChecked` for one-step checked rotary application at `(head_dim,pair_index,position)` (WS5-01)
+- [x] IQ-136 Implement HolyC `RoPEQ16RotatePairByPositionChecked` in `src/model/rope.HC` that composes `RoPEQ16AngleStepChecked` + `RoPEQ16AngleForPositionChecked` + `RoPEQ16RotatePairChecked` for one-step checked rotary application at `(head_dim,pair_index,position)` (WS5-01)
+- [ ] IQ-137 Implement HolyC `RoPEQ16RotateHeadByPositionChecked` in `src/model/rope.HC` to apply checked rotary updates across all `(x,y)` pairs in one head slice with stride/capacity guards for WS5 attention kernels (WS5-01)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-16 | loop-116 | IQ-136 RoPE Q16 rotate-by-position helper | done | Added `RoPEQ16RotatePairByPositionChecked` in `src/model/rope.HC` plus parity harness `tests/test_rope_q16_rotate_pair_position.py`; `python3 tests/test_rope_q16_rotate_pair_position.py && python3 tests/test_rope_q16_rotate_pair.py && python3 tests/test_rope_q16_angle_position.py && python3 tests/test_rope_q16_angle_step.py` passed |
 | 2026-04-16 | loop-114 | IQ-032 mixed Q4_0×Q8_0 parity harness | done | Added `tests/test_q4_0_q8_0_dot.py` with GGML-bounded single/multiblock Q32 parity and checked Q16-accumulator bounds; `python3 tests/test_q4_0_q8_0_dot.py && python3 tests/test_q4_0_q8_0_dot_kernel.py` passed |
 | 2026-04-16 | loop-115 | IQ-135 RoPE Q16 rotate-pair helper | done | Added integer-only sin/cos approximation + checked rotate pair helper in `src/model/rope.HC` and parity harness `tests/test_rope_q16_rotate_pair.py`; `python3 tests/test_rope_q16_rotate_pair.py && python3 tests/test_rope_q16_angle_position.py && python3 tests/test_rope_q16_angle_step.py` passed |
 | 2026-04-16 | loop-113 | IQ-133 RoPE Q16 angle-step helper | done | Added `src/model/rope.HC` (`RoPEQ16AngleStepChecked` + checked Q16 mul/div/add primitives) and `tests/test_rope_q16_angle_step.py`; `python3 tests/test_rope_q16_angle_step.py && python3 tests/test_intlog_q16.py` passed |
