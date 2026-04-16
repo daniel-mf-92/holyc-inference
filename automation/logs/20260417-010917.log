@@ -90,3 +90,8 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_17","type":"todo_list","items":[{"text":"Review current RoPE token-window code","completed":true},{"text":"Implement IQ-149 HolyC helper","completed":true},{"text":"Add parity validation test","completed":true},{"text":"Run focused tests and update tracking","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":1837883,"cached_input_tokens":1663104,"output_tokens":9485}}
 Codex final exit code: 0
+[main 84e2374] feat(inference): codex iteration 20260417-010917
+ 6 files changed, 521 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260417-010917.final.txt
+ create mode 100644 tests/test_rope_q16_rotate_head_range_token_window_preflighted_head_bases.py
+=== End iteration 58 (outcome=ok) ===
