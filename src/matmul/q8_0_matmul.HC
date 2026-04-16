@@ -69,6 +69,18 @@ I64 Q8_0MatMulMinI64(I64 lhs, I64 rhs)
     return rhs;
 }
 
+// Shared tile-shape contract for tiled Q8_0 matmul call-sites.
+// Both tile extents must be strictly positive so tiled traversal always
+// makes forward progress and never loops forever on zero-sized tiles.
+I32 Q8_0MatMulTiledValidateTileShapeChecked(I64 tile_rows,
+                                            I64 tile_cols)
+{
+    if (tile_rows <= 0 || tile_cols <= 0)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    return Q8_0_MATMUL_OK;
+}
+
 // Shared stride/K-span invariants for tiled Q8_0 matmul call-sites.
 // This centralizes the active-K and output-row-stride checks used by
 // scalar and AVX2 entrypoints so BAD_LEN surfaces stay identical.
@@ -165,8 +177,11 @@ I32 Q8_0MatMulTiledValidateArgsChecked(
                                                        out_row_stride_cells);
     if (status != Q8_0_MATMUL_OK)
         return status;
-    if (tile_rows <= 0 || tile_cols <= 0)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    status = Q8_0MatMulTiledValidateTileShapeChecked(tile_rows,
+                                                     tile_cols);
+    if (status != Q8_0_MATMUL_OK)
+        return status;
 
     status = Q8_0MatMulTiledComputeRequiredCapacitiesChecked(row_count,
                                                              lhs_row_stride_blocks,

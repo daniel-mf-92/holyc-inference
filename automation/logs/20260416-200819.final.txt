@@ -1,0 +1,20 @@
+Completed a full unattended iteration for `IQ-122` with queue maintenance and logging.
+
+**What Changed**
+- Added HolyC helper `Q8_0MatMulTiledValidateTileShapeChecked` and routed shared preflight through it in `src/matmul/q8_0_matmul.HC:75`.
+- Replaced inline tile-shape check in preflight with helper call in `src/matmul/q8_0_matmul.HC:181`.
+- Added focused scalar+AVX2 parity harness for tile-shape invariants in `tests/test_q8_0_matmul_tiled_tile_shape_preflight.py:1`.
+- Marked `IQ-122` done, added one new unchecked queue item `IQ-123`, and appended one ledger line in `MASTER_TASKS.md:312`.
+
+**Validation**
+- Ran: `python3 tests/test_q8_0_matmul_tiled_tile_shape_preflight.py && python3 tests/test_q8_0_matmul_tiled_stride_k_preflight.py && python3 tests/test_q8_0_matmul_tiled_avx2_preflight.py && python3 tests/test_q8_0_matmul_tiled_avx2_q16.py && python3 tests/test_q8_0_matmul_tiled_avx2_q32.py`
+- Output:
+  - `q8_0_matmul_tiled_tile_shape_preflight=ok`
+  - `q8_0_matmul_tiled_stride_k_preflight=ok`
+  - `q8_0_matmul_tiled_avx2_preflight_parity=ok`
+  - `q8_0_matmul_tiled_avx2_q16_reference_checks=ok`
+  - `q8_0_matmul_tiled_avx2_q32_reference_checks=ok`
+
+**Contract Checks**
+- Queue depth preserved at 15 unchecked IQ items (includes new `IQ-123`).
+- Central DB logged: inserted `iterations` row for `IQ-122` with `status=pass` and `validation_result=ok` in `~/Documents/local-codebases/temple-central.db`.
