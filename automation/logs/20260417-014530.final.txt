@@ -1,0 +1,17 @@
+Done — I completed one full iteration on `IQ-155` with queue depth maintained.
+
+**What Changed**
+- Implemented `FPQ16RMSNormApplyInvDenomWeightedChecked` with checked two-stage math (`inv_denom` scaling + per-channel gamma multiply) in `src/math/rmsnorm.HC:69`.
+- Added required checked helper prototype usage for weighted stage multiplication in `src/math/rmsnorm.HC:16`.
+- Added host-side parity/contract harness `tests/test_rmsnorm_apply_inv_denom_weighted_checked.py:2`.
+- Marked `IQ-155` done, appended new unchecked `IQ-156`, and added one ledger line in `MASTER_TASKS.md:346`, `MASTER_TASKS.md:347`, `MASTER_TASKS.md:354`.
+
+**Validation**
+- Ran: `python3 tests/test_rmsnorm_apply_inv_denom_weighted_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_checked.py`
+- Output:
+  - `rmsnorm_apply_inv_denom_weighted_checked_reference_checks=ok`
+  - `rmsnorm_apply_inv_denom_checked_reference_checks=ok`
+
+**Bookkeeping**
+- Queue depth check: `unchecked_iq=15` (policy satisfied).
+- Logged central DB iteration for `IQ-155` as pass in `~/Documents/local-codebases/temple-central.db` (verified latest row: `inference|IQ-155|pass|ok`).
