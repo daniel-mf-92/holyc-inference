@@ -108,6 +108,29 @@ I32 RoPETrySubI64Checked(I64 lhs, I64 rhs, I64 *out_diff)
                                 out_diff);
 }
 
+I32 RoPETryMulI64Checked(I64 lhs, I64 rhs, I64 *out_prod)
+{
+    U64 abs_lhs;
+    U64 abs_rhs;
+    U64 abs_prod;
+    Bool is_negative;
+
+    if (!out_prod)
+        return ROPE_Q16_ERR_NULL_PTR;
+
+    abs_lhs = RoPEAbsToU64(lhs);
+    abs_rhs = RoPEAbsToU64(rhs);
+    is_negative = ((lhs < 0) ^ (rhs < 0));
+
+    if (abs_lhs && abs_rhs && abs_lhs > (ROPE_U64_MAX_VALUE / abs_rhs))
+        return ROPE_Q16_ERR_OVERFLOW;
+
+    abs_prod = abs_lhs * abs_rhs;
+    return RoPEApplySignFromMagnitudeChecked(abs_prod,
+                                             is_negative,
+                                             out_prod);
+}
+
 I32 RoPEQ16FromIntChecked(I64 x, I64 *out_q16)
 {
     if (!out_q16)
@@ -618,4 +641,96 @@ I32 RoPEQ16RotatePairByPositionChecked(I64 x_q16,
                                     angle_q16,
                                     out_x_rot_q16,
                                     out_y_rot_q16);
+}
+
+// Rotate all Q16 `(x,y)` pairs for one attention head slice in-place.
+// Layout contract:
+//   - For pair index `i`, `x` is at `head_base_index + i*pair_stride_cells`.
+//   - The corresponding `y` is at `x_index + 1`.
+// This mirrors interleaved RoPE layouts like `[x0,y0,x1,y1,...]` when stride=2,
+// and also supports wider-stride packed layouts used by caller-owned buffers.
+I32 RoPEQ16RotateHeadByPositionChecked(I64 *head_cells_q16,
+                                       I64 head_cell_capacity,
+                                       I64 head_base_index,
+                                       I64 head_dim,
+                                       I64 pair_stride_cells,
+                                       I64 freq_base_q16,
+                                       I64 position)
+{
+    I64 pair_count;
+    I64 pair_index;
+    I64 pair_offset;
+    I64 x_index;
+    I64 y_index;
+    I64 x_q16;
+    I64 y_q16;
+    I64 x_rot_q16;
+    I64 y_rot_q16;
+    I32 status;
+
+    if (!head_cells_q16)
+        return ROPE_Q16_ERR_NULL_PTR;
+
+    if (head_cell_capacity < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (head_base_index < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (head_dim <= 0 || (head_dim & 1))
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (pair_stride_cells < 2)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    if (head_base_index >= head_cell_capacity)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    pair_count = head_dim >> 1;
+
+    for (pair_index = 0; pair_index < pair_count; pair_index++)
+    {
+        // Checked index math keeps every address derivation auditable:
+        //   pair_offset = pair_index * pair_stride
+        //   x_index = head_base + pair_offset
+        //   y_index = x_index + 1
+        status = RoPETryMulI64Checked(pair_index,
+                                      pair_stride_cells,
+                                      &pair_offset);
+        if (status != ROPE_Q16_OK)
+            return status;
+
+        status = RoPETryAddI64Checked(head_base_index,
+                                      pair_offset,
+                                      &x_index);
+        if (status != ROPE_Q16_OK)
+            return status;
+
+        status = RoPETryAddI64Checked(x_index,
+                                      1,
+                                      &y_index);
+        if (status != ROPE_Q16_OK)
+            return status;
+
+        if (x_index < 0 || y_index < 0)
+            return ROPE_Q16_ERR_BAD_PARAM;
+        if (x_index >= head_cell_capacity || y_index >= head_cell_capacity)
+            return ROPE_Q16_ERR_BAD_PARAM;
+
+        x_q16 = head_cells_q16[x_index];
+        y_q16 = head_cells_q16[y_index];
+
+        status = RoPEQ16RotatePairByPositionChecked(x_q16,
+                                                    y_q16,
+                                                    freq_base_q16,
+                                                    head_dim,
+                                                    pair_index,
+                                                    position,
+                                                    &x_rot_q16,
+                                                    &y_rot_q16);
+        if (status != ROPE_Q16_OK)
+            return status;
+
+        head_cells_q16[x_index] = x_rot_q16;
+        head_cells_q16[y_index] = y_rot_q16;
+    }
+
+    return ROPE_Q16_OK;
 }
