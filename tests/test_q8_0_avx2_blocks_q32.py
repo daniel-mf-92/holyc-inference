@@ -178,10 +178,107 @@ def test_error_paths() -> None:
     assert err == Q8_0_AVX2_ERR_BAD_LEN
 
 
+def test_zero_block_count_returns_zero() -> None:
+    lhs = [make_block(0x3C00, [1] * 32)]
+    rhs = [make_block(0x3C00, [2] * 32)]
+    err, got = q8_0_dot_blocks_avx2_q32_checked(lhs, rhs, 0)
+    assert err == Q8_0_AVX2_OK
+    assert got == 0
+
+
+def test_fp16_scale_conversion_known_values() -> None:
+    # Spot-check exact integer conversion behavior of HolyC-style fp16->Q16 path.
+    # Values chosen to cover zero, unit, powers of two, sign bit, and subnormal.
+    cases = {
+        0x0000: 0,      # +0
+        0x8000: 0,      # -0
+        0x3C00: 65536,  # +1.0
+        0xBC00: -65536, # -1.0
+        0x4000: 131072, # +2.0
+        0xC000: -131072,# -2.0
+        0x0400: 4,      # smallest normal (2^-14)
+        0x0001: 0,      # minimum subnormal rounds to 0 in Q16
+        0x03FF: 4,      # max subnormal rounds to 4
+    }
+    for fp16, expected in cases.items():
+        assert q8_0_f16_to_q16(fp16) == expected
+
+
+def test_overflow_scale_product_reports_error() -> None:
+    # fp16 inf in this helper saturates to a very large signed sentinel.
+    # Multiplying two such sentinels must trip checked I64 multiply.
+    lhs = [make_block(0x7C00, [1] * 32)]
+    rhs = [make_block(0x7C00, [1] * 32)]
+    err, got = q8_0_dot_blocks_avx2_q32_checked(lhs, rhs, 1)
+    assert err == Q8_0_AVX2_ERR_OVERFLOW
+    assert got == 0
+
+
+def test_overflow_total_accumulator_reports_error() -> None:
+    # Build a per-block dot large enough that summing three blocks overflows I64
+    # while each individual block multiply remains in range.
+    # qdot(32x127x127)=516128 and scale(0x5BFF)->4292870144 in Q16.
+    # block_dot ~= 9.506e18 (< I64_MAX), but 3x block_dot > I64_MAX.
+    qs = [127] * 32
+    lhs = [make_block(0x5BFF, qs) for _ in range(3)]
+    rhs = [make_block(0x5BFF, qs) for _ in range(3)]
+    err, got = q8_0_dot_blocks_avx2_q32_checked(lhs, rhs, 3)
+    assert err == Q8_0_AVX2_ERR_OVERFLOW
+    assert got == 0
+
+
+def test_sign_symmetry_with_negated_rhs() -> None:
+    rng = random.Random(2026041602)
+    block_count = 9
+    fp16_scales = [0x3000, 0x3400, 0x3800, 0x3A00, 0x3C00]
+
+    lhs = []
+    rhs = []
+    rhs_neg = []
+    for _ in range(block_count):
+        lq = [rng.randint(-128, 127) for _ in range(32)]
+        rq = [rng.randint(-128, 127) for _ in range(32)]
+        d_l = rng.choice(fp16_scales)
+        d_r = rng.choice(fp16_scales)
+
+        lhs.append(make_block(d_l, lq))
+        rhs.append(make_block(d_r, rq))
+        rhs_neg.append(make_block(d_r, [-v for v in rq]))
+
+    err_pos, dot_pos = q8_0_dot_blocks_avx2_q32_checked(lhs, rhs, block_count)
+    err_neg, dot_neg = q8_0_dot_blocks_avx2_q32_checked(lhs, rhs_neg, block_count)
+
+    assert err_pos == Q8_0_AVX2_OK
+    assert err_neg == Q8_0_AVX2_OK
+    assert dot_neg == -dot_pos
+
+
+def test_lane_permutation_changes_result() -> None:
+    # AVX2 lane mapping contract is order-sensitive; swapping lane order should
+    # change results for asymmetric inputs.
+    base = [i - 16 for i in range(32)]
+    rev = list(reversed(base))
+    lhs = [make_block(0x3C00, base)]
+    rhs = [make_block(0x3C00, base)]
+    rhs_perm = [make_block(0x3C00, rev)]
+
+    err_a, dot_a = q8_0_dot_blocks_avx2_q32_checked(lhs, rhs, 1)
+    err_b, dot_b = q8_0_dot_blocks_avx2_q32_checked(lhs, rhs_perm, 1)
+    assert err_a == Q8_0_AVX2_OK
+    assert err_b == Q8_0_AVX2_OK
+    assert dot_a != dot_b
+
+
 def run() -> None:
     test_known_multi_block_matches_scalar_formula()
     test_randomized_blocks_match_scalar_reference()
     test_error_paths()
+    test_zero_block_count_returns_zero()
+    test_fp16_scale_conversion_known_values()
+    test_overflow_scale_product_reports_error()
+    test_overflow_total_accumulator_reports_error()
+    test_sign_symmetry_with_negated_rhs()
+    test_lane_permutation_changes_result()
     print("q8_0_avx2_blocks_q32_reference_checks=ok")
 
 
