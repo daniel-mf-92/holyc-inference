@@ -1,0 +1,16 @@
+Completed one full unattended iteration for `IQ-154` with HolyC runtime purity preserved.
+
+**What Changed**
+- Implemented checked helper `FPQ16RMSNormApplyInvDenomChecked` in `src/math/rmsnorm.HC:25` using integer-only one-rounding scaling via `FPQ16MulDivRoundedByPositiveIntFromQ16DenChecked`, with explicit `NULL_PTR/BAD_PARAM/DOMAIN/OVERFLOW` surfaces.
+- Added host-side parity harness `tests/test_rmsnorm_apply_inv_denom_checked.py:1` covering contract errors, overflow propagation, helper-composition parity, and numeric error bounds.
+
+**Queue + Ledger + DB**
+- Marked `IQ-154` done in `MASTER_TASKS.md:345`.
+- Added new unchecked deep code task `IQ-155` in `MASTER_TASKS.md:346` to keep rolling queue depth.
+- Added one progress-ledger line in `MASTER_TASKS.md:352` (`loop-132`).
+- Logged central DB iteration row (`rowid=1775`) in `~/Documents/local-codebases/temple-central.db` with status `pass`, `lines_added=258`.
+
+**Validation Output**
+- `python3 tests/test_rmsnorm_apply_inv_denom_checked.py` → `rmsnorm_apply_inv_denom_checked_reference_checks=ok`
+- `python3 tests/test_fixedpoint_q16_muldiv_positive_int_from_q16den_checked.py` → `fixedpoint_q16_muldiv_positive_int_from_q16den_checked_reference_checks=ok`
+
