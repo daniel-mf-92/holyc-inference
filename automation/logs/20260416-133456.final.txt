@@ -1,0 +1,19 @@
+Done — I completed one full iteration on `IQ-104` with HolyC runtime-only changes.
+
+**What Changed**
+- Implemented `Q8_0DotI16LanesAVX2` in `src/quant/q8_0_avx2.HC:136`, composing existing AVX2-shape primitives (`Q8_0MulI16LanesToI32PairsAVX2` + `Q8_0HSumI32PairsAVX2`) with explicit error propagation and integer-only semantics.
+- Added focused host-side parity/adversarial harness `tests/test_q8_0_avx2_dot_lanes.py:1`.
+- Marked queue item complete in `MASTER_TASKS.md:293`.
+- Appended one-line progress ledger entry in `MASTER_TASKS.md:299`.
+- Logged iteration to central DB (`temple-central.db`) with status `pass`.
+
+**Validation**
+- Ran: `python3 tests/test_q8_0_avx2_dot_lanes.py && python3 tests/test_q8_0_avx2_mul_pairs.py && python3 tests/test_q8_0_avx2_hsum_pairs.py && python3 tests/test_q8_0_dot.py`
+- Output:
+  - `q8_0_avx2_dot_lanes_reference_checks=ok`
+  - `q8_0_avx2_mul_pairs_reference_checks=ok`
+  - `q8_0_avx2_hsum_pairs_reference_checks=ok`
+  - `q8_0_dot_reference_checks=ok`
+
+**Queue Policy**
+- Unchecked `IQ-` depth is now `15` (meets the “at least 15” rolling requirement).

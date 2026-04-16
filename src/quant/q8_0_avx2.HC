@@ -132,3 +132,40 @@ I32 Q8_0HSumI32PairsAVX2(I32 *pairs_i32,
     *out_sum_i64 = running_sum;
     return Q8_0_AVX2_OK;
 }
+
+I32 Q8_0DotI16LanesAVX2(I16 *lhs_i16,
+                        I64 lhs_len,
+                        I16 *rhs_i16,
+                        I64 rhs_len,
+                        I64 *out_dot_i64)
+{
+    I32 pairs_i32[Q8_0_AVX2_PAIR_COUNT];
+    I64 dot_i64;
+    I32 status;
+
+    if (!lhs_i16 || !rhs_i16 || !out_dot_i64)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+
+    // Compose the lane-dot from the two audited AVX2-shape primitives:
+    // 1) `vpmaddwd`-equivalent pairwise multiply-add over 32 I16 lanes.
+    // 2) Horizontal sum over 16 I32 pair partials into one I64 scalar.
+    // Keeping this composition explicit preserves bit-level auditability while
+    // allowing future inline-asm replacement of each stage independently.
+    status = Q8_0MulI16LanesToI32PairsAVX2(lhs_i16,
+                                           lhs_len,
+                                           rhs_i16,
+                                           rhs_len,
+                                           pairs_i32,
+                                           Q8_0_AVX2_PAIR_COUNT);
+    if (status != Q8_0_AVX2_OK)
+        return status;
+
+    status = Q8_0HSumI32PairsAVX2(pairs_i32,
+                                  Q8_0_AVX2_PAIR_COUNT,
+                                  &dot_i64);
+    if (status != Q8_0_AVX2_OK)
+        return status;
+
+    *out_dot_i64 = dot_i64;
+    return Q8_0_AVX2_OK;
+}
