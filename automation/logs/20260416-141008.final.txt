@@ -1,0 +1,14 @@
+Implemented one full iteration and completed `IQ-111` end-to-end.
+
+**What Changed**
+- Added signed Q32→Q16 rounding helpers and the new checked handoff kernel `Q8_0DotBlocksAVX2Q32ToQ16Checked` in `src/quant/q8_0_avx2.HC:100` and `src/quant/q8_0_avx2.HC:426`.
+- Added focused parity/adversarial harness for single-rounding semantics in `tests/test_q8_0_avx2_blocks_q32_to_q16.py:1` (including explicit per-block-vs-single-rounding divergence check at `tests/test_q8_0_avx2_blocks_q32_to_q16.py:88`).
+- Marked queue item done and appended one ledger line in `MASTER_TASKS.md:300` and `MASTER_TASKS.md:305`.
+
+**Validation**
+- Ran: `python3 tests/test_q8_0_avx2_blocks_q32.py && python3 tests/test_q8_0_avx2_rows_q32.py && python3 tests/test_q8_0_avx2_blocks_q32_to_q16.py`
+- Output: `q8_0_avx2_blocks_q32_reference_checks=ok`, `ok`, `q8_0_avx2_blocks_q32_to_q16_reference_checks=ok`
+
+**Queue/DB**
+- Inference queue unchecked depth is `17` (policy satisfied: 15+).
+- Logged to central DB with `task_id='IQ-111'`, status `pass` (new row id `1221`).

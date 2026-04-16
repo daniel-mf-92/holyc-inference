@@ -297,11 +297,12 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-108 Implement HolyC `Q8_0DotRowsAVX2Q32Checked` in `src/quant/q8_0_avx2.HC` for row-wise matrix×vector AVX2 block-dot accumulation with stride/capacity guards (WS4-03)
 - [ ] IQ-109 Implement HolyC `Q8_0MatMulQ32TiledAVX2Checked` in `src/matmul/q8_0_matmul.HC` using AVX2 block-dot inner loops and checked tile bounds (WS4-03)
 - [ ] IQ-110 Add host-side parity harness `tests/test_q8_0_matmul_tiled_avx2_q32.py` for AVX2 tiled Q32 matmul against scalar checked reference (WS4-03)
-- [ ] IQ-111 Implement HolyC `Q8_0DotBlocksAVX2Q32ToQ16Checked` in `src/quant/q8_0_avx2.HC` for single-rounding Q32->Q16 handoff used by Q16 row kernels (WS4-03)
+- [x] IQ-111 Implement HolyC `Q8_0DotBlocksAVX2Q32ToQ16Checked` in `src/quant/q8_0_avx2.HC` for single-rounding Q32->Q16 handoff used by Q16 row kernels (WS4-03)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
+| 2026-04-16 | loop-088 | IQ-111 AVX2 Q32->Q16 handoff helper | done | Added `Q8_0DotBlocksAVX2Q32ToQ16Checked` (+ signed round-shift helper) in `src/quant/q8_0_avx2.HC` and parity harness `tests/test_q8_0_avx2_blocks_q32_to_q16.py`; `python3 tests/test_q8_0_avx2_blocks_q32.py && python3 tests/test_q8_0_avx2_rows_q32.py && python3 tests/test_q8_0_avx2_blocks_q32_to_q16.py` passed |
 | 2026-04-16 | loop-087 | IQ-108 AVX2 row-wise Q32 dot kernel | done | Added `Q8_0DotRowsAVX2Q32Checked` in `src/quant/q8_0_avx2.HC` with stride/capacity and overflow guards; added parity harness `tests/test_q8_0_avx2_rows_q32.py`; `python3 tests/test_q8_0_avx2_rows_q32.py && python3 tests/test_q8_0_avx2_blocks_q32.py && python3 tests/test_q8_0_avx2_dot_lanes.py && python3 tests/test_q8_0_dot.py` passed |
 | 2026-04-16 | loop-086 | IQ-106 AVX2 multi-block Q32 dot helper | done | Added `Q8_0DotBlocksAVX2Q32Checked` in `src/quant/q8_0_avx2.HC` with checked scale+block accumulation and added parity harness `tests/test_q8_0_avx2_blocks_q32.py`; `python3 tests/test_q8_0_avx2_blocks_q32.py && python3 tests/test_q8_0_avx2_dot_lanes.py && python3 tests/test_q8_0_dot.py` passed |
 | 2026-04-16 | loop-085 | IQ-105 AVX2 lane-dot adversarial parity harness | done | Expanded `tests/test_q8_0_avx2_dot_lanes.py` with pair-grouping composition checks (`mul_pairs`→`hsum` parity), lane-order mismatch sensitivity, and explicit reduction overflow probes; `python3 tests/test_q8_0_avx2_dot_lanes.py && python3 tests/test_q8_0_avx2_mul_pairs.py && python3 tests/test_q8_0_avx2_hsum_pairs.py` passed |

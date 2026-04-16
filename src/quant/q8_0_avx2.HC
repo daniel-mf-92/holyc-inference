@@ -97,6 +97,24 @@ I64 Q8_0AVX2RoundShiftRightUnsigned(I64 value, I64 shift)
     return (value + round_bias) >> shift;
 }
 
+I64 Q8_0AVX2RoundShiftRightSigned(I64 value, I64 shift)
+{
+    if (shift <= 0)
+        return value;
+
+    if (value >= 0)
+        return Q8_0AVX2RoundShiftRightUnsigned(value, shift);
+
+    return -Q8_0AVX2RoundShiftRightUnsigned(-value, shift);
+}
+
+I64 Q8_0AVX2DotQ32ToQ16(I64 dot_q32)
+{
+    // Dot products carry Q16*Q16 scale in Q32 during accumulation.
+    // Hand-off to Q16 row kernels is one rounded signed downshift by 16.
+    return Q8_0AVX2RoundShiftRightSigned(dot_q32, 16);
+}
+
 I64 Q8_0AVX2F16ToQ16(U16 fp16_bits)
 {
     I64 sign_bit;
@@ -402,5 +420,30 @@ I32 Q8_0DotRowsAVX2Q32Checked(
         out_rows_q32[row_index] = row_dot_q32;
     }
 
+    return Q8_0_AVX2_OK;
+}
+
+I32 Q8_0DotBlocksAVX2Q32ToQ16Checked(Q8_0Block *lhs,
+                                     Q8_0Block *rhs,
+                                     I64 block_count,
+                                     I64 *out_dot_q16)
+{
+    I64 total_dot_q32;
+    I32 status;
+
+    if (!lhs || !rhs || !out_dot_q16)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    // Single-rounding contract for row kernels:
+    // 1) Build checked full Q32 dot over all blocks.
+    // 2) Downshift once Q32->Q16 at the boundary.
+    // This avoids per-block rounding drift and preserves GGML-style intent.
+    status = Q8_0DotBlocksAVX2Q32Checked(lhs, rhs, block_count, &total_dot_q32);
+    if (status != Q8_0_AVX2_OK)
+        return status;
+
+    *out_dot_q16 = Q8_0AVX2DotQ32ToQ16(total_dot_q32);
     return Q8_0_AVX2_OK;
 }
