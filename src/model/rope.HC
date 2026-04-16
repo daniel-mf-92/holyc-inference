@@ -1115,17 +1115,17 @@ I32 RoPEQ16RotateHeadRangeByPositionPreflightedChecked(I64 *head_cells_q16,
 //
 // This keeps all token-position stepping in explicit integer arithmetic and
 // returns overflow/domain errors before mutating the failing token iteration.
-I32 RoPEQ16RotateHeadRangeByTokenWindowChecked(I64 *head_cells_q16,
-                                               I64 head_cell_capacity,
-                                               I64 range_base_index,
-                                               I64 head_count,
-                                               I64 head_stride_cells,
-                                               I64 head_dim,
-                                               I64 pair_stride_cells,
-                                               I64 freq_base_q16,
-                                               I64 position_start,
-                                               I64 token_count,
-                                               I64 position_step)
+I32 RoPEQ16RotateHeadRangeByTokenWindowPreflightedChecked(I64 *head_cells_q16,
+                                                          I64 head_cell_capacity,
+                                                          I64 range_base_index,
+                                                          I64 head_count,
+                                                          I64 head_stride_cells,
+                                                          I64 head_dim,
+                                                          I64 pair_stride_cells,
+                                                          I64 freq_base_q16,
+                                                          I64 position_start,
+                                                          I64 token_count,
+                                                          I64 position_step)
 {
     I64 token_index;
     I64 head_index;
@@ -1204,4 +1204,31 @@ I32 RoPEQ16RotateHeadRangeByTokenWindowChecked(I64 *head_cells_q16,
         return ROPE_Q16_ERR_BAD_PARAM;
 
     return ROPE_Q16_OK;
+}
+
+// Compatibility wrapper preserving existing API name while routing all callers
+// through the explicit preflighted implementation.
+I32 RoPEQ16RotateHeadRangeByTokenWindowChecked(I64 *head_cells_q16,
+                                               I64 head_cell_capacity,
+                                               I64 range_base_index,
+                                               I64 head_count,
+                                               I64 head_stride_cells,
+                                               I64 head_dim,
+                                               I64 pair_stride_cells,
+                                               I64 freq_base_q16,
+                                               I64 position_start,
+                                               I64 token_count,
+                                               I64 position_step)
+{
+    return RoPEQ16RotateHeadRangeByTokenWindowPreflightedChecked(head_cells_q16,
+                                                                  head_cell_capacity,
+                                                                  range_base_index,
+                                                                  head_count,
+                                                                  head_stride_cells,
+                                                                  head_dim,
+                                                                  pair_stride_cells,
+                                                                  freq_base_q16,
+                                                                  position_start,
+                                                                  token_count,
+                                                                  position_step);
 }

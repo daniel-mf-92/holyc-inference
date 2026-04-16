@@ -1,0 +1,16 @@
+Done — this iteration fully progressed `IQ-148` with queue depth preserved at 15 unchecked.
+
+**What Changed**
+- Implemented `RoPEQ16RotateHeadRangeByTokenWindowPreflightedChecked` as the primary HolyC entrypoint in `src/model/rope.HC:1118`.
+- Kept API compatibility by turning `RoPEQ16RotateHeadRangeByTokenWindowChecked` into a wrapper that forwards to the new preflighted function in `src/model/rope.HC:1211`.
+- Marked `IQ-148` complete, appended new unchecked `IQ-149` (monotonic ID), and added one progress-ledger line in `MASTER_TASKS.md:339`, `MASTER_TASKS.md:340`, and `MASTER_TASKS.md:346`.
+
+**Validation**
+- Ran: `python3 tests/test_rope_q16_rotate_head_range_preflighted_position.py`
+  - Output: `rope_q16_rotate_head_range_preflighted_position_reference_checks=ok`
+- Ran: `python3 tests/test_rope_q16_rotate_head_range_position.py`
+  - Output: `rope_q16_rotate_head_range_position_reference_checks=ok`
+
+**Iteration Log**
+- Inserted into central DB: `~/Documents/local-codebases/temple-central.db` as row `id=1713` for `task_id='IQ-148'`, status `pass`.
+- Files changed for this iteration: `src/model/rope.HC`, `MASTER_TASKS.md`.
