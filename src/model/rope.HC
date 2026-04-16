@@ -730,6 +730,47 @@ I32 RoPEQ16RotateHeadByPositionChecked(I64 *head_cells_q16,
     return ROPE_Q16_OK;
 }
 
+// Compute one head base index inside a contiguous head range:
+//   head_base = range_base_index + head_index * head_stride_cells
+//
+// This isolates checked multiply+add arithmetic so multi-head kernels can
+// share one auditable contract for base-address derivation.
+I32 RoPEQ16ComputeHeadBaseIndexChecked(I64 range_base_index,
+                                       I64 head_index,
+                                       I64 head_stride_cells,
+                                       I64 *out_head_base_index)
+{
+    I64 head_offset;
+    I32 status;
+
+    if (!out_head_base_index)
+        return ROPE_Q16_ERR_NULL_PTR;
+
+    if (range_base_index < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (head_index < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (head_stride_cells <= 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    status = RoPETryMulI64Checked(head_index,
+                                  head_stride_cells,
+                                  &head_offset);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPETryAddI64Checked(range_base_index,
+                                  head_offset,
+                                  out_head_base_index);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    if (*out_head_base_index < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    return ROPE_Q16_OK;
+}
+
 // Rotate a contiguous range of attention heads in-place at one token position.
 // For head index `h` in `[0, head_count)`, this derives:
 //   head_base = range_base_index + h*head_stride_cells
@@ -746,7 +787,6 @@ I32 RoPEQ16RotateHeadRangeByPositionChecked(I64 *head_cells_q16,
                                             I64 position)
 {
     I64 head_index;
-    I64 head_offset;
     I64 head_base_index;
     I32 status;
 
@@ -770,17 +810,10 @@ I32 RoPEQ16RotateHeadRangeByPositionChecked(I64 *head_cells_q16,
 
     for (head_index = 0; head_index < head_count; head_index++)
     {
-        // Checked base derivation keeps head-range traversal explicit:
-        //   head_base = range_base + head_index * head_stride
-        status = RoPETryMulI64Checked(head_index,
-                                      head_stride_cells,
-                                      &head_offset);
-        if (status != ROPE_Q16_OK)
-            return status;
-
-        status = RoPETryAddI64Checked(range_base_index,
-                                      head_offset,
-                                      &head_base_index);
+        status = RoPEQ16ComputeHeadBaseIndexChecked(range_base_index,
+                                                    head_index,
+                                                    head_stride_cells,
+                                                    &head_base_index);
         if (status != ROPE_Q16_OK)
             return status;
 
