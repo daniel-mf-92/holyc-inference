@@ -514,3 +514,11 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_41","type":"agent_message","text":"Done — completed one full iteration for `IQ-116` with HolyC-only runtime changes.\n\n**What Changed**\n- Implemented `Q4_0Q8_0MatMulQ32TiledAVX2Checked` with full checked tile/stride/capacity/overflow guards and mixed AVX2 block-dot composition in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/matmul/q4_0_q8_0_matmul.HC:197`.\n- Added AVX2 Q32 mixed-dot forward declaration used by the kernel in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/matmul/q4_0_q8_0_matmul.HC:34`.\n- Marked queue item done in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:306`.\n- Added one progress-ledger line (`loop-096`) in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:313`.\n\n**Validation**\n- `python3 tests/test_q4_0_q8_0_dot_kernel.py` → `q4_0_q8_0_dot_kernel_reference_checks=ok`\n- `python3 tests/test_q4_0_q8_0_matmul_tiled_checked.py` → `q4_0_q8_0_matmul_tiled_checked_reference_checks=ok`\n- Inline focused randomized tiled-Q32 parity check (against untiled scalar reference) → `q4_0_q8_0_matmul_tiled_avx2_q32_reference_checks=ok`\n- Unchecked queue depth after update: `16` (policy maintained, no refill needed).\n\n**Central DB**\n- Inserted iteration row into `~/Documents/local-codebases/temple-central.db`:\n  - `agent=inference`, `task_id=IQ-116`, `status=pass`, `lines_added=129`, `validation_result=ok`."}}
 {"type":"turn.completed","usage":{"input_tokens":1806312,"cached_input_tokens":1697920,"output_tokens":13087}}
 Codex final exit code: 0
+[main 3388c23] feat(inference): codex iteration 20260416-162210
+ 10 files changed, 1220 insertions(+), 1 deletion(-)
+ create mode 100644 automation/logs/20260416-162210.final.txt
+ create mode 100644 tests/__pycache__/test_q4_0_q8_0_avx2_blocks_q32.cpython-314.pyc
+ create mode 100644 tests/__pycache__/test_q4_0_q8_0_dot_kernel.cpython-314.pyc
+ create mode 100644 tests/__pycache__/test_q4_0_q8_0_matmul_tiled_checked.cpython-314.pyc
+ create mode 100644 tests/test_q4_0_q8_0_avx2_blocks_q32.py
+=== End iteration 23 (outcome=ok) ===
