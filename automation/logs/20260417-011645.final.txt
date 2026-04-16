@@ -1,0 +1,16 @@
+Done — I completed one full unattended iteration on `IQ-151` and kept queue depth compliant.
+
+**What Changed**
+- Implemented checked fixed-point status codes + signed magnitude helper in `src/math/fixedpoint.HC:8` and `src/math/fixedpoint.HC:41`.
+- Implemented `FPQ16MulDivRoundedChecked` with one-rounding `(a*b)/d`, domain/overflow guards, and half-up rounding in `src/math/fixedpoint.HC:210`.
+- Added focused host-side parity/contract harness in `tests/test_fixedpoint_q16_muldiv_checked.py:1`.
+- Marked `IQ-151` done, added new unchecked `IQ-152`, and added one ledger line in `MASTER_TASKS.md:342`, `MASTER_TASKS.md:343`, `MASTER_TASKS.md:349`.
+
+**Validation**
+- `python3 tests/test_fixedpoint_q16_muldiv_checked.py` → `fixedpoint_q16_muldiv_checked_reference_checks=ok`
+- `python3 tests/test_fixedpoint_q16.py` → `fixedpoint_q16_reference_checks=ok`
+- `python3 tests/test_rope_q16_rotate_head_range_token_window_preflighted_head_bases.py` → `rope_q16_rotate_head_range_token_window_preflighted_head_bases_reference_checks=ok`
+
+**Queue/DB**
+- Unchecked queue count is `15` after this iteration (policy satisfied).
+- Logged to central DB as iteration `id=1742`, `agent=inference`, `task_id=IQ-151`, `status=pass`.

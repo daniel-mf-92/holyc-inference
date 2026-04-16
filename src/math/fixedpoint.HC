@@ -5,6 +5,12 @@
 #define FP_Q16_ONE   (1 << FP_Q16_SHIFT)
 #define FP_Q16_HALF  (1 << (FP_Q16_SHIFT - 1))
 
+#define FP_Q16_OK            0
+#define FP_Q16_ERR_NULL_PTR  1
+#define FP_Q16_ERR_BAD_PARAM 2
+#define FP_Q16_ERR_DOMAIN    3
+#define FP_Q16_ERR_OVERFLOW  4
+
 #define I64_MAX_VALUE  0x7FFFFFFFFFFFFFFF
 #define I64_MIN_VALUE -0x8000000000000000
 #define U64_MAX_VALUE  0xFFFFFFFFFFFFFFFF
@@ -30,6 +36,24 @@ I64 FPSignApplyFromU64(U64 mag, I64 is_negative)
     if (mag > (U64)I64_MAX_VALUE)
         return I64_MAX_VALUE;
     return (I64)mag;
+}
+
+I32 FPTryApplySignFromU64Checked(U64 mag, I64 is_negative, I64 *out_value)
+{
+    U64 limit;
+
+    if (!out_value)
+        return FP_Q16_ERR_NULL_PTR;
+
+    limit = (U64)I64_MAX_VALUE;
+    if (is_negative)
+        limit = 0x8000000000000000;
+
+    if (mag > limit)
+        return FP_Q16_ERR_OVERFLOW;
+
+    *out_value = FPSignApplyFromU64(mag, is_negative);
+    return FP_Q16_OK;
 }
 
 I64 FPQ16RoundShiftSigned(I64 value, I64 shift)
@@ -175,4 +199,61 @@ I64 FPQ16Div(I64 num, I64 den)
     }
 
     return FPSignApplyFromU64(result_mag, is_negative);
+}
+
+// Checked one-rounding Q16 helper for:
+//   out_q16 = round_half_up((a_q16 * b_q16) / d_q16)
+//
+// Inputs/outputs are Q16.16 integers, so this computes the exact Q16 result
+// of (a*b)/d without an intermediate Q16 downshift between mul and div.
+// That avoids double-rounding drift in RMSNorm/softmax scale paths.
+I32 FPQ16MulDivRoundedChecked(I64 a_q16,
+                              I64 b_q16,
+                              I64 d_q16,
+                              I64 *out_q16)
+{
+    U64 abs_a;
+    U64 abs_b;
+    U64 abs_d;
+    U64 abs_num;
+    U64 q;
+    U64 r;
+    U64 limit;
+    I64 is_negative;
+
+    if (!out_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (!d_q16)
+        return FP_Q16_ERR_DOMAIN;
+
+    abs_a = FPAbsToU64(a_q16);
+    abs_b = FPAbsToU64(b_q16);
+    abs_d = FPAbsToU64(d_q16);
+    is_negative = ((a_q16 < 0) ^ (b_q16 < 0) ^ (d_q16 < 0));
+
+    if (abs_a && abs_b && abs_a > (U64_MAX_VALUE / abs_b))
+        return FP_Q16_ERR_OVERFLOW;
+
+    abs_num = abs_a * abs_b;
+    q = abs_num / abs_d;
+    r = abs_num % abs_d;
+
+    limit = (U64)I64_MAX_VALUE;
+    if (is_negative)
+        limit = 0x8000000000000000;
+
+    if (q > limit)
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Half-up rounding: bump quotient when residual >= 0.5 denominator.
+    if (r >= ((abs_d + 1) >> 1))
+    {
+        if (q == limit)
+            return FP_Q16_ERR_OVERFLOW;
+        q++;
+    }
+
+    return FPTryApplySignFromU64Checked(q,
+                                        is_negative,
+                                        out_q16);
 }
