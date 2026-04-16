@@ -1,0 +1,249 @@
+// rope.HC
+// Integer-only RoPE helpers for HolyC inference.
+//
+// RoPE frequency step math (for one rotary pair index i):
+//   theta_step(i) = base^(-(2*i)/head_dim)
+//                 = exp(-(2*i/head_dim) * ln(base))
+//
+// This file computes theta_step in Q16.16 with explicit checked arithmetic.
+
+#define FP_Q16_SHIFT 16
+#define FP_Q16_ONE   (1 << FP_Q16_SHIFT)
+
+#define ROPE_Q16_OK            0
+#define ROPE_Q16_ERR_NULL_PTR  1
+#define ROPE_Q16_ERR_BAD_PARAM 2
+#define ROPE_Q16_ERR_DOMAIN    3
+#define ROPE_Q16_ERR_OVERFLOW  4
+
+#define ROPE_I64_MAX_VALUE  0x7FFFFFFFFFFFFFFF
+#define ROPE_I64_MIN_VALUE -0x8000000000000000
+#define ROPE_U64_MAX_VALUE  0xFFFFFFFFFFFFFFFF
+
+// Declared in src/math/intlog.HC and src/math/intexp.HC.
+I64 FPQ16Ln(I64 x_q16);
+I64 FPQ16Exp(I64 x_q16);
+
+U64 RoPEAbsToU64(I64 x)
+{
+    if (x >= 0)
+        return (U64)x;
+
+    // Keep I64_MIN representable using two's-complement identity.
+    return ((U64)(-(x + 1))) + 1;
+}
+
+I32 RoPEApplySignFromMagnitudeChecked(U64 mag, Bool is_negative, I64 *out_value)
+{
+    if (!out_value)
+        return ROPE_Q16_ERR_NULL_PTR;
+
+    if (is_negative)
+    {
+        if (mag > 0x8000000000000000)
+            return ROPE_Q16_ERR_OVERFLOW;
+
+        if (mag == 0x8000000000000000)
+        {
+            *out_value = ROPE_I64_MIN_VALUE;
+            return ROPE_Q16_OK;
+        }
+
+        *out_value = -(I64)mag;
+        return ROPE_Q16_OK;
+    }
+
+    if (mag > (U64)ROPE_I64_MAX_VALUE)
+        return ROPE_Q16_ERR_OVERFLOW;
+
+    *out_value = (I64)mag;
+    return ROPE_Q16_OK;
+}
+
+I32 RoPETryAddI64Checked(I64 lhs, I64 rhs, I64 *out_sum)
+{
+    if (!out_sum)
+        return ROPE_Q16_ERR_NULL_PTR;
+
+    if (rhs > 0 && lhs > ROPE_I64_MAX_VALUE - rhs)
+        return ROPE_Q16_ERR_OVERFLOW;
+    if (rhs < 0 && lhs < ROPE_I64_MIN_VALUE - rhs)
+        return ROPE_Q16_ERR_OVERFLOW;
+
+    *out_sum = lhs + rhs;
+    return ROPE_Q16_OK;
+}
+
+I32 RoPEQ16FromIntChecked(I64 x, I64 *out_q16)
+{
+    if (!out_q16)
+        return ROPE_Q16_ERR_NULL_PTR;
+
+    if (x > (ROPE_I64_MAX_VALUE >> FP_Q16_SHIFT) || x < (ROPE_I64_MIN_VALUE >> FP_Q16_SHIFT))
+        return ROPE_Q16_ERR_OVERFLOW;
+
+    *out_q16 = x << FP_Q16_SHIFT;
+    return ROPE_Q16_OK;
+}
+
+I32 RoPEQ16MulChecked(I64 lhs_q16, I64 rhs_q16, I64 *out_q16)
+{
+    U64 abs_lhs;
+    U64 abs_rhs;
+    U64 abs_prod;
+    U64 round_bias;
+    U64 rounded;
+    Bool is_negative;
+
+    if (!out_q16)
+        return ROPE_Q16_ERR_NULL_PTR;
+
+    abs_lhs = RoPEAbsToU64(lhs_q16);
+    abs_rhs = RoPEAbsToU64(rhs_q16);
+    is_negative = ((lhs_q16 < 0) ^ (rhs_q16 < 0));
+
+    if (abs_lhs && abs_rhs && abs_lhs > (ROPE_U64_MAX_VALUE / abs_rhs))
+        return ROPE_Q16_ERR_OVERFLOW;
+
+    abs_prod = abs_lhs * abs_rhs;
+    round_bias = (U64)1 << (FP_Q16_SHIFT - 1);
+
+    if (abs_prod > ROPE_U64_MAX_VALUE - round_bias)
+        rounded = ROPE_U64_MAX_VALUE >> FP_Q16_SHIFT;
+    else
+        rounded = (abs_prod + round_bias) >> FP_Q16_SHIFT;
+
+    return RoPEApplySignFromMagnitudeChecked(rounded, is_negative, out_q16);
+}
+
+I32 RoPEQ16DivChecked(I64 num_q16, I64 den_q16, I64 *out_q16)
+{
+    U64 abs_num;
+    U64 abs_den;
+    U64 limit;
+    U64 int_part;
+    U64 rem;
+    U64 result_mag;
+    Bool is_negative;
+    I64 bit;
+
+    if (!out_q16)
+        return ROPE_Q16_ERR_NULL_PTR;
+    if (!den_q16)
+        return ROPE_Q16_ERR_DOMAIN;
+
+    abs_num = RoPEAbsToU64(num_q16);
+    abs_den = RoPEAbsToU64(den_q16);
+    is_negative = ((num_q16 < 0) ^ (den_q16 < 0));
+
+    limit = (U64)ROPE_I64_MAX_VALUE;
+    if (is_negative)
+        limit = 0x8000000000000000;
+
+    int_part = abs_num / abs_den;
+    if (int_part > (limit >> FP_Q16_SHIFT))
+        return ROPE_Q16_ERR_OVERFLOW;
+
+    result_mag = int_part << FP_Q16_SHIFT;
+    rem = abs_num % abs_den;
+
+    // Emit 16 fractional bits by long division.
+    for (bit = FP_Q16_SHIFT - 1; bit >= 0; bit--)
+    {
+        rem <<= 1;
+        if (rem >= abs_den)
+        {
+            rem -= abs_den;
+            if (result_mag > limit - (((U64)1) << bit))
+                return ROPE_Q16_ERR_OVERFLOW;
+            result_mag |= ((U64)1) << bit;
+        }
+    }
+
+    // Half-up rounding when residual remainder is >= 0.5.
+    if (rem >= ((abs_den + 1) >> 1))
+    {
+        if (result_mag == limit)
+            return ROPE_Q16_ERR_OVERFLOW;
+        result_mag++;
+    }
+
+    return RoPEApplySignFromMagnitudeChecked(result_mag, is_negative, out_q16);
+}
+
+// Compute RoPE per-position angle increment for one rotary pair index:
+//   step_q16 = exp(-(2*pair_index/head_dim) * ln(freq_base_q16))
+//
+// Contracts:
+//   - freq_base_q16 must be > 0.
+//   - head_dim must be positive and even.
+//   - pair_index must satisfy 0 <= pair_index < head_dim/2.
+I32 RoPEQ16AngleStepChecked(I64 freq_base_q16,
+                            I64 head_dim,
+                            I64 pair_index,
+                            I64 *out_step_q16)
+{
+    I64 pair_count;
+    I64 two_i;
+    I64 two_i_q16;
+    I64 head_dim_q16;
+    I64 ratio_q16;
+    I64 ln_base_q16;
+    I64 exponent_mag_q16;
+    I64 exponent_q16;
+    I32 status;
+
+    if (!out_step_q16)
+        return ROPE_Q16_ERR_NULL_PTR;
+
+    if (freq_base_q16 <= 0)
+        return ROPE_Q16_ERR_DOMAIN;
+    if (head_dim <= 0 || (head_dim & 1))
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (pair_index < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    pair_count = head_dim >> 1;
+    if (pair_index >= pair_count)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    // two_i = 2 * pair_index (checked add avoids signed-mul overflow).
+    status = RoPETryAddI64Checked(pair_index,
+                                  pair_index,
+                                  &two_i);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPEQ16FromIntChecked(two_i,
+                                   &two_i_q16);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPEQ16FromIntChecked(head_dim,
+                                   &head_dim_q16);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPEQ16DivChecked(two_i_q16,
+                               head_dim_q16,
+                               &ratio_q16);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    ln_base_q16 = FPQ16Ln(freq_base_q16);
+    if (ln_base_q16 == ROPE_I64_MIN_VALUE)
+        return ROPE_Q16_ERR_DOMAIN;
+
+    status = RoPEQ16MulChecked(ratio_q16,
+                               ln_base_q16,
+                               &exponent_mag_q16);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    if (exponent_mag_q16 == ROPE_I64_MIN_VALUE)
+        return ROPE_Q16_ERR_OVERFLOW;
+    exponent_q16 = -exponent_mag_q16;
+
+    *out_step_q16 = FPQ16Exp(exponent_q16);
+    return ROPE_Q16_OK;
+}
