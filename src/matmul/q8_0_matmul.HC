@@ -170,6 +170,37 @@ I32 Q8_0MatMulTiledComputeRequiredCapacitiesChecked(
     return Q8_0_MATMUL_OK;
 }
 
+// Shared checked row-base math for tiled Q8_0 matmul inner loops:
+//   lhs_row_base = row_index * lhs_row_stride_blocks
+//   out_row_base = row_index * out_row_stride_cells
+// Centralizing this keeps overflow/BAD_LEN behavior identical across
+// scalar Q16, AVX2 Q32, and AVX2 Q16 tiled entrypoints.
+I32 Q8_0MatMulTiledComputeRowBaseChecked(
+    I64 row_index,
+    I64 lhs_row_stride_blocks,
+    I64 out_row_stride_cells,
+    I64 *out_lhs_row_base,
+    I64 *out_out_row_base)
+{
+    if (!out_lhs_row_base || !out_out_row_base)
+        return Q8_0_MATMUL_ERR_NULL_PTR;
+
+    if (row_index < 0 || lhs_row_stride_blocks < 0 || out_row_stride_cells < 0)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (!Q8_0MatMulTryMulI64NonNeg(row_index,
+                                   lhs_row_stride_blocks,
+                                   out_lhs_row_base))
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+
+    if (!Q8_0MatMulTryMulI64NonNeg(row_index,
+                                   out_row_stride_cells,
+                                   out_out_row_base))
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+
+    return Q8_0_MATMUL_OK;
+}
+
 I32 Q8_0MatMulTiledValidateArgsChecked(
     Q8_0Block *lhs_blocks,
     I64 lhs_block_capacity,
@@ -349,10 +380,13 @@ I32 Q8_0MatMulQ16TiledChecked(
 
             for (row_index = row_tile_start; row_index < row_tile_end; ++row_index)
             {
-                if (!Q8_0MatMulTryMulI64NonNeg(row_index, lhs_row_stride_blocks, &lhs_row_base))
-                    return Q8_0_MATMUL_ERR_OVERFLOW;
-                if (!Q8_0MatMulTryMulI64NonNeg(row_index, out_row_stride_cells, &out_row_base))
-                    return Q8_0_MATMUL_ERR_OVERFLOW;
+                status = Q8_0MatMulTiledComputeRowBaseChecked(row_index,
+                                                              lhs_row_stride_blocks,
+                                                              out_row_stride_cells,
+                                                              &lhs_row_base,
+                                                              &out_row_base);
+                if (status != Q8_0_MATMUL_OK)
+                    return status;
 
                 lhs_row_ptr = &lhs_blocks[lhs_row_base];
 
@@ -461,10 +495,13 @@ I32 Q8_0MatMulQ32TiledAVX2Checked(
 
             for (row_index = row_tile_start; row_index < row_tile_end; ++row_index)
             {
-                if (!Q8_0MatMulTryMulI64NonNeg(row_index, lhs_row_stride_blocks, &lhs_row_base))
-                    return Q8_0_MATMUL_ERR_OVERFLOW;
-                if (!Q8_0MatMulTryMulI64NonNeg(row_index, out_row_stride_cells, &out_row_base))
-                    return Q8_0_MATMUL_ERR_OVERFLOW;
+                status = Q8_0MatMulTiledComputeRowBaseChecked(row_index,
+                                                              lhs_row_stride_blocks,
+                                                              out_row_stride_cells,
+                                                              &lhs_row_base,
+                                                              &out_row_base);
+                if (status != Q8_0_MATMUL_OK)
+                    return status;
 
                 lhs_row_ptr = &lhs_blocks[lhs_row_base];
 
@@ -574,10 +611,13 @@ I32 Q8_0MatMulQ16TiledAVX2Checked(
 
             for (row_index = row_tile_start; row_index < row_tile_end; ++row_index)
             {
-                if (!Q8_0MatMulTryMulI64NonNeg(row_index, lhs_row_stride_blocks, &lhs_row_base))
-                    return Q8_0_MATMUL_ERR_OVERFLOW;
-                if (!Q8_0MatMulTryMulI64NonNeg(row_index, out_row_stride_cells, &out_row_base))
-                    return Q8_0_MATMUL_ERR_OVERFLOW;
+                status = Q8_0MatMulTiledComputeRowBaseChecked(row_index,
+                                                              lhs_row_stride_blocks,
+                                                              out_row_stride_cells,
+                                                              &lhs_row_base,
+                                                              &out_row_base);
+                if (status != Q8_0_MATMUL_OK)
+                    return status;
 
                 lhs_row_ptr = &lhs_blocks[lhs_row_base];
 
