@@ -644,26 +644,20 @@ I32 RoPEQ16RotatePairByPositionChecked(I64 x_q16,
 //   - The corresponding `y` is at `x_index + 1`.
 // This mirrors interleaved RoPE layouts like `[x0,y0,x1,y1,...]` when stride=2,
 // and also supports wider-stride packed layouts used by caller-owned buffers.
-I32 RoPEQ16RotateHeadByPositionChecked(I64 *head_cells_q16,
-                                       I64 head_cell_capacity,
-                                       I64 head_base_index,
-                                       I64 head_dim,
-                                       I64 pair_stride_cells,
-                                       I64 freq_base_q16,
-                                       I64 position)
+I32 RoPEQ16ValidateHeadSpanForDimChecked(I64 head_cell_capacity,
+                                         I64 head_base_index,
+                                         I64 head_dim,
+                                         I64 pair_stride_cells,
+                                         I64 *out_last_pair_y_index)
 {
     I64 pair_count;
-    I64 pair_index;
-    I64 pair_offset;
-    I64 x_index;
-    I64 y_index;
-    I64 x_q16;
-    I64 y_q16;
-    I64 x_rot_q16;
-    I64 y_rot_q16;
+    I64 last_pair_index;
+    I64 last_pair_offset;
+    I64 last_pair_x_index;
+    I64 last_pair_y_index;
     I32 status;
 
-    if (!head_cells_q16)
+    if (!out_last_pair_y_index)
         return ROPE_Q16_ERR_NULL_PTR;
 
     if (head_cell_capacity < 0)
@@ -677,6 +671,77 @@ I32 RoPEQ16RotateHeadByPositionChecked(I64 *head_cells_q16,
 
     if (head_base_index >= head_cell_capacity)
         return ROPE_Q16_ERR_BAD_PARAM;
+
+    pair_count = head_dim >> 1;
+
+    // Checked end-span math for one head:
+    //   last_pair_index = (head_dim/2)-1
+    //   last_pair_x = head_base + last_pair_index*pair_stride
+    //   last_pair_y = last_pair_x + 1
+    // Require last_pair_y < head_cell_capacity.
+    status = RoPETrySubI64Checked(pair_count,
+                                  1,
+                                  &last_pair_index);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPETryMulI64Checked(last_pair_index,
+                                  pair_stride_cells,
+                                  &last_pair_offset);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPETryAddI64Checked(head_base_index,
+                                  last_pair_offset,
+                                  &last_pair_x_index);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPETryAddI64Checked(last_pair_x_index,
+                                  1,
+                                  &last_pair_y_index);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    if (last_pair_x_index < 0 || last_pair_y_index < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (last_pair_y_index >= head_cell_capacity)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    *out_last_pair_y_index = last_pair_y_index;
+    return ROPE_Q16_OK;
+}
+
+I32 RoPEQ16RotateHeadByPositionChecked(I64 *head_cells_q16,
+                                       I64 head_cell_capacity,
+                                       I64 head_base_index,
+                                       I64 head_dim,
+                                       I64 pair_stride_cells,
+                                       I64 freq_base_q16,
+                                       I64 position)
+{
+    I64 pair_count;
+    I64 pair_index;
+    I64 last_pair_y_index;
+    I64 pair_offset;
+    I64 x_index;
+    I64 y_index;
+    I64 x_q16;
+    I64 y_q16;
+    I64 x_rot_q16;
+    I64 y_rot_q16;
+    I32 status;
+
+    if (!head_cells_q16)
+        return ROPE_Q16_ERR_NULL_PTR;
+
+    status = RoPEQ16ValidateHeadSpanForDimChecked(head_cell_capacity,
+                                                  head_base_index,
+                                                  head_dim,
+                                                  pair_stride_cells,
+                                                  &last_pair_y_index);
+    if (status != ROPE_Q16_OK)
+        return status;
 
     pair_count = head_dim >> 1;
 
@@ -706,7 +771,7 @@ I32 RoPEQ16RotateHeadByPositionChecked(I64 *head_cells_q16,
 
         if (x_index < 0 || y_index < 0)
             return ROPE_Q16_ERR_BAD_PARAM;
-        if (x_index >= head_cell_capacity || y_index >= head_cell_capacity)
+        if (x_index > last_pair_y_index || y_index > last_pair_y_index)
             return ROPE_Q16_ERR_BAD_PARAM;
 
         x_q16 = head_cells_q16[x_index];
