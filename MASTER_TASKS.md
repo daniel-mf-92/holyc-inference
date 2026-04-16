@@ -287,11 +287,13 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-098 Add host-side parity harness `tests/test_q8_0_dot_matrix_vector_checked.py` for `Q8_0DotRowsQ16MatrixVectorChecked` covering capacity bounds, row-base overflow guards, and adversarial accumulator overflow vectors (WS4-02)
 - [x] IQ-099 Implement HolyC checked Q8_0 tiled matmul kernel `Q8_0MatMulQ16TiledChecked` in `src/matmul/q8_0_matmul.HC` (explicit tile bounds, row/col stride, and I64 overflow guards) (WS4-03)
 - [x] IQ-100 Implement HolyC checked mixed tiled matmul kernel `Q4_0Q8_0MatMulQ16TiledChecked` in `src/matmul/q4_0_q8_0_matmul.HC` reusing mixed dot kernels with explicit K-block contracts (WS4-03)
-- [ ] IQ-101 Implement HolyC AVX2 lane-pack helper `Q8_0Pack32ToI16LanesAVX2` in `src/quant/q8_0_avx2.HC` as a preparatory primitive for WS4 tiled AVX2 matmul inner loops (WS4-03)
+- [x] IQ-101 Implement HolyC AVX2 lane-pack helper `Q8_0Pack32ToI16LanesAVX2` in `src/quant/q8_0_avx2.HC` as a preparatory primitive for WS4 tiled AVX2 matmul inner loops (WS4-03)
+- [ ] IQ-102 Implement HolyC AVX2 pairwise multiply helper `Q8_0MulI16LanesToI32PairsAVX2` in `src/quant/q8_0_avx2.HC` (32 widened lanes -> 16 pairwise I32 products) for WS4 tiled AVX2 dot/matmul inner loops (WS4-03)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
+| 2026-04-16 | loop-081 | IQ-101 Q8_0 AVX2 lane-pack helper | done | Added `src/quant/q8_0_avx2.HC` with `Q8_0Pack32ToI16LanesAVX2` + `Q8_0PackBlockToI16LanesAVX2`; added parity harness `tests/test_q8_0_avx2_pack.py`; `python3 tests/test_q8_0_avx2_pack.py && python3 tests/test_q8_0_dot.py && python3 tests/test_q8_0_matmul_tiled_checked.py` passed |
 | 2026-04-16 | loop-080 | IQ-100 checked mixed tiled matmul kernel | done | Added `Q4_0Q8_0MatMulQ16TiledChecked` in `src/matmul/q4_0_q8_0_matmul.HC` + parity harness `tests/test_q4_0_q8_0_matmul_tiled_checked.py`; `python3 tests/test_q4_0_q8_0_matmul_tiled_checked.py && python3 tests/test_q4_0_q8_0_dot_kernel.py` passed |
 | 2026-04-16 | loop-079 | IQ-099 checked Q8_0 tiled matmul kernel | done | Added `Q8_0MatMulQ16TiledChecked` in `src/matmul/q8_0_matmul.HC` + parity harness `tests/test_q8_0_matmul_tiled_checked.py`; `python3 tests/test_q8_0_matmul_tiled_checked.py && python3 tests/test_q8_0_dot.py && python3 tests/test_q8_0_dot_matrix_vector_checked.py` passed |
 | 2026-04-16 | loop-078 | IQ-098 checked Q8_0 matrix×vector parity harness | done | Added `tests/test_q8_0_dot_matrix_vector_checked.py`; `python3 tests/test_q8_0_dot_matrix_vector_checked.py && python3 tests/test_q8_0_dot.py` passed |
