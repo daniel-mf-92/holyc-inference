@@ -69,6 +69,39 @@ I64 Q8_0MatMulMinI64(I64 lhs, I64 rhs)
     return rhs;
 }
 
+// Computes full row-strided capacities required for tiled matmul views:
+//   lhs_required_blocks = row_count * lhs_row_stride_blocks
+//   rhs_required_blocks = col_count * rhs_col_stride_blocks
+//   out_required_cells  = row_count * out_row_stride_cells
+// The helper is overflow-checked and shared by preflight and math entrypoints.
+I32 Q8_0MatMulTiledComputeRequiredCapacitiesChecked(
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 out_row_stride_cells,
+    I64 *out_lhs_required_blocks,
+    I64 *out_rhs_required_blocks,
+    I64 *out_required_cells)
+{
+    if (!out_lhs_required_blocks || !out_rhs_required_blocks || !out_required_cells)
+        return Q8_0_MATMUL_ERR_NULL_PTR;
+
+    if (row_count < 0 || col_count < 0)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (lhs_row_stride_blocks < 0 || rhs_col_stride_blocks < 0 || out_row_stride_cells < 0)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (!Q8_0MatMulTryMulI64NonNeg(row_count, lhs_row_stride_blocks, out_lhs_required_blocks))
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+    if (!Q8_0MatMulTryMulI64NonNeg(col_count, rhs_col_stride_blocks, out_rhs_required_blocks))
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+    if (!Q8_0MatMulTryMulI64NonNeg(row_count, out_row_stride_cells, out_required_cells))
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+
+    return Q8_0_MATMUL_OK;
+}
+
 I32 Q8_0MatMulTiledValidateArgsChecked(
     Q8_0Block *lhs_blocks,
     I64 lhs_block_capacity,
@@ -88,6 +121,8 @@ I32 Q8_0MatMulTiledValidateArgsChecked(
     I64 *out_rhs_required_blocks,
     I64 *out_required_cells)
 {
+    I32 status;
+
     if (!lhs_blocks || !rhs_col_blocks || !out_cells)
         return Q8_0_MATMUL_ERR_NULL_PTR;
     if (!out_lhs_required_blocks || !out_rhs_required_blocks || !out_required_cells)
@@ -110,13 +145,16 @@ I32 Q8_0MatMulTiledValidateArgsChecked(
     if (row_count > 0 && out_row_stride_cells < col_count)
         return Q8_0_MATMUL_ERR_BAD_DST_LEN;
 
-    // Capacity proofs for full row-strided views.
-    if (!Q8_0MatMulTryMulI64NonNeg(row_count, lhs_row_stride_blocks, out_lhs_required_blocks))
-        return Q8_0_MATMUL_ERR_OVERFLOW;
-    if (!Q8_0MatMulTryMulI64NonNeg(col_count, rhs_col_stride_blocks, out_rhs_required_blocks))
-        return Q8_0_MATMUL_ERR_OVERFLOW;
-    if (!Q8_0MatMulTryMulI64NonNeg(row_count, out_row_stride_cells, out_required_cells))
-        return Q8_0_MATMUL_ERR_OVERFLOW;
+    status = Q8_0MatMulTiledComputeRequiredCapacitiesChecked(row_count,
+                                                             lhs_row_stride_blocks,
+                                                             col_count,
+                                                             rhs_col_stride_blocks,
+                                                             out_row_stride_cells,
+                                                             out_lhs_required_blocks,
+                                                             out_rhs_required_blocks,
+                                                             out_required_cells);
+    if (status != Q8_0_MATMUL_OK)
+        return status;
 
     if (*out_lhs_required_blocks > lhs_block_capacity)
         return Q8_0_MATMUL_ERR_BAD_DST_LEN;
@@ -221,13 +259,16 @@ I32 Q8_0MatMulQ16TiledChecked(
     if (row_count > 0 && out_row_stride_cells < col_count)
         return Q8_0_MATMUL_ERR_BAD_DST_LEN;
 
-    // Capacity proofs for full row-strided views.
-    if (!Q8_0MatMulTryMulI64NonNeg(row_count, lhs_row_stride_blocks, &lhs_required_blocks))
-        return Q8_0_MATMUL_ERR_OVERFLOW;
-    if (!Q8_0MatMulTryMulI64NonNeg(col_count, rhs_col_stride_blocks, &rhs_required_blocks))
-        return Q8_0_MATMUL_ERR_OVERFLOW;
-    if (!Q8_0MatMulTryMulI64NonNeg(row_count, out_row_stride_cells, &out_required_cells))
-        return Q8_0_MATMUL_ERR_OVERFLOW;
+    status = Q8_0MatMulTiledComputeRequiredCapacitiesChecked(row_count,
+                                                             lhs_row_stride_blocks,
+                                                             col_count,
+                                                             rhs_col_stride_blocks,
+                                                             out_row_stride_cells,
+                                                             &lhs_required_blocks,
+                                                             &rhs_required_blocks,
+                                                             &out_required_cells);
+    if (status != Q8_0_MATMUL_OK)
+        return status;
 
     if (lhs_required_blocks > lhs_block_capacity)
         return Q8_0_MATMUL_ERR_BAD_DST_LEN;
