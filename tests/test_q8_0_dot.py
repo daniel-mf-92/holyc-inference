@@ -189,6 +189,13 @@ def dot_row_blocks_q16(
     return dot_product_blocks_q16_accumulate(lhs_blocks, rhs_blocks, 0)
 
 
+def dot_row_blocks_q16_checked(
+    lhs_blocks: list[tuple[int, bytes]],
+    rhs_blocks: list[tuple[int, bytes]],
+) -> tuple[int, int]:
+    return dot_product_blocks_q16_accumulate_checked(lhs_blocks, rhs_blocks, 0)
+
+
 def dot_rows_q16_matrix_vector(
     matrix_blocks: list[tuple[int, bytes]],
     row_count: int,
@@ -262,6 +269,26 @@ def dot_rows_q16_matrix_vector_checked(
         out_rows_q16[row_index] = row_dot_q16
 
     return Q8_0_OK, out_rows_q16
+
+
+def q8_0_dot_rows_q16_matrix_vector_checked(
+    matrix_blocks: list[tuple[int, bytes]],
+    matrix_block_capacity: int,
+    row_count: int,
+    row_stride_blocks: int,
+    vec_blocks: list[tuple[int, bytes]],
+    vec_block_capacity: int,
+    vec_block_count: int,
+) -> tuple[int, list[int]]:
+    return dot_rows_q16_matrix_vector_checked(
+        matrix_blocks,
+        matrix_block_capacity,
+        row_count,
+        row_stride_blocks,
+        vec_blocks,
+        vec_block_capacity,
+        vec_block_count,
+    )
 
 
 def dot_product_blocks_q32_to_q16(
@@ -460,6 +487,47 @@ def test_row_blocks_q16_bad_length_error() -> None:
     assert err == Q8_0_ERR_BAD_DST_LEN
 
 
+def test_row_blocks_q16_checked_matches_unchecked_on_normal_ranges() -> None:
+    rng = random.Random(2026041602)
+
+    for _ in range(250):
+        block_count = rng.randint(1, 8)
+        lhs_blocks: list[tuple[int, bytes]] = []
+        rhs_blocks: list[tuple[int, bytes]] = []
+
+        for _ in range(block_count):
+            lhs_scale = half_bits(rng.uniform(-2.5, 2.5))
+            rhs_scale = half_bits(rng.uniform(-2.5, 2.5))
+            lhs_qs = pack_signed([rng.randint(-128, 127) for _ in range(Q8_0_VALUES_PER_BLOCK)])
+            rhs_qs = pack_signed([rng.randint(-128, 127) for _ in range(Q8_0_VALUES_PER_BLOCK)])
+            lhs_blocks.append((lhs_scale, lhs_qs))
+            rhs_blocks.append((rhs_scale, rhs_qs))
+
+        err_unchecked, got_unchecked_q16 = dot_row_blocks_q16(lhs_blocks, rhs_blocks)
+        err_checked, got_checked_q16 = dot_row_blocks_q16_checked(lhs_blocks, rhs_blocks)
+        assert err_unchecked == Q8_0_OK
+        assert err_checked == Q8_0_OK
+        assert got_checked_q16 == got_unchecked_q16
+
+
+def test_row_blocks_q16_checked_reports_overflow() -> None:
+    scale_max = 0x7C00  # +inf in fp16 -> saturated large q16 in this kernel
+    plus_one = pack_signed([1] + [0] * (Q8_0_VALUES_PER_BLOCK - 1))
+
+    lhs_blocks = [(scale_max, plus_one), (scale_max, plus_one)]
+    rhs_blocks = [(scale_max, plus_one), (scale_max, plus_one)]
+
+    err, _ = dot_row_blocks_q16_checked(lhs_blocks, rhs_blocks)
+    assert err == Q8_0_ERR_OVERFLOW
+
+
+def test_row_blocks_q16_checked_bad_length_error() -> None:
+    lhs_blocks = [(half_bits(1.0), pack_signed([1] * Q8_0_VALUES_PER_BLOCK))]
+    rhs_blocks: list[tuple[int, bytes]] = []
+    err, _ = dot_row_blocks_q16_checked(lhs_blocks, rhs_blocks)
+    assert err == Q8_0_ERR_BAD_DST_LEN
+
+
 def test_q32_to_q16_single_rounding_matches_total_q32_rounding() -> None:
     rng = random.Random(20260415)
 
@@ -616,6 +684,54 @@ def test_matrix_vector_checked_reports_row_accumulator_overflow() -> None:
     assert err == Q8_0_ERR_OVERFLOW
 
 
+def test_matrix_vector_checked_compat_wrapper_matches_checked_core() -> None:
+    rng = random.Random(2026041607)
+
+    for _ in range(120):
+        row_count = rng.randint(1, 5)
+        vec_block_count = rng.randint(1, 5)
+        row_stride_blocks = vec_block_count + rng.randint(0, 3)
+        matrix_block_capacity = row_count * row_stride_blocks
+        vec_block_capacity = vec_block_count
+
+        vec_blocks: list[tuple[int, bytes]] = []
+        for _ in range(vec_block_count):
+            vec_scale = half_bits(rng.uniform(-2.0, 2.0))
+            vec_qs = pack_signed([rng.randint(-128, 127) for _ in range(Q8_0_VALUES_PER_BLOCK)])
+            vec_blocks.append((vec_scale, vec_qs))
+
+        matrix_blocks: list[tuple[int, bytes]] = []
+        for _row in range(row_count):
+            for _ in range(vec_block_count):
+                row_scale = half_bits(rng.uniform(-2.0, 2.0))
+                row_qs = pack_signed([rng.randint(-128, 127) for _ in range(Q8_0_VALUES_PER_BLOCK)])
+                matrix_blocks.append((row_scale, row_qs))
+            for _ in range(row_stride_blocks - vec_block_count):
+                matrix_blocks.append((half_bits(-2.0), pack_signed([-127] * Q8_0_VALUES_PER_BLOCK)))
+
+        err_core, rows_core = dot_rows_q16_matrix_vector_checked(
+            matrix_blocks,
+            matrix_block_capacity,
+            row_count,
+            row_stride_blocks,
+            vec_blocks,
+            vec_block_capacity,
+            vec_block_count,
+        )
+        err_wrapper, rows_wrapper = q8_0_dot_rows_q16_matrix_vector_checked(
+            matrix_blocks,
+            matrix_block_capacity,
+            row_count,
+            row_stride_blocks,
+            vec_blocks,
+            vec_block_capacity,
+            vec_block_count,
+        )
+
+        assert err_wrapper == err_core
+        assert rows_wrapper == rows_core
+
+
 def test_checked_q32_matches_unchecked_on_normal_ranges() -> None:
     rng = random.Random(2026041509)
 
@@ -673,6 +789,9 @@ def run() -> None:
     test_row_blocks_q16_matches_per_block_rounding()
     test_row_blocks_q16_distinct_from_round_at_end()
     test_row_blocks_q16_bad_length_error()
+    test_row_blocks_q16_checked_matches_unchecked_on_normal_ranges()
+    test_row_blocks_q16_checked_reports_overflow()
+    test_row_blocks_q16_checked_bad_length_error()
     test_q32_to_q16_single_rounding_matches_total_q32_rounding()
     test_q32_to_q16_length_mismatch_error()
     test_matrix_vector_rows_stride_and_values()
@@ -680,6 +799,7 @@ def run() -> None:
     test_matrix_vector_checked_matches_unchecked_on_normal_ranges()
     test_matrix_vector_checked_rejects_bad_capacities()
     test_matrix_vector_checked_reports_row_accumulator_overflow()
+    test_matrix_vector_checked_compat_wrapper_matches_checked_core()
     test_checked_q32_matches_unchecked_on_normal_ranges()
     test_checked_q32_reports_positive_overflow()
     test_checked_q32_reports_negative_overflow()

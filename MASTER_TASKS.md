@@ -282,13 +282,14 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-093 Implement HolyC `Q4_0Q8_0DotRowsQ16MatrixVector` in `src/quant/q4_0_q8_0_dot.HC` for mixed quantized row-block matrix×vector kernels with explicit `row_stride_blocks`, plus parity coverage in `tests/test_q4_0_q8_0_dot_kernel.py` (WS4-02)
 - [x] IQ-094 Implement HolyC `Q4_0Q8_0DotRowsQ16MatrixVectorChecked` in `src/quant/q4_0_q8_0_dot.HC` with explicit matrix/vector extent and accumulator-overflow guards, plus adversarial parity coverage in `tests/test_q4_0_q8_0_dot_kernel.py` (WS4-02)
 - [x] IQ-095 Implement HolyC `Q8_0DotRowsQ16MatrixVectorChecked` in `src/quant/q8_0_dot.HC` with explicit matrix/vector extent + row accumulator overflow guards and adversarial parity coverage in `tests/test_q8_0_dot.py` (WS4-02)
-- [ ] IQ-096 Implement HolyC `Q8_0DotRowBlocksQ16Checked` alias helper in `src/quant/q8_0_dot.HC` for explicit checked row-dot call-sites reusing `Q8_0DotProductBlocksQ16AccumulateChecked` semantics (WS4-02)
-- [ ] IQ-097 Implement HolyC compatibility wrapper `Q8_0_DotRowsQ16MatrixVectorChecked` in `src/quant/q8_0_dot.HC` for mixed kernel naming parity with checked extent/overflow path (WS4-02)
+- [x] IQ-096 Implement HolyC `Q8_0DotRowBlocksQ16Checked` alias helper in `src/quant/q8_0_dot.HC` for explicit checked row-dot call-sites reusing `Q8_0DotProductBlocksQ16AccumulateChecked` semantics (WS4-02)
+- [x] IQ-097 Implement HolyC compatibility wrapper `Q8_0_DotRowsQ16MatrixVectorChecked` in `src/quant/q8_0_dot.HC` for mixed kernel naming parity with checked extent/overflow path (WS4-02)
 - [ ] IQ-098 Add host-side parity harness `tests/test_q8_0_dot_matrix_vector_checked.py` for `Q8_0DotRowsQ16MatrixVectorChecked` covering capacity bounds, row-base overflow guards, and adversarial accumulator overflow vectors (WS4-02)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
+| 2026-04-16 | loop-076 | IQ-096 checked Q8_0 row-dot alias helper | done | Added `Q8_0DotRowBlocksQ16Checked` in `src/quant/q8_0_dot.HC` and checked-row parity/overflow coverage in `tests/test_q8_0_dot.py`; `python3 tests/test_q8_0_dot.py` passed |
 | 2026-04-16 | loop-075 | IQ-095 Q8_0 checked matrix×vector kernel | done | Added `Q8_0DotProductBlocksQ16AccumulateChecked` + `Q8_0DotRowsQ16MatrixVectorChecked` in `src/quant/q8_0_dot.HC` with explicit capacity/overflow guards and adversarial parity coverage in `tests/test_q8_0_dot.py`; `python3 tests/test_q8_0_dot.py` passed |
 | 2026-04-16 | loop-074 | IQ-094 mixed Q4_0xQ8_0 checked matrix×vector kernel | done | Added `Q4_0Q8_0DotRowsQ16MatrixVectorChecked` + checked Q16 accumulator helper in `src/quant/q4_0_q8_0_dot.HC` with extent/overflow guards and adversarial parity coverage in `tests/test_q4_0_q8_0_dot_kernel.py`; `python3 tests/test_q4_0_q8_0_dot_kernel.py` passed |
 | 2026-04-16 | loop-073 | IQ-093 mixed Q4_0xQ8_0 matrix×vector helper | done | Added `Q4_0Q8_0DotRowsQ16MatrixVector` in `src/quant/q4_0_q8_0_dot.HC` with stride validation and expanded `tests/test_q4_0_q8_0_dot_kernel.py`; `python3 tests/test_q4_0_q8_0_dot_kernel.py && python3 tests/test_q4_0_dot.py && python3 tests/test_q8_0_dot_matrix_vector.py` passed |
@@ -386,3 +387,4 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 | 2026-04-15 | loop-068 | IQ-087 Q8_0 row-dot helper | done | Added `Q8_0DotRowBlocksQ16` in `src/quant/q8_0_dot.HC` + row-rounding parity tests in `tests/test_q8_0_dot.py`; `python3 tests/test_q8_0_dot.py` passed |
 
 | 2026-04-16 | loop-069 | IQ-092 Q4_0 row-matrix×vector helper | done | Added Q4_0DotRowsQ16MatrixVector in src/quant/q4_0_dot.HC + stride/length parity coverage in tests/test_q4_0_dot.py; python3 tests/test_q4_0_dot.py && python3 tests/test_q4_0_dequant.py && python3 tests/test_q4_0_q8_0_dot_kernel.py passed |
+| 2026-04-16 | loop-077 | IQ-097 Q8_0 checked matrix wrapper compat | done | Added `Q8_0_DotRowsQ16MatrixVectorChecked` alias in `src/quant/q8_0_dot.HC` with parity test in `tests/test_q8_0_dot.py`; `python3 tests/test_q8_0_dot.py && python3 tests/test_q8_0_dot_matrix_vector.py` passed |

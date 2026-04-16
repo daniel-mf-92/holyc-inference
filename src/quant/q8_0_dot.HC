@@ -318,6 +318,29 @@ I32 Q8_0DotRowBlocksQ16(Q8_0Block *row_blocks, Q8_0Block *vec_blocks, I64 block_
     return Q8_0_OK;
 }
 
+I32 Q8_0DotRowBlocksQ16Checked(Q8_0Block *row_blocks, Q8_0Block *vec_blocks, I64 block_count, I64 *out_dot_q16)
+{
+    I64 total_dot_q16;
+    I32 status;
+
+    if (!row_blocks || !vec_blocks || !out_dot_q16)
+        return Q8_0_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    // Checked row helper for WS4 call-sites that require explicit overflow status.
+    // Semantics are intentionally identical to blockwise Q16 accumulation:
+    //   row_total = Sum( RoundQ16(block_dot_q32) )
+    // with the same I64 overflow guards used by checked matrix kernels.
+    total_dot_q16 = 0;
+    status = Q8_0DotProductBlocksQ16AccumulateChecked(row_blocks, vec_blocks, block_count, &total_dot_q16);
+    if (status != Q8_0_OK)
+        return status;
+
+    *out_dot_q16 = total_dot_q16;
+    return Q8_0_OK;
+}
+
 I32 Q8_0DotRowsQ16MatrixVector(Q8_0Block *matrix_blocks, I64 row_count, I64 row_stride_blocks, Q8_0Block *vec_blocks, I64 vec_block_count, I64 *out_rows_q16)
 {
     I64 row_index;
@@ -400,6 +423,29 @@ I32 Q8_0DotRowsQ16MatrixVectorChecked(
     }
 
     return Q8_0_OK;
+}
+
+I32 Q8_0_DotRowsQ16MatrixVectorChecked(
+    Q8_0Block *matrix_blocks,
+    I64 matrix_block_capacity,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q8_0Block *vec_blocks,
+    I64 vec_block_capacity,
+    I64 vec_block_count,
+    I64 *out_rows_q16)
+{
+    // Compatibility entry-point for callers using underscored mixed-kernel naming.
+    // Keep one checked implementation path and delegate here to avoid semantic drift.
+    return Q8_0DotRowsQ16MatrixVectorChecked(
+        matrix_blocks,
+        matrix_block_capacity,
+        row_count,
+        row_stride_blocks,
+        vec_blocks,
+        vec_block_capacity,
+        vec_block_count,
+        out_rows_q16);
 }
 
 I64 Q8_0DotQ32ToQ16(I64 dot_q32)
