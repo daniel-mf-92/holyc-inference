@@ -100,6 +100,33 @@ def dot_row_blocks_q16(lhs_blocks, rhs_blocks):
     return Q4_0_OK, total_q16
 
 
+def dot_rows_q16_matrix_vector(
+    matrix_blocks,
+    row_count: int,
+    row_stride_blocks: int,
+    vec_blocks,
+    vec_block_count: int,
+):
+    if row_count < 0 or row_stride_blocks < 0 or vec_block_count < 0:
+        return Q4_0_ERR_BAD_DST_LEN, []
+    if row_count > 0 and row_stride_blocks < vec_block_count:
+        return Q4_0_ERR_BAD_DST_LEN, []
+
+    out_rows_q16 = [0] * row_count
+    for row_index in range(row_count):
+        row_base = row_index * row_stride_blocks
+        row_slice = matrix_blocks[row_base : row_base + vec_block_count]
+        if len(row_slice) != vec_block_count:
+            return Q4_0_ERR_BAD_DST_LEN, []
+
+        err, row_dot_q16 = dot_row_blocks_q16(row_slice, vec_blocks[:vec_block_count])
+        if err != Q4_0_OK:
+            return err, []
+        out_rows_q16[row_index] = row_dot_q16
+
+    return Q4_0_OK, out_rows_q16
+
+
 def dot_product_blocks_q32(lhs_blocks, rhs_blocks):
     if len(lhs_blocks) != len(rhs_blocks):
         return Q4_0_ERR_BAD_DST_LEN, 0
@@ -284,6 +311,73 @@ def test_q32_to_q16_length_mismatch_error() -> None:
     assert err == Q4_0_ERR_BAD_DST_LEN
 
 
+def test_matrix_vector_stride_padding_ignored_randomized() -> None:
+    rng = random.Random(20260416)
+
+    for _ in range(200):
+        row_count = rng.randint(1, 8)
+        vec_block_count = rng.randint(1, 6)
+        row_stride_blocks = vec_block_count + rng.randint(0, 4)
+
+        vec_blocks = []
+        for _ in range(vec_block_count):
+            vec_scale = half_bits(rng.uniform(-2.0, 2.0))
+            vec_qs = bytes(rng.randrange(256) for _ in range(Q4_0_PACKED_BYTES))
+            vec_blocks.append((vec_scale, vec_qs))
+
+        matrix_blocks = []
+        expected_rows = []
+
+        for _ in range(row_count):
+            active_blocks = []
+            for _ in range(vec_block_count):
+                row_scale = half_bits(rng.uniform(-2.0, 2.0))
+                row_qs = bytes(rng.randrange(256) for _ in range(Q4_0_PACKED_BYTES))
+                block = (row_scale, row_qs)
+                matrix_blocks.append(block)
+                active_blocks.append(block)
+
+            pad_blocks = row_stride_blocks - vec_block_count
+            for _ in range(pad_blocks):
+                pad_scale = half_bits(rng.uniform(-2.0, 2.0))
+                pad_qs = bytes(rng.randrange(256) for _ in range(Q4_0_PACKED_BYTES))
+                matrix_blocks.append((pad_scale, pad_qs))
+
+            err, expected_q16 = dot_row_blocks_q16(active_blocks, vec_blocks)
+            assert err == Q4_0_OK
+            expected_rows.append(expected_q16)
+
+        err, got_rows = dot_rows_q16_matrix_vector(
+            matrix_blocks,
+            row_count,
+            row_stride_blocks,
+            vec_blocks,
+            vec_block_count,
+        )
+        assert err == Q4_0_OK
+        assert got_rows == expected_rows
+
+
+def test_matrix_vector_bad_length_errors() -> None:
+    vec_blocks = [(half_bits(1.0), bytes([0x88] * Q4_0_PACKED_BYTES))]
+    matrix_blocks = [(half_bits(1.0), bytes([0x88] * Q4_0_PACKED_BYTES))]
+
+    err, _ = dot_rows_q16_matrix_vector(matrix_blocks, -1, 1, vec_blocks, 1)
+    assert err == Q4_0_ERR_BAD_DST_LEN
+
+    err, _ = dot_rows_q16_matrix_vector(matrix_blocks, 1, -1, vec_blocks, 1)
+    assert err == Q4_0_ERR_BAD_DST_LEN
+
+    err, _ = dot_rows_q16_matrix_vector(matrix_blocks, 1, 1, vec_blocks, -1)
+    assert err == Q4_0_ERR_BAD_DST_LEN
+
+    err, _ = dot_rows_q16_matrix_vector(matrix_blocks, 2, 0, vec_blocks, 1)
+    assert err == Q4_0_ERR_BAD_DST_LEN
+
+    err, _ = dot_rows_q16_matrix_vector(matrix_blocks, 2, 1, vec_blocks, 1)
+    assert err == Q4_0_ERR_BAD_DST_LEN
+
+
 def run() -> None:
     test_identity_block()
     test_opposite_sign_scales()
@@ -293,6 +387,8 @@ def run() -> None:
     test_row_blocks_q16_distinct_from_round_at_end()
     test_q32_to_q16_single_rounding_matches_total_q32_rounding()
     test_q32_to_q16_length_mismatch_error()
+    test_matrix_vector_stride_padding_ignored_randomized()
+    test_matrix_vector_bad_length_errors()
     print("q4_0_dot_reference_checks=ok")
 
 

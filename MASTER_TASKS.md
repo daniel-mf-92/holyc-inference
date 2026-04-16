@@ -278,7 +278,8 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-089 Add host-side parity harness `tests/test_q8_0_dot_matrix_vector.py` for `Q8_0DotRowsQ16MatrixVector` covering stride, sign, and per-row rounding semantics (WS4-02)
 - [x] IQ-090 Implement HolyC `Q8_0DotProductBlocksQ32Checked` in `src/quant/q8_0_dot.HC` with overflow-safe accumulation and parity/adversarial tests for hostile block streams (WS4-01)
 - [x] IQ-091 Implement HolyC Q16 fixed-point multiply/divide/round helpers (`FPQ16Mul`, `FPQ16Div`, `FPQ16MulSat`) in `src/math/fixedpoint.HC` with overflow-checked I64 intermediates for WS1 arithmetic callers (WS1-01)
-- [ ] IQ-092 Implement HolyC `Q4_0DotRowsQ16MatrixVector` in `src/quant/q4_0_dot.HC` for contiguous row-block matrix×vector kernels with explicit `row_stride_blocks`, plus parity coverage in `tests/test_q4_0_dot.py` (WS4-02)
+- [x] IQ-092 Implement HolyC `Q4_0DotRowsQ16MatrixVector` in `src/quant/q4_0_dot.HC` for contiguous row-block matrix×vector kernels with explicit `row_stride_blocks`, plus parity coverage in `tests/test_q4_0_dot.py` (WS4-02)
+- [ ] IQ-093 Implement HolyC `Q4_0Q8_0DotRowsQ16MatrixVector` in `src/quant/q4_0_q8_0_dot.HC` for mixed quantized row-block matrix×vector kernels with explicit `row_stride_blocks`, plus parity coverage in `tests/test_q4_0_q8_0_dot_kernel.py` (WS4-02)
 
 ## Progress Ledger
 
@@ -375,3 +376,5 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 
 | 2026-04-15 | loop-035 | IQ-083 Q8_0 Q32->Q16 matmul helper | done | Added `Q8_0DotProductBlocksQ32ToQ16` in `src/quant/q8_0_dot.HC` + parity cases in `tests/test_q8_0_dot.py`; `python3 tests/test_q8_0_dot.py && python3 tests/test_q8_0_dequant.py` passed |
 | 2026-04-15 | loop-068 | IQ-087 Q8_0 row-dot helper | done | Added `Q8_0DotRowBlocksQ16` in `src/quant/q8_0_dot.HC` + row-rounding parity tests in `tests/test_q8_0_dot.py`; `python3 tests/test_q8_0_dot.py` passed |
+
+| 2026-04-16 | loop-069 | IQ-092 Q4_0 row-matrix×vector helper | done | Added Q4_0DotRowsQ16MatrixVector in src/quant/q4_0_dot.HC + stride/length parity coverage in tests/test_q4_0_dot.py; python3 tests/test_q4_0_dot.py && python3 tests/test_q4_0_dequant.py && python3 tests/test_q4_0_q8_0_dot_kernel.py passed |
