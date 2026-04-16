@@ -320,3 +320,37 @@ I32 FPQ16MulDivRoundedByPositiveIntChecked(I64 a_q16,
                                         is_negative,
                                         out_q16);
 }
+
+// Checked wrapper for positive integer divisors encoded as Q16 whole values:
+//   d_q16 = d_int << 16, d_int > 0
+//
+// This enforces the encoded-denominator contract used by RMSNorm call sites:
+// - denominator must be positive
+// - denominator must be an exact Q16 whole integer (no fractional bits)
+// - then route to FPQ16MulDivRoundedByPositiveIntChecked for single-rounding
+//   (a_q16*b_q16)/(d_int*2^16) semantics.
+I32 FPQ16MulDivRoundedByPositiveIntFromQ16DenChecked(I64 a_q16,
+                                                     I64 b_q16,
+                                                     I64 d_q16,
+                                                     I64 *out_q16)
+{
+    I64 d_int;
+
+    if (!out_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (d_q16 <= 0)
+        return FP_Q16_ERR_DOMAIN;
+
+    // Strict encoding contract: denominator is an integer represented in Q16.
+    if (d_q16 & (FP_Q16_ONE - 1))
+        return FP_Q16_ERR_BAD_PARAM;
+
+    d_int = d_q16 >> FP_Q16_SHIFT;
+    if (d_int <= 0)
+        return FP_Q16_ERR_DOMAIN;
+
+    return FPQ16MulDivRoundedByPositiveIntChecked(a_q16,
+                                                  b_q16,
+                                                  d_int,
+                                                  out_q16);
+}
