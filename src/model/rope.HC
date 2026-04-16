@@ -729,3 +729,74 @@ I32 RoPEQ16RotateHeadByPositionChecked(I64 *head_cells_q16,
 
     return ROPE_Q16_OK;
 }
+
+// Rotate a contiguous range of attention heads in-place at one token position.
+// For head index `h` in `[0, head_count)`, this derives:
+//   head_base = range_base_index + h*head_stride_cells
+// and applies RoPE pair rotation across that head slice via
+// `RoPEQ16RotateHeadByPositionChecked`.
+I32 RoPEQ16RotateHeadRangeByPositionChecked(I64 *head_cells_q16,
+                                            I64 head_cell_capacity,
+                                            I64 range_base_index,
+                                            I64 head_count,
+                                            I64 head_stride_cells,
+                                            I64 head_dim,
+                                            I64 pair_stride_cells,
+                                            I64 freq_base_q16,
+                                            I64 position)
+{
+    I64 head_index;
+    I64 head_offset;
+    I64 head_base_index;
+    I32 status;
+
+    if (!head_cells_q16)
+        return ROPE_Q16_ERR_NULL_PTR;
+
+    if (head_cell_capacity < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (range_base_index < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (head_count < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (head_stride_cells <= 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    if (!head_count)
+        return ROPE_Q16_OK;
+
+    if (range_base_index >= head_cell_capacity)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    for (head_index = 0; head_index < head_count; head_index++)
+    {
+        // Checked base derivation keeps head-range traversal explicit:
+        //   head_base = range_base + head_index * head_stride
+        status = RoPETryMulI64Checked(head_index,
+                                      head_stride_cells,
+                                      &head_offset);
+        if (status != ROPE_Q16_OK)
+            return status;
+
+        status = RoPETryAddI64Checked(range_base_index,
+                                      head_offset,
+                                      &head_base_index);
+        if (status != ROPE_Q16_OK)
+            return status;
+
+        if (head_base_index < 0 || head_base_index >= head_cell_capacity)
+            return ROPE_Q16_ERR_BAD_PARAM;
+
+        status = RoPEQ16RotateHeadByPositionChecked(head_cells_q16,
+                                                    head_cell_capacity,
+                                                    head_base_index,
+                                                    head_dim,
+                                                    pair_stride_cells,
+                                                    freq_base_q16,
+                                                    position);
+        if (status != ROPE_Q16_OK)
+            return status;
+    }
+
+    return ROPE_Q16_OK;
+}
