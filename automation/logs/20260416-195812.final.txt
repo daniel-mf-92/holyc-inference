@@ -1,0 +1,21 @@
+Done — I completed one full IQ iteration for `IQ-121` with queue/DB/ledger updates.
+
+**What Changed**
+- Added HolyC helper `Q8_0MatMulTiledValidateStridesAndKChecked` and routed shared preflight through it in `src/matmul/q8_0_matmul.HC:75` and `src/matmul/q8_0_matmul.HC:132`.
+- Switched scalar tiled matmul to use shared validator path in `src/matmul/q8_0_matmul.HC:231`.
+- Added focused host parity harness for stride/K invariants across scalar+AVX2 paths in `tests/test_q8_0_matmul_tiled_stride_k_preflight.py:1`.
+- Marked `IQ-121` done, added new rolling queue item `IQ-122`, and added one ledger line in `MASTER_TASKS.md:311` and `MASTER_TASKS.md:318`.
+
+**Validation**
+- Ran: `python3 tests/test_q8_0_matmul_tiled_stride_k_preflight.py && python3 tests/test_q8_0_matmul_tiled_avx2_preflight.py && python3 tests/test_q8_0_matmul_tiled_avx2_q16.py && python3 tests/test_q8_0_matmul_tiled_avx2_q32.py`
+- Output:
+  - `q8_0_matmul_tiled_stride_k_preflight=ok`
+  - `q8_0_matmul_tiled_avx2_preflight_parity=ok`
+  - `q8_0_matmul_tiled_avx2_q16_reference_checks=ok`
+  - `q8_0_matmul_tiled_avx2_q32_reference_checks=ok`
+
+**Central DB**
+- Inserted iteration row into `~/Documents/local-codebases/temple-central.db` for `IQ-121` with status `pass` and `validation_result=ok` (verified by latest-row query).
+
+**Queue Depth**
+- Unchecked `IQ-` count is maintained at `15` after completion (rolling policy satisfied).
