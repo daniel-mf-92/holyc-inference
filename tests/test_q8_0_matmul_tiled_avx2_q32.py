@@ -46,6 +46,17 @@ def compute_tile_end_checked(tile_start: int, tile_span: int, axis_len: int):
     return Q8_0_AVX2_OK, min(tile_end, axis_len)
 
 
+def compute_out_index_checked(out_row_base: int, col_index: int):
+    if out_row_base < 0 or col_index < 0:
+        return Q8_0_AVX2_ERR_BAD_LEN, 0
+
+    ok, out_index = q8_0_try_add_i64(out_row_base, col_index)
+    if not ok:
+        return Q8_0_AVX2_ERR_OVERFLOW, 0
+
+    return Q8_0_AVX2_OK, out_index
+
+
 def q8_0_f16_to_q16(fp16_bits: int) -> int:
     sign_bit = (fp16_bits >> 15) & 1
     exponent_bits = (fp16_bits >> 10) & 0x1F
@@ -189,9 +200,9 @@ def q8_0_matmul_tiled_avx2_q32_checked(
                     ok, out_index = q8_0_try_mul_i64(row_index, out_row_stride_cols)
                     if not ok:
                         return Q8_0_AVX2_ERR_OVERFLOW, []
-                    ok, out_index = q8_0_try_add_i64(out_index, col_index)
-                    if not ok:
-                        return Q8_0_AVX2_ERR_OVERFLOW, []
+                    err, out_index = compute_out_index_checked(out_index, col_index)
+                    if err != Q8_0_AVX2_OK:
+                        return err, []
 
                     out[out_index] = dot_q32
 

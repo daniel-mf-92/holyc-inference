@@ -52,6 +52,17 @@ def compute_tile_end_checked(tile_start: int, tile_span: int, axis_len: int):
     return Q8_0_AVX2_OK, min(tile_end, axis_len)
 
 
+def compute_out_index_checked(out_row_base: int, col_index: int):
+    if out_row_base < 0 or col_index < 0:
+        return Q8_0_AVX2_ERR_BAD_LEN, 0
+
+    ok, out_index = try_add_i64_nonneg(out_row_base, col_index)
+    if not ok:
+        return Q8_0_AVX2_ERR_OVERFLOW, 0
+
+    return Q8_0_AVX2_OK, out_index
+
+
 def round_shift_right_signed(value: int, shift: int) -> int:
     if shift <= 0:
         return value
@@ -139,9 +150,9 @@ def q8_0_matmul_tiled_avx2_q16_checked(
                     ok, rhs_col_base = try_mul_i64_nonneg(col_index, rhs_col_stride_blocks)
                     if not ok:
                         return Q8_0_AVX2_ERR_OVERFLOW, []
-                    ok, out_index = try_add_i64_nonneg(out_row_base, col_index)
-                    if not ok:
-                        return Q8_0_AVX2_ERR_OVERFLOW, []
+                    err, out_index = compute_out_index_checked(out_row_base, col_index)
+                    if err != Q8_0_AVX2_OK:
+                        return err, []
 
                     rhs_col_slice = rhs_col_blocks[rhs_col_base : rhs_col_base + k_block_count]
                     if len(rhs_col_slice) != k_block_count:
