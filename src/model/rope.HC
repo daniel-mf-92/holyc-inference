@@ -247,3 +247,36 @@ I32 RoPEQ16AngleStepChecked(I64 freq_base_q16,
     *out_step_q16 = FPQ16Exp(exponent_q16);
     return ROPE_Q16_OK;
 }
+
+// Compute absolute rotary angle in radians (Q16) for one token position:
+//   angle_q16 = position * angle_step_q16
+//
+// Contracts:
+//   - angle_step_q16 must be > 0 (radians per position, Q16).
+//   - position must be >= 0.
+//   - checked Q16 multiply is used so overflow surfaces as ERR_OVERFLOW.
+I32 RoPEQ16AngleForPositionChecked(I64 angle_step_q16,
+                                   I64 position,
+                                   I64 *out_angle_q16)
+{
+    I64 position_q16;
+    I32 status;
+
+    if (!out_angle_q16)
+        return ROPE_Q16_ERR_NULL_PTR;
+
+    if (angle_step_q16 <= 0)
+        return ROPE_Q16_ERR_DOMAIN;
+    if (position < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    // Convert integer token position to Q16 once, then reuse checked Q16 mul.
+    status = RoPEQ16FromIntChecked(position,
+                                   &position_q16);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    return RoPEQ16MulChecked(position_q16,
+                             angle_step_q16,
+                             out_angle_q16);
+}

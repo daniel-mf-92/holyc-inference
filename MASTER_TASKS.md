@@ -217,7 +217,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-029 Implement Q8_0 dot product (naive, integer-only accumulator) in `src/quant/q8_0_dot.HC` (WS3-05)
 - [x] IQ-030 Implement mixed Q4_0 x Q8_0 dot product kernel in `src/quant/q4_0_q8_0_dot.HC` (WS3-05)
 - [x] IQ-031 Implement Q8_0 blockwise dot-to-Q16 accumulation helper in `src/quant/q8_0_dot.HC` for matmul callers (WS4-01)
-- [ ] IQ-032 Add mixed Q4_0 x Q8_0 dot parity harness in `tests/test_q4_0_q8_0_dot.py` with GGML-math bounds (WS3-05)
+- [x] IQ-032 Add mixed Q4_0 x Q8_0 dot parity harness in `tests/test_q4_0_q8_0_dot.py` with GGML-math bounds (WS3-05)
 - [x] IQ-033 Implement Q4_0 row-dot helper (`Q4_0DotRowBlocksQ16`) in `src/quant/q4_0_dot.HC` for quant matmul row kernels (WS4-01)
 - [x] IQ-034 Implement Q4_0 x Q8_0 blockwise Q16 accumulation helper in `src/quant/q4_0_q8_0_dot.HC` for mixed matmul callers (WS4-01)
 - [ ] IQ-035 Add Q8_0 Q16-accumulator parity harness in `tests/test_q8_0_dot_accum_q16.py` with seeded blockwise rounding checks (WS4-01)
@@ -323,11 +323,13 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-132 Add host-side parity harness `tests/test_q8_0_matmul_tiled_row_slice_preflight.py` to assert scalar/AVX2 tiled entrypoints surface identical BAD_LEN/OVERFLOW contracts for checked row-slice bounds (`row_base + k_block_count`) (WS4-03)
 - [x] IQ-133 Implement HolyC `RoPEQ16AngleStepChecked` in `src/model/rope.HC` to compute per-head rotary angle increments with checked Q16 fixed-point multiply/divide and explicit overflow domain guards before WS5 attention integration (WS5-01)
 - [ ] IQ-134 Implement HolyC `RoPEQ16AngleForPositionChecked` in `src/model/rope.HC` to compute checked `pos * angle_step` radians in Q16 with explicit overflow/domain guards for WS5 attention rotation kernels (WS5-01)
+- [ ] IQ-135 Implement HolyC `RoPEQ16RotatePairChecked` in `src/model/rope.HC` to rotate `(x_q16,y_q16)` by `angle_q16` using integer sin/cos Q16 helpers with checked mul/add overflow guards for WS5 rotary application (WS5-01)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-16 | loop-114 | IQ-032 mixed Q4_0×Q8_0 parity harness | done | Added `tests/test_q4_0_q8_0_dot.py` with GGML-bounded single/multiblock Q32 parity and checked Q16-accumulator bounds; `python3 tests/test_q4_0_q8_0_dot.py && python3 tests/test_q4_0_q8_0_dot_kernel.py` passed |
 | 2026-04-16 | loop-113 | IQ-133 RoPE Q16 angle-step helper | done | Added `src/model/rope.HC` (`RoPEQ16AngleStepChecked` + checked Q16 mul/div/add primitives) and `tests/test_rope_q16_angle_step.py`; `python3 tests/test_rope_q16_angle_step.py && python3 tests/test_intlog_q16.py` passed |
 | 2026-04-16 | loop-112 | IQ-132 row-slice preflight parity harness | done | Added `tests/test_q8_0_matmul_tiled_row_slice_preflight.py` with targeted/randomized helper parity and scalar/AVX2 tiled BAD_LEN/OVERFLOW surface checks; `python3 tests/test_q8_0_matmul_tiled_row_slice_preflight.py && python3 tests/test_q8_0_matmul_tiled_row_base_preflight.py && python3 tests/test_q8_0_matmul_tiled_rhs_base_preflight.py && python3 tests/test_q8_0_matmul_tiled_out_capacity_preflight.py` passed |
 | 2026-04-16 | loop-111 | IQ-131 tiled out-index capacity validator helper | done | Added `Q8_0MatMulTiledValidateOutIndexCapacityChecked` in `src/matmul/q8_0_matmul.HC`, routed scalar+AVX2 tiled writers through it, and added `tests/test_q8_0_matmul_tiled_out_capacity_preflight.py`; `python3 tests/test_q8_0_matmul_tiled_out_capacity_preflight.py && python3 tests/test_q8_0_matmul_tiled_out_index_preflight.py && python3 tests/test_q8_0_matmul_tiled_avx2_preflight.py && python3 tests/test_q8_0_matmul_tiled_avx2_q32.py && python3 tests/test_q8_0_matmul_tiled_avx2_q16.py` passed |

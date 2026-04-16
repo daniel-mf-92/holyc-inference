@@ -1,0 +1,20 @@
+Done — I completed one full unattended iteration on `IQ-032` and kept queue depth compliant.
+
+**What Changed**
+- Added new mixed-kernel parity harness with GGML-bounded checks in `tests/test_q4_0_q8_0_dot.py:1`.
+- Marked `IQ-032` complete in `MASTER_TASKS.md:220`.
+- Appended one new unchecked queue item (`IQ-135`) to keep monotonic IDs and maintain 15+ depth in `MASTER_TASKS.md:326`.
+- Added one ledger line for this loop in `MASTER_TASKS.md:332`.
+
+**Validation**
+- Ran: `python3 tests/test_q4_0_q8_0_dot.py && python3 tests/test_q4_0_q8_0_dot_kernel.py`
+- Output:
+  - `q4_0_q8_0_dot_reference_checks=ok`
+  - `q4_0_q8_0_dot_kernel_reference_checks=ok`
+
+**Central DB Log**
+- Inserted iteration row into `~/Documents/local-codebases/temple-central.db`.
+- Verified latest row: `1558|inference|IQ-032|pass|ok`.
+
+**Queue Policy**
+- Unchecked `IQ-` count is now `15` (meets rolling depth requirement).
