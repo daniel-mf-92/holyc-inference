@@ -295,13 +295,15 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-106 Implement HolyC `Q8_0DotBlocksAVX2Q32Checked` in `src/quant/q8_0_avx2.HC` to compose lane-pack + lane-dot helpers across N Q8_0 blocks with explicit accumulator overflow guards (WS4-03)
 - [ ] IQ-107 Add host-side parity harness `tests/test_q8_0_avx2_blocks_q32.py` for multi-block AVX2 Q32 dot composition (scale conversion, lane-dot parity, checked accumulation) (WS4-03)
 - [x] IQ-108 Implement HolyC `Q8_0DotRowsAVX2Q32Checked` in `src/quant/q8_0_avx2.HC` for row-wise matrix×vector AVX2 block-dot accumulation with stride/capacity guards (WS4-03)
-- [ ] IQ-109 Implement HolyC `Q8_0MatMulQ32TiledAVX2Checked` in `src/matmul/q8_0_matmul.HC` using AVX2 block-dot inner loops and checked tile bounds (WS4-03)
+- [x] IQ-109 Implement HolyC `Q8_0MatMulQ32TiledAVX2Checked` in `src/matmul/q8_0_matmul.HC` using AVX2 block-dot inner loops and checked tile bounds (WS4-03)
 - [ ] IQ-110 Add host-side parity harness `tests/test_q8_0_matmul_tiled_avx2_q32.py` for AVX2 tiled Q32 matmul against scalar checked reference (WS4-03)
 - [x] IQ-111 Implement HolyC `Q8_0DotBlocksAVX2Q32ToQ16Checked` in `src/quant/q8_0_avx2.HC` for single-rounding Q32->Q16 handoff used by Q16 row kernels (WS4-03)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
+|---|---|---|---|---|
+| 2026-04-16 | loop-089 | IQ-109 AVX2 tiled Q32 matmul kernel | done | Added `Q8_0MatMulQ32TiledAVX2Checked` in `src/matmul/q8_0_matmul.HC` with checked tile/stride/capacity guards and expanded parity coverage in `tests/test_q8_0_matmul_tiled_checked.py`; `python3 tests/test_q8_0_avx2_blocks_q32.py && python3 tests/test_q8_0_matmul_tiled_checked.py` passed |
 | 2026-04-16 | loop-088 | IQ-111 AVX2 Q32->Q16 handoff helper | done | Added `Q8_0DotBlocksAVX2Q32ToQ16Checked` (+ signed round-shift helper) in `src/quant/q8_0_avx2.HC` and parity harness `tests/test_q8_0_avx2_blocks_q32_to_q16.py`; `python3 tests/test_q8_0_avx2_blocks_q32.py && python3 tests/test_q8_0_avx2_rows_q32.py && python3 tests/test_q8_0_avx2_blocks_q32_to_q16.py` passed |
 | 2026-04-16 | loop-087 | IQ-108 AVX2 row-wise Q32 dot kernel | done | Added `Q8_0DotRowsAVX2Q32Checked` in `src/quant/q8_0_avx2.HC` with stride/capacity and overflow guards; added parity harness `tests/test_q8_0_avx2_rows_q32.py`; `python3 tests/test_q8_0_avx2_rows_q32.py && python3 tests/test_q8_0_avx2_blocks_q32.py && python3 tests/test_q8_0_avx2_dot_lanes.py && python3 tests/test_q8_0_dot.py` passed |
 | 2026-04-16 | loop-086 | IQ-106 AVX2 multi-block Q32 dot helper | done | Added `Q8_0DotBlocksAVX2Q32Checked` in `src/quant/q8_0_avx2.HC` with checked scale+block accumulation and added parity harness `tests/test_q8_0_avx2_blocks_q32.py`; `python3 tests/test_q8_0_avx2_blocks_q32.py && python3 tests/test_q8_0_avx2_dot_lanes.py && python3 tests/test_q8_0_dot.py` passed |
