@@ -1,0 +1,18 @@
+Completed one full unattended iteration for `IQ-114` with queue depth preserved.
+
+**What Changed**
+- Added host-side AVX2 Q16 tiled matmul parity harness at `tests/test_q8_0_matmul_tiled_avx2_q16.py:1`.
+- Harness includes known-vector checks, randomized parity, tile/stride contract checks, and null/overflow/bad-length error-path assertions.
+- Marked queue item done in `MASTER_TASKS.md:304`.
+- Added one-line progress ledger entry in `MASTER_TASKS.md:310`.
+- Logged iteration to central DB `~/Documents/local-codebases/temple-central.db` (`agent='inference'`, `task_id='IQ-114'`, `status='pass'`).
+
+**Validation Output**
+- Ran: `python3 tests/test_q8_0_matmul_tiled_avx2_q16.py && python3 tests/test_q8_0_matmul_tiled_avx2_q32.py && python3 tests/test_q8_0_avx2_blocks_q32_to_q16.py`
+- Output:
+  - `q8_0_matmul_tiled_avx2_q16_reference_checks=ok`
+  - `q8_0_matmul_tiled_avx2_q32_reference_checks=ok`
+  - `q8_0_avx2_blocks_q32_to_q16_reference_checks=ok`
+
+**Queue Policy**
+- Unchecked `IQ-` count is now `15` (meets the required minimum of 15).

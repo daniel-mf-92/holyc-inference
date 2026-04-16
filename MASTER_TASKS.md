@@ -301,12 +301,13 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 
 - [x] IQ-112 Implement HolyC `Q8_0DotRowsAVX2Q32ToQ16Checked` in `src/quant/q8_0_avx2.HC` to convert row-wise AVX2 Q32 outputs into Q16 with one rounded downshift per row (WS4-03)
 - [ ] IQ-113 Implement HolyC `Q8_0MatMulQ16TiledAVX2Checked` in `src/matmul/q8_0_matmul.HC` by composing `Q8_0DotBlocksAVX2Q32ToQ16Checked` with checked tile bounds and Q16 output stride contracts (WS4-03)
-- [ ] IQ-114 Add host-side parity harness `tests/test_q8_0_matmul_tiled_avx2_q16.py` for `Q8_0MatMulQ16TiledAVX2Checked` against scalar checked Q16 reference (WS4-03)
+- [x] IQ-114 Add host-side parity harness `tests/test_q8_0_matmul_tiled_avx2_q16.py` for `Q8_0MatMulQ16TiledAVX2Checked` against scalar checked Q16 reference (WS4-03)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-16 | loop-093 | IQ-114 AVX2 tiled Q16 matmul parity harness | done | Added `tests/test_q8_0_matmul_tiled_avx2_q16.py` covering known vectors, randomized parity, tile/stride invariants, and overflow/null error paths; `python3 tests/test_q8_0_matmul_tiled_avx2_q16.py && python3 tests/test_q8_0_matmul_tiled_avx2_q32.py && python3 tests/test_q8_0_avx2_blocks_q32_to_q16.py` passed |
 | 2026-04-16 | loop-092 | IQ-112 AVX2 row-wise Q32->Q16 kernel | done | Added `Q8_0DotRowsAVX2Q32ToQ16Checked` in `src/quant/q8_0_avx2.HC` with single-rounding row semantics + parity harness `tests/test_q8_0_avx2_rows_q32_to_q16.py`; `python3 tests/test_q8_0_avx2_rows_q32_to_q16.py && python3 tests/test_q8_0_avx2_rows_q32.py && python3 tests/test_q8_0_avx2_blocks_q32_to_q16.py && python3 tests/test_q8_0_avx2_blocks_q32.py` passed |
 | 2026-04-16 | loop-091 | IQ-107 AVX2 multi-block Q32 parity harness | done | Hardened `tests/test_q8_0_avx2_blocks_q32.py` with fp16->Q16 spot checks, zero-block semantics, sign/lane invariants, and overflow probes; `python3 tests/test_q8_0_avx2_blocks_q32.py && python3 tests/test_q8_0_avx2_dot_lanes.py && python3 tests/test_q8_0_avx2_blocks_q32_to_q16.py` passed |
 | 2026-04-16 | loop-090 | IQ-110 AVX2 tiled Q32 matmul parity harness | done | Added `tests/test_q8_0_matmul_tiled_avx2_q32.py` plus `Q8_0MatMulTiledAVX2Q32Checked` in `src/quant/q8_0_avx2.HC`; `python3 tests/test_q8_0_matmul_tiled_avx2_q32.py && python3 tests/test_q8_0_avx2_blocks_q32.py && python3 tests/test_q8_0_avx2_blocks_q32_to_q16.py` passed |
