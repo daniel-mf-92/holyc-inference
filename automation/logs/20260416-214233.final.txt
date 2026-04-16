@@ -1,0 +1,22 @@
+I finished one full iteration on `IQ-131` end-to-end.
+
+**What changed**
+- Added HolyC helper `Q8_0MatMulTiledValidateOutIndexCapacityChecked` and routed all three tiled writers through it in `src/matmul/q8_0_matmul.HC:227`.
+- Updated AVX2 Q32 parity model to use checked out-index capacity helper in `tests/test_q8_0_matmul_tiled_avx2_q32.py:60`.
+- Updated AVX2 Q16 parity model to use checked out-index capacity helper in `tests/test_q8_0_matmul_tiled_avx2_q16.py:66`.
+- Added new focused harness `tests/test_q8_0_matmul_tiled_out_capacity_preflight.py:1` for helper parity + entrypoint BAD_LEN/OVERFLOW surface parity.
+- Marked `IQ-131` done and added one ledger row in `MASTER_TASKS.md:322` and `MASTER_TASKS.md:329`.
+
+**Validation run**
+- `python3 tests/test_q8_0_matmul_tiled_out_capacity_preflight.py && python3 tests/test_q8_0_matmul_tiled_out_index_preflight.py && python3 tests/test_q8_0_matmul_tiled_avx2_preflight.py && python3 tests/test_q8_0_matmul_tiled_avx2_q32.py && python3 tests/test_q8_0_matmul_tiled_avx2_q16.py`
+- Output:
+  - `q8_0_matmul_tiled_out_capacity_preflight=ok`
+  - `q8_0_matmul_tiled_out_index_preflight=ok`
+  - `q8_0_matmul_tiled_avx2_preflight_parity=ok`
+  - `q8_0_matmul_tiled_avx2_q32_reference_checks=ok`
+  - `q8_0_matmul_tiled_avx2_q16_reference_checks=ok`
+
+**Central DB log**
+- Inserted iteration row: `iterations.id=1514`, `task_id=IQ-131`, `status=pass`, `validation_result=ok`.
+
+Queue depth remains compliant (`16` unchecked `IQ-` items, so no queue append required this iteration).

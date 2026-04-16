@@ -63,6 +63,24 @@ def compute_out_index_checked(out_row_base: int, col_index: int):
     return Q8_0_AVX2_OK, out_index
 
 
+def validate_out_index_capacity_checked(
+    out_row_base: int,
+    col_index: int,
+    out_cell_capacity: int,
+):
+    if out_cell_capacity < 0:
+        return Q8_0_AVX2_ERR_BAD_LEN, 0
+
+    err, out_index = compute_out_index_checked(out_row_base, col_index)
+    if err != Q8_0_AVX2_OK:
+        return err, 0
+
+    if out_index >= out_cell_capacity:
+        return Q8_0_AVX2_ERR_BAD_LEN, 0
+
+    return Q8_0_AVX2_OK, out_index
+
+
 def round_shift_right_signed(value: int, shift: int) -> int:
     if shift <= 0:
         return value
@@ -150,7 +168,11 @@ def q8_0_matmul_tiled_avx2_q16_checked(
                     ok, rhs_col_base = try_mul_i64_nonneg(col_index, rhs_col_stride_blocks)
                     if not ok:
                         return Q8_0_AVX2_ERR_OVERFLOW, []
-                    err, out_index = compute_out_index_checked(out_row_base, col_index)
+                    err, out_index = validate_out_index_capacity_checked(
+                        out_row_base,
+                        col_index,
+                        out_cell_capacity,
+                    )
                     if err != Q8_0_AVX2_OK:
                         return err, []
 

@@ -57,6 +57,24 @@ def compute_out_index_checked(out_row_base: int, col_index: int):
     return Q8_0_AVX2_OK, out_index
 
 
+def validate_out_index_capacity_checked(
+    out_row_base: int,
+    col_index: int,
+    out_cell_capacity: int,
+):
+    if out_cell_capacity < 0:
+        return Q8_0_AVX2_ERR_BAD_LEN, 0
+
+    err, out_index = compute_out_index_checked(out_row_base, col_index)
+    if err != Q8_0_AVX2_OK:
+        return err, 0
+
+    if out_index >= out_cell_capacity:
+        return Q8_0_AVX2_ERR_BAD_LEN, 0
+
+    return Q8_0_AVX2_OK, out_index
+
+
 def q8_0_f16_to_q16(fp16_bits: int) -> int:
     sign_bit = (fp16_bits >> 15) & 1
     exponent_bits = (fp16_bits >> 10) & 0x1F
@@ -197,10 +215,14 @@ def q8_0_matmul_tiled_avx2_q32_checked(
                     if err != Q8_0_AVX2_OK:
                         return err, []
 
-                    ok, out_index = q8_0_try_mul_i64(row_index, out_row_stride_cols)
+                    ok, out_row_base = q8_0_try_mul_i64(row_index, out_row_stride_cols)
                     if not ok:
                         return Q8_0_AVX2_ERR_OVERFLOW, []
-                    err, out_index = compute_out_index_checked(out_index, col_index)
+                    err, out_index = validate_out_index_capacity_checked(
+                        out_row_base,
+                        col_index,
+                        out_capacity,
+                    )
                     if err != Q8_0_AVX2_OK:
                         return err, []
 

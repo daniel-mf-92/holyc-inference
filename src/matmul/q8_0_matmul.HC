@@ -224,6 +224,37 @@ I32 Q8_0MatMulTiledComputeOutIndexChecked(
     return Q8_0_MATMUL_OK;
 }
 
+// Shared checked output-index capacity validation for tiled Q8_0 matmul writes:
+//   out_index = out_row_base + col_index
+//   require out_index < out_cell_capacity
+// This centralizes BAD_LEN vs OVERFLOW behavior at store sites across
+// scalar Q16, AVX2 Q32, and AVX2 Q16 tiled entrypoints.
+I32 Q8_0MatMulTiledValidateOutIndexCapacityChecked(
+    I64 out_row_base,
+    I64 col_index,
+    I64 out_cell_capacity,
+    I64 *out_out_index)
+{
+    I32 status;
+
+    if (!out_out_index)
+        return Q8_0_MATMUL_ERR_NULL_PTR;
+
+    if (out_cell_capacity < 0)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    status = Q8_0MatMulTiledComputeOutIndexChecked(out_row_base,
+                                                   col_index,
+                                                   out_out_index);
+    if (status != Q8_0_MATMUL_OK)
+        return status;
+
+    if (*out_out_index >= out_cell_capacity)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    return Q8_0_MATMUL_OK;
+}
+
 // Shared checked RHS-column base math for tiled Q8_0 matmul inner loops:
 //   rhs_col_base = col_index * rhs_col_stride_blocks
 // Centralizing this keeps overflow/BAD_LEN behavior identical across
@@ -480,9 +511,10 @@ I32 Q8_0MatMulQ16TiledChecked(
                                                                       &rhs_col_base);
                     if (status != Q8_0_MATMUL_OK)
                         return status;
-                    status = Q8_0MatMulTiledComputeOutIndexChecked(out_row_base,
-                                                                   col_index,
-                                                                   &out_index);
+                    status = Q8_0MatMulTiledValidateOutIndexCapacityChecked(out_row_base,
+                                                                             col_index,
+                                                                             out_cell_capacity,
+                                                                             &out_index);
                     if (status != Q8_0_MATMUL_OK)
                         return status;
 
@@ -617,9 +649,10 @@ I32 Q8_0MatMulQ32TiledAVX2Checked(
                                                                       &rhs_col_base);
                     if (status != Q8_0_MATMUL_OK)
                         return status;
-                    status = Q8_0MatMulTiledComputeOutIndexChecked(out_row_base,
-                                                                   col_index,
-                                                                   &out_index);
+                    status = Q8_0MatMulTiledValidateOutIndexCapacityChecked(out_row_base,
+                                                                             col_index,
+                                                                             out_cell_capacity,
+                                                                             &out_index);
                     if (status != Q8_0_MATMUL_OK)
                         return status;
 
@@ -755,9 +788,10 @@ I32 Q8_0MatMulQ16TiledAVX2Checked(
                                                                       &rhs_col_base);
                     if (status != Q8_0_MATMUL_OK)
                         return status;
-                    status = Q8_0MatMulTiledComputeOutIndexChecked(out_row_base,
-                                                                   col_index,
-                                                                   &out_index);
+                    status = Q8_0MatMulTiledValidateOutIndexCapacityChecked(out_row_base,
+                                                                             col_index,
+                                                                             out_cell_capacity,
+                                                                             &out_index);
                     if (status != Q8_0_MATMUL_OK)
                         return status;
 
