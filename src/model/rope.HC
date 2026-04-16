@@ -771,6 +771,68 @@ I32 RoPEQ16ComputeHeadBaseIndexChecked(I64 range_base_index,
     return ROPE_Q16_OK;
 }
 
+// Validate a contiguous multi-head range before any in-place rotation.
+//
+// Range contract:
+//   head_base(h) = range_base_index + h * head_stride_cells, for h in [0, head_count)
+//
+// This helper centralizes all checked preflight math for head-range traversal so
+// callers can fail fast on malformed capacities and arithmetic overflow before
+// touching tensor cells.
+I32 RoPEQ16ValidateHeadRangeCapacityChecked(I64 head_cell_capacity,
+                                            I64 range_base_index,
+                                            I64 head_count,
+                                            I64 head_stride_cells,
+                                            I64 *out_last_head_base_index)
+{
+    I64 last_head_index;
+    I64 last_head_base_index;
+    I32 status;
+
+    if (!out_last_head_base_index)
+        return ROPE_Q16_ERR_NULL_PTR;
+
+    if (head_cell_capacity < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (range_base_index < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (head_count < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (head_stride_cells <= 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    if (!head_count)
+    {
+        // Empty range is a no-op. No capacity touch occurs.
+        *out_last_head_base_index = range_base_index;
+        return ROPE_Q16_OK;
+    }
+
+    if (range_base_index >= head_cell_capacity)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    // Tail-base validation catches overflow and far-end capacity faults once,
+    // before the rotation loop starts.
+    status = RoPETrySubI64Checked(head_count,
+                                  1,
+                                  &last_head_index);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPEQ16ComputeHeadBaseIndexChecked(range_base_index,
+                                                last_head_index,
+                                                head_stride_cells,
+                                                &last_head_base_index);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    if (last_head_base_index >= head_cell_capacity)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    *out_last_head_base_index = last_head_base_index;
+    return ROPE_Q16_OK;
+}
+
 // Rotate a contiguous range of attention heads in-place at one token position.
 // For head index `h` in `[0, head_count)`, this derives:
 //   head_base = range_base_index + h*head_stride_cells
@@ -788,25 +850,22 @@ I32 RoPEQ16RotateHeadRangeByPositionChecked(I64 *head_cells_q16,
 {
     I64 head_index;
     I64 head_base_index;
+    I64 last_head_base_index;
     I32 status;
 
     if (!head_cells_q16)
         return ROPE_Q16_ERR_NULL_PTR;
 
-    if (head_cell_capacity < 0)
-        return ROPE_Q16_ERR_BAD_PARAM;
-    if (range_base_index < 0)
-        return ROPE_Q16_ERR_BAD_PARAM;
-    if (head_count < 0)
-        return ROPE_Q16_ERR_BAD_PARAM;
-    if (head_stride_cells <= 0)
-        return ROPE_Q16_ERR_BAD_PARAM;
+    status = RoPEQ16ValidateHeadRangeCapacityChecked(head_cell_capacity,
+                                                     range_base_index,
+                                                     head_count,
+                                                     head_stride_cells,
+                                                     &last_head_base_index);
+    if (status != ROPE_Q16_OK)
+        return status;
 
     if (!head_count)
         return ROPE_Q16_OK;
-
-    if (range_base_index >= head_cell_capacity)
-        return ROPE_Q16_ERR_BAD_PARAM;
 
     for (head_index = 0; head_index < head_count; head_index++)
     {
@@ -816,6 +875,9 @@ I32 RoPEQ16RotateHeadRangeByPositionChecked(I64 *head_cells_q16,
                                                     &head_base_index);
         if (status != ROPE_Q16_OK)
             return status;
+
+        if (head_base_index > last_head_base_index)
+            return ROPE_Q16_ERR_BAD_PARAM;
 
         if (head_base_index < 0 || head_base_index >= head_cell_capacity)
             return ROPE_Q16_ERR_BAD_PARAM;
