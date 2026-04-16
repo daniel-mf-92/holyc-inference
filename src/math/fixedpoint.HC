@@ -257,3 +257,66 @@ I32 FPQ16MulDivRoundedChecked(I64 a_q16,
                                         is_negative,
                                         out_q16);
 }
+
+// Checked one-rounding Q16 helper for positive integer divisors:
+//   out_q16 = round_half_up((a_q16 * b_q16) / d_int)
+// where d_int is an integer (not Q16) with d_int > 0.
+//
+// Since a_q16*b_q16 is Q32, dividing by d_int keeps Q32. Returning Q16 means
+// one final divide by 2^16. We combine both denominators into:
+//   denom = d_int * 2^16
+// and perform a single rounded integer divide to avoid double-rounding drift.
+I32 FPQ16MulDivRoundedByPositiveIntChecked(I64 a_q16,
+                                           I64 b_q16,
+                                           I64 d_int,
+                                           I64 *out_q16)
+{
+    U64 abs_a;
+    U64 abs_b;
+    U64 abs_num;
+    U64 abs_den_q16;
+    U64 q;
+    U64 r;
+    U64 limit;
+    I64 is_negative;
+
+    if (!out_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (d_int <= 0)
+        return FP_Q16_ERR_DOMAIN;
+
+    if ((U64)d_int > (U64_MAX_VALUE >> FP_Q16_SHIFT))
+        return FP_Q16_ERR_OVERFLOW;
+
+    abs_a = FPAbsToU64(a_q16);
+    abs_b = FPAbsToU64(b_q16);
+    is_negative = ((a_q16 < 0) ^ (b_q16 < 0));
+
+    if (abs_a && abs_b && abs_a > (U64_MAX_VALUE / abs_b))
+        return FP_Q16_ERR_OVERFLOW;
+
+    abs_num = abs_a * abs_b;
+    abs_den_q16 = ((U64)d_int) << FP_Q16_SHIFT;
+
+    q = abs_num / abs_den_q16;
+    r = abs_num % abs_den_q16;
+
+    limit = (U64)I64_MAX_VALUE;
+    if (is_negative)
+        limit = 0x8000000000000000;
+
+    if (q > limit)
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Half-up rounding: bump quotient when residual >= 0.5 denominator.
+    if (r >= ((abs_den_q16 + 1) >> 1))
+    {
+        if (q == limit)
+            return FP_Q16_ERR_OVERFLOW;
+        q++;
+    }
+
+    return FPTryApplySignFromU64Checked(q,
+                                        is_negative,
+                                        out_q16);
+}

@@ -1,0 +1,15 @@
+Completed one full iteration on `IQ-152` end-to-end.
+
+**What Changed**
+- Implemented `FPQ16MulDivRoundedByPositiveIntChecked` with checked one-rounding `(a_q16*b_q16)/d_int`, `d_int>0` domain enforcement, overflow guards, and half-up rounding in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/math/fixedpoint.HC:269`.
+- Added focused parity harness for the new helper (domain/overflow/sign/rounding/randomized checks) in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_fixedpoint_q16_muldiv_positive_int_checked.py:2`.
+
+**Queue + Ledger**
+- Marked `IQ-152` done and appended new unchecked `IQ-153` to keep monotonic queue growth in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:343`.
+- Added one progress-ledger line (`loop-130`) in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:350`.
+- Unchecked queue depth is now `15` (policy maintained).
+
+**Validation + DB**
+- Ran: `python3 tests/test_fixedpoint_q16_muldiv_positive_int_checked.py && python3 tests/test_fixedpoint_q16_muldiv_checked.py && python3 tests/test_fixedpoint_q16.py`.
+- Output: `fixedpoint_q16_muldiv_positive_int_checked_reference_checks=ok`, `fixedpoint_q16_muldiv_checked_reference_checks=ok`, `fixedpoint_q16_reference_checks=ok`.
+- Logged iteration to `~/Documents/local-codebases/temple-central.db` (`iterations` row for `IQ-152`, status `pass`).
