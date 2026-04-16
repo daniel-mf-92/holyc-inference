@@ -101,3 +101,9 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_2","type":"todo_list","items":[{"text":"Inspect tasks and repository state","completed":true},{"text":"Top up IQ queue to 15+","completed":true},{"text":"Implement selected IQ task deeply","completed":true},{"text":"Run focused validation","completed":true},{"text":"Log iteration and update ledger","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":2173373,"cached_input_tokens":1778176,"output_tokens":16459}}
 Codex final exit code: 0
+[main a383955] feat(inference): codex iteration 20260416-130003
+ 6 files changed, 777 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260416-130003.final.txt
+ create mode 100644 src/matmul/q4_0_q8_0_matmul.HC
+ create mode 100644 tests/test_q4_0_q8_0_matmul_tiled_checked.py
+=== End iteration 9 (outcome=ok) ===
