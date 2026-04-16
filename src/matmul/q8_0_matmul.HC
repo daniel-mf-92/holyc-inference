@@ -247,6 +247,34 @@ I32 Q8_0MatMulTiledComputeRhsColBaseChecked(
     return Q8_0_MATMUL_OK;
 }
 
+// Shared checked row-slice extent validation for tiled Q8_0 matmul loops:
+//   row_slice_end = row_base + k_block_count
+//   require row_slice_end <= block_capacity
+// This centralizes BAD_LEN vs OVERFLOW behavior for row-window bounds across
+// scalar Q16, AVX2 Q32, and AVX2 Q16 tiled entrypoints.
+I32 Q8_0MatMulTiledValidateRowSliceChecked(
+    I64 row_base,
+    I64 k_block_count,
+    I64 block_capacity,
+    I64 *out_row_slice_end)
+{
+    if (!out_row_slice_end)
+        return Q8_0_MATMUL_ERR_NULL_PTR;
+
+    if (row_base < 0 || k_block_count < 0 || block_capacity < 0)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (!Q8_0MatMulTryAddI64NonNeg(row_base,
+                                   k_block_count,
+                                   out_row_slice_end))
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+
+    if (*out_row_slice_end > block_capacity)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    return Q8_0_MATMUL_OK;
+}
+
 I32 Q8_0MatMulTiledValidateArgsChecked(
     Q8_0Block *lhs_blocks,
     I64 lhs_block_capacity,
@@ -375,7 +403,9 @@ I32 Q8_0MatMulQ16TiledChecked(
     I64 row_index;
     I64 col_index;
     I64 lhs_row_base;
+    I64 lhs_row_slice_end;
     I64 rhs_col_base;
+    I64 rhs_col_slice_end;
     I64 out_row_base;
     I64 out_index;
     I64 cell_dot_q16;
@@ -434,6 +464,13 @@ I32 Q8_0MatMulQ16TiledChecked(
                 if (status != Q8_0_MATMUL_OK)
                     return status;
 
+                status = Q8_0MatMulTiledValidateRowSliceChecked(lhs_row_base,
+                                                                 k_block_count,
+                                                                 lhs_block_capacity,
+                                                                 &lhs_row_slice_end);
+                if (status != Q8_0_MATMUL_OK)
+                    return status;
+
                 lhs_row_ptr = &lhs_blocks[lhs_row_base];
 
                 for (col_index = col_tile_start; col_index < col_tile_end; ++col_index)
@@ -446,6 +483,13 @@ I32 Q8_0MatMulQ16TiledChecked(
                     status = Q8_0MatMulTiledComputeOutIndexChecked(out_row_base,
                                                                    col_index,
                                                                    &out_index);
+                    if (status != Q8_0_MATMUL_OK)
+                        return status;
+
+                    status = Q8_0MatMulTiledValidateRowSliceChecked(rhs_col_base,
+                                                                     k_block_count,
+                                                                     rhs_block_capacity,
+                                                                     &rhs_col_slice_end);
                     if (status != Q8_0_MATMUL_OK)
                         return status;
 
@@ -495,7 +539,9 @@ I32 Q8_0MatMulQ32TiledAVX2Checked(
     I64 row_index;
     I64 col_index;
     I64 lhs_row_base;
+    I64 lhs_row_slice_end;
     I64 rhs_col_base;
+    I64 rhs_col_slice_end;
     I64 out_row_base;
     I64 out_index;
     I64 cell_dot_q32;
@@ -555,6 +601,13 @@ I32 Q8_0MatMulQ32TiledAVX2Checked(
                 if (status != Q8_0_MATMUL_OK)
                     return status;
 
+                status = Q8_0MatMulTiledValidateRowSliceChecked(lhs_row_base,
+                                                                 k_block_count,
+                                                                 lhs_block_capacity,
+                                                                 &lhs_row_slice_end);
+                if (status != Q8_0_MATMUL_OK)
+                    return status;
+
                 lhs_row_ptr = &lhs_blocks[lhs_row_base];
 
                 for (col_index = col_tile_start; col_index < col_tile_end; ++col_index)
@@ -567,6 +620,13 @@ I32 Q8_0MatMulQ32TiledAVX2Checked(
                     status = Q8_0MatMulTiledComputeOutIndexChecked(out_row_base,
                                                                    col_index,
                                                                    &out_index);
+                    if (status != Q8_0_MATMUL_OK)
+                        return status;
+
+                    status = Q8_0MatMulTiledValidateRowSliceChecked(rhs_col_base,
+                                                                     k_block_count,
+                                                                     rhs_block_capacity,
+                                                                     &rhs_col_slice_end);
                     if (status != Q8_0_MATMUL_OK)
                         return status;
 
@@ -617,7 +677,9 @@ I32 Q8_0MatMulQ16TiledAVX2Checked(
     I64 row_index;
     I64 col_index;
     I64 lhs_row_base;
+    I64 lhs_row_slice_end;
     I64 rhs_col_base;
+    I64 rhs_col_slice_end;
     I64 out_row_base;
     I64 out_index;
     I64 cell_dot_q16;
@@ -677,6 +739,13 @@ I32 Q8_0MatMulQ16TiledAVX2Checked(
                 if (status != Q8_0_MATMUL_OK)
                     return status;
 
+                status = Q8_0MatMulTiledValidateRowSliceChecked(lhs_row_base,
+                                                                 k_block_count,
+                                                                 lhs_block_capacity,
+                                                                 &lhs_row_slice_end);
+                if (status != Q8_0_MATMUL_OK)
+                    return status;
+
                 lhs_row_ptr = &lhs_blocks[lhs_row_base];
 
                 for (col_index = col_tile_start; col_index < col_tile_end; ++col_index)
@@ -689,6 +758,13 @@ I32 Q8_0MatMulQ16TiledAVX2Checked(
                     status = Q8_0MatMulTiledComputeOutIndexChecked(out_row_base,
                                                                    col_index,
                                                                    &out_index);
+                    if (status != Q8_0_MATMUL_OK)
+                        return status;
+
+                    status = Q8_0MatMulTiledValidateRowSliceChecked(rhs_col_base,
+                                                                     k_block_count,
+                                                                     rhs_block_capacity,
+                                                                     &rhs_col_slice_end);
                     if (status != Q8_0_MATMUL_OK)
                         return status;
 

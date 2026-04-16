@@ -67,6 +67,24 @@ def compute_rhs_col_base_checked(col_index: int, rhs_col_stride_blocks: int) -> 
     return Q8_0_OK, rhs_col_base
 
 
+def validate_row_slice_checked(
+    row_base: int,
+    k_block_count: int,
+    block_capacity: int,
+) -> tuple[int, int]:
+    if row_base < 0 or k_block_count < 0 or block_capacity < 0:
+        return Q8_0_ERR_BAD_DST_LEN, 0
+
+    ok, row_slice_end = try_add_i64_nonneg(row_base, k_block_count)
+    if not ok:
+        return Q8_0_ERR_OVERFLOW, 0
+
+    if row_slice_end > block_capacity:
+        return Q8_0_ERR_BAD_DST_LEN, 0
+
+    return Q8_0_OK, row_slice_end
+
+
 def q8_0_matmul_q16_tiled_checked(
     lhs_blocks: list[tuple[int, bytes]],
     lhs_block_capacity: int,
@@ -137,6 +155,14 @@ def q8_0_matmul_q16_tiled_checked(
                 if not ok:
                     return Q8_0_ERR_OVERFLOW, []
 
+                err, _lhs_row_slice_end = validate_row_slice_checked(
+                    lhs_row_base,
+                    k_block_count,
+                    lhs_block_capacity,
+                )
+                if err != Q8_0_OK:
+                    return err, []
+
                 lhs_row_slice = lhs_blocks[lhs_row_base : lhs_row_base + k_block_count]
                 if len(lhs_row_slice) != k_block_count:
                     return Q8_0_ERR_BAD_DST_LEN, []
@@ -146,6 +172,14 @@ def q8_0_matmul_q16_tiled_checked(
                     if err != Q8_0_OK:
                         return err, []
                     err, out_index = compute_out_index_checked(out_row_base, col_index)
+                    if err != Q8_0_OK:
+                        return err, []
+
+                    err, _rhs_row_slice_end = validate_row_slice_checked(
+                        rhs_col_base,
+                        k_block_count,
+                        rhs_block_capacity,
+                    )
                     if err != Q8_0_OK:
                         return err, []
 
@@ -274,6 +308,14 @@ def q8_0_matmul_q32_tiled_avx2_checked(
                 if not ok:
                     return Q8_0_ERR_OVERFLOW, []
 
+                err, _lhs_row_slice_end = validate_row_slice_checked(
+                    lhs_row_base,
+                    k_block_count,
+                    lhs_block_capacity,
+                )
+                if err != Q8_0_OK:
+                    return err, []
+
                 lhs_row_slice = lhs_blocks[lhs_row_base : lhs_row_base + k_block_count]
                 if len(lhs_row_slice) != k_block_count:
                     return Q8_0_ERR_BAD_DST_LEN, []
@@ -285,6 +327,14 @@ def q8_0_matmul_q32_tiled_avx2_checked(
                     ok, out_index = try_add_i64_nonneg(out_row_base, col_index)
                     if not ok:
                         return Q8_0_ERR_OVERFLOW, []
+
+                    err, _rhs_row_slice_end = validate_row_slice_checked(
+                        rhs_col_base,
+                        k_block_count,
+                        rhs_block_capacity,
+                    )
+                    if err != Q8_0_OK:
+                        return err, []
 
                     rhs_col_slice = rhs_col_blocks[rhs_col_base : rhs_col_base + k_block_count]
                     if len(rhs_col_slice) != k_block_count:
@@ -447,6 +497,14 @@ def q8_0_matmul_q16_tiled_avx2_checked(
                 if not ok:
                     return Q8_0_ERR_OVERFLOW, []
 
+                err, _lhs_row_slice_end = validate_row_slice_checked(
+                    lhs_row_base,
+                    k_block_count,
+                    lhs_block_capacity,
+                )
+                if err != Q8_0_OK:
+                    return err, []
+
                 lhs_row_slice = lhs_blocks[lhs_row_base : lhs_row_base + k_block_count]
                 if len(lhs_row_slice) != k_block_count:
                     return Q8_0_ERR_BAD_DST_LEN, []
@@ -458,6 +516,14 @@ def q8_0_matmul_q16_tiled_avx2_checked(
                     ok, out_index = try_add_i64_nonneg(out_row_base, col_index)
                     if not ok:
                         return Q8_0_ERR_OVERFLOW, []
+
+                    err, _rhs_row_slice_end = validate_row_slice_checked(
+                        rhs_col_base,
+                        k_block_count,
+                        rhs_block_capacity,
+                    )
+                    if err != Q8_0_OK:
+                        return err, []
 
                     rhs_col_slice = rhs_col_blocks[rhs_col_base : rhs_col_base + k_block_count]
                     if len(rhs_col_slice) != k_block_count:
@@ -823,6 +889,21 @@ def test_q16_avx2_reports_extent_multiply_overflow() -> None:
     assert err == Q8_0_ERR_OVERFLOW
 
 
+def test_row_slice_validator_contract() -> None:
+    err, end = validate_row_slice_checked(8, 4, 16)
+    assert err == Q8_0_OK
+    assert end == 12
+
+    err, _ = validate_row_slice_checked(-1, 4, 16)
+    assert err == Q8_0_ERR_BAD_DST_LEN
+
+    err, _ = validate_row_slice_checked(8, 9, 16)
+    assert err == Q8_0_ERR_BAD_DST_LEN
+
+    err, _ = validate_row_slice_checked(Q8_0_I64_MAX, 1, Q8_0_I64_MAX)
+    assert err == Q8_0_ERR_OVERFLOW
+
+
 def run() -> None:
     test_tiled_matches_untiled_randomized()
     test_rejects_bad_dimensions_and_capacities()
@@ -832,6 +913,7 @@ def run() -> None:
     test_q32_avx2_reports_extent_multiply_overflow()
     test_q16_avx2_tiled_matches_scalar_q16_randomized()
     test_q16_avx2_reports_extent_multiply_overflow()
+    test_row_slice_validator_contract()
     print("q8_0_matmul_tiled_checked_reference_checks=ok")
 
 
