@@ -9,6 +9,7 @@
 //   (`vpmovsxbw`) without changing call-site semantics.
 
 #define Q8_0_AVX2_VALUES_PER_BLOCK   32
+#define Q8_0_AVX2_PAIR_COUNT         16
 
 #define Q8_0_AVX2_OK                 0
 #define Q8_0_AVX2_ERR_NULL_PTR       1
@@ -51,4 +52,43 @@ I32 Q8_0PackBlockToI16LanesAVX2(Q8_0Block *block, I16 *dst_i16, I64 dst_len)
                                     Q8_0_AVX2_VALUES_PER_BLOCK,
                                     dst_i16,
                                     dst_len);
+}
+
+I32 Q8_0MulI16LanesToI32PairsAVX2(I16 *lhs_i16,
+                                  I64 lhs_len,
+                                  I16 *rhs_i16,
+                                  I64 rhs_len,
+                                  I32 *dst_i32,
+                                  I64 dst_len)
+{
+    I64 pair_index;
+    I64 lane_base;
+    I32 product0;
+    I32 product1;
+
+    if (!lhs_i16 || !rhs_i16 || !dst_i32)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+
+    if (lhs_len < Q8_0_AVX2_VALUES_PER_BLOCK)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (rhs_len < Q8_0_AVX2_VALUES_PER_BLOCK)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (dst_len < Q8_0_AVX2_PAIR_COUNT)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    // Contract mirrors AVX2 `vpmaddwd` lane behavior used by quantized dot kernels:
+    // - Multiply lane pairs independently in signed 16-bit domain.
+    // - Accumulate each adjacent pair into one signed 32-bit output.
+    // - Preserve lane order so output pair k maps to input lanes [2k, 2k+1].
+    for (pair_index = 0; pair_index < Q8_0_AVX2_PAIR_COUNT; ++pair_index)
+    {
+        lane_base = pair_index << 1;
+
+        product0 = lhs_i16[lane_base] * rhs_i16[lane_base];
+        product1 = lhs_i16[lane_base + 1] * rhs_i16[lane_base + 1];
+
+        dst_i32[pair_index] = product0 + product1;
+    }
+
+    return Q8_0_AVX2_OK;
 }
