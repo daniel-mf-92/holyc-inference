@@ -367,14 +367,67 @@ def test_error_paths() -> None:
     assert err == Q8_0_AVX2_ERR_OVERFLOW
 
 
+def test_q16_q32_shared_preflight_error_surface() -> None:
+    lhs = [make_block(0x3C00, [1] * 32) for _ in range(9)]
+    rhs = [make_block(0x3C00, [1] * 32) for _ in range(9)]
+
+    # Preflight-equivalent invalid configurations should fail identically in
+    # Q32 and Q16 tiled AVX2 matmul entry points.
+    scenarios = [
+        dict(row_count=-1, col_count=2, k_block_count=1, lhs_stride=1, rhs_stride=1, out_stride=2, tile_rows=1, tile_cols=1, lhs_cap=9, rhs_cap=9, out_cap=9),
+        dict(row_count=2, col_count=2, k_block_count=3, lhs_stride=2, rhs_stride=3, out_stride=2, tile_rows=1, tile_cols=1, lhs_cap=9, rhs_cap=9, out_cap=9),
+        dict(row_count=2, col_count=2, k_block_count=2, lhs_stride=2, rhs_stride=2, out_stride=1, tile_rows=1, tile_cols=1, lhs_cap=9, rhs_cap=9, out_cap=9),
+        dict(row_count=2, col_count=2, k_block_count=2, lhs_stride=2, rhs_stride=2, out_stride=2, tile_rows=0, tile_cols=1, lhs_cap=9, rhs_cap=9, out_cap=9),
+        dict(row_count=I64_MAX, col_count=2, k_block_count=1, lhs_stride=2, rhs_stride=1, out_stride=2, tile_rows=1, tile_cols=1, lhs_cap=9, rhs_cap=9, out_cap=9),
+        dict(row_count=3, col_count=3, k_block_count=2, lhs_stride=3, rhs_stride=3, out_stride=3, tile_rows=2, tile_cols=2, lhs_cap=8, rhs_cap=9, out_cap=9),
+        dict(row_count=3, col_count=3, k_block_count=2, lhs_stride=3, rhs_stride=3, out_stride=3, tile_rows=2, tile_cols=2, lhs_cap=9, rhs_cap=8, out_cap=9),
+        dict(row_count=3, col_count=3, k_block_count=2, lhs_stride=3, rhs_stride=3, out_stride=3, tile_rows=2, tile_cols=2, lhs_cap=9, rhs_cap=9, out_cap=8),
+    ]
+
+    for scenario in scenarios:
+        err_q16, _ = q8_0_matmul_tiled_avx2_q16_checked(
+            lhs_blocks=lhs,
+            lhs_block_capacity=scenario["lhs_cap"],
+            row_count=scenario["row_count"],
+            lhs_row_stride_blocks=scenario["lhs_stride"],
+            rhs_col_blocks=rhs,
+            rhs_block_capacity=scenario["rhs_cap"],
+            col_count=scenario["col_count"],
+            rhs_col_stride_blocks=scenario["rhs_stride"],
+            k_block_count=scenario["k_block_count"],
+            tile_rows=scenario["tile_rows"],
+            tile_cols=scenario["tile_cols"],
+            out_cell_capacity=scenario["out_cap"],
+            out_row_stride_cells=scenario["out_stride"],
+        )
+
+        err_q32, _ = q8_0_matmul_tiled_avx2_q32_checked(
+            lhs_matrix_blocks=lhs,
+            lhs_block_capacity=scenario["lhs_cap"],
+            lhs_rows=scenario["row_count"],
+            lhs_row_stride_blocks=scenario["lhs_stride"],
+            rhs_col_blocks=rhs,
+            rhs_block_capacity=scenario["rhs_cap"],
+            rhs_cols=scenario["col_count"],
+            rhs_col_stride_blocks=scenario["rhs_stride"],
+            k_block_count=scenario["k_block_count"],
+            tile_rows=scenario["tile_rows"],
+            tile_cols=scenario["tile_cols"],
+            out_capacity=scenario["out_cap"],
+            out_row_stride_cols=scenario["out_stride"],
+        )
+
+        assert err_q16 == err_q32
+
+
 def run() -> None:
     test_known_matrix_matches_q32_then_single_round()
     test_q16_output_matches_q32_matmul_single_rounding_per_cell()
     test_tile_and_stride_invariants()
     test_error_paths()
+    test_q16_q32_shared_preflight_error_surface()
     print("q8_0_matmul_tiled_avx2_q16_reference_checks=ok")
 
 
 if __name__ == "__main__":
     run()
-

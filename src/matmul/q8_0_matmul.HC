@@ -69,6 +69,65 @@ I64 Q8_0MatMulMinI64(I64 lhs, I64 rhs)
     return rhs;
 }
 
+I32 Q8_0MatMulValidateTiledArgsChecked(
+    Q8_0Block *lhs_blocks,
+    I64 lhs_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_col_blocks,
+    I64 rhs_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 tile_rows,
+    I64 tile_cols,
+    I64 *out_cells,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells,
+    I64 *out_lhs_required_blocks,
+    I64 *out_rhs_required_blocks,
+    I64 *out_required_cells)
+{
+    if (!lhs_blocks || !rhs_col_blocks || !out_cells)
+        return Q8_0_MATMUL_ERR_NULL_PTR;
+    if (!out_lhs_required_blocks || !out_rhs_required_blocks || !out_required_cells)
+        return Q8_0_MATMUL_ERR_NULL_PTR;
+
+    if (lhs_block_capacity < 0 || rhs_block_capacity < 0 || out_cell_capacity < 0)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (row_count < 0 || col_count < 0 || k_block_count < 0)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (lhs_row_stride_blocks < 0 || rhs_col_stride_blocks < 0 || out_row_stride_cells < 0)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (tile_rows <= 0 || tile_cols <= 0)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    // Active K span must fit inside each source row stride.
+    if (k_block_count > lhs_row_stride_blocks || k_block_count > rhs_col_stride_blocks)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    // Output row stride must cover active output columns.
+    if (row_count > 0 && out_row_stride_cells < col_count)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    // Capacity proofs for full row-strided views.
+    if (!Q8_0MatMulTryMulI64NonNeg(row_count, lhs_row_stride_blocks, out_lhs_required_blocks))
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+    if (!Q8_0MatMulTryMulI64NonNeg(col_count, rhs_col_stride_blocks, out_rhs_required_blocks))
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+    if (!Q8_0MatMulTryMulI64NonNeg(row_count, out_row_stride_cells, out_required_cells))
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+
+    if (*out_lhs_required_blocks > lhs_block_capacity)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (*out_rhs_required_blocks > rhs_block_capacity)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (*out_required_cells > out_cell_capacity)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    return Q8_0_MATMUL_OK;
+}
+
 I32 Q8_0MatMulQ16TiledChecked(
     Q8_0Block *lhs_blocks,
     I64 lhs_block_capacity,
@@ -223,40 +282,25 @@ I32 Q8_0MatMulQ32TiledAVX2Checked(
     Q8_0Block *rhs_col_ptr;
     I32 status;
 
-    if (!lhs_blocks || !rhs_col_blocks || !out_cells_q32)
-        return Q8_0_MATMUL_ERR_NULL_PTR;
-
-    if (lhs_block_capacity < 0 || rhs_block_capacity < 0 || out_cell_capacity < 0)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
-    if (row_count < 0 || col_count < 0 || k_block_count < 0)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
-    if (lhs_row_stride_blocks < 0 || rhs_col_stride_blocks < 0 || out_row_stride_cells < 0)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
-    if (tile_rows <= 0 || tile_cols <= 0)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
-
-    // Active K span must fit inside each source row stride.
-    if (k_block_count > lhs_row_stride_blocks || k_block_count > rhs_col_stride_blocks)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
-
-    // Output row stride must cover active output columns.
-    if (row_count > 0 && out_row_stride_cells < col_count)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
-
-    // Capacity proofs for full row-strided views.
-    if (!Q8_0MatMulTryMulI64NonNeg(row_count, lhs_row_stride_blocks, &lhs_required_blocks))
-        return Q8_0_MATMUL_ERR_OVERFLOW;
-    if (!Q8_0MatMulTryMulI64NonNeg(col_count, rhs_col_stride_blocks, &rhs_required_blocks))
-        return Q8_0_MATMUL_ERR_OVERFLOW;
-    if (!Q8_0MatMulTryMulI64NonNeg(row_count, out_row_stride_cells, &out_required_cells))
-        return Q8_0_MATMUL_ERR_OVERFLOW;
-
-    if (lhs_required_blocks > lhs_block_capacity)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
-    if (rhs_required_blocks > rhs_block_capacity)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
-    if (out_required_cells > out_cell_capacity)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    status = Q8_0MatMulValidateTiledArgsChecked(lhs_blocks,
+                                                lhs_block_capacity,
+                                                row_count,
+                                                lhs_row_stride_blocks,
+                                                rhs_col_blocks,
+                                                rhs_block_capacity,
+                                                col_count,
+                                                rhs_col_stride_blocks,
+                                                k_block_count,
+                                                tile_rows,
+                                                tile_cols,
+                                                out_cells_q32,
+                                                out_cell_capacity,
+                                                out_row_stride_cells,
+                                                &lhs_required_blocks,
+                                                &rhs_required_blocks,
+                                                &out_required_cells);
+    if (status != Q8_0_MATMUL_OK)
+        return status;
 
     // Tiled traversal mirrors Q16 path but preserves Q32 accumulator results.
     // Each output cell is one checked AVX2-shape block dot over K blocks.
@@ -345,40 +389,25 @@ I32 Q8_0MatMulQ16TiledAVX2Checked(
     Q8_0Block *rhs_col_ptr;
     I32 status;
 
-    if (!lhs_blocks || !rhs_col_blocks || !out_cells_q16)
-        return Q8_0_MATMUL_ERR_NULL_PTR;
-
-    if (lhs_block_capacity < 0 || rhs_block_capacity < 0 || out_cell_capacity < 0)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
-    if (row_count < 0 || col_count < 0 || k_block_count < 0)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
-    if (lhs_row_stride_blocks < 0 || rhs_col_stride_blocks < 0 || out_row_stride_cells < 0)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
-    if (tile_rows <= 0 || tile_cols <= 0)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
-
-    // Active K span must fit inside each source row stride.
-    if (k_block_count > lhs_row_stride_blocks || k_block_count > rhs_col_stride_blocks)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
-
-    // Output row stride must cover active output columns.
-    if (row_count > 0 && out_row_stride_cells < col_count)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
-
-    // Capacity proofs for full row-strided views.
-    if (!Q8_0MatMulTryMulI64NonNeg(row_count, lhs_row_stride_blocks, &lhs_required_blocks))
-        return Q8_0_MATMUL_ERR_OVERFLOW;
-    if (!Q8_0MatMulTryMulI64NonNeg(col_count, rhs_col_stride_blocks, &rhs_required_blocks))
-        return Q8_0_MATMUL_ERR_OVERFLOW;
-    if (!Q8_0MatMulTryMulI64NonNeg(row_count, out_row_stride_cells, &out_required_cells))
-        return Q8_0_MATMUL_ERR_OVERFLOW;
-
-    if (lhs_required_blocks > lhs_block_capacity)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
-    if (rhs_required_blocks > rhs_block_capacity)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
-    if (out_required_cells > out_cell_capacity)
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    status = Q8_0MatMulValidateTiledArgsChecked(lhs_blocks,
+                                                lhs_block_capacity,
+                                                row_count,
+                                                lhs_row_stride_blocks,
+                                                rhs_col_blocks,
+                                                rhs_block_capacity,
+                                                col_count,
+                                                rhs_col_stride_blocks,
+                                                k_block_count,
+                                                tile_rows,
+                                                tile_cols,
+                                                out_cells_q16,
+                                                out_cell_capacity,
+                                                out_row_stride_cells,
+                                                &lhs_required_blocks,
+                                                &rhs_required_blocks,
+                                                &out_required_cells);
+    if (status != Q8_0_MATMUL_OK)
+        return status;
 
     // Tiled traversal mirrors Q32 AVX2 path but stores Q16 outputs.
     // Each cell runs one checked full-row Q32 dot and downshifts once to Q16.
