@@ -108,3 +108,8 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_1","type":"todo_list","items":[{"text":"Read tasks and research context","completed":true},{"text":"Refresh IQ queue to 15+","completed":true},{"text":"Implement highest-priority IQ task","completed":true},{"text":"Run focused validation","completed":true},{"text":"Log DB and update ledger","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":2418079,"cached_input_tokens":2227712,"output_tokens":10665}}
 Codex final exit code: 0
+[main 4387436] feat(inference): codex iteration 20260416-195812
+ 6 files changed, 344 insertions(+), 49 deletions(-)
+ create mode 100644 automation/logs/20260416-195812.final.txt
+ create mode 100644 tests/test_q8_0_matmul_tiled_stride_k_preflight.py
+=== End iteration 29 (outcome=ok) ===
