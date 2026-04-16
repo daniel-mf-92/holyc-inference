@@ -41,14 +41,20 @@ def test_zero_position_yields_zero_angle() -> None:
 
 
 def test_checked_overflow_surfaces() -> None:
-    too_large_position = (ref.I64_MAX >> ref.FP_Q16_SHIFT) + 1
-    step_q16 = ref.q16_from_float(0.125)
-
-    err, _ = rope_q16_angle_for_position_checked(step_q16, too_large_position)
+    err, _ = rope_q16_angle_for_position_checked(ref.q16_from_float(1.0), ref.I64_MAX)
     assert err == ref.ROPE_Q16_ERR_OVERFLOW
 
     err, _ = rope_q16_angle_for_position_checked(ref.I64_MAX, 2)
     assert err == ref.ROPE_Q16_ERR_OVERFLOW
+
+
+def test_large_position_with_small_step_stays_valid() -> None:
+    position = (ref.I64_MAX >> ref.FP_Q16_SHIFT) + 1
+    step_q16 = 1
+
+    err, angle_q16 = rope_q16_angle_for_position_checked(step_q16, position)
+    assert err == ref.ROPE_Q16_OK
+    assert angle_q16 == position
 
 
 def test_composes_with_angle_step_helper() -> None:

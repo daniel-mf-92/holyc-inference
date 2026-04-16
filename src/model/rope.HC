@@ -510,9 +510,6 @@ I32 RoPEQ16AngleForPositionChecked(I64 angle_step_q16,
                                    I64 position,
                                    I64 *out_angle_q16)
 {
-    I64 position_q16;
-    I32 status;
-
     if (!out_angle_q16)
         return ROPE_Q16_ERR_NULL_PTR;
 
@@ -521,15 +518,13 @@ I32 RoPEQ16AngleForPositionChecked(I64 angle_step_q16,
     if (position < 0)
         return ROPE_Q16_ERR_BAD_PARAM;
 
-    // Convert integer token position to Q16 once, then reuse checked Q16 mul.
-    status = RoPEQ16FromIntChecked(position,
-                                   &position_q16);
-    if (status != ROPE_Q16_OK)
-        return status;
-
-    return RoPEQ16MulChecked(position_q16,
-                             angle_step_q16,
-                             out_angle_q16);
+    // angle_step_q16 is already radians-per-position in Q16, so multiplying
+    // by an integer position is exact in Q16 space (no extra <<16 conversion).
+    // This also avoids rejecting large-but-valid positions that only overflow
+    // in an intermediate `position<<16`, not in the final `position*step`.
+    return RoPETryMulI64Checked(angle_step_q16,
+                                position,
+                                out_angle_q16);
 }
 
 // Rotate one Q16 vector pair by a RoPE angle using integer sin/cos approximations:
