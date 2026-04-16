@@ -13,6 +13,8 @@ Q4_0_Q8_0_OK = 0
 Q4_0_Q8_0_ERR_NULL_PTR = 1
 Q4_0_Q8_0_ERR_BAD_DST_LEN = 2
 Q4_0_Q8_0_ERR_OVERFLOW = 3
+Q4_0_Q8_0_I64_MAX = (1 << 63) - 1
+Q4_0_Q8_0_I64_MIN = -(1 << 63)
 
 
 def round_shift_right_unsigned(value: int, shift: int) -> int:
@@ -143,6 +145,32 @@ def dot_product_blocks_q16_accumulate(lhs_blocks, rhs_blocks, initial_accum_q16:
     return Q4_0_Q8_0_OK, total_q16
 
 
+def try_add_i64(lhs: int, rhs: int) -> tuple[bool, int]:
+    if rhs > 0 and lhs > Q4_0_Q8_0_I64_MAX - rhs:
+        return False, 0
+    if rhs < 0 and lhs < Q4_0_Q8_0_I64_MIN - rhs:
+        return False, 0
+    return True, lhs + rhs
+
+
+def dot_product_blocks_q16_accumulate_checked(lhs_blocks, rhs_blocks, initial_accum_q16: int) -> tuple[int, int]:
+    if len(lhs_blocks) != len(rhs_blocks):
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN, 0
+
+    total_q16 = initial_accum_q16
+    for (l_scale, l_q4), (r_scale, r_q8) in zip(lhs_blocks, rhs_blocks):
+        err, block_dot_q32 = dot_product_block_q32(l_scale, l_q4, r_scale, r_q8)
+        if err != Q4_0_Q8_0_OK:
+            return err, 0
+        block_dot_q16 = dot_q32_to_q16(block_dot_q32)
+        ok, checked = try_add_i64(total_q16, block_dot_q16)
+        if not ok:
+            return Q4_0_Q8_0_ERR_OVERFLOW, 0
+        total_q16 = checked
+
+    return Q4_0_Q8_0_OK, total_q16
+
+
 def dot_row_blocks_q16(lhs_blocks, rhs_blocks) -> tuple[int, int]:
     return dot_product_blocks_q16_accumulate(lhs_blocks, rhs_blocks, 0)
 
@@ -170,6 +198,42 @@ def dot_rows_q16_matrix_vector(
         row_start = row_index * row_stride_blocks
         row_slice = matrix_blocks[row_start : row_start + vec_block_count]
         err, row_q16 = dot_row_blocks_q16(row_slice, vec_blocks[:vec_block_count])
+        if err != Q4_0_Q8_0_OK:
+            return err, []
+        out_rows.append(row_q16)
+
+    return Q4_0_Q8_0_OK, out_rows
+
+
+def dot_rows_q16_matrix_vector_checked(
+    matrix_blocks,
+    matrix_block_capacity: int,
+    row_count: int,
+    row_stride_blocks: int,
+    vec_blocks,
+    vec_block_capacity: int,
+    vec_block_count: int,
+) -> tuple[int, list[int]]:
+    if matrix_block_capacity < 0 or vec_block_capacity < 0:
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN, []
+    if row_count < 0 or row_stride_blocks < 0 or vec_block_count < 0:
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN, []
+    if row_count > 0 and row_stride_blocks < vec_block_count:
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN, []
+    if vec_block_count > vec_block_capacity:
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN, []
+
+    required_matrix_blocks = row_count * row_stride_blocks
+    if required_matrix_blocks > Q4_0_Q8_0_I64_MAX:
+        return Q4_0_Q8_0_ERR_OVERFLOW, []
+    if required_matrix_blocks > matrix_block_capacity:
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN, []
+
+    out_rows: list[int] = []
+    for row_index in range(row_count):
+        row_start = row_index * row_stride_blocks
+        row_slice = matrix_blocks[row_start : row_start + vec_block_count]
+        err, row_q16 = dot_product_blocks_q16_accumulate_checked(row_slice, vec_blocks[:vec_block_count], 0)
         if err != Q4_0_Q8_0_OK:
             return err, []
         out_rows.append(row_q16)
@@ -483,6 +547,101 @@ def test_matrix_vector_argument_and_extent_errors() -> None:
     assert err == Q4_0_Q8_0_ERR_BAD_DST_LEN
 
 
+def test_matrix_vector_checked_matches_unchecked_normal_ranges() -> None:
+    rng = random.Random(2026041602)
+
+    for _ in range(180):
+        row_count = rng.randint(1, 8)
+        vec_block_count = rng.randint(1, 6)
+        row_stride_blocks = vec_block_count + rng.randint(0, 3)
+
+        vec_blocks = []
+        for _ in range(vec_block_count):
+            vec_scale = half_bits(rng.uniform(-2.0, 2.0))
+            vec_q8 = pack_q8_signed([rng.randrange(-128, 128) for _ in range(32)])
+            vec_blocks.append((vec_scale, vec_q8))
+
+        matrix_blocks = []
+        for _ in range(row_count):
+            for _ in range(row_stride_blocks):
+                row_scale = half_bits(rng.uniform(-2.0, 2.0))
+                row_q4 = pack_q4_from_signed([rng.randrange(-8, 8) for _ in range(32)])
+                matrix_blocks.append((row_scale, row_q4))
+
+        err_u, out_u = dot_rows_q16_matrix_vector(
+            matrix_blocks,
+            row_count,
+            row_stride_blocks,
+            vec_blocks,
+            vec_block_count,
+        )
+        err_c, out_c = dot_rows_q16_matrix_vector_checked(
+            matrix_blocks,
+            len(matrix_blocks),
+            row_count,
+            row_stride_blocks,
+            vec_blocks,
+            len(vec_blocks),
+            vec_block_count,
+        )
+        assert err_u == Q4_0_Q8_0_OK
+        assert err_c == Q4_0_Q8_0_OK
+        assert out_c == out_u
+
+
+def test_matrix_vector_checked_extent_errors() -> None:
+    vec_blocks = [(half_bits(1.0), pack_q8_signed([1] * 32))]
+    matrix_blocks = [(half_bits(1.0), pack_q4_from_signed([1] * 32))]
+
+    err, _ = dot_rows_q16_matrix_vector_checked(matrix_blocks, -1, 1, 1, vec_blocks, 1, 1)
+    assert err == Q4_0_Q8_0_ERR_BAD_DST_LEN
+
+    err, _ = dot_rows_q16_matrix_vector_checked(matrix_blocks, 1, 1, 1, vec_blocks, -1, 1)
+    assert err == Q4_0_Q8_0_ERR_BAD_DST_LEN
+
+    err, _ = dot_rows_q16_matrix_vector_checked(matrix_blocks, 1, -1, 1, vec_blocks, 1, 1)
+    assert err == Q4_0_Q8_0_ERR_BAD_DST_LEN
+
+    err, _ = dot_rows_q16_matrix_vector_checked(matrix_blocks, 1, 1, -1, vec_blocks, 1, 1)
+    assert err == Q4_0_Q8_0_ERR_BAD_DST_LEN
+
+    err, _ = dot_rows_q16_matrix_vector_checked(matrix_blocks, 1, 1, 1, vec_blocks, 1, -1)
+    assert err == Q4_0_Q8_0_ERR_BAD_DST_LEN
+
+    err, _ = dot_rows_q16_matrix_vector_checked(matrix_blocks, 1, 1, 0, vec_blocks, 1, 1)
+    assert err == Q4_0_Q8_0_ERR_BAD_DST_LEN
+
+    err, _ = dot_rows_q16_matrix_vector_checked(matrix_blocks, 1, 1, 1, vec_blocks, 0, 1)
+    assert err == Q4_0_Q8_0_ERR_BAD_DST_LEN
+
+    err, _ = dot_rows_q16_matrix_vector_checked(matrix_blocks, 1, 2, 1, vec_blocks, 1, 1)
+    assert err == Q4_0_Q8_0_ERR_BAD_DST_LEN
+
+
+def test_matrix_vector_checked_reports_row_accumulator_overflow() -> None:
+    scale_pos_max = 0x7C00
+    plus_one_q8 = pack_q8_signed([1] + [0] * 31)
+    plus_seven_q4 = pack_q4_from_signed([7] + [0] * 31)
+
+    # One block contributes a huge positive Q16 value; two rows force overflow
+    # when checked code accumulates row outputs separately.
+    row_block = (scale_pos_max, plus_seven_q4)
+    vec_block = (scale_pos_max, plus_one_q8)
+    matrix_blocks = [row_block, row_block]
+    vec_blocks = [vec_block]
+
+    err, _ = dot_rows_q16_matrix_vector_checked(
+        matrix_blocks,
+        len(matrix_blocks),
+        2,
+        1,
+        vec_blocks,
+        len(vec_blocks),
+        1,
+    )
+    assert err == Q4_0_Q8_0_ERR_OVERFLOW
+
+
 def run() -> None:
     test_identity_mixed_block()
     test_random_blocks_match_integer_reference()
@@ -497,6 +656,9 @@ def run() -> None:
     test_matrix_vector_stride_padding_ignored_randomized()
     test_matrix_vector_sign_semantics_reference_rowwise()
     test_matrix_vector_argument_and_extent_errors()
+    test_matrix_vector_checked_matches_unchecked_normal_ranges()
+    test_matrix_vector_checked_extent_errors()
+    test_matrix_vector_checked_reports_row_accumulator_overflow()
     print("q4_0_q8_0_dot_kernel_reference_checks=ok")
 
 

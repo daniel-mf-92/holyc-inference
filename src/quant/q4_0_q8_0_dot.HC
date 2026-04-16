@@ -129,6 +129,27 @@ Bool Q4_0Q8_0TryAddI64(I64 lhs, I64 rhs, I64 *out_sum)
     return TRUE;
 }
 
+Bool Q4_0Q8_0TryMulI64NonNeg(I64 lhs, I64 rhs, I64 *out_prod)
+{
+    if (!out_prod)
+        return FALSE;
+
+    if (lhs < 0 || rhs < 0)
+        return FALSE;
+
+    if (!lhs || !rhs)
+    {
+        *out_prod = 0;
+        return TRUE;
+    }
+
+    if (lhs > Q4_0_Q8_0_I64_MAX / rhs)
+        return FALSE;
+
+    *out_prod = lhs * rhs;
+    return TRUE;
+}
+
 I32 Q4_0_Q8_0DotProductBlockQ32(Q4_0Block *lhs_q4, Q8_0Block *rhs_q8, I64 *out_dot_q32)
 {
     I64 lhs_scale_q16;
@@ -254,6 +275,38 @@ I32 Q4_0_Q8_0DotProductBlocksQ16Accumulate(Q4_0Block *lhs_q4, Q8_0Block *rhs_q8,
     return Q4_0_Q8_0_OK;
 }
 
+I32 Q4_0_Q8_0DotProductBlocksQ16AccumulateChecked(Q4_0Block *lhs_q4, Q8_0Block *rhs_q8, I64 block_count, I64 *io_accum_q16)
+{
+    I64 block_index;
+    I64 block_dot_q32;
+    I64 block_dot_q16;
+    I64 total_q16;
+    I32 status;
+
+    if (!lhs_q4 || !rhs_q8 || !io_accum_q16)
+        return Q4_0_Q8_0_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    total_q16 = *io_accum_q16;
+
+    // Checked variant for hostile inputs:
+    //   block Q32 dot -> rounded Q16 -> checked add into accumulator lane.
+    for (block_index = 0; block_index < block_count; ++block_index)
+    {
+        status = Q4_0_Q8_0DotProductBlockQ32(&lhs_q4[block_index], &rhs_q8[block_index], &block_dot_q32);
+        if (status != Q4_0_Q8_0_OK)
+            return status;
+
+        block_dot_q16 = Q4_0_Q8_0DotQ32ToQ16(block_dot_q32);
+        if (!Q4_0Q8_0TryAddI64(total_q16, block_dot_q16, &total_q16))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+    }
+
+    *io_accum_q16 = total_q16;
+    return Q4_0_Q8_0_OK;
+}
+
 I32 Q4_0Q8_0DotRowBlocksQ16(Q4_0Block *row_blocks_q4, Q8_0Block *vec_blocks_q8, I64 block_count, I64 *out_dot_q16)
 {
     I64 accum_q16;
@@ -306,6 +359,83 @@ I32 Q4_0Q8_0DotRowsQ16MatrixVector(Q4_0Block *matrix_blocks_q4, I64 row_count, I
     }
 
     return Q4_0_Q8_0_OK;
+}
+
+I32 Q4_0Q8_0DotRowsQ16MatrixVectorChecked(
+    Q4_0Block *matrix_blocks_q4,
+    I64 matrix_block_capacity,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q8_0Block *vec_blocks_q8,
+    I64 vec_block_capacity,
+    I64 vec_block_count,
+    I64 *out_rows_q16)
+{
+    I64 row_index;
+    I64 row_dot_q16;
+    I64 required_matrix_blocks;
+    I64 row_base;
+    Q4_0Block *row_ptr_q4;
+    I32 status;
+
+    if (!matrix_blocks_q4 || !vec_blocks_q8 || !out_rows_q16)
+        return Q4_0_Q8_0_ERR_NULL_PTR;
+
+    if (matrix_block_capacity < 0 || vec_block_capacity < 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+    if (row_count < 0 || row_stride_blocks < 0 || vec_block_count < 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    if (row_count > 0 && row_stride_blocks < vec_block_count)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    if (vec_block_count > vec_block_capacity)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    // Capacity guards:
+    //   required_matrix_blocks = row_count * row_stride_blocks
+    // must be representable and within provided matrix extent.
+    if (!Q4_0Q8_0TryMulI64NonNeg(row_count, row_stride_blocks, &required_matrix_blocks))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+    if (required_matrix_blocks > matrix_block_capacity)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    for (row_index = 0; row_index < row_count; ++row_index)
+    {
+        if (!Q4_0Q8_0TryMulI64NonNeg(row_index, row_stride_blocks, &row_base))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+
+        row_ptr_q4 = &matrix_blocks_q4[row_base];
+        row_dot_q16 = 0;
+        status = Q4_0_Q8_0DotProductBlocksQ16AccumulateChecked(row_ptr_q4, vec_blocks_q8, vec_block_count, &row_dot_q16);
+        if (status != Q4_0_Q8_0_OK)
+            return status;
+
+        out_rows_q16[row_index] = row_dot_q16;
+    }
+
+    return Q4_0_Q8_0_OK;
+}
+
+I32 Q4_0_Q8_0DotRowsQ16MatrixVectorChecked(
+    Q4_0Block *matrix_blocks_q4,
+    I64 matrix_block_capacity,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q8_0Block *vec_blocks_q8,
+    I64 vec_block_capacity,
+    I64 vec_block_count,
+    I64 *out_rows_q16)
+{
+    return Q4_0Q8_0DotRowsQ16MatrixVectorChecked(
+        matrix_blocks_q4,
+        matrix_block_capacity,
+        row_count,
+        row_stride_blocks,
+        vec_blocks_q8,
+        vec_block_capacity,
+        vec_block_count,
+        out_rows_q16);
 }
 
 I32 Q4_0_Q8_0DotRowsQ16MatrixVector(Q4_0Block *matrix_blocks_q4, I64 row_count, I64 row_stride_blocks, Q8_0Block *vec_blocks_q8, I64 vec_block_count, I64 *out_rows_q16)
