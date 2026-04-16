@@ -87,3 +87,9 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_18","type":"todo_list","items":[{"text":"Review AVX2-related math patterns","completed":true},{"text":"Implement IQ-101 HolyC AVX2 helper","completed":true},{"text":"Add host-side parity validation test","completed":true},{"text":"Run focused validation commands","completed":true},{"text":"Update queue and iteration ledger","completed":true},{"text":"Insert central DB iteration row","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":1843268,"cached_input_tokens":1557504,"output_tokens":7610}}
 Codex final exit code: 0
+[main 652a287] feat(inference): codex iteration 20260416-131306
+ 6 files changed, 286 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260416-131306.final.txt
+ create mode 100644 src/quant/q8_0_avx2.HC
+ create mode 100644 tests/test_q8_0_avx2_pack.py
+=== End iteration 10 (outcome=ok) ===
