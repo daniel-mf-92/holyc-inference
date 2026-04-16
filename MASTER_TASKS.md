@@ -275,12 +275,16 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-086 Implement HolyC `Q4_0Q8_0DotProductBlocksQ32ToQ16` row-helper integration tests in `src/quant/q4_0_q8_0_dot.HC` + `tests/test_q4_0_q8_0_dot_kernel.py` for single-rounding-vs-blockwise invariants (WS4-01)
 - [x] IQ-087 Implement HolyC `Q8_0DotRowBlocksQ16` in `src/quant/q8_0_dot.HC` with parity/semantic tests in `tests/test_q8_0_dot.py` (blockwise rounding lane contract for WS4 matmul row kernels) (WS4-01)
 - [x] IQ-088 Implement HolyC `Q8_0DotRowsQ16MatrixVector` in `src/quant/q8_0_dot.HC` for contiguous row-block matrix×vector kernels with explicit `row_stride_blocks` (WS4-02)
-- [ ] IQ-089 Add host-side parity harness `tests/test_q8_0_dot_matrix_vector.py` for `Q8_0DotRowsQ16MatrixVector` covering stride, sign, and per-row rounding semantics (WS4-02)
+- [x] IQ-089 Add host-side parity harness `tests/test_q8_0_dot_matrix_vector.py` for `Q8_0DotRowsQ16MatrixVector` covering stride, sign, and per-row rounding semantics (WS4-02)
 - [x] IQ-090 Implement HolyC `Q8_0DotProductBlocksQ32Checked` in `src/quant/q8_0_dot.HC` with overflow-safe accumulation and parity/adversarial tests for hostile block streams (WS4-01)
+- [x] IQ-091 Implement HolyC Q16 fixed-point multiply/divide/round helpers (`FPQ16Mul`, `FPQ16Div`, `FPQ16MulSat`) in `src/math/fixedpoint.HC` with overflow-checked I64 intermediates for WS1 arithmetic callers (WS1-01)
+- [ ] IQ-092 Implement HolyC `Q4_0DotRowsQ16MatrixVector` in `src/quant/q4_0_dot.HC` for contiguous row-block matrix×vector kernels with explicit `row_stride_blocks`, plus parity coverage in `tests/test_q4_0_dot.py` (WS4-02)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
+| 2026-04-16 | loop-072 | IQ-091 fixedpoint Q16 checked arithmetic | done | Implemented checked/saturating `FPQ16Mul`/`FPQ16Div`/`FPQ16MulSat` plus rounding helpers in `src/math/fixedpoint.HC` and added `tests/test_fixedpoint_q16.py`; `python3 tests/test_fixedpoint_q16.py && python3 tests/test_intlog_q16.py && python3 tests/test_intlog_ratio_q16.py && python3 tests/test_softmax_entropy_q16.py` passed |
+| 2026-04-16 | loop-071 | IQ-089 Q8_0 matrix×vector parity harness | done | Added `tests/test_q8_0_dot_matrix_vector.py` with stride/sign/per-row semantic coverage for `Q8_0DotRowsQ16MatrixVector`; `python3 tests/test_q8_0_dot_matrix_vector.py && python3 tests/test_q8_0_dot.py && python3 tests/test_q8_0_dequant.py` passed |
 | 2026-04-15 | loop-070 | IQ-090 checked Q8_0 Q32 accumulator | done | Added `Q8_0DotProductBlocksQ32Checked` + overflow guard helper in `src/quant/q8_0_dot.HC` and adversarial overflow parity coverage in `tests/test_q8_0_dot.py`; `python3 tests/test_q8_0_dot.py && python3 tests/test_q8_0_dequant.py` passed |
 | 2026-04-15 | loop-069 | IQ-088 Q8_0 matrix×vector row kernel | done | Added `Q8_0DotRowsQ16MatrixVector` in `src/quant/q8_0_dot.HC` with explicit `row_stride_blocks` validation and row-wise Q16 outputs; `python3 tests/test_q8_0_dot.py` passed |
 | 2026-04-15 | loop-066 | IQ-085 mixed Q4_0xQ8_0 Q32->Q16 matmul helper | done | Added canonical `Q4_0Q8_0DotProductBlocksQ32` + `Q4_0Q8_0DotProductBlocksQ32ToQ16` in `src/quant/q4_0_q8_0_dot.HC` (I64 checked accumulation) and parity coverage in `tests/test_q4_0_q8_0_dot_kernel.py`; `python3 tests/test_q4_0_q8_0_dot_kernel.py && python3 tests/test_q4_0_dot.py && python3 tests/test_q8_0_dot.py` passed |

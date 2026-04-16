@@ -5,8 +5,92 @@
 #define FP_Q16_ONE   (1 << FP_Q16_SHIFT)
 #define FP_Q16_HALF  (1 << (FP_Q16_SHIFT - 1))
 
+#define I64_MAX_VALUE  0x7FFFFFFFFFFFFFFF
+#define I64_MIN_VALUE -0x8000000000000000
+#define U64_MAX_VALUE  0xFFFFFFFFFFFFFFFF
+
+U64 FPAbsToU64(I64 x)
+{
+    if (x >= 0)
+        return (U64)x;
+
+    // Avoid overflow for I64_MIN by using two's-complement identity.
+    return ((U64)(-(x + 1))) + 1;
+}
+
+I64 FPSignApplyFromU64(U64 mag, I64 is_negative)
+{
+    if (is_negative)
+    {
+        if (mag >= 0x8000000000000000)
+            return I64_MIN_VALUE;
+        return -(I64)mag;
+    }
+
+    if (mag > (U64)I64_MAX_VALUE)
+        return I64_MAX_VALUE;
+    return (I64)mag;
+}
+
+I64 FPQ16RoundShiftSigned(I64 value, I64 shift)
+{
+    U64 abs_value;
+    U64 round_bias;
+    U64 rounded;
+    I64 is_negative;
+
+    if (shift <= 0)
+        return value;
+    if (shift >= 63)
+        return 0;
+
+    is_negative = value < 0;
+    abs_value = FPAbsToU64(value);
+    round_bias = (U64)1 << (shift - 1);
+
+    if (abs_value > U64_MAX_VALUE - round_bias)
+        rounded = U64_MAX_VALUE >> shift;
+    else
+        rounded = (abs_value + round_bias) >> shift;
+
+    return FPSignApplyFromU64(rounded, is_negative);
+}
+
+I64 FPQ16MulSat(I64 a, I64 b)
+{
+    U64 abs_a;
+    U64 abs_b;
+    U64 limit;
+    I64 is_negative;
+    I64 prod;
+
+    if (!a || !b)
+        return 0;
+
+    abs_a = FPAbsToU64(a);
+    abs_b = FPAbsToU64(b);
+    is_negative = ((a < 0) ^ (b < 0));
+
+    limit = (U64)I64_MAX_VALUE;
+    if (is_negative)
+        limit = 0x8000000000000000;
+
+    if (abs_a > (limit / abs_b))
+    {
+        if (is_negative)
+            return I64_MIN_VALUE;
+        return I64_MAX_VALUE;
+    }
+
+    prod = a * b;
+    return FPQ16RoundShiftSigned(prod, FP_Q16_SHIFT);
+}
+
 I64 FPQ16Abs(I64 x)
 {
+    if (x == I64_MIN_VALUE)
+        return I64_MAX_VALUE;
+
     if (x < 0)
         return -x;
     return x;
@@ -14,6 +98,11 @@ I64 FPQ16Abs(I64 x)
 
 I64 FPQ16FromInt(I64 x)
 {
+    if (x > (I64_MAX_VALUE >> FP_Q16_SHIFT))
+        return I64_MAX_VALUE;
+    if (x < (I64_MIN_VALUE >> FP_Q16_SHIFT))
+        return I64_MIN_VALUE;
+
     return x << FP_Q16_SHIFT;
 }
 
@@ -26,44 +115,64 @@ I64 FPQ16ToInt(I64 x)
 
 I64 FPQ16Mul(I64 a, I64 b)
 {
-    I64 prod;
-
-    prod = a * b;
-    if (prod >= 0)
-        return (prod + FP_Q16_HALF) >> FP_Q16_SHIFT;
-    return -(((-prod) + FP_Q16_HALF) >> FP_Q16_SHIFT);
+    return FPQ16MulSat(a, b);
 }
 
 I64 FPQ16Div(I64 num, I64 den)
 {
-    I64 sign;
-    I64 abs_num;
-    I64 abs_den;
-    I64 scaled;
-    I64 q;
+    U64 abs_num;
+    U64 abs_den;
+    U64 limit;
+    U64 int_part;
+    U64 rem;
+    U64 result_mag;
+    I64 is_negative;
+    I64 bit;
 
     if (!den)
         return 0;
 
-    sign = 1;
-    if (num < 0)
+    abs_num = FPAbsToU64(num);
+    abs_den = FPAbsToU64(den);
+    is_negative = ((num < 0) ^ (den < 0));
+
+    limit = (U64)I64_MAX_VALUE;
+    if (is_negative)
+        limit = 0x8000000000000000;
+
+    int_part = abs_num / abs_den;
+    if (int_part > (limit >> FP_Q16_SHIFT))
     {
-        sign = -sign;
-        num = -num;
+        if (is_negative)
+            return I64_MIN_VALUE;
+        return I64_MAX_VALUE;
     }
-    if (den < 0)
+
+    result_mag = int_part << FP_Q16_SHIFT;
+    rem = abs_num % abs_den;
+
+    // Emit 16 fractional bits using integer long division.
+    for (bit = FP_Q16_SHIFT - 1; bit >= 0; bit--)
     {
-        sign = -sign;
-        den = -den;
+        rem <<= 1;
+        if (rem >= abs_den)
+        {
+            rem -= abs_den;
+            if (result_mag <= limit - (((U64)1) << bit))
+                result_mag |= ((U64)1) << bit;
+            else
+                result_mag = limit;
+        }
     }
 
-    abs_num = num;
-    abs_den = den;
+    // Half-up rounding by checking whether residual remainder is >= 0.5.
+    if (rem >= ((abs_den + 1) >> 1))
+    {
+        if (result_mag < limit)
+            result_mag++;
+        else
+            result_mag = limit;
+    }
 
-    scaled = abs_num << FP_Q16_SHIFT;
-    q = (scaled + (abs_den >> 1)) / abs_den;
-
-    if (sign < 0)
-        return -q;
-    return q;
+    return FPSignApplyFromU64(result_mag, is_negative);
 }
