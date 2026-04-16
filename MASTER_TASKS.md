@@ -306,12 +306,14 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-116 Implement HolyC `Q4_0Q8_0MatMulQ32TiledAVX2Checked` in `src/matmul/q4_0_q8_0_matmul.HC` using mixed AVX2 block dots with explicit tile/stride/capacity overflow guards (WS4-03)
 - [x] IQ-117 Add host-side parity harness `tests/test_q4_0_q8_0_matmul_tiled_avx2_q32.py` for mixed AVX2 tiled Q32 matmul against scalar checked reference outputs (WS4-03)
 - [x] IQ-118 Implement HolyC `Q8_0MatMulTiledValidateArgsChecked` helper in `src/matmul/q8_0_matmul.HC` and route both AVX2 tiled entrypoints through the shared checked preflight contract (WS4-03)
-- [ ] IQ-119 Add host-side parity harness `tests/test_q8_0_matmul_tiled_avx2_preflight.py` to assert Q32/Q16 tiled entrypoints return identical BAD_LEN/OVERFLOW surfaces for shared preflight invariants (WS4-03)
+- [x] IQ-119 Add host-side parity harness `tests/test_q8_0_matmul_tiled_avx2_preflight.py` to assert Q32/Q16 tiled entrypoints return identical BAD_LEN/OVERFLOW surfaces for shared preflight invariants (WS4-03)
+- [ ] IQ-120 Implement HolyC helper `Q8_0MatMulTiledComputeRequiredCapacitiesChecked` in `src/matmul/q8_0_matmul.HC` to return checked `{lhs_required_blocks,rhs_required_blocks,out_required_cells}` for shared preflight/math callers (WS4-03)
 
 ## Progress Ledger
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-16 | loop-100 | IQ-119 AVX2 tiled preflight parity harness | done | Added `tests/test_q8_0_matmul_tiled_avx2_preflight.py` with targeted + randomized BAD_LEN/OVERFLOW parity checks across Q32/Q16 tiled entrypoints; `python3 tests/test_q8_0_matmul_tiled_avx2_preflight.py && python3 tests/test_q8_0_matmul_tiled_avx2_q32.py && python3 tests/test_q8_0_matmul_tiled_avx2_q16.py` passed |
 | 2026-04-16 | loop-098 | IQ-113 AVX2 tiled Q16 matmul preflight hardening | done | Shared Q32/Q16 tiled argument validator in `src/matmul/q8_0_matmul.HC` + parity-surface check in `tests/test_q8_0_matmul_tiled_avx2_q16.py`; `python3 tests/test_q8_0_matmul_tiled_avx2_q16.py && python3 tests/test_q8_0_matmul_tiled_avx2_q32.py && python3 tests/test_q8_0_avx2_rows_q32_to_q16.py` passed |
 | 2026-04-16 | loop-097 | IQ-117 mixed AVX2 tiled Q32 matmul parity harness | done | Added `tests/test_q4_0_q8_0_matmul_tiled_avx2_q32.py` covering known-vector parity, randomized tile/stride shapes, BAD_LEN/NULL checks, and overflow propagation from the mixed AVX2 dot kernel; `python3 tests/test_q4_0_q8_0_matmul_tiled_avx2_q32.py && python3 tests/test_q4_0_q8_0_avx2_blocks_q32.py && python3 tests/test_q4_0_q8_0_matmul_tiled_checked.py` passed |
 | 2026-04-16 | loop-096 | IQ-116 mixed AVX2 tiled Q32 matmul kernel | done | Added `Q4_0Q8_0MatMulQ32TiledAVX2Checked` in `src/matmul/q4_0_q8_0_matmul.HC` with checked tile/stride/capacity overflow guards over mixed AVX2 block dots; `python3 tests/test_q4_0_q8_0_dot_kernel.py && python3 tests/test_q4_0_q8_0_matmul_tiled_checked.py && python3 - <<'PY' ... PY` (`q4_0_q8_0_matmul_tiled_avx2_q32_reference_checks=ok`) passed |
