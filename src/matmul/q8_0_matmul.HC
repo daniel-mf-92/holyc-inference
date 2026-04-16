@@ -224,6 +224,29 @@ I32 Q8_0MatMulTiledComputeOutIndexChecked(
     return Q8_0_MATMUL_OK;
 }
 
+// Shared checked RHS-column base math for tiled Q8_0 matmul inner loops:
+//   rhs_col_base = col_index * rhs_col_stride_blocks
+// Centralizing this keeps overflow/BAD_LEN behavior identical across
+// scalar Q16, AVX2 Q32, and AVX2 Q16 tiled entrypoints.
+I32 Q8_0MatMulTiledComputeRhsColBaseChecked(
+    I64 col_index,
+    I64 rhs_col_stride_blocks,
+    I64 *out_rhs_col_base)
+{
+    if (!out_rhs_col_base)
+        return Q8_0_MATMUL_ERR_NULL_PTR;
+
+    if (col_index < 0 || rhs_col_stride_blocks < 0)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (!Q8_0MatMulTryMulI64NonNeg(col_index,
+                                   rhs_col_stride_blocks,
+                                   out_rhs_col_base))
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+
+    return Q8_0_MATMUL_OK;
+}
+
 I32 Q8_0MatMulTiledValidateArgsChecked(
     Q8_0Block *lhs_blocks,
     I64 lhs_block_capacity,
@@ -415,8 +438,11 @@ I32 Q8_0MatMulQ16TiledChecked(
 
                 for (col_index = col_tile_start; col_index < col_tile_end; ++col_index)
                 {
-                    if (!Q8_0MatMulTryMulI64NonNeg(col_index, rhs_col_stride_blocks, &rhs_col_base))
-                        return Q8_0_MATMUL_ERR_OVERFLOW;
+                    status = Q8_0MatMulTiledComputeRhsColBaseChecked(col_index,
+                                                                      rhs_col_stride_blocks,
+                                                                      &rhs_col_base);
+                    if (status != Q8_0_MATMUL_OK)
+                        return status;
                     status = Q8_0MatMulTiledComputeOutIndexChecked(out_row_base,
                                                                    col_index,
                                                                    &out_index);
@@ -533,8 +559,11 @@ I32 Q8_0MatMulQ32TiledAVX2Checked(
 
                 for (col_index = col_tile_start; col_index < col_tile_end; ++col_index)
                 {
-                    if (!Q8_0MatMulTryMulI64NonNeg(col_index, rhs_col_stride_blocks, &rhs_col_base))
-                        return Q8_0_MATMUL_ERR_OVERFLOW;
+                    status = Q8_0MatMulTiledComputeRhsColBaseChecked(col_index,
+                                                                      rhs_col_stride_blocks,
+                                                                      &rhs_col_base);
+                    if (status != Q8_0_MATMUL_OK)
+                        return status;
                     status = Q8_0MatMulTiledComputeOutIndexChecked(out_row_base,
                                                                    col_index,
                                                                    &out_index);
@@ -652,8 +681,11 @@ I32 Q8_0MatMulQ16TiledAVX2Checked(
 
                 for (col_index = col_tile_start; col_index < col_tile_end; ++col_index)
                 {
-                    if (!Q8_0MatMulTryMulI64NonNeg(col_index, rhs_col_stride_blocks, &rhs_col_base))
-                        return Q8_0_MATMUL_ERR_OVERFLOW;
+                    status = Q8_0MatMulTiledComputeRhsColBaseChecked(col_index,
+                                                                      rhs_col_stride_blocks,
+                                                                      &rhs_col_base);
+                    if (status != Q8_0_MATMUL_OK)
+                        return status;
                     status = Q8_0MatMulTiledComputeOutIndexChecked(out_row_base,
                                                                    col_index,
                                                                    &out_index);
