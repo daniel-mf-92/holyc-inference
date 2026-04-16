@@ -86,6 +86,61 @@ def rope_q16_rotate_head_range_by_position_checked(
     return ref.ROPE_Q16_OK, work
 
 
+def rope_q16_rotate_head_range_by_position_composed_reference(
+    head_cells_q16: list[int],
+    head_cell_capacity: int,
+    range_base_index: int,
+    head_count: int,
+    head_stride_cells: int,
+    head_dim: int,
+    pair_stride_cells: int,
+    freq_base_q16: int,
+    position: int,
+) -> tuple[int, list[int]]:
+    if head_cells_q16 is None:
+        return ref.ROPE_Q16_ERR_NULL_PTR, []
+
+    if head_cell_capacity < 0:
+        return ref.ROPE_Q16_ERR_BAD_PARAM, []
+    if range_base_index < 0:
+        return ref.ROPE_Q16_ERR_BAD_PARAM, []
+    if head_count < 0:
+        return ref.ROPE_Q16_ERR_BAD_PARAM, []
+    if head_stride_cells <= 0:
+        return ref.ROPE_Q16_ERR_BAD_PARAM, []
+    if head_count == 0:
+        return ref.ROPE_Q16_OK, list(head_cells_q16)
+    if range_base_index >= head_cell_capacity:
+        return ref.ROPE_Q16_ERR_BAD_PARAM, []
+
+    work = list(head_cells_q16)
+    for head_index in range(head_count):
+        err, head_offset = rope_try_mul_i64_checked(head_index, head_stride_cells)
+        if err != ref.ROPE_Q16_OK:
+            return err, []
+
+        err, head_base = rope_try_add_i64_checked(range_base_index, head_offset)
+        if err != ref.ROPE_Q16_OK:
+            return err, []
+
+        if head_base < 0 or head_base >= head_cell_capacity:
+            return ref.ROPE_Q16_ERR_BAD_PARAM, []
+
+        err, work = head_ref.rope_q16_rotate_head_by_position_checked(
+            work,
+            head_cell_capacity,
+            head_base,
+            head_dim,
+            pair_stride_cells,
+            freq_base_q16,
+            position,
+        )
+        if err != ref.ROPE_Q16_OK:
+            return err, []
+
+    return ref.ROPE_Q16_OK, work
+
+
 def make_head_buffer(capacity: int, seed: int) -> list[int]:
     rng = random.Random(seed)
     return [ref.q16_from_float(rng.uniform(-2.0, 2.0)) for _ in range(capacity)]
@@ -156,6 +211,24 @@ def test_huge_head_range_surfaces_bad_param_before_overflow() -> None:
     assert err == ref.ROPE_Q16_ERR_BAD_PARAM
 
 
+def test_preflighted_base_add_overflow_surfaces_overflow() -> None:
+    base_q16 = ref.q16_from_float(10000.0)
+    buf = make_head_buffer(16, 11)
+
+    err, _ = rope_q16_rotate_head_range_by_position_checked(
+        buf,
+        ref.I64_MAX,
+        1,
+        2,
+        ref.I64_MAX,
+        8,
+        2,
+        base_q16,
+        4,
+    )
+    assert err == ref.ROPE_Q16_ERR_OVERFLOW
+
+
 def test_checked_index_primitives_report_overflow() -> None:
     err, _ = rope_try_mul_i64_checked(ref.I64_MAX, 2)
     assert err == ref.ROPE_Q16_ERR_OVERFLOW
@@ -203,6 +276,79 @@ def test_interleaved_head_range_matches_per_head_composition() -> None:
         )
         assert err_head == ref.ROPE_Q16_OK
 
+    assert got == want
+
+
+def test_second_head_span_failure_preserves_first_head_mutation() -> None:
+    base_q16 = ref.q16_from_float(10000.0)
+    cap = 39
+    base = 0
+    head_count = 2
+    head_stride = 16
+    head_dim = 24
+    pair_stride = 2
+    position = 13
+
+    inp = make_head_buffer(cap, 12)
+
+    err_got, got = rope_q16_rotate_head_range_by_position_checked(
+        inp,
+        cap,
+        base,
+        head_count,
+        head_stride,
+        head_dim,
+        pair_stride,
+        base_q16,
+        position,
+    )
+    assert err_got == ref.ROPE_Q16_ERR_BAD_PARAM
+
+    err_want, want = rope_q16_rotate_head_range_by_position_composed_reference(
+        inp,
+        cap,
+        base,
+        head_count,
+        head_stride,
+        head_dim,
+        pair_stride,
+        base_q16,
+        position,
+    )
+    assert err_want == ref.ROPE_Q16_ERR_BAD_PARAM
+    assert got == want
+
+
+def test_negative_position_fails_without_mutation() -> None:
+    base_q16 = ref.q16_from_float(10000.0)
+    cap = 64
+    inp = make_head_buffer(cap, 13)
+
+    err_got, got = rope_q16_rotate_head_range_by_position_checked(
+        inp,
+        cap,
+        8,
+        2,
+        24,
+        16,
+        2,
+        base_q16,
+        -1,
+    )
+    assert err_got == ref.ROPE_Q16_ERR_BAD_PARAM
+
+    err_want, want = rope_q16_rotate_head_range_by_position_composed_reference(
+        inp,
+        cap,
+        8,
+        2,
+        24,
+        16,
+        2,
+        base_q16,
+        -1,
+    )
+    assert err_want == ref.ROPE_Q16_ERR_BAD_PARAM
     assert got == want
 
 
@@ -272,8 +418,11 @@ def run() -> None:
     test_zero_head_count_is_noop()
     test_range_capacity_bounds_guard()
     test_huge_head_range_surfaces_bad_param_before_overflow()
+    test_preflighted_base_add_overflow_surfaces_overflow()
     test_checked_index_primitives_report_overflow()
     test_interleaved_head_range_matches_per_head_composition()
+    test_second_head_span_failure_preserves_first_head_mutation()
+    test_negative_position_fails_without_mutation()
     test_randomized_contract_and_composition_parity()
     print("rope_q16_rotate_head_range_position_reference_checks=ok")
 
