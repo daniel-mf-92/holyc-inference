@@ -33,7 +33,7 @@ def q8_0_try_mul_i64(lhs: int, rhs: int):
     return True, product
 
 
-def compute_tile_end_checked(tile_start: int, tile_span: int, axis_len: int):
+def compute_span_bounds_checked(tile_start: int, tile_span: int, axis_len: int):
     if tile_start < 0 or tile_span < 0 or axis_len < 0:
         return Q8_0_AVX2_ERR_BAD_LEN, 0
     if tile_start > axis_len:
@@ -169,13 +169,13 @@ def q8_0_matmul_tiled_avx2_q32_checked(
 
     tile_row_start = 0
     while tile_row_start < lhs_rows:
-        err, tile_row_end = compute_tile_end_checked(tile_row_start, tile_rows, lhs_rows)
+        err, tile_row_end = compute_span_bounds_checked(tile_row_start, tile_rows, lhs_rows)
         if err != Q8_0_AVX2_OK:
             return err, []
 
         tile_col_start = 0
         while tile_col_start < rhs_cols:
-            err, tile_col_end = compute_tile_end_checked(tile_col_start, tile_cols, rhs_cols)
+            err, tile_col_end = compute_span_bounds_checked(tile_col_start, tile_cols, rhs_cols)
             if err != Q8_0_AVX2_OK:
                 return err, []
 
@@ -419,25 +419,25 @@ def test_error_paths() -> None:
     assert err == Q8_0_AVX2_ERR_BAD_LEN
 
 
-def test_compute_tile_end_checked_contract() -> None:
-    err, tile_end = compute_tile_end_checked(1, 4, 9)
+def test_compute_span_bounds_checked_contract() -> None:
+    err, tile_end = compute_span_bounds_checked(1, 4, 9)
     assert err == Q8_0_AVX2_OK
     assert tile_end == 5
 
-    err, tile_end = compute_tile_end_checked(8, 4, 9)
+    err, tile_end = compute_span_bounds_checked(8, 4, 9)
     assert err == Q8_0_AVX2_OK
     assert tile_end == 9
 
-    err, _ = compute_tile_end_checked(-1, 2, 9)
+    err, _ = compute_span_bounds_checked(-1, 2, 9)
     assert err == Q8_0_AVX2_ERR_BAD_LEN
-    err, _ = compute_tile_end_checked(1, -2, 9)
+    err, _ = compute_span_bounds_checked(1, -2, 9)
     assert err == Q8_0_AVX2_ERR_BAD_LEN
-    err, _ = compute_tile_end_checked(1, 2, -9)
+    err, _ = compute_span_bounds_checked(1, 2, -9)
     assert err == Q8_0_AVX2_ERR_BAD_LEN
-    err, _ = compute_tile_end_checked(10, 1, 9)
+    err, _ = compute_span_bounds_checked(10, 1, 9)
     assert err == Q8_0_AVX2_ERR_BAD_LEN
 
-    err, _ = compute_tile_end_checked(I64_MAX - 2, 5, I64_MAX)
+    err, _ = compute_span_bounds_checked(I64_MAX - 2, 5, I64_MAX)
     assert err == Q8_0_AVX2_ERR_OVERFLOW
 
 
@@ -445,7 +445,7 @@ def run() -> None:
     test_known_small_matches_scalar_reference()
     test_randomized_tiling_matches_scalar_many_shapes()
     test_error_paths()
-    test_compute_tile_end_checked_contract()
+    test_compute_span_bounds_checked_contract()
     print("q8_0_matmul_tiled_avx2_q32_reference_checks=ok")
 
 
