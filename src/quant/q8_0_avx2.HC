@@ -345,3 +345,62 @@ I32 Q8_0DotBlocksAVX2Q32Checked(Q8_0Block *lhs,
     *out_dot_q32 = total_dot_q32;
     return Q8_0_AVX2_OK;
 }
+
+I32 Q8_0DotRowsAVX2Q32Checked(
+    Q8_0Block *matrix_blocks,
+    I64 matrix_block_capacity,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q8_0Block *vec_blocks,
+    I64 vec_block_capacity,
+    I64 vec_block_count,
+    I64 *out_rows_q32)
+{
+    I64 row_index;
+    I64 required_matrix_blocks;
+    I64 row_base;
+    Q8_0Block *row_ptr;
+    I64 row_dot_q32;
+    I32 status;
+
+    if (!matrix_blocks || !vec_blocks || !out_rows_q32)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+
+    if (matrix_block_capacity < 0 || vec_block_capacity < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (row_count < 0 || row_stride_blocks < 0 || vec_block_count < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    // Row layout contract:
+    // - Row i starts at matrix_blocks + i*row_stride_blocks.
+    // - Active row span consumes vec_block_count blocks.
+    // Require stride to cover active K span so every row window is valid.
+    if (row_count > 0 && row_stride_blocks < vec_block_count)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (vec_block_count > vec_block_capacity)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    // Full matrix view capacity proof for strided rows.
+    if (!Q8_0AVX2TryMulI64(row_count, row_stride_blocks, &required_matrix_blocks))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+    if (required_matrix_blocks > matrix_block_capacity)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    for (row_index = 0; row_index < row_count; ++row_index)
+    {
+        if (!Q8_0AVX2TryMulI64(row_index, row_stride_blocks, &row_base))
+            return Q8_0_AVX2_ERR_OVERFLOW;
+
+        row_ptr = &matrix_blocks[row_base];
+        status = Q8_0DotBlocksAVX2Q32Checked(row_ptr,
+                                             vec_blocks,
+                                             vec_block_count,
+                                             &row_dot_q32);
+        if (status != Q8_0_AVX2_OK)
+            return status;
+
+        out_rows_q32[row_index] = row_dot_q32;
+    }
+
+    return Q8_0_AVX2_OK;
+}

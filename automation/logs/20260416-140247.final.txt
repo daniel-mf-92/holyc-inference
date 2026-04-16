@@ -1,0 +1,19 @@
+Done — one full loop iteration completed with `IQ-108` progressed end-to-end.
+
+**What Changed**
+- Implemented `Q8_0DotRowsAVX2Q32Checked` with explicit stride/capacity/overflow guards in `src/quant/q8_0_avx2.HC:349`.
+- Added row-wise AVX2 Q32 parity harness in `tests/test_q8_0_avx2_rows_q32.py:23`.
+- Marked queue item complete in `MASTER_TASKS.md:297`.
+- Added one progress ledger line in `MASTER_TASKS.md:305`.
+- Logged iteration to central DB (`iterations.id=1208`, `task_id=IQ-108`, `status=pass`).
+
+**Validation**
+- Ran: `python3 tests/test_q8_0_avx2_rows_q32.py && python3 tests/test_q8_0_avx2_blocks_q32.py && python3 tests/test_q8_0_avx2_dot_lanes.py && python3 tests/test_q8_0_dot.py`
+- Output:
+  - `ok`
+  - `q8_0_avx2_blocks_q32_reference_checks=ok`
+  - `q8_0_avx2_dot_lanes_reference_checks=ok`
+  - `q8_0_dot_reference_checks=ok`
+
+**Queue Policy**
+- Unchecked `IQ-` depth is `18` (>=15), so no queue refill was required this iteration.
