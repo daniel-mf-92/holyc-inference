@@ -1025,3 +1025,83 @@ I32 RoPEQ16RotateHeadRangeByPositionChecked(I64 *head_cells_q16,
 
     return ROPE_Q16_OK;
 }
+
+// Rotate a contiguous range of heads after full range preflight.
+//
+// Preflight contract:
+//   1) Validate range base/stride/capacity across all heads.
+//   2) Validate per-head RoPE pair span (`head_dim`, `pair_stride_cells`) across
+//      the same range.
+//
+// Only after both checks pass does this helper apply per-head rotation. This
+// gives callers a fail-fast path that guarantees no partial mutation from range
+// shape/capacity faults discovered mid-loop.
+I32 RoPEQ16RotateHeadRangeByPositionPreflightedChecked(I64 *head_cells_q16,
+                                                       I64 head_cell_capacity,
+                                                       I64 range_base_index,
+                                                       I64 head_count,
+                                                       I64 head_stride_cells,
+                                                       I64 head_dim,
+                                                       I64 pair_stride_cells,
+                                                       I64 freq_base_q16,
+                                                       I64 position)
+{
+    I64 head_index;
+    I64 head_base_index;
+    I64 last_head_base_index;
+    I64 last_head_last_pair_y_index;
+    I32 status;
+
+    if (!head_cells_q16)
+        return ROPE_Q16_ERR_NULL_PTR;
+
+    status = RoPEQ16ValidateHeadRangeCapacityChecked(head_cell_capacity,
+                                                     range_base_index,
+                                                     head_count,
+                                                     head_stride_cells,
+                                                     &last_head_base_index);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPEQ16ValidateHeadRangeSpanForDimChecked(head_cell_capacity,
+                                                       range_base_index,
+                                                       head_count,
+                                                       head_stride_cells,
+                                                       head_dim,
+                                                       pair_stride_cells,
+                                                       &last_head_last_pair_y_index);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    if (!head_count)
+        return ROPE_Q16_OK;
+
+    for (head_index = 0; head_index < head_count; head_index++)
+    {
+        status = RoPEQ16ComputeHeadBaseIndexChecked(range_base_index,
+                                                    head_index,
+                                                    head_stride_cells,
+                                                    &head_base_index);
+        if (status != ROPE_Q16_OK)
+            return status;
+
+        if (head_base_index > last_head_base_index)
+            return ROPE_Q16_ERR_BAD_PARAM;
+
+        status = RoPEQ16RotateHeadByPositionChecked(head_cells_q16,
+                                                    head_cell_capacity,
+                                                    head_base_index,
+                                                    head_dim,
+                                                    pair_stride_cells,
+                                                    freq_base_q16,
+                                                    position);
+        if (status != ROPE_Q16_OK)
+            return status;
+    }
+
+    // Postcondition echoes preflight ceiling to keep behavior auditable.
+    if (last_head_last_pair_y_index >= head_cell_capacity)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    return ROPE_Q16_OK;
+}
