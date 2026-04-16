@@ -567,3 +567,64 @@ I32 Q8_0DotBlocksAVX2Q32ToQ16Checked(Q8_0Block *lhs,
     *out_dot_q16 = Q8_0AVX2DotQ32ToQ16(total_dot_q32);
     return Q8_0_AVX2_OK;
 }
+
+I32 Q8_0DotRowsAVX2Q32ToQ16Checked(
+    Q8_0Block *matrix_blocks,
+    I64 matrix_block_capacity,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q8_0Block *vec_blocks,
+    I64 vec_block_capacity,
+    I64 vec_block_count,
+    I64 *out_rows_q16)
+{
+    I64 row_index;
+    I64 required_matrix_blocks;
+    I64 row_base;
+    Q8_0Block *row_ptr;
+    I64 row_dot_q16;
+    I32 status;
+
+    if (!matrix_blocks || !vec_blocks || !out_rows_q16)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+
+    if (matrix_block_capacity < 0 || vec_block_capacity < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (row_count < 0 || row_stride_blocks < 0 || vec_block_count < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    // Row layout contract mirrors Q32 row helper:
+    // - Row i begins at matrix_blocks + i*row_stride_blocks.
+    // - Each row consumes vec_block_count active blocks for the dot.
+    if (row_count > 0 && row_stride_blocks < vec_block_count)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (vec_block_count > vec_block_capacity)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    if (!Q8_0AVX2TryMulI64(row_count, row_stride_blocks, &required_matrix_blocks))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+    if (required_matrix_blocks > matrix_block_capacity)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    // Single-rounding row contract:
+    // - Build each row dot in checked Q32 precision across all K blocks.
+    // - Downshift once Q32->Q16 after full-row accumulation.
+    // This preserves GGML-style rounding behavior and avoids per-block drift.
+    for (row_index = 0; row_index < row_count; ++row_index)
+    {
+        if (!Q8_0AVX2TryMulI64(row_index, row_stride_blocks, &row_base))
+            return Q8_0_AVX2_ERR_OVERFLOW;
+
+        row_ptr = &matrix_blocks[row_base];
+        status = Q8_0DotBlocksAVX2Q32ToQ16Checked(row_ptr,
+                                                  vec_blocks,
+                                                  vec_block_count,
+                                                  &row_dot_q16);
+        if (status != Q8_0_AVX2_OK)
+            return status;
+
+        out_rows_q16[row_index] = row_dot_q16;
+    }
+
+    return Q8_0_AVX2_OK;
+}
