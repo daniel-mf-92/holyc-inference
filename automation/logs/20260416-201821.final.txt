@@ -1,0 +1,19 @@
+Done — I completed one full unattended iteration for `IQ-123` end-to-end.
+
+**What Changed**
+- Implemented `Q8_0MatMulTiledComputeTileEndChecked` and centralized checked `tile_end=min(tile_start+tile_span,axis_len)` math in all three tiled paths (scalar Q16, AVX2 Q32, AVX2 Q16) in `src/matmul/q8_0_matmul.HC:76`.
+- Rewired tiled row/col traversal to use the shared helper in `src/matmul/q8_0_matmul.HC:330`, `src/matmul/q8_0_matmul.HC:442`, `src/matmul/q8_0_matmul.HC:555`.
+- Added/updated host parity helper-contract coverage in `tests/test_q8_0_matmul_tiled_avx2_q16.py:42` and `tests/test_q8_0_matmul_tiled_avx2_q32.py:36`.
+
+**Queue + Ledger + DB**
+- Marked `IQ-123` complete and appended new rolling items `IQ-124` and `IQ-125` in `MASTER_TASKS.md:313`.
+- Added one-line progress ledger entry for loop-104 in `MASTER_TASKS.md:321`.
+- Inserted central DB iteration row: `iterations.id=1417`, `task_id=IQ-123`, `status=pass`.
+- Queue depth policy maintained: **16 unchecked `IQ-` items**.
+
+**Validation Output**
+- `python3 tests/test_q8_0_matmul_tiled_avx2_q32.py` → `q8_0_matmul_tiled_avx2_q32_reference_checks=ok`
+- `python3 tests/test_q8_0_matmul_tiled_avx2_q16.py` → `q8_0_matmul_tiled_avx2_q16_reference_checks=ok`
+- `python3 tests/test_q8_0_matmul_tiled_avx2_preflight.py` → `q8_0_matmul_tiled_avx2_preflight_parity=ok`
+- `python3 tests/test_q8_0_matmul_tiled_stride_k_preflight.py` → `q8_0_matmul_tiled_stride_k_preflight=ok`
+- `python3 tests/test_q8_0_matmul_tiled_tile_shape_preflight.py` → `q8_0_matmul_tiled_tile_shape_preflight=ok`

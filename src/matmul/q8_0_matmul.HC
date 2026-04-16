@@ -69,6 +69,35 @@ I64 Q8_0MatMulMinI64(I64 lhs, I64 rhs)
     return rhs;
 }
 
+// Shared checked tile-end math for tiled row/column traversals:
+//   tile_end = min(tile_start + tile_span, axis_len)
+// The helper keeps overflow and BAD_LEN behavior identical across
+// scalar Q16, AVX2 Q32, and AVX2 Q16 entrypoints.
+I32 Q8_0MatMulTiledComputeTileEndChecked(
+    I64 tile_start,
+    I64 tile_span,
+    I64 axis_len,
+    I64 *out_tile_end)
+{
+    I64 tile_end;
+
+    if (!out_tile_end)
+        return Q8_0_MATMUL_ERR_NULL_PTR;
+    if (tile_start < 0 || tile_span < 0 || axis_len < 0)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (tile_start > axis_len)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (!Q8_0MatMulTryAddI64NonNeg(tile_start,
+                                   tile_span,
+                                   &tile_end))
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+
+    *out_tile_end = Q8_0MatMulMinI64(tile_end,
+                                     axis_len);
+    return Q8_0_MATMUL_OK;
+}
+
 // Shared tile-shape contract for tiled Q8_0 matmul call-sites.
 // Both tile extents must be strictly positive so tiled traversal always
 // makes forward progress and never loops forever on zero-sized tiles.
@@ -301,16 +330,22 @@ I32 Q8_0MatMulQ16TiledChecked(
     row_tile_start = 0;
     while (row_tile_start < row_count)
     {
-        if (!Q8_0MatMulTryAddI64NonNeg(row_tile_start, tile_rows, &row_tile_end))
-            return Q8_0_MATMUL_ERR_OVERFLOW;
-        row_tile_end = Q8_0MatMulMinI64(row_tile_end, row_count);
+        status = Q8_0MatMulTiledComputeTileEndChecked(row_tile_start,
+                                                      tile_rows,
+                                                      row_count,
+                                                      &row_tile_end);
+        if (status != Q8_0_MATMUL_OK)
+            return status;
 
         col_tile_start = 0;
         while (col_tile_start < col_count)
         {
-            if (!Q8_0MatMulTryAddI64NonNeg(col_tile_start, tile_cols, &col_tile_end))
-                return Q8_0_MATMUL_ERR_OVERFLOW;
-            col_tile_end = Q8_0MatMulMinI64(col_tile_end, col_count);
+            status = Q8_0MatMulTiledComputeTileEndChecked(col_tile_start,
+                                                          tile_cols,
+                                                          col_count,
+                                                          &col_tile_end);
+            if (status != Q8_0_MATMUL_OK)
+                return status;
 
             for (row_index = row_tile_start; row_index < row_tile_end; ++row_index)
             {
@@ -407,16 +442,22 @@ I32 Q8_0MatMulQ32TiledAVX2Checked(
     row_tile_start = 0;
     while (row_tile_start < row_count)
     {
-        if (!Q8_0MatMulTryAddI64NonNeg(row_tile_start, tile_rows, &row_tile_end))
-            return Q8_0_MATMUL_ERR_OVERFLOW;
-        row_tile_end = Q8_0MatMulMinI64(row_tile_end, row_count);
+        status = Q8_0MatMulTiledComputeTileEndChecked(row_tile_start,
+                                                      tile_rows,
+                                                      row_count,
+                                                      &row_tile_end);
+        if (status != Q8_0_MATMUL_OK)
+            return status;
 
         col_tile_start = 0;
         while (col_tile_start < col_count)
         {
-            if (!Q8_0MatMulTryAddI64NonNeg(col_tile_start, tile_cols, &col_tile_end))
-                return Q8_0_MATMUL_ERR_OVERFLOW;
-            col_tile_end = Q8_0MatMulMinI64(col_tile_end, col_count);
+            status = Q8_0MatMulTiledComputeTileEndChecked(col_tile_start,
+                                                          tile_cols,
+                                                          col_count,
+                                                          &col_tile_end);
+            if (status != Q8_0_MATMUL_OK)
+                return status;
 
             for (row_index = row_tile_start; row_index < row_tile_end; ++row_index)
             {
@@ -514,16 +555,22 @@ I32 Q8_0MatMulQ16TiledAVX2Checked(
     row_tile_start = 0;
     while (row_tile_start < row_count)
     {
-        if (!Q8_0MatMulTryAddI64NonNeg(row_tile_start, tile_rows, &row_tile_end))
-            return Q8_0_MATMUL_ERR_OVERFLOW;
-        row_tile_end = Q8_0MatMulMinI64(row_tile_end, row_count);
+        status = Q8_0MatMulTiledComputeTileEndChecked(row_tile_start,
+                                                      tile_rows,
+                                                      row_count,
+                                                      &row_tile_end);
+        if (status != Q8_0_MATMUL_OK)
+            return status;
 
         col_tile_start = 0;
         while (col_tile_start < col_count)
         {
-            if (!Q8_0MatMulTryAddI64NonNeg(col_tile_start, tile_cols, &col_tile_end))
-                return Q8_0_MATMUL_ERR_OVERFLOW;
-            col_tile_end = Q8_0MatMulMinI64(col_tile_end, col_count);
+            status = Q8_0MatMulTiledComputeTileEndChecked(col_tile_start,
+                                                          tile_cols,
+                                                          col_count,
+                                                          &col_tile_end);
+            if (status != Q8_0_MATMUL_OK)
+                return status;
 
             for (row_index = row_tile_start; row_index < row_tile_end; ++row_index)
             {

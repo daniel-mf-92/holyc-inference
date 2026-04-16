@@ -39,6 +39,19 @@ def try_add_i64_nonneg(lhs: int, rhs: int):
     return True, lhs + rhs
 
 
+def compute_tile_end_checked(tile_start: int, tile_span: int, axis_len: int):
+    if tile_start < 0 or tile_span < 0 or axis_len < 0:
+        return Q8_0_AVX2_ERR_BAD_LEN, 0
+    if tile_start > axis_len:
+        return Q8_0_AVX2_ERR_BAD_LEN, 0
+
+    ok, tile_end = try_add_i64_nonneg(tile_start, tile_span)
+    if not ok:
+        return Q8_0_AVX2_ERR_OVERFLOW, 0
+
+    return Q8_0_AVX2_OK, min(tile_end, axis_len)
+
+
 def round_shift_right_signed(value: int, shift: int) -> int:
     if shift <= 0:
         return value
@@ -100,17 +113,15 @@ def q8_0_matmul_tiled_avx2_q16_checked(
 
     row_tile_start = 0
     while row_tile_start < row_count:
-        ok, row_tile_end = try_add_i64_nonneg(row_tile_start, tile_rows)
-        if not ok:
-            return Q8_0_AVX2_ERR_OVERFLOW, []
-        row_tile_end = min(row_tile_end, row_count)
+        err, row_tile_end = compute_tile_end_checked(row_tile_start, tile_rows, row_count)
+        if err != Q8_0_AVX2_OK:
+            return err, []
 
         col_tile_start = 0
         while col_tile_start < col_count:
-            ok, col_tile_end = try_add_i64_nonneg(col_tile_start, tile_cols)
-            if not ok:
-                return Q8_0_AVX2_ERR_OVERFLOW, []
-            col_tile_end = min(col_tile_end, col_count)
+            err, col_tile_end = compute_tile_end_checked(col_tile_start, tile_cols, col_count)
+            if err != Q8_0_AVX2_OK:
+                return err, []
 
             for row_index in range(row_tile_start, row_tile_end):
                 ok, lhs_row_base = try_mul_i64_nonneg(row_index, lhs_row_stride_blocks)
@@ -420,12 +431,35 @@ def test_q16_q32_shared_preflight_error_surface() -> None:
         assert err_q16 == err_q32
 
 
+def test_compute_tile_end_checked_contract() -> None:
+    err, tile_end = compute_tile_end_checked(2, 3, 9)
+    assert err == Q8_0_AVX2_OK
+    assert tile_end == 5
+
+    err, tile_end = compute_tile_end_checked(7, 5, 9)
+    assert err == Q8_0_AVX2_OK
+    assert tile_end == 9
+
+    err, _ = compute_tile_end_checked(-1, 3, 9)
+    assert err == Q8_0_AVX2_ERR_BAD_LEN
+    err, _ = compute_tile_end_checked(1, -3, 9)
+    assert err == Q8_0_AVX2_ERR_BAD_LEN
+    err, _ = compute_tile_end_checked(1, 3, -9)
+    assert err == Q8_0_AVX2_ERR_BAD_LEN
+    err, _ = compute_tile_end_checked(10, 1, 9)
+    assert err == Q8_0_AVX2_ERR_BAD_LEN
+
+    err, _ = compute_tile_end_checked(I64_MAX - 1, 5, I64_MAX)
+    assert err == Q8_0_AVX2_ERR_OVERFLOW
+
+
 def run() -> None:
     test_known_matrix_matches_q32_then_single_round()
     test_q16_output_matches_q32_matmul_single_rounding_per_cell()
     test_tile_and_stride_invariants()
     test_error_paths()
     test_q16_q32_shared_preflight_error_surface()
+    test_compute_tile_end_checked_contract()
     print("q8_0_matmul_tiled_avx2_q16_reference_checks=ok")
 
 
