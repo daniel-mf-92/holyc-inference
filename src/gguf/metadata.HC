@@ -449,6 +449,14 @@ I32 GGUFMetadataReadF64BitsTripleChecked(U8 *buf,
                                          U64 *out_second_bits,
                                          U64 *out_third_bits);
 
+I32 GGUFMetadataReadF64BitsTripleCheckedNoPartial(U8 *buf,
+                                                  U64 buf_nbytes,
+                                                  U64 *cursor,
+                                                  U64 table_end,
+                                                  U64 *out_first_bits,
+                                                  U64 *out_second_bits,
+                                                  U64 *out_third_bits);
+
 I32 GGUFMetadataReadF64BitsQuadChecked(U8 *buf,
                                        U64 buf_nbytes,
                                        U64 *cursor,
@@ -3212,6 +3220,27 @@ I32 GGUFMetadataReadF64BitsTripleChecked(U8 *buf,
     *out_third_bits = third_bits;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Checked metadata FLOAT64 raw-bit triple reader with explicit no-partial
+// wrapper semantics.
+// Contract: this entrypoint enforces strict all-or-nothing cursor/output
+// commit by delegating to the canonical staged triple decoder.
+I32 GGUFMetadataReadF64BitsTripleCheckedNoPartial(U8 *buf,
+                                                  U64 buf_nbytes,
+                                                  U64 *cursor,
+                                                  U64 table_end,
+                                                  U64 *out_first_bits,
+                                                  U64 *out_second_bits,
+                                                  U64 *out_third_bits)
+{
+    return GGUFMetadataReadF64BitsTripleChecked(buf,
+                                                buf_nbytes,
+                                                cursor,
+                                                table_end,
+                                                out_first_bits,
+                                                out_second_bits,
+                                                out_third_bits);
 }
 
 // Checked metadata FLOAT64 raw-bit quad reader.

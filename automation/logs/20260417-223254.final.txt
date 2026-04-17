@@ -1,0 +1,14 @@
+Done — I completed one full iteration for `IQ-272` and kept the queue rolling.
+
+**What Changed**
+- Added HolyC no-partial wrapper declaration + implementation: `GGUFMetadataReadF64BitsTripleCheckedNoPartial` in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/gguf/metadata.HC:452` and `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/gguf/metadata.HC:3229`.
+- Added focused host parity harness with no-partial/failure-lane/randomized coverage in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_gguf_metadata_read_f64bits_triple_checked_no_partial.py:1`.
+- Updated queue + ledger in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:466`, `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:481`, `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:488` (`IQ-272` checked, new `IQ-287` appended).
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_f64bits_triple_checked_no_partial.py && python3 tests/test_gguf_metadata_read_f64bits_triple_checked.py && python3 tests/test_gguf_metadata_read_f64bits_pair_checked.py && python3 tests/test_gguf_metadata_read_f64bitsle_checked.py && python3 tests/test_gguf_metadata_parse.py`
+- Output: `gguf_metadata_read_f64bits_triple_checked_reference_checks=ok`, `gguf_metadata_read_f64bits_pair_checked_reference_checks=ok`, `gguf_metadata_read_f64bitsle_checked_reference_checks=ok`, `gguf_metadata_reference_checks=ok`.
+
+**Queue/DB**
+- Unchecked `IQ-` depth is maintained at `15`.
+- Logged central DB row in `/Users/danielmatthews-ferrero/Documents/local-codebases/temple-central.db` as `iterations.id=3159` (`agent=inference`, `task_id=IQ-272`, `status=pass`).
