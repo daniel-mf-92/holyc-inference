@@ -16,6 +16,9 @@ I64 FPQ16Mul(I64 a, I64 b);
 I64 FPQ16Div(I64 num, I64 den);
 I64 FPQ16FromInt(I64 x);
 I64 FPQ16Sqrt(I64 x);
+I32 FPQ16MulChecked(I64 a_q16,
+                    I64 b_q16,
+                    I64 *out_q16);
 I32 FPQ16MulDivRoundedChecked(I64 a_q16,
                               I64 b_q16,
                               I64 d_q16,
@@ -24,6 +27,157 @@ I32 FPQ16MulDivRoundedByPositiveIntFromQ16DenChecked(I64 a_q16,
                                                      I64 b_q16,
                                                      I64 d_q16,
                                                      I64 *out_q16);
+
+// WS1-04 RMSNorm assumptions (Q16 tensors):
+// - `count` is the feature width for one normalized row/token/head slice.
+// - `input_q16`, `gamma_q16`, `output_q16` each contain at least `count`
+//   contiguous I64 Q16 lanes.
+// - mean-square and denominator are scalar per-slice values.
+// TODO(WS4/WS5): Add tiled/strided variants for batched matmul/attention paths.
+// TODO(WS4/WS5): Add AVX2 lane kernels once scalar checked semantics are frozen.
+
+// Compute checked RMSNorm inverse denominator from one Q16 slice:
+//   mean_sq_q16 = (sum_i input[i]^2) / count
+//   denom_q16   = sqrt(mean_sq_q16 + eps_q16)
+//   inv_q16     = 1.0_q16 / denom_q16
+// All intermediate math is integer-only with explicit overflow/domain checks.
+I32 FPQ16RMSNormComputeInvDenomChecked(I64 *input_q16,
+                                       I64 count,
+                                       I64 eps_q16,
+                                       I64 *inv_denom_q16_out,
+                                       I64 *denom_q16_out)
+{
+    I64 lane_index;
+    I64 lane_sq_q16;
+    I64 sum_sq_q16;
+    I64 count_q16;
+    I64 mean_sq_q16;
+    I64 denom_arg_q16;
+    I64 denom_q16;
+    I64 inv_denom_q16;
+    I32 status;
+
+    if (!input_q16 || !inv_denom_q16_out || !denom_q16_out)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count <= 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (eps_q16 < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (count > (I64_MAX_VALUE >> FP_Q16_SHIFT))
+        return FP_Q16_ERR_OVERFLOW;
+
+    sum_sq_q16 = 0;
+    for (lane_index = 0; lane_index < count; lane_index++)
+    {
+        status = FPQ16MulChecked(input_q16[lane_index],
+                                 input_q16[lane_index],
+                                 &lane_sq_q16);
+        if (status)
+            return status;
+
+        if (sum_sq_q16 > I64_MAX_VALUE - lane_sq_q16)
+            return FP_Q16_ERR_OVERFLOW;
+
+        sum_sq_q16 += lane_sq_q16;
+    }
+
+    count_q16 = FPQ16FromInt(count);
+    if (count_q16 <= 0)
+        return FP_Q16_ERR_OVERFLOW;
+
+    mean_sq_q16 = FPQ16Div(sum_sq_q16, count_q16);
+    if (mean_sq_q16 < 0)
+        return FP_Q16_ERR_DOMAIN;
+
+    if (mean_sq_q16 > I64_MAX_VALUE - eps_q16)
+        return FP_Q16_ERR_OVERFLOW;
+
+    denom_arg_q16 = mean_sq_q16 + eps_q16;
+    denom_q16 = FPQ16Sqrt(denom_arg_q16);
+    if (denom_q16 <= 0)
+        return FP_Q16_ERR_DOMAIN;
+
+    inv_denom_q16 = FPQ16Div(FP_Q16_ONE, denom_q16);
+    if (inv_denom_q16 <= 0)
+        return FP_Q16_ERR_DOMAIN;
+
+    *inv_denom_q16_out = inv_denom_q16;
+    *denom_q16_out = denom_q16;
+
+    return 0;
+}
+
+// Checked full RMSNorm (no-alias output contract):
+//   out[i] = ((input[i] / sqrt(mean(input^2)+eps)) * gamma[i])
+// The function performs a no-write validation pass first, then commits writes,
+// so any error returns with `output_q16` unchanged.
+I32 FPQ16RMSNormChecked(I64 *input_q16,
+                        I64 *gamma_q16,
+                        I64 *output_q16,
+                        I64 count,
+                        I64 eps_q16)
+{
+    I64 lane_index;
+    I64 inv_denom_q16;
+    I64 denom_q16;
+    I64 norm_lane_q16;
+    I64 weighted_lane_q16;
+    I32 status;
+
+    if (!input_q16 || !gamma_q16 || !output_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count <= 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (eps_q16 < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (input_q16 == output_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    status = FPQ16RMSNormComputeInvDenomChecked(input_q16,
+                                                count,
+                                                eps_q16,
+                                                &inv_denom_q16,
+                                                &denom_q16);
+    if (status)
+        return status;
+
+    // Validation pass: prove every lane arithmetic operation succeeds before
+    // writing output, preserving no-partial-write behavior.
+    for (lane_index = 0; lane_index < count; lane_index++)
+    {
+        status = FPQ16MulChecked(input_q16[lane_index],
+                                 inv_denom_q16,
+                                 &norm_lane_q16);
+        if (status)
+            return status;
+
+        status = FPQ16MulChecked(norm_lane_q16,
+                                 gamma_q16[lane_index],
+                                 &weighted_lane_q16);
+        if (status)
+            return status;
+    }
+
+    for (lane_index = 0; lane_index < count; lane_index++)
+    {
+        status = FPQ16MulChecked(input_q16[lane_index],
+                                 inv_denom_q16,
+                                 &norm_lane_q16);
+        if (status)
+            return status;
+
+        status = FPQ16MulChecked(norm_lane_q16,
+                                 gamma_q16[lane_index],
+                                 &weighted_lane_q16);
+        if (status)
+            return status;
+
+        output_q16[lane_index] = weighted_lane_q16;
+    }
+
+    return 0;
+}
 
 // Apply precomputed RMSNorm inverse denominator to a Q16 vector with explicit
 // checked error surfaces. This uses one-rounding math:

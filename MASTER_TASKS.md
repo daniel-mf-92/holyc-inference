@@ -208,7 +208,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-020 Implement Q16 integer exponent range clamp and base constants in `src/math/intexp.HC` (WS1-02)
 - [x] IQ-021 Add host-side Q16 exp parity harness in `tests/test_intexp_q16.py` against `math.exp` samples (WS1-05)
 - [x] IQ-022 Implement GGUF header constants and struct layout notes in `src/gguf/header.HC` before parser logic (WS2-01)
-- [ ] IQ-023 Create `src/math/rmsnorm.HC` skeleton with Q16 constants, tensor shape assumptions, and TODO stubs for scale/variance accumulation (WS1-04)
+- [x] IQ-023 Implement checked RMSNorm core helpers in `src/math/rmsnorm.HC` (`FPQ16RMSNormComputeInvDenomChecked`, `FPQ16RMSNormChecked`) with explicit WS1-04 assumptions/TODO notes and integer-only no-partial-write semantics (WS1-04)
 - [ ] IQ-024 Create `src/gguf/header.HC` skeleton with `GGUFHeader` struct and endian-safe integer read helper stubs (WS2-01)
 - [ ] IQ-025 Add host-side GGUF header parser parity fixture in `tests/test_gguf_header_parse.py` covering valid/magic/version/truncation cases (WS2-01, WS2-05)
 - [x] IQ-026 Implement metadata key lookup helpers (`GGUFMetaFindByKey`, scalar extractors) in `src/gguf/metadata.HC` (WS2-02)
@@ -377,12 +377,14 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 
 
 - [ ] IQ-186 Implement HolyC helper GGUFMetadataTableCursorAdvanceChecked in src/gguf/metadata.HC to compose checked span validation with cursor advancement for WS2 metadata parser entrypoints (WS2-02, WS2-05)
+- [ ] IQ-187 Implement HolyC helper `FPQ16RMSNormCheckedInPlace` in `src/math/rmsnorm.HC` to provide alias-safe in-place RMSNorm with shared preflight/compute path parity against `FPQ16RMSNormChecked` for WS1/WS5 norm call sites (WS1-04)
 
 ## Progress Ledger
 
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-17 | loop-163 | IQ-023 RMSNorm checked core helpers | done | Added `FPQ16RMSNormComputeInvDenomChecked` and `FPQ16RMSNormChecked` with explicit WS1 assumptions/TODOs in `src/math/rmsnorm.HC` plus parity harness `tests/test_rmsnorm_q16_checked.py`; `python3 tests/test_rmsnorm_q16_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_weighted_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_weighted_inplace_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_weighted_auto_checked.py` passed |
 | 2026-04-17 | loop-162 | IQ-184 GGUF header validate+size helper | done | Added `GGUFHeaderValidateAndSizeChecked` and routed `GGUFHeaderParseChecked` through it in `src/gguf/header.HC`, plus parity harness `tests/test_gguf_header_validate_and_size_checked.py`; `python3 tests/test_gguf_header_parse_checked.py && python3 tests/test_gguf_header_validate_and_size_checked.py` passed |
 | 2026-04-17 | loop-161 | IQ-022 GGUF header layout constants | done | Added canonical header byte offsets/widths + shared version predicate in `src/gguf/header.HC`; `python3 tests/test_gguf_header_parse_checked.py` passed |
 | 2026-04-17 | loop-160 | IQ-183 checked GGUF header parser helper | done | Added `GGUFHeaderParseChecked` with explicit little-endian checked decode in `src/gguf/header.HC` and parity harness `tests/test_gguf_header_parse_checked.py`; `python3 tests/test_gguf_header_parse_checked.py` passed |
