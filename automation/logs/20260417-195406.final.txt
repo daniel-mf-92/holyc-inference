@@ -1,0 +1,24 @@
+Done — completed one full unattended iteration for `IQ-252` end-to-end.
+
+**What changed**
+- Implemented `GGUFMetadataReadI32QuadChecked` in `src/gguf/metadata.HC:2025` with staged 4-lane I32 decode and atomic cursor/output commit semantics (strict no-partial-write).
+- Added forward declaration for the new helper in `src/gguf/metadata.HC:263`.
+- Added parity harness `tests/test_gguf_metadata_read_i32_quad_checked.py:1` with null-pointer, truncation/no-commit, success decode, overflow passthrough, and randomized parity checks.
+- Updated queue/ledger in `MASTER_TASKS.md:446`, `MASTER_TASKS.md:461`, `MASTER_TASKS.md:468`:
+  - Marked `IQ-252` checked.
+  - Added new unchecked `IQ-267` to keep rolling queue depth.
+  - Added one progress-ledger line (`loop-337`).
+
+**Validation run**
+- `python3 tests/test_gguf_metadata_read_i32_quad_checked.py && python3 tests/test_gguf_metadata_read_i32_triple_checked.py && python3 tests/test_gguf_metadata_read_i32_pair_checked.py && python3 tests/test_gguf_metadata_read_i32le_checked.py`
+- Output:
+  - `ok`
+  - `ok`
+  - `gguf_metadata_read_i32_pair_checked_reference_checks=ok`
+  - `gguf_metadata_read_i32le_checked_reference_checks=ok`
+
+**Central DB log**
+- Inserted iteration row into `~/Documents/local-codebases/temple-central.db` for `IQ-252` (`status=pass`, `validation_result=ok`), confirmed as latest row `id=2965`.
+
+**Queue policy**
+- Unchecked queue count is `15` after this iteration (policy satisfied).

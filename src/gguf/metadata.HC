@@ -260,6 +260,15 @@ I32 GGUFMetadataReadI32TripleChecked(U8 *buf,
                                      I32 *out_second,
                                      I32 *out_third);
 
+I32 GGUFMetadataReadI32QuadChecked(U8 *buf,
+                                   U64 buf_nbytes,
+                                   U64 *cursor,
+                                   U64 table_end,
+                                   I32 *out_first,
+                                   I32 *out_second,
+                                   I32 *out_third,
+                                   I32 *out_fourth);
+
 I32 GGUFMetadataReadI64LEChecked(U8 *buf,
                                  U64 buf_nbytes,
                                  U64 *cursor,
@@ -1983,6 +1992,72 @@ I32 GGUFMetadataReadI32TripleChecked(U8 *buf,
     *out_first = first;
     *out_second = second;
     *out_third = third;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked little-endian I32 tuple reader for fixed-layout metadata records.
+// Contract: stages four I32 decodes through GGUFMetadataReadI32LEChecked and
+// commits outputs + cursor only when all lanes succeed.
+I32 GGUFMetadataReadI32QuadChecked(U8 *buf,
+                                   U64 buf_nbytes,
+                                   U64 *cursor,
+                                   U64 table_end,
+                                   I32 *out_first,
+                                   I32 *out_second,
+                                   I32 *out_third,
+                                   I32 *out_fourth)
+{
+    U64 cur;
+    I32 first;
+    I32 second;
+    I32 third;
+    I32 fourth;
+    I32 err;
+
+    if (!buf || !cursor || !out_first || !out_second || !out_third || !out_fourth)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Stage all scalar reads through the canonical signed-I32 helper so quad
+    // reads preserve identical bounds/overflow/no-partial-write semantics.
+    err = GGUFMetadataReadI32LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &first);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadI32LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &second);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadI32LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &third);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadI32LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &fourth);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_first = first;
+    *out_second = second;
+    *out_third = third;
+    *out_fourth = fourth;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
