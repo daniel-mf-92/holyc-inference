@@ -3311,14 +3311,37 @@ I32 GGUFMetadataReadF64BitsQuadCheckedNoPartial(U8 *buf,
                                                 U64 *out_third_bits,
                                                 U64 *out_fourth_bits)
 {
-    return GGUFMetadataReadF64BitsQuadChecked(buf,
-                                              buf_nbytes,
-                                              cursor,
-                                              table_end,
-                                              out_first_bits,
-                                              out_second_bits,
-                                              out_third_bits,
-                                              out_fourth_bits);
+    U64 cur;
+    U64 first_bits;
+    U64 second_bits;
+    U64 third_bits;
+    U64 fourth_bits;
+    I32 err;
+
+    if (!buf || !cursor || !out_first_bits || !out_second_bits || !out_third_bits || !out_fourth_bits)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Stage the canonical checked quad decode into local temporaries first so
+    // this explicit no-partial wrapper can commit cursor + outputs atomically.
+    err = GGUFMetadataReadF64BitsQuadChecked(buf,
+                                             buf_nbytes,
+                                             &cur,
+                                             table_end,
+                                             &first_bits,
+                                             &second_bits,
+                                             &third_bits,
+                                             &fourth_bits);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_first_bits = first_bits;
+    *out_second_bits = second_bits;
+    *out_third_bits = third_bits;
+    *out_fourth_bits = fourth_bits;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
 }
 
 // Checked metadata BOOL reader (`U8 in {0,1}`).

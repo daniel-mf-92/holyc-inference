@@ -1,0 +1,18 @@
+Completed one full iteration on `IQ-273` with queue depth preserved.
+
+**What Changed**
+- Hardened `GGUFMetadataReadF64BitsQuadCheckedNoPartial` to explicit staged local decode + atomic commit semantics (instead of direct pass-through), preserving strict no-partial cursor/output behavior in `src/gguf/metadata.HC:3305`.
+- Marked `IQ-273` done, added new unchecked monotonic queue item `IQ-288` to keep rolling depth at 15, and added one ledger line `loop-354` in `MASTER_TASKS.md:467`, `MASTER_TASKS.md:482`, `MASTER_TASKS.md:489`.
+- Logged iteration to central DB `~/Documents/local-codebases/temple-central.db` (`task_id=IQ-273`, status `pass`).
+
+**Validation**
+- Ran:
+  - `python3 tests/test_gguf_metadata_read_f64bits_quad_checked_no_partial.py`
+  - `python3 tests/test_gguf_metadata_read_f64bits_quad_checked.py`
+  - `python3 tests/test_gguf_metadata_read_f64bits_triple_checked.py`
+  - `python3 tests/test_gguf_metadata_parse.py`
+- Output:
+  - `gguf_metadata_read_f64bits_quad_checked_no_partial_reference_checks=ok`
+  - `gguf_metadata_read_f64bits_quad_checked_reference_checks=ok`
+  - `gguf_metadata_read_f64bits_triple_checked_reference_checks=ok`
+  - `gguf_metadata_reference_checks=ok`
