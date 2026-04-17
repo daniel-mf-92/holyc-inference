@@ -78,3 +78,7 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_2","type":"todo_list","items":[{"text":"Inspect tasks and repo state","completed":true},{"text":"Refill IQ queue to 15+","completed":true},{"text":"Implement top unchecked IQ task","completed":true},{"text":"Run focused validations","completed":true},{"text":"Log iteration and update ledger","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":1475631,"cached_input_tokens":1219712,"output_tokens":7204}}
 Codex final exit code: 0
+[main 87c890f] feat(inference): codex iteration 20260417-103719
+ 6 files changed, 140 insertions(+), 3 deletions(-)
+ create mode 100644 automation/logs/20260417-103719.final.txt
+=== End iteration 123 (outcome=ok) ===
