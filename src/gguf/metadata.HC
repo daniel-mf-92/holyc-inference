@@ -74,6 +74,11 @@ class GGUFMetadataTable
     GGUFMetadataKV *items;
 };
 
+I32 GGUFMetadataCursorCanAdvanceChecked(U64 cursor,
+                                        U64 need,
+                                        U64 table_end,
+                                        U64 *out_next_cursor);
+
 // Validate metadata table byte-window math before any parser cursor movement.
 // Contract: `out_table_end` is written only on success.
 I32 GGUFMetadataTableSpanValidateChecked(U64 table_start,
@@ -121,7 +126,6 @@ I32 GGUFMetadataTableCursorAdvanceChecked(U64 table_start,
                                           U64 *out_table_end)
 {
     U64 table_end;
-    U64 cursor;
     I32 err;
 
     if (!out_cursor || !out_table_end)
@@ -134,23 +138,52 @@ I32 GGUFMetadataTableCursorAdvanceChecked(U64 table_start,
     if (err != GGUF_META_TABLE_OK)
         return err;
 
-    // Advance is relative to table_start. Reject requests that would place
-    // cursor beyond [table_start, table_end]. Equal-to-end is legal and
-    // matches cursor semantics used by metadata table loops.
-    if (cursor_advance > table_nbytes)
-        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    // Advance is relative to table_start. Equal-to-end is legal and matches
+    // cursor semantics used by metadata table loops.
+    err = GGUFMetadataCursorCanAdvanceChecked(table_start,
+                                              cursor_advance,
+                                              table_end,
+                                              out_cursor);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
 
-    // Keep add-overflow guard explicit even though span validation already
-    // bounds table_start + table_nbytes.
-    if (table_start > (0xFFFFFFFFFFFFFFFF - cursor_advance))
+    *out_table_end = table_end;
+    return GGUF_META_TABLE_OK;
+}
+
+// Validate `cursor + need <= table_end` with explicit signed/unsigned overflow
+// guards. On success, `out_next_cursor` is the advanced cursor position.
+// Contract: out pointer is written only on success.
+I32 GGUFMetadataCursorCanAdvanceChecked(U64 cursor,
+                                        U64 need,
+                                        U64 table_end,
+                                        U64 *out_next_cursor)
+{
+    U64 next_cursor;
+
+    if (!out_next_cursor)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    // Keep cursor math in positive I64 space because parser entrypoints route
+    // through signed cursors.
+    if (cursor > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (need > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (table_end > 0x7FFFFFFFFFFFFFFF)
         return GGUF_META_TABLE_ERR_OVERFLOW;
 
-    cursor = table_start + cursor_advance;
     if (cursor > table_end)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (cursor > (0xFFFFFFFFFFFFFFFF - need))
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    next_cursor = cursor + need;
+    if (next_cursor > table_end)
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
 
-    *out_cursor = cursor;
-    *out_table_end = table_end;
+    *out_next_cursor = next_cursor;
     return GGUF_META_TABLE_OK;
 }
 
