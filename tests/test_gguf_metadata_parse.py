@@ -111,6 +111,69 @@ def array_payload(elem_type: int, values: list) -> bytes:
     return u32(elem_type) + u64(len(values)) + payload
 
 
+def decode_scalar_by_type(raw: bytes, t: int):
+    if t == GGUF_TYPE_UINT8:
+        return raw[0]
+    if t == GGUF_TYPE_INT8:
+        return int.from_bytes(raw[:1], "little", signed=True)
+    if t == GGUF_TYPE_UINT16:
+        return int.from_bytes(raw[:2], "little", signed=False)
+    if t == GGUF_TYPE_INT16:
+        return int.from_bytes(raw[:2], "little", signed=True)
+    if t == GGUF_TYPE_UINT32:
+        return int.from_bytes(raw[:4], "little", signed=False)
+    if t == GGUF_TYPE_INT32:
+        return int.from_bytes(raw[:4], "little", signed=True)
+    if t == GGUF_TYPE_UINT64:
+        return int.from_bytes(raw[:8], "little", signed=False)
+    if t == GGUF_TYPE_INT64:
+        return int.from_bytes(raw[:8], "little", signed=True)
+    if t == GGUF_TYPE_BOOL:
+        return raw[0] != 0
+    if t == GGUF_TYPE_FLOAT32:
+        return int.from_bytes(raw[:4], "little", signed=False)
+    if t == GGUF_TYPE_FLOAT64:
+        return int.from_bytes(raw[:8], "little", signed=False)
+    raise ValueError(t)
+
+
+def decode_array_payload(buf: bytes, parsed_value: dict):
+    elem_type = parsed_value["array_elem_type"]
+    cursor = parsed_value["array_payload_off"]
+    end = cursor + parsed_value["array_payload_bytes"]
+
+    values = []
+    while cursor < end:
+        if elem_type == GGUF_TYPE_STRING:
+            err, cursor2, value = parse_gguf_string(buf, cursor)
+            assert err == GGUF_META_PARSE_OK
+            cursor = cursor2
+            values.append(value)
+            continue
+
+        width = {
+            GGUF_TYPE_UINT8: 1,
+            GGUF_TYPE_INT8: 1,
+            GGUF_TYPE_BOOL: 1,
+            GGUF_TYPE_UINT16: 2,
+            GGUF_TYPE_INT16: 2,
+            GGUF_TYPE_UINT32: 4,
+            GGUF_TYPE_INT32: 4,
+            GGUF_TYPE_FLOAT32: 4,
+            GGUF_TYPE_UINT64: 8,
+            GGUF_TYPE_INT64: 8,
+            GGUF_TYPE_FLOAT64: 8,
+        }[elem_type]
+        raw = buf[cursor : cursor + width]
+        assert len(raw) == width
+        values.append(decode_scalar_by_type(raw, elem_type))
+        cursor += width
+
+    assert cursor == end
+    assert len(values) == parsed_value["array_len"]
+    return values
+
+
 def parse_gguf_string(buf: bytes, cursor: int):
     if cursor + 8 > len(buf):
         return GGUF_META_PARSE_ERR_TRUNCATED, cursor, None
@@ -319,6 +382,102 @@ def test_mixed_scalar_and_arrays() -> None:
     assert items[4][1]["array_elem_type"] == GGUF_TYPE_STRING
     assert items[4][1]["array_len"] == 3
     assert items[4][1]["array_payload_bytes"] > 0
+    assert decode_array_payload(buf, items[4][1]) == ["<unk>", "<s>", "</s>"]
+
+
+def test_all_scalar_widths_and_signs_round_trip() -> None:
+    expected_f32_bits = int.from_bytes(struct.pack("<f", -13.5), "little", signed=False)
+    expected_f64_bits = int.from_bytes(struct.pack("<d", 0.03125), "little", signed=False)
+
+    fixtures = [
+        ("u8", GGUF_TYPE_UINT8, 255),
+        ("i8", GGUF_TYPE_INT8, -127),
+        ("u16", GGUF_TYPE_UINT16, 65535),
+        ("i16", GGUF_TYPE_INT16, -12345),
+        ("u32", GGUF_TYPE_UINT32, 0xFEDCBA98),
+        ("i32", GGUF_TYPE_INT32, -123456789),
+        ("u64", GGUF_TYPE_UINT64, 0xFEDCBA9876543210),
+        ("i64", GGUF_TYPE_INT64, -0x0123456789ABCDEF),
+        ("bool_true", GGUF_TYPE_BOOL, 1),
+        ("f32", GGUF_TYPE_FLOAT32, -13.5),
+        ("f64", GGUF_TYPE_FLOAT64, 0.03125),
+        ("txt", GGUF_TYPE_STRING, "temple"),
+    ]
+
+    buf = b"".join(meta_entry(key, t, scalar_payload(t, v)) for key, t, v in fixtures)
+    err, cursor, items = parse_metadata_table(buf, len(fixtures))
+    assert err == GGUF_META_PARSE_OK
+    assert cursor == len(buf)
+
+    expected = {
+        "u8": 255,
+        "i8": -127,
+        "u16": 65535,
+        "i16": -12345,
+        "u32": 0xFEDCBA98,
+        "i32": -123456789,
+        "u64": 0xFEDCBA9876543210,
+        "i64": -0x0123456789ABCDEF,
+        "bool_true": True,
+        "f32": expected_f32_bits,
+        "f64": expected_f64_bits,
+        "txt": "temple",
+    }
+
+    for key, value in items:
+        if value["type"] == GGUF_TYPE_STRING:
+            got = value["value"]
+        else:
+            got = decode_scalar_by_type(value["raw"], value["type"])
+        assert got == expected[key]
+
+
+def test_array_payload_offsets_and_byte_sizes_for_numeric_types() -> None:
+    f32_bits_one = int.from_bytes(struct.pack("<f", 1.5), "little", signed=False)
+    f32_bits_two = int.from_bytes(struct.pack("<f", -2.25), "little", signed=False)
+
+    buf = b"".join(
+        [
+            meta_entry("arr.u8", GGUF_TYPE_ARRAY, array_payload(GGUF_TYPE_UINT8, [2, 7, 9, 255])),
+            meta_entry("arr.i16", GGUF_TYPE_ARRAY, array_payload(GGUF_TYPE_INT16, [-1, 22, -32768])),
+            meta_entry(
+                "arr.f32",
+                GGUF_TYPE_ARRAY,
+                array_payload(GGUF_TYPE_FLOAT32, [1.5, -2.25]),
+            ),
+        ]
+    )
+
+    err, cursor, items = parse_metadata_table(buf, 3)
+    assert err == GGUF_META_PARSE_OK
+    assert cursor == len(buf)
+
+    arr_u8 = meta_find_by_key(items, "arr.u8")
+    arr_i16 = meta_find_by_key(items, "arr.i16")
+    arr_f32 = meta_find_by_key(items, "arr.f32")
+    assert arr_u8 is not None and arr_i16 is not None and arr_f32 is not None
+
+    assert arr_u8["array_payload_bytes"] == 4
+    assert arr_i16["array_payload_bytes"] == 6
+    assert arr_f32["array_payload_bytes"] == 8
+
+    assert decode_array_payload(buf, arr_u8) == [2, 7, 9, 255]
+    assert decode_array_payload(buf, arr_i16) == [-1, 22, -32768]
+    assert decode_array_payload(buf, arr_f32) == [f32_bits_one, f32_bits_two]
+
+
+def test_invalid_array_element_type_rejected() -> None:
+    payload = u32(99) + u64(1) + u32(9)
+    nested = meta_entry("bad.array.elem_type", GGUF_TYPE_ARRAY, payload)
+    err, _cursor, _items = parse_metadata_table(nested, 1)
+    assert err == GGUF_META_PARSE_ERR_BAD_TYPE
+
+
+def test_array_payload_truncation_detected() -> None:
+    full = meta_entry("arr.u64", GGUF_TYPE_ARRAY, array_payload(GGUF_TYPE_UINT64, [1, 2]))
+    truncated = full[:-3]
+    err, _cursor, _items = parse_metadata_table(truncated, 1)
+    assert err == GGUF_META_PARSE_ERR_TRUNCATED
 
 
 def test_nested_array_rejected() -> None:
@@ -420,7 +579,11 @@ def test_metadata_table_span_validate_out_of_bounds() -> None:
 
 def run() -> None:
     test_mixed_scalar_and_arrays()
+    test_all_scalar_widths_and_signs_round_trip()
+    test_array_payload_offsets_and_byte_sizes_for_numeric_types()
     test_nested_array_rejected()
+    test_invalid_array_element_type_rejected()
+    test_array_payload_truncation_detected()
     test_truncation_detected()
     test_lookup_and_scalar_extractors()
     test_metadata_table_span_validate_known_good()

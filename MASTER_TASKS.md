@@ -212,7 +212,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-024 Create `src/gguf/header.HC` skeleton with `GGUFHeader` struct and endian-safe integer read helper stubs (WS2-01)
 - [x] IQ-025 Add host-side GGUF header parser parity fixture in `tests/test_gguf_header_parse.py` covering valid/magic/version/truncation cases (WS2-01, WS2-05)
 - [x] IQ-026 Implement metadata key lookup helpers (`GGUFMetaFindByKey`, scalar extractors) in `src/gguf/metadata.HC` (WS2-02)
-- [ ] IQ-027 Add host-side metadata parser parity fixture for scalar/string/array/nested-array cases in `tests/test_gguf_metadata_parse.py` (WS2-02, WS2-05)
+- [x] IQ-027 Add host-side metadata parser parity fixture for scalar/string/array/nested-array cases in `tests/test_gguf_metadata_parse.py` (WS2-02, WS2-05)
 - [x] IQ-028 Implement GGUF tensor data base alignment helper in `src/gguf/tensor_data_base.HC` (WS2-04)
 - [x] IQ-029 Implement Q8_0 dot product (naive, integer-only accumulator) in `src/quant/q8_0_dot.HC` (WS3-05)
 - [x] IQ-030 Implement mixed Q4_0 x Q8_0 dot product kernel in `src/quant/q4_0_q8_0_dot.HC` (WS3-05)
@@ -382,6 +382,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] IQ-189 Add host-side parity harness `tests/test_fixedpoint_q16_muldiv_array_positive_int_checked.py` validating per-lane domain/overflow/no-partial-write behavior for `FPQ16MulDivArrayRoundedByPositiveIntChecked` against scalar composition references (WS1-05)
 - [ ] IQ-190 Implement HolyC helper `FPQ16MulDivArrayRoundedByPositiveIntFromQ16DenChecked` in `src/math/fixedpoint.HC` for elementwise Q16-encoded positive-int denominators (`d_q16[i]=n<<16`) with strict divisibility checks and no-partial-write semantics (WS1-01, WS1-04)
 - [ ] IQ-191 Add host-side parity harness `tests/test_fixedpoint_q16_muldiv_array_positive_int_from_q16den_checked.py` validating encoded-denominator contracts and scalar parity for `FPQ16MulDivArrayRoundedByPositiveIntFromQ16DenChecked` (WS1-05)
+- [ ] IQ-192 Implement HolyC helper `GGUFMetadataCursorCanAdvanceChecked` in `src/gguf/metadata.HC` to centralize checked `cursor + need <= table_end` validation (with signed/unsigned overflow guards) reused by metadata key/value readers before byte loads (WS2-02, WS2-05)
 
 ## Progress Ledger
 
@@ -582,3 +583,4 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 | 2026-04-17 | loop-118 | IQ-147 token-window range parity harness | done | Added `tests/test_rope_q16_rotate_head_range_token_window.py`; `python3 tests/test_rope_q16_rotate_head_range_token_window.py && python3 tests/test_rope_q16_rotate_head_range_preflighted_position.py && python3 tests/test_rope_q16_rotate_head_range_position.py && python3 tests/test_rope_q16_rotate_head_position.py && python3 tests/test_rope_q16_angle_step.py` passed |
 | 2026-04-17 | loop-159 | IQ-020 exp clamp/base constants | done | Added `FPQ16ExpSplitBase2FromClampedInputChecked` and shared Q16 exp base/saturation constants in `src/math/intexp.HC`, plus parity harness `tests/test_intexp_split_base2_from_clamped_input_checked.py`; `python3 tests/test_intexp_clamp_to_input_domain_checked.py && python3 tests/test_intexp_exp_from_clamped_input_checked.py && python3 tests/test_intexp_exp_array_checked.py && python3 tests/test_intexp_split_base2_from_clamped_input_checked.py` passed |
 | 2026-04-17 | loop-160 | IQ-024 endian-safe header read helpers | done | Added `GGUFReadU16LEChecked`/`GGUFReadI32LEChecked`/`GGUFReadI64LEChecked` in `src/gguf/header.HC` and parity harness `tests/test_gguf_header_read_endian_checked.py`; `python3 tests/test_gguf_header_read_endian_checked.py && python3 tests/test_gguf_header_parse_checked.py && python3 tests/test_gguf_header_validate_and_size_checked.py` passed |
+| 2026-04-17 | loop-163 | IQ-027 GGUF metadata scalar/string/array parity fixture | done | Expanded `tests/test_gguf_metadata_parse.py` with full scalar-width/sign round-trip checks, numeric/string array payload offset+byte-size decode checks, and invalid elem-type/truncation coverage; `python3 tests/test_gguf_metadata_parse.py && python3 tests/test_gguf_header_parse.py` passed |
