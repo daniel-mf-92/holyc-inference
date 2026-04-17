@@ -227,6 +227,14 @@ I32 GGUFMetadataReadI64PairCheckedNoPartial(U8 *buf,
                                             I64 *out_first,
                                             I64 *out_second);
 
+I32 GGUFMetadataReadI64TripleCheckedNoPartial(U8 *buf,
+                                              U64 buf_nbytes,
+                                              U64 *cursor,
+                                              U64 table_end,
+                                              I64 *out_first,
+                                              I64 *out_second,
+                                              I64 *out_third);
+
 I32 GGUFMetadataReadF32BitsLEChecked(U8 *buf,
                                      U64 buf_nbytes,
                                      U64 *cursor,
@@ -1607,6 +1615,62 @@ I32 GGUFMetadataReadI64PairCheckedNoPartial(U8 *buf,
 
     *out_first = first;
     *out_second = second;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked little-endian I64 triple reader with explicit all-or-nothing
+// staging contract. All lane decodes route through the shared no-partial
+// signed-I64 helper and outputs/cursor are committed only when all succeed.
+I32 GGUFMetadataReadI64TripleCheckedNoPartial(U8 *buf,
+                                              U64 buf_nbytes,
+                                              U64 *cursor,
+                                              U64 table_end,
+                                              I64 *out_first,
+                                              I64 *out_second,
+                                              I64 *out_third)
+{
+    U64 cur;
+    I64 first;
+    I64 second;
+    I64 third;
+    I32 err;
+
+    if (!buf || !cursor || !out_first || !out_second || !out_third)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Stage all lane reads through the canonical no-partial I64 helper so
+    // tuple decoding preserves identical bounds/overflow semantics and never
+    // commits a partially-decoded triple.
+    err = GGUFMetadataReadI64LECheckedNoPartial(buf,
+                                                buf_nbytes,
+                                                &cur,
+                                                table_end,
+                                                &first);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadI64LECheckedNoPartial(buf,
+                                                buf_nbytes,
+                                                &cur,
+                                                table_end,
+                                                &second);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadI64LECheckedNoPartial(buf,
+                                                buf_nbytes,
+                                                &cur,
+                                                table_end,
+                                                &third);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_first = first;
+    *out_second = second;
+    *out_third = third;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
