@@ -417,6 +417,13 @@ I32 GGUFMetadataArrayPayloadSpanFromFixedTypeAtCursorChecked(U32 elem_type,
                                                              U64 *out_payload_bytes,
                                                              U64 *out_payload_end);
 
+I32 GGUFMetadataArrayPayloadSpanFromFixedTypeAtCursorCheckedDefault(U32 elem_type,
+                                                                    U64 elem_count,
+                                                                    U64 *cursor,
+                                                                    U64 buf_nbytes,
+                                                                    U64 *out_payload_bytes,
+                                                                    U64 *out_payload_end);
+
 // Validate metadata table byte-window math before any parser cursor movement.
 // Contract: `out_table_end` is written only on success.
 I32 GGUFMetadataTableSpanValidateChecked(U64 table_start,
@@ -768,6 +775,27 @@ I32 GGUFMetadataArrayPayloadSpanFromFixedTypeAtCursorChecked(U32 elem_type,
                                                             buf_nbytes,
                                                             out_payload_bytes,
                                                             out_payload_end);
+}
+
+// Default wrapper for fixed-width metadata ARRAY payload-span composition from
+// caller cursor state. Canonical parser default treats metadata table window as
+// the full metadata buffer (`table_end == buf_nbytes`).
+// Contract: this helper never mutates `*cursor`; output pointers are written
+// only when the wrapped checked helper succeeds.
+I32 GGUFMetadataArrayPayloadSpanFromFixedTypeAtCursorCheckedDefault(U32 elem_type,
+                                                                    U64 elem_count,
+                                                                    U64 *cursor,
+                                                                    U64 buf_nbytes,
+                                                                    U64 *out_payload_bytes,
+                                                                    U64 *out_payload_end)
+{
+    return GGUFMetadataArrayPayloadSpanFromFixedTypeAtCursorChecked(elem_type,
+                                                                     elem_count,
+                                                                     cursor,
+                                                                     buf_nbytes,
+                                                                     buf_nbytes,
+                                                                     out_payload_bytes,
+                                                                     out_payload_end);
 }
 
 // Checked 1-byte metadata reader used by table-backed decoders.
