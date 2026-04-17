@@ -155,6 +155,13 @@ I32 GGUFMetadataReadI32LEChecked(U8 *buf,
                                  U64 table_end,
                                  I32 *out_value);
 
+I32 GGUFMetadataReadI32PairChecked(U8 *buf,
+                                   U64 buf_nbytes,
+                                   U64 *cursor,
+                                   U64 table_end,
+                                   I32 *out_first,
+                                   I32 *out_second);
+
 I32 GGUFMetadataReadI64LEChecked(U8 *buf,
                                  U64 buf_nbytes,
                                  U64 *cursor,
@@ -944,6 +951,50 @@ I32 GGUFMetadataReadI32LEChecked(U8 *buf,
 
     // Two's-complement reinterpretation is a plain cast in HolyC.
     *out_value = (I32)raw_u32;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked little-endian I32 tuple reader for compact metadata pair fields.
+// Contract: stages both I32 decodes through GGUFMetadataReadI32LEChecked and
+// commits outputs + cursor only when both lanes succeed.
+I32 GGUFMetadataReadI32PairChecked(U8 *buf,
+                                   U64 buf_nbytes,
+                                   U64 *cursor,
+                                   U64 table_end,
+                                   I32 *out_first,
+                                   I32 *out_second)
+{
+    U64 cur;
+    I32 first;
+    I32 second;
+    I32 err;
+
+    if (!buf || !cursor || !out_first || !out_second)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Stage both scalar reads through the canonical signed-I32 helper so pair
+    // reads preserve identical bounds/overflow and no-partial-write behavior.
+    err = GGUFMetadataReadI32LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &first);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadI32LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &second);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_first = first;
+    *out_second = second;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
