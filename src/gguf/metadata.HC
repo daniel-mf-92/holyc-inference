@@ -85,6 +85,12 @@ I32 GGUFMetadataReadU8Checked(U8 *buf,
                               U64 table_end,
                               U8 *out_value);
 
+I32 GGUFMetadataReadU16LEChecked(U8 *buf,
+                                 U64 buf_nbytes,
+                                 U64 *cursor,
+                                 U64 table_end,
+                                 U16 *out_value);
+
 I32 GGUFMetadataReadU32LEChecked(U8 *buf,
                                  U64 buf_nbytes,
                                  U64 *cursor,
@@ -288,6 +294,39 @@ I32 GGUFMetadataReadU8Checked(U8 *buf,
 
     *out_value = buf[cur];
     *cursor = next_cursor;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked little-endian U16 metadata reader.
+// Contract: writes `*out_value` and advances `*cursor` only on success.
+I32 GGUFMetadataReadU16LEChecked(U8 *buf,
+                                 U64 buf_nbytes,
+                                 U64 *cursor,
+                                 U64 table_end,
+                                 U16 *out_value)
+{
+    U64 cur;
+    U8 b0;
+    U8 b1;
+    I32 err;
+
+    if (!buf || !cursor || !out_value)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Reuse the canonical checked 1-byte reader so 16-bit scalar decode keeps
+    // identical cursor/bounds/no-partial-write behavior.
+    err = GGUFMetadataReadU8Checked(buf, buf_nbytes, &cur, table_end, &b0);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+    err = GGUFMetadataReadU8Checked(buf, buf_nbytes, &cur, table_end, &b1);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_value = ((U16)b0)
+               | (((U16)b1) << 8);
+    *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
 
