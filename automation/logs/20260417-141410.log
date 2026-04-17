@@ -98,3 +98,8 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_2","type":"todo_list","items":[{"text":"Inspect tasks and research context","completed":true},{"text":"Replenish IQ queue to 15+","completed":true},{"text":"Implement top IQ HolyC work","completed":true},{"text":"Run focused validation","completed":true},{"text":"Log iteration and update ledger","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":1989503,"cached_input_tokens":1767040,"output_tokens":10600}}
 Codex final exit code: 0
+[main 954fa38] feat(inference): codex iteration 20260417-141410
+ 6 files changed, 362 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260417-141410.final.txt
+ create mode 100644 tests/test_rope_q16_rotate_head_range_token_window_strided_preflight_only_default_stride.py
+=== End iteration 147 (outcome=ok) ===
