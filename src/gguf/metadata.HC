@@ -433,6 +433,13 @@ I32 GGUFMetadataReadI32TripleCheckedNoPartial(U8 *buf,
                                               I32 *out_second,
                                               I32 *out_third);
 
+I32 GGUFMetadataReadI32TripleCheckedDefault(U8 *buf,
+                                            U64 buf_nbytes,
+                                            U64 *cursor,
+                                            I32 *out_first,
+                                            I32 *out_second,
+                                            I32 *out_third);
+
 I32 GGUFMetadataReadI32QuadChecked(U8 *buf,
                                    U64 buf_nbytes,
                                    U64 *cursor,
@@ -3098,6 +3105,25 @@ I32 GGUFMetadataReadI32TripleCheckedNoPartial(U8 *buf,
     *out_third = third;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Canonical default-end wrapper for compact I32-triple metadata records.
+// Contract: preserves exact checked triple semantics by pinning table_end to
+// buf_nbytes and delegating to GGUFMetadataReadI32TripleChecked.
+I32 GGUFMetadataReadI32TripleCheckedDefault(U8 *buf,
+                                            U64 buf_nbytes,
+                                            U64 *cursor,
+                                            I32 *out_first,
+                                            I32 *out_second,
+                                            I32 *out_third)
+{
+    return GGUFMetadataReadI32TripleChecked(buf,
+                                            buf_nbytes,
+                                            cursor,
+                                            buf_nbytes,
+                                            out_first,
+                                            out_second,
+                                            out_third);
 }
 
 // Checked little-endian I32 tuple reader for fixed-layout metadata records.
