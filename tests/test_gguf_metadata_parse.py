@@ -30,6 +30,15 @@ GGUF_META_PARSE_ERR_NESTED_ARRAY = 7
 GGUF_META_PARSE_ERR_NOT_FOUND = 9
 GGUF_META_PARSE_ERR_TYPE_MISMATCH = 10
 
+GGUF_META_TABLE_OK = 0
+GGUF_META_TABLE_ERR_NULL_PTR = 1
+GGUF_META_TABLE_ERR_BAD_PARAM = 2
+GGUF_META_TABLE_ERR_OVERFLOW = 3
+GGUF_META_TABLE_ERR_OUT_OF_BOUNDS = 4
+
+I64_MAX = (1 << 63) - 1
+U64_MAX = (1 << 64) - 1
+
 
 def u8(v: int) -> bytes:
     return struct.pack("<B", v)
@@ -195,6 +204,29 @@ def parse_metadata_table(buf: bytes, count: int):
     return GGUF_META_PARSE_OK, cursor, items
 
 
+def metadata_table_span_validate_checked(
+    table_start: int,
+    table_nbytes: int,
+    file_nbytes: int,
+):
+    if table_start > I64_MAX:
+        return GGUF_META_TABLE_ERR_OVERFLOW, 0
+    if table_nbytes > I64_MAX:
+        return GGUF_META_TABLE_ERR_OVERFLOW, 0
+    if file_nbytes > I64_MAX:
+        return GGUF_META_TABLE_ERR_OVERFLOW, 0
+
+    if table_start > file_nbytes:
+        return GGUF_META_TABLE_ERR_BAD_PARAM, 0
+    if table_nbytes > U64_MAX - table_start:
+        return GGUF_META_TABLE_ERR_OVERFLOW, 0
+
+    table_end = table_start + table_nbytes
+    if table_end > file_nbytes:
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS, 0
+    return GGUF_META_TABLE_OK, table_end
+
+
 def meta_find_by_key(items, key: str):
     for k, v in items:
         if k == key:
@@ -348,11 +380,55 @@ def test_lookup_and_scalar_extractors() -> None:
     assert err == GGUF_META_PARSE_ERR_NOT_FOUND
 
 
+def test_metadata_table_span_validate_known_good() -> None:
+    err, table_end = metadata_table_span_validate_checked(64, 128, 4096)
+    assert err == GGUF_META_TABLE_OK
+    assert table_end == 192
+
+
+def test_metadata_table_span_validate_zero_length() -> None:
+    err, table_end = metadata_table_span_validate_checked(256, 0, 4096)
+    assert err == GGUF_META_TABLE_OK
+    assert table_end == 256
+
+
+def test_metadata_table_span_validate_bad_param_start_past_eof() -> None:
+    err, _ = metadata_table_span_validate_checked(5000, 0, 4096)
+    assert err == GGUF_META_TABLE_ERR_BAD_PARAM
+
+
+def test_metadata_table_span_validate_overflow_inputs() -> None:
+    err, _ = metadata_table_span_validate_checked(I64_MAX + 1, 0, I64_MAX)
+    assert err == GGUF_META_TABLE_ERR_OVERFLOW
+
+    err, _ = metadata_table_span_validate_checked(0, I64_MAX + 1, I64_MAX)
+    assert err == GGUF_META_TABLE_ERR_OVERFLOW
+
+    err, _ = metadata_table_span_validate_checked(0, 0, I64_MAX + 1)
+    assert err == GGUF_META_TABLE_ERR_OVERFLOW
+
+
+def test_metadata_table_span_validate_unsigned_add_wrap() -> None:
+    err, _ = metadata_table_span_validate_checked(U64_MAX - 1, 4, U64_MAX)
+    assert err == GGUF_META_TABLE_ERR_OVERFLOW
+
+
+def test_metadata_table_span_validate_out_of_bounds() -> None:
+    err, _ = metadata_table_span_validate_checked(1024, 2048, 2047)
+    assert err == GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
+
+
 def run() -> None:
     test_mixed_scalar_and_arrays()
     test_nested_array_rejected()
     test_truncation_detected()
     test_lookup_and_scalar_extractors()
+    test_metadata_table_span_validate_known_good()
+    test_metadata_table_span_validate_zero_length()
+    test_metadata_table_span_validate_bad_param_start_past_eof()
+    test_metadata_table_span_validate_overflow_inputs()
+    test_metadata_table_span_validate_unsigned_add_wrap()
+    test_metadata_table_span_validate_out_of_bounds()
     print("gguf_metadata_reference_checks=ok")
 
 

@@ -1,0 +1,14 @@
+Done — I completed one deep iteration on `IQ-185` and kept the queue rolling.
+
+**What Changed**
+- Implemented `GGUFMetadataTableSpanValidateChecked` with checked overflow/I64-domain/OOB guards and no-partial-write output semantics in `src/gguf/metadata.HC:79`.
+- Added host-side parity/reference coverage for the new span validator (good path, zero-length, start>EOF, signed-domain overflow, unsigned add-wrap, OOB) in `tests/test_gguf_metadata_parse.py:207`.
+- Marked the queue item complete in `MASTER_TASKS.md:376`.
+- Added one ledger line for this iteration in `MASTER_TASKS.md:391`.
+- Logged the iteration to central DB (`temple-central.db`), row `id=2150`, task `IQ-185`, status `pass`.
+
+**Validation**
+- `python3 tests/test_gguf_metadata_parse.py` → `gguf_metadata_reference_checks=ok`
+- `python3 tests/test_gguf_header_parse_checked.py` → `gguf_header_parse_checked_reference_checks=ok`
+- `python3 tests/test_gguf_header_validate_and_size_checked.py` → `gguf_header_validate_and_size_checked_reference_checks=ok`
+- Queue depth policy satisfied: unchecked `IQ-` count is `17` (>=15), so no refill was required this iteration.

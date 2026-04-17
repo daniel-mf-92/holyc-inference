@@ -13,6 +13,12 @@
 #define GGUF_META_PARSE_ERR_NOT_FOUND 9
 #define GGUF_META_PARSE_ERR_TYPE_MISMATCH 10
 
+#define GGUF_META_TABLE_OK 0
+#define GGUF_META_TABLE_ERR_NULL_PTR 1
+#define GGUF_META_TABLE_ERR_BAD_PARAM 2
+#define GGUF_META_TABLE_ERR_OVERFLOW 3
+#define GGUF_META_TABLE_ERR_OUT_OF_BOUNDS 4
+
 #define GGUF_MAX_METADATA_COUNT (1 << 20)
 #define GGUF_MAX_STRING_BYTES   (1 << 20)
 #define GGUF_MAX_ARRAY_ELEMS    (1 << 24)
@@ -67,6 +73,41 @@ class GGUFMetadataTable
     U64 count;
     GGUFMetadataKV *items;
 };
+
+// Validate metadata table byte-window math before any parser cursor movement.
+// Contract: `out_table_end` is written only on success.
+I32 GGUFMetadataTableSpanValidateChecked(U64 table_start,
+                                         U64 table_nbytes,
+                                         U64 file_nbytes,
+                                         U64 *out_table_end)
+{
+    U64 table_end;
+
+    if (!out_table_end)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    // Parser cursors are signed in multiple call sites; reject spans that do
+    // not fit cleanly in positive I64 address space.
+    if (table_start > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (table_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (file_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    if (table_start > file_nbytes)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (table_nbytes > (0xFFFFFFFFFFFFFFFF - table_start))
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    table_end = table_start + table_nbytes;
+    if (table_end > file_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    *out_table_end = table_end;
+    return GGUF_META_TABLE_OK;
+}
 
 Bool GGUFMetaCanRead(U8 *buf, I64 size, I64 cursor, I64 need)
 {
