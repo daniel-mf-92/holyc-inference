@@ -1,0 +1,18 @@
+Completed one full iteration on `IQ-229` with queue depth preserved.
+
+**What Changed**
+- Implemented `GGUFMetadataReadKeyStringChecked` with strict no-partial semantics, non-empty key enforcement, embedded-NUL rejection, and guaranteed trailing NUL on success in `src/gguf/metadata.HC:1587`.
+- Added focused host parity/adversarial harness for the new helper in `tests/test_gguf_metadata_read_key_string_checked.py:191`.
+- Updated queue/task ledger: marked `IQ-229` done, appended new unchecked `IQ-244`, and added one progress-ledger line in `MASTER_TASKS.md:423`, `MASTER_TASKS.md:438`, `MASTER_TASKS.md:444`.
+
+**Validation**
+- Ran:
+  - `python3 - <<'PY' ...` (module-loader runner for key-string + string suites)
+- Output:
+  - `PASS tests/test_gguf_metadata_read_key_string_checked.py 6`
+  - `PASS tests/test_gguf_metadata_read_string_checked.py 5`
+  - `PASS total 11`
+
+**Queue & DB**
+- Unchecked `IQ-` depth is maintained at `15` after completion/replenish.
+- Logged iteration to central DB (`temple-central.db`) as `task_id=IQ-229`, `status=pass` (row id `2734`).

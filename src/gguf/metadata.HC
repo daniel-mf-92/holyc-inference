@@ -255,6 +255,14 @@ I32 GGUFMetadataReadStringChecked(U8 *buf,
                                   U64 out_nbytes,
                                   U64 *out_len);
 
+I32 GGUFMetadataReadKeyStringChecked(U8 *buf,
+                                     U64 buf_nbytes,
+                                     U64 *cursor,
+                                     U64 table_end,
+                                     U8 *out_key_bytes,
+                                     U64 out_key_nbytes,
+                                     U64 *out_key_len);
+
 I32 GGUFMetadataReadArrayHeaderChecked(U8 *buf,
                                        U64 buf_nbytes,
                                        U64 *cursor,
@@ -1567,6 +1575,77 @@ I32 GGUFMetadataReadStringChecked(U8 *buf,
         return err;
 
     *out_len = str_len;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked metadata KV-key reader (`len:U64` + payload bytes, no alloc).
+// Contract: composes shared checked string-header + payload-copy helpers,
+// enforces key invariants (`len > 0`, no embedded NUL byte), writes one
+// trailing NUL for C-string consumers, and commits cursor/outputs only after
+// full decode+validation succeeds (strict no-partial-write semantics).
+I32 GGUFMetadataReadKeyStringChecked(U8 *buf,
+                                     U64 buf_nbytes,
+                                     U64 *cursor,
+                                     U64 table_end,
+                                     U8 *out_key_bytes,
+                                     U64 out_key_nbytes,
+                                     U64 *out_key_len)
+{
+    U64 cur;
+    U64 key_len;
+    U64 i;
+    I32 err;
+
+    if (!buf || !cursor || !out_key_bytes || !out_key_len)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Decode key length through shared checked helper so key parsing inherits
+    // canonical table/window overflow and no-partial cursor semantics.
+    err = GGUFMetadataReadStringLenU64Checked(buf,
+                                              buf_nbytes,
+                                              &cur,
+                                              table_end,
+                                              &key_len);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // GGUF metadata keys are non-empty.
+    if (!key_len)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    // Reserve one trailing NUL for C-string consumers of key buffers.
+    if (!out_key_nbytes)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (key_len >= out_key_nbytes)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    // Metadata keys cannot contain NUL because downstream lookup treats keys
+    // as byte-strings and C-strings interchangeably. Validate directly against
+    // source payload bytes before any output copy to preserve strict no-partial
+    // output semantics on malformed key payloads.
+    for (i = 0; i < key_len; ++i)
+    {
+        if (!buf[cur + i])
+            return GGUF_META_TABLE_ERR_BAD_PARAM;
+    }
+
+    // Copy payload bytes through shared checked string copier after key-domain
+    // validation succeeds so composed helper semantics remain atomic.
+    err = GGUFMetadataReadStringBytesChecked(buf,
+                                             buf_nbytes,
+                                             &cur,
+                                             table_end,
+                                             key_len,
+                                             out_key_bytes,
+                                             out_key_nbytes - 1);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    out_key_bytes[key_len] = 0;
+    *out_key_len = key_len;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
