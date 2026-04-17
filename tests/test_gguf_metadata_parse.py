@@ -290,6 +290,32 @@ def metadata_table_span_validate_checked(
     return GGUF_META_TABLE_OK, table_end
 
 
+def metadata_table_cursor_advance_checked(
+    table_start: int,
+    table_nbytes: int,
+    file_nbytes: int,
+    cursor_advance: int,
+):
+    err, table_end = metadata_table_span_validate_checked(
+        table_start=table_start,
+        table_nbytes=table_nbytes,
+        file_nbytes=file_nbytes,
+    )
+    if err != GGUF_META_TABLE_OK:
+        return err, 0, 0
+
+    if cursor_advance > table_nbytes:
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS, 0, 0
+    if table_start > U64_MAX - cursor_advance:
+        return GGUF_META_TABLE_ERR_OVERFLOW, 0, 0
+
+    cursor = table_start + cursor_advance
+    if cursor > table_end:
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS, 0, 0
+
+    return GGUF_META_TABLE_OK, cursor, table_end
+
+
 def meta_find_by_key(items, key: str):
     for k, v in items:
         if k == key:
@@ -577,6 +603,35 @@ def test_metadata_table_span_validate_out_of_bounds() -> None:
     assert err == GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
 
 
+def test_metadata_table_cursor_advance_known_good() -> None:
+    err, cursor, table_end = metadata_table_cursor_advance_checked(64, 128, 4096, 32)
+    assert err == GGUF_META_TABLE_OK
+    assert cursor == 96
+    assert table_end == 192
+
+
+def test_metadata_table_cursor_advance_allows_end_cursor() -> None:
+    err, cursor, table_end = metadata_table_cursor_advance_checked(1000, 24, 4096, 24)
+    assert err == GGUF_META_TABLE_OK
+    assert cursor == 1024
+    assert table_end == 1024
+
+
+def test_metadata_table_cursor_advance_rejects_past_table_end() -> None:
+    err, _, _ = metadata_table_cursor_advance_checked(256, 32, 4096, 33)
+    assert err == GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
+
+
+def test_metadata_table_cursor_advance_propagates_span_error() -> None:
+    err, _, _ = metadata_table_cursor_advance_checked(5000, 10, 4096, 0)
+    assert err == GGUF_META_TABLE_ERR_BAD_PARAM
+
+
+def test_metadata_table_cursor_advance_unsigned_add_wrap() -> None:
+    err, _, _ = metadata_table_cursor_advance_checked(U64_MAX - 1, 1, U64_MAX, 2)
+    assert err == GGUF_META_TABLE_ERR_OVERFLOW
+
+
 def run() -> None:
     test_mixed_scalar_and_arrays()
     test_all_scalar_widths_and_signs_round_trip()
@@ -592,6 +647,11 @@ def run() -> None:
     test_metadata_table_span_validate_overflow_inputs()
     test_metadata_table_span_validate_unsigned_add_wrap()
     test_metadata_table_span_validate_out_of_bounds()
+    test_metadata_table_cursor_advance_known_good()
+    test_metadata_table_cursor_advance_allows_end_cursor()
+    test_metadata_table_cursor_advance_rejects_past_table_end()
+    test_metadata_table_cursor_advance_propagates_span_error()
+    test_metadata_table_cursor_advance_unsigned_add_wrap()
     print("gguf_metadata_reference_checks=ok")
 
 

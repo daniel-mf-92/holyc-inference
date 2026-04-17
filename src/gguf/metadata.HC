@@ -109,6 +109,51 @@ I32 GGUFMetadataTableSpanValidateChecked(U64 table_start,
     return GGUF_META_TABLE_OK;
 }
 
+// Validate metadata table bounds, then derive a checked cursor position at
+// `table_start + cursor_advance`. This helper keeps parser entrypoints on one
+// auditable range-math path before any field reads happen.
+// Contract: out pointers are written only on success.
+I32 GGUFMetadataTableCursorAdvanceChecked(U64 table_start,
+                                          U64 table_nbytes,
+                                          U64 file_nbytes,
+                                          U64 cursor_advance,
+                                          U64 *out_cursor,
+                                          U64 *out_table_end)
+{
+    U64 table_end;
+    U64 cursor;
+    I32 err;
+
+    if (!out_cursor || !out_table_end)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    err = GGUFMetadataTableSpanValidateChecked(table_start,
+                                               table_nbytes,
+                                               file_nbytes,
+                                               &table_end);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // Advance is relative to table_start. Reject requests that would place
+    // cursor beyond [table_start, table_end]. Equal-to-end is legal and
+    // matches cursor semantics used by metadata table loops.
+    if (cursor_advance > table_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    // Keep add-overflow guard explicit even though span validation already
+    // bounds table_start + table_nbytes.
+    if (table_start > (0xFFFFFFFFFFFFFFFF - cursor_advance))
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    cursor = table_start + cursor_advance;
+    if (cursor > table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    *out_cursor = cursor;
+    *out_table_end = table_end;
+    return GGUF_META_TABLE_OK;
+}
+
 Bool GGUFMetaCanRead(U8 *buf, I64 size, I64 cursor, I64 need)
 {
     if (!buf)
