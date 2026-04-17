@@ -92,3 +92,8 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_2","type":"todo_list","items":[{"text":"Read tasks and research context","completed":true},{"text":"Top up IQ queue to 15+","completed":true},{"text":"Implement top unchecked IQ item","completed":true},{"text":"Run focused validation tests","completed":true},{"text":"Log iteration and update ledger","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":2129683,"cached_input_tokens":2016384,"output_tokens":11120}}
 Codex final exit code: 0
+[main 4021355] feat(inference): codex iteration 20260417-215735
+ 6 files changed, 562 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260417-215735.final.txt
+ create mode 100644 tests/test_gguf_metadata_read_f64bits_quad_checked_no_partial.py
+=== End iteration 15 (outcome=ok) ===
