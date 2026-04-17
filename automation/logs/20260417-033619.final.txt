@@ -1,0 +1,17 @@
+Completed one full unattended loop iteration on `IQ-169` with queue policy maintained.
+
+**What Changed**
+- Implemented `FPQ16SoftmaxExpPhaseFromPreclampedChecked` with checked pointer/span guards, composed preclamped exp evaluation, and checked I64 sum accumulation in `src/math/softmax.HC:38`.
+- Added Q16 softmax exp-phase parity harness in `tests/test_softmax_exp_phase_from_preclamped_checked.py:1` (includes random/vector/domain/error-surface checks; run entry at `tests/test_softmax_exp_phase_from_preclamped_checked.py:222`).
+- Updated queue/ledger in `MASTER_TASKS.md:360` (`IQ-169` checked), appended new unchecked `IQ-172` at `MASTER_TASKS.md:363`, and added one-line progress ledger entry at `MASTER_TASKS.md:371`.
+- Queue depth check after update: `15` unchecked `IQ-` items (meets 15+ rolling policy).
+
+**Validation**
+- `python3 tests/test_softmax_exp_phase_from_preclamped_checked.py && python3 tests/test_intexp_exp_array_from_clamped_input_checked.py && python3 tests/test_intexp_exp_array_checked.py`
+- Output:
+  - `softmax_exp_phase_from_preclamped_checked_reference_checks=ok`
+  - `intexp_exp_array_from_clamped_input_checked_reference_checks=ok`
+  - `intexp_exp_array_checked_reference_checks=ok`
+
+**Central DB**
+- Logged iteration in `~/Documents/local-codebases/temple-central.db` as `IQ-169` (`id=1978`, `status=pass`).
