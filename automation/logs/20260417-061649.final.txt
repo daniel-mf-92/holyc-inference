@@ -1,0 +1,31 @@
+Done — I completed one full unattended iteration for `IQ-024` with code, validation, queue policy checks, and bookkeeping.
+
+**What changed**
+- Implemented additional endian-safe helpers in `src/gguf/header.HC:99`:
+  - `GGUFReadU16LEChecked`
+  - `GGUFReadI32LEChecked`
+  - `GGUFReadI64LEChecked`
+- Added focused host-side parity harness:
+  - `tests/test_gguf_header_read_endian_checked.py:1`
+- Updated task tracking:
+  - Marked `IQ-024` checked in `MASTER_TASKS.md:212`
+  - Added one progress-ledger line in `MASTER_TASKS.md:391`
+
+**Queue + policy**
+- Read Sanhedrin research files from `~/Documents/local-codebases/temple-sanhedrin/research/`.
+- Inference queue already satisfied depth policy (`16` unchecked `IQ-` items), so no refill was needed.
+
+**Validation run (captured output)**
+- `python3 tests/test_gguf_header_read_endian_checked.py`
+  - `gguf_header_read_endian_checked_reference_checks=ok`
+- `python3 tests/test_gguf_header_parse_checked.py`
+  - `gguf_header_parse_checked_reference_checks=ok`
+- `python3 tests/test_gguf_header_validate_and_size_checked.py`
+  - `gguf_header_validate_and_size_checked_reference_checks=ok`
+
+**Central DB log**
+- Inserted/updated iteration row in `~/Documents/local-codebases/temple-central.db`:
+  - `agent=inference`, `task_id=IQ-024`, `status=pass`
+  - `files_changed=src/gguf/header.HC;tests/test_gguf_header_read_endian_checked.py;MASTER_TASKS.md`
+  - `lines_added=60`
+  - `validation_result=ok`

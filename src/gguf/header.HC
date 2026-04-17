@@ -85,6 +85,19 @@ I32 GGUFReadU32LEChecked(U8 *buf, U64 buf_nbytes, U64 offset, U32 *out_value)
     return GGUF_HEADER_OK;
 }
 
+I32 GGUFReadU16LEChecked(U8 *buf, U64 buf_nbytes, U64 offset, U16 *out_value)
+{
+    if (!buf || !out_value)
+        return GGUF_HEADER_ERR_NULL_PTR;
+    if (!GGUFHeaderCanReadSpan(buf_nbytes, offset, 2))
+        return GGUF_HEADER_ERR_TRUNCATED;
+
+    *out_value = (U16)buf[offset]
+               | ((U16)buf[offset + 1] << 8);
+
+    return GGUF_HEADER_OK;
+}
+
 I32 GGUFReadU64LEChecked(U8 *buf, U64 buf_nbytes, U64 offset, U64 *out_value)
 {
     if (!buf || !out_value)
@@ -100,6 +113,49 @@ I32 GGUFReadU64LEChecked(U8 *buf, U64 buf_nbytes, U64 offset, U64 *out_value)
                | ((U64)buf[offset + 5] << 40)
                | ((U64)buf[offset + 6] << 48)
                | ((U64)buf[offset + 7] << 56);
+
+    return GGUF_HEADER_OK;
+}
+
+I32 GGUFReadI32LEChecked(U8 *buf, U64 buf_nbytes, U64 offset, I32 *out_value)
+{
+    U32 raw;
+    I32 status;
+
+    if (!buf || !out_value)
+        return GGUF_HEADER_ERR_NULL_PTR;
+
+    status = GGUFReadU32LEChecked(buf, buf_nbytes, offset, &raw);
+    if (status)
+        return status;
+
+    // GGUF stores all integers little-endian. Convert to signed I32 using
+    // explicit two's-complement math so behavior stays deterministic.
+    if (raw & 0x80000000)
+        *out_value = -(I32)((~raw + 1) & 0xFFFFFFFF);
+    else
+        *out_value = (I32)raw;
+
+    return GGUF_HEADER_OK;
+}
+
+I32 GGUFReadI64LEChecked(U8 *buf, U64 buf_nbytes, U64 offset, I64 *out_value)
+{
+    U64 raw;
+    I32 status;
+
+    if (!buf || !out_value)
+        return GGUF_HEADER_ERR_NULL_PTR;
+
+    status = GGUFReadU64LEChecked(buf, buf_nbytes, offset, &raw);
+    if (status)
+        return status;
+
+    // Same explicit two's-complement conversion for I64 domain.
+    if (raw & 0x8000000000000000)
+        *out_value = -(I64)((~raw + 1) & 0xFFFFFFFFFFFFFFFF);
+    else
+        *out_value = (I64)raw;
 
     return GGUF_HEADER_OK;
 }
