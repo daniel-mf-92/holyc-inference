@@ -210,7 +210,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-022 Implement GGUF header constants and struct layout notes in `src/gguf/header.HC` before parser logic (WS2-01)
 - [x] IQ-023 Implement checked RMSNorm core helpers in `src/math/rmsnorm.HC` (`FPQ16RMSNormComputeInvDenomChecked`, `FPQ16RMSNormChecked`) with explicit WS1-04 assumptions/TODO notes and integer-only no-partial-write semantics (WS1-04)
 - [x] IQ-024 Create `src/gguf/header.HC` skeleton with `GGUFHeader` struct and endian-safe integer read helper stubs (WS2-01)
-- [ ] IQ-025 Add host-side GGUF header parser parity fixture in `tests/test_gguf_header_parse.py` covering valid/magic/version/truncation cases (WS2-01, WS2-05)
+- [x] IQ-025 Add host-side GGUF header parser parity fixture in `tests/test_gguf_header_parse.py` covering valid/magic/version/truncation cases (WS2-01, WS2-05)
 - [x] IQ-026 Implement metadata key lookup helpers (`GGUFMetaFindByKey`, scalar extractors) in `src/gguf/metadata.HC` (WS2-02)
 - [ ] IQ-027 Add host-side metadata parser parity fixture for scalar/string/array/nested-array cases in `tests/test_gguf_metadata_parse.py` (WS2-02, WS2-05)
 - [x] IQ-028 Implement GGUF tensor data base alignment helper in `src/gguf/tensor_data_base.HC` (WS2-04)
@@ -388,6 +388,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-17 | loop-166 | IQ-025 GGUF header parser parity fixture | done | Added `tests/test_gguf_header_parse.py` covering valid/magic/version/truncation plus NULL/BAD_PARAM/OVERFLOW contracts; `python3 tests/test_gguf_header_parse.py && python3 tests/test_gguf_header_parse_checked.py && python3 tests/test_gguf_header_validate_and_size_checked.py` passed |
 | 2026-04-17 | loop-165 | IQ-185 metadata table-span validator helper | done | Added `GGUFMetadataTableSpanValidateChecked` in `src/gguf/metadata.HC` and span-parity coverage in `tests/test_gguf_metadata_parse.py`; `python3 tests/test_gguf_metadata_parse.py && python3 tests/test_gguf_header_parse_checked.py && python3 tests/test_gguf_header_validate_and_size_checked.py` passed |
 | 2026-04-17 | loop-164 | IQ-181 Q16 elementwise one-rounding mul/div helper | done | Added `FPQ16MulDivArrayRoundedChecked` in `src/math/fixedpoint.HC` with no-partial-write preflight and harness `tests/test_fixedpoint_q16_muldiv_array_checked.py`; `python3 tests/test_fixedpoint_q16_muldiv_array_checked.py && python3 tests/test_fixedpoint_q16_muldiv_checked.py && python3 tests/test_fixedpoint_q16_muldiv_positive_int_checked.py` passed |
 | 2026-04-17 | loop-163 | IQ-023 RMSNorm checked core helpers | done | Added `FPQ16RMSNormComputeInvDenomChecked` and `FPQ16RMSNormChecked` with explicit WS1 assumptions/TODOs in `src/math/rmsnorm.HC` plus parity harness `tests/test_rmsnorm_q16_checked.py`; `python3 tests/test_rmsnorm_q16_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_weighted_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_weighted_inplace_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_weighted_auto_checked.py` passed |
