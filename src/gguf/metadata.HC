@@ -223,6 +223,10 @@ I32 GGUFMetadataArrayPayloadSpanValidateChecked(U64 payload_start,
 I32 GGUFMetadataArrayFixedElemWidthBytesChecked(U32 elem_type,
                                                 U64 *out_elem_width_bytes);
 
+I32 GGUFMetadataArrayFixedPayloadBytesChecked(U64 elem_count,
+                                              U64 elem_width_bytes,
+                                              U64 *out_payload_bytes);
+
 // Validate metadata table byte-window math before any parser cursor movement.
 // Contract: `out_table_end` is written only on success.
 I32 GGUFMetadataTableSpanValidateChecked(U64 table_start,
@@ -413,6 +417,62 @@ I32 GGUFMetadataArrayFixedElemWidthBytesChecked(U32 elem_type,
     }
 
     *out_elem_width_bytes = width_bytes;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked multiplication helper used by metadata table math where callers keep
+// cursor/index values in positive I64 space.
+// Contract: writes `*out_product` only on success.
+I32 GGUFMetadataMulU64Checked(U64 lhs,
+                              U64 rhs,
+                              U64 *out_product)
+{
+    U64 product;
+
+    if (!out_product)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    // Keep table/index arithmetic in positive I64 space for compatibility with
+    // parser entrypoints that route through signed cursors.
+    if (lhs > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (rhs > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    if (rhs && lhs > (0xFFFFFFFFFFFFFFFF / rhs))
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    product = lhs * rhs;
+    if (product > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    *out_product = product;
+    return GGUF_META_TABLE_OK;
+}
+
+// Compute fixed-width metadata ARRAY payload bytes (`elem_count*elem_width`).
+// Intended for callers that first validate/resolve fixed element widths, then
+// compose this payload-byte result with payload-span validation helpers.
+// Contract: writes `*out_payload_bytes` only on success.
+I32 GGUFMetadataArrayFixedPayloadBytesChecked(U64 elem_count,
+                                              U64 elem_width_bytes,
+                                              U64 *out_payload_bytes)
+{
+    U64 payload_bytes;
+    I32 err;
+
+    if (!out_payload_bytes)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    // Compose through shared checked multiply guards so all fixed-width array
+    // payload math follows one overflow/sign-domain contract.
+    err = GGUFMetadataMulU64Checked(elem_count,
+                                    elem_width_bytes,
+                                    &payload_bytes);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_payload_bytes = payload_bytes;
     return GGUF_META_TABLE_OK;
 }
 
