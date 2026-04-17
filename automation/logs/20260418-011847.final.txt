@@ -1,0 +1,19 @@
+Done — I completed one full unattended iteration for `IQ-294` end-to-end.
+
+**What Changed**
+- Added HolyC helper `GGUFMetadataReadU32PairCheckedNoPartial` with strict all-or-nothing commit semantics in `src/gguf/metadata.HC:2283` (prototype at `src/gguf/metadata.HC:297`).
+- Added focused host parity harness `tests/test_gguf_metadata_read_u32_pair_checked_no_partial.py:1`.
+- Marked `IQ-294` complete in `MASTER_TASKS.md:491`.
+- Appended new unchecked queue item `IQ-309` to keep rolling depth ≥15 in `MASTER_TASKS.md:508`.
+- Added one ledger line for this iteration in `MASTER_TASKS.md:515`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_u32_pair_checked_no_partial.py && python3 tests/test_gguf_metadata_read_u32_pair_checked.py && python3 tests/test_gguf_metadata_parse.py`
+- Output:
+  - `gguf_metadata_read_u32_pair_checked_no_partial_reference_checks=ok`
+  - `gguf_metadata_read_u32_pair_checked_reference_checks=ok`
+  - `gguf_metadata_reference_checks=ok`
+
+**Queue/DB**
+- Unchecked queue depth is maintained at `15` (first unchecked now `IQ-295`, last unchecked `IQ-309`).
+- Logged to central DB: `iterations.id=3381`, `task_id=IQ-294`, `status=pass`, updated files/lines and validation command/result.
