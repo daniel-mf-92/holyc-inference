@@ -283,6 +283,14 @@ I32 GGUFMetadataReadF64BitsPairChecked(U8 *buf,
                                        U64 *out_first_bits,
                                        U64 *out_second_bits);
 
+I32 GGUFMetadataReadF64BitsTripleChecked(U8 *buf,
+                                         U64 buf_nbytes,
+                                         U64 *cursor,
+                                         U64 table_end,
+                                         U64 *out_first_bits,
+                                         U64 *out_second_bits,
+                                         U64 *out_third_bits);
+
 I32 GGUFMetadataReadBoolChecked(U8 *buf,
                                 U64 buf_nbytes,
                                 U64 *cursor,
@@ -1976,6 +1984,62 @@ I32 GGUFMetadataReadF64BitsPairChecked(U8 *buf,
 
     *out_first_bits = first_bits;
     *out_second_bits = second_bits;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked metadata FLOAT64 raw-bit triple reader.
+// Contract: decodes three sequential little-endian FLOAT64 payload bit-patterns
+// through shared checked scalar staging and commits all outputs + cursor only
+// after all three lanes pass (strict no-partial-write tuple semantics).
+I32 GGUFMetadataReadF64BitsTripleChecked(U8 *buf,
+                                         U64 buf_nbytes,
+                                         U64 *cursor,
+                                         U64 table_end,
+                                         U64 *out_first_bits,
+                                         U64 *out_second_bits,
+                                         U64 *out_third_bits)
+{
+    U64 cur;
+    U64 first_bits;
+    U64 second_bits;
+    U64 third_bits;
+    I32 err;
+
+    if (!buf || !cursor || !out_first_bits || !out_second_bits || !out_third_bits)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Stage all float64 lanes through the canonical checked scalar reader so
+    // triple decode preserves identical bounds/overflow/no-partial-write rules.
+    err = GGUFMetadataReadF64BitsLEChecked(buf,
+                                           buf_nbytes,
+                                           &cur,
+                                           table_end,
+                                           &first_bits);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadF64BitsLEChecked(buf,
+                                           buf_nbytes,
+                                           &cur,
+                                           table_end,
+                                           &second_bits);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadF64BitsLEChecked(buf,
+                                           buf_nbytes,
+                                           &cur,
+                                           table_end,
+                                           &third_bits);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_first_bits = first_bits;
+    *out_second_bits = second_bits;
+    *out_third_bits = third_bits;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
