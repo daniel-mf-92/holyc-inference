@@ -1,0 +1,22 @@
+Completed one full unattended iteration on `IQ-226` with queue depth maintained.
+
+**What I changed**
+- Implemented `GGUFMetadataReadI8PairChecked` in `src/gguf/metadata.HC:577` (new function inserted after `GGUFMetadataReadU8PairChecked`), with staged cursor and strict no-partial-write tuple commit semantics.
+- Added prototype declaration in `src/gguf/metadata.HC:94`.
+- Added host parity harness `tests/test_gguf_metadata_read_i8_pair_checked.py:1` covering null-pointer contracts, short-read no-commit behavior, signed two’s-complement reinterpretation, and randomized parity.
+- Marked queue item complete in `MASTER_TASKS.md:420` (`IQ-226` now `[x]`).
+- Added one In Progress Ledger line in `MASTER_TASKS.md:441` as `loop-318` for `IQ-226`.
+
+**Queue policy**
+- Unchecked queue depth is still compliant: 15+ unchecked `IQ-` items remain (`IQ-227` onward), so no top-up was required this iteration.
+
+**Validation run**
+- `python3 tests/test_gguf_metadata_read_i8_pair_checked.py && python3 tests/test_gguf_metadata_read_i8_checked.py && python3 tests/test_gguf_metadata_read_u8_pair_checked.py`
+- Output:
+  - `gguf_metadata_read_i8_pair_checked_reference_checks=ok`
+  - `gguf_metadata_read_i8_checked_reference_checks=ok`
+  - `gguf_metadata_read_u8_pair_checked_reference_checks=ok`
+
+**Central DB log**
+- Inserted iteration row into `~/Documents/local-codebases/temple-central.db`:
+  - `id=2699`, `agent=inference`, `task_id=IQ-226`, `status=pass`, `validation_result=ok`.
