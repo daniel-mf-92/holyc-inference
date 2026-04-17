@@ -1,0 +1,14 @@
+Completed one full unattended iteration on `IQ-299` with queue depth preserved at 15 unchecked items.
+
+**What Changed**
+- Added HolyC default wrapper declaration+implementation `GGUFMetadataReadU32TripleCheckedDefault` that pins `table_end=buf_nbytes` and delegates to checked core in `src/gguf/metadata.HC:328` and `src/gguf/metadata.HC:2473`.
+- Added focused parity harness for success/error/cursor/output/no-partial-write parity in `tests/test_gguf_metadata_read_u32_triple_checked_default.py:1`.
+- Marked task done and appended one ledger line in `MASTER_TASKS.md:498` and `MASTER_TASKS.md:841`.
+- Kept rolling queue depth by appending new unchecked `IQ-314` in `MASTER_TASKS.md:513` (unchecked IQ count = `15`).
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_u32_triple_checked_default.py && python3 tests/test_gguf_metadata_read_u32_triple_checked.py && python3 tests/test_gguf_metadata_read_u32_triple_checked_no_partial.py && python3 tests/test_gguf_metadata_parse.py`
+- Output: `gguf_metadata_read_u32_triple_checked_default: ok`, `ok`, `gguf_metadata_reference_checks=ok`.
+
+**Central DB**
+- Logged iteration to `~/Documents/local-codebases/temple-central.db` as `IQ-299` pass; inserted row id `3432`.
