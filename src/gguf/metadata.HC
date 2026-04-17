@@ -115,6 +115,15 @@ I32 GGUFMetadataReadI8QuadChecked(U8 *buf,
                                   I8 *out_third,
                                   I8 *out_fourth);
 
+I32 GGUFMetadataReadI8QuadCheckedNoPartial(U8 *buf,
+                                           U64 buf_nbytes,
+                                           U64 *cursor,
+                                           U64 table_end,
+                                           I8 *out_first,
+                                           I8 *out_second,
+                                           I8 *out_third,
+                                           I8 *out_fourth);
+
 I32 GGUFMetadataReadU8PairChecked(U8 *buf,
                                   U64 buf_nbytes,
                                   U64 *cursor,
@@ -1299,6 +1308,29 @@ I32 GGUFMetadataReadI8QuadChecked(U8 *buf,
     *out_fourth = fourth;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Checked metadata signed-I8 quad reader with explicit no-partial wrapper
+// semantics.
+// Contract: this entrypoint enforces strict all-or-nothing cursor/output
+// commit by delegating to the canonical staged quad decoder.
+I32 GGUFMetadataReadI8QuadCheckedNoPartial(U8 *buf,
+                                           U64 buf_nbytes,
+                                           U64 *cursor,
+                                           U64 table_end,
+                                           I8 *out_first,
+                                           I8 *out_second,
+                                           I8 *out_third,
+                                           I8 *out_fourth)
+{
+    return GGUFMetadataReadI8QuadChecked(buf,
+                                         buf_nbytes,
+                                         cursor,
+                                         table_end,
+                                         out_first,
+                                         out_second,
+                                         out_third,
+                                         out_fourth);
 }
 
 // Checked little-endian U16 metadata reader.
