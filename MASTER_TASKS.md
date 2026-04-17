@@ -220,7 +220,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-032 Add mixed Q4_0 x Q8_0 dot parity harness in `tests/test_q4_0_q8_0_dot.py` with GGML-math bounds (WS3-05)
 - [x] IQ-033 Implement Q4_0 row-dot helper (`Q4_0DotRowBlocksQ16`) in `src/quant/q4_0_dot.HC` for quant matmul row kernels (WS4-01)
 - [x] IQ-034 Implement Q4_0 x Q8_0 blockwise Q16 accumulation helper in `src/quant/q4_0_q8_0_dot.HC` for mixed matmul callers (WS4-01)
-- [ ] IQ-035 Add Q8_0 Q16-accumulator parity harness in `tests/test_q8_0_dot_accum_q16.py` with seeded blockwise rounding checks (WS4-01)
+- [x] IQ-035 Add Q8_0 Q16-accumulator parity harness in `tests/test_q8_0_dot_accum_q16.py` with seeded blockwise rounding checks (WS4-01)
 - [x] IQ-036 Implement GGUF tensor data offset resolver (`GGUFTensorDataBaseOffset`) in `src/gguf/tensor_data_base.HC` with alignment validation (WS2-04)
 - [x] IQ-037 Implement GGML tensor block-size/byte-size helpers in `src/gguf/tensor_data_base.HC` for F32/F16/Q4_0/Q8_0 sizing math (WS2-04)
 - [x] IQ-038 Implement GGUF tensor absolute range validator (`GGUFTensorResolveRange`) in `src/gguf/tensor_data_base.HC` with overflow-safe `abs+size` checks (WS2-04)
@@ -383,12 +383,16 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] IQ-190 Implement HolyC helper `FPQ16MulDivArrayRoundedByPositiveIntFromQ16DenChecked` in `src/math/fixedpoint.HC` for elementwise Q16-encoded positive-int denominators (`d_q16[i]=n<<16`) with strict divisibility checks and no-partial-write semantics (WS1-01, WS1-04)
 - [ ] IQ-191 Add host-side parity harness `tests/test_fixedpoint_q16_muldiv_array_positive_int_from_q16den_checked.py` validating encoded-denominator contracts and scalar parity for `FPQ16MulDivArrayRoundedByPositiveIntFromQ16DenChecked` (WS1-05)
 - [ ] IQ-192 Implement HolyC helper `GGUFMetadataCursorCanAdvanceChecked` in `src/gguf/metadata.HC` to centralize checked `cursor + need <= table_end` validation (with signed/unsigned overflow guards) reused by metadata key/value readers before byte loads (WS2-02, WS2-05)
+- [ ] IQ-193 Implement HolyC helper `GGUFMetadataReadU8Checked` in `src/gguf/metadata.HC` to perform checked single-byte metadata reads (`cursor < table_end`) and advance cursor for parser field decoding (WS2-02, WS2-05)
+- [ ] IQ-194 Implement HolyC helper `GGUFMetadataReadU32LEChecked` in `src/gguf/metadata.HC` for checked little-endian U32 reads from metadata tables with shared cursor/bounds contracts (WS2-02, WS2-05)
+- [ ] IQ-195 Implement HolyC helper `GGUFMetadataReadU64LEChecked` in `src/gguf/metadata.HC` for checked little-endian U64 reads from metadata tables, including overflow-safe cursor advancement (WS2-02, WS2-05)
 
 ## Progress Ledger
 
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-17 | loop-167 | IQ-035 Q8_0 Q16 accumulator parity harness | done | Added `tests/test_q8_0_dot_accum_q16.py`; `python3 tests/test_q8_0_dot_accum_q16.py && python3 tests/test_q8_0_dot.py` passed |
 | 2026-04-17 | loop-166 | IQ-025 GGUF header parser parity fixture | done | Added `tests/test_gguf_header_parse.py` covering valid/magic/version/truncation plus NULL/BAD_PARAM/OVERFLOW contracts; `python3 tests/test_gguf_header_parse.py && python3 tests/test_gguf_header_parse_checked.py && python3 tests/test_gguf_header_validate_and_size_checked.py` passed |
 | 2026-04-17 | loop-165 | IQ-185 metadata table-span validator helper | done | Added `GGUFMetadataTableSpanValidateChecked` in `src/gguf/metadata.HC` and span-parity coverage in `tests/test_gguf_metadata_parse.py`; `python3 tests/test_gguf_metadata_parse.py && python3 tests/test_gguf_header_parse_checked.py && python3 tests/test_gguf_header_validate_and_size_checked.py` passed |
 | 2026-04-17 | loop-164 | IQ-181 Q16 elementwise one-rounding mul/div helper | done | Added `FPQ16MulDivArrayRoundedChecked` in `src/math/fixedpoint.HC` with no-partial-write preflight and harness `tests/test_fixedpoint_q16_muldiv_array_checked.py`; `python3 tests/test_fixedpoint_q16_muldiv_array_checked.py && python3 tests/test_fixedpoint_q16_muldiv_checked.py && python3 tests/test_fixedpoint_q16_muldiv_positive_int_checked.py` passed |

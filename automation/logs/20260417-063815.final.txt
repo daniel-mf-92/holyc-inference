@@ -1,0 +1,16 @@
+Done — I completed one full unattended iteration for `IQ-035` end-to-end.
+
+**What Changed**
+- Added seeded Q8_0 Q16 accumulation parity harness at `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_q8_0_dot_accum_q16.py:1`.
+- Included randomized blockwise-rounding parity, checked-vs-unchecked parity, overflow-edge checks, and bad-length contracts in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_q8_0_dot_accum_q16.py:56` and `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_q8_0_dot_accum_q16.py:114`.
+- Marked `IQ-035` complete in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:223`.
+- Kept queue depth rolling by appending `IQ-193..IQ-195` in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:386`.
+- Added one progress-ledger line (`loop-167`) in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:395`.
+
+**Validation**
+- Ran: `python3 tests/test_q8_0_dot_accum_q16.py && python3 tests/test_q8_0_dot.py`
+- Output captured: `q8_0_dot_accum_q16_checks=ok` and `q8_0_dot_reference_checks=ok`.
+
+**Central DB Log**
+- Inserted iteration row into `~/Documents/local-codebases/temple-central.db` with `task_id='IQ-035'`, status `pass`, and validation result recorded.
+- Latest row confirmed as `id=2191` (`inference`, `IQ-035`, `pass`).
