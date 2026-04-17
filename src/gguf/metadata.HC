@@ -419,6 +419,15 @@ I32 GGUFMetadataReadF32BitsQuadChecked(U8 *buf,
                                        U32 *out_third_bits,
                                        U32 *out_fourth_bits);
 
+I32 GGUFMetadataReadF32BitsQuadCheckedNoPartial(U8 *buf,
+                                                U64 buf_nbytes,
+                                                U64 *cursor,
+                                                U64 table_end,
+                                                U32 *out_first_bits,
+                                                U32 *out_second_bits,
+                                                U32 *out_third_bits,
+                                                U32 *out_fourth_bits);
+
 I32 GGUFMetadataReadF64BitsLEChecked(U8 *buf,
                                      U64 buf_nbytes,
                                      U64 *cursor,
@@ -3050,6 +3059,29 @@ I32 GGUFMetadataReadF32BitsQuadChecked(U8 *buf,
     *out_fourth_bits = fourth_bits;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Checked metadata FLOAT32 raw-bit quad reader with explicit no-partial
+// wrapper semantics.
+// Contract: this entrypoint enforces strict all-or-nothing cursor/output
+// commit by delegating to the canonical staged quad decoder.
+I32 GGUFMetadataReadF32BitsQuadCheckedNoPartial(U8 *buf,
+                                                U64 buf_nbytes,
+                                                U64 *cursor,
+                                                U64 table_end,
+                                                U32 *out_first_bits,
+                                                U32 *out_second_bits,
+                                                U32 *out_third_bits,
+                                                U32 *out_fourth_bits)
+{
+    return GGUFMetadataReadF32BitsQuadChecked(buf,
+                                              buf_nbytes,
+                                              cursor,
+                                              table_end,
+                                              out_first_bits,
+                                              out_second_bits,
+                                              out_third_bits,
+                                              out_fourth_bits);
 }
 
 // Checked little-endian FLOAT64 bit-pattern metadata reader.
