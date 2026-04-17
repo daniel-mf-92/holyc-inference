@@ -569,6 +569,14 @@ I32 GGUFMetadataReadF32BitsQuadCheckedNoPartial(U8 *buf,
                                                 U32 *out_third_bits,
                                                 U32 *out_fourth_bits);
 
+I32 GGUFMetadataReadF32BitsQuadCheckedDefault(U8 *buf,
+                                              U64 buf_nbytes,
+                                              U64 *cursor,
+                                              U32 *out_first_bits,
+                                              U32 *out_second_bits,
+                                              U32 *out_third_bits,
+                                              U32 *out_fourth_bits);
+
 I32 GGUFMetadataReadF64BitsLEChecked(U8 *buf,
                                      U64 buf_nbytes,
                                      U64 *cursor,
@@ -3848,6 +3856,28 @@ I32 GGUFMetadataReadF32BitsQuadCheckedNoPartial(U8 *buf,
                                               buf_nbytes,
                                               cursor,
                                               table_end,
+                                              out_first_bits,
+                                              out_second_bits,
+                                              out_third_bits,
+                                              out_fourth_bits);
+}
+
+// Canonical default-end wrapper for fixed-layout FLOAT32 raw-bit quad
+// metadata records.
+// Contract: preserves exact checked quad semantics by pinning table_end to
+// buf_nbytes and delegating to GGUFMetadataReadF32BitsQuadChecked.
+I32 GGUFMetadataReadF32BitsQuadCheckedDefault(U8 *buf,
+                                              U64 buf_nbytes,
+                                              U64 *cursor,
+                                              U32 *out_first_bits,
+                                              U32 *out_second_bits,
+                                              U32 *out_third_bits,
+                                              U32 *out_fourth_bits)
+{
+    return GGUFMetadataReadF32BitsQuadChecked(buf,
+                                              buf_nbytes,
+                                              cursor,
+                                              buf_nbytes,
                                               out_first_bits,
                                               out_second_bits,
                                               out_third_bits,
