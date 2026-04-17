@@ -15,6 +15,10 @@
 #define I64_MIN_VALUE -0x8000000000000000
 #define U64_MAX_VALUE  0xFFFFFFFFFFFFFFFF
 
+// Core Q16.16 aliases used by inference math call sites.
+typedef I64 FPQ16;
+typedef I64 FPStatus;
+
 U64 FPAbsToU64(I64 x)
 {
     if (x >= 0)
@@ -142,6 +146,59 @@ I64 FPQ16Mul(I64 a, I64 b)
     return FPQ16MulSat(a, b);
 }
 
+// Checked Q16 multiply:
+//   out_q16 = round_half_up((a_q16 * b_q16) / 2^16)
+// Returns OVERFLOW instead of saturating and never writes on failure.
+I32 FPQ16MulChecked(I64 a_q16,
+                    I64 b_q16,
+                    I64 *out_q16)
+{
+    U64 abs_a;
+    U64 abs_b;
+    U64 round_bias;
+    U64 abs_prod;
+    U64 rounded_mag;
+    U64 limit;
+    I64 is_negative;
+
+    if (!out_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (!a_q16 || !b_q16)
+    {
+        *out_q16 = 0;
+        return FP_Q16_OK;
+    }
+
+    abs_a = FPAbsToU64(a_q16);
+    abs_b = FPAbsToU64(b_q16);
+    is_negative = ((a_q16 < 0) ^ (b_q16 < 0));
+
+    limit = (U64)I64_MAX_VALUE;
+    if (is_negative)
+        limit = 0x8000000000000000;
+
+    // Detect overflow before signed multiplication.
+    if (abs_a > (U64_MAX_VALUE / abs_b))
+        return FP_Q16_ERR_OVERFLOW;
+
+    abs_prod = abs_a * abs_b;
+    round_bias = (U64)1 << (FP_Q16_SHIFT - 1);
+
+    // Rounded magnitude in Q16.
+    if (abs_prod > U64_MAX_VALUE - round_bias)
+        rounded_mag = (U64_MAX_VALUE >> FP_Q16_SHIFT);
+    else
+        rounded_mag = (abs_prod + round_bias) >> FP_Q16_SHIFT;
+
+    if (rounded_mag > limit)
+        return FP_Q16_ERR_OVERFLOW;
+
+    return FPTryApplySignFromU64Checked(rounded_mag,
+                                        is_negative,
+                                        out_q16);
+}
+
 I64 FPQ16Div(I64 num, I64 den)
 {
     U64 abs_num;
@@ -199,6 +256,146 @@ I64 FPQ16Div(I64 num, I64 den)
     }
 
     return FPSignApplyFromU64(result_mag, is_negative);
+}
+
+// Checked Q16 divide:
+//   out_q16 = round_half_up((num_q16 / den_q16) * 2^16)
+// Returns DOMAIN on divide-by-zero and OVERFLOW on range violations.
+// On any error this performs no output write.
+I32 FPQ16DivChecked(I64 num_q16,
+                    I64 den_q16,
+                    I64 *out_q16)
+{
+    U64 abs_num;
+    U64 abs_den;
+    U64 limit;
+    U64 int_part;
+    U64 rem;
+    U64 result_mag;
+    I64 is_negative;
+    I64 bit;
+
+    if (!out_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (!den_q16)
+        return FP_Q16_ERR_DOMAIN;
+
+    abs_num = FPAbsToU64(num_q16);
+    abs_den = FPAbsToU64(den_q16);
+    is_negative = ((num_q16 < 0) ^ (den_q16 < 0));
+
+    limit = (U64)I64_MAX_VALUE;
+    if (is_negative)
+        limit = 0x8000000000000000;
+
+    int_part = abs_num / abs_den;
+    if (int_part > (limit >> FP_Q16_SHIFT))
+        return FP_Q16_ERR_OVERFLOW;
+
+    result_mag = int_part << FP_Q16_SHIFT;
+    rem = abs_num % abs_den;
+
+    // Long division emits exactly 16 fractional bits.
+    for (bit = FP_Q16_SHIFT - 1; bit >= 0; bit--)
+    {
+        rem <<= 1;
+        if (rem >= abs_den)
+        {
+            rem -= abs_den;
+            if (result_mag > (limit - (((U64)1) << bit)))
+                return FP_Q16_ERR_OVERFLOW;
+            result_mag |= ((U64)1) << bit;
+        }
+    }
+
+    // Half-up rounding from the remaining fraction.
+    if (rem >= ((abs_den + 1) >> 1))
+    {
+        if (result_mag == limit)
+            return FP_Q16_ERR_OVERFLOW;
+        result_mag++;
+    }
+
+    return FPTryApplySignFromU64Checked(result_mag,
+                                        is_negative,
+                                        out_q16);
+}
+
+// Checked elementwise Q16 multiply helper for inference vector paths.
+// Contracts:
+//   - count >= 0
+//   - lhs_q16/rhs_q16/out_q16 are valid arrays for count lanes
+//   - out_q16 is unchanged if any lane fails
+I32 FPQ16MulArrayChecked(I64 *lhs_q16,
+                         I64 *rhs_q16,
+                         I64 *out_q16,
+                         I64 count)
+{
+    I64 i;
+    I64 lane_value;
+    I32 err;
+
+    if (!lhs_q16 || !rhs_q16 || !out_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Preflight all lanes first so failures never partially write output.
+    for (i = 0; i < count; i++)
+    {
+        err = FPQ16MulChecked(lhs_q16[i],
+                              rhs_q16[i],
+                              &lane_value);
+        if (err)
+            return err;
+    }
+
+    for (i = 0; i < count; i++)
+    {
+        err = FPQ16MulChecked(lhs_q16[i],
+                              rhs_q16[i],
+                              &out_q16[i]);
+        if (err)
+            return err;
+    }
+
+    return FP_Q16_OK;
+}
+
+// Checked elementwise Q16 divide helper with no-partial-write contract.
+I32 FPQ16DivArrayChecked(I64 *num_q16,
+                         I64 *den_q16,
+                         I64 *out_q16,
+                         I64 count)
+{
+    I64 i;
+    I64 lane_value;
+    I32 err;
+
+    if (!num_q16 || !den_q16 || !out_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    for (i = 0; i < count; i++)
+    {
+        err = FPQ16DivChecked(num_q16[i],
+                              den_q16[i],
+                              &lane_value);
+        if (err)
+            return err;
+    }
+
+    for (i = 0; i < count; i++)
+    {
+        err = FPQ16DivChecked(num_q16[i],
+                              den_q16[i],
+                              &out_q16[i]);
+        if (err)
+            return err;
+    }
+
+    return FP_Q16_OK;
 }
 
 // Checked one-rounding Q16 helper for:
