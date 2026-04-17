@@ -1,0 +1,18 @@
+Completed one full unattended iteration for `IQ-221` with queue maintenance and validation.
+
+**What Changed**
+- Implemented HolyC helper `GGUFMetadataReadU16PairChecked` with staged cursor/output commit and strict no-partial-write tuple semantics in `src/gguf/metadata.HC:625` (prototype at `src/gguf/metadata.HC:107`).
+- Added focused parity harness `tests/test_gguf_metadata_read_u16_pair_checked.py:1`.
+- Updated queue/ledger in `MASTER_TASKS.md:414` (`IQ-221` checked), `MASTER_TASKS.md:430` (added new unchecked `IQ-236` to keep rolling depth), and `MASTER_TASKS.md:436` (one-line progress ledger entry).
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_u16_pair_checked.py && python3 tests/test_gguf_metadata_read_u16le_checked.py && python3 tests/test_gguf_metadata_read_u8_checked.py && python3 tests/test_gguf_metadata_parse.py`
+- Output:
+  - `gguf_metadata_read_u16_pair_checked_reference_checks=ok`
+  - `gguf_metadata_read_u16le_checked_reference_checks=ok`
+  - `gguf_metadata_read_u8_checked_reference_checks=ok`
+  - `gguf_metadata_reference_checks=ok`
+
+**Contract/DB**
+- Queue depth maintained at 15 unchecked `IQ-` items after completion.
+- Logged central DB iteration for `IQ-221` in `~/Documents/local-codebases/temple-central.db` with `status=pass` and `validation_result=ok`.
