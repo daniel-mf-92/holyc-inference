@@ -1,0 +1,15 @@
+Completed one full iteration on `IQ-283` with queue depth preserved at 15 unchecked.
+
+**What Changed**
+- Implemented `GGUFMetadataReadF32BitsTripleCheckedNoPartial` with strict staged commit semantics in `src/gguf/metadata.HC:3457` (prototype at `src/gguf/metadata.HC:479`).
+- Added focused parity harness `tests/test_gguf_metadata_read_f32bits_triple_checked_no_partial.py:1`.
+- Updated queue/ledger in `MASTER_TASKS.md:477` (`IQ-283` checked), added new unchecked `IQ-298` at `MASTER_TASKS.md:497`, and logged one ledger line at `MASTER_TASKS.md:504`.
+
+**Validation**
+- `python3 tests/test_gguf_metadata_read_f32bits_triple_checked_no_partial.py` → `ok`
+- `python3 tests/test_gguf_metadata_read_f32bits_triple_checked.py` → `ok`
+- `python3 tests/test_gguf_metadata_read_f32bitsle_checked_no_partial.py` → `gguf_metadata_read_f32bitsle_checked_no_partial_reference_checks=ok`
+
+**Central DB**
+- Inserted iteration row in `~/Documents/local-codebases/temple-central.db`:
+  - `id=3267`, `agent=inference`, `task_id=IQ-283`, `status=pass`, `lines_added=387`.

@@ -476,6 +476,14 @@ I32 GGUFMetadataReadF32BitsTripleChecked(U8 *buf,
                                          U32 *out_second_bits,
                                          U32 *out_third_bits);
 
+I32 GGUFMetadataReadF32BitsTripleCheckedNoPartial(U8 *buf,
+                                                  U64 buf_nbytes,
+                                                  U64 *cursor,
+                                                  U64 table_end,
+                                                  U32 *out_first_bits,
+                                                  U32 *out_second_bits,
+                                                  U32 *out_third_bits);
+
 I32 GGUFMetadataReadF32BitsQuadChecked(U8 *buf,
                                        U64 buf_nbytes,
                                        U64 *cursor,
@@ -3432,6 +3440,46 @@ I32 GGUFMetadataReadF32BitsTripleChecked(U8 *buf,
                                            &cur,
                                            table_end,
                                            &third_bits);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_first_bits = first_bits;
+    *out_second_bits = second_bits;
+    *out_third_bits = third_bits;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked metadata FLOAT32 raw-bit triple reader with explicit no-partial
+// wrapper semantics.
+// Contract: stages cursor/output writes into local temporaries and commits the
+// caller-visible tuple only after canonical staged triple decoding succeeds.
+I32 GGUFMetadataReadF32BitsTripleCheckedNoPartial(U8 *buf,
+                                                  U64 buf_nbytes,
+                                                  U64 *cursor,
+                                                  U64 table_end,
+                                                  U32 *out_first_bits,
+                                                  U32 *out_second_bits,
+                                                  U32 *out_third_bits)
+{
+    U64 cur;
+    U32 first_bits;
+    U32 second_bits;
+    U32 third_bits;
+    I32 err;
+
+    if (!buf || !cursor || !out_first_bits || !out_second_bits || !out_third_bits)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    err = GGUFMetadataReadF32BitsTripleChecked(buf,
+                                               buf_nbytes,
+                                               &cur,
+                                               table_end,
+                                               &first_bits,
+                                               &second_bits,
+                                               &third_bits);
     if (err != GGUF_META_TABLE_OK)
         return err;
 
