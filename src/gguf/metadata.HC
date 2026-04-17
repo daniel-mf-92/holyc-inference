@@ -479,6 +479,15 @@ I32 GGUFMetadataReadBoolQuadChecked(U8 *buf,
                                     Bool *out_third,
                                     Bool *out_fourth);
 
+I32 GGUFMetadataReadBoolQuadCheckedNoPartial(U8 *buf,
+                                             U64 buf_nbytes,
+                                             U64 *cursor,
+                                             U64 table_end,
+                                             Bool *out_first,
+                                             Bool *out_second,
+                                             Bool *out_third,
+                                             Bool *out_fourth);
+
 I32 GGUFMetadataReadStringLenU64Checked(U8 *buf,
                                         U64 buf_nbytes,
                                         U64 *cursor,
@@ -3421,6 +3430,29 @@ I32 GGUFMetadataReadBoolQuadChecked(U8 *buf,
     *out_fourth = fourth;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Checked metadata BOOL quad reader with explicit no-partial wrapper
+// semantics.
+// Contract: this entrypoint enforces strict all-or-nothing cursor/output
+// commit by delegating to the canonical staged quad decoder.
+I32 GGUFMetadataReadBoolQuadCheckedNoPartial(U8 *buf,
+                                             U64 buf_nbytes,
+                                             U64 *cursor,
+                                             U64 table_end,
+                                             Bool *out_first,
+                                             Bool *out_second,
+                                             Bool *out_third,
+                                             Bool *out_fourth)
+{
+    return GGUFMetadataReadBoolQuadChecked(buf,
+                                           buf_nbytes,
+                                           cursor,
+                                           table_end,
+                                           out_first,
+                                           out_second,
+                                           out_third,
+                                           out_fourth);
 }
 
 // Checked GGUF string header reader (`U64 len`) plus payload-window bounds
