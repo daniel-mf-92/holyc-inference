@@ -278,6 +278,30 @@ I32 FPQ16SoftmaxNormalizePhaseChecked(I64 *exp_lanes_q16,
     return FP_Q16_OK;
 }
 
+// Checked no-alias normalization helper for immutable exp-lane callers.
+// Behavior:
+//   - Rejects exp_lanes_q16 == probs_q16 with BAD_PARAM.
+//   - Otherwise delegates to FPQ16SoftmaxNormalizePhaseChecked so rounding,
+//     deterministic remainder correction, and overflow contracts remain
+//     byte-for-byte identical with the alias-permitted path.
+I32 FPQ16SoftmaxNormalizePhaseNoAliasChecked(I64 *exp_lanes_q16,
+                                             I64 lane_count,
+                                             I64 exp_sum_q16,
+                                             I64 *probs_q16)
+{
+    if (!exp_lanes_q16 || !probs_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (exp_lanes_q16 == probs_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    return FPQ16SoftmaxNormalizePhaseChecked(exp_lanes_q16,
+                                             lane_count,
+                                             exp_sum_q16,
+                                             probs_q16);
+}
+
 U0 FPQ16Softmax(I64 *logits, I64 *probs, I64 count)
 {
     I64 i;
