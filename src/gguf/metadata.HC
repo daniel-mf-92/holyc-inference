@@ -103,6 +103,24 @@ I32 GGUFMetadataReadI64LEChecked(U8 *buf,
                                  U64 table_end,
                                  I64 *out_value);
 
+I32 GGUFMetadataReadF64BitsLEChecked(U8 *buf,
+                                     U64 buf_nbytes,
+                                     U64 *cursor,
+                                     U64 table_end,
+                                     U64 *out_bits);
+
+I32 GGUFMetadataReadBoolChecked(U8 *buf,
+                                U64 buf_nbytes,
+                                U64 *cursor,
+                                U64 table_end,
+                                Bool *out_value);
+
+I32 GGUFMetadataReadStringLenU64Checked(U8 *buf,
+                                        U64 buf_nbytes,
+                                        U64 *cursor,
+                                        U64 table_end,
+                                        U64 *out_len);
+
 // Validate metadata table byte-window math before any parser cursor movement.
 // Contract: `out_table_end` is written only on success.
 I32 GGUFMetadataTableSpanValidateChecked(U64 table_start,
@@ -379,6 +397,127 @@ I32 GGUFMetadataReadI64LEChecked(U8 *buf,
         return err;
 
     *out_value = (I64)raw_u64;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked little-endian FLOAT64 bit-pattern metadata reader.
+// Runtime remains integer-only: the 64-bit payload is returned as raw bits
+// so callers can audit exact IEEE754 encodings without float math.
+// Contract: writes  and advances  only on success.
+I32 GGUFMetadataReadF64BitsLEChecked(U8 *buf,
+                                     U64 buf_nbytes,
+                                     U64 *cursor,
+                                     U64 table_end,
+                                     U64 *out_bits)
+{
+    U64 cur;
+    U64 raw_bits;
+    I32 err;
+
+    if (!buf || !cursor || !out_bits)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Decode through the shared U64 checked reader so float64 payload bit
+    // extraction inherits identical cursor/bounds/no-partial-write behavior.
+    err = GGUFMetadataReadU64LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &raw_bits);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_bits = raw_bits;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked metadata BOOL reader (`U8 in {0,1}`).
+// Contract: writes `*out_value` and advances `*cursor` only on success.
+I32 GGUFMetadataReadBoolChecked(U8 *buf,
+                                U64 buf_nbytes,
+                                U64 *cursor,
+                                U64 table_end,
+                                Bool *out_value)
+{
+    U64 cur;
+    U8 raw_u8;
+    I32 err;
+
+    if (!buf || !cursor || !out_value)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Decode through the shared checked byte reader so bool decode inherits
+    // canonical cursor/bounds/no-partial-write behavior.
+    err = GGUFMetadataReadU8Checked(buf,
+                                    buf_nbytes,
+                                    &cur,
+                                    table_end,
+                                    &raw_u8);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // GGUF bool payloads are strict 0/1 in one byte.
+    if (raw_u8 > 1)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    *out_value = (raw_u8 != 0);
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked GGUF string-length reader (`U64 len` prefix). Decodes the length
+// field and validates that the subsequent payload byte span stays inside the
+// metadata table and backing buffer before any payload copy is attempted.
+// Contract: writes `*out_len` and advances `*cursor` to payload start only on
+// success; caller performs payload read/alloc separately.
+I32 GGUFMetadataReadStringLenU64Checked(U8 *buf,
+                                        U64 buf_nbytes,
+                                        U64 *cursor,
+                                        U64 table_end,
+                                        U64 *out_len)
+{
+    U64 cur;
+    U64 str_len;
+    U64 payload_end;
+    I32 err;
+
+    if (!buf || !cursor || !out_len)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Decode through the shared U64 reader so length header parsing inherits
+    // identical overflow/bounds/no-partial-write semantics.
+    err = GGUFMetadataReadU64LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &str_len);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // Validate `payload_start + str_len <= table_end` before payload reads.
+    err = GGUFMetadataCursorCanAdvanceChecked(cur,
+                                              str_len,
+                                              table_end,
+                                              &payload_end);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // Metadata table span must also live inside the provided buffer.
+    if (payload_end > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    if (str_len > GGUF_MAX_STRING_BYTES)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    *out_len = str_len;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
