@@ -1,0 +1,26 @@
+Completed one full unattended iteration for `IQ-222` with queue policy preserved.
+
+**What Changed**
+- Implemented `GGUFMetadataReadI16PairChecked` in `src/gguf/metadata.HC:120` and `src/gguf/metadata.HC:699` with staged cursor/output commit and strict no-partial-write semantics.
+- Added host-side parity harness `tests/test_gguf_metadata_read_i16_pair_checked.py:1` covering null-pointer, short-read second-lane failure, signed reinterpretation, overflow, and randomized parity.
+- Marked `IQ-222` done and appended one ledger line in `MASTER_TASKS.md:415` and `MASTER_TASKS.md:436`.
+- Kept queue depth at policy target by appending one new unchecked item `IQ-237` in `MASTER_TASKS.md:431` (unchecked count remains 15).
+
+**Validation**
+- `python3 tests/test_gguf_metadata_read_i16_pair_checked.py`
+- `python3 tests/test_gguf_metadata_read_i16le_checked.py`
+- `python3 tests/test_gguf_metadata_read_u16le_checked.py`
+- `python3 tests/test_gguf_metadata_parse.py`
+- Output:
+  - `gguf_metadata_read_i16_pair_checked_reference_checks=ok`
+  - `gguf_metadata_read_i16le_checked_reference_checks=ok`
+  - `gguf_metadata_read_u16le_checked_reference_checks=ok`
+  - `gguf_metadata_reference_checks=ok`
+
+**Central DB Log**
+- Inserted iteration row into `~/Documents/local-codebases/temple-central.db`:
+  - `agent=inference`, `task_id=IQ-222`, `status=pass`
+  - Verified latest row: `id=2651`.
+
+**Notes**
+- Repo also has unrelated runtime log-file modifications already present: `automation/logs/20260417-135434.log`, `automation/logs/loop.heartbeat` (left untouched).
