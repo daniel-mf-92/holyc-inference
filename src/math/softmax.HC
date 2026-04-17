@@ -410,6 +410,54 @@ I32 FPQ16SoftmaxNormalizePhasePreflightChecked(I64 *exp_lanes_q16,
     return FP_Q16_OK;
 }
 
+// Checked composed helper for alias-permitted split-phase softmax.
+// Pipeline:
+//   1) exp_lanes_q16 <- exp(preclamped_logits_q16)
+//   2) exp_sum_q16   <- checked sum(exp_lanes_q16)
+//   3) probs_q16     <- normalize(exp_lanes_q16 / exp_sum_q16)
+// Contracts:
+//   - All pointers non-null
+//   - lane_count >= 0
+//   - Alias is allowed across {preclamped_logits_q16, exp_lanes_q16, probs_q16}
+//   - No partial writes to probs_q16 on normalization failure paths
+// Notes:
+//   - Composes alias-permitted split-phase helpers so checked arithmetic,
+//     rounding, and overflow behavior stay centralized and auditable.
+I32 FPQ16SoftmaxFromPreclampedChecked(I64 *preclamped_logits_q16,
+                                      I64 *exp_lanes_q16,
+                                      I64 lane_count,
+                                      I64 *probs_q16)
+{
+    I64 exp_sum_q16;
+    I32 status;
+
+    if (!preclamped_logits_q16 || !exp_lanes_q16 || !probs_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    status = FPQ16SoftmaxExpPhaseFromPreclampedChecked(preclamped_logits_q16,
+                                                        exp_lanes_q16,
+                                                        lane_count,
+                                                        &exp_sum_q16);
+    if (status)
+        return status;
+
+    if (!lane_count)
+        return FP_Q16_OK;
+
+    status = FPQ16SoftmaxNormalizePhasePreflightChecked(exp_lanes_q16,
+                                                        lane_count,
+                                                        exp_sum_q16);
+    if (status)
+        return status;
+
+    return FPQ16SoftmaxNormalizePhaseChecked(exp_lanes_q16,
+                                             lane_count,
+                                             exp_sum_q16,
+                                             probs_q16);
+}
+
 // Checked composed helper for immutable-logit, no-alias split-phase softmax.
 // Pipeline:
 //   1) exp_lanes_q16 <- exp(preclamped_logits_q16)
