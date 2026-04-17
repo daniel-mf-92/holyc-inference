@@ -1,0 +1,14 @@
+Completed one deep iteration on `IQ-213` with HolyC/runtime purity preserved.
+
+**What Changed**
+- Hardened `GGUFMetadataReadStringBytesChecked` with explicit `buf_nbytes` I64 overflow rejection and `str_len <= GGUF_MAX_STRING_BYTES` guard before copy/commit logic in `src/gguf/metadata.HC:836`.
+- Extended host parity model with matching overflow/max-len checks in `tests/test_gguf_metadata_read_string_bytes_checked.py:15`.
+- Marked `IQ-213` complete and added one ledger row in `MASTER_TASKS.md:406` and `MASTER_TASKS.md:428`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_string_bytes_checked.py && python3 tests/test_gguf_metadata_read_string_len_u64_checked.py && python3 tests/test_gguf_metadata_parse.py`
+- Output: `gguf_metadata_read_string_bytes_checked_reference_checks=ok`, `gguf_metadata_read_string_len_u64_checked_reference_checks=ok`, `gguf_metadata_reference_checks=ok`.
+
+**Queue + DB**
+- Unchecked queue depth is maintained at `15` (`>=15` policy satisfied).
+- Logged iteration in central DB: `iterations.id=2558`, `agent=inference`, `task_id=IQ-213`, `status=pass`, `validation_result=ok`.

@@ -849,6 +849,14 @@ I32 GGUFMetadataReadStringBytesChecked(U8 *buf,
     if (!buf || !cursor || !out_bytes)
         return GGUF_META_TABLE_ERR_NULL_PTR;
 
+    // Keep all read-path bounds and cursor math in positive I64 space.
+    if (buf_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    // String payload widths must stay within parser policy bounds.
+    if (str_len > GGUF_MAX_STRING_BYTES)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
     // Caller destination must be large enough for the checked payload width.
     if (out_nbytes < str_len)
         return GGUF_META_TABLE_ERR_BAD_PARAM;

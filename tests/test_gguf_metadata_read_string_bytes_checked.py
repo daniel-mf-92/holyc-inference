@@ -12,6 +12,7 @@ GGUF_META_TABLE_ERR_OVERFLOW = 3
 GGUF_META_TABLE_ERR_OUT_OF_BOUNDS = 4
 
 I64_MAX = (1 << 63) - 1
+GGUF_MAX_STRING_BYTES = 1 << 20
 
 
 def gguf_metadata_cursor_can_advance_checked(
@@ -46,6 +47,12 @@ def gguf_metadata_read_string_bytes_checked(
 ) -> int:
     if buf is None or cursor_ref is None or out_bytes_ref is None:
         return GGUF_META_TABLE_ERR_NULL_PTR
+
+    if buf_nbytes > I64_MAX:
+        return GGUF_META_TABLE_ERR_OVERFLOW
+
+    if str_len > GGUF_MAX_STRING_BYTES:
+        return GGUF_META_TABLE_ERR_BAD_PARAM
 
     if out_nbytes < str_len:
         return GGUF_META_TABLE_ERR_BAD_PARAM
@@ -94,6 +101,16 @@ def test_null_ptr_and_basic_param_rejection() -> None:
     out = [0x11] * 4
     err = gguf_metadata_read_string_bytes_checked([9, 8, 7], 3, cursor, 3, 3, out, 2)
     assert err == GGUF_META_TABLE_ERR_BAD_PARAM
+    assert cursor[0] == 0
+    assert out == [0x11] * 4
+
+    err = gguf_metadata_read_string_bytes_checked([9, 8, 7], 3, cursor, 3, GGUF_MAX_STRING_BYTES + 1, out, len(out))
+    assert err == GGUF_META_TABLE_ERR_BAD_PARAM
+    assert cursor[0] == 0
+    assert out == [0x11] * 4
+
+    err = gguf_metadata_read_string_bytes_checked([9, 8, 7], I64_MAX + 1, cursor, 3, 1, out, len(out))
+    assert err == GGUF_META_TABLE_ERR_OVERFLOW
     assert cursor[0] == 0
     assert out == [0x11] * 4
 
