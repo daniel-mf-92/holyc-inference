@@ -1,0 +1,17 @@
+Done — I completed one full iteration on `IQ-160` end-to-end.
+
+**What Changed**
+- Added new host-side parity/adversarial harness: `tests/test_rmsnorm_apply_inv_denom_weighted_auto_checked.py:1`.
+- Marked `IQ-160` complete in `MASTER_TASKS.md:351`.
+- Appended one new unchecked queue item (`IQ-163`) to keep queue depth rolling at 15+: `MASTER_TASKS.md:354`.
+- Added one-line progress ledger entry for this loop: `MASTER_TASKS.md:361`.
+
+**Validation**
+- Ran: `python3 tests/test_rmsnorm_apply_inv_denom_weighted_auto_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_weighted_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_weighted_inplace_checked.py`
+- Output:
+  - `rmsnorm_apply_inv_denom_weighted_auto_checked_reference_checks=ok`
+  - `rmsnorm_apply_inv_denom_weighted_checked_reference_checks=ok`
+  - `rmsnorm_apply_inv_denom_weighted_inplace_checked_reference_checks=ok`
+
+**Central DB**
+- Logged iteration in `~/Documents/local-codebases/temple-central.db` with `task_id='IQ-160'`, status `pass` (verified row id `1869`).

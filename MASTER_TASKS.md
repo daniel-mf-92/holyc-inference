@@ -348,15 +348,17 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-157 Implement HolyC `FPQ16RMSNormApplyInvDenomWeightedAutoChecked` in `src/math/rmsnorm.HC` to dispatch between in-place and out-of-place weighted inverse-denominator paths based on pointer aliasing while preserving identical checked error surfaces (WS1-04)
 - [x] IQ-158 Implement HolyC helper `FPQ16RMSNormApplyInvDenomWeightedAutoValidateChecked` in `src/math/rmsnorm.HC` to centralize null/len/denominator/gamma capacity checks shared by auto-dispatch RMSNorm entrypoints (WS1-04)
 - [x] IQ-159 Implement HolyC helper `FPQ16RMSNormApplyInvDenomWeightedAutoSelectPathChecked` in `src/math/rmsnorm.HC` to derive deterministic in-place vs out-of-place dispatch from pointer aliasing and preserve shared error surfaces (WS1-04)
-- [ ] IQ-160 Add host-side parity harness `tests/test_rmsnorm_apply_inv_denom_weighted_auto_checked.py` covering alias/non-alias dispatch equivalence and BAD_PARAM/OVERFLOW parity against explicit in-place/out-of-place references (WS1-04)
+- [x] IQ-160 Add host-side parity harness `tests/test_rmsnorm_apply_inv_denom_weighted_auto_checked.py` covering alias/non-alias dispatch equivalence and BAD_PARAM/OVERFLOW parity against explicit in-place/out-of-place references (WS1-04)
 - [ ] IQ-161 Implement HolyC helper `FPQ16ExpClampToInputDomainChecked` in `src/math/intexp.HC` to centralize saturating Q16 exponent input clamp (min/max domain + checked bounds) shared by scalar exp and upcoming vectorized exp callers (WS1-02)
 - [ ] IQ-162 Implement HolyC helper `FPQ16RMSNormApplyInvDenomWeightedAutoCheckedWithPathOut` in `src/math/rmsnorm.HC` to execute auto-dispatch scaling while returning selected path id for WS1-04 harness parity probes without duplicating math loops (WS1-04)
+- [ ] IQ-163 Implement HolyC helper `FPQ16ExpClampArrayToInputDomainChecked` in `src/math/intexp.HC` to apply checked per-lane domain clamping over Q16 vectors (`in[i] -> out[i]`) with shared scalar clamp semantics for upcoming WS1 vectorized exp kernels (WS1-02)
 
 ## Progress Ledger
 
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-17 | loop-140 | IQ-160 RMSNorm auto-dispatch parity harness | done | Added `tests/test_rmsnorm_apply_inv_denom_weighted_auto_checked.py`; `python3 tests/test_rmsnorm_apply_inv_denom_weighted_auto_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_weighted_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_weighted_inplace_checked.py` passed |
 | 2026-04-17 | loop-139 | IQ-159 RMSNorm auto-dispatch path selector helper | done | Added `FPQ16RMSNormApplyInvDenomWeightedAutoSelectPathChecked` in `src/math/rmsnorm.HC` and routed `FPQ16RMSNormApplyInvDenomWeightedAutoChecked` through explicit path selection constants; `python3 tests/test_rmsnorm_apply_inv_denom_weighted_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_weighted_inplace_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_checked.py` passed |
 | 2026-04-17 | loop-138 | IQ-016 GGUF format parser contract refresh | done | Expanded `docs/GGUF_FORMAT.md` into a strict HolyC parser spec for header/metadata/tensor/alignment/range/error invariants; `python3 tests/test_gguf_tensor_data_base.py` passed |
 | 2026-04-17 | loop-137 | IQ-158 RMSNorm auto-dispatch shared preflight helper | done | Added `FPQ16RMSNormApplyInvDenomWeightedAutoValidateChecked` in `src/math/rmsnorm.HC` and routed auto-dispatch through it; `python3 tests/test_rmsnorm_apply_inv_denom_weighted_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_weighted_inplace_checked.py` passed |
