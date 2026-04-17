@@ -209,6 +209,13 @@ I32 GGUFMetadataReadU16TripleCheckedNoPartial(U8 *buf,
                                               U16 *out_second,
                                               U16 *out_third);
 
+I32 GGUFMetadataReadU16TripleCheckedDefault(U8 *buf,
+                                            U64 buf_nbytes,
+                                            U64 *cursor,
+                                            U16 *out_first,
+                                            U16 *out_second,
+                                            U16 *out_third);
+
 I32 GGUFMetadataReadU16QuadChecked(U8 *buf,
                                    U64 buf_nbytes,
                                    U64 *cursor,
@@ -1743,6 +1750,25 @@ I32 GGUFMetadataReadU16TripleCheckedNoPartial(U8 *buf,
     *out_third = third;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Canonical default-end wrapper for compact U16-triple metadata records.
+// Contract: preserves exact checked triple semantics by pinning table_end to
+// buf_nbytes and delegating to GGUFMetadataReadU16TripleChecked.
+I32 GGUFMetadataReadU16TripleCheckedDefault(U8 *buf,
+                                            U64 buf_nbytes,
+                                            U64 *cursor,
+                                            U16 *out_first,
+                                            U16 *out_second,
+                                            U16 *out_third)
+{
+    return GGUFMetadataReadU16TripleChecked(buf,
+                                            buf_nbytes,
+                                            cursor,
+                                            buf_nbytes,
+                                            out_first,
+                                            out_second,
+                                            out_third);
 }
 
 // Checked little-endian U16 quad reader for fixed-layout metadata records.
