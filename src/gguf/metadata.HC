@@ -91,6 +91,12 @@ I32 GGUFMetadataReadU32LEChecked(U8 *buf,
                                  U64 table_end,
                                  U32 *out_value);
 
+I32 GGUFMetadataReadU64LEChecked(U8 *buf,
+                                 U64 buf_nbytes,
+                                 U64 *cursor,
+                                 U64 table_end,
+                                 U64 *out_value);
+
 // Validate metadata table byte-window math before any parser cursor movement.
 // Contract: `out_table_end` is written only on success.
 I32 GGUFMetadataTableSpanValidateChecked(U64 table_start,
@@ -272,6 +278,69 @@ I32 GGUFMetadataReadU32LEChecked(U8 *buf,
                | (((U32)b1) << 8)
                | (((U32)b2) << 16)
                | (((U32)b3) << 24);
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked little-endian U64 metadata reader.
+// Contract: writes `*out_value` and advances `*cursor` only on success.
+I32 GGUFMetadataReadU64LEChecked(U8 *buf,
+                                 U64 buf_nbytes,
+                                 U64 *cursor,
+                                 U64 table_end,
+                                 U64 *out_value)
+{
+    U64 cur;
+    U8 b0;
+    U8 b1;
+    U8 b2;
+    U8 b3;
+    U8 b4;
+    U8 b5;
+    U8 b6;
+    U8 b7;
+    I32 err;
+
+    if (!buf || !cursor || !out_value)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Reuse the canonical checked 1-byte reader so all scalar-width readers
+    // inherit identical cursor/bounds behavior and overflow surfaces.
+    err = GGUFMetadataReadU8Checked(buf, buf_nbytes, &cur, table_end, &b0);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+    err = GGUFMetadataReadU8Checked(buf, buf_nbytes, &cur, table_end, &b1);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+    err = GGUFMetadataReadU8Checked(buf, buf_nbytes, &cur, table_end, &b2);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+    err = GGUFMetadataReadU8Checked(buf, buf_nbytes, &cur, table_end, &b3);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+    err = GGUFMetadataReadU8Checked(buf, buf_nbytes, &cur, table_end, &b4);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+    err = GGUFMetadataReadU8Checked(buf, buf_nbytes, &cur, table_end, &b5);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+    err = GGUFMetadataReadU8Checked(buf, buf_nbytes, &cur, table_end, &b6);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+    err = GGUFMetadataReadU8Checked(buf, buf_nbytes, &cur, table_end, &b7);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_value = ((U64)b0)
+               | (((U64)b1) << 8)
+               | (((U64)b2) << 16)
+               | (((U64)b3) << 24)
+               | (((U64)b4) << 32)
+               | (((U64)b5) << 40)
+               | (((U64)b6) << 48)
+               | (((U64)b7) << 56);
     *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
