@@ -85,6 +85,12 @@ I32 GGUFMetadataReadU8Checked(U8 *buf,
                               U64 table_end,
                               U8 *out_value);
 
+I32 GGUFMetadataReadI8Checked(U8 *buf,
+                              U64 buf_nbytes,
+                              U64 *cursor,
+                              U64 table_end,
+                              I8 *out_value);
+
 I32 GGUFMetadataReadU8PairChecked(U8 *buf,
                                   U64 buf_nbytes,
                                   U64 *cursor,
@@ -313,6 +319,40 @@ I32 GGUFMetadataReadU8Checked(U8 *buf,
 
     *out_value = buf[cur];
     *cursor = next_cursor;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked signed-I8 metadata reader.
+// Contract: decodes through GGUFMetadataReadU8Checked and commits `*out_value`
+// plus `*cursor` only on success (strict no-partial-write semantics).
+I32 GGUFMetadataReadI8Checked(U8 *buf,
+                              U64 buf_nbytes,
+                              U64 *cursor,
+                              U64 table_end,
+                              I8 *out_value)
+{
+    U64 cur;
+    U8 raw_u8;
+    I32 err;
+
+    if (!buf || !cursor || !out_value)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Stage decode through the canonical checked U8 reader so signed-I8 keeps
+    // identical bounds/overflow and no-partial-write contracts.
+    err = GGUFMetadataReadU8Checked(buf,
+                                    buf_nbytes,
+                                    &cur,
+                                    table_end,
+                                    &raw_u8);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // Two's-complement reinterpretation is a plain cast in HolyC.
+    *out_value = (I8)raw_u8;
+    *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
 
