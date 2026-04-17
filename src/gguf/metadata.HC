@@ -440,6 +440,15 @@ I32 GGUFMetadataReadF64BitsQuadChecked(U8 *buf,
                                        U64 *out_third_bits,
                                        U64 *out_fourth_bits);
 
+I32 GGUFMetadataReadF64BitsQuadCheckedNoPartial(U8 *buf,
+                                                U64 buf_nbytes,
+                                                U64 *cursor,
+                                                U64 table_end,
+                                                U64 *out_first_bits,
+                                                U64 *out_second_bits,
+                                                U64 *out_third_bits,
+                                                U64 *out_fourth_bits);
+
 I32 GGUFMetadataReadBoolChecked(U8 *buf,
                                 U64 buf_nbytes,
                                 U64 *cursor,
@@ -3185,6 +3194,29 @@ I32 GGUFMetadataReadF64BitsQuadChecked(U8 *buf,
     *out_fourth_bits = fourth_bits;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Checked metadata FLOAT64 raw-bit quad reader with explicit no-partial
+// wrapper semantics.
+// Contract: this entrypoint enforces strict all-or-nothing cursor/output
+// commit by delegating to the canonical staged quad decoder.
+I32 GGUFMetadataReadF64BitsQuadCheckedNoPartial(U8 *buf,
+                                                U64 buf_nbytes,
+                                                U64 *cursor,
+                                                U64 table_end,
+                                                U64 *out_first_bits,
+                                                U64 *out_second_bits,
+                                                U64 *out_third_bits,
+                                                U64 *out_fourth_bits)
+{
+    return GGUFMetadataReadF64BitsQuadChecked(buf,
+                                              buf_nbytes,
+                                              cursor,
+                                              table_end,
+                                              out_first_bits,
+                                              out_second_bits,
+                                              out_third_bits,
+                                              out_fourth_bits);
 }
 
 // Checked metadata BOOL reader (`U8 in {0,1}`).
