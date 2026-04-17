@@ -372,6 +372,7 @@ while true; do
     elif [[ -n "$(git status --porcelain)" ]]; then
       git add -A
       git commit -m "feat(inference): codex iteration $timestamp" || true
+      git push origin HEAD 2>/dev/null || true
     else
       echo "No changes produced in this iteration."
     fi

@@ -200,6 +200,13 @@ I32 GGUFMetadataReadF32BitsLECheckedNoPartial(U8 *buf,
                                               U64 table_end,
                                               U32 *out_bits);
 
+I32 GGUFMetadataReadF32BitsPairChecked(U8 *buf,
+                                       U64 buf_nbytes,
+                                       U64 *cursor,
+                                       U64 table_end,
+                                       U32 *out_first_bits,
+                                       U32 *out_second_bits);
+
 I32 GGUFMetadataReadF64BitsLEChecked(U8 *buf,
                                      U64 buf_nbytes,
                                      U64 *cursor,
@@ -1221,6 +1228,51 @@ I32 GGUFMetadataReadF32BitsLECheckedNoPartial(U8 *buf,
         return err;
 
     *out_bits = raw_bits;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked metadata FLOAT32 raw-bit pair reader.
+// Contract: decodes two sequential little-endian FLOAT32 payload bit-patterns
+// through shared checked scalar staging and commits both outputs + cursor only
+// after both lanes pass (strict no-partial-write tuple semantics).
+I32 GGUFMetadataReadF32BitsPairChecked(U8 *buf,
+                                       U64 buf_nbytes,
+                                       U64 *cursor,
+                                       U64 table_end,
+                                       U32 *out_first_bits,
+                                       U32 *out_second_bits)
+{
+    U64 cur;
+    U32 first_bits;
+    U32 second_bits;
+    I32 err;
+
+    if (!buf || !cursor || !out_first_bits || !out_second_bits)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Stage both float32 lanes through the canonical checked scalar reader so
+    // pair decode preserves identical bounds/overflow/no-partial-write rules.
+    err = GGUFMetadataReadF32BitsLEChecked(buf,
+                                           buf_nbytes,
+                                           &cur,
+                                           table_end,
+                                           &first_bits);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadF32BitsLEChecked(buf,
+                                           buf_nbytes,
+                                           &cur,
+                                           table_end,
+                                           &second_bits);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_first_bits = first_bits;
+    *out_second_bits = second_bits;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
