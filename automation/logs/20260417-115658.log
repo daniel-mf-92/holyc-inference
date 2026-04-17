@@ -89,3 +89,8 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_5","type":"todo_list","items":[{"text":"Inspect metadata code and tests","completed":true},{"text":"Implement selected IQ helper","completed":true},{"text":"Add host-side validation tests","completed":true},{"text":"Run focused validation command","completed":true},{"text":"Update tasks and central DB","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":1915289,"cached_input_tokens":1700224,"output_tokens":11418}}
 Codex final exit code: 0
+[main 79e6584] feat(inference): codex iteration 20260417-115658
+ 6 files changed, 565 insertions(+), 19 deletions(-)
+ create mode 100644 automation/logs/20260417-115658.final.txt
+ create mode 100644 tests/test_rope_q16_rotate_head_range_token_window_strided_preflight_only.py
+=== End iteration 132 (outcome=ok) ===
