@@ -1,0 +1,18 @@
+Done — I completed one full unattended iteration for `IQ-276` with queue maintenance and logging.
+
+**What Changed**
+- Implemented `GGUFMetadataReadU16TripleCheckedNoPartial` as an explicit all-or-nothing wrapper over canonical staged triple decode in `src/gguf/metadata.HC:1574` (prototype at `src/gguf/metadata.HC:189`).
+- Added focused host parity harness `tests/test_gguf_metadata_read_u16_triple_checked_no_partial.py:1` with null/overflow/OOB/no-partial/randomized checks.
+- Marked `IQ-276` complete in `MASTER_TASKS.md:470`.
+- Replenished queue depth by appending new unchecked item `IQ-291` in `MASTER_TASKS.md:486` (unchecked IQ count remains 15).
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_u16_triple_checked_no_partial.py && python3 tests/test_gguf_metadata_read_u16_triple_checked.py && python3 tests/test_gguf_metadata_read_u16le_checked.py`
+- Output:
+  - `gguf_metadata_read_u16_triple_checked_no_partial_reference_checks=ok`
+  - `gguf_metadata_read_u16_triple_checked_reference_checks=ok`
+  - `gguf_metadata_read_u16le_checked_reference_checks=ok`
+
+**Tracking**
+- Added one-line ledger entry in `MASTER_TASKS.md:493` (`loop-357`).
+- Logged central DB iteration row for `IQ-276` in `~/Documents/local-codebases/temple-central.db` with `status=pass` and `validation_result=ok`.
