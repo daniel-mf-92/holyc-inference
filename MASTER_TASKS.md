@@ -202,7 +202,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-014 Implement Q4_0 dot product (naive) in `src/quant/q4_0_dot.HC` (WS3-03)
 - [x] IQ-015 Implement Q8_0 block struct and dequantize in `src/quant/q8_0.HC` (WS3-04)
 - [x] IQ-016 Draft `docs/GGUF_FORMAT.md` skeleton with sections for header, metadata, tensor info, and alignment rules (WS0-02)
-- [ ] IQ-017 Write host-side GGUF header/tensor dump fixture plan in `tests/README.md` for llama.cpp parity checks (WS0-05, WS2-05)
+- [x] IQ-017 Write host-side GGUF header/tensor dump fixture plan in `tests/README.md` for llama.cpp parity checks (WS0-05, WS2-05)
 - [ ] IQ-018 Create `tests/README.md` skeleton for llama.cpp parity fixtures (header, metadata, tensor offsets) (WS0-05, WS2-05)
 - [ ] IQ-019 Create `src/math/fixedpoint.HC` skeleton with Q16 constants, core type aliases, and TODO stubs for mul/div helpers (WS1-01)
 - [ ] IQ-020 Implement Q16 integer exponent range clamp and base constants in `src/math/intexp.HC` (WS1-02)
@@ -364,6 +364,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] IQ-173 Add host-side parity harness `tests/test_softmax_exp_phase_from_preclamped_no_alias_checked.py` validating alias rejection, no-partial-write failure behavior, and exp-lane/sum parity for `FPQ16SoftmaxExpPhaseFromPreclampedNoAliasChecked` (WS1-05)
 - [x] IQ-174 Implement HolyC helper `FPQ16SoftmaxNormalizePhaseNoAliasChecked` in `src/math/softmax.HC` to enforce `exp_lanes_q16 != probs_q16` and delegate to `FPQ16SoftmaxNormalizePhaseChecked` so immutable exp-lane callers keep identical normalization/remainder semantics with explicit alias rejection (WS1-03)
 - [ ] IQ-175 Implement HolyC helper `FPQ16SoftmaxFromPreclampedNoAliasChecked` in `src/math/softmax.HC` to compose exp-phase and normalize-phase no-alias helpers into one checked split-phase entrypoint for immutable buffers (WS1-03)
+- [ ] IQ-176 Implement HolyC helper `FPQ16SoftmaxFromPreclampedNoAliasChecked` in `src/math/softmax.HC` to compose no-alias exp-phase + no-alias normalize-phase into one checked split-phase entrypoint with fail-fast no-partial-write behavior (WS1-03)
 
 
 ## Progress Ledger
@@ -371,6 +372,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-17 | loop-153 | IQ-017 GGUF fixture-plan spec | done | Added `tests/README.md` with deterministic llama.cpp parity fixture contracts for GGUF header/tensor/range validation; `python3 - <<'PY' ... gguf_fixture_plan_readme_contracts=ok ... PY` passed |
 | 2026-04-17 | loop-152 | IQ-174 no-alias normalize helper | done | Added `FPQ16SoftmaxNormalizePhaseNoAliasChecked` in `src/math/softmax.HC` and `tests/test_softmax_normalize_phase_no_alias_checked.py`; `python3 tests/test_softmax_normalize_phase_no_alias_checked.py && python3 tests/test_softmax_normalize_phase_checked.py && python3 tests/test_softmax_exp_phase_from_preclamped_no_alias_checked.py` passed |
 | 2026-04-17 | loop-151 | IQ-172 softmax normalize split-phase helper | done | Added `FPQ16SoftmaxNormalizePhaseChecked` in `src/math/softmax.HC` + `tests/test_softmax_normalize_phase_checked.py`; `python3 tests/test_softmax_normalize_phase_checked.py && python3 tests/test_softmax_exp_phase_from_preclamped_checked.py && python3 tests/test_softmax_exp_phase_from_preclamped_no_alias_checked.py` passed |
 | 2026-04-17 | loop-150 | IQ-170 pre-clamped softmax exp-phase no-alias helper | done | Added `FPQ16SoftmaxExpPhaseFromPreclampedNoAliasChecked` in `src/math/softmax.HC` and validation harness `tests/test_softmax_exp_phase_from_preclamped_no_alias_checked.py`; `python3 tests/test_softmax_exp_phase_from_preclamped_no_alias_checked.py && python3 tests/test_softmax_exp_phase_from_preclamped_checked.py && python3 tests/test_intexp_exp_array_no_alias_checked.py` passed |
