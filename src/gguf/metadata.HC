@@ -97,6 +97,12 @@ I32 GGUFMetadataReadU64LEChecked(U8 *buf,
                                  U64 table_end,
                                  U64 *out_value);
 
+I32 GGUFMetadataReadI32LEChecked(U8 *buf,
+                                 U64 buf_nbytes,
+                                 U64 *cursor,
+                                 U64 table_end,
+                                 I32 *out_value);
+
 I32 GGUFMetadataReadI64LEChecked(U8 *buf,
                                  U64 buf_nbytes,
                                  U64 *cursor,
@@ -373,6 +379,39 @@ I32 GGUFMetadataReadU64LEChecked(U8 *buf,
                | (((U64)b5) << 40)
                | (((U64)b6) << 48)
                | (((U64)b7) << 56);
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked little-endian I32 metadata reader.
+// Contract: writes `*out_value` and advances `*cursor` only on success.
+I32 GGUFMetadataReadI32LEChecked(U8 *buf,
+                                 U64 buf_nbytes,
+                                 U64 *cursor,
+                                 U64 table_end,
+                                 I32 *out_value)
+{
+    U64 cur;
+    U32 raw_u32;
+    I32 err;
+
+    if (!buf || !cursor || !out_value)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Decode through the shared U32 checked reader so signed-I32 decode keeps
+    // identical cursor/bounds/no-partial-write behavior.
+    err = GGUFMetadataReadU32LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &raw_u32);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // Two's-complement reinterpretation is a plain cast in HolyC.
+    *out_value = (I32)raw_u32;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
