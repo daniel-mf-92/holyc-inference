@@ -28,11 +28,6 @@ I32 FPQ16ExpArrayFromClampedInputChecked(I64 *input_q16,
 I32 FPQ16ExpArrayCheckedNoAliasChecked(I64 *input_q16,
                                        I64 *output_q16,
                                        I64 count);
-I32 FPQ16SoftmaxFromPreclampedNoAliasCheckedWithSumOut(I64 *preclamped_logits_q16,
-                                                       I64 *exp_lanes_q16,
-                                                       I64 lane_count,
-                                                       I64 *probs_q16,
-                                                       I64 *out_exp_sum_q16);
 
 // Checked softmax split-phase helper for pre-clamped logits.
 // Phase performed here:
@@ -481,13 +476,45 @@ I32 FPQ16SoftmaxFromPreclampedNoAliasChecked(I64 *preclamped_logits_q16,
                                              I64 lane_count,
                                              I64 *probs_q16)
 {
-    I64 exp_sum_q16_unused;
+    I64 exp_sum_q16;
+    I32 status;
 
-    return FPQ16SoftmaxFromPreclampedNoAliasCheckedWithSumOut(preclamped_logits_q16,
+    if (!preclamped_logits_q16 || !exp_lanes_q16 || !probs_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Immutable-buffer contract: reject all pairwise alias combinations.
+    if (preclamped_logits_q16 == exp_lanes_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (preclamped_logits_q16 == probs_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (exp_lanes_q16 == probs_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Split phase 1: exp lanes + checked exp-sum accumulation.
+    status = FPQ16SoftmaxExpPhaseFromPreclampedNoAliasChecked(preclamped_logits_q16,
                                                                exp_lanes_q16,
                                                                lane_count,
-                                                               probs_q16,
-                                                               &exp_sum_q16_unused);
+                                                               &exp_sum_q16);
+    if (status)
+        return status;
+
+    if (!lane_count)
+        return FP_Q16_OK;
+
+    // Preflight phase 2 math before writing output probabilities.
+    status = FPQ16SoftmaxNormalizePhasePreflightChecked(exp_lanes_q16,
+                                                        lane_count,
+                                                        exp_sum_q16);
+    if (status)
+        return status;
+
+    // Split phase 2: no-alias normalization write.
+    return FPQ16SoftmaxNormalizePhaseNoAliasChecked(exp_lanes_q16,
+                                                    lane_count,
+                                                    exp_sum_q16,
+                                                    probs_q16);
 }
 
 // Checked composed helper for immutable-logit, no-alias split-phase softmax

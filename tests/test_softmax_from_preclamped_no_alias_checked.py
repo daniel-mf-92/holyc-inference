@@ -22,6 +22,9 @@ from test_softmax_normalize_phase_checked import fpq16_softmax_normalize_phase_c
 from test_softmax_normalize_phase_no_alias_checked import (
     fpq16_softmax_normalize_phase_no_alias_checked_reference,
 )
+from test_softmax_from_preclamped_no_alias_checked_with_sum_out import (
+    fpq16_softmax_from_preclamped_no_alias_checked_with_sum_out_reference,
+)
 
 
 def fpq16_softmax_from_preclamped_no_alias_checked_reference(
@@ -173,11 +176,45 @@ def test_random_vectors_match_split_phase_no_alias_reference() -> None:
         assert sum(probs_out) == FP_Q16_ONE
 
 
+def test_random_vectors_match_sum_out_variant_outputs() -> None:
+    rng = random.Random(20260417175)
+
+    for _ in range(1200):
+        lane_count = rng.randint(0, 24)
+        logits = [rng.randint(EXP_Q16_MIN_INPUT, EXP_Q16_MAX_INPUT) for _ in range(max(1, lane_count))]
+        exp_seed = [rng.randint(0, 4096) for _ in range(max(1, lane_count))]
+        probs_seed = [rng.randint(0, 4096) for _ in range(max(1, lane_count))]
+
+        err_a, exp_a, probs_a = fpq16_softmax_from_preclamped_no_alias_checked_reference(
+            logits,
+            exp_seed,
+            lane_count,
+            probs_seed,
+        )
+        err_b, exp_b, probs_b, sum_b = (
+            fpq16_softmax_from_preclamped_no_alias_checked_with_sum_out_reference(
+                logits,
+                exp_seed,
+                lane_count,
+                probs_seed,
+                777,
+            )
+        )
+
+        assert err_a == err_b
+        assert exp_a == exp_b
+        assert probs_a == probs_b
+
+        if err_b == FP_Q16_OK and lane_count > 0:
+            assert sum_b == sum(exp_b)
+
+
 def run() -> None:
     test_alias_rejection_all_pairs()
     test_domain_failure_no_partial_writes()
     test_normalize_overflow_is_fail_fast_for_probs()
     test_random_vectors_match_split_phase_no_alias_reference()
+    test_random_vectors_match_sum_out_variant_outputs()
     print("softmax_from_preclamped_no_alias_checked_reference_checks=ok")
 
 
