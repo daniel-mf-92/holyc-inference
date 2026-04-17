@@ -206,7 +206,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-018 Create `tests/README.md` skeleton for llama.cpp parity fixtures (header, metadata, tensor offsets) (WS0-05, WS2-05)
 - [x] IQ-019 Create `src/math/fixedpoint.HC` skeleton with Q16 constants, core type aliases, and TODO stubs for mul/div helpers (WS1-01)
 - [x] IQ-020 Implement Q16 integer exponent range clamp and base constants in `src/math/intexp.HC` (WS1-02)
-- [ ] IQ-021 Add host-side Q16 exp parity harness in `tests/test_intexp_q16.py` against `math.exp` samples (WS1-05)
+- [x] IQ-021 Add host-side Q16 exp parity harness in `tests/test_intexp_q16.py` against `math.exp` samples (WS1-05)
 - [ ] IQ-022 Implement GGUF header constants and struct layout notes in `src/gguf/header.HC` before parser logic (WS2-01)
 - [ ] IQ-023 Create `src/math/rmsnorm.HC` skeleton with Q16 constants, tensor shape assumptions, and TODO stubs for scale/variance accumulation (WS1-04)
 - [ ] IQ-024 Create `src/gguf/header.HC` skeleton with `GGUFHeader` struct and endian-safe integer read helper stubs (WS2-01)
@@ -371,6 +371,8 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] IQ-180 Implement HolyC helper `FPQ16SoftmaxFromPreclampedCheckedWithSumOut` in `src/math/softmax.HC` to compose alias-permitted split-phase softmax and return `exp_sum_q16` for attention diagnostics while preserving checked no-partial-write semantics (WS1-03, WS5-02)
 - [ ] IQ-181 Implement HolyC helper `FPQ16MulDivArrayRoundedChecked` in `src/math/fixedpoint.HC` to compute elementwise single-rounding `(a[i]*b[i])/d[i]` with checked no-partial-write semantics for RMSNorm and attention scaling call sites (WS1-01, WS1-04)
 - [ ] IQ-182 Add host-side parity harness `tests/test_intexp_split_base2_from_clamped_input_checked.py` validating base-2 split invariants (`x = k*ln2 + r`, `0<=r<ln2`) and BAD_PARAM/NULL_PTR contracts for `FPQ16ExpSplitBase2FromClampedInputChecked` (WS1-05)
+- [ ] IQ-183 Implement HolyC `GGUFHeaderParseChecked` in `src/gguf/header.HC` to parse magic/version/tensor_count/metadata_count from a byte span with explicit little-endian decoding and BAD_PARAM/OVERFLOW contracts (WS2-01)
+- [ ] IQ-184 Implement HolyC `GGUFHeaderValidateAndSizeChecked` in `src/gguf/header.HC` to enforce supported versions and compute checked header byte size for downstream metadata/tensor table offsets (WS2-01, WS2-05)
 
 
 ## Progress Ledger
@@ -378,6 +380,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-17 | loop-159 | IQ-021 Q16 exp parity harness vs math.exp | done | Added `tests/test_intexp_q16.py`; `python3 tests/test_intexp_q16.py && python3 tests/test_intexp_exp_from_clamped_input_checked.py && python3 tests/test_intexp_exp_array_checked.py` passed |
 | 2026-04-17 | loop-158 | IQ-019 fixedpoint checked skeleton completion | done | Extended `src/math/fixedpoint.HC` with Q16 aliases plus checked mul/div + array helpers and added `tests/test_fixedpoint_q16_checked.py`; `python3 tests/test_fixedpoint_q16_checked.py && python3 tests/test_intexp_exp_from_clamped_input_checked.py` passed |
 | 2026-04-17 | loop-157 | IQ-178 no-alias softmax with sum-out | done | Added `FPQ16SoftmaxFromPreclampedNoAliasCheckedWithSumOut` in `src/math/softmax.HC` and harness `tests/test_softmax_from_preclamped_no_alias_checked_with_sum_out.py`; `python3 tests/test_softmax_from_preclamped_no_alias_checked_with_sum_out.py && python3 tests/test_softmax_from_preclamped_no_alias_checked.py && python3 tests/test_softmax_exp_phase_from_preclamped_no_alias_checked.py && python3 tests/test_softmax_normalize_phase_no_alias_checked.py` passed |
 | 2026-04-17 | loop-156 | IQ-018 GGUF fixture README skeleton | done | Expanded `tests/README.md` with required skeleton sections, fixture-family mapping, and template contract; `python3 tests/test_gguf_metadata_parse.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_tensor_data_base.py` passed |
