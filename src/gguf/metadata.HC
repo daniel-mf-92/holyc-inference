@@ -165,6 +165,14 @@ I32 GGUFMetadataReadU8QuadCheckedNoPartial(U8 *buf,
                                            U8 *out_third,
                                            U8 *out_fourth);
 
+I32 GGUFMetadataReadU8QuadCheckedDefault(U8 *buf,
+                                         U64 buf_nbytes,
+                                         U64 *cursor,
+                                         U8 *out_first,
+                                         U8 *out_second,
+                                         U8 *out_third,
+                                         U8 *out_fourth);
+
 I32 GGUFMetadataReadU16LEChecked(U8 *buf,
                                  U64 buf_nbytes,
                                  U64 *cursor,
@@ -1321,6 +1329,27 @@ I32 GGUFMetadataReadU8QuadCheckedNoPartial(U8 *buf,
     *out_fourth = fourth;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Canonical default-end wrapper for fixed-layout U8-quad metadata records.
+// Contract: preserves exact checked U8-quad semantics by pinning table_end to
+// buf_nbytes and delegating to GGUFMetadataReadU8QuadChecked.
+I32 GGUFMetadataReadU8QuadCheckedDefault(U8 *buf,
+                                         U64 buf_nbytes,
+                                         U64 *cursor,
+                                         U8 *out_first,
+                                         U8 *out_second,
+                                         U8 *out_third,
+                                         U8 *out_fourth)
+{
+    return GGUFMetadataReadU8QuadChecked(buf,
+                                         buf_nbytes,
+                                         cursor,
+                                         buf_nbytes,
+                                         out_first,
+                                         out_second,
+                                         out_third,
+                                         out_fourth);
 }
 
 // Checked signed-I8 tuple reader for compact metadata pair fields.

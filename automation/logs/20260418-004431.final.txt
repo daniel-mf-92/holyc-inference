@@ -1,0 +1,24 @@
+Done — I completed one deep queue item end-to-end (`IQ-289`) and kept the queue rolling.
+
+**What Changed**
+- Added HolyC default-end wrapper `GGUFMetadataReadU8QuadCheckedDefault` in `src/gguf/metadata.HC:1337` (prototype at `src/gguf/metadata.HC:168`).
+- Added focused parity harness `tests/test_gguf_metadata_read_u8_quad_checked_default.py:1` (null/no-partial, truncation/default-end, success/advance).
+- Marked `IQ-289` complete in `MASTER_TASKS.md:483`.
+- Appended three new unchecked IQ items (`IQ-304`..`IQ-306`) to maintain rolling depth in `MASTER_TASKS.md:503`.
+- Added one progress-ledger line for this iteration in `MASTER_TASKS.md:512`.
+
+**Validation**
+- Ran:
+  - `python3 tests/test_gguf_metadata_read_u8_quad_checked_default.py`
+  - `python3 tests/test_gguf_metadata_read_u8_quad_checked.py`
+  - `python3 tests/test_gguf_metadata_read_u8_quad_checked_no_partial.py`
+  - `python3 tests/test_gguf_metadata_parse.py`
+- Output summary:
+  - `gguf_metadata_read_u8_quad_checked_reference_checks=ok`
+  - `gguf_metadata_read_u8_quad_checked_no_partial_reference_checks=ok`
+  - `gguf_metadata_reference_checks=ok`
+
+**Contract Checks**
+- Queue depth policy satisfied: unchecked IQ count is now `17` (>=15).
+- Central DB logged:
+  - inserted `iterations` row for `IQ-289` with status `pass` in `~/Documents/local-codebases/temple-central.db`.
