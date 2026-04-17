@@ -290,6 +290,12 @@ I32 GGUFMetadataArrayPayloadSpanValidateChecked(U64 payload_start,
                                                 U64 buf_nbytes,
                                                 U64 *out_payload_end);
 
+I32 GGUFMetadataArrayPayloadSpanValidateFromCursorChecked(U64 *cursor,
+                                                          U64 payload_bytes,
+                                                          U64 table_end,
+                                                          U64 buf_nbytes,
+                                                          U64 *out_payload_end);
+
 I32 GGUFMetadataArrayFixedElemWidthBytesChecked(U32 elem_type,
                                                 U64 *out_elem_width_bytes);
 
@@ -448,6 +454,32 @@ I32 GGUFMetadataArrayPayloadSpanValidateChecked(U64 payload_start,
 
     *out_payload_end = payload_end;
     return GGUF_META_TABLE_OK;
+}
+
+// Validate fixed-width metadata ARRAY payload window starting at `*cursor`
+// and return checked payload end cursor for decode loops.
+// Contract: writes `*out_payload_end` only on success and never mutates
+// `*cursor` (caller decides when to commit cursor movement).
+I32 GGUFMetadataArrayPayloadSpanValidateFromCursorChecked(U64 *cursor,
+                                                          U64 payload_bytes,
+                                                          U64 table_end,
+                                                          U64 buf_nbytes,
+                                                          U64 *out_payload_end)
+{
+    U64 payload_start;
+
+    if (!cursor || !out_payload_end)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    payload_start = *cursor;
+
+    // Compose through canonical payload-span validator so cursor-sourced
+    // windows keep identical checked bounds/overflow semantics.
+    return GGUFMetadataArrayPayloadSpanValidateChecked(payload_start,
+                                                       payload_bytes,
+                                                       table_end,
+                                                       buf_nbytes,
+                                                       out_payload_end);
 }
 
 // Return canonical fixed-width byte size for metadata ARRAY element types.
