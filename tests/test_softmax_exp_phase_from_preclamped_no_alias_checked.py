@@ -204,6 +204,71 @@ def test_domain_failure_has_no_partial_writes() -> None:
     assert exp_sum == 0
 
 
+def test_domain_failure_first_lane_has_no_partial_writes() -> None:
+    logits = [EXP_Q16_MIN_INPUT - 1, q16_from_float(0.25), q16_from_float(0.75)]
+    out = [7001, 7002, 7003]
+
+    err, exp_lanes, exp_sum = fpq16_softmax_exp_phase_from_preclamped_no_alias_checked_reference(
+        logits,
+        out,
+        len(logits),
+    )
+
+    assert err == FP_Q16_ERR_BAD_PARAM
+    assert exp_lanes == out
+    assert exp_sum == 0
+
+
+def test_domain_failure_last_lane_has_no_partial_writes() -> None:
+    logits = [q16_from_float(-0.75), q16_from_float(0.25), EXP_Q16_MAX_INPUT + 1]
+    out = [8101, 8102, 8103]
+
+    err, exp_lanes, exp_sum = fpq16_softmax_exp_phase_from_preclamped_no_alias_checked_reference(
+        logits,
+        out,
+        len(logits),
+    )
+
+    assert err == FP_Q16_ERR_BAD_PARAM
+    assert exp_lanes == out
+    assert exp_sum == 0
+
+
+def test_upper_domain_edge_lanes_match_scalar_reference() -> None:
+    lane = EXP_Q16_MAX_INPUT - 1
+    logits = [lane, lane, lane, lane]
+    out_seed = [0, 0, 0, 0]
+
+    err, exp_lanes, exp_sum = fpq16_softmax_exp_phase_from_preclamped_no_alias_checked_reference(
+        logits,
+        out_seed,
+        len(logits),
+    )
+
+    assert err == FP_Q16_OK
+
+    lane_err, lane_exp = fpq16_exp_from_clamped_input_checked(lane)
+    assert lane_err == FP_Q16_OK
+    assert exp_lanes == [lane_exp, lane_exp, lane_exp, lane_exp]
+    assert exp_sum == 4 * lane_exp
+
+
+def test_preflight_overflow_count_rejected_before_writes() -> None:
+    logits = [q16_from_float(0.0)]
+    out = [111]
+    huge_count = (I64_MAX_VALUE >> 3) + 2
+
+    err, exp_lanes, exp_sum = fpq16_softmax_exp_phase_from_preclamped_no_alias_checked_reference(
+        logits,
+        out,
+        huge_count,
+    )
+
+    assert err == FP_Q16_ERR_OVERFLOW
+    assert exp_lanes == out
+    assert exp_sum == 0
+
+
 def test_random_vectors_match_lane_exp_and_sum() -> None:
     rng = random.Random(2026041702)
 
@@ -235,6 +300,10 @@ def run() -> None:
     test_negative_count_rejected()
     test_zero_count_writes_nothing()
     test_domain_failure_has_no_partial_writes()
+    test_domain_failure_first_lane_has_no_partial_writes()
+    test_domain_failure_last_lane_has_no_partial_writes()
+    test_upper_domain_edge_lanes_match_scalar_reference()
+    test_preflight_overflow_count_rejected_before_writes()
     test_random_vectors_match_lane_exp_and_sum()
     print("softmax_exp_phase_from_preclamped_no_alias_checked_reference_checks=ok")
 
