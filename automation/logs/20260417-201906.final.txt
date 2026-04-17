@@ -1,0 +1,15 @@
+Done — one full iteration completed end-to-end for `IQ-254`.
+
+**Implemented**
+- Added HolyC prototype + implementation for `GGUFMetadataReadI8TripleChecked` with staged cursor, shared `GGUFMetadataReadI8Checked` lanes, and strict no-partial tuple commit in `src/gguf/metadata.HC:101` and `src/gguf/metadata.HC:1047`.
+- Added parity/contract harness `tests/test_gguf_metadata_read_i8_triple_checked.py:1` (null checks, short-read no-commit, success path, randomized parity).
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_i8_triple_checked.py && python3 tests/test_gguf_metadata_read_i8_pair_checked.py && python3 tests/test_gguf_metadata_read_i8_checked.py && python3 tests/test_gguf_metadata_parse.py`
+- Output: `gguf_metadata_read_i8_triple_checked_reference_checks=ok`, `...i8_pair...=ok`, `...i8_checked...=ok`, `gguf_metadata_reference_checks=ok`.
+
+**Queue/ledger/DB**
+- Marked done: `MASTER_TASKS.md:448` (`IQ-254`).
+- Kept queue depth policy at 15 unchecked by appending `IQ-270` at `MASTER_TASKS.md:464`.
+- Added one-line ledger entry at `MASTER_TASKS.md:471` (`loop-339`).
+- Logged central DB iteration row: `inference | IQ-254 | pass` (id `3000`) in `~/Documents/local-codebases/temple-central.db`.
