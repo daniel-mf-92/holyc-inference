@@ -1,0 +1,18 @@
+Completed one full iteration on `IQ-282` end-to-end.
+
+**What Changed**
+- Added HolyC no-partial wrapper `GGUFMetadataReadBoolTripleCheckedNoPartial` (delegating to canonical staged triple reader) in `src/gguf/metadata.HC:3916` and its prototype in `src/gguf/metadata.HC:565`.
+- Added focused host parity harness `tests/test_gguf_metadata_read_bool_triple_checked_no_partial.py:1` (wrapper impl at `:129`, randomized parity test at `:259`).
+- Updated queue/ledger in `MASTER_TASKS.md:476` (IQ-282 checked), `MASTER_TASKS.md:503` (loop-362 ledger line).
+- Kept queue depth rolling at 15 by appending new unchecked code task `IQ-297` in `MASTER_TASKS.md:496`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_bool_triple_checked_no_partial.py && python3 tests/test_gguf_metadata_read_bool_triple_checked.py && python3 tests/test_gguf_metadata_read_bool_quad_checked_no_partial.py && python3 tests/test_gguf_metadata_parse.py`
+- Output:
+  - `gguf_metadata_read_bool_triple_checked_no_partial_reference_checks=ok`
+  - `ok`
+  - `ok`
+  - `gguf_metadata_reference_checks=ok`
+
+**Central DB**
+- Logged iteration in `~/Documents/local-codebases/temple-central.db` as row `id=3258` with `task_id='IQ-282'`, status `pass`.

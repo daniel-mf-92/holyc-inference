@@ -562,6 +562,14 @@ I32 GGUFMetadataReadBoolTripleChecked(U8 *buf,
                                       Bool *out_second,
                                       Bool *out_third);
 
+I32 GGUFMetadataReadBoolTripleCheckedNoPartial(U8 *buf,
+                                               U64 buf_nbytes,
+                                               U64 *cursor,
+                                               U64 table_end,
+                                               Bool *out_first,
+                                               Bool *out_second,
+                                               Bool *out_third);
+
 I32 GGUFMetadataReadBoolQuadChecked(U8 *buf,
                                     U64 buf_nbytes,
                                     U64 *cursor,
@@ -3899,6 +3907,27 @@ I32 GGUFMetadataReadBoolTripleChecked(U8 *buf,
     *out_third = third;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Checked metadata BOOL triple reader with explicit no-partial wrapper
+// semantics.
+// Contract: this entrypoint enforces strict all-or-nothing cursor/output
+// commit by delegating to the canonical staged triple decoder.
+I32 GGUFMetadataReadBoolTripleCheckedNoPartial(U8 *buf,
+                                               U64 buf_nbytes,
+                                               U64 *cursor,
+                                               U64 table_end,
+                                               Bool *out_first,
+                                               Bool *out_second,
+                                               Bool *out_third)
+{
+    return GGUFMetadataReadBoolTripleChecked(buf,
+                                             buf_nbytes,
+                                             cursor,
+                                             table_end,
+                                             out_first,
+                                             out_second,
+                                             out_third);
 }
 
 // Checked metadata BOOL quad reader (`U8 in {0,1}` for each lane).
