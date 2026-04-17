@@ -9,6 +9,8 @@
 #define FP_Q16_ERR_DOMAIN    3
 #define FP_Q16_ERR_OVERFLOW  4
 #define U64_MAX_VALUE 0xFFFFFFFFFFFFFFFF
+#define FP_Q16_RMSNORM_AUTO_PATH_OUT_OF_PLACE 0
+#define FP_Q16_RMSNORM_AUTO_PATH_IN_PLACE     1
 
 I64 FPQ16Mul(I64 a, I64 b);
 I64 FPQ16Div(I64 num, I64 den);
@@ -206,6 +208,29 @@ I32 FPQ16RMSNormApplyInvDenomWeightedAutoValidateChecked(I64 *input_q16,
     return 0;
 }
 
+// Select auto-dispatch execution path deterministically from pointer aliasing.
+// The contract is explicit and checked:
+// - in-place path only when input and output pointers are identical
+// - out-of-place path for all other pointer pairs
+// This helper isolates path selection from math kernels so dispatch behavior
+// stays stable as validation and execution logic evolve independently.
+I32 FPQ16RMSNormApplyInvDenomWeightedAutoSelectPathChecked(I64 *input_q16,
+                                                           I64 *output_q16,
+                                                           I32 *path_out)
+{
+    if (!input_q16 || !output_q16 || !path_out)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (input_q16 == output_q16)
+    {
+        *path_out = FP_Q16_RMSNORM_AUTO_PATH_IN_PLACE;
+        return 0;
+    }
+
+    *path_out = FP_Q16_RMSNORM_AUTO_PATH_OUT_OF_PLACE;
+    return 0;
+}
+
 // Auto-dispatch weighted inverse-denominator RMSNorm scaling:
 // - If input/output alias, use the in-place checked kernel.
 // - If they do not alias, use the out-of-place checked kernel.
@@ -219,6 +244,7 @@ I32 FPQ16RMSNormApplyInvDenomWeightedAutoChecked(I64 *input_q16,
                                                  I64 den_q16)
 {
     I32 status;
+    I32 selected_path;
 
     status = FPQ16RMSNormApplyInvDenomWeightedAutoValidateChecked(input_q16,
                                                                    gamma_q16,
@@ -229,9 +255,13 @@ I32 FPQ16RMSNormApplyInvDenomWeightedAutoChecked(I64 *input_q16,
     if (status)
         return status;
 
-    // Pointer equality is the only alias contract supported by the current
-    // RMSNorm call sites: same buffer means in-place, otherwise out-of-place.
-    if (input_q16 == output_q16)
+    status = FPQ16RMSNormApplyInvDenomWeightedAutoSelectPathChecked(input_q16,
+                                                                     output_q16,
+                                                                     &selected_path);
+    if (status)
+        return status;
+
+    if (selected_path == FP_Q16_RMSNORM_AUTO_PATH_IN_PLACE)
     {
         return FPQ16RMSNormApplyInvDenomWeightedInPlaceChecked(input_q16,
                                                                 gamma_q16,
@@ -239,6 +269,9 @@ I32 FPQ16RMSNormApplyInvDenomWeightedAutoChecked(I64 *input_q16,
                                                                 inv_denom_q16,
                                                                 den_q16);
     }
+
+    if (selected_path != FP_Q16_RMSNORM_AUTO_PATH_OUT_OF_PLACE)
+        return FP_Q16_ERR_BAD_PARAM;
 
     return FPQ16RMSNormApplyInvDenomWeightedChecked(input_q16,
                                                     gamma_q16,
