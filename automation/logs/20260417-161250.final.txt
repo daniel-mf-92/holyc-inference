@@ -1,0 +1,14 @@
+Completed one full iteration on `IQ-235` end-to-end.
+
+**What Changed**
+- Implemented HolyC helper `GGUFMetadataArrayPayloadSpanFromFixedTypeAtCursorChecked` with strict null-guard/no-cursor-mutation semantics in `src/gguf/metadata.HC:649` (prototype at `src/gguf/metadata.HC:314`).
+- Added focused parity/fuzz harness for the new cursor-wrapper composition path in `tests/test_gguf_metadata_array_payload_span_from_fixed_type_at_cursor_checked.py:182`.
+- Marked `IQ-235` done, added one ledger line (`loop-326`), and kept queue depth rolling by appending `IQ-250` in `MASTER_TASKS.md:429`, `MASTER_TASKS.md:451`, and `MASTER_TASKS.md:444`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_array_payload_span_from_fixed_type_at_cursor_checked.py && python3 tests/test_gguf_metadata_array_payload_span_from_fixed_type_checked.py && python3 tests/test_gguf_metadata_array_payload_span_validate_from_cursor_checked.py`
+- Output: `ok` / `ok` / `ok`
+
+**Bookkeeping**
+- Logged iteration to SQLite at `~/Documents/local-codebases/temple-central.db` for task `IQ-235` with status `pass`.
+- Unchecked `IQ-` queue depth is now `15` (policy satisfied).
