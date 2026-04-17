@@ -179,6 +179,14 @@ I32 GGUFMetadataReadStringBytesChecked(U8 *buf,
                                        U8 *out_bytes,
                                        U64 out_nbytes);
 
+I32 GGUFMetadataReadStringChecked(U8 *buf,
+                                  U64 buf_nbytes,
+                                  U64 *cursor,
+                                  U64 table_end,
+                                  U8 *out_bytes,
+                                  U64 out_nbytes,
+                                  U64 *out_len);
+
 I32 GGUFMetadataReadArrayHeaderChecked(U8 *buf,
                                        U64 buf_nbytes,
                                        U64 *cursor,
@@ -880,6 +888,57 @@ I32 GGUFMetadataReadStringBytesChecked(U8 *buf,
         out_bytes[i] = buf[cur + i];
 
     *cursor = next_cursor;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked GGUF metadata string reader (`len:U64` + payload bytes, no alloc).
+// Contract: writes `*out_len`, copies payload bytes, and advances `*cursor`
+// only when the full length+payload path succeeds.
+I32 GGUFMetadataReadStringChecked(U8 *buf,
+                                  U64 buf_nbytes,
+                                  U64 *cursor,
+                                  U64 table_end,
+                                  U8 *out_bytes,
+                                  U64 out_nbytes,
+                                  U64 *out_len)
+{
+    U64 cur;
+    U64 str_len;
+    I32 err;
+
+    if (!buf || !cursor || !out_bytes || !out_len)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Stage `len` decode through the shared helper; this commits only on
+    // success and leaves `cur` at payload start.
+    err = GGUFMetadataReadStringLenU64Checked(buf,
+                                              buf_nbytes,
+                                              &cur,
+                                              table_end,
+                                              &str_len);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // Destination capacity is validated before payload copy.
+    if (out_nbytes < str_len)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    // Copy payload bytes through the shared checked copier so this composed
+    // reader inherits canonical no-partial-write cursor/bytes semantics.
+    err = GGUFMetadataReadStringBytesChecked(buf,
+                                             buf_nbytes,
+                                             &cur,
+                                             table_end,
+                                             str_len,
+                                             out_bytes,
+                                             out_nbytes);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_len = str_len;
+    *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
 
