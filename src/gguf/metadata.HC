@@ -539,6 +539,13 @@ I32 GGUFMetadataReadF64BitsTripleCheckedNoPartial(U8 *buf,
                                                   U64 *out_second_bits,
                                                   U64 *out_third_bits);
 
+I32 GGUFMetadataReadF64BitsTripleCheckedDefault(U8 *buf,
+                                                U64 buf_nbytes,
+                                                U64 *cursor,
+                                                U64 *out_first_bits,
+                                                U64 *out_second_bits,
+                                                U64 *out_third_bits);
+
 I32 GGUFMetadataReadF64BitsQuadChecked(U8 *buf,
                                        U64 buf_nbytes,
                                        U64 *cursor,
@@ -3743,6 +3750,26 @@ I32 GGUFMetadataReadF64BitsTripleCheckedNoPartial(U8 *buf,
                                                 buf_nbytes,
                                                 cursor,
                                                 table_end,
+                                                out_first_bits,
+                                                out_second_bits,
+                                                out_third_bits);
+}
+
+// Canonical default-end wrapper for fixed-layout FLOAT64 raw-bit triple
+// metadata records.
+// Contract: preserves exact checked triple semantics by pinning table_end to
+// buf_nbytes and delegating to GGUFMetadataReadF64BitsTripleChecked.
+I32 GGUFMetadataReadF64BitsTripleCheckedDefault(U8 *buf,
+                                                U64 buf_nbytes,
+                                                U64 *cursor,
+                                                U64 *out_first_bits,
+                                                U64 *out_second_bits,
+                                                U64 *out_third_bits)
+{
+    return GGUFMetadataReadF64BitsTripleChecked(buf,
+                                                buf_nbytes,
+                                                cursor,
+                                                buf_nbytes,
                                                 out_first_bits,
                                                 out_second_bits,
                                                 out_third_bits);
