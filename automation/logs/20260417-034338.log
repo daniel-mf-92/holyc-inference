@@ -79,3 +79,8 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_2","type":"todo_list","items":[{"text":"Inspect tasks and repo context","completed":true},{"text":"Top up unchecked IQ queue","completed":true},{"text":"Implement highest-priority IQ item","completed":true},{"text":"Run focused validations","completed":true},{"text":"Log iteration and update ledger","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":1422601,"cached_input_tokens":1322240,"output_tokens":8647}}
 Codex final exit code: 0
+[main 1e3bddb] feat(inference): codex iteration 20260417-034338
+ 6 files changed, 414 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260417-034338.final.txt
+ create mode 100644 tests/test_softmax_exp_phase_from_preclamped_no_alias_checked.py
+=== End iteration 80 (outcome=ok) ===
