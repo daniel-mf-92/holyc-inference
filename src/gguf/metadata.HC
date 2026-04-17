@@ -323,6 +323,15 @@ I32 GGUFMetadataReadF32BitsTripleChecked(U8 *buf,
                                          U32 *out_second_bits,
                                          U32 *out_third_bits);
 
+I32 GGUFMetadataReadF32BitsQuadChecked(U8 *buf,
+                                       U64 buf_nbytes,
+                                       U64 *cursor,
+                                       U64 table_end,
+                                       U32 *out_first_bits,
+                                       U32 *out_second_bits,
+                                       U32 *out_third_bits,
+                                       U32 *out_fourth_bits);
+
 I32 GGUFMetadataReadF64BitsLEChecked(U8 *buf,
                                      U64 buf_nbytes,
                                      U64 *cursor,
@@ -2363,6 +2372,74 @@ I32 GGUFMetadataReadF32BitsTripleChecked(U8 *buf,
     *out_first_bits = first_bits;
     *out_second_bits = second_bits;
     *out_third_bits = third_bits;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked metadata FLOAT32 raw-bit quad reader.
+// Contract: decodes four sequential little-endian FLOAT32 payload
+// bit-patterns through shared checked scalar staging and commits all
+// outputs + cursor only after all four lanes pass
+// (strict no-partial-write tuple semantics).
+I32 GGUFMetadataReadF32BitsQuadChecked(U8 *buf,
+                                       U64 buf_nbytes,
+                                       U64 *cursor,
+                                       U64 table_end,
+                                       U32 *out_first_bits,
+                                       U32 *out_second_bits,
+                                       U32 *out_third_bits,
+                                       U32 *out_fourth_bits)
+{
+    U64 cur;
+    U32 first_bits;
+    U32 second_bits;
+    U32 third_bits;
+    U32 fourth_bits;
+    I32 err;
+
+    if (!buf || !cursor || !out_first_bits || !out_second_bits || !out_third_bits || !out_fourth_bits)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Decode each lane through the canonical float32-bit checked reader so
+    // quad decode preserves identical bounds/overflow/no-partial-write rules.
+    err = GGUFMetadataReadF32BitsLEChecked(buf,
+                                           buf_nbytes,
+                                           &cur,
+                                           table_end,
+                                           &first_bits);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadF32BitsLEChecked(buf,
+                                           buf_nbytes,
+                                           &cur,
+                                           table_end,
+                                           &second_bits);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadF32BitsLEChecked(buf,
+                                           buf_nbytes,
+                                           &cur,
+                                           table_end,
+                                           &third_bits);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadF32BitsLEChecked(buf,
+                                           buf_nbytes,
+                                           &cur,
+                                           table_end,
+                                           &fourth_bits);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_first_bits = first_bits;
+    *out_second_bits = second_bits;
+    *out_third_bits = third_bits;
+    *out_fourth_bits = fourth_bits;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
