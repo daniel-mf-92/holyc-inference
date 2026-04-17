@@ -513,6 +513,66 @@ I32 FPQ16SoftmaxFromPreclampedNoAliasChecked(I64 *preclamped_logits_q16,
                                                     probs_q16);
 }
 
+// Checked composed helper for immutable-logit, no-alias split-phase softmax
+// with explicit exp-sum output for diagnostics/logging.
+// Pipeline:
+//   1) exp_lanes_q16 <- exp(preclamped_logits_q16)
+//   2) exp_sum_q16   <- checked sum(exp_lanes_q16)
+//   3) probs_q16     <- normalize(exp_lanes_q16 / exp_sum_q16)
+//   4) out_exp_sum_q16 <- exp_sum_q16
+// Contracts:
+//   - All pointers non-null
+//   - lane_count >= 0
+//   - preclamped_logits_q16, exp_lanes_q16, probs_q16 are pairwise disjoint
+//   - No partial writes to probs_q16 on any failure path
+// Notes:
+//   - out_exp_sum_q16 is written only after exp-phase success.
+//   - For lane_count == 0, writes out_exp_sum_q16 = 0 and returns OK.
+I32 FPQ16SoftmaxFromPreclampedNoAliasCheckedWithSumOut(I64 *preclamped_logits_q16,
+                                                       I64 *exp_lanes_q16,
+                                                       I64 lane_count,
+                                                       I64 *probs_q16,
+                                                       I64 *out_exp_sum_q16)
+{
+    I64 exp_sum_q16;
+    I32 status;
+
+    if (!preclamped_logits_q16 || !exp_lanes_q16 || !probs_q16 || !out_exp_sum_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (preclamped_logits_q16 == exp_lanes_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (preclamped_logits_q16 == probs_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (exp_lanes_q16 == probs_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    status = FPQ16SoftmaxExpPhaseFromPreclampedNoAliasChecked(preclamped_logits_q16,
+                                                               exp_lanes_q16,
+                                                               lane_count,
+                                                               &exp_sum_q16);
+    if (status)
+        return status;
+
+    *out_exp_sum_q16 = exp_sum_q16;
+
+    if (!lane_count)
+        return FP_Q16_OK;
+
+    status = FPQ16SoftmaxNormalizePhasePreflightChecked(exp_lanes_q16,
+                                                        lane_count,
+                                                        exp_sum_q16);
+    if (status)
+        return status;
+
+    return FPQ16SoftmaxNormalizePhaseNoAliasChecked(exp_lanes_q16,
+                                                    lane_count,
+                                                    exp_sum_q16,
+                                                    probs_q16);
+}
+
 U0 FPQ16Softmax(I64 *logits, I64 *probs, I64 count)
 {
     I64 i;
