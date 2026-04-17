@@ -179,6 +179,79 @@ I32 FPQ16RMSNormChecked(I64 *input_q16,
     return 0;
 }
 
+// Checked full RMSNorm in-place variant:
+//   input[i] = ((input[i] / sqrt(mean(input^2)+eps)) * gamma[i])
+// This mirrors FPQ16RMSNormChecked arithmetic and error contracts while
+// allowing alias-safe writes to the input buffer.
+// Behavior:
+//   - Computes inverse denominator from the original input slice.
+//   - Runs a no-write validation pass across all lanes.
+//   - Commits in-place writes only if every lane pre-validates.
+I32 FPQ16RMSNormCheckedInPlace(I64 *input_q16,
+                               I64 *gamma_q16,
+                               I64 count,
+                               I64 eps_q16)
+{
+    I64 lane_index;
+    I64 inv_denom_q16;
+    I64 denom_q16;
+    I64 norm_lane_q16;
+    I64 weighted_lane_q16;
+    I32 status;
+
+    if (!input_q16 || !gamma_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count <= 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (eps_q16 < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    status = FPQ16RMSNormComputeInvDenomChecked(input_q16,
+                                                count,
+                                                eps_q16,
+                                                &inv_denom_q16,
+                                                &denom_q16);
+    if (status)
+        return status;
+
+    // Validation pass over original input values: fail fast on overflow/domain
+    // before mutating any lane in-place.
+    for (lane_index = 0; lane_index < count; lane_index++)
+    {
+        status = FPQ16MulChecked(input_q16[lane_index],
+                                 inv_denom_q16,
+                                 &norm_lane_q16);
+        if (status)
+            return status;
+
+        status = FPQ16MulChecked(norm_lane_q16,
+                                 gamma_q16[lane_index],
+                                 &weighted_lane_q16);
+        if (status)
+            return status;
+    }
+
+    // Commit phase: same checked math, now writing back lane-by-lane.
+    for (lane_index = 0; lane_index < count; lane_index++)
+    {
+        status = FPQ16MulChecked(input_q16[lane_index],
+                                 inv_denom_q16,
+                                 &norm_lane_q16);
+        if (status)
+            return status;
+
+        status = FPQ16MulChecked(norm_lane_q16,
+                                 gamma_q16[lane_index],
+                                 &weighted_lane_q16);
+        if (status)
+            return status;
+
+        input_q16[lane_index] = weighted_lane_q16;
+    }
+
+    return 0;
+}
+
 // Apply precomputed RMSNorm inverse denominator to a Q16 vector with explicit
 // checked error surfaces. This uses one-rounding math:
 //   out[i] = round_half_up((input[i] * inv_denom_q16) / den_q16)

@@ -377,7 +377,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 
 
 - [x] IQ-186 Implement HolyC helper GGUFMetadataTableCursorAdvanceChecked in src/gguf/metadata.HC to compose checked span validation with cursor advancement for WS2 metadata parser entrypoints (WS2-02, WS2-05)
-- [ ] IQ-187 Implement HolyC helper `FPQ16RMSNormCheckedInPlace` in `src/math/rmsnorm.HC` to provide alias-safe in-place RMSNorm with shared preflight/compute path parity against `FPQ16RMSNormChecked` for WS1/WS5 norm call sites (WS1-04)
+- [x] IQ-187 Implement HolyC helper `FPQ16RMSNormCheckedInPlace` in `src/math/rmsnorm.HC` to provide alias-safe in-place RMSNorm with shared preflight/compute path parity against `FPQ16RMSNormChecked` for WS1/WS5 norm call sites (WS1-04)
 - [ ] IQ-188 Implement HolyC helper `FPQ16MulDivArrayRoundedByPositiveIntChecked` in `src/math/fixedpoint.HC` for elementwise checked one-rounding `(a[i]*b[i])/d_int[i]` (`d_int[i]>0`) with no-partial-write semantics for RMSNorm denominator-specialized paths (WS1-01, WS1-04)
 - [ ] IQ-189 Add host-side parity harness `tests/test_fixedpoint_q16_muldiv_array_positive_int_checked.py` validating per-lane domain/overflow/no-partial-write behavior for `FPQ16MulDivArrayRoundedByPositiveIntChecked` against scalar composition references (WS1-05)
 - [ ] IQ-190 Implement HolyC helper `FPQ16MulDivArrayRoundedByPositiveIntFromQ16DenChecked` in `src/math/fixedpoint.HC` for elementwise Q16-encoded positive-int denominators (`d_q16[i]=n<<16`) with strict divisibility checks and no-partial-write semantics (WS1-01, WS1-04)
@@ -390,12 +390,14 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] IQ-197 Implement HolyC helper `GGUFMetadataReadI64LEChecked` in `src/gguf/metadata.HC` for checked little-endian signed-I64 metadata reads with shared cursor/span overflow guards and parser-consistent BAD_PARAM/OVERFLOW contracts (WS2-02, WS2-05)
 - [ ] IQ-198 Implement HolyC helper `GGUFMetadataReadF64BitsLEChecked` in `src/gguf/metadata.HC` to decode little-endian 64-bit metadata payload bits for FLOAT64 values via shared cursor/span checks without introducing float runtime dependencies (WS2-02, WS2-05)
 - [ ] IQ-199 Implement HolyC helper `GGUFMetadataReadBoolChecked` in `src/gguf/metadata.HC` to decode checked boolean metadata fields (`U8 in {0,1}`) via shared cursor-safe byte reader with parser-consistent BAD_PARAM/OVERFLOW contracts (WS2-02, WS2-05)
+- [ ] IQ-200 Implement HolyC helper `GGUFMetadataReadStringLenU64Checked` in `src/gguf/metadata.HC` to decode checked metadata string lengths (U64 LE) and validate `cursor+len<=table_end` before payload reads for WS2 key/value parsers (WS2-02, WS2-05)
 
 ## Progress Ledger
 
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-17 | loop-173 | IQ-187 in-place RMSNorm checked helper | done | Added `FPQ16RMSNormCheckedInPlace` in `src/math/rmsnorm.HC` and parity harness `tests/test_rmsnorm_q16_checked_inplace.py`; `python3 tests/test_rmsnorm_q16_checked_inplace.py && python3 tests/test_rmsnorm_q16_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_weighted_inplace_checked.py` passed |
 | 2026-04-17 | loop-172 | IQ-180 checked softmax split-phase sum-out helper | done | Added `FPQ16SoftmaxFromPreclampedCheckedWithSumOut` in `src/math/softmax.HC` and parity harness `tests/test_softmax_from_preclamped_checked_with_sum_out.py`; `python3 tests/test_softmax_from_preclamped_checked_with_sum_out.py && python3 tests/test_softmax_from_preclamped_checked.py && python3 tests/test_softmax_from_preclamped_no_alias_checked_with_sum_out.py` passed |
 | 2026-04-17 | loop-171 | IQ-173 no-alias softmax exp-phase parity hardening | done | Expanded `tests/test_softmax_exp_phase_from_preclamped_no_alias_checked.py` with first/last-lane domain-fail no-partial-write checks, upper-edge scalar parity, and overflow-preflight coverage; `python3 tests/test_softmax_exp_phase_from_preclamped_no_alias_checked.py && python3 tests/test_softmax_exp_phase_from_preclamped_checked.py` passed |
 | 2026-04-17 | loop-170 | IQ-171 softmax exp-phase checked parity harness | done | Hardened `tests/test_softmax_exp_phase_from_preclamped_checked.py` with NULL_PTR/no-partial-write/overflow-preflight + scalar lane/sum composition checks and updated split-phase caller parity in `tests/test_softmax_from_preclamped_checked.py`; `python3 tests/test_softmax_exp_phase_from_preclamped_checked.py && python3 tests/test_softmax_exp_phase_from_preclamped_no_alias_checked.py && python3 tests/test_softmax_from_preclamped_checked.py && python3 tests/test_softmax_normalize_phase_checked.py` passed |
