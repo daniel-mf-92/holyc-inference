@@ -309,6 +309,15 @@ I32 GGUFMetadataReadU64PairChecked(U8 *buf,
                                    U64 *out_first,
                                    U64 *out_second);
 
+I32 GGUFMetadataReadU64QuadChecked(U8 *buf,
+                                   U64 buf_nbytes,
+                                   U64 *cursor,
+                                   U64 table_end,
+                                   U64 *out_first,
+                                   U64 *out_second,
+                                   U64 *out_third,
+                                   U64 *out_fourth);
+
 I32 GGUFMetadataReadU64PairCheckedNoPartial(U8 *buf,
                                             U64 buf_nbytes,
                                             U64 *cursor,
@@ -2437,6 +2446,73 @@ I32 GGUFMetadataReadU64TripleCheckedNoPartial(U8 *buf,
     *out_first = first;
     *out_second = second;
     *out_third = third;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked little-endian U64 quad reader.
+// Contract: stages four U64 decodes through GGUFMetadataReadU64LEChecked and
+// commits outputs + cursor only when all lanes succeed.
+I32 GGUFMetadataReadU64QuadChecked(U8 *buf,
+                                   U64 buf_nbytes,
+                                   U64 *cursor,
+                                   U64 table_end,
+                                   U64 *out_first,
+                                   U64 *out_second,
+                                   U64 *out_third,
+                                   U64 *out_fourth)
+{
+    U64 cur;
+    U64 first;
+    U64 second;
+    U64 third;
+    U64 fourth;
+    I32 err;
+
+    if (!buf || !cursor || !out_first || !out_second || !out_third || !out_fourth)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Stage four scalar decodes through the canonical checked U64 reader so
+    // quad tuples preserve identical bounds/overflow behavior with strict
+    // no-partial commit semantics at the tuple boundary.
+    err = GGUFMetadataReadU64LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &first);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadU64LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &second);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadU64LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &third);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadU64LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &fourth);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_first = first;
+    *out_second = second;
+    *out_third = third;
+    *out_fourth = fourth;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
