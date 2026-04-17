@@ -290,6 +290,14 @@ I32 GGUFMetadataArrayFixedPayloadBytesChecked(U64 elem_count,
                                               U64 elem_width_bytes,
                                               U64 *out_payload_bytes);
 
+I32 GGUFMetadataArrayPayloadSpanFromFixedTypeChecked(U32 elem_type,
+                                                     U64 elem_count,
+                                                     U64 payload_start,
+                                                     U64 table_end,
+                                                     U64 buf_nbytes,
+                                                     U64 *out_payload_bytes,
+                                                     U64 *out_payload_end);
+
 // Validate metadata table byte-window math before any parser cursor movement.
 // Contract: `out_table_end` is written only on success.
 I32 GGUFMetadataTableSpanValidateChecked(U64 table_start,
@@ -536,6 +544,54 @@ I32 GGUFMetadataArrayFixedPayloadBytesChecked(U64 elem_count,
         return err;
 
     *out_payload_bytes = payload_bytes;
+    return GGUF_META_TABLE_OK;
+}
+
+// Compose fixed-width metadata ARRAY payload-byte math and validated payload
+// span bounds in one checked helper for array decode entrypoints.
+// Contract: output pointers are written only on success.
+I32 GGUFMetadataArrayPayloadSpanFromFixedTypeChecked(U32 elem_type,
+                                                     U64 elem_count,
+                                                     U64 payload_start,
+                                                     U64 table_end,
+                                                     U64 buf_nbytes,
+                                                     U64 *out_payload_bytes,
+                                                     U64 *out_payload_end)
+{
+    U64 elem_width_bytes;
+    U64 payload_bytes;
+    U64 payload_end;
+    I32 err;
+
+    if (!out_payload_bytes || !out_payload_end)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    // Resolve canonical fixed element width; variable-width tags are rejected
+    // here so callers never apply fixed `count*width` math to STRING/ARRAY.
+    err = GGUFMetadataArrayFixedElemWidthBytesChecked(elem_type,
+                                                      &elem_width_bytes);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // Compute fixed payload bytes through shared checked multiply helper.
+    err = GGUFMetadataArrayFixedPayloadBytesChecked(elem_count,
+                                                    elem_width_bytes,
+                                                    &payload_bytes);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // Validate `[payload_start, payload_start + payload_bytes)` against table
+    // window and backing buffer bounds before decode loops consume payload.
+    err = GGUFMetadataArrayPayloadSpanValidateChecked(payload_start,
+                                                      payload_bytes,
+                                                      table_end,
+                                                      buf_nbytes,
+                                                      &payload_end);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_payload_bytes = payload_bytes;
+    *out_payload_end = payload_end;
     return GGUF_META_TABLE_OK;
 }
 

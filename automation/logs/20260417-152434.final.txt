@@ -1,0 +1,15 @@
+Done — one deep queue item (`IQ-231`) is fully progressed end-to-end.
+
+**What Changed**
+- Implemented `GGUFMetadataArrayPayloadSpanFromFixedTypeChecked` (prototype + implementation) in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/gguf/metadata.HC:293` and `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/gguf/metadata.HC:553`.
+- Added host parity harness for the new helper in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_gguf_metadata_array_payload_span_from_fixed_type_checked.py:1`.
+- Updated tasks: marked `IQ-231` done, added new unchecked `IQ-246` to keep rolling queue depth in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:425` and `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:440`.
+- Added one-line progress ledger entry in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:697`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_array_payload_span_from_fixed_type_checked.py && python3 tests/test_gguf_metadata_array_fixed_payload_bytes_checked_core.py && python3 tests/test_gguf_metadata_array_payload_span_validate_checked.py`
+- Output: `ok`, `ok`, `ok`.
+
+**Central DB**
+- Logged iteration to `~/Documents/local-codebases/temple-central.db` with `task_id='IQ-231'`, status `pass`, and validation command/result recorded.
+
