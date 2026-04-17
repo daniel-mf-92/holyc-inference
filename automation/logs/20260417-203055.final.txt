@@ -1,0 +1,19 @@
+Implemented and closed this iteration on `IQ-256` end-to-end.
+
+**What Changed**
+- Updated `GGUFMetadataReadF32BitsQuadChecked` to use staged pair composition (`GGUFMetadataReadF32BitsPairChecked` twice), preserving strict all-or-nothing cursor/output commit semantics in `src/gguf/metadata.HC:2456`.
+- Marked `IQ-256` complete in `MASTER_TASKS.md:450`.
+- Added one new unchecked queue item to keep rolling depth (`IQ-271`) in `MASTER_TASKS.md:465`.
+- Added one progress-ledger line for this loop in `MASTER_TASKS.md:470`.
+
+**Validation**
+- `python3 tests/test_gguf_metadata_read_f32bits_quad_checked.py` → `ok`
+- `python3 tests/test_gguf_metadata_read_f32bits_pair_checked.py` → `ok`
+- `python3 tests/test_gguf_metadata_read_f32bitsle_checked.py` → `gguf_metadata_read_f32bitsle_checked_reference_checks=ok`
+- `python3 tests/test_gguf_metadata_parse.py` → `gguf_metadata_reference_checks=ok`
+
+**Central DB Log**
+- Inserted iteration row into `~/Documents/local-codebases/temple-central.db` for `IQ-256` (`status=pass`), latest id now `3009`.
+
+**Queue Policy**
+- Unchecked IQ queue remained compliant (15 before; still 15 after completing `IQ-256` and appending `IQ-271`).

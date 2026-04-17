@@ -2474,38 +2474,24 @@ I32 GGUFMetadataReadF32BitsQuadChecked(U8 *buf,
 
     cur = *cursor;
 
-    // Decode each lane through the explicit no-partial scalar helper so
-    // quad decode guarantees all-or-nothing tuple commit behavior even if a
-    // later lane faults (cursor and outputs remain untouched until success).
-    err = GGUFMetadataReadF32BitsLECheckedNoPartial(buf,
-                                                    buf_nbytes,
-                                                    &cur,
-                                                    table_end,
-                                                    &first_bits);
+    // Decode in two staged pair reads through the canonical checked pair
+    // helper so quad semantics are explicit: each pair commits into locals,
+    // while the caller-visible cursor/outputs commit only after both pairs.
+    err = GGUFMetadataReadF32BitsPairChecked(buf,
+                                             buf_nbytes,
+                                             &cur,
+                                             table_end,
+                                             &first_bits,
+                                             &second_bits);
     if (err != GGUF_META_TABLE_OK)
         return err;
 
-    err = GGUFMetadataReadF32BitsLECheckedNoPartial(buf,
-                                                    buf_nbytes,
-                                                    &cur,
-                                                    table_end,
-                                                    &second_bits);
-    if (err != GGUF_META_TABLE_OK)
-        return err;
-
-    err = GGUFMetadataReadF32BitsLECheckedNoPartial(buf,
-                                                    buf_nbytes,
-                                                    &cur,
-                                                    table_end,
-                                                    &third_bits);
-    if (err != GGUF_META_TABLE_OK)
-        return err;
-
-    err = GGUFMetadataReadF32BitsLECheckedNoPartial(buf,
-                                                    buf_nbytes,
-                                                    &cur,
-                                                    table_end,
-                                                    &fourth_bits);
+    err = GGUFMetadataReadF32BitsPairChecked(buf,
+                                             buf_nbytes,
+                                             &cur,
+                                             table_end,
+                                             &third_bits,
+                                             &fourth_bits);
     if (err != GGUF_META_TABLE_OK)
         return err;
 
