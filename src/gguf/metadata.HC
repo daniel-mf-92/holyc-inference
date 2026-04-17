@@ -140,6 +140,12 @@ I32 GGUFMetadataReadI64LEChecked(U8 *buf,
                                  U64 table_end,
                                  I64 *out_value);
 
+I32 GGUFMetadataReadI64LECheckedNoPartial(U8 *buf,
+                                          U64 buf_nbytes,
+                                          U64 *cursor,
+                                          U64 table_end,
+                                          I64 *out_value);
+
 I32 GGUFMetadataReadF64BitsLEChecked(U8 *buf,
                                      U64 buf_nbytes,
                                      U64 *cursor,
@@ -621,6 +627,24 @@ I32 GGUFMetadataReadI64LEChecked(U8 *buf,
                                  U64 *cursor,
                                  U64 table_end,
                                  I64 *out_value)
+{
+    // Keep legacy symbol as the canonical parser entrypoint while routing
+    // decode through the explicit no-partial-write helper.
+    return GGUFMetadataReadI64LECheckedNoPartial(buf,
+                                                 buf_nbytes,
+                                                 cursor,
+                                                 table_end,
+                                                 out_value);
+}
+
+// Checked little-endian I64 metadata reader with explicit all-or-nothing
+// staging contract. Cursor/output are committed only after full U64 decode
+// succeeds through the shared checked U64 reader.
+I32 GGUFMetadataReadI64LECheckedNoPartial(U8 *buf,
+                                          U64 buf_nbytes,
+                                          U64 *cursor,
+                                          U64 table_end,
+                                          I64 *out_value)
 {
     U64 cur;
     U64 raw_u64;
