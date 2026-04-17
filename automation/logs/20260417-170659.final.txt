@@ -1,0 +1,16 @@
+Done — I executed one full iteration on `IQ-238` end-to-end.
+
+**Completed**
+- Implemented `GGUFMetadataReadI32TripleChecked` with staged cursor/output commit and strict no-partial-write tuple semantics in `src/gguf/metadata.HC:1403` (prototype at `src/gguf/metadata.HC:195`).
+- Added host-side parity harness `tests/test_gguf_metadata_read_i32_triple_checked.py:2` covering NULL_PTR, third-lane failure no-commit, overflow passthrough, success decode, and randomized parity.
+- Updated queue/ledger: marked `IQ-238` done at `MASTER_TASKS.md:432`, appended one new unchecked item `IQ-253` at `MASTER_TASKS.md:447`, and added a one-line progress ledger entry at `MASTER_TASKS.md:712`.
+- Logged to central DB (`temple-central.db`) with `task_id='IQ-238'` and status `pass`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_i32_triple_checked.py && python3 tests/test_gguf_metadata_read_i32_pair_checked.py && python3 tests/test_gguf_metadata_read_i32le_checked.py && python3 tests/test_gguf_metadata_parse.py`
+- Output:
+  - `ok`
+  - `gguf_metadata_read_i32_pair_checked_reference_checks=ok`
+  - `gguf_metadata_read_i32le_checked_reference_checks=ok`
+  - `gguf_metadata_reference_checks=ok`
+- Queue depth check after update: 15 unchecked (`first_unchecked=IQ-239`, `last_id=IQ-253`).
