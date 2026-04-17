@@ -224,6 +224,57 @@ I32 FPQ16ExpArrayChecked(I64 *input_q16,
     return FP_Q16_OK;
 }
 
+// Checked vector exp helper for callers that already pre-clamped lanes into
+// the scalar-domain contract:
+//   EXP_Q16_MIN_INPUT <= input_q16[i] <= EXP_Q16_MAX_INPUT
+// On any out-of-domain lane this returns BAD_PARAM and performs zero writes,
+// so split-phase clamp/eval callers never observe partially-updated output.
+I32 FPQ16ExpArrayFromClampedInputChecked(I64 *input_q16,
+                                         I64 *output_q16,
+                                         I64 count)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I32 status;
+
+    if (!input_q16 || !output_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (!count)
+        return FP_Q16_OK;
+
+    // Guard pointer-span arithmetic used by indexed lane access.
+    last_index = count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)input_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)output_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Fail fast before any writes so output remains untouched on BAD_PARAM.
+    for (i = 0; i < count; i++)
+    {
+        if (input_q16[i] < EXP_Q16_MIN_INPUT ||
+            input_q16[i] > EXP_Q16_MAX_INPUT)
+            return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    for (i = 0; i < count; i++)
+    {
+        status = FPQ16ExpFromClampedInputChecked(input_q16[i],
+                                                 &output_q16[i]);
+        if (status)
+            return status;
+    }
+
+    return FP_Q16_OK;
+}
+
 I64 FPQ16Exp(I64 x)
 {
     I32 clamp_status;
