@@ -89,10 +89,14 @@ I32 FPQ16ExpClampArrayToInputDomainChecked(I64 *input_q16,
     return FP_Q16_OK;
 }
 
-I64 FPQ16Exp(I64 x)
+// Checked Q16 exp evaluation for callers that already performed input-domain
+// clamping. This helper refuses out-of-domain inputs instead of clamping:
+//   requires EXP_Q16_MIN_INPUT <= clamped_input_q16 <= EXP_Q16_MAX_INPUT
+//   returns BAD_PARAM on domain violations
+// This keeps split-phase clamp+eval vector paths explicit and auditable.
+I32 FPQ16ExpFromClampedInputChecked(I64 clamped_input_q16,
+                                    I64 *out_exp_q16)
 {
-    I32 clamp_status;
-    I64 clamped_x;
     I64 k;
     I64 r;
     I64 r2;
@@ -104,23 +108,31 @@ I64 FPQ16Exp(I64 x)
     I64 t4;
     I64 poly;
 
-    clamp_status = FPQ16ExpClampToInputDomainChecked(x,
-                                                     &clamped_x);
-    if (clamp_status)
-        return 0;
+    if (!out_exp_q16)
+        return FP_Q16_ERR_NULL_PTR;
 
-    // Keep scalar exp saturation behavior exactly explicit at boundaries.
-    if (clamped_x >= EXP_Q16_MAX_INPUT)
-        return I64_MAX_VALUE;
-    if (clamped_x <= EXP_Q16_MIN_INPUT)
-        return 0;
+    if (clamped_input_q16 < EXP_Q16_MIN_INPUT ||
+        clamped_input_q16 > EXP_Q16_MAX_INPUT)
+        return FP_Q16_ERR_BAD_PARAM;
 
-    // Range reduction: x = k*ln(2) + r, where r in [0, ln(2))
-    k = clamped_x / EXP_Q16_LN2;
-    if (clamped_x < 0 && (clamped_x % EXP_Q16_LN2))
+    // Preserve scalar saturation contract exactly on domain boundaries.
+    if (clamped_input_q16 >= EXP_Q16_MAX_INPUT)
+    {
+        *out_exp_q16 = I64_MAX_VALUE;
+        return FP_Q16_OK;
+    }
+    if (clamped_input_q16 <= EXP_Q16_MIN_INPUT)
+    {
+        *out_exp_q16 = 0;
+        return FP_Q16_OK;
+    }
+
+    // Range reduction: x = k*ln(2) + r, where r in [0, ln(2)).
+    k = clamped_input_q16 / EXP_Q16_LN2;
+    if (clamped_input_q16 < 0 && (clamped_input_q16 % EXP_Q16_LN2))
         k--;
 
-    r = clamped_x - (k * EXP_Q16_LN2);
+    r = clamped_input_q16 - (k * EXP_Q16_LN2);
 
     // exp(r) ~= 1 + r + r^2/2 + r^3/6 + r^4/24
     r2 = FPQ16Mul(r, r);
@@ -137,16 +149,44 @@ I64 FPQ16Exp(I64 x)
     if (k >= 0)
     {
         if (k >= 30)
-            return I64_MAX_VALUE;
+        {
+            *out_exp_q16 = I64_MAX_VALUE;
+            return FP_Q16_OK;
+        }
 
         if (poly > (I64_MAX_VALUE >> k))
-            return I64_MAX_VALUE;
+        {
+            *out_exp_q16 = I64_MAX_VALUE;
+            return FP_Q16_OK;
+        }
 
-        return poly << k;
+        *out_exp_q16 = poly << k;
+        return FP_Q16_OK;
     }
 
     if (k <= -63)
+    {
+        *out_exp_q16 = 0;
+        return FP_Q16_OK;
+    }
+
+    *out_exp_q16 = poly >> (-k);
+    return FP_Q16_OK;
+}
+
+I64 FPQ16Exp(I64 x)
+{
+    I32 clamp_status;
+    I64 clamped_x;
+    I64 out_exp_q16;
+
+    clamp_status = FPQ16ExpClampToInputDomainChecked(x,
+                                                     &clamped_x);
+    if (clamp_status)
         return 0;
 
-    return poly >> (-k);
+    if (FPQ16ExpFromClampedInputChecked(clamped_x, &out_exp_q16))
+        return 0;
+
+    return out_exp_q16;
 }

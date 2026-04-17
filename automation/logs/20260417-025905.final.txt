@@ -1,0 +1,17 @@
+Implemented and closed `IQ-164` end-to-end with queue depth preserved.
+
+**What Changed**
+- Added `FPQ16ExpFromClampedInputChecked` with strict pre-clamped domain contract (`BAD_PARAM` outside `[EXP_Q16_MIN_INPUT, EXP_Q16_MAX_INPUT]`) and boundary saturation behavior in `src/math/intexp.HC:97`.
+- Refactored scalar `FPQ16Exp` to delegate eval to the new checked helper (no math drift, same clamp-first behavior) in `src/math/intexp.HC:188`.
+- Added focused parity harness for the new helper in `tests/test_intexp_exp_from_clamped_input_checked.py:2`.
+
+**Task/Queue/DB Updates**
+- Marked `IQ-164` done and appended new rolling queue item `IQ-167` in `MASTER_TASKS.md:355` and `MASTER_TASKS.md:358`.
+- Added one-line progress ledger entry for this iteration in `MASTER_TASKS.md:365`.
+- Logged iteration row to central DB (`~/Documents/local-codebases/temple-central.db`) with task `IQ-164`, status `pass`, validation command, and notes.
+- Queue depth check after update: `15` unchecked `IQ-` items (policy satisfied).
+
+**Validation Run**
+- `python3 tests/test_intexp_exp_from_clamped_input_checked.py` → `intexp_exp_from_clamped_input_checked_reference_checks=ok`
+- `python3 tests/test_intexp_clamp_to_input_domain_checked.py` → `intexp_clamp_to_input_domain_checked_reference_checks=ok`
+- `python3 tests/test_intexp_clamp_array_to_input_domain_checked.py` → `intexp_clamp_array_to_input_domain_checked_reference_checks=ok`
