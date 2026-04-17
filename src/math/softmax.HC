@@ -302,6 +302,169 @@ I32 FPQ16SoftmaxNormalizePhaseNoAliasChecked(I64 *exp_lanes_q16,
                                              probs_q16);
 }
 
+// Internal checked preflight for normalization math.
+// Purpose:
+//   - Re-run normalize arithmetic checks without writing output lanes.
+//   - Lets composed helpers fail before mutating caller probability buffers.
+// Contracts mirror FPQ16SoftmaxNormalizePhaseChecked except no output pointer.
+I32 FPQ16SoftmaxNormalizePhasePreflightChecked(I64 *exp_lanes_q16,
+                                               I64 lane_count,
+                                               I64 exp_sum_q16)
+{
+    I64 i;
+    I64 pass;
+    I64 idx;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 prob_q16;
+    I64 prob_sum_q16;
+    I64 diff_q16;
+    I64 remaining_q16;
+    I64 take_q16;
+    I64 max_exp_q16;
+    I64 max_exp_index;
+    I32 status;
+
+    if (!exp_lanes_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (exp_sum_q16 <= 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (!lane_count)
+        return FP_Q16_OK;
+
+    last_index = lane_count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)exp_lanes_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    max_exp_q16 = exp_lanes_q16[0];
+    max_exp_index = 0;
+    prob_sum_q16 = 0;
+
+    for (i = 0; i < lane_count; i++)
+    {
+        status = FPQ16MulDivRoundedChecked(exp_lanes_q16[i],
+                                           FP_Q16_ONE,
+                                           exp_sum_q16,
+                                           &prob_q16);
+        if (status)
+            return status;
+
+        if (prob_q16 > (I64_MAX_VALUE - prob_sum_q16))
+            return FP_Q16_ERR_OVERFLOW;
+        prob_sum_q16 += prob_q16;
+
+        if (exp_lanes_q16[i] > max_exp_q16)
+        {
+            max_exp_q16 = exp_lanes_q16[i];
+            max_exp_index = i;
+        }
+    }
+
+    diff_q16 = FP_Q16_ONE - prob_sum_q16;
+    if (!diff_q16)
+        return FP_Q16_OK;
+
+    if (diff_q16 > 0)
+    {
+        status = FPQ16MulDivRoundedChecked(exp_lanes_q16[max_exp_index],
+                                           FP_Q16_ONE,
+                                           exp_sum_q16,
+                                           &prob_q16);
+        if (status)
+            return status;
+        if (prob_q16 > (I64_MAX_VALUE - diff_q16))
+            return FP_Q16_ERR_OVERFLOW;
+        return FP_Q16_OK;
+    }
+
+    remaining_q16 = -diff_q16;
+    for (pass = 0; pass < lane_count && remaining_q16 > 0; pass++)
+    {
+        idx = max_exp_index + pass;
+        if (idx >= lane_count)
+            idx -= lane_count;
+
+        status = FPQ16MulDivRoundedChecked(exp_lanes_q16[idx],
+                                           FP_Q16_ONE,
+                                           exp_sum_q16,
+                                           &take_q16);
+        if (status)
+            return status;
+
+        if (take_q16 > remaining_q16)
+            take_q16 = remaining_q16;
+
+        remaining_q16 -= take_q16;
+    }
+
+    if (remaining_q16)
+        return FP_Q16_ERR_OVERFLOW;
+
+    return FP_Q16_OK;
+}
+
+// Checked composed helper for immutable-logit, no-alias split-phase softmax.
+// Pipeline:
+//   1) exp_lanes_q16 <- exp(preclamped_logits_q16)
+//   2) exp_sum_q16   <- checked sum(exp_lanes_q16)
+//   3) probs_q16     <- normalize(exp_lanes_q16 / exp_sum_q16)
+// Contracts:
+//   - All pointers non-null
+//   - lane_count >= 0
+//   - preclamped_logits_q16, exp_lanes_q16, probs_q16 are pairwise disjoint
+//   - No partial writes to probs_q16 on any failure path
+// Notes:
+//   - Uses no-alias split-phase helpers so arithmetic stays centralized.
+//   - Runs a normalization preflight before writing probs_q16.
+I32 FPQ16SoftmaxFromPreclampedNoAliasChecked(I64 *preclamped_logits_q16,
+                                             I64 *exp_lanes_q16,
+                                             I64 lane_count,
+                                             I64 *probs_q16)
+{
+    I64 exp_sum_q16;
+    I32 status;
+
+    if (!preclamped_logits_q16 || !exp_lanes_q16 || !probs_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (preclamped_logits_q16 == exp_lanes_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (preclamped_logits_q16 == probs_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (exp_lanes_q16 == probs_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    status = FPQ16SoftmaxExpPhaseFromPreclampedNoAliasChecked(preclamped_logits_q16,
+                                                               exp_lanes_q16,
+                                                               lane_count,
+                                                               &exp_sum_q16);
+    if (status)
+        return status;
+
+    if (!lane_count)
+        return FP_Q16_OK;
+
+    status = FPQ16SoftmaxNormalizePhasePreflightChecked(exp_lanes_q16,
+                                                        lane_count,
+                                                        exp_sum_q16);
+    if (status)
+        return status;
+
+    return FPQ16SoftmaxNormalizePhaseNoAliasChecked(exp_lanes_q16,
+                                                    lane_count,
+                                                    exp_sum_q16,
+                                                    probs_q16);
+}
+
 U0 FPQ16Softmax(I64 *logits, I64 *probs, I64 count)
 {
     I64 i;

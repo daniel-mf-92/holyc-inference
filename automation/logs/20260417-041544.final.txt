@@ -1,0 +1,25 @@
+Completed one full iteration end-to-end with deep HolyC work and queue maintenance.
+
+**What changed**
+- Implemented `FPQ16SoftmaxFromPreclampedNoAliasChecked` in `src/math/softmax.HC:426` as a composed, checked no-alias split-phase softmax entrypoint.
+- Added `FPQ16SoftmaxNormalizePhasePreflightChecked` in `src/math/softmax.HC:304` to enforce fail-fast semantics before any `probs_q16` writes.
+- Added parity harness `tests/test_softmax_from_preclamped_no_alias_checked.py:1` covering alias rejection, domain failure no-partial-write, normalize-overflow fail-fast behavior, and randomized split-phase parity.
+- Updated queue/ledger in `MASTER_TASKS.md:366` (marked `IQ-176` done) and appended one ledger line at `MASTER_TASKS.md:376`.
+- Appended new rolling queue items (`IQ-177`..`IQ-179`) so unchecked depth remains >=15.
+
+**Validation run**
+- `python3 tests/test_softmax_from_preclamped_no_alias_checked.py`
+- `python3 tests/test_softmax_exp_phase_from_preclamped_no_alias_checked.py`
+- `python3 tests/test_softmax_normalize_phase_no_alias_checked.py`
+- `python3 tests/test_softmax_normalize_phase_checked.py`
+- Output:
+  - `softmax_from_preclamped_no_alias_checked_reference_checks=ok`
+  - `softmax_exp_phase_from_preclamped_no_alias_checked_reference_checks=ok`
+  - `softmax_normalize_phase_no_alias_checked_reference_checks=ok`
+  - `softmax_normalize_phase_checked_reference_checks=ok`
+
+**Central DB log**
+- Inserted iteration row into `~/Documents/local-codebases/temple-central.db` with `task_id='IQ-176'`, `status='pass'`.
+- Verified latest row: `2018|inference|IQ-176|pass|ok`.
+
+Queue status now: `17` unchecked `IQ-` items (policy satisfied).
