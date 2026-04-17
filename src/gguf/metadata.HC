@@ -412,7 +412,7 @@ I32 GGUFMetadataReadI64LEChecked(U8 *buf,
 // Checked little-endian FLOAT64 bit-pattern metadata reader.
 // Runtime remains integer-only: the 64-bit payload is returned as raw bits
 // so callers can audit exact IEEE754 encodings without float math.
-// Contract: writes  and advances  only on success.
+// Contract: writes `*out_bits` and advances `*cursor` only on success.
 I32 GGUFMetadataReadF64BitsLEChecked(U8 *buf,
                                      U64 buf_nbytes,
                                      U64 *cursor,

@@ -199,6 +199,50 @@ def test_nan_payload_bits_are_preserved_exactly() -> None:
     assert cursor[0] == 8
 
 
+
+
+def test_cursor_beyond_table_end_is_bad_param_and_no_commit() -> None:
+    buf = [0x11] * 16
+    cursor = [9]
+    out_bits = [0xDEADBEEFDEADBEEF]
+
+    err = gguf_metadata_read_f64bitsle_checked(
+        buf,
+        len(buf),
+        cursor,
+        8,
+        out_bits,
+    )
+
+    assert err == GGUF_META_TABLE_ERR_BAD_PARAM
+    assert cursor[0] == 9
+    assert out_bits[0] == 0xDEADBEEFDEADBEEF
+
+
+def test_i64_domain_overflow_surfaces_and_no_commit() -> None:
+    buf = [0x22] * 16
+    out_seed = 0x123456789ABCDEF0
+
+    cursor = [0]
+    out_bits = [out_seed]
+    err = gguf_metadata_read_f64bitsle_checked(buf, (1 << 63), cursor, 16, out_bits)
+    assert err == GGUF_META_TABLE_ERR_OVERFLOW
+    assert cursor[0] == 0
+    assert out_bits[0] == out_seed
+
+    cursor = [0]
+    out_bits = [out_seed]
+    err = gguf_metadata_read_f64bitsle_checked(buf, len(buf), cursor, (1 << 63), out_bits)
+    assert err == GGUF_META_TABLE_ERR_OVERFLOW
+    assert cursor[0] == 0
+    assert out_bits[0] == out_seed
+
+    cursor = [(1 << 63)]
+    out_bits = [out_seed]
+    err = gguf_metadata_read_f64bitsle_checked(buf, len(buf), cursor, len(buf), out_bits)
+    assert err == GGUF_META_TABLE_ERR_OVERFLOW
+    assert cursor[0] == (1 << 63)
+    assert out_bits[0] == out_seed
 def test_randomized_parity() -> None:
     rng = random.Random(20260417_198)
 
@@ -231,6 +275,8 @@ def run() -> None:
     test_short_reads_do_not_advance_or_write()
     test_success_preserves_known_ieee754_bit_patterns()
     test_nan_payload_bits_are_preserved_exactly()
+    test_cursor_beyond_table_end_is_bad_param_and_no_commit()
+    test_i64_domain_overflow_surfaces_and_no_commit()
     test_randomized_parity()
     print("gguf_metadata_read_f64bitsle_checked_reference_checks=ok")
 

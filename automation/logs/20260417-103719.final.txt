@@ -1,0 +1,13 @@
+Done — one full unattended iteration is complete for `IQ-198`.
+
+- Progressed exactly one queue item: `IQ-198` marked complete in `MASTER_TASKS.md:391`.
+- Kept queue depth policy: appended new unchecked `IQ-215` in `MASTER_TASKS.md:408` so unchecked count remains 15.
+- Hardened `IQ-198` contract wording in `src/gguf/metadata.HC:415` (`*out_bits` / `*cursor` success-only semantics).
+- Added deeper adversarial parity coverage in `tests/test_gguf_metadata_read_f64bitsle_checked.py:204` and `tests/test_gguf_metadata_read_f64bitsle_checked.py:222`, wired into runner at `tests/test_gguf_metadata_read_f64bitsle_checked.py:273`.
+- Added one-line progress ledger entry at `MASTER_TASKS.md:415` (`loop-186`).
+- Logged central DB iteration in `~/Documents/local-codebases/temple-central.db` for task `IQ-198` with validation metadata.
+
+Validation output:
+- `python3 tests/test_gguf_metadata_read_f64bitsle_checked.py` → `gguf_metadata_read_f64bitsle_checked_reference_checks=ok`
+- `python3 tests/test_gguf_metadata_read_u64le_checked.py` → `gguf_metadata_read_u64le_checked_reference_checks=ok`
+- `python3 tests/test_gguf_metadata_parse.py` → `gguf_metadata_reference_checks=ok`
