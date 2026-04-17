@@ -12,6 +12,15 @@
 #define EXP_Q16_LN2       45426   // round(ln(2) * 65536)
 #define EXP_Q16_MAX_INPUT 655360  // +10.0 in Q16
 #define EXP_Q16_MIN_INPUT -655360 // -10.0 in Q16
+#define EXP_Q16_POLY_C0   FP_Q16_ONE
+#define EXP_Q16_POLY_C2_DIV 2
+#define EXP_Q16_POLY_C3_DIV 6
+#define EXP_Q16_POLY_C4_DIV 24
+#define EXP_Q16_LEFT_SHIFT_SAT_K   30
+#define EXP_Q16_RIGHT_SHIFT_ZERO_K -63
+
+#define EXP_Q16_SAT_MIN_OUTPUT 0
+#define EXP_Q16_SAT_MAX_OUTPUT I64_MAX_VALUE
 
 #define I64_MAX_VALUE 0x7FFFFFFFFFFFFFFF
 #define U64_MAX_VALUE 0xFFFFFFFFFFFFFFFF
@@ -89,6 +98,44 @@ I32 FPQ16ExpClampArrayToInputDomainChecked(I64 *input_q16,
     return FP_Q16_OK;
 }
 
+// Checked base-2 range split for clamped Q16 exp inputs.
+// Decomposes x into:
+//   x = k*ln(2) + r
+// where k is floor(x/ln2) and remainder r satisfies 0 <= r < ln(2).
+//
+// This keeps range-reduction math centralized and auditable for every exp
+// caller while validating the ln(2) base constant at runtime.
+I32 FPQ16ExpSplitBase2FromClampedInputChecked(I64 clamped_input_q16,
+                                              I64 *out_k,
+                                              I64 *out_r_q16)
+{
+    I64 k;
+    I64 r;
+
+    if (!out_k || !out_r_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (clamped_input_q16 < EXP_Q16_MIN_INPUT ||
+        clamped_input_q16 > EXP_Q16_MAX_INPUT)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (EXP_Q16_LN2 <= 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Floor division so negative inputs preserve [0, ln(2)) remainder.
+    k = clamped_input_q16 / EXP_Q16_LN2;
+    if (clamped_input_q16 < 0 && (clamped_input_q16 % EXP_Q16_LN2))
+        k--;
+
+    r = clamped_input_q16 - (k * EXP_Q16_LN2);
+    if (r < 0 || r >= EXP_Q16_LN2)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_k = k;
+    *out_r_q16 = r;
+    return FP_Q16_OK;
+}
+
 // Checked Q16 exp evaluation for callers that already performed input-domain
 // clamping. This helper refuses out-of-domain inputs instead of clamping:
 //   requires EXP_Q16_MIN_INPUT <= clamped_input_q16 <= EXP_Q16_MAX_INPUT
@@ -107,6 +154,7 @@ I32 FPQ16ExpFromClampedInputChecked(I64 clamped_input_q16,
     I64 t3;
     I64 t4;
     I64 poly;
+    I32 status;
 
     if (!out_exp_q16)
         return FP_Q16_ERR_NULL_PTR;
@@ -118,21 +166,20 @@ I32 FPQ16ExpFromClampedInputChecked(I64 clamped_input_q16,
     // Preserve scalar saturation contract exactly on domain boundaries.
     if (clamped_input_q16 >= EXP_Q16_MAX_INPUT)
     {
-        *out_exp_q16 = I64_MAX_VALUE;
+        *out_exp_q16 = EXP_Q16_SAT_MAX_OUTPUT;
         return FP_Q16_OK;
     }
     if (clamped_input_q16 <= EXP_Q16_MIN_INPUT)
     {
-        *out_exp_q16 = 0;
+        *out_exp_q16 = EXP_Q16_SAT_MIN_OUTPUT;
         return FP_Q16_OK;
     }
 
-    // Range reduction: x = k*ln(2) + r, where r in [0, ln(2)).
-    k = clamped_input_q16 / EXP_Q16_LN2;
-    if (clamped_input_q16 < 0 && (clamped_input_q16 % EXP_Q16_LN2))
-        k--;
-
-    r = clamped_input_q16 - (k * EXP_Q16_LN2);
+    status = FPQ16ExpSplitBase2FromClampedInputChecked(clamped_input_q16,
+                                                       &k,
+                                                       &r);
+    if (status)
+        return status;
 
     // exp(r) ~= 1 + r + r^2/2 + r^3/6 + r^4/24
     r2 = FPQ16Mul(r, r);
@@ -140,23 +187,23 @@ I32 FPQ16ExpFromClampedInputChecked(I64 clamped_input_q16,
     r4 = FPQ16Mul(r3, r);
 
     t1 = r;
-    t2 = r2 / 2;
-    t3 = r3 / 6;
-    t4 = r4 / 24;
+    t2 = r2 / EXP_Q16_POLY_C2_DIV;
+    t3 = r3 / EXP_Q16_POLY_C3_DIV;
+    t4 = r4 / EXP_Q16_POLY_C4_DIV;
 
-    poly = FP_Q16_ONE + t1 + t2 + t3 + t4;
+    poly = EXP_Q16_POLY_C0 + t1 + t2 + t3 + t4;
 
     if (k >= 0)
     {
-        if (k >= 30)
+        if (k >= EXP_Q16_LEFT_SHIFT_SAT_K)
         {
-            *out_exp_q16 = I64_MAX_VALUE;
+            *out_exp_q16 = EXP_Q16_SAT_MAX_OUTPUT;
             return FP_Q16_OK;
         }
 
         if (poly > (I64_MAX_VALUE >> k))
         {
-            *out_exp_q16 = I64_MAX_VALUE;
+            *out_exp_q16 = EXP_Q16_SAT_MAX_OUTPUT;
             return FP_Q16_OK;
         }
 
@@ -164,9 +211,9 @@ I32 FPQ16ExpFromClampedInputChecked(I64 clamped_input_q16,
         return FP_Q16_OK;
     }
 
-    if (k <= -63)
+    if (k <= EXP_Q16_RIGHT_SHIFT_ZERO_K)
     {
-        *out_exp_q16 = 0;
+        *out_exp_q16 = EXP_Q16_SAT_MIN_OUTPUT;
         return FP_Q16_OK;
     }
 

@@ -1,0 +1,22 @@
+Done — I completed one full iteration on `IQ-020` end-to-end.
+
+**What I changed**
+- Implemented Q16 exp base constants + saturation constants in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/math/intexp.HC:12`.
+- Added new HolyC helper `FPQ16ExpSplitBase2FromClampedInputChecked` (checked `x = k*ln2 + r`, `0<=r<ln2`) in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/math/intexp.HC:108`.
+- Refactored `FPQ16ExpFromClampedInputChecked` to use the split helper + shared constants (no behavior drift, same integer-only path) in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/math/intexp.HC:144`.
+- Added host-side parity harness `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_intexp_split_base2_from_clamped_input_checked.py:1`.
+
+**Validation run**
+- `python3 tests/test_intexp_clamp_to_input_domain_checked.py && python3 tests/test_intexp_exp_from_clamped_input_checked.py && python3 tests/test_intexp_exp_array_checked.py && python3 tests/test_intexp_split_base2_from_clamped_input_checked.py`
+- Output:
+  - `intexp_clamp_to_input_domain_checked_reference_checks=ok`
+  - `intexp_exp_from_clamped_input_checked_reference_checks=ok`
+  - `intexp_exp_array_checked_reference_checks=ok`
+  - `intexp_split_base2_from_clamped_input_checked_reference_checks=ok`
+
+**Queue + ledger + DB**
+- Marked `IQ-020` done in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:208`.
+- Added new unchecked queue item `IQ-182` to keep rolling depth in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:373`.
+- Added one progress-ledger line in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:565`.
+- Logged to central DB: inserted `iterations.id=2075` for `IQ-020` (`pass`) in `~/Documents/local-codebases/temple-central.db`.
+- Unchecked `IQ-` depth is maintained at `15`.

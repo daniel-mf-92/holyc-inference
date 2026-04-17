@@ -205,7 +205,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-017 Write host-side GGUF header/tensor dump fixture plan in `tests/README.md` for llama.cpp parity checks (WS0-05, WS2-05)
 - [x] IQ-018 Create `tests/README.md` skeleton for llama.cpp parity fixtures (header, metadata, tensor offsets) (WS0-05, WS2-05)
 - [x] IQ-019 Create `src/math/fixedpoint.HC` skeleton with Q16 constants, core type aliases, and TODO stubs for mul/div helpers (WS1-01)
-- [ ] IQ-020 Implement Q16 integer exponent range clamp and base constants in `src/math/intexp.HC` (WS1-02)
+- [x] IQ-020 Implement Q16 integer exponent range clamp and base constants in `src/math/intexp.HC` (WS1-02)
 - [ ] IQ-021 Add host-side Q16 exp parity harness in `tests/test_intexp_q16.py` against `math.exp` samples (WS1-05)
 - [ ] IQ-022 Implement GGUF header constants and struct layout notes in `src/gguf/header.HC` before parser logic (WS2-01)
 - [ ] IQ-023 Create `src/math/rmsnorm.HC` skeleton with Q16 constants, tensor shape assumptions, and TODO stubs for scale/variance accumulation (WS1-04)
@@ -370,6 +370,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] IQ-179 Implement HolyC helper `RoPEQ16RotateHeadRangeByPositionCheckedStrided` in `src/model/rope.HC` to apply checked rotary updates over strided token-head slabs (`token_stride_q16`) for KV-cache-aligned WS5 attention block layouts (WS5-01)
 - [ ] IQ-180 Implement HolyC helper `FPQ16SoftmaxFromPreclampedCheckedWithSumOut` in `src/math/softmax.HC` to compose alias-permitted split-phase softmax and return `exp_sum_q16` for attention diagnostics while preserving checked no-partial-write semantics (WS1-03, WS5-02)
 - [ ] IQ-181 Implement HolyC helper `FPQ16MulDivArrayRoundedChecked` in `src/math/fixedpoint.HC` to compute elementwise single-rounding `(a[i]*b[i])/d[i]` with checked no-partial-write semantics for RMSNorm and attention scaling call sites (WS1-01, WS1-04)
+- [ ] IQ-182 Add host-side parity harness `tests/test_intexp_split_base2_from_clamped_input_checked.py` validating base-2 split invariants (`x = k*ln2 + r`, `0<=r<ln2`) and BAD_PARAM/NULL_PTR contracts for `FPQ16ExpSplitBase2FromClampedInputChecked` (WS1-05)
 
 
 ## Progress Ledger
@@ -561,3 +562,4 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 | 2026-04-16 | loop-099 | IQ-118 AVX2 tiled preflight unification | done | Unified AVX2 tiled Q32/Q16 preflight through `Q8_0MatMulTiledValidateArgsChecked` in `src/matmul/q8_0_matmul.HC`; `python3 tests/test_q8_0_matmul_tiled_avx2_q32.py && python3 tests/test_q8_0_matmul_tiled_avx2_q16.py` passed |
 | 2026-04-16 | loop-117 | IQ-137 RoPE head-slice rotate kernel | done | Added `RoPEQ16RotateHeadByPositionChecked` (+ checked `RoPETryMulI64Checked`) in `src/model/rope.HC` and parity harness `tests/test_rope_q16_rotate_head_position.py`; `python3 tests/test_rope_q16_angle_step.py && python3 tests/test_rope_q16_angle_position.py && python3 tests/test_rope_q16_rotate_pair.py && python3 tests/test_rope_q16_rotate_pair_position.py && python3 tests/test_rope_q16_rotate_head_position.py` passed |
 | 2026-04-17 | loop-118 | IQ-147 token-window range parity harness | done | Added `tests/test_rope_q16_rotate_head_range_token_window.py`; `python3 tests/test_rope_q16_rotate_head_range_token_window.py && python3 tests/test_rope_q16_rotate_head_range_preflighted_position.py && python3 tests/test_rope_q16_rotate_head_range_position.py && python3 tests/test_rope_q16_rotate_head_position.py && python3 tests/test_rope_q16_angle_step.py` passed |
+| 2026-04-17 | loop-159 | IQ-020 exp clamp/base constants | done | Added `FPQ16ExpSplitBase2FromClampedInputChecked` and shared Q16 exp base/saturation constants in `src/math/intexp.HC`, plus parity harness `tests/test_intexp_split_base2_from_clamped_input_checked.py`; `python3 tests/test_intexp_clamp_to_input_domain_checked.py && python3 tests/test_intexp_exp_from_clamped_input_checked.py && python3 tests/test_intexp_exp_array_checked.py && python3 tests/test_intexp_split_base2_from_clamped_input_checked.py` passed |
