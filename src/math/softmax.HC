@@ -21,6 +21,9 @@ I64 FPQ16Ln(I64 x_q16);
 I32 FPQ16ExpArrayFromClampedInputChecked(I64 *input_q16,
                                          I64 *output_q16,
                                          I64 count);
+I32 FPQ16ExpArrayCheckedNoAliasChecked(I64 *input_q16,
+                                       I64 *output_q16,
+                                       I64 count);
 
 // Checked softmax split-phase helper for pre-clamped logits.
 // Phase performed here:
@@ -72,6 +75,73 @@ I32 FPQ16SoftmaxExpPhaseFromPreclampedChecked(I64 *preclamped_logits_q16,
     status = FPQ16ExpArrayFromClampedInputChecked(preclamped_logits_q16,
                                                   exp_lanes_q16,
                                                   lane_count);
+    if (status)
+        return status;
+
+    exp_sum_q16 = 0;
+    for (i = 0; i < lane_count; i++)
+    {
+        if (exp_lanes_q16[i] > (I64_MAX_VALUE - exp_sum_q16))
+            return FP_Q16_ERR_OVERFLOW;
+        exp_sum_q16 += exp_lanes_q16[i];
+    }
+
+    *out_exp_sum_q16 = exp_sum_q16;
+    return FP_Q16_OK;
+}
+
+// Checked no-alias softmax exp-phase helper for immutable-logit callers.
+// Phase performed here:
+//   1) exp_lanes_q16[i] = exp(preclamped_logits_q16[i])
+//   2) out_exp_sum_q16  = sum_i exp_lanes_q16[i] (checked I64 add)
+// Contracts:
+//   - All pointers must be non-null
+//   - lane_count must be >= 0
+//   - preclamped_logits_q16 and exp_lanes_q16 must each address lane_count I64s
+//   - preclamped_logits_q16 and exp_lanes_q16 must be disjoint buffers
+// Notes:
+//   - This reuses shared checked span+sum logic from
+//     FPQ16SoftmaxExpPhaseFromPreclampedChecked so no-alias and alias-permitted
+//     callers stay bit-identical other than explicit alias rejection.
+I32 FPQ16SoftmaxExpPhaseFromPreclampedNoAliasChecked(I64 *preclamped_logits_q16,
+                                                     I64 *exp_lanes_q16,
+                                                     I64 lane_count,
+                                                     I64 *out_exp_sum_q16)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 exp_sum_q16;
+    I32 status;
+
+    if (!preclamped_logits_q16 || !exp_lanes_q16 || !out_exp_sum_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (preclamped_logits_q16 == exp_lanes_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Empty vectors are valid: no lanes, zero sum.
+    if (!lane_count)
+    {
+        *out_exp_sum_q16 = 0;
+        return FP_Q16_OK;
+    }
+
+    // Guard pointer-span arithmetic before any indexed access.
+    last_index = lane_count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)preclamped_logits_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)exp_lanes_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    status = FPQ16ExpArrayCheckedNoAliasChecked(preclamped_logits_q16,
+                                                exp_lanes_q16,
+                                                lane_count);
     if (status)
         return status;
 
