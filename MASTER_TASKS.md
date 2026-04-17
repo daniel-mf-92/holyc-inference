@@ -203,7 +203,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-015 Implement Q8_0 block struct and dequantize in `src/quant/q8_0.HC` (WS3-04)
 - [x] IQ-016 Draft `docs/GGUF_FORMAT.md` skeleton with sections for header, metadata, tensor info, and alignment rules (WS0-02)
 - [x] IQ-017 Write host-side GGUF header/tensor dump fixture plan in `tests/README.md` for llama.cpp parity checks (WS0-05, WS2-05)
-- [ ] IQ-018 Create `tests/README.md` skeleton for llama.cpp parity fixtures (header, metadata, tensor offsets) (WS0-05, WS2-05)
+- [x] IQ-018 Create `tests/README.md` skeleton for llama.cpp parity fixtures (header, metadata, tensor offsets) (WS0-05, WS2-05)
 - [ ] IQ-019 Create `src/math/fixedpoint.HC` skeleton with Q16 constants, core type aliases, and TODO stubs for mul/div helpers (WS1-01)
 - [ ] IQ-020 Implement Q16 integer exponent range clamp and base constants in `src/math/intexp.HC` (WS1-02)
 - [ ] IQ-021 Add host-side Q16 exp parity harness in `tests/test_intexp_q16.py` against `math.exp` samples (WS1-05)
@@ -375,6 +375,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-17 | loop-156 | IQ-018 GGUF fixture README skeleton | done | Expanded `tests/README.md` with required skeleton sections, fixture-family mapping, and template contract; `python3 tests/test_gguf_metadata_parse.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_tensor_data_base.py` passed |
 | 2026-04-17 | loop-155 | IQ-177 composed alias-permitted softmax helper | done | Added `FPQ16SoftmaxFromPreclampedChecked` in `src/math/softmax.HC` and harness `tests/test_softmax_from_preclamped_checked.py`; `python3 tests/test_softmax_from_preclamped_checked.py && python3 tests/test_softmax_from_preclamped_no_alias_checked.py && python3 tests/test_softmax_exp_phase_from_preclamped_checked.py && python3 tests/test_softmax_normalize_phase_checked.py` passed |
 | 2026-04-17 | loop-154 | IQ-176 composed no-alias softmax helper | done | Added `FPQ16SoftmaxNormalizePhasePreflightChecked` + `FPQ16SoftmaxFromPreclampedNoAliasChecked` in `src/math/softmax.HC` with fail-fast no-partial-write contract and harness `tests/test_softmax_from_preclamped_no_alias_checked.py`; `python3 tests/test_softmax_from_preclamped_no_alias_checked.py && python3 tests/test_softmax_exp_phase_from_preclamped_no_alias_checked.py && python3 tests/test_softmax_normalize_phase_no_alias_checked.py && python3 tests/test_softmax_normalize_phase_checked.py` passed |
 | 2026-04-17 | loop-153 | IQ-017 GGUF fixture-plan spec | done | Added `tests/README.md` with deterministic llama.cpp parity fixture contracts for GGUF header/tensor/range validation; `python3 - <<'PY' ... gguf_fixture_plan_readme_contracts=ok ... PY` passed |

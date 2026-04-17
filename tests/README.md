@@ -8,6 +8,17 @@ This directory contains host-side validation harnesses only. The TempleOS infere
 - Produce deterministic binary fixtures for header, metadata, tensor table, and tensor payload offsets.
 - Keep fixture generation and checks fully offline and reproducible.
 
+## Required Skeleton Sections (IQ-018)
+
+`tests/README.md` must always provide a minimal-but-complete scaffold for llama.cpp parity fixtures:
+
+- **Header fixtures**: magic/version/count/truncation invariants.
+- **Metadata fixtures**: scalar/string/array/nested-array decode invariants.
+- **Tensor-offset fixtures**: relative offset -> aligned absolute span invariants.
+- **Execution contract**: exact test commands that must pass for fixture changes.
+
+If any of these sections is missing, fixture work is considered incomplete.
+
 ## Parity Targets
 
 - Header parse parity: magic (`GGUF`), version acceptance window, tensor count, metadata count.
@@ -21,10 +32,14 @@ This directory contains host-side validation harnesses only. The TempleOS infere
 - `fixtures/gguf/header_bad_magic.gguf`
 - `fixtures/gguf/header_bad_version_unsupported.gguf`
 - `fixtures/gguf/header_truncated_u64_counts.gguf`
+- `fixtures/gguf/metadata_scalars.gguf`
+- `fixtures/gguf/metadata_strings_and_arrays.gguf`
+- `fixtures/gguf/metadata_nested_arrays.gguf`
 - `fixtures/gguf/tensorinfo_two_tensors_q4_q8.gguf`
 - `fixtures/gguf/tensorinfo_alignment_32_64.gguf`
 - `fixtures/gguf/tensorinfo_overflow_offsets.gguf`
 - `fixtures/gguf/tensorinfo_overlap_ranges.gguf`
+- `fixtures/gguf/tensor_offsets_sparse_gaps.gguf`
 
 Each fixture intentionally targets exactly one primary invariant so failure diagnostics stay sharp.
 
@@ -45,6 +60,29 @@ For every fixture, add a sidecar manifest:
   - `expected_error` (null on success fixtures)
 
 The sidecar is the single source of truth for host harness assertions.
+
+## Fixture Family -> Harness Mapping
+
+- Header fixtures map to `tests/test_gguf_tensorinfo_parse.py` header checks.
+- Metadata fixtures map to `tests/test_gguf_metadata_parse.py` scalar/string/array coverage.
+- Tensor-offset fixtures map to `tests/test_gguf_tensor_data_base.py` span/index/range checks.
+
+Every new fixture should be named so its owning harness is obvious from filename and manifest.
+
+## Skeleton Template For New Fixtures
+
+When adding a fixture family, copy this minimal scaffold:
+
+- Binary: `fixtures/gguf/<family>_<case>.gguf`
+- Sidecar: `fixtures/gguf/<family>_<case>.json`
+- Test name pattern: `test_<family>_<case>_<invariant>()`
+- Required assertions:
+  - decoded integer fields exactly match sidecar
+  - decoded string keys exactly match sidecar
+  - decoded tensor offsets/ranges exactly match sidecar
+  - expected failure code (if any) exactly matches contract
+
+This keeps fixture additions deterministic and auditable against GGUF invariants.
 
 ## Validation Harness Contract
 

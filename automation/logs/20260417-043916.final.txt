@@ -1,0 +1,19 @@
+Completed one full iteration on `IQ-018` end-to-end.
+
+**What Changed**
+- Expanded the fixture skeleton spec in `tests/README.md:11` with required header/metadata/tensor-offset sections and completion criteria.
+- Added fixture-family-to-harness ownership mapping in `tests/README.md:64`.
+- Added a reusable new-fixture template contract in `tests/README.md:72`.
+- Marked the queue item done in `MASTER_TASKS.md:206`.
+- Added one progress-ledger line in `MASTER_TASKS.md:378`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_parse.py && python3 tests/test_gguf_tensorinfo_parse.py && python3 tests/test_gguf_tensor_data_base.py`
+- Output:
+  - `gguf_metadata_reference_checks=ok`
+  - `gguf_tensorinfo_reference_checks=ok`
+  - `gguf_tensor_data_base_reference_checks=ok`
+
+**Queue + DB**
+- Queue depth policy preserved: `15` unchecked IQ items remain (minimum satisfied).
+- Logged to central DB `~/Documents/local-codebases/temple-central.db` with `task_id='IQ-018'`, `status='pass'`, `lines_added=40`.
