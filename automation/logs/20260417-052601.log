@@ -75,3 +75,8 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_14","type":"todo_list","items":[{"text":"Inspect GGUF header code/tests","completed":true},{"text":"Implement IQ-183 parser helper","completed":true},{"text":"Add focused parity validation test","completed":true},{"text":"Run validation and capture output","completed":true},{"text":"Update tasks and DB log","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":1266522,"cached_input_tokens":1131008,"output_tokens":6775}}
 Codex final exit code: 0
+[main 13e77cb] feat(inference): codex iteration 20260417-052601
+ 6 files changed, 324 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260417-052601.final.txt
+ create mode 100644 tests/test_gguf_header_parse_checked.py
+=== End iteration 91 (outcome=ok) ===
