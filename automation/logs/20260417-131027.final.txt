@@ -1,0 +1,12 @@
+Completed one full iteration on `IQ-217` with HolyC-first runtime purity preserved.
+
+- Implemented `GGUFMetadataReadU32PairChecked` with staged cursor/output commit and strict no-partial-write tuple semantics in `src/gguf/metadata.HC:540` (prototype at `src/gguf/metadata.HC:119`).
+- Added focused host parity harness at `tests/test_gguf_metadata_read_u32_pair_checked.py:1` (null/overflow/short-read/randomized cases).
+- Updated queue/ledger in `MASTER_TASKS.md:410`, `MASTER_TASKS.md:426`, `MASTER_TASKS.md:432` (`IQ-217` checked off, added `IQ-232`, loop entry added).
+- Queue depth policy maintained: 15 unchecked `IQ-` items remain (now `IQ-218`..`IQ-232`).
+- Logged iteration to central DB: `~/Documents/local-codebases/temple-central.db` (`task_id='IQ-217'`, status `pass`).
+
+Validation output:
+- `python3 tests/test_gguf_metadata_read_u32_pair_checked.py` → `gguf_metadata_read_u32_pair_checked_reference_checks=ok`
+- `python3 tests/test_gguf_metadata_read_u32le_checked.py` → `gguf_metadata_read_u32le_checked_reference_checks=ok`
+- `python3 tests/test_gguf_metadata_parse.py` → `gguf_metadata_reference_checks=ok`
