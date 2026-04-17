@@ -85,6 +85,12 @@ I32 GGUFMetadataReadU8Checked(U8 *buf,
                               U64 table_end,
                               U8 *out_value);
 
+I32 GGUFMetadataReadU32LEChecked(U8 *buf,
+                                 U64 buf_nbytes,
+                                 U64 *cursor,
+                                 U64 table_end,
+                                 U32 *out_value);
+
 // Validate metadata table byte-window math before any parser cursor movement.
 // Contract: `out_table_end` is written only on success.
 I32 GGUFMetadataTableSpanValidateChecked(U64 table_start,
@@ -224,6 +230,49 @@ I32 GGUFMetadataReadU8Checked(U8 *buf,
 
     *out_value = buf[cur];
     *cursor = next_cursor;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked little-endian U32 metadata reader.
+// Contract: writes `*out_value` and advances `*cursor` only on success.
+I32 GGUFMetadataReadU32LEChecked(U8 *buf,
+                                 U64 buf_nbytes,
+                                 U64 *cursor,
+                                 U64 table_end,
+                                 U32 *out_value)
+{
+    U64 cur;
+    U8 b0;
+    U8 b1;
+    U8 b2;
+    U8 b3;
+    I32 err;
+
+    if (!buf || !cursor || !out_value)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Reuse the canonical checked 1-byte reader so cursor/bounds semantics are
+    // identical across scalar-width metadata decoders.
+    err = GGUFMetadataReadU8Checked(buf, buf_nbytes, &cur, table_end, &b0);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+    err = GGUFMetadataReadU8Checked(buf, buf_nbytes, &cur, table_end, &b1);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+    err = GGUFMetadataReadU8Checked(buf, buf_nbytes, &cur, table_end, &b2);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+    err = GGUFMetadataReadU8Checked(buf, buf_nbytes, &cur, table_end, &b3);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_value = ((U32)b0)
+               | (((U32)b1) << 8)
+               | (((U32)b2) << 16)
+               | (((U32)b3) << 24);
+    *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
 
