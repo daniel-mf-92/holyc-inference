@@ -1,232 +1,202 @@
-# GGUF Format Reference (HolyC Implementation Contract)
+# GGUF Format Reference (HolyC Parser Contract)
 
-This is the parser contract for the TempleOS HolyC runtime in `src/gguf/*.HC`.
-It is intentionally concrete: every field, offset rule, and bounds check here maps
-straight to explicit integer code.
+This document is the implementation contract for TempleOS HolyC GGUF parsing.
+Every byte rule here maps to explicit integer code paths in `src/gguf/*.HC`.
 
-Scope of this reference (current runtime):
-- Parse GGUF header (`magic`, `version`, counts).
-- Parse metadata key/value table with scalar, string, and array payloads.
-- Parse tensor directory records (name, dims, type, relative offset).
-- Resolve aligned tensor data base and absolute tensor byte ranges.
-- Support tensor storage sizing for `F32`, `F16`, `Q4_0`, `Q8_0`.
-- Keep parser integer-only and fully auditable (no float math required).
+Runtime philosophy:
+- deterministic integer-only parsing
+- checked arithmetic for every offset/length/count operation
+- no hidden control flow, no external dependencies, no networking
 
-## 1) Container Layout
+## 1) File Skeleton
 
-GGUF file sections are read strictly in order:
-1. Header
-2. Metadata key/value table
-3. Tensor info table
-4. Tensor data region (aligned)
+GGUF is parsed with one monotonic cursor:
+1. header
+2. metadata table
+3. tensor info table
+4. aligned tensor payload region
 
-No out-of-band index is required. A single monotonic cursor can parse the file.
+No random seeks are required for the structural pass.
 
-## 2) Header (Fixed 24 Bytes)
+## 2) Header Section
 
-Binary layout (little-endian):
+Binary layout (little-endian, fixed 24 bytes):
 - `magic: U32`
 - `version: U32`
 - `tensor_count: U64`
 - `metadata_kv_count: U64`
 
-TempleOS runtime constants in `src/gguf/header.HC`:
+HolyC constants:
 - `GGUF_MAGIC_U32 = 0x46554747`
 - supported versions: `2`, `3`
 
-Header parse invariants:
-- Reject non-GGUF magic.
-- Reject unsupported version.
-- Reject `tensor_count == 0`.
-- Keep cursor bounds-checked before every field read.
+Header invariants:
+- reject bad magic
+- reject unsupported version
+- reject `tensor_count == 0`
+- reject truncated 24-byte header
+- reject counts above parser caps
 
-## 3) Primitive Encodings
+## 3) Primitive Encoding Rules
 
-All scalar reads use explicit LE helpers:
-- `GGUFReadU32LE`, `GGUFReadU64LE` for header.
-- Metadata/tensor readers have analogous per-width helpers.
+All scalar values are little-endian.
 
 String encoding:
 - `len: U64`
-- `bytes[len]` (not null-terminated on disk)
+- `len` raw bytes (not null-terminated on disk)
 
-HolyC runtime behavior:
-- Allocate `len + 1` bytes, copy payload, append `\0`.
-- Enforce hard caps for malformed files.
+HolyC parser behavior:
+- allocate `len + 1`
+- copy payload and append `0`
+- reject `len` beyond configured caps
 
-Current parser caps (`src/gguf/metadata.HC`):
-- `GGUF_MAX_METADATA_COUNT = 1 << 20`
-- `GGUF_MAX_STRING_BYTES = 1 << 20`
-- `GGUF_MAX_ARRAY_ELEMS = 1 << 24`
+Checked helpers expected in parser paths:
+- `CheckedAddU64`
+- `CheckedMulU64`
+- `CheckedAlignUpU64`
+- `ValidateRange(offset, length, file_size)`
 
-## 4) Metadata Table
+## 4) Metadata Section
 
-Each metadata entry:
+Each metadata KV entry encodes:
 1. key string
 2. `value_type: U32` (`gguf_type`)
-3. value payload (type-dependent)
+3. value payload (shape depends on type)
 
-Supported `gguf_type` IDs:
+Supported scalar type IDs:
 - `0 UINT8`
 - `1 INT8`
 - `2 UINT16`
 - `3 INT16`
 - `4 UINT32`
 - `5 INT32`
-- `6 FLOAT32` (stored as raw bits, not float math)
+- `6 FLOAT32` (stored/parity-checked as raw bits)
 - `7 BOOL`
 - `8 STRING`
 - `9 ARRAY`
 - `10 UINT64`
 - `11 INT64`
-- `12 FLOAT64` (stored as raw bits)
+- `12 FLOAT64` (stored/parity-checked as raw bits)
 
-Array payload format:
+Array payload layout:
 - `elem_type: U32`
 - `array_len: U64`
-- `elem_payload[array_len]`
+- contiguous `array_len` elements
 
-Safety policy:
-- Reject nested arrays.
-- Reject unknown value types.
-- Reject truncation at any point.
-- Preserve float payload bits as integers; runtime stays integer-only.
+Metadata guard rules:
+- reject unknown type IDs
+- reject nested arrays
+- reject key collisions only when callers require uniqueness (parser itself may preserve order)
+- reject truncation at any element boundary
+- keep cursor monotonic and range-checked
 
-Runtime representation:
-- `GGUFMetadataTable` owns an array of `GGUFMetadataKV`.
-- Each value stores scalar slots or lazy array payload offsets/byte spans.
-- Lookup helpers (`GGUFMetaFindByKey`, typed extractors) are exact-key and type-strict.
+Recommended parser caps (hostile-file hardening):
+- `MAX_METADATA_COUNT`
+- `MAX_STRING_BYTES`
+- `MAX_ARRAY_ELEMS`
 
-## 5) Tensor Info Table
+## 5) Tensor Info Section
 
-Each tensor record:
-1. tensor name string
+Each tensor descriptor encodes:
+1. name string
 2. `n_dims: U32`
 3. `dims[n_dims]: U64`
 4. `ggml_type: U32`
-5. `offset: U64` (relative to aligned tensor data base)
+5. `offset: U64` (relative to aligned tensor payload base)
 
-Parser invariants:
-- `n_dims` must be positive and within parser max.
-- each dimension must be non-zero.
-- element-count multiplication must be overflow-checked.
-- `ggml_type` must be known for byte-size resolution.
+Tensor info invariants:
+- `n_dims > 0`
+- each dimension is non-zero
+- checked product for total element count
+- type must be recognized by byte-size resolver
+- relative offset arithmetic must not overflow
 
-Runtime currently requires sizing rules for:
-- `GGML_TYPE_F32` (`0`)
-- `GGML_TYPE_F16` (`1`)
-- `GGML_TYPE_Q4_0` (`2`)
-- `GGML_TYPE_Q8_0` (`8`)
+## 6) Quant Block Math (Sizing Contract)
 
-## 6) Tensor Type Block Math
+Supported type sizing for current runtime:
+- `F32`: block size `1`, block bytes `4`
+- `F16`: block size `1`, block bytes `2`
+- `Q4_0`: block size `32`, block bytes `18` (`fp16 scale + 16 packed nibbles`)
+- `Q8_0`: block size `32`, block bytes `34` (`fp16 scale + 32 signed i8`)
 
-Type sizing is block-based for quantized tensors.
-
-Per-type block elements:
-- `F32`: block size `1`
-- `F16`: block size `1`
-- `Q4_0`: block size `32`
-- `Q8_0`: block size `32`
-
-Per-type block bytes:
-- `F32`: `4`
-- `F16`: `2`
-- `Q4_0`: `18` (`fp16 scale + 16 packed nibbles`)
-- `Q8_0`: `34` (`fp16 scale + 32 signed bytes`)
-
-Tensor payload sizing contract:
-1. `elem_count % block_size == 0` (else error)
+Tensor byte-size algorithm:
+1. require `elem_count % block_size == 0`
 2. `block_count = elem_count / block_size`
-3. `nbytes = block_count * block_bytes` with overflow checks
+3. `tensor_nbytes = block_count * block_bytes` (checked multiply)
 
-This is implemented in `src/gguf/tensor_data_base.HC` via:
-- `GGUFTensorTypeBlockSize`
-- `GGUFTensorTypeBlockBytes`
-- `GGUFTensorBytesForType`
+Failure if any step overflows or divisibility fails.
 
-## 7) Alignment Rules
+## 7) Alignment Section
 
-After metadata + tensor info parsing, compute aligned data base:
+After metadata + tensor descriptors, compute tensor payload base:
 - `tensor_data_base = AlignUp(cursor_after_tensor_info, alignment)`
 
-Default alignment constant:
-- `GGUF_DEFAULT_ALIGNMENT = 32`
+Current default alignment:
+- `32`
 
-Alignment validity:
-- alignment must be a non-zero power-of-two.
-- base and every tensor relative offset must be alignment-aligned.
+Alignment invariants:
+- alignment is non-zero power-of-two
+- aligned base is representable in `U64`
+- tensor relative offsets satisfy required alignment
 
-Absolute tensor payload start:
-- `tensor_abs = tensor_data_base + tensor_rel_offset`
+## 8) Absolute Tensor Range Resolution
 
-All additions are overflow-checked on `U64`.
-
-## 8) Absolute Range Resolution
-
-Tensor byte span is half-open interval:
-- `[abs_start, abs_end)`
-- `abs_start = tensor_abs`
+Per tensor:
+- `abs_start = tensor_data_base + rel_offset`
 - `abs_end = abs_start + tensor_nbytes`
+- range is half-open `[abs_start, abs_end)`
 
-Range validity checks:
-- no arithmetic overflow while building `abs_end`
-- `abs_end <= gguf_file_nbytes`
+Guard rules:
+- checked add on both additions
+- `abs_end <= file_size`
+- no overlap in validated tensor tables unless caller explicitly allows it
 
-Overlap validity for tensor table:
-- two ranges overlap iff:
-  - `start_a < end_b` and `start_b < end_a`
-- touching boundaries (`end_a == start_b`) are legal.
+Overlap predicate:
+- overlap exists iff `(start_a < end_b) && (start_b < end_a)`
+- touching boundaries are valid (`end_a == start_b`)
 
-Implemented helpers in `src/gguf/tensor_data_base.HC`:
-- `GGUFTensorResolveRange`
-- `GGUFValidateTensorRanges`
-- `GGUFValidateTensorRangesSorted`
-- lookup/index helpers over sorted `[start,end)` spans
+## 9) Deterministic Error Surface
 
-## 9) Error Model (Deterministic, Integer)
+Expose integer status codes only.
 
-Parser and tensor-range helpers return explicit integer error codes.
-Representative failures:
-- null pointer arguments
-- truncated read
-- bad magic/version
-- bad counts/string lengths/array lengths
-- unknown metadata/tensor type
-- misaligned base/offset
-- add/mul overflow
-- out-of-bounds tensor payload
-- overlapping tensor ranges
+Expected classes:
+- `BAD_PARAM` (null pointers, illegal args)
+- `BAD_MAGIC` / `BAD_VERSION`
+- `BAD_COUNT` / `BAD_LEN`
+- `TRUNCATED`
+- `UNKNOWN_TYPE`
+- `MISALIGNED`
+- `OVERFLOW`
+- `OUT_OF_BOUNDS`
+- `OVERLAP`
 
-No exceptions, no hidden control flow. Every failure path is a branch you can audit.
+Design requirement: scalar and any optimized paths return identical error classes for identical invalid inputs.
 
-## 10) HolyC API Shape
+## 10) Parser Walkthrough (Reference Order)
 
-Current API surface (trimmed):
-- Header: `GGUFParseHeader(...)`
-- Metadata: `GGUFParseMetadataTable(...)`, key/value extractors
-- Tensor info: tensor directory parse helpers in `src/gguf/tensorinfo.HC`
-- Data base/ranges: `GGUFTensorDataBaseAlign*`, `GGUFTensorResolveRange*`, validators, lookup/index helpers
+1. parse header
+2. preflight metadata/tensor counts against caps
+3. parse metadata table with strict cursor checks
+4. parse tensor info records + precompute `elem_count` and `nbytes`
+5. compute aligned tensor payload base
+6. resolve absolute tensor ranges
+7. validate range bounds/overlap invariants
+8. expose lookup helpers by tensor name and absolute offset
 
-Design rule: direct loops + explicit arithmetic > abstract indirection.
+## 11) Host-Side Validation Matrix
 
-## 11) Validation Contract (Host-Side Only)
+Validation scripts in `tests/` should cover:
+- header: valid, bad magic, unsupported version, truncation
+- metadata: scalar/string/array decoding and nested-array rejection
+- tensor info: dim overflow, zero dim rejection, unknown type rejection
+- sizing: block-divisibility and block-bytes parity for F32/F16/Q4_0/Q8_0
+- alignment: non-power-of-two and overflowed align-up rejection
+- ranges: out-of-bounds and overlap adversarial cases near `U64_MAX`
 
-Validation scripts in `tests/` mirror HolyC parser math and error rules.
-They verify:
-- header field parsing and rejection cases
-- metadata scalar/string/array decoding and type checks
-- tensor byte-size calculations for supported types
-- alignment, range, and overlap behavior parity
-- offset lookup/index invariants
+Host validation is parity tooling only; runtime remains HolyC-only.
 
-Host tools are for parity checking only; inference runtime remains pure HolyC.
+## 12) Air-Gap Constraint
 
-## 12) Air-Gap Policy Reminder
-
-GGUF parser/runtime is disk-only.
-- No HTTP/client stack
-- No model downloading
-- No socket usage
-- No network dependency for parsing or inference
-
-TempleOS VM runs must keep NIC disabled (`-nic none`, fallback `-net none`).
+GGUF parser and inference runtime are disk-only.
+No sockets, HTTP, model downloaders, or VM guest networking.
+TempleOS guest runs must keep NIC disabled (`-nic none`; fallback `-net none`).

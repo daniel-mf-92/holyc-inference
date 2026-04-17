@@ -1,0 +1,14 @@
+Done — IQ-016 is fully progressed end-to-end with queue depth preserved.
+
+**What I changed**
+- Rewrote `docs/GGUF_FORMAT.md:1` into a strict HolyC parser contract (header/metadata/tensor info/alignment/range/error model + validation matrix + air-gap constraints).
+- Marked `IQ-016` complete in `MASTER_TASKS.md:204`.
+- Appended one new unchecked queue item `IQ-161` in `MASTER_TASKS.md:352` to keep the rolling queue at 15 unchecked items.
+- Added one progress ledger line for this iteration in `MASTER_TASKS.md:358`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_tensor_data_base.py`
+- Output: `gguf_tensor_data_base_reference_checks=ok`
+
+**Central DB log**
+- Inserted iteration row in `~/Documents/local-codebases/temple-central.db` for `IQ-016` (`id=1848`, status `pass`, validation result recorded).

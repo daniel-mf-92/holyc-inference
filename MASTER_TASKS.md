@@ -201,7 +201,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-013 Implement Q4_0 block struct and dequantize in `src/quant/q4_0.HC` (WS3-01, WS3-02)
 - [x] IQ-014 Implement Q4_0 dot product (naive) in `src/quant/q4_0_dot.HC` (WS3-03)
 - [x] IQ-015 Implement Q8_0 block struct and dequantize in `src/quant/q8_0.HC` (WS3-04)
-- [ ] IQ-016 Draft `docs/GGUF_FORMAT.md` skeleton with sections for header, metadata, tensor info, and alignment rules (WS0-02)
+- [x] IQ-016 Draft `docs/GGUF_FORMAT.md` skeleton with sections for header, metadata, tensor info, and alignment rules (WS0-02)
 - [ ] IQ-017 Write host-side GGUF header/tensor dump fixture plan in `tests/README.md` for llama.cpp parity checks (WS0-05, WS2-05)
 - [ ] IQ-018 Create `tests/README.md` skeleton for llama.cpp parity fixtures (header, metadata, tensor offsets) (WS0-05, WS2-05)
 - [ ] IQ-019 Create `src/math/fixedpoint.HC` skeleton with Q16 constants, core type aliases, and TODO stubs for mul/div helpers (WS1-01)
@@ -349,12 +349,14 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-158 Implement HolyC helper `FPQ16RMSNormApplyInvDenomWeightedAutoValidateChecked` in `src/math/rmsnorm.HC` to centralize null/len/denominator/gamma capacity checks shared by auto-dispatch RMSNorm entrypoints (WS1-04)
 - [ ] IQ-159 Implement HolyC helper `FPQ16RMSNormApplyInvDenomWeightedAutoSelectPathChecked` in `src/math/rmsnorm.HC` to derive deterministic in-place vs out-of-place dispatch from pointer aliasing and preserve shared error surfaces (WS1-04)
 - [ ] IQ-160 Add host-side parity harness `tests/test_rmsnorm_apply_inv_denom_weighted_auto_checked.py` covering alias/non-alias dispatch equivalence and BAD_PARAM/OVERFLOW parity against explicit in-place/out-of-place references (WS1-04)
+- [ ] IQ-161 Implement HolyC helper `FPQ16ExpClampToInputDomainChecked` in `src/math/intexp.HC` to centralize saturating Q16 exponent input clamp (min/max domain + checked bounds) shared by scalar exp and upcoming vectorized exp callers (WS1-02)
 
 ## Progress Ledger
 
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-17 | loop-138 | IQ-016 GGUF format parser contract refresh | done | Expanded `docs/GGUF_FORMAT.md` into a strict HolyC parser spec for header/metadata/tensor/alignment/range/error invariants; `python3 tests/test_gguf_tensor_data_base.py` passed |
 | 2026-04-17 | loop-137 | IQ-158 RMSNorm auto-dispatch shared preflight helper | done | Added `FPQ16RMSNormApplyInvDenomWeightedAutoValidateChecked` in `src/math/rmsnorm.HC` and routed auto-dispatch through it; `python3 tests/test_rmsnorm_apply_inv_denom_weighted_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_weighted_inplace_checked.py` passed |
 | 2026-04-17 | loop-136 | IQ-157 RMSNorm weighted inverse-denominator auto-dispatch helper | done | Added `FPQ16RMSNormApplyInvDenomWeightedAutoChecked` in `src/math/rmsnorm.HC`; `python3 tests/test_rmsnorm_apply_inv_denom_weighted_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_weighted_inplace_checked.py` passed |
 | 2026-04-17 | loop-135 | IQ-150 cached head-base token-window execution path | done | Routed `RoPEQ16RotateHeadRangeByTokenWindowPreflightedChecked` through cached-base execution helper with checked scratch allocation in `src/model/rope.HC`; `python3 tests/test_rope_q16_rotate_head_range_token_window.py && python3 tests/test_rope_q16_rotate_head_range_token_window_preflighted_head_bases.py && python3 tests/test_rope_q16_rotate_head_range_preflighted_position.py && python3 tests/test_rope_q16_rotate_head_range_position.py && python3 tests/test_rope_q16_rotate_head_position.py` passed |
