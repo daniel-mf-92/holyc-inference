@@ -1,6 +1,6 @@
-timestamp=20260417-195406
-iteration=175
+timestamp=20260417-200833
+iteration=1
 outcome=ok
 exit_code=0
-run_log=/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/automation/logs/20260417-195406.log
-final_message=/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/automation/logs/20260417-195406.final.txt
+run_log=/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/automation/logs/20260417-200833.log
+final_message=/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/automation/logs/20260417-200833.final.txt
