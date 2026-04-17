@@ -1,0 +1,15 @@
+Done — I completed one deep iteration centered on `IQ-172`.
+
+**What changed**
+- Implemented HolyC normalization phase helper `FPQ16SoftmaxNormalizePhaseChecked` with checked pointer-span guards, one-rounding divide (`FPQ16MulDivRoundedChecked`), and deterministic remainder correction in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/math/softmax.HC:179`.
+- Added focused host-side parity harness for normalization semantics in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_softmax_normalize_phase_checked.py:1`.
+
+**Validation**
+- Ran: `python3 tests/test_softmax_normalize_phase_checked.py && python3 tests/test_softmax_exp_phase_from_preclamped_checked.py && python3 tests/test_softmax_exp_phase_from_preclamped_no_alias_checked.py`
+- Output: `softmax_normalize_phase_checked_reference_checks=ok`, `softmax_exp_phase_from_preclamped_checked_reference_checks=ok`, `softmax_exp_phase_from_preclamped_no_alias_checked_reference_checks=ok`.
+
+**Queue + ledger + DB**
+- Marked exactly one IQ item progressed: `IQ-172` checked in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:363`.
+- Kept rolling queue depth policy satisfied by appending new unchecked `IQ-174` in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:365` (unchecked count remains 15).
+- Added one progress ledger line (`loop-151`) in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:373`.
+- Logged central DB iteration: `task_id=IQ-172`, `status=pass` (latest row id `1989`).

@@ -18,6 +18,10 @@ I64 FPQ16Div(I64 num, I64 den);
 I64 FPQ16FromInt(I64 x);
 I64 FPQ16Mul(I64 a, I64 b);
 I64 FPQ16Ln(I64 x_q16);
+I32 FPQ16MulDivRoundedChecked(I64 a_q16,
+                              I64 b_q16,
+                              I64 d_q16,
+                              I64 *out_q16);
 I32 FPQ16ExpArrayFromClampedInputChecked(I64 *input_q16,
                                          I64 *output_q16,
                                          I64 count);
@@ -154,6 +158,123 @@ I32 FPQ16SoftmaxExpPhaseFromPreclampedNoAliasChecked(I64 *preclamped_logits_q16,
     }
 
     *out_exp_sum_q16 = exp_sum_q16;
+    return FP_Q16_OK;
+}
+
+// Checked softmax split-phase normalization helper.
+// Phase performed here:
+//   1) probs_q16[i] = round_half_up(exp_lanes_q16[i] / exp_sum_q16)
+//   2) Deterministic remainder correction to force sum(probs_q16) == 1.0_q16
+// Contracts:
+//   - All pointers must be non-null
+//   - lane_count must be >= 0
+//   - exp_sum_q16 must be strictly positive
+//   - Input/output buffers must each address lane_count I64s
+// Notes:
+//   - Uses FPQ16MulDivRoundedChecked with b=1.0_q16 to keep one-rounding,
+//     auditable fixed-point divide semantics.
+//   - Remainder correction is deterministic: positive remainder goes to the
+//     max-exp lane; negative remainder is removed in stable lane order
+//     (max lane first, then wrap) without allowing negative probabilities.
+I32 FPQ16SoftmaxNormalizePhaseChecked(I64 *exp_lanes_q16,
+                                      I64 lane_count,
+                                      I64 exp_sum_q16,
+                                      I64 *probs_q16)
+{
+    I64 i;
+    I64 pass;
+    I64 idx;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 prob_q16;
+    I64 prob_sum_q16;
+    I64 diff_q16;
+    I64 remaining_q16;
+    I64 take_q16;
+    I64 max_exp_q16;
+    I64 max_exp_index;
+    I32 status;
+
+    if (!exp_lanes_q16 || !probs_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (exp_sum_q16 <= 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (!lane_count)
+        return FP_Q16_OK;
+
+    // Guard pointer-span arithmetic before indexed lane access.
+    last_index = lane_count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)exp_lanes_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)probs_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Normalize lanes and keep running probability sum for remainder fixup.
+    max_exp_q16 = exp_lanes_q16[0];
+    max_exp_index = 0;
+    prob_sum_q16 = 0;
+
+    for (i = 0; i < lane_count; i++)
+    {
+        status = FPQ16MulDivRoundedChecked(exp_lanes_q16[i],
+                                           FP_Q16_ONE,
+                                           exp_sum_q16,
+                                           &prob_q16);
+        if (status)
+            return status;
+
+        probs_q16[i] = prob_q16;
+
+        if (prob_q16 > (I64_MAX_VALUE - prob_sum_q16))
+            return FP_Q16_ERR_OVERFLOW;
+        prob_sum_q16 += prob_q16;
+
+        if (exp_lanes_q16[i] > max_exp_q16)
+        {
+            max_exp_q16 = exp_lanes_q16[i];
+            max_exp_index = i;
+        }
+    }
+
+    diff_q16 = FP_Q16_ONE - prob_sum_q16;
+    if (!diff_q16)
+        return FP_Q16_OK;
+
+    // If sum is low, add full residual to argmax lane.
+    if (diff_q16 > 0)
+    {
+        if (probs_q16[max_exp_index] > (I64_MAX_VALUE - diff_q16))
+            return FP_Q16_ERR_OVERFLOW;
+        probs_q16[max_exp_index] += diff_q16;
+        return FP_Q16_OK;
+    }
+
+    // If sum is high, subtract excess deterministically without going < 0.
+    remaining_q16 = -diff_q16;
+    for (pass = 0; pass < lane_count && remaining_q16 > 0; pass++)
+    {
+        idx = max_exp_index + pass;
+        if (idx >= lane_count)
+            idx -= lane_count;
+
+        take_q16 = probs_q16[idx];
+        if (take_q16 > remaining_q16)
+            take_q16 = remaining_q16;
+
+        probs_q16[idx] -= take_q16;
+        remaining_q16 -= take_q16;
+    }
+
+    if (remaining_q16)
+        return FP_Q16_ERR_OVERFLOW;
+
     return FP_Q16_OK;
 }
 
