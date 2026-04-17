@@ -281,6 +281,63 @@ I32 FPQ16RMSNormApplyInvDenomWeightedAutoChecked(I64 *input_q16,
                                                     den_q16);
 }
 
+// Auto-dispatch weighted inverse-denominator RMSNorm scaling with explicit
+// selected-path output for parity harnesses and callers that need to assert
+// alias-driven execution mode.
+// - On success: writes path id to `path_out` and executes selected kernel.
+// - On failure: preserves canonical checked error surfaces from shared
+//   validation/selection/math helpers.
+I32 FPQ16RMSNormApplyInvDenomWeightedAutoCheckedWithPathOut(I64 *input_q16,
+                                                            I64 *gamma_q16,
+                                                            I64 *output_q16,
+                                                            I64 count,
+                                                            I64 inv_denom_q16,
+                                                            I64 den_q16,
+                                                            I32 *path_out)
+{
+    I32 status;
+    I32 selected_path;
+
+    if (!path_out)
+        return FP_Q16_ERR_NULL_PTR;
+
+    status = FPQ16RMSNormApplyInvDenomWeightedAutoValidateChecked(input_q16,
+                                                                   gamma_q16,
+                                                                   output_q16,
+                                                                   count,
+                                                                   inv_denom_q16,
+                                                                   den_q16);
+    if (status)
+        return status;
+
+    status = FPQ16RMSNormApplyInvDenomWeightedAutoSelectPathChecked(input_q16,
+                                                                     output_q16,
+                                                                     &selected_path);
+    if (status)
+        return status;
+
+    *path_out = selected_path;
+
+    if (selected_path == FP_Q16_RMSNORM_AUTO_PATH_IN_PLACE)
+    {
+        return FPQ16RMSNormApplyInvDenomWeightedInPlaceChecked(input_q16,
+                                                                gamma_q16,
+                                                                count,
+                                                                inv_denom_q16,
+                                                                den_q16);
+    }
+
+    if (selected_path != FP_Q16_RMSNORM_AUTO_PATH_OUT_OF_PLACE)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    return FPQ16RMSNormApplyInvDenomWeightedChecked(input_q16,
+                                                    gamma_q16,
+                                                    output_q16,
+                                                    count,
+                                                    inv_denom_q16,
+                                                    den_q16);
+}
+
 U0 FPQ16RMSNorm(I64 *input, I64 *weight, I64 *output, I64 count, I64 eps_q16)
 {
     I64 i;

@@ -297,6 +297,64 @@ def fpq16_rmsnorm_apply_inv_denom_weighted_auto_checked(
     return status, out, selected_path
 
 
+def fpq16_rmsnorm_apply_inv_denom_weighted_auto_checked_with_path_out(
+    input_q16: list[int] | None,
+    gamma_q16: list[int] | None,
+    output_q16: list[int] | None,
+    count: int,
+    inv_denom_q16: int,
+    den_q16: int,
+    path_out: list[int] | None,
+    input_addr: int = 0x1000,
+    gamma_addr: int = 0x2000,
+    output_addr: int = 0x3000,
+) -> tuple[int, list[int], int]:
+    if path_out is None:
+        return FP_Q16_ERR_NULL_PTR, [], FP_Q16_RMSNORM_AUTO_PATH_OUT_OF_PLACE
+
+    status = fpq16_rmsnorm_apply_inv_denom_weighted_auto_validate_checked(
+        input_q16,
+        gamma_q16,
+        output_q16,
+        count,
+        inv_denom_q16,
+        den_q16,
+        input_addr,
+        gamma_addr,
+        output_addr,
+    )
+    if status != FP_Q16_OK:
+        return status, [], FP_Q16_RMSNORM_AUTO_PATH_OUT_OF_PLACE
+
+    status, selected_path = fpq16_rmsnorm_apply_inv_denom_weighted_auto_select_path_checked(input_q16, output_q16)
+    if status != FP_Q16_OK:
+        return status, [], FP_Q16_RMSNORM_AUTO_PATH_OUT_OF_PLACE
+
+    path_out[0] = selected_path
+
+    if selected_path == FP_Q16_RMSNORM_AUTO_PATH_IN_PLACE:
+        status, out = fpq16_rmsnorm_apply_inv_denom_weighted_inplace_checked(
+            input_q16,
+            gamma_q16,
+            count,
+            inv_denom_q16,
+            den_q16,
+        )
+        return status, out, selected_path
+
+    if selected_path != FP_Q16_RMSNORM_AUTO_PATH_OUT_OF_PLACE:
+        return FP_Q16_ERR_BAD_PARAM, [], selected_path
+
+    status, out = fpq16_rmsnorm_apply_inv_denom_weighted_checked(
+        input_q16,
+        gamma_q16,
+        count,
+        inv_denom_q16,
+        den_q16,
+    )
+    return status, out, selected_path
+
+
 def test_contract_surfaces() -> None:
     vec = [1, 2, 3]
     gamma = [FP_Q16_ONE, FP_Q16_ONE, FP_Q16_ONE]
@@ -500,12 +558,60 @@ def test_validate_pointer_span_overflow_guards() -> None:
     assert err_wrap_output == FP_Q16_ERR_OVERFLOW
 
 
+def test_with_path_out_contract_and_dispatch_parity() -> None:
+    vec = [13, -27, 39, -55]
+    gamma = [FP_Q16_ONE, FP_Q16_ONE // 2, -(FP_Q16_ONE // 4), FP_Q16_ONE]
+
+    err_null, _, _ = fpq16_rmsnorm_apply_inv_denom_weighted_auto_checked_with_path_out(
+        vec,
+        gamma,
+        [0, 0, 0, 0],
+        len(vec),
+        FP_Q16_ONE,
+        FP_Q16_ONE,
+        None,
+    )
+    assert err_null == FP_Q16_ERR_NULL_PTR
+
+    alias_path_out = [FP_Q16_RMSNORM_AUTO_PATH_OUT_OF_PLACE]
+    err_alias, out_alias, path_alias = fpq16_rmsnorm_apply_inv_denom_weighted_auto_checked_with_path_out(
+        vec,
+        gamma,
+        vec,
+        len(vec),
+        FP_Q16_ONE,
+        FP_Q16_ONE,
+        alias_path_out,
+    )
+    assert err_alias == FP_Q16_OK
+    assert path_alias == FP_Q16_RMSNORM_AUTO_PATH_IN_PLACE
+    assert alias_path_out[0] == FP_Q16_RMSNORM_AUTO_PATH_IN_PLACE
+    assert out_alias == fpq16_rmsnorm_apply_inv_denom_weighted_inplace_checked(vec, gamma, len(vec), FP_Q16_ONE, FP_Q16_ONE)[1]
+
+    out_buf = [0] * len(vec)
+    non_alias_path_out = [FP_Q16_RMSNORM_AUTO_PATH_IN_PLACE]
+    err_non_alias, out_non_alias, path_non_alias = fpq16_rmsnorm_apply_inv_denom_weighted_auto_checked_with_path_out(
+        vec,
+        gamma,
+        out_buf,
+        len(vec),
+        FP_Q16_ONE,
+        FP_Q16_ONE,
+        non_alias_path_out,
+    )
+    assert err_non_alias == FP_Q16_OK
+    assert path_non_alias == FP_Q16_RMSNORM_AUTO_PATH_OUT_OF_PLACE
+    assert non_alias_path_out[0] == FP_Q16_RMSNORM_AUTO_PATH_OUT_OF_PLACE
+    assert out_non_alias == fpq16_rmsnorm_apply_inv_denom_weighted_checked(vec, gamma, len(vec), FP_Q16_ONE, FP_Q16_ONE)[1]
+
+
 def run() -> None:
     test_contract_surfaces()
     test_alias_and_non_alias_dispatch_path_ids()
     test_dispatch_equivalence_vs_explicit_paths()
     test_bad_param_and_overflow_parity_vs_explicit_paths()
     test_validate_pointer_span_overflow_guards()
+    test_with_path_out_contract_and_dispatch_parity()
     print("rmsnorm_apply_inv_denom_weighted_auto_checked_reference_checks=ok")
 
 
