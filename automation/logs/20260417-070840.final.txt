@@ -1,0 +1,25 @@
+Completed full iteration for `IQ-179` with queue maintenance preserved.
+
+**What changed**
+- Implemented HolyC helper `RoPEQ16RotateHeadRangeByPositionCheckedStrided` in `src/model/rope.HC:1052`.
+- Added checked strided slab addressing math:
+  - `token_base = token_base_index + token_index * token_stride_q16`
+  - `abs_range_base = token_base + range_base_index`
+- Composed into existing preflighted range rotator for identical fail-fast/no-partial-write behavior.
+- Added parity harness `tests/test_rope_q16_rotate_head_range_position_strided.py:1`.
+- Updated task status and ledger in `MASTER_TASKS.md:370` and `MASTER_TASKS.md:393`.
+- Appended new queue item `IQ-196` to keep rolling queue depth in `MASTER_TASKS.md:389`.
+
+**Validation run**
+- `python3 tests/test_rope_q16_rotate_head_range_position_strided.py && python3 tests/test_rope_q16_rotate_head_range_preflighted_position.py && python3 tests/test_rope_q16_rotate_head_range_token_window.py`
+- Output:
+  - `ok`
+  - `rope_q16_rotate_head_range_preflighted_position_reference_checks=ok`
+  - `rope_q16_rotate_head_range_token_window_reference_checks=ok`
+
+**Central DB log**
+- Inserted iteration row into `~/Documents/local-codebases/temple-central.db` for `IQ-179` (`status=pass`).
+- Verified latest row: `id=2224 | agent=inference | task_id=IQ-179 | validation_result=ok`.
+
+**Queue policy check**
+- Unchecked `IQ-` depth after updates: `15` (policy satisfied, monotonic IDs preserved).

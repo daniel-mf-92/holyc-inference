@@ -367,7 +367,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-176 Implement HolyC helper `FPQ16SoftmaxFromPreclampedNoAliasChecked` in `src/math/softmax.HC` to compose no-alias exp-phase + no-alias normalize-phase into one checked split-phase entrypoint with fail-fast no-partial-write behavior (WS1-03)
 - [x] IQ-177 Implement HolyC helper `FPQ16SoftmaxFromPreclampedChecked` in `src/math/softmax.HC` to compose alias-permitted exp/normalize split-phase helpers into one checked entrypoint for reusable WS1 scalar attention score normalization paths (WS1-03)
 - [x] IQ-178 Implement HolyC helper `FPQ16SoftmaxFromPreclampedNoAliasCheckedWithSumOut` in `src/math/softmax.HC` to return `exp_sum_q16` alongside normalized output for WS5 attention diagnostics and deterministic Book-of-Truth softmax mass logging (WS1-03, WS5-02)
-- [ ] IQ-179 Implement HolyC helper `RoPEQ16RotateHeadRangeByPositionCheckedStrided` in `src/model/rope.HC` to apply checked rotary updates over strided token-head slabs (`token_stride_q16`) for KV-cache-aligned WS5 attention block layouts (WS5-01)
+- [x] IQ-179 Implement HolyC helper `RoPEQ16RotateHeadRangeByPositionCheckedStrided` in `src/model/rope.HC` to apply checked rotary updates over strided token-head slabs (`token_stride_q16`) for KV-cache-aligned WS5 attention block layouts (WS5-01)
 - [ ] IQ-180 Implement HolyC helper `FPQ16SoftmaxFromPreclampedCheckedWithSumOut` in `src/math/softmax.HC` to compose alias-permitted split-phase softmax and return `exp_sum_q16` for attention diagnostics while preserving checked no-partial-write semantics (WS1-03, WS5-02)
 - [x] IQ-181 Implement HolyC helper `FPQ16MulDivArrayRoundedChecked` in `src/math/fixedpoint.HC` to compute elementwise single-rounding `(a[i]*b[i])/d[i]` with checked no-partial-write semantics for RMSNorm and attention scaling call sites (WS1-01, WS1-04)
 - [ ] IQ-182 Add host-side parity harness `tests/test_intexp_split_base2_from_clamped_input_checked.py` validating base-2 split invariants (`x = k*ln2 + r`, `0<=r<ln2`) and BAD_PARAM/NULL_PTR contracts for `FPQ16ExpSplitBase2FromClampedInputChecked` (WS1-05)
@@ -386,12 +386,14 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] IQ-193 Implement HolyC helper `GGUFMetadataReadU8Checked` in `src/gguf/metadata.HC` to perform checked single-byte metadata reads (`cursor < table_end`) and advance cursor for parser field decoding (WS2-02, WS2-05)
 - [ ] IQ-194 Implement HolyC helper `GGUFMetadataReadU32LEChecked` in `src/gguf/metadata.HC` for checked little-endian U32 reads from metadata tables with shared cursor/bounds contracts (WS2-02, WS2-05)
 - [ ] IQ-195 Implement HolyC helper `GGUFMetadataReadU64LEChecked` in `src/gguf/metadata.HC` for checked little-endian U64 reads from metadata tables, including overflow-safe cursor advancement (WS2-02, WS2-05)
+- [ ] IQ-196 Implement HolyC helper `RoPEQ16RotateHeadRangeByTokenWindowCheckedStrided` in `src/model/rope.HC` to apply checked multi-token rotary updates over strided KV-cache slabs (`token_base_index + token_index*token_stride_q16`) with shared preflight parity and no-partial-write semantics (WS5-01)
 
 ## Progress Ledger
 
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-17 | loop-169 | IQ-179 strided RoPE head-range position helper | done | Added `RoPEQ16RotateHeadRangeByPositionCheckedStrided` in `src/model/rope.HC` and parity harness `tests/test_rope_q16_rotate_head_range_position_strided.py`; `python3 tests/test_rope_q16_rotate_head_range_position_strided.py && python3 tests/test_rope_q16_rotate_head_range_preflighted_position.py && python3 tests/test_rope_q16_rotate_head_range_token_window.py` passed |
 | 2026-04-17 | loop-168 | IQ-039 GGUF tensor payload byte-size helper | done | Hardened `GGUFTensorBytesForType` zero-element + defensive block-metadata invariants in `src/gguf/tensor_data_base.HC` and added `tests/test_gguf_tensor_bytes_for_type.py`; `python3 tests/test_gguf_tensor_bytes_for_type.py && python3 tests/test_gguf_tensor_data_base.py` passed |
 | 2026-04-17 | loop-167 | IQ-035 Q8_0 Q16 accumulator parity harness | done | Added `tests/test_q8_0_dot_accum_q16.py`; `python3 tests/test_q8_0_dot_accum_q16.py && python3 tests/test_q8_0_dot.py` passed |
 | 2026-04-17 | loop-166 | IQ-025 GGUF header parser parity fixture | done | Added `tests/test_gguf_header_parse.py` covering valid/magic/version/truncation plus NULL/BAD_PARAM/OVERFLOW contracts; `python3 tests/test_gguf_header_parse.py && python3 tests/test_gguf_header_parse_checked.py && python3 tests/test_gguf_header_validate_and_size_checked.py` passed |

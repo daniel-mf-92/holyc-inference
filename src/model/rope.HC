@@ -41,6 +41,19 @@ I32 RoPEQ16RotateHeadRangeByTokenWindowPreflightedHeadBasesChecked(I64 *head_cel
                                                                    I64 *head_base_cache,
                                                                    I64 head_base_cache_capacity);
 
+I32 RoPEQ16RotateHeadRangeByPositionCheckedStrided(I64 *head_cells_q16,
+                                                   I64 head_cell_capacity,
+                                                   I64 token_base_index,
+                                                   I64 token_stride_q16,
+                                                   I64 token_index,
+                                                   I64 range_base_index,
+                                                   I64 head_count,
+                                                   I64 head_stride_cells,
+                                                   I64 head_dim,
+                                                   I64 pair_stride_cells,
+                                                   I64 freq_base_q16,
+                                                   I64 position);
+
 U64 RoPEAbsToU64(I64 x)
 {
     if (x >= 0)
@@ -1037,6 +1050,69 @@ I32 RoPEQ16RotateHeadRangeByPositionChecked(I64 *head_cells_q16,
     }
 
     return ROPE_Q16_OK;
+}
+
+// Rotate one head-range for a token stored in a strided KV-cache slab layout.
+//
+// Absolute range base derivation (all checked integer math):
+//   token_base = token_base_index + token_index * token_stride_q16
+//   abs_range_base = token_base + range_base_index
+//
+// After deriving `abs_range_base`, this helper composes the same preflighted
+// contiguous-head path used elsewhere, so range/span validation and no-partial-
+// write behavior stay identical to `RoPEQ16RotateHeadRangeByPositionPreflightedChecked`.
+I32 RoPEQ16RotateHeadRangeByPositionCheckedStrided(I64 *head_cells_q16,
+                                                   I64 head_cell_capacity,
+                                                   I64 token_base_index,
+                                                   I64 token_stride_q16,
+                                                   I64 token_index,
+                                                   I64 range_base_index,
+                                                   I64 head_count,
+                                                   I64 head_stride_cells,
+                                                   I64 head_dim,
+                                                   I64 pair_stride_cells,
+                                                   I64 freq_base_q16,
+                                                   I64 position)
+{
+    I64 token_offset;
+    I64 token_base;
+    I64 abs_range_base;
+    I32 status;
+
+    if (!head_cells_q16)
+        return ROPE_Q16_ERR_NULL_PTR;
+    if (token_index < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (token_stride_q16 < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    status = RoPETryMulI64Checked(token_index,
+                                  token_stride_q16,
+                                  &token_offset);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPETryAddI64Checked(token_base_index,
+                                  token_offset,
+                                  &token_base);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPETryAddI64Checked(token_base,
+                                  range_base_index,
+                                  &abs_range_base);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    return RoPEQ16RotateHeadRangeByPositionPreflightedChecked(head_cells_q16,
+                                                               head_cell_capacity,
+                                                               abs_range_base,
+                                                               head_count,
+                                                               head_stride_cells,
+                                                               head_dim,
+                                                               pair_stride_cells,
+                                                               freq_base_q16,
+                                                               position);
 }
 
 // Rotate a contiguous range of heads after full range preflight.
