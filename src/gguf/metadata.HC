@@ -411,6 +411,13 @@ I32 GGUFMetadataReadU64QuadCheckedDefault(U8 *buf,
                                           U64 *out_third,
                                           U64 *out_fourth);
 
+I32 GGUFMetadataReadU64TripleCheckedDefault(U8 *buf,
+                                            U64 buf_nbytes,
+                                            U64 *cursor,
+                                            U64 *out_first,
+                                            U64 *out_second,
+                                            U64 *out_third);
+
 I32 GGUFMetadataReadI32LEChecked(U8 *buf,
                                  U64 buf_nbytes,
                                  U64 *cursor,
@@ -2975,6 +2982,25 @@ I32 GGUFMetadataReadU64QuadCheckedDefault(U8 *buf,
                                           out_second,
                                           out_third,
                                           out_fourth);
+}
+
+// Canonical default-end wrapper for fixed-layout U64 triple metadata tuples.
+// Contract: preserves exact checked-triple semantics by pinning table_end to
+// buf_nbytes and delegating to GGUFMetadataReadU64TripleChecked.
+I32 GGUFMetadataReadU64TripleCheckedDefault(U8 *buf,
+                                            U64 buf_nbytes,
+                                            U64 *cursor,
+                                            U64 *out_first,
+                                            U64 *out_second,
+                                            U64 *out_third)
+{
+    return GGUFMetadataReadU64TripleChecked(buf,
+                                            buf_nbytes,
+                                            cursor,
+                                            buf_nbytes,
+                                            out_first,
+                                            out_second,
+                                            out_third);
 }
 
 // Checked little-endian I32 metadata reader.

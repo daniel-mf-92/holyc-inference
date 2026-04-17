@@ -1,0 +1,16 @@
+Done — I completed `IQ-295` end-to-end with HolyC code, tests, queue maintenance, and DB logging.
+
+**What Changed**
+- Added canonical default-end wrapper declaration `GGUFMetadataReadU64TripleCheckedDefault` in `src/gguf/metadata.HC:414`.
+- Implemented wrapper logic delegating to checked core with `table_end = buf_nbytes` in `src/gguf/metadata.HC:2990`.
+- Added focused parity harness `tests/test_gguf_metadata_read_u64_triple_checked_default.py:1`.
+- Marked `IQ-295` complete and appended new unchecked `IQ-310` to keep rolling depth in `MASTER_TASKS.md:492` and `MASTER_TASKS.md:509`.
+- Added one ledger line for this iteration in `MASTER_TASKS.md:516`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_u64_triple_checked_default.py && python3 tests/test_gguf_metadata_read_u64_triple_checked.py && python3 tests/test_gguf_metadata_read_u64_quad_checked_default.py && echo 'validation=ok'`
+- Output: `ok`, `ok`, `validation=ok`.
+
+**Central DB**
+- Logged iteration row in `~/Documents/local-codebases/temple-central.db` with `task_id='IQ-295'`, status `pass` (record id `3388`).
+- Queue depth check after completion/top-up: `15` unchecked `IQ-` items.
