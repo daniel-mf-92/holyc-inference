@@ -2605,24 +2605,19 @@ I32 GGUFMetadataReadF64BitsTripleChecked(U8 *buf,
 
     cur = *cursor;
 
-    // Stage all float64 lanes through the canonical checked scalar reader so
-    // triple decode preserves identical bounds/overflow/no-partial-write rules.
-    err = GGUFMetadataReadF64BitsLEChecked(buf,
-                                           buf_nbytes,
-                                           &cur,
-                                           table_end,
-                                           &first_bits);
+    // Stage the first two lanes through pair-reader composition so compact
+    // tuple helpers share identical scalar decode + bounds behavior.
+    err = GGUFMetadataReadF64BitsPairChecked(buf,
+                                             buf_nbytes,
+                                             &cur,
+                                             table_end,
+                                             &first_bits,
+                                             &second_bits);
     if (err != GGUF_META_TABLE_OK)
         return err;
 
-    err = GGUFMetadataReadF64BitsLEChecked(buf,
-                                           buf_nbytes,
-                                           &cur,
-                                           table_end,
-                                           &second_bits);
-    if (err != GGUF_META_TABLE_OK)
-        return err;
-
+    // Stage the third lane with the canonical scalar F64-bits reader. Outputs
+    // + cursor commit only after this succeeds (strict no-partial semantics).
     err = GGUFMetadataReadF64BitsLEChecked(buf,
                                            buf_nbytes,
                                            &cur,

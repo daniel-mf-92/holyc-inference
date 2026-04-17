@@ -130,11 +130,14 @@ def gguf_metadata_read_f64bits_triple_checked(
     second = [0]
     third = [0]
 
-    err = gguf_metadata_read_f64bitsle_checked(buf, buf_nbytes, cur, table_end, first)
-    if err != GGUF_META_TABLE_OK:
-        return err
-
-    err = gguf_metadata_read_f64bitsle_checked(buf, buf_nbytes, cur, table_end, second)
+    err = gguf_metadata_read_f64bits_pair_checked(
+        buf,
+        buf_nbytes,
+        cur,
+        table_end,
+        first,
+        second,
+    )
     if err != GGUF_META_TABLE_OK:
         return err
 
@@ -145,6 +148,40 @@ def gguf_metadata_read_f64bits_triple_checked(
     out_first_ref[0] = first[0]
     out_second_ref[0] = second[0]
     out_third_ref[0] = third[0]
+    cursor_ref[0] = cur[0]
+    return GGUF_META_TABLE_OK
+
+
+def gguf_metadata_read_f64bits_pair_checked(
+    buf: list[int] | None,
+    buf_nbytes: int,
+    cursor_ref: list[int] | None,
+    table_end: int,
+    out_first_ref: list[int] | None,
+    out_second_ref: list[int] | None,
+) -> int:
+    if (
+        buf is None
+        or cursor_ref is None
+        or out_first_ref is None
+        or out_second_ref is None
+    ):
+        return GGUF_META_TABLE_ERR_NULL_PTR
+
+    cur = [cursor_ref[0]]
+    first = [0]
+    second = [0]
+
+    err = gguf_metadata_read_f64bitsle_checked(buf, buf_nbytes, cur, table_end, first)
+    if err != GGUF_META_TABLE_OK:
+        return err
+
+    err = gguf_metadata_read_f64bitsle_checked(buf, buf_nbytes, cur, table_end, second)
+    if err != GGUF_META_TABLE_OK:
+        return err
+
+    out_first_ref[0] = first[0]
+    out_second_ref[0] = second[0]
     cursor_ref[0] = cur[0]
     return GGUF_META_TABLE_OK
 
@@ -181,6 +218,31 @@ def test_third_scalar_fail_does_not_commit_outputs_or_cursor() -> None:
     first = 0x0123456789ABCDEF
     second = 0x0FEDCBA987654321
     buf = _le_u64(first) + _le_u64(second) + [0xAA] * 7
+
+    cursor = [0]
+    out_first = [0x1111111111111111]
+    out_second = [0x2222222222222222]
+    out_third = [0x3333333333333333]
+
+    err = gguf_metadata_read_f64bits_triple_checked(
+        buf,
+        len(buf),
+        cursor,
+        len(buf),
+        out_first,
+        out_second,
+        out_third,
+    )
+    assert err == GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
+    assert cursor == [0]
+    assert out_first == [0x1111111111111111]
+    assert out_second == [0x2222222222222222]
+    assert out_third == [0x3333333333333333]
+
+
+def test_pair_stage_fail_does_not_commit_outputs_or_cursor() -> None:
+    first = 0x0123456789ABCDEF
+    buf = _le_u64(first) + [0xAA] * 7
 
     cursor = [0]
     out_first = [0x1111111111111111]
@@ -282,6 +344,7 @@ def test_randomized_parity() -> None:
 
 def run() -> None:
     test_null_ptr_and_no_partial_write()
+    test_pair_stage_fail_does_not_commit_outputs_or_cursor()
     test_third_scalar_fail_does_not_commit_outputs_or_cursor()
     test_success_reads_three_f64_raw_bit_patterns_and_advances()
     test_randomized_parity()
