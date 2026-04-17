@@ -361,6 +361,15 @@ I32 GGUFMetadataReadF64BitsTripleChecked(U8 *buf,
                                          U64 *out_second_bits,
                                          U64 *out_third_bits);
 
+I32 GGUFMetadataReadF64BitsQuadChecked(U8 *buf,
+                                       U64 buf_nbytes,
+                                       U64 *cursor,
+                                       U64 table_end,
+                                       U64 *out_first_bits,
+                                       U64 *out_second_bits,
+                                       U64 *out_third_bits,
+                                       U64 *out_fourth_bits);
+
 I32 GGUFMetadataReadBoolChecked(U8 *buf,
                                 U64 buf_nbytes,
                                 U64 *cursor,
@@ -2629,6 +2638,61 @@ I32 GGUFMetadataReadF64BitsTripleChecked(U8 *buf,
     *out_first_bits = first_bits;
     *out_second_bits = second_bits;
     *out_third_bits = third_bits;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked metadata FLOAT64 raw-bit quad reader.
+// Contract: decodes four sequential little-endian FLOAT64 payload bit-patterns
+// through shared checked scalar staging and commits all outputs + cursor only
+// after all four lanes pass (strict no-partial-write tuple semantics).
+I32 GGUFMetadataReadF64BitsQuadChecked(U8 *buf,
+                                       U64 buf_nbytes,
+                                       U64 *cursor,
+                                       U64 table_end,
+                                       U64 *out_first_bits,
+                                       U64 *out_second_bits,
+                                       U64 *out_third_bits,
+                                       U64 *out_fourth_bits)
+{
+    U64 cur;
+    U64 first_bits;
+    U64 second_bits;
+    U64 third_bits;
+    U64 fourth_bits;
+    I32 err;
+
+    if (!buf || !cursor || !out_first_bits || !out_second_bits || !out_third_bits || !out_fourth_bits)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Stage three lanes through triple composition to preserve canonical
+    // bounds/cursor behavior while avoiding duplicate decode math.
+    err = GGUFMetadataReadF64BitsTripleChecked(buf,
+                                               buf_nbytes,
+                                               &cur,
+                                               table_end,
+                                               &first_bits,
+                                               &second_bits,
+                                               &third_bits);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // Stage the fourth lane through canonical scalar decoding. Outputs +
+    // cursor commit only after this succeeds (strict no-partial semantics).
+    err = GGUFMetadataReadF64BitsLEChecked(buf,
+                                           buf_nbytes,
+                                           &cur,
+                                           table_end,
+                                           &fourth_bits);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_first_bits = first_bits;
+    *out_second_bits = second_bits;
+    *out_third_bits = third_bits;
+    *out_fourth_bits = fourth_bits;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
