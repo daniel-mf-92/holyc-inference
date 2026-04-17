@@ -754,3 +754,27 @@ I32 FPQ16MulDivArrayRoundedByPositiveIntFromQ16DenChecked(I64 *a_q16,
 
     return FP_Q16_OK;
 }
+
+// Checked no-alias wrapper for Q16-denominator positive-int array mul/div.
+// This hardens immutable-source call sites by requiring output storage to be
+// distinct from every input lane buffer before delegating into the checked
+// core helper that performs full preflight and lane math.
+I32 FPQ16MulDivArrayRoundedByPositiveIntFromQ16DenCheckedNoAlias(I64 *a_q16,
+                                                                 I64 *b_q16,
+                                                                 I64 *d_q16,
+                                                                 I64 *out_q16,
+                                                                 I64 count)
+{
+    if (!a_q16 || !b_q16 || !d_q16 || !out_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (out_q16 == a_q16 || out_q16 == b_q16 || out_q16 == d_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    return FPQ16MulDivArrayRoundedByPositiveIntFromQ16DenChecked(a_q16,
+                                                                  b_q16,
+                                                                  d_q16,
+                                                                  out_q16,
+                                                                  count);
+}
