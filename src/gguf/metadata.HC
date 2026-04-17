@@ -135,6 +135,13 @@ I32 GGUFMetadataReadStringBytesChecked(U8 *buf,
                                        U8 *out_bytes,
                                        U64 out_nbytes);
 
+I32 GGUFMetadataReadArrayHeaderChecked(U8 *buf,
+                                       U64 buf_nbytes,
+                                       U64 *cursor,
+                                       U64 table_end,
+                                       U32 *out_elem_type,
+                                       U64 *out_elem_count);
+
 // Validate metadata table byte-window math before any parser cursor movement.
 // Contract: `out_table_end` is written only on success.
 I32 GGUFMetadataTableSpanValidateChecked(U64 table_start,
@@ -611,6 +618,64 @@ I32 GGUFMetadataReadStringBytesChecked(U8 *buf,
         out_bytes[i] = buf[cur + i];
 
     *cursor = next_cursor;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked GGUF metadata ARRAY header reader (`elem_type:U32`, `elem_count:U64`).
+// This helper enforces strict element-type/count contracts before payload
+// iteration so callers can safely dispatch to scalar/value readers.
+// Contract: writes outputs and advances `*cursor` only on success.
+I32 GGUFMetadataReadArrayHeaderChecked(U8 *buf,
+                                       U64 buf_nbytes,
+                                       U64 *cursor,
+                                       U64 table_end,
+                                       U32 *out_elem_type,
+                                       U64 *out_elem_count)
+{
+    U64 cur;
+    U32 elem_type;
+    U64 elem_count;
+    I32 err;
+
+    if (!buf || !cursor || !out_elem_type || !out_elem_count)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Decode element type via shared checked U32 reader so the cursor/bounds
+    // behavior matches all other metadata scalar-width decoders.
+    err = GGUFMetadataReadU32LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &elem_type);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // GGUF forbids nested arrays; additionally reject unsupported element tags
+    // up front before payload-width dependent iteration begins.
+    if (elem_type == GGUF_TYPE_ARRAY)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (!GGUFMetaTypeSupported(elem_type))
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    // Decode element count through shared checked U64 reader so count parsing
+    // inherits identical no-partial-write and overflow semantics.
+    err = GGUFMetadataReadU64LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &elem_count);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // Keep array fan-out bounded before any payload byte math/iteration.
+    if (elem_count > GGUF_MAX_ARRAY_ELEMS)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    *out_elem_type = elem_type;
+    *out_elem_count = elem_count;
+    *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
 

@@ -1,0 +1,18 @@
+Done — this iteration fully progressed `IQ-203` end-to-end with HolyC runtime code + host-side parity validation.
+
+**What Changed**
+- Implemented `GGUFMetadataReadArrayHeaderChecked` with strict checked decode (`elem_type` U32 + `elem_count` U64), nested-array rejection, unsupported-type rejection, max-count guard, and no-partial-write cursor/output semantics in `src/gguf/metadata.HC:628`.
+- Added forward declaration for the helper in `src/gguf/metadata.HC:138`.
+- Added dedicated adversarial/randomized parity harness in `tests/test_gguf_metadata_read_array_header_checked.py:2`.
+- Marked `IQ-203` complete, appended new unchecked `IQ-218` (monotonic queue), and added one ledger line in `MASTER_TASKS.md:396`, `MASTER_TASKS.md:411`, `MASTER_TASKS.md:418`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_array_header_checked.py && python3 tests/test_gguf_metadata_parse.py && python3 tests/test_gguf_metadata_read_u64le_checked.py`
+- Output:
+  - `gguf_metadata_read_array_header_checked_reference_checks=ok`
+  - `gguf_metadata_reference_checks=ok`
+  - `gguf_metadata_read_u64le_checked_reference_checks=ok`
+
+**Queue/DB**
+- Unchecked queue depth maintained at 15 (first unchecked now `IQ-204`).
+- Logged to central DB: iteration row `id=2469`, `agent=inference`, `task_id=IQ-203`, `status=pass`.
