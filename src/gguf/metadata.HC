@@ -146,6 +146,12 @@ I32 GGUFMetadataReadI64LECheckedNoPartial(U8 *buf,
                                           U64 table_end,
                                           I64 *out_value);
 
+I32 GGUFMetadataReadF32BitsLEChecked(U8 *buf,
+                                     U64 buf_nbytes,
+                                     U64 *cursor,
+                                     U64 table_end,
+                                     U32 *out_bits);
+
 I32 GGUFMetadataReadF64BitsLEChecked(U8 *buf,
                                      U64 buf_nbytes,
                                      U64 *cursor,
@@ -674,6 +680,40 @@ I32 GGUFMetadataReadI64LECheckedNoPartial(U8 *buf,
         return err;
 
     *out_value = (I64)raw_u64;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked little-endian FLOAT32 bit-pattern metadata reader.
+// Runtime remains integer-only: the 32-bit payload is returned as raw bits
+// so callers can audit exact IEEE754 encodings without float math.
+// Contract: writes `*out_bits` and advances `*cursor` only on success.
+I32 GGUFMetadataReadF32BitsLEChecked(U8 *buf,
+                                     U64 buf_nbytes,
+                                     U64 *cursor,
+                                     U64 table_end,
+                                     U32 *out_bits)
+{
+    U64 cur;
+    U32 raw_bits;
+    I32 err;
+
+    if (!buf || !cursor || !out_bits)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Decode through the shared U32 checked reader so float32 payload bit
+    // extraction inherits identical cursor/bounds/no-partial-write behavior.
+    err = GGUFMetadataReadU32LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &raw_bits);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_bits = raw_bits;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
