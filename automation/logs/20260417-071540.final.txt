@@ -1,0 +1,19 @@
+Completed a full unattended iteration on `IQ-171` with queue maintenance and logging.
+
+**What Changed**
+- Expanded `tests/test_softmax_exp_phase_from_preclamped_checked.py:114` to model checked pointer-style contracts in the reference harness (NULL_PTR, BAD_PARAM, OVERFLOW, no-partial-write), including new targeted cases at `tests/test_softmax_exp_phase_from_preclamped_checked.py:179` and `tests/test_softmax_exp_phase_from_preclamped_checked.py:213`.
+- Updated split-phase caller parity wiring in `tests/test_softmax_from_preclamped_checked.py:52` to pass explicit output/sum buffers into the upgraded exp-phase reference signature.
+- Marked `IQ-171` complete and added rolling queue item `IQ-197` in `MASTER_TASKS.md:362` and `MASTER_TASKS.md:390`.
+- Added one concise progress-ledger line for this iteration in `MASTER_TASKS.md:397`.
+
+**Validation**
+- Ran: `python3 tests/test_softmax_exp_phase_from_preclamped_checked.py && python3 tests/test_softmax_exp_phase_from_preclamped_no_alias_checked.py && python3 tests/test_softmax_from_preclamped_checked.py && python3 tests/test_softmax_normalize_phase_checked.py`
+- Output:
+  - `softmax_exp_phase_from_preclamped_checked_reference_checks=ok`
+  - `softmax_exp_phase_from_preclamped_no_alias_checked_reference_checks=ok`
+  - `softmax_from_preclamped_checked_reference_checks=ok`
+  - `softmax_normalize_phase_checked_reference_checks=ok`
+
+**Contract Checks**
+- Queue depth maintained at 15 unchecked IQ items; top unchecked is now `IQ-173`.
+- Central DB logged in `~/Documents/local-codebases/temple-central.db` with `agent='inference'`, `task_id='IQ-171'`, `status='pass'`.

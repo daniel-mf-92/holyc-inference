@@ -51,7 +51,9 @@ def fpq16_softmax_from_preclamped_checked_reference(
 
     exp_err, exp_out, exp_sum_q16 = fpq16_softmax_exp_phase_from_preclamped_checked_reference(
         read_logits,
+        exp_lanes_q16,
         lane_count,
+        0,
     )
     if exp_err != FP_Q16_OK:
         return exp_err, exp_lanes_q16[:], probs_q16[:]
