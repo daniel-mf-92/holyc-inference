@@ -2395,6 +2395,52 @@ I32 GGUFMetadataReadI32QuadChecked(U8 *buf,
     return GGUF_META_TABLE_OK;
 }
 
+// Checked little-endian I32 quad reader with explicit all-or-nothing staging
+// contract. Wraps the canonical staged quad decoder and commits outputs/cursor
+// only after full tuple decode succeeds.
+I32 GGUFMetadataReadI32QuadCheckedNoPartial(U8 *buf,
+                                            U64 buf_nbytes,
+                                            U64 *cursor,
+                                            U64 table_end,
+                                            I32 *out_first,
+                                            I32 *out_second,
+                                            I32 *out_third,
+                                            I32 *out_fourth)
+{
+    U64 cur;
+    I32 first;
+    I32 second;
+    I32 third;
+    I32 fourth;
+    I32 err;
+
+    if (!buf || !cursor || !out_first || !out_second || !out_third || !out_fourth)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Route through the canonical signed-I32 quad helper so this explicit
+    // no-partial symbol preserves identical bounds/overflow behavior while
+    // guaranteeing tuple/cursor commit only on full success.
+    err = GGUFMetadataReadI32QuadChecked(buf,
+                                         buf_nbytes,
+                                         &cur,
+                                         table_end,
+                                         &first,
+                                         &second,
+                                         &third,
+                                         &fourth);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_first = first;
+    *out_second = second;
+    *out_third = third;
+    *out_fourth = fourth;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
 // Checked little-endian I64 metadata reader.
 // Contract: writes `*out_value` and advances `*cursor` only on success.
 I32 GGUFMetadataReadI64LEChecked(U8 *buf,
