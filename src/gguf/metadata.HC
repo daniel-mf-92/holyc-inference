@@ -208,6 +208,15 @@ I32 GGUFMetadataReadI16QuadChecked(U8 *buf,
                                    I16 *out_third,
                                    I16 *out_fourth);
 
+I32 GGUFMetadataReadI16QuadCheckedNoPartial(U8 *buf,
+                                            U64 buf_nbytes,
+                                            U64 *cursor,
+                                            U64 table_end,
+                                            I16 *out_first,
+                                            I16 *out_second,
+                                            I16 *out_third,
+                                            I16 *out_fourth);
+
 I32 GGUFMetadataReadU32LEChecked(U8 *buf,
                                  U64 buf_nbytes,
                                  U64 *cursor,
@@ -1690,6 +1699,52 @@ I32 GGUFMetadataReadI16QuadChecked(U8 *buf,
                                        &cur,
                                        table_end,
                                        &fourth);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_first = first;
+    *out_second = second;
+    *out_third = third;
+    *out_fourth = fourth;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked little-endian I16 quad reader with explicit all-or-nothing staging
+// contract. Wraps the canonical staged quad decoder and commits outputs/cursor
+// only after full tuple decode succeeds.
+I32 GGUFMetadataReadI16QuadCheckedNoPartial(U8 *buf,
+                                            U64 buf_nbytes,
+                                            U64 *cursor,
+                                            U64 table_end,
+                                            I16 *out_first,
+                                            I16 *out_second,
+                                            I16 *out_third,
+                                            I16 *out_fourth)
+{
+    U64 cur;
+    I16 first;
+    I16 second;
+    I16 third;
+    I16 fourth;
+    I32 err;
+
+    if (!buf || !cursor || !out_first || !out_second || !out_third || !out_fourth)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Route through the canonical signed-I16 quad helper so this explicit
+    // no-partial symbol preserves identical bounds/overflow behavior while
+    // guaranteeing tuple/cursor commit only on full success.
+    err = GGUFMetadataReadI16QuadChecked(buf,
+                                         buf_nbytes,
+                                         &cur,
+                                         table_end,
+                                         &first,
+                                         &second,
+                                         &third,
+                                         &fourth);
     if (err != GGUF_META_TABLE_OK)
         return err;
 
