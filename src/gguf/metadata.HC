@@ -180,6 +180,12 @@ I32 GGUFMetadataReadF32BitsLEChecked(U8 *buf,
                                      U64 table_end,
                                      U32 *out_bits);
 
+I32 GGUFMetadataReadF32BitsLECheckedNoPartial(U8 *buf,
+                                              U64 buf_nbytes,
+                                              U64 *cursor,
+                                              U64 table_end,
+                                              U32 *out_bits);
+
 I32 GGUFMetadataReadF64BitsLEChecked(U8 *buf,
                                      U64 buf_nbytes,
                                      U64 *cursor,
@@ -1058,6 +1064,24 @@ I32 GGUFMetadataReadF32BitsLEChecked(U8 *buf,
                                      U64 *cursor,
                                      U64 table_end,
                                      U32 *out_bits)
+{
+    // Keep legacy symbol as the canonical parser entrypoint while routing
+    // decode through the explicit no-partial-write helper.
+    return GGUFMetadataReadF32BitsLECheckedNoPartial(buf,
+                                                     buf_nbytes,
+                                                     cursor,
+                                                     table_end,
+                                                     out_bits);
+}
+
+// Checked little-endian FLOAT32 bit-pattern metadata reader with explicit
+// all-or-nothing staging contract. Cursor/output are committed only after
+// full U32 decode succeeds through the shared checked U32 reader.
+I32 GGUFMetadataReadF32BitsLECheckedNoPartial(U8 *buf,
+                                              U64 buf_nbytes,
+                                              U64 *cursor,
+                                              U64 table_end,
+                                              U32 *out_bits)
 {
     U64 cur;
     U32 raw_bits;
