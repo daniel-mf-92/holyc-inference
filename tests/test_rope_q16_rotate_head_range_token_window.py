@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent))
 
 import test_rope_q16_angle_step as ref
+import test_rope_q16_rotate_head_range_token_window_preflighted_head_bases as hb_ref
 import test_rope_q16_compute_head_base_index as base_ref
 import test_rope_q16_rotate_head_position as head_ref
 import test_rope_q16_rotate_head_range_preflighted_position as preflight_ref
@@ -404,6 +405,79 @@ def test_randomized_contract_parity_vs_composed_reference() -> None:
             assert got == want
 
 
+def test_preflighted_execution_path_parity_with_cached_head_bases_variant() -> None:
+    rng = random.Random(2026041704)
+    dims = [8, 16, 24, 32]
+    freq_bases = [5000.0, 10000.0, 50000.0]
+
+    for _ in range(1400):
+        head_dim = rng.choice(dims)
+        pair_stride = rng.randint(2, 6)
+        head_span = (head_dim // 2) * pair_stride + 1
+
+        head_stride = rng.randint(max(1, head_span - 2), head_span + 14)
+        head_count = rng.randint(0, 4)
+        token_count = rng.randint(0, 6)
+        position_start = rng.randint(-1024, 4096)
+        position_step = rng.randint(-8, 8)
+
+        if head_count == 0:
+            cap = rng.randint(max(1, head_span), max(2, head_span + 64))
+            base = rng.randint(0, cap - 1)
+        else:
+            needed = ((head_count - 1) * max(1, head_stride)) + head_span
+            cap = rng.randint(max(needed, 1), max(needed + 96, 2))
+            max_base = cap - needed
+            base = rng.randint(0, max(0, max_base))
+
+        if rng.random() < 0.22:
+            if rng.random() < 0.5:
+                head_stride = 0
+            else:
+                token_count = -1
+
+        freq_base_q16 = ref.q16_from_float(rng.choice(freq_bases))
+        inp = make_head_buffer(cap, rng.randint(0, 10_000_000))
+
+        err_pre, got_pre = rope_q16_rotate_head_range_by_token_window_preflighted_checked(
+            inp,
+            cap,
+            base,
+            head_count,
+            head_stride,
+            head_dim,
+            pair_stride,
+            freq_base_q16,
+            position_start,
+            token_count,
+            position_step,
+        )
+
+        cache_pad = rng.randint(0, 3)
+        cache_cap = max(0, head_count) + cache_pad
+        cache = [rng.randint(-1000, 1000) for _ in range(cache_cap)]
+
+        err_hb, got_hb = hb_ref.rope_q16_rotate_head_range_by_token_window_preflighted_head_bases_checked(
+            inp,
+            cap,
+            base,
+            head_count,
+            head_stride,
+            head_dim,
+            pair_stride,
+            freq_base_q16,
+            position_start,
+            token_count,
+            position_step,
+            cache,
+            cache_cap,
+        )
+
+        assert err_pre == err_hb
+        if err_pre == ref.ROPE_Q16_OK:
+            assert got_pre == got_hb
+
+
 def run() -> None:
     test_bad_param_contracts()
     test_zero_token_count_is_noop()
@@ -412,6 +486,7 @@ def run() -> None:
     test_position_step_overflow_surfaces_err_overflow()
     test_preflighted_token_window_matches_per_position_composition()
     test_randomized_contract_parity_vs_composed_reference()
+    test_preflighted_execution_path_parity_with_cached_head_bases_variant()
     print("rope_q16_rotate_head_range_token_window_reference_checks=ok")
 
 

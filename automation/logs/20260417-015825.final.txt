@@ -1,0 +1,23 @@
+Completed — I ran a full IQ-150 iteration end-to-end with HolyC runtime-only changes.
+
+**What Changed**
+- Routed `RoPEQ16RotateHeadRangeByTokenWindowPreflightedChecked` to execute through the cached head-base path by allocating a scratch head-base buffer once per call, delegating to the cached helper, and freeing it after execution in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/model/rope.HC:1131`.
+- Added forward declaration for cached helper entrypoint to keep compile order explicit in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/model/rope.HC:30`.
+- Preserved zero-work behavior by routing `token_count==0 || head_count==0` through the same execution helper to keep error/contract surfaces unified in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/model/rope.HC:1156`.
+- Fixed cached helper no-op contract ordering (`head_count==0` returns OK before cache-capacity check) in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/model/rope.HC:1204`.
+
+**Validation**
+- Added randomized parity test ensuring preflighted execution path matches cached-head-base variant in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_rope_q16_rotate_head_range_token_window.py:408`.
+- Ran:
+  - `python3 tests/test_rope_q16_rotate_head_range_token_window.py`
+  - `python3 tests/test_rope_q16_rotate_head_range_token_window_preflighted_head_bases.py`
+  - `python3 tests/test_rope_q16_rotate_head_range_preflighted_position.py`
+  - `python3 tests/test_rope_q16_rotate_head_range_position.py`
+  - `python3 tests/test_rope_q16_rotate_head_position.py`
+- Output: all passed (`...reference_checks=ok` for each suite).
+
+**Queue/DB Updates**
+- Marked IQ item done: `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:341` (`IQ-150` now checked).
+- Added one-line ledger entry: `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:357` (`loop-135`).
+- Kept queue depth rolling by appending new unchecked items (`IQ-158..IQ-160`) in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:349` (unchecked IQ count now 17).
+- Logged central DB iteration row: `id=1811`, `agent=inference`, `task_id=IQ-150`, `status=pass`, `validation_result=ok`.
