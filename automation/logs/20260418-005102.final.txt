@@ -1,0 +1,13 @@
+Done — I completed one full unattended iteration on `IQ-290`.
+
+- Implemented canonical HolyC default-end wrapper `GGUFMetadataReadI8TripleCheckedDefault` that delegates to checked core with `table_end = buf_nbytes` in `src/gguf/metadata.HC:1486` (prototype at `src/gguf/metadata.HC:117`).
+- Added focused host parity harness with null/error/no-partial/success/randomized parity checks in `tests/test_gguf_metadata_read_i8_triple_checked_default.py:1` (wrapper model at `tests/test_gguf_metadata_read_i8_triple_checked_default.py:136`).
+- Updated queue state and ledger: marked item done at `MASTER_TASKS.md:484`, appended one-line progress ledger entry at `MASTER_TASKS.md:823`.
+- Queue depth policy satisfied without appending new IQ items (unchecked IQ count remains `16`, first unchecked now `IQ-291`).
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_i8_triple_checked_default.py && python3 tests/test_gguf_metadata_read_i8_triple_checked.py && python3 tests/test_gguf_metadata_read_i8_quad_checked_no_partial.py && python3 tests/test_gguf_metadata_parse.py`
+- Output: `ok`, `gguf_metadata_read_i8_triple_checked_reference_checks=ok`, `gguf_metadata_reference_checks=ok`.
+
+**Central DB**
+- Logged iteration to `~/Documents/local-codebases/temple-central.db` (`iterations.id=3337`, `task_id=IQ-290`, `status=pass`).
