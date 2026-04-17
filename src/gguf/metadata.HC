@@ -106,6 +106,14 @@ I32 GGUFMetadataReadI8TripleChecked(U8 *buf,
                                     I8 *out_second,
                                     I8 *out_third);
 
+I32 GGUFMetadataReadI8TripleCheckedNoPartial(U8 *buf,
+                                             U64 buf_nbytes,
+                                             U64 *cursor,
+                                             U64 table_end,
+                                             I8 *out_first,
+                                             I8 *out_second,
+                                             I8 *out_third);
+
 I32 GGUFMetadataReadI8QuadChecked(U8 *buf,
                                   U64 buf_nbytes,
                                   U64 *cursor,
@@ -1324,6 +1332,27 @@ I32 GGUFMetadataReadI8TripleChecked(U8 *buf,
     *out_third = third;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Checked metadata signed-I8 triple reader with explicit no-partial wrapper
+// semantics.
+// Contract: this entrypoint enforces strict all-or-nothing cursor/output
+// commit by delegating to the canonical staged triple decoder.
+I32 GGUFMetadataReadI8TripleCheckedNoPartial(U8 *buf,
+                                             U64 buf_nbytes,
+                                             U64 *cursor,
+                                             U64 table_end,
+                                             I8 *out_first,
+                                             I8 *out_second,
+                                             I8 *out_third)
+{
+    return GGUFMetadataReadI8TripleChecked(buf,
+                                           buf_nbytes,
+                                           cursor,
+                                           table_end,
+                                           out_first,
+                                           out_second,
+                                           out_third);
 }
 
 // Checked signed-I8 tuple reader for compact metadata quad fields.

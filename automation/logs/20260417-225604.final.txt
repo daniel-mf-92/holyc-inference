@@ -1,0 +1,21 @@
+Done — completed one full iteration on `IQ-275` and kept queue depth compliant.
+
+**What Changed**
+- Added HolyC no-partial wrapper `GGUFMetadataReadI8TripleCheckedNoPartial` delegating to canonical staged triple decode in `src/gguf/metadata.HC:1341` (prototype at `src/gguf/metadata.HC:109`).
+- Added focused host parity harness `tests/test_gguf_metadata_read_i8_triple_checked_no_partial.py:1`.
+- Marked `IQ-275` complete in `MASTER_TASKS.md:469`.
+- Appended new unchecked queue item `IQ-290` to keep monotonic IDs and maintain 15+ depth in `MASTER_TASKS.md:484`.
+- Added one progress ledger line for this loop in `MASTER_TASKS.md:492`.
+- Logged iteration to central DB (`task_id=IQ-275`, status `pass`).
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_i8_triple_checked_no_partial.py && python3 tests/test_gguf_metadata_read_i8_triple_checked.py && python3 tests/test_gguf_metadata_read_i8_checked.py && python3 tests/test_gguf_metadata_parse.py`
+- Output:
+  - `gguf_metadata_read_i8_triple_checked_no_partial_reference_checks=ok`
+  - `gguf_metadata_read_i8_triple_checked_reference_checks=ok`
+  - `gguf_metadata_read_i8_checked_reference_checks=ok`
+  - `gguf_metadata_reference_checks=ok`
+
+**Queue/Contract Check**
+- Progressed exactly one IQ item: `IQ-275`.
+- Unchecked `IQ-*` count after update: `15` (first `IQ-276`, last `IQ-290`).
