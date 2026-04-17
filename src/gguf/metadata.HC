@@ -97,6 +97,12 @@ I32 GGUFMetadataReadU64LEChecked(U8 *buf,
                                  U64 table_end,
                                  U64 *out_value);
 
+I32 GGUFMetadataReadI64LEChecked(U8 *buf,
+                                 U64 buf_nbytes,
+                                 U64 *cursor,
+                                 U64 table_end,
+                                 I64 *out_value);
+
 // Validate metadata table byte-window math before any parser cursor movement.
 // Contract: `out_table_end` is written only on success.
 I32 GGUFMetadataTableSpanValidateChecked(U64 table_start,
@@ -341,6 +347,38 @@ I32 GGUFMetadataReadU64LEChecked(U8 *buf,
                | (((U64)b5) << 40)
                | (((U64)b6) << 48)
                | (((U64)b7) << 56);
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked little-endian I64 metadata reader.
+// Contract: writes `*out_value` and advances `*cursor` only on success.
+I32 GGUFMetadataReadI64LEChecked(U8 *buf,
+                                 U64 buf_nbytes,
+                                 U64 *cursor,
+                                 U64 table_end,
+                                 I64 *out_value)
+{
+    U64 cur;
+    U64 raw_u64;
+    I32 err;
+
+    if (!buf || !cursor || !out_value)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Keep no-partial-write semantics by decoding through a staged cursor and
+    // only committing cursor/output after the shared U64 checked reader passes.
+    err = GGUFMetadataReadU64LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &raw_u64);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_value = (I64)raw_u64;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
