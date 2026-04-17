@@ -84,3 +84,8 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_25","type":"todo_list","items":[{"text":"Implement IQ-241 HolyC triple helper","completed":true},{"text":"Add focused Python parity harness","completed":true},{"text":"Run targeted validation commands","completed":true},{"text":"Update tasks, queue, and ledger","completed":true},{"text":"Insert central DB iteration record","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":1589656,"cached_input_tokens":1421440,"output_tokens":8274}}
 Codex final exit code: 0
+[main ceabc4a] feat(inference): codex iteration 20260417-175329
+ 6 files changed, 507 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260417-175329.final.txt
+ create mode 100644 tests/test_gguf_metadata_read_f32bits_triple_checked.py
+=== End iteration 164 (outcome=ok) ===
