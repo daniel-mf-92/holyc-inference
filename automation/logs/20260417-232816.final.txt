@@ -1,0 +1,14 @@
+Completed one full iteration end-to-end on `IQ-279` with queue depth preserved.
+
+**What Changed**
+- Implemented `GGUFMetadataReadU32TripleCheckedNoPartial` as an explicit all-or-nothing wrapper over canonical staged triple decode in `src/gguf/metadata.HC:2137` (prototype at `src/gguf/metadata.HC:275`).
+- Added focused parity harness `tests/test_gguf_metadata_read_u32_triple_checked_no_partial.py:1` covering null-ptr, fail-on-third-lane no-commit, overflow passthrough, success path, and randomized cases.
+- Updated queue/ledger in `MASTER_TASKS.md:473` (`IQ-279` checked), added new unchecked `IQ-294` at `MASTER_TASKS.md:491` to keep rolling depth, and appended one ledger line at `MASTER_TASKS.md:797`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_u32_triple_checked_no_partial.py && python3 tests/test_gguf_metadata_read_u32_triple_checked.py && python3 tests/test_gguf_metadata_read_u32_quad_checked_no_partial.py && python3 tests/test_gguf_metadata_parse.py`
+- Output: `ok` and `gguf_metadata_reference_checks=ok`
+
+**Queue/DB**
+- Unchecked IQ count is maintained at 15 (next is `IQ-280`).
+- Logged iteration to central DB: `temple-central.db` row `id=3228` for `IQ-279` with `status=pass`.

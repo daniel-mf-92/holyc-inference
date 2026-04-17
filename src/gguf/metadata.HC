@@ -272,6 +272,14 @@ I32 GGUFMetadataReadU32TripleChecked(U8 *buf,
                                      U32 *out_second,
                                      U32 *out_third);
 
+I32 GGUFMetadataReadU32TripleCheckedNoPartial(U8 *buf,
+                                              U64 buf_nbytes,
+                                              U64 *cursor,
+                                              U64 table_end,
+                                              U32 *out_first,
+                                              U32 *out_second,
+                                              U32 *out_third);
+
 I32 GGUFMetadataReadU32QuadChecked(U8 *buf,
                                    U64 buf_nbytes,
                                    U64 *cursor,
@@ -2113,6 +2121,47 @@ I32 GGUFMetadataReadU32TripleChecked(U8 *buf,
                                        &cur,
                                        table_end,
                                        &third);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_first = first;
+    *out_second = second;
+    *out_third = third;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Explicit no-partial wrapper for compact U32-triple metadata records.
+// Contract: routes through canonical staged U32-triple decoding while staging
+// output lanes + cursor locally, then commits all-or-nothing on success.
+I32 GGUFMetadataReadU32TripleCheckedNoPartial(U8 *buf,
+                                              U64 buf_nbytes,
+                                              U64 *cursor,
+                                              U64 table_end,
+                                              U32 *out_first,
+                                              U32 *out_second,
+                                              U32 *out_third)
+{
+    U64 cur;
+    U32 first;
+    U32 second;
+    U32 third;
+    I32 err;
+
+    if (!buf || !cursor || !out_first || !out_second || !out_third)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Reuse canonical staged triple decode to preserve exact U32 bounds /
+    // overflow behavior while making no-partial commit intent explicit.
+    err = GGUFMetadataReadU32TripleChecked(buf,
+                                           buf_nbytes,
+                                           &cur,
+                                           table_end,
+                                           &first,
+                                           &second,
+                                           &third);
     if (err != GGUF_META_TABLE_OK)
         return err;
 
