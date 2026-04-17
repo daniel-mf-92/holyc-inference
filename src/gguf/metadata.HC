@@ -281,6 +281,14 @@ I32 GGUFMetadataReadI16QuadCheckedNoPartial(U8 *buf,
                                             I16 *out_third,
                                             I16 *out_fourth);
 
+I32 GGUFMetadataReadI16QuadCheckedDefault(U8 *buf,
+                                          U64 buf_nbytes,
+                                          U64 *cursor,
+                                          I16 *out_first,
+                                          I16 *out_second,
+                                          I16 *out_third,
+                                          I16 *out_fourth);
+
 I32 GGUFMetadataReadU32LEChecked(U8 *buf,
                                  U64 buf_nbytes,
                                  U64 *cursor,
@@ -2195,6 +2203,26 @@ I32 GGUFMetadataReadI16QuadCheckedNoPartial(U8 *buf,
     *out_fourth = fourth;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Canonical signed-I16 quad wrapper that binds table_end to buf_nbytes for
+// fixed-window metadata call sites that consume the entire provided span.
+I32 GGUFMetadataReadI16QuadCheckedDefault(U8 *buf,
+                                          U64 buf_nbytes,
+                                          U64 *cursor,
+                                          I16 *out_first,
+                                          I16 *out_second,
+                                          I16 *out_third,
+                                          I16 *out_fourth)
+{
+    return GGUFMetadataReadI16QuadChecked(buf,
+                                          buf_nbytes,
+                                          cursor,
+                                          buf_nbytes,
+                                          out_first,
+                                          out_second,
+                                          out_third,
+                                          out_fourth);
 }
 
 // Checked little-endian U32 metadata reader.
