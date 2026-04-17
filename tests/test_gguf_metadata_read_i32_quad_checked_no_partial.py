@@ -291,6 +291,63 @@ def test_fourth_scalar_fail_does_not_commit_anything() -> None:
     assert out_fourth == [0x444]
 
 
+def test_second_scalar_fail_does_not_commit_anything() -> None:
+    first = -17
+    buf = _le_i32(first) + [0xDE, 0xAD]
+
+    cursor = [0]
+    out_first = [0x101]
+    out_second = [0x202]
+    out_third = [0x303]
+    out_fourth = [0x404]
+
+    err = gguf_metadata_read_i32_quad_checked_no_partial(
+        buf,
+        len(buf),
+        cursor,
+        len(buf),
+        out_first,
+        out_second,
+        out_third,
+        out_fourth,
+    )
+    assert err == GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
+    assert cursor == [0]
+    assert out_first == [0x101]
+    assert out_second == [0x202]
+    assert out_third == [0x303]
+    assert out_fourth == [0x404]
+
+
+def test_third_scalar_fail_does_not_commit_anything() -> None:
+    first = -123
+    second = 456
+    buf = _le_i32(first) + _le_i32(second) + [0xFE, 0xED]
+
+    cursor = [0]
+    out_first = [0x1111]
+    out_second = [0x2222]
+    out_third = [0x3333]
+    out_fourth = [0x4444]
+
+    err = gguf_metadata_read_i32_quad_checked_no_partial(
+        buf,
+        len(buf),
+        cursor,
+        len(buf),
+        out_first,
+        out_second,
+        out_third,
+        out_fourth,
+    )
+    assert err == GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
+    assert cursor == [0]
+    assert out_first == [0x1111]
+    assert out_second == [0x2222]
+    assert out_third == [0x3333]
+    assert out_fourth == [0x4444]
+
+
 def test_success_reads_four_i32_and_advances() -> None:
     first = -(1 << 31)
     second = -123456789
@@ -368,6 +425,8 @@ def test_randomized_parity_against_quad_checked() -> None:
 
 if __name__ == "__main__":
     test_null_ptr_and_no_partial_write()
+    test_second_scalar_fail_does_not_commit_anything()
+    test_third_scalar_fail_does_not_commit_anything()
     test_fourth_scalar_fail_does_not_commit_anything()
     test_success_reads_four_i32_and_advances()
     test_randomized_parity_against_quad_checked()

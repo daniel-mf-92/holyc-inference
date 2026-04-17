@@ -329,6 +329,15 @@ I32 GGUFMetadataReadI32QuadChecked(U8 *buf,
                                    I32 *out_third,
                                    I32 *out_fourth);
 
+I32 GGUFMetadataReadI32QuadCheckedNoPartial(U8 *buf,
+                                            U64 buf_nbytes,
+                                            U64 *cursor,
+                                            U64 table_end,
+                                            I32 *out_first,
+                                            I32 *out_second,
+                                            I32 *out_third,
+                                            I32 *out_fourth);
+
 I32 GGUFMetadataReadI64LEChecked(U8 *buf,
                                  U64 buf_nbytes,
                                  U64 *cursor,
@@ -2523,17 +2532,38 @@ I32 GGUFMetadataReadI32QuadCheckedNoPartial(U8 *buf,
 
     cur = *cursor;
 
-    // Route through the canonical signed-I32 quad helper so this explicit
-    // no-partial symbol preserves identical bounds/overflow behavior while
-    // guaranteeing tuple/cursor commit only on full success.
-    err = GGUFMetadataReadI32QuadChecked(buf,
-                                         buf_nbytes,
-                                         &cur,
-                                         table_end,
-                                         &first,
-                                         &second,
-                                         &third,
-                                         &fourth);
+    // Keep this no-partial variant explicit and auditable: stage each lane
+    // through the canonical signed-I32 scalar reader and only commit outputs
+    // + cursor after all four reads succeed.
+    err = GGUFMetadataReadI32LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &first);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadI32LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &second);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadI32LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &third);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadI32LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &fourth);
     if (err != GGUF_META_TABLE_OK)
         return err;
 
