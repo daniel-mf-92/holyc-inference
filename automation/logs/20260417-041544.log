@@ -96,3 +96,11 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_1","type":"todo_list","items":[{"text":"Inspect tasks and research context","completed":true},{"text":"Expand IQ queue to 15+","completed":true},{"text":"Implement top IQ code task","completed":true},{"text":"Run focused validation commands","completed":true},{"text":"Log DB and update ledger","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":2160851,"cached_input_tokens":1966336,"output_tokens":14446}}
 Codex final exit code: 0
+[main cf9abbb] feat(inference): codex iteration 20260417-041544
+ 9 files changed, 473 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260417-041544.final.txt
+ create mode 100644 tests/__pycache__/test_softmax_exp_phase_from_preclamped_no_alias_checked.cpython-314.pyc
+ create mode 100644 tests/__pycache__/test_softmax_normalize_phase_checked.cpython-314.pyc
+ create mode 100644 tests/__pycache__/test_softmax_normalize_phase_no_alias_checked.cpython-314.pyc
+ create mode 100644 tests/test_softmax_from_preclamped_no_alias_checked.py
+=== End iteration 84 (outcome=ok) ===
