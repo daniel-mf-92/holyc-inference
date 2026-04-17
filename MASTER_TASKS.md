@@ -372,15 +372,18 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] IQ-181 Implement HolyC helper `FPQ16MulDivArrayRoundedChecked` in `src/math/fixedpoint.HC` to compute elementwise single-rounding `(a[i]*b[i])/d[i]` with checked no-partial-write semantics for RMSNorm and attention scaling call sites (WS1-01, WS1-04)
 - [ ] IQ-182 Add host-side parity harness `tests/test_intexp_split_base2_from_clamped_input_checked.py` validating base-2 split invariants (`x = k*ln2 + r`, `0<=r<ln2`) and BAD_PARAM/NULL_PTR contracts for `FPQ16ExpSplitBase2FromClampedInputChecked` (WS1-05)
 - [x] IQ-183 Implement HolyC `GGUFHeaderParseChecked` in `src/gguf/header.HC` to parse magic/version/tensor_count/metadata_count from a byte span with explicit little-endian decoding and BAD_PARAM/OVERFLOW contracts (WS2-01)
-- [ ] IQ-184 Implement HolyC `GGUFHeaderValidateAndSizeChecked` in `src/gguf/header.HC` to enforce supported versions and compute checked header byte size for downstream metadata/tensor table offsets (WS2-01, WS2-05)
+- [x] IQ-184 Implement HolyC `GGUFHeaderValidateAndSizeChecked` in `src/gguf/header.HC` to enforce supported versions and compute checked header byte size for downstream metadata/tensor table offsets (WS2-01, WS2-05)
 - [ ] IQ-185 Implement HolyC helper `GGUFMetadataTableSpanValidateChecked` in `src/gguf/metadata.HC` to validate metadata KV table byte window (`start+len<=file_size`) with checked overflow guards for WS2 parser cursor safety (WS2-02, WS2-05)
 
+
+- [ ] IQ-186 Implement HolyC helper GGUFMetadataTableCursorAdvanceChecked in src/gguf/metadata.HC to compose checked span validation with cursor advancement for WS2 metadata parser entrypoints (WS2-02, WS2-05)
 
 ## Progress Ledger
 
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-17 | loop-162 | IQ-184 GGUF header validate+size helper | done | Added `GGUFHeaderValidateAndSizeChecked` and routed `GGUFHeaderParseChecked` through it in `src/gguf/header.HC`, plus parity harness `tests/test_gguf_header_validate_and_size_checked.py`; `python3 tests/test_gguf_header_parse_checked.py && python3 tests/test_gguf_header_validate_and_size_checked.py` passed |
 | 2026-04-17 | loop-161 | IQ-022 GGUF header layout constants | done | Added canonical header byte offsets/widths + shared version predicate in `src/gguf/header.HC`; `python3 tests/test_gguf_header_parse_checked.py` passed |
 | 2026-04-17 | loop-160 | IQ-183 checked GGUF header parser helper | done | Added `GGUFHeaderParseChecked` with explicit little-endian checked decode in `src/gguf/header.HC` and parity harness `tests/test_gguf_header_parse_checked.py`; `python3 tests/test_gguf_header_parse_checked.py` passed |
 | 2026-04-17 | loop-159 | IQ-021 Q16 exp parity harness vs math.exp | done | Added `tests/test_intexp_q16.py`; `python3 tests/test_intexp_q16.py && python3 tests/test_intexp_exp_from_clamped_input_checked.py && python3 tests/test_intexp_exp_array_checked.py` passed |

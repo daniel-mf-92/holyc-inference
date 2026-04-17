@@ -104,6 +104,36 @@ I32 GGUFReadU64LEChecked(U8 *buf, U64 buf_nbytes, U64 offset, U64 *out_value)
     return GGUF_HEADER_OK;
 }
 
+// Validate parsed header fields and return the canonical byte width consumed by
+// the fixed GGUF v2/v3 header prefix. Downstream metadata/tensor parsers should
+// use this helper as the single source of truth for header-size math.
+I32 GGUFHeaderValidateAndSizeChecked(GGUFHeader *header, U64 *out_header_bytes)
+{
+    if (!header || !out_header_bytes)
+        return GGUF_HEADER_ERR_NULL_PTR;
+
+    if (header->magic != GGUF_MAGIC_U32)
+        return GGUF_HEADER_ERR_BAD_MAGIC;
+
+    if (!GGUFHeaderVersionSupported(header->version))
+        return GGUF_HEADER_ERR_BAD_VERSION;
+
+    // HolyC parser loops index with signed offsets in multiple call sites.
+    // Reject count fields that cannot be represented in positive I64 space.
+    if (header->tensor_count > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_HEADER_ERR_OVERFLOW;
+    if (header->metadata_kv_count > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_HEADER_ERR_OVERFLOW;
+
+    // Guard future header-layout edits that could accidentally exceed the
+    // signed index domain expected by downstream offset arithmetic.
+    if ((U64)GGUF_HEADER_BYTES > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_HEADER_ERR_OVERFLOW;
+
+    *out_header_bytes = GGUF_HEADER_BYTES;
+    return GGUF_HEADER_OK;
+}
+
 // Checked GGUF header decoder for parser front-ends that consume a fixed
 // byte span and need explicit status codes (NULL_PTR/BAD_PARAM/OVERFLOW).
 // Decodes fields exactly as little-endian U32/U64 values from bytes[0..23].
@@ -165,9 +195,8 @@ I32 GGUFHeaderParseChecked(U8 *header_bytes,
     out_header->version = version_u32;
     out_header->tensor_count = tensor_count;
     out_header->metadata_kv_count = metadata_kv_count;
-    *out_header_bytes = GGUF_HEADER_BYTES;
 
-    return GGUF_HEADER_OK;
+    return GGUFHeaderValidateAndSizeChecked(out_header, out_header_bytes);
 }
 
 Bool GGUFCanRead(U8 *buf, I64 size, I64 cursor, I64 need)
