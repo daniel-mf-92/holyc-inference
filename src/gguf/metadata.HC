@@ -121,6 +121,15 @@ I32 GGUFMetadataReadU8TripleChecked(U8 *buf,
                                     U8 *out_second,
                                     U8 *out_third);
 
+I32 GGUFMetadataReadU8QuadChecked(U8 *buf,
+                                  U64 buf_nbytes,
+                                  U64 *cursor,
+                                  U64 table_end,
+                                  U8 *out_first,
+                                  U8 *out_second,
+                                  U8 *out_third,
+                                  U8 *out_fourth);
+
 I32 GGUFMetadataReadU16LEChecked(U8 *buf,
                                  U64 buf_nbytes,
                                  U64 *cursor,
@@ -1002,6 +1011,59 @@ I32 GGUFMetadataReadU8TripleChecked(U8 *buf,
     *out_first = first;
     *out_second = second;
     *out_third = third;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked four-byte tuple reader for fixed-layout metadata records.
+// Contract: stages four sequential bytes through checked tuple/scalar readers
+// and commits all outputs + cursor only after every lane succeeds.
+I32 GGUFMetadataReadU8QuadChecked(U8 *buf,
+                                  U64 buf_nbytes,
+                                  U64 *cursor,
+                                  U64 table_end,
+                                  U8 *out_first,
+                                  U8 *out_second,
+                                  U8 *out_third,
+                                  U8 *out_fourth)
+{
+    U64 cur;
+    U8 first;
+    U8 second;
+    U8 third;
+    U8 fourth;
+    I32 err;
+
+    if (!buf || !cursor || !out_first || !out_second || !out_third || !out_fourth)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Stage the first three lanes through the shared triple helper so bounds,
+    // cursor math, and no-partial-write semantics stay canonical.
+    err = GGUFMetadataReadU8TripleChecked(buf,
+                                          buf_nbytes,
+                                          &cur,
+                                          table_end,
+                                          &first,
+                                          &second,
+                                          &third);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // Stage lane four through the scalar helper and commit only after success.
+    err = GGUFMetadataReadU8Checked(buf,
+                                    buf_nbytes,
+                                    &cur,
+                                    table_end,
+                                    &fourth);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_first = first;
+    *out_second = second;
+    *out_third = third;
+    *out_fourth = fourth;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
