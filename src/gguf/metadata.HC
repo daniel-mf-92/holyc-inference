@@ -220,6 +220,9 @@ I32 GGUFMetadataArrayPayloadSpanValidateChecked(U64 payload_start,
                                                 U64 buf_nbytes,
                                                 U64 *out_payload_end);
 
+I32 GGUFMetadataArrayFixedElemWidthBytesChecked(U32 elem_type,
+                                                U64 *out_elem_width_bytes);
+
 // Validate metadata table byte-window math before any parser cursor movement.
 // Contract: `out_table_end` is written only on success.
 I32 GGUFMetadataTableSpanValidateChecked(U64 table_start,
@@ -362,6 +365,54 @@ I32 GGUFMetadataArrayPayloadSpanValidateChecked(U64 payload_start,
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
 
     *out_payload_end = payload_end;
+    return GGUF_META_TABLE_OK;
+}
+
+// Return canonical fixed-width byte size for metadata ARRAY element types.
+// Reject variable-width ARRAY element tags (STRING/ARRAY) because payload-byte
+// math for those must use per-element decoding instead of fixed `count*width`.
+// Contract: `*out_elem_width_bytes` is written only on success.
+I32 GGUFMetadataArrayFixedElemWidthBytesChecked(U32 elem_type,
+                                                U64 *out_elem_width_bytes)
+{
+    U64 width_bytes;
+
+    if (!out_elem_width_bytes)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    switch (elem_type)
+    {
+        case GGUF_TYPE_UINT8:
+        case GGUF_TYPE_INT8:
+        case GGUF_TYPE_BOOL:
+            width_bytes = 1;
+            break;
+
+        case GGUF_TYPE_UINT16:
+        case GGUF_TYPE_INT16:
+            width_bytes = 2;
+            break;
+
+        case GGUF_TYPE_UINT32:
+        case GGUF_TYPE_INT32:
+        case GGUF_TYPE_FLOAT32:
+            width_bytes = 4;
+            break;
+
+        case GGUF_TYPE_UINT64:
+        case GGUF_TYPE_INT64:
+        case GGUF_TYPE_FLOAT64:
+            width_bytes = 8;
+            break;
+
+        // Variable-width element payloads require non-fixed decoding paths.
+        case GGUF_TYPE_STRING:
+        case GGUF_TYPE_ARRAY:
+        default:
+            return GGUF_META_TABLE_ERR_BAD_PARAM;
+    }
+
+    *out_elem_width_bytes = width_bytes;
     return GGUF_META_TABLE_OK;
 }
 
