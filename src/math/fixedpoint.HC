@@ -617,3 +617,71 @@ I32 FPQ16MulDivRoundedByPositiveIntFromQ16DenChecked(I64 a_q16,
                                                   d_int,
                                                   out_q16);
 }
+
+// Checked elementwise one-rounding mul/div helper with positive integer
+// denominators:
+//   out_q16[i] = round_half_up((a_q16[i] * b_q16[i]) / d_int[i])
+// where every d_int[i] is required to be > 0.
+//
+// Contracts:
+// - All pointers are non-null and each points to at least count I64 lanes.
+// - count >= 0.
+// - Per-lane math reuses FPQ16MulDivRoundedByPositiveIntChecked.
+// - No-partial-write: a full preflight pass runs before any out writes.
+I32 FPQ16MulDivArrayRoundedByPositiveIntChecked(I64 *a_q16,
+                                                I64 *b_q16,
+                                                I64 *d_int,
+                                                I64 *out_q16,
+                                                I64 count)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 lane_value;
+    I32 err;
+
+    if (!a_q16 || !b_q16 || !d_int || !out_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (!count)
+        return FP_Q16_OK;
+
+    // Guard pointer-span math before indexed lane access.
+    last_index = count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)a_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)b_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)d_int > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)out_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Preflight all lanes first so failures never partially write output.
+    for (i = 0; i < count; i++)
+    {
+        err = FPQ16MulDivRoundedByPositiveIntChecked(a_q16[i],
+                                                     b_q16[i],
+                                                     d_int[i],
+                                                     &lane_value);
+        if (err)
+            return err;
+    }
+
+    for (i = 0; i < count; i++)
+    {
+        err = FPQ16MulDivRoundedByPositiveIntChecked(a_q16[i],
+                                                     b_q16[i],
+                                                     d_int[i],
+                                                     &out_q16[i]);
+        if (err)
+            return err;
+    }
+
+    return FP_Q16_OK;
+}
