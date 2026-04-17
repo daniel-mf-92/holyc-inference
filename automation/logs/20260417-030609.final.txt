@@ -1,0 +1,17 @@
+Completed one full iteration end-to-end on `IQ-165`.
+
+**What Changed**
+- Implemented `FPQ16ExpArrayChecked` in `src/math/intexp.HC:183` with checked null/count/span guards and lane-wise clamp+eval composition via existing scalar helpers.
+- Marked `IQ-165` done in `MASTER_TASKS.md:356`.
+- Appended new rolling queue item `IQ-168` in `MASTER_TASKS.md:359` to keep unchecked depth at policy minimum.
+- Added one progress ledger line for this iteration in `MASTER_TASKS.md:366`.
+
+**Validation Run**
+- `python3 - <<'PY' ...` → `intexp_exp_array_checked_reference_checks=ok`
+- `python3 tests/test_intexp_exp_from_clamped_input_checked.py` → `intexp_exp_from_clamped_input_checked_reference_checks=ok`
+- `python3 tests/test_intexp_clamp_array_to_input_domain_checked.py` → `intexp_clamp_array_to_input_domain_checked_reference_checks=ok`
+
+**Queue + DB**
+- Unchecked `IQ-` count after updates: `15` (policy maintained).
+- Logged central iteration row in `~/Documents/local-codebases/temple-central.db` as `id=1927`, `task_id=IQ-165`, `status=pass`.
+

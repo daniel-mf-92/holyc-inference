@@ -174,6 +174,56 @@ I32 FPQ16ExpFromClampedInputChecked(I64 clamped_input_q16,
     return FP_Q16_OK;
 }
 
+// Checked vector exp helper for softmax precompute lanes.
+// For each lane i, this composes the scalar checked path directly:
+//   clamped = clamp(input_q16[i], EXP_Q16_MIN_INPUT, EXP_Q16_MAX_INPUT)
+//   output_q16[i] = exp(clamped)
+// This preserves scalar saturation/domain semantics exactly while keeping all
+// pointer/count arithmetic guarded for deterministic TempleOS-safe behavior.
+I32 FPQ16ExpArrayChecked(I64 *input_q16,
+                         I64 *output_q16,
+                         I64 count)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 clamped_lane;
+    I32 status;
+
+    if (!input_q16 || !output_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (!count)
+        return FP_Q16_OK;
+
+    // Guard pointer-span arithmetic used by indexed lane access.
+    last_index = count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)input_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)output_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    for (i = 0; i < count; i++)
+    {
+        status = FPQ16ExpClampToInputDomainChecked(input_q16[i],
+                                                   &clamped_lane);
+        if (status)
+            return status;
+
+        status = FPQ16ExpFromClampedInputChecked(clamped_lane,
+                                                 &output_q16[i]);
+        if (status)
+            return status;
+    }
+
+    return FP_Q16_OK;
+}
+
 I64 FPQ16Exp(I64 x)
 {
     I32 clamp_status;
