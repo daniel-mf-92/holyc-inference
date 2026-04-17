@@ -20,6 +20,123 @@ class GGUFHeader
     U64 metadata_kv_count;
 };
 
+#define GGUF_HEADER_OK              0
+#define GGUF_HEADER_ERR_NULL_PTR    1
+#define GGUF_HEADER_ERR_BAD_PARAM   2
+#define GGUF_HEADER_ERR_OVERFLOW    3
+#define GGUF_HEADER_ERR_TRUNCATED   4
+#define GGUF_HEADER_ERR_BAD_MAGIC   5
+#define GGUF_HEADER_ERR_BAD_VERSION 6
+
+#define GGUF_HEADER_BYTES 24
+
+Bool GGUFHeaderCanReadSpan(U64 total_bytes, U64 offset, U64 need_bytes)
+{
+    U64 end_offset;
+
+    if (offset > total_bytes)
+        return FALSE;
+    if (need_bytes > (0xFFFFFFFFFFFFFFFF - offset))
+        return FALSE;
+
+    end_offset = offset + need_bytes;
+    if (end_offset > total_bytes)
+        return FALSE;
+
+    return TRUE;
+}
+
+I32 GGUFReadU32LEChecked(U8 *buf, U64 buf_nbytes, U64 offset, U32 *out_value)
+{
+    if (!buf || !out_value)
+        return GGUF_HEADER_ERR_NULL_PTR;
+    if (!GGUFHeaderCanReadSpan(buf_nbytes, offset, 4))
+        return GGUF_HEADER_ERR_TRUNCATED;
+
+    *out_value = (U32)buf[offset]
+               | ((U32)buf[offset + 1] << 8)
+               | ((U32)buf[offset + 2] << 16)
+               | ((U32)buf[offset + 3] << 24);
+
+    return GGUF_HEADER_OK;
+}
+
+I32 GGUFReadU64LEChecked(U8 *buf, U64 buf_nbytes, U64 offset, U64 *out_value)
+{
+    if (!buf || !out_value)
+        return GGUF_HEADER_ERR_NULL_PTR;
+    if (!GGUFHeaderCanReadSpan(buf_nbytes, offset, 8))
+        return GGUF_HEADER_ERR_TRUNCATED;
+
+    *out_value = (U64)buf[offset]
+               | ((U64)buf[offset + 1] << 8)
+               | ((U64)buf[offset + 2] << 16)
+               | ((U64)buf[offset + 3] << 24)
+               | ((U64)buf[offset + 4] << 32)
+               | ((U64)buf[offset + 5] << 40)
+               | ((U64)buf[offset + 6] << 48)
+               | ((U64)buf[offset + 7] << 56);
+
+    return GGUF_HEADER_OK;
+}
+
+// Checked GGUF header decoder for parser front-ends that consume a fixed
+// byte span and need explicit status codes (NULL_PTR/BAD_PARAM/OVERFLOW).
+// Decodes fields exactly as little-endian U32/U64 values from bytes[0..23].
+I32 GGUFHeaderParseChecked(U8 *header_bytes,
+                           U64 header_nbytes,
+                           GGUFHeader *out_header,
+                           U64 *out_header_bytes)
+{
+    U32 magic_u32;
+    U32 version_u32;
+    U64 tensor_count;
+    U64 metadata_kv_count;
+    I32 status;
+
+    if (!header_bytes || !out_header || !out_header_bytes)
+        return GGUF_HEADER_ERR_NULL_PTR;
+
+    // HolyC indexed addressing uses signed offsets; reject spans that cannot
+    // be represented in positive I64 index space to avoid signed-wrap hazards.
+    if (header_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_HEADER_ERR_OVERFLOW;
+
+    if (header_nbytes < GGUF_HEADER_BYTES)
+        return GGUF_HEADER_ERR_TRUNCATED;
+
+    status = GGUFReadU32LEChecked(header_bytes, header_nbytes, 0, &magic_u32);
+    if (status)
+        return status;
+    if (magic_u32 != GGUF_MAGIC_U32)
+        return GGUF_HEADER_ERR_BAD_MAGIC;
+
+    status = GGUFReadU32LEChecked(header_bytes, header_nbytes, 4, &version_u32);
+    if (status)
+        return status;
+    if (version_u32 != GGUF_VERSION_V2 && version_u32 != GGUF_VERSION_V3)
+        return GGUF_HEADER_ERR_BAD_VERSION;
+
+    status = GGUFReadU64LEChecked(header_bytes, header_nbytes, 8, &tensor_count);
+    if (status)
+        return status;
+
+    status = GGUFReadU64LEChecked(header_bytes,
+                                  header_nbytes,
+                                  16,
+                                  &metadata_kv_count);
+    if (status)
+        return status;
+
+    out_header->magic = magic_u32;
+    out_header->version = version_u32;
+    out_header->tensor_count = tensor_count;
+    out_header->metadata_kv_count = metadata_kv_count;
+    *out_header_bytes = GGUF_HEADER_BYTES;
+
+    return GGUF_HEADER_OK;
+}
+
 Bool GGUFCanRead(U8 *buf, I64 size, I64 cursor, I64 need)
 {
     if (!buf)
