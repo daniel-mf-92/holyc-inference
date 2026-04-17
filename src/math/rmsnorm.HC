@@ -8,6 +8,7 @@
 #define FP_Q16_ERR_BAD_PARAM 2
 #define FP_Q16_ERR_DOMAIN    3
 #define FP_Q16_ERR_OVERFLOW  4
+#define U64_MAX_VALUE 0xFFFFFFFFFFFFFFFF
 
 I64 FPQ16Mul(I64 a, I64 b);
 I64 FPQ16Div(I64 num, I64 den);
@@ -154,6 +155,57 @@ I32 FPQ16RMSNormApplyInvDenomWeightedInPlaceChecked(I64 *input_q16,
     return 0;
 }
 
+// Shared preflight for auto-dispatch weighted inverse-denominator RMSNorm.
+// This centralizes parameter/domain checks so alias and non-alias paths
+// surface identical BAD_PARAM/DOMAIN/OVERFLOW behavior before any writes.
+I32 FPQ16RMSNormApplyInvDenomWeightedAutoValidateChecked(I64 *input_q16,
+                                                         I64 *gamma_q16,
+                                                         I64 *output_q16,
+                                                         I64 count,
+                                                         I64 inv_denom_q16,
+                                                         I64 den_q16)
+{
+    I64 last_index;
+    I64 last_byte_offset;
+
+    if (!input_q16 || !gamma_q16 || !output_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (inv_denom_q16 <= 0)
+        return FP_Q16_ERR_DOMAIN;
+
+    // Keep denominator contract explicit at auto-dispatch boundary:
+    // - positive
+    // - exact Q16 whole integer (d_int << 16)
+    // - d_int strictly positive after decode
+    if (den_q16 <= 0)
+        return FP_Q16_ERR_DOMAIN;
+    if (den_q16 & (FP_Q16_ONE - 1))
+        return FP_Q16_ERR_BAD_PARAM;
+    if ((den_q16 >> FP_Q16_SHIFT) <= 0)
+        return FP_Q16_ERR_DOMAIN;
+
+    if (!count)
+        return 0;
+
+    // Guard pointer-span math used by indexed access in both dispatch paths.
+    // count-1 element index and byte offsets must stay in signed range.
+    last_index = count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)input_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)gamma_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)output_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    return 0;
+}
+
 // Auto-dispatch weighted inverse-denominator RMSNorm scaling:
 // - If input/output alias, use the in-place checked kernel.
 // - If they do not alias, use the out-of-place checked kernel.
@@ -166,6 +218,17 @@ I32 FPQ16RMSNormApplyInvDenomWeightedAutoChecked(I64 *input_q16,
                                                  I64 inv_denom_q16,
                                                  I64 den_q16)
 {
+    I32 status;
+
+    status = FPQ16RMSNormApplyInvDenomWeightedAutoValidateChecked(input_q16,
+                                                                   gamma_q16,
+                                                                   output_q16,
+                                                                   count,
+                                                                   inv_denom_q16,
+                                                                   den_q16);
+    if (status)
+        return status;
+
     // Pointer equality is the only alias contract supported by the current
     // RMSNorm call sites: same buffer means in-place, otherwise out-of-place.
     if (input_q16 == output_q16)
