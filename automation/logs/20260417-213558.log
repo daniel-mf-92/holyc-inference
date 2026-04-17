@@ -87,3 +87,8 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_2","type":"todo_list","items":[{"text":"Inspect tasks and research context","completed":true},{"text":"Top up IQ queue to 15+","completed":true},{"text":"Implement highest-priority IQ item","completed":true},{"text":"Run focused validation","completed":true},{"text":"Log DB and update ledger","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":1795835,"cached_input_tokens":1740928,"output_tokens":8511}}
 Codex final exit code: 0
+[main 8d9d9ba] feat(inference): codex iteration 20260417-213558
+ 6 files changed, 434 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260417-213558.final.txt
+ create mode 100644 tests/test_gguf_metadata_read_u64_pair_checked.py
+=== End iteration 12 (outcome=ok) ===
