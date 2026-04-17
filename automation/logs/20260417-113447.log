@@ -82,3 +82,8 @@ Codex PID: 49877 (runner=codex timeout=1200s, kill-after=30s)
 {"type":"item.completed","item":{"id":"item_14","type":"todo_list","items":[{"text":"Inspect IQ queue and choose top item","completed":true},{"text":"Implement HolyC helper and tests","completed":true},{"text":"Run focused validation","completed":true},{"text":"Update tasks and log iteration DB","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":1568977,"cached_input_tokens":1260032,"output_tokens":6874}}
 Codex final exit code: 0
+[main 121519f] feat(inference): codex iteration 20260417-113447
+ 6 files changed, 338 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260417-113447.final.txt
+ create mode 100644 tests/test_gguf_metadata_read_u16le_checked.py
+=== End iteration 129 (outcome=ok) ===
