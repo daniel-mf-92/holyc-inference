@@ -83,6 +83,22 @@ I32 RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedPreflightOnly(I64 head_cell
                                                                     I64 *out_last_head_last_pair_y_index,
                                                                     I64 *out_last_token_position);
 
+I32 RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedPreflightOnlyDefaultStride(I64 head_cell_capacity,
+                                                                                 I64 token_base_index,
+                                                                                 I64 head_cell_stride,
+                                                                                 I64 range_base_index,
+                                                                                 I64 head_count,
+                                                                                 I64 head_stride_cells,
+                                                                                 I64 head_dim,
+                                                                                 I64 pair_stride_cells,
+                                                                                 I64 position_start,
+                                                                                 I64 token_count,
+                                                                                 I64 position_step,
+                                                                                 I64 *out_last_abs_range_base,
+                                                                                 I64 *out_last_head_base_index,
+                                                                                 I64 *out_last_head_last_pair_y_index,
+                                                                                 I64 *out_last_token_position);
+
 U64 RoPEAbsToU64(I64 x)
 {
     if (x >= 0)
@@ -1583,6 +1599,48 @@ I32 RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedPreflightOnly(I64 head_cell
     *out_last_head_last_pair_y_index = last_head_last_pair_y_index;
     *out_last_token_position = token_position;
     return ROPE_Q16_OK;
+}
+
+// Default-stride preflight wrapper for KV-cache rows where each token begins
+// exactly `head_cell_stride` cells after the previous token.
+//
+// Arithmetic path (all checked in the shared core helper):
+//   token_base(token_index) = token_base_index + token_index * head_cell_stride
+//   abs_range_base          = token_base(token_index) + range_base_index
+//
+// The wrapper does not mutate tensor memory; it returns only diagnostics from
+// the final validated token, preserving no-partial-write behavior on outputs.
+I32 RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedPreflightOnlyDefaultStride(I64 head_cell_capacity,
+                                                                                 I64 token_base_index,
+                                                                                 I64 head_cell_stride,
+                                                                                 I64 range_base_index,
+                                                                                 I64 head_count,
+                                                                                 I64 head_stride_cells,
+                                                                                 I64 head_dim,
+                                                                                 I64 pair_stride_cells,
+                                                                                 I64 position_start,
+                                                                                 I64 token_count,
+                                                                                 I64 position_step,
+                                                                                 I64 *out_last_abs_range_base,
+                                                                                 I64 *out_last_head_base_index,
+                                                                                 I64 *out_last_head_last_pair_y_index,
+                                                                                 I64 *out_last_token_position)
+{
+    return RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedPreflightOnly(head_cell_capacity,
+                                                                           token_base_index,
+                                                                           head_cell_stride,
+                                                                           range_base_index,
+                                                                           head_count,
+                                                                           head_stride_cells,
+                                                                           head_dim,
+                                                                           pair_stride_cells,
+                                                                           position_start,
+                                                                           token_count,
+                                                                           position_step,
+                                                                           out_last_abs_range_base,
+                                                                           out_last_head_base_index,
+                                                                           out_last_head_last_pair_y_index,
+                                                                           out_last_token_position);
 }
 
 I32 RoPEQ16RotateHeadRangeByTokenWindowCheckedStrided(I64 *head_cells_q16,

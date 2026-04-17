@@ -1,0 +1,16 @@
+Completed a full unattended iteration for `IQ-224` and kept queue depth rolling.
+
+**What Changed**
+- Added HolyC default-stride preflight wrapper `RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedPreflightOnlyDefaultStride` in `src/model/rope.HC:1613` (declared at `src/model/rope.HC:86`), delegating to the checked strided preflight core.
+- Added host parity harness `tests/test_rope_q16_rotate_head_range_token_window_strided_preflight_only_default_stride.py:1` with deterministic + randomized coverage.
+- Marked task done in queue at `MASTER_TASKS.md:417`.
+- Replenished queue with new unchecked code tasks `IQ-239..IQ-241` at `MASTER_TASKS.md:433`.
+- Added one-line ledger entry at `MASTER_TASKS.md:441`.
+
+**Validation**
+- Ran: `python3 tests/test_rope_q16_rotate_head_range_token_window_strided_preflight_only_default_stride.py && python3 tests/test_rope_q16_rotate_head_range_token_window_strided_preflight_only.py && python3 tests/test_rope_q16_rotate_head_range_token_window_strided.py && python3 tests/test_rope_q16_rotate_head_range_position_strided.py`
+- Output: `ok`, `rope_q16_rotate_head_range_token_window_strided_preflight_only_reference_checks=ok`, `rope_q16_rotate_head_range_token_window_strided_reference_checks=ok`, `ok`.
+
+**Central DB**
+- Logged iteration in `~/Documents/local-codebases/temple-central.db` as `inference | IQ-224 | pass` (row id `2683`).
+- Queue depth now: `17` unchecked `IQ-` items (policy satisfied).
