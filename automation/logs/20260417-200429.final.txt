@@ -1,0 +1,15 @@
+Done — one full unattended iteration is complete and recorded.
+
+**Implemented**
+- Added HolyC `GGUFMetadataReadBoolQuadChecked` with staged 4-lane bool decode (`U8 in {0,1}`), atomic cursor/output commit, and no-partial semantics in `src/gguf/metadata.HC:2733` (prototype at `src/gguf/metadata.HC:377`).
+- Added host parity/adversarial harness in `tests/test_gguf_metadata_read_bool_quad_checked.py:89`.
+
+**Queue + Ledger**
+- Progressed exactly one IQ item: marked `IQ-255` done at `MASTER_TASKS.md:449`.
+- Maintained queue depth at 15 unchecked; appended monotonic `IQ-268` at `MASTER_TASKS.md:462`.
+- Added one-line ledger entry for this loop at `MASTER_TASKS.md:469`.
+
+**Validation + DB**
+- Ran: `python3 tests/test_gguf_metadata_read_bool_quad_checked.py && python3 tests/test_gguf_metadata_read_bool_triple_checked.py && python3 tests/test_gguf_metadata_read_bool_pair_checked.py && python3 tests/test_gguf_metadata_read_bool_checked.py && python3 tests/test_gguf_metadata_parse.py`
+- Output: `ok`, `ok`, `gguf_metadata_read_bool_pair_checked_reference_checks=ok`, `gguf_metadata_read_bool_checked_reference_checks=ok`, `gguf_metadata_reference_checks=ok`.
+- Logged to central DB: `temple-central.db` row `id=2990` (`agent=inference`, `task_id=IQ-255`, `status=pass`).
