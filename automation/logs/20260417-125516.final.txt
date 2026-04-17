@@ -1,0 +1,23 @@
+Done — completed one full unattended iteration centered on `IQ-216`.
+
+**What Changed**
+- Implemented `GGUFMetadataReadBoolPairChecked` with staged cursor/output commit and strict no-partial-write semantics in `src/gguf/metadata.HC:802`.
+- Added declaration for the helper in `src/gguf/metadata.HC:167`.
+- Added host-side parity harness `tests/test_gguf_metadata_read_bool_pair_checked.py:1`.
+- Marked `IQ-216` as complete and appended one ledger line (`loop-309`) in `MASTER_TASKS.md:409` and `MASTER_TASKS.md:429`.
+- Kept rolling queue depth policy satisfied by appending a new unchecked item `IQ-231` in `MASTER_TASKS.md:425` (unchecked count verified at 15).
+
+**Validation**
+- `python3 tests/test_gguf_metadata_read_bool_pair_checked.py`
+- `python3 tests/test_gguf_metadata_read_bool_checked.py`
+- `python3 tests/test_gguf_metadata_read_u8_pair_checked.py`
+- `python3 tests/test_gguf_metadata_parse.py`
+- Output: all passed (`..._reference_checks=ok`).
+
+**Central DB Log**
+- Inserted iteration row in `~/Documents/local-codebases/temple-central.db`.
+- Verification query result: `2590|inference|IQ-216|pass`.
+
+**Notes**
+- Read Sanhedrin research context from `~/Documents/local-codebases/temple-sanhedrin/research/2026-04-16-gguf-range-guard-patterns.md`.
+- `automation/logs/*` were already changing in this loop environment and were not edited by task logic.
