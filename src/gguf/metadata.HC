@@ -660,6 +660,13 @@ I32 GGUFMetadataReadBoolTripleCheckedNoPartial(U8 *buf,
                                                Bool *out_second,
                                                Bool *out_third);
 
+I32 GGUFMetadataReadBoolTripleCheckedDefault(U8 *buf,
+                                             U64 buf_nbytes,
+                                             U64 *cursor,
+                                             Bool *out_first,
+                                             Bool *out_second,
+                                             Bool *out_third);
+
 I32 GGUFMetadataReadBoolQuadChecked(U8 *buf,
                                     U64 buf_nbytes,
                                     U64 *cursor,
@@ -4294,6 +4301,25 @@ I32 GGUFMetadataReadBoolTripleCheckedNoPartial(U8 *buf,
                                              buf_nbytes,
                                              cursor,
                                              table_end,
+                                             out_first,
+                                             out_second,
+                                             out_third);
+}
+
+// Canonical default-end wrapper for compact BOOL-triple metadata records.
+// Contract: preserves exact checked triple semantics by pinning table_end to
+// buf_nbytes and delegating to GGUFMetadataReadBoolTripleChecked.
+I32 GGUFMetadataReadBoolTripleCheckedDefault(U8 *buf,
+                                             U64 buf_nbytes,
+                                             U64 *cursor,
+                                             Bool *out_first,
+                                             Bool *out_second,
+                                             Bool *out_third)
+{
+    return GGUFMetadataReadBoolTripleChecked(buf,
+                                             buf_nbytes,
+                                             cursor,
+                                             buf_nbytes,
                                              out_first,
                                              out_second,
                                              out_third);

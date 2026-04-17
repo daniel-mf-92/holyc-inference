@@ -1,0 +1,19 @@
+Done — I completed one deep iteration on `IQ-297` with HolyC/runtime purity intact.
+
+**What Changed**
+- Added canonical default-end wrapper `GGUFMetadataReadBoolTripleCheckedDefault` delegating to checked core in `src/gguf/metadata.HC:4312`.
+- Added focused parity harness covering null-pointer/no-partial-write, default-end success, truncation/bad-bool failure, and 10k randomized parity in `tests/test_gguf_metadata_read_bool_triple_checked_default.py:1` (`default` helper at `:127`, randomized parity at `:233`).
+- Marked `IQ-297` complete and appended new rolling queue item `IQ-312` to keep depth policy in `MASTER_TASKS.md:496` and `MASTER_TASKS.md:511`.
+- Added one progress-ledger row for this iteration in `MASTER_TASKS.md:837`.
+- Logged iteration to central DB: `~/Documents/local-codebases/temple-central.db` (row id `3410`, task `IQ-297`, status `pass`).
+
+**Validation Output**
+- Ran: `python3 tests/test_gguf_metadata_read_bool_triple_checked_default.py && python3 tests/test_gguf_metadata_read_bool_triple_checked.py && python3 tests/test_gguf_metadata_read_bool_triple_checked_no_partial.py && python3 tests/test_gguf_metadata_parse.py`
+- Output:
+  - `ok`
+  - `ok`
+  - `gguf_metadata_read_bool_triple_checked_no_partial_reference_checks=ok`
+  - `gguf_metadata_reference_checks=ok`
+
+**Queue Policy**
+- Unchecked `IQ-` depth is maintained at `15` after completion (rolling queue preserved).
