@@ -214,3 +214,36 @@ I32 Q4_0DotProductBlocksQ32AVX2(Q4_0Block *lhs,
     *out_dot_q32 = total_dot_q32;
     return Q4_0_AVX2_OK;
 }
+
+I32 Q4_0DotProductBlocksQ32AVX2Checked(
+    Q4_0Block *lhs,
+    I64 lhs_block_capacity,
+    Q4_0Block *rhs,
+    I64 rhs_block_capacity,
+    I64 block_count,
+    I64 *out_dot_q32)
+{
+    // IQ-286 checked wrapper contract:
+    // - Null checks are explicit and return ERR_NULL_PTR.
+    // - Capacities and block_count must be non-negative.
+    // - Requested block_count must fit both provided extents.
+    // - Delegate to AVX2-shape core kernel so math/bit semantics stay single-source.
+    // - No partial write: out_dot_q32 is only modified when the delegated kernel succeeds.
+    if (!lhs || !rhs || !out_dot_q32)
+        return Q4_0_AVX2_ERR_NULL_PTR;
+
+    if (lhs_block_capacity < 0 || rhs_block_capacity < 0)
+        return Q4_0_AVX2_ERR_BAD_LEN;
+    if (block_count < 0)
+        return Q4_0_AVX2_ERR_BAD_LEN;
+
+    if (block_count > lhs_block_capacity)
+        return Q4_0_AVX2_ERR_BAD_LEN;
+    if (block_count > rhs_block_capacity)
+        return Q4_0_AVX2_ERR_BAD_LEN;
+
+    return Q4_0DotProductBlocksQ32AVX2(lhs,
+                                       rhs,
+                                       block_count,
+                                       out_dot_q32);
+}

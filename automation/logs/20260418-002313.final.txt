@@ -1,0 +1,18 @@
+Completed one full unattended iteration with `IQ-286` progressed end-to-end.
+
+**What Changed**
+- Implemented checked AVX2 wrapper `Q4_0DotProductBlocksQ32AVX2Checked` with explicit null/capacity/block-count guards and no-partial-write delegation semantics in `src/quant/q4_0_avx2.HC:218`.
+- Added focused parity harness for checked semantics (bounds fail + no-partial-write + delegation error propagation) in `tests/test_q4_0_avx2_dot_q32_checked.py:1`.
+- Marked `IQ-286` done, appended new unchecked `IQ-301` to keep queue rolling, and added one ledger line in `MASTER_TASKS.md:480`, `MASTER_TASKS.md:500`, `MASTER_TASKS.md:813`.
+
+**Validation**
+- Ran: `python3 tests/test_q4_0_avx2_dot_q32_checked.py && python3 tests/test_q4_0_avx2_dot_q32.py && python3 tests/test_q4_0_q8_0_avx2_blocks_q32.py`
+- Output:
+  - `q4_0_avx2_dot_q32_checked_reference_checks=ok`
+  - `q4_0_avx2_dot_q32_reference_checks=ok`
+  - `q4_0_q8_0_avx2_blocks_q32_reference_checks=ok`
+
+**Queue/DB Contract**
+- Exactly one queue item progressed: `IQ-286` (done).
+- Queue depth maintained at 15 unchecked by adding `IQ-301`.
+- Logged iteration to central DB (`~/Documents/local-codebases/temple-central.db`) with `task_id='IQ-286'`, status `pass`, validation command/result captured.
