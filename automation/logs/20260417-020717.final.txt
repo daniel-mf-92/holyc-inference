@@ -1,0 +1,15 @@
+Iteration complete: I progressed exactly one queue item (`IQ-157`) and kept queue depth healthy (`16` unchecked `IQ-` items remain).
+
+**What Changed**
+- Implemented `FPQ16RMSNormApplyInvDenomWeightedAutoChecked` in `src/math/rmsnorm.HC:162` with pointer-alias dispatch:
+  - `input_q16 == output_q16` → in-place checked path.
+  - otherwise → out-of-place checked path.
+- Marked `IQ-157` done in `MASTER_TASKS.md:348`.
+- Added one progress-ledger line in `MASTER_TASKS.md:358`.
+- Logged central iteration record into `~/Documents/local-codebases/temple-central.db` (`task_id='IQ-157'`, status `pass`, `lines_added=31`).
+
+**Validation**
+- Ran: `python3 tests/test_rmsnorm_apply_inv_denom_weighted_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_weighted_inplace_checked.py`
+- Output:
+  - `rmsnorm_apply_inv_denom_weighted_checked_reference_checks=ok`
+  - `rmsnorm_apply_inv_denom_weighted_inplace_checked_reference_checks=ok`

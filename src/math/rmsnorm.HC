@@ -154,6 +154,37 @@ I32 FPQ16RMSNormApplyInvDenomWeightedInPlaceChecked(I64 *input_q16,
     return 0;
 }
 
+// Auto-dispatch weighted inverse-denominator RMSNorm scaling:
+// - If input/output alias, use the in-place checked kernel.
+// - If they do not alias, use the out-of-place checked kernel.
+// This keeps the math path fully transparent while preserving the exact
+// checked error surfaces of the selected canonical helper.
+I32 FPQ16RMSNormApplyInvDenomWeightedAutoChecked(I64 *input_q16,
+                                                 I64 *gamma_q16,
+                                                 I64 *output_q16,
+                                                 I64 count,
+                                                 I64 inv_denom_q16,
+                                                 I64 den_q16)
+{
+    // Pointer equality is the only alias contract supported by the current
+    // RMSNorm call sites: same buffer means in-place, otherwise out-of-place.
+    if (input_q16 == output_q16)
+    {
+        return FPQ16RMSNormApplyInvDenomWeightedInPlaceChecked(input_q16,
+                                                                gamma_q16,
+                                                                count,
+                                                                inv_denom_q16,
+                                                                den_q16);
+    }
+
+    return FPQ16RMSNormApplyInvDenomWeightedChecked(input_q16,
+                                                    gamma_q16,
+                                                    output_q16,
+                                                    count,
+                                                    inv_denom_q16,
+                                                    den_q16);
+}
+
 U0 FPQ16RMSNorm(I64 *input, I64 *weight, I64 *output, I64 count, I64 eps_q16)
 {
     I64 i;
