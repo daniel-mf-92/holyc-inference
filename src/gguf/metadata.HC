@@ -304,6 +304,14 @@ I32 GGUFMetadataReadBoolPairChecked(U8 *buf,
                                     Bool *out_first,
                                     Bool *out_second);
 
+I32 GGUFMetadataReadBoolTripleChecked(U8 *buf,
+                                      U64 buf_nbytes,
+                                      U64 *cursor,
+                                      U64 table_end,
+                                      Bool *out_first,
+                                      Bool *out_second,
+                                      Bool *out_third);
+
 I32 GGUFMetadataReadStringLenU64Checked(U8 *buf,
                                         U64 buf_nbytes,
                                         U64 *cursor,
@@ -2121,6 +2129,62 @@ I32 GGUFMetadataReadBoolPairChecked(U8 *buf,
 
     *out_first = first;
     *out_second = second;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked metadata BOOL triple reader (`U8 in {0,1}` for each lane).
+// Contract: decodes three sequential BOOL payloads through shared checked
+// bool reader staging and commits outputs + cursor only after all lanes pass
+// canonical validation (strict no-partial-write tuple semantics).
+I32 GGUFMetadataReadBoolTripleChecked(U8 *buf,
+                                      U64 buf_nbytes,
+                                      U64 *cursor,
+                                      U64 table_end,
+                                      Bool *out_first,
+                                      Bool *out_second,
+                                      Bool *out_third)
+{
+    U64 cur;
+    Bool first;
+    Bool second;
+    Bool third;
+    I32 err;
+
+    if (!buf || !cursor || !out_first || !out_second || !out_third)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Stage all lane decodes through the canonical BOOL reader so triple decode
+    // preserves identical bounds/canonical-value/no-partial-write semantics.
+    err = GGUFMetadataReadBoolChecked(buf,
+                                      buf_nbytes,
+                                      &cur,
+                                      table_end,
+                                      &first);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadBoolChecked(buf,
+                                      buf_nbytes,
+                                      &cur,
+                                      table_end,
+                                      &second);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadBoolChecked(buf,
+                                      buf_nbytes,
+                                      &cur,
+                                      table_end,
+                                      &third);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_first = first;
+    *out_second = second;
+    *out_third = third;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
