@@ -7,12 +7,14 @@
 #define FP_Q16_OK            0
 #define FP_Q16_ERR_NULL_PTR  1
 #define FP_Q16_ERR_BAD_PARAM 2
+#define FP_Q16_ERR_OVERFLOW  4
 
 #define EXP_Q16_LN2       45426   // round(ln(2) * 65536)
 #define EXP_Q16_MAX_INPUT 655360  // +10.0 in Q16
 #define EXP_Q16_MIN_INPUT -655360 // -10.0 in Q16
 
 #define I64_MAX_VALUE 0x7FFFFFFFFFFFFFFF
+#define U64_MAX_VALUE 0xFFFFFFFFFFFFFFFF
 
 I64 FPQ16Mul(I64 a, I64 b);
 
@@ -41,6 +43,49 @@ I32 FPQ16ExpClampToInputDomainChecked(I64 input_q16,
     }
 
     *out_clamped_q16 = input_q16;
+    return FP_Q16_OK;
+}
+
+// Vector checked clamp helper for Q16 exp input-domain saturation.
+// Applies the same scalar clamp contract lane-by-lane:
+//   out[i] = clamp(in[i], EXP_Q16_MIN_INPUT, EXP_Q16_MAX_INPUT)
+// This keeps scalar and vector behavior identical by delegating each lane to
+// FPQ16ExpClampToInputDomainChecked instead of duplicating clamp logic.
+I32 FPQ16ExpClampArrayToInputDomainChecked(I64 *input_q16,
+                                           I64 *output_q16,
+                                           I64 count)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I32 status;
+
+    if (!input_q16 || !output_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (!count)
+        return FP_Q16_OK;
+
+    // Guard pointer-span arithmetic used by indexed array access.
+    last_index = count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)input_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)output_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    for (i = 0; i < count; i++)
+    {
+        status = FPQ16ExpClampToInputDomainChecked(input_q16[i],
+                                                   &output_q16[i]);
+        if (status)
+            return status;
+    }
+
     return FP_Q16_OK;
 }
 
