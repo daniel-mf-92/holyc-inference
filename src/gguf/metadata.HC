@@ -121,6 +121,14 @@ I32 GGUFMetadataReadStringLenU64Checked(U8 *buf,
                                         U64 table_end,
                                         U64 *out_len);
 
+I32 GGUFMetadataReadStringBytesChecked(U8 *buf,
+                                       U64 buf_nbytes,
+                                       U64 *cursor,
+                                       U64 table_end,
+                                       U64 str_len,
+                                       U8 *out_bytes,
+                                       U64 out_nbytes);
+
 // Validate metadata table byte-window math before any parser cursor movement.
 // Contract: `out_table_end` is written only on success.
 I32 GGUFMetadataTableSpanValidateChecked(U64 table_start,
@@ -519,6 +527,51 @@ I32 GGUFMetadataReadStringLenU64Checked(U8 *buf,
 
     *out_len = str_len;
     *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked metadata string payload copier.
+// Contract: copies exactly `str_len` bytes, advances `*cursor` by `str_len`, and
+// writes no output bytes on any error path.
+I32 GGUFMetadataReadStringBytesChecked(U8 *buf,
+                                       U64 buf_nbytes,
+                                       U64 *cursor,
+                                       U64 table_end,
+                                       U64 str_len,
+                                       U8 *out_bytes,
+                                       U64 out_nbytes)
+{
+    U64 cur;
+    U64 next_cursor;
+    U64 i;
+    I32 err;
+
+    if (!buf || !cursor || !out_bytes)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    // Caller destination must be large enough for the checked payload width.
+    if (out_nbytes < str_len)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    cur = *cursor;
+
+    // Validate source window against table bounds via canonical helper.
+    err = GGUFMetadataCursorCanAdvanceChecked(cur,
+                                              str_len,
+                                              table_end,
+                                              &next_cursor);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // Backing buffer must also contain the validated source window.
+    if (next_cursor > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    // All checks passed: safe to copy and then commit cursor.
+    for (i = 0; i < str_len; ++i)
+        out_bytes[i] = buf[cur + i];
+
+    *cursor = next_cursor;
     return GGUF_META_TABLE_OK;
 }
 

@@ -1,0 +1,15 @@
+Done — I completed one full loop iteration around `IQ-201` with code, tests, queue maintenance, ledger, and DB logging.
+
+**What Changed**
+- Implemented `GGUFMetadataReadStringBytesChecked` with staged cursor commit, bounds checks via shared cursor helper, and no-partial-write semantics in `src/gguf/metadata.HC:536` (prototype at `src/gguf/metadata.HC:124`).
+- Added host-side parity harness `tests/test_gguf_metadata_read_string_bytes_checked.py:1` covering null pointers, bad params, bounds failures, success cases, zero-length behavior, and randomized checks.
+- Marked `IQ-201` complete, appended new unchecked `IQ-214` to keep rolling queue depth at 15, and added one progress-ledger line in `MASTER_TASKS.md:394`, `MASTER_TASKS.md:407`, `MASTER_TASKS.md:414`.
+
+**Validation (captured output)**
+- `python3 tests/test_gguf_metadata_read_string_bytes_checked.py` → `gguf_metadata_read_string_bytes_checked_reference_checks=ok`
+- `python3 tests/test_gguf_metadata_read_string_len_u64_checked.py` → `gguf_metadata_read_string_len_u64_checked_reference_checks=ok`
+- `python3 tests/test_gguf_metadata_read_u64le_checked.py` → `gguf_metadata_read_u64le_checked_reference_checks=ok`
+- `python3 tests/test_gguf_metadata_parse.py` → `gguf_metadata_reference_checks=ok`
+
+**Central DB**
+- Inserted iteration row into `~/Documents/local-codebases/temple-central.db` as `IQ-201` with status `pass` (latest id: `2424`).
