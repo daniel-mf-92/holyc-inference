@@ -128,6 +128,31 @@ def test_bounds_and_short_read_do_not_mutate() -> None:
     assert out[0] is True
 
 
+def test_overflow_guards_passthrough_from_shared_reader() -> None:
+    buf = [0, 1, 0, 1]
+
+    cursor = [0]
+    out = [True]
+    err = gguf_metadata_read_bool_checked(buf, I64_MAX + 1, cursor, len(buf), out)
+    assert err == GGUF_META_TABLE_ERR_OVERFLOW
+    assert cursor[0] == 0
+    assert out[0] is True
+
+    cursor = [I64_MAX + 1]
+    out = [False]
+    err = gguf_metadata_read_bool_checked(buf, len(buf), cursor, len(buf), out)
+    assert err == GGUF_META_TABLE_ERR_OVERFLOW
+    assert cursor[0] == I64_MAX + 1
+    assert out[0] is False
+
+    cursor = [0]
+    out = [False]
+    err = gguf_metadata_read_bool_checked(buf, len(buf), cursor, I64_MAX + 1, out)
+    assert err == GGUF_META_TABLE_ERR_OVERFLOW
+    assert cursor[0] == 0
+    assert out[0] is False
+
+
 def test_rejects_non_canonical_bool_values() -> None:
     for raw in (2, 3, 127, 255):
         cursor = [0]
@@ -186,6 +211,7 @@ def test_randomized_parity() -> None:
 def run() -> None:
     test_null_ptr_and_no_partial_write()
     test_bounds_and_short_read_do_not_mutate()
+    test_overflow_guards_passthrough_from_shared_reader()
     test_rejects_non_canonical_bool_values()
     test_reads_canonical_bool_values()
     test_randomized_parity()

@@ -1,0 +1,18 @@
+Done — I ran a full iteration and progressed `IQ-199` end-to-end.
+
+**What I changed**
+- Hardened bool-reader parity by adding overflow pass-through and strict no-partial-write coverage in `tests/test_gguf_metadata_read_bool_checked.py:131`.
+- Ensured new coverage is executed in test runner path at `tests/test_gguf_metadata_read_bool_checked.py:214`.
+- Marked `IQ-199` complete in `MASTER_TASKS.md:392`.
+- Kept queue depth policy compliant by appending new unchecked `IQ-216` in `MASTER_TASKS.md:409` (unchecked queue count remains 15).
+- Added one concise progress-ledger line for this iteration in `MASTER_TASKS.md:419`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_bool_checked.py && python3 tests/test_gguf_metadata_read_u8_checked.py && python3 tests/test_gguf_metadata_parse.py`
+- Output:
+  - `gguf_metadata_read_bool_checked_reference_checks=ok`
+  - `gguf_metadata_read_u8_checked_reference_checks=ok`
+  - `gguf_metadata_reference_checks=ok`
+
+**Central DB log**
+- Inserted iteration row into `~/Documents/local-codebases/temple-central.db` for `IQ-199` (verified latest row id `2447`, status `pass`, lines_added `29`).
