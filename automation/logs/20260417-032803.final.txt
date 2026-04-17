@@ -1,0 +1,17 @@
+Done — I completed one full unattended iteration on `IQ-168` with queue depth maintained.
+
+**What Changed**
+- Implemented HolyC helper `FPQ16ExpArrayCheckedNoAliasChecked` in `src/math/intexp.HC:285` with explicit `NULL_PTR`, `BAD_PARAM` (`count < 0`), and strict non-alias enforcement (`input_q16 == output_q16`), then delegated to the existing checked pre-clamped vector exp path.
+- Added host-side parity/contract harness `tests/test_intexp_exp_array_no_alias_checked.py:2` covering nulls, negative count, alias rejection (including zero-count), overflow-span guards, no-partial-write domain failure, and randomized parity vs pre-clamped baseline.
+- Marked queue item done in `MASTER_TASKS.md:359` and added one ledger line in `MASTER_TASKS.md:370`.
+
+**Validation**
+- Command: `python3 tests/test_intexp_exp_array_no_alias_checked.py && python3 tests/test_intexp_exp_array_from_clamped_input_checked.py && python3 tests/test_intexp_exp_array_checked.py`
+- Output:
+  - `intexp_exp_array_no_alias_checked_reference_checks=ok`
+  - `intexp_exp_array_from_clamped_input_checked_reference_checks=ok`
+  - `intexp_exp_array_checked_reference_checks=ok`
+
+**Queue + DB**
+- Queue depth check after update: `unchecked=15 max_id=171` (policy satisfied, no new IQs required).
+- Logged iteration to `~/Documents/local-codebases/temple-central.db` with `task_id='IQ-168'`, `status='pass'`, validation command/result, and changed files summary.

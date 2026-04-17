@@ -275,6 +275,29 @@ I32 FPQ16ExpArrayFromClampedInputChecked(I64 *input_q16,
     return FP_Q16_OK;
 }
 
+// Checked no-alias vector exp helper for pre-clamped lanes.
+// Contract is explicit for immutable-source call sites:
+//   - input_q16 and output_q16 must both be non-null
+//   - input_q16 and output_q16 must be different buffers
+//   - all lanes must already satisfy EXP_Q16_MIN_INPUT..EXP_Q16_MAX_INPUT
+// This composes the existing pre-clamped helper so pointer-span overflow
+// checks and lane math stay centralized in one auditable implementation.
+I32 FPQ16ExpArrayCheckedNoAliasChecked(I64 *input_q16,
+                                       I64 *output_q16,
+                                       I64 count)
+{
+    if (!input_q16 || !output_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (input_q16 == output_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    return FPQ16ExpArrayFromClampedInputChecked(input_q16,
+                                                output_q16,
+                                                count);
+}
+
 I64 FPQ16Exp(I64 x)
 {
     I32 clamp_status;
