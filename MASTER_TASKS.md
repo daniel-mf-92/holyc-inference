@@ -224,7 +224,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-036 Implement GGUF tensor data offset resolver (`GGUFTensorDataBaseOffset`) in `src/gguf/tensor_data_base.HC` with alignment validation (WS2-04)
 - [x] IQ-037 Implement GGML tensor block-size/byte-size helpers in `src/gguf/tensor_data_base.HC` for F32/F16/Q4_0/Q8_0 sizing math (WS2-04)
 - [x] IQ-038 Implement GGUF tensor absolute range validator (`GGUFTensorResolveRange`) in `src/gguf/tensor_data_base.HC` with overflow-safe `abs+size` checks (WS2-04)
-- [ ] IQ-039 Implement GGUF tensor payload byte-size helper (`GGUFTensorBytesForType`) in `src/gguf/tensor_data_base.HC` for F32/F16/Q4_0/Q8_0 (WS2-04)
+- [x] IQ-039 Implement GGUF tensor payload byte-size helper (`GGUFTensorBytesForType`) in `src/gguf/tensor_data_base.HC` for F32/F16/Q4_0/Q8_0 (WS2-04)
 - [x] IQ-040 Implement GGUF tensor-table range validator (`GGUFValidateTensorRanges`) in `src/gguf/tensor_data_base.HC` to enforce non-overlap and EOF bounds (WS2-04)
 - [x] IQ-041 Implement `GGUFValidateTensorRangesSorted` in `src/gguf/tensor_data_base.HC` using in-place sort + single-pass overlap scan for large tensor tables (WS2-04)
 - [x] IQ-042 Implement `GGUFTensorInfoResolveByteSpans` in `src/gguf/tensor_data_base.HC` to derive per-tensor payload bytes from dims+type and feed sorted range validation (WS2-04)
@@ -392,6 +392,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-17 | loop-168 | IQ-039 GGUF tensor payload byte-size helper | done | Hardened `GGUFTensorBytesForType` zero-element + defensive block-metadata invariants in `src/gguf/tensor_data_base.HC` and added `tests/test_gguf_tensor_bytes_for_type.py`; `python3 tests/test_gguf_tensor_bytes_for_type.py && python3 tests/test_gguf_tensor_data_base.py` passed |
 | 2026-04-17 | loop-167 | IQ-035 Q8_0 Q16 accumulator parity harness | done | Added `tests/test_q8_0_dot_accum_q16.py`; `python3 tests/test_q8_0_dot_accum_q16.py && python3 tests/test_q8_0_dot.py` passed |
 | 2026-04-17 | loop-166 | IQ-025 GGUF header parser parity fixture | done | Added `tests/test_gguf_header_parse.py` covering valid/magic/version/truncation plus NULL/BAD_PARAM/OVERFLOW contracts; `python3 tests/test_gguf_header_parse.py && python3 tests/test_gguf_header_parse_checked.py && python3 tests/test_gguf_header_validate_and_size_checked.py` passed |
 | 2026-04-17 | loop-165 | IQ-185 metadata table-span validator helper | done | Added `GGUFMetadataTableSpanValidateChecked` in `src/gguf/metadata.HC` and span-parity coverage in `tests/test_gguf_metadata_parse.py`; `python3 tests/test_gguf_metadata_parse.py && python3 tests/test_gguf_header_parse_checked.py && python3 tests/test_gguf_header_validate_and_size_checked.py` passed |

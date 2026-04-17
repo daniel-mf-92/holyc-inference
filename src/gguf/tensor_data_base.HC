@@ -108,6 +108,18 @@ I64 GGUFTensorBytesForType(U32 ggml_type,
     if (err != GGUF_TDBASE_OK)
         return err;
 
+    // Defensive invariant: block metadata must never be zero.
+    // If this ever trips, the type table above is corrupted.
+    if (!block_size || !block_bytes)
+        return GGUF_TDBASE_ERR_BAD_TYPE;
+
+    // Zero-element tensors are legal and occupy zero payload bytes.
+    if (!element_count)
+    {
+        *out_tensor_nbytes = 0;
+        return GGUF_TDBASE_OK;
+    }
+
     // Quantized formats are stored in fixed-size element blocks.
     // Reject non-multiples instead of silently rounding/truncating.
     if (element_count % block_size)
