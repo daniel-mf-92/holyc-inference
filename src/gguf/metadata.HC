@@ -127,6 +127,13 @@ I32 GGUFMetadataReadStringLenU64Checked(U8 *buf,
                                         U64 table_end,
                                         U64 *out_len);
 
+I32 GGUFMetadataReadStringU64HeaderAndBoundsChecked(U8 *buf,
+                                                    U64 buf_nbytes,
+                                                    U64 *cursor,
+                                                    U64 table_end,
+                                                    U64 *out_len,
+                                                    U64 *out_payload_end);
+
 I32 GGUFMetadataReadStringBytesChecked(U8 *buf,
                                        U64 buf_nbytes,
                                        U64 *cursor,
@@ -525,6 +532,59 @@ I32 GGUFMetadataReadBoolChecked(U8 *buf,
     return GGUF_META_TABLE_OK;
 }
 
+// Checked GGUF string header reader (`U64 len`) plus payload-window bounds
+// validation. This helper stages cursor advancement to payload start so string
+// payload readers can compose strict no-partial-write decode flows.
+// Contract: writes `*out_len`, `*out_payload_end`, and advances `*cursor`
+// to payload start only on success.
+I32 GGUFMetadataReadStringU64HeaderAndBoundsChecked(U8 *buf,
+                                                    U64 buf_nbytes,
+                                                    U64 *cursor,
+                                                    U64 table_end,
+                                                    U64 *out_len,
+                                                    U64 *out_payload_end)
+{
+    U64 cur;
+    U64 str_len;
+    U64 payload_end;
+    I32 err;
+
+    if (!buf || !cursor || !out_len || !out_payload_end)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Decode through the shared U64 reader so the length-prefix path keeps
+    // identical checked bounds and no-partial-write semantics.
+    err = GGUFMetadataReadU64LEChecked(buf,
+                                       buf_nbytes,
+                                       &cur,
+                                       table_end,
+                                       &str_len);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // Validate `payload_start + str_len` against metadata table bounds.
+    err = GGUFMetadataCursorCanAdvanceChecked(cur,
+                                              str_len,
+                                              table_end,
+                                              &payload_end);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // Metadata table span must also fit inside the backing input buffer.
+    if (payload_end > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    if (str_len > GGUF_MAX_STRING_BYTES)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    *out_len = str_len;
+    *out_payload_end = payload_end;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
 // Checked GGUF string-length reader (`U64 len` prefix). Decodes the length
 // field and validates that the subsequent payload byte span stays inside the
 // metadata table and backing buffer before any payload copy is attempted.
@@ -546,30 +606,16 @@ I32 GGUFMetadataReadStringLenU64Checked(U8 *buf,
 
     cur = *cursor;
 
-    // Decode through the shared U64 reader so length header parsing inherits
-    // identical overflow/bounds/no-partial-write semantics.
-    err = GGUFMetadataReadU64LEChecked(buf,
-                                       buf_nbytes,
-                                       &cur,
-                                       table_end,
-                                       &str_len);
+    // Route through the shared string U64-header + bounds helper so all string
+    // prefix decoders keep one canonical checked cursor/bounds contract.
+    err = GGUFMetadataReadStringU64HeaderAndBoundsChecked(buf,
+                                                          buf_nbytes,
+                                                          &cur,
+                                                          table_end,
+                                                          &str_len,
+                                                          &payload_end);
     if (err != GGUF_META_TABLE_OK)
         return err;
-
-    // Validate `payload_start + str_len <= table_end` before payload reads.
-    err = GGUFMetadataCursorCanAdvanceChecked(cur,
-                                              str_len,
-                                              table_end,
-                                              &payload_end);
-    if (err != GGUF_META_TABLE_OK)
-        return err;
-
-    // Metadata table span must also live inside the provided buffer.
-    if (payload_end > buf_nbytes)
-        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
-
-    if (str_len > GGUF_MAX_STRING_BYTES)
-        return GGUF_META_TABLE_ERR_BAD_PARAM;
 
     *out_len = str_len;
     *cursor = cur;
