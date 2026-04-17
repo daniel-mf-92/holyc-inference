@@ -105,6 +105,14 @@ I32 GGUFMetadataReadU8PairChecked(U8 *buf,
                                   U8 *out_first,
                                   U8 *out_second);
 
+I32 GGUFMetadataReadU8TripleChecked(U8 *buf,
+                                    U64 buf_nbytes,
+                                    U64 *cursor,
+                                    U64 table_end,
+                                    U8 *out_first,
+                                    U8 *out_second,
+                                    U8 *out_third);
+
 I32 GGUFMetadataReadU16LEChecked(U8 *buf,
                                  U64 buf_nbytes,
                                  U64 *cursor,
@@ -843,6 +851,49 @@ I32 GGUFMetadataReadU8PairChecked(U8 *buf,
 
     *out_first = first;
     *out_second = second;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked three-byte tuple reader for compact metadata fields.
+// Contract: decodes sequential bytes through GGUFMetadataReadU8Checked and
+// commits all outputs + cursor only after all three reads succeed.
+I32 GGUFMetadataReadU8TripleChecked(U8 *buf,
+                                    U64 buf_nbytes,
+                                    U64 *cursor,
+                                    U64 table_end,
+                                    U8 *out_first,
+                                    U8 *out_second,
+                                    U8 *out_third)
+{
+    U64 cur;
+    U8 first;
+    U8 second;
+    U8 third;
+    I32 err;
+
+    if (!buf || !cursor || !out_first || !out_second || !out_third)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Stage all three reads through the canonical checked U8 reader so bounds
+    // and no-partial-write behavior exactly matches scalar decoders.
+    err = GGUFMetadataReadU8Checked(buf, buf_nbytes, &cur, table_end, &first);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadU8Checked(buf, buf_nbytes, &cur, table_end, &second);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataReadU8Checked(buf, buf_nbytes, &cur, table_end, &third);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_first = first;
+    *out_second = second;
+    *out_third = third;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
 }
