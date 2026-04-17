@@ -238,6 +238,15 @@ I32 GGUFMetadataReadU32QuadChecked(U8 *buf,
                                    U32 *out_third,
                                    U32 *out_fourth);
 
+I32 GGUFMetadataReadU32QuadCheckedNoPartial(U8 *buf,
+                                            U64 buf_nbytes,
+                                            U64 *cursor,
+                                            U64 table_end,
+                                            U32 *out_first,
+                                            U32 *out_second,
+                                            U32 *out_third,
+                                            U32 *out_fourth);
+
 I32 GGUFMetadataReadU64LEChecked(U8 *buf,
                                  U64 buf_nbytes,
                                  U64 *cursor,
@@ -1882,6 +1891,51 @@ I32 GGUFMetadataReadU32QuadChecked(U8 *buf,
                                        &cur,
                                        table_end,
                                        &fourth);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_first = first;
+    *out_second = second;
+    *out_third = third;
+    *out_fourth = fourth;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Explicit no-partial wrapper for fixed-layout U32-quad metadata records.
+// Contract: routes through the canonical staged U32-quad reader while staging
+// output lanes + cursor locally, then commits all-or-nothing on success.
+I32 GGUFMetadataReadU32QuadCheckedNoPartial(U8 *buf,
+                                            U64 buf_nbytes,
+                                            U64 *cursor,
+                                            U64 table_end,
+                                            U32 *out_first,
+                                            U32 *out_second,
+                                            U32 *out_third,
+                                            U32 *out_fourth)
+{
+    U64 cur;
+    U32 first;
+    U32 second;
+    U32 third;
+    U32 fourth;
+    I32 err;
+
+    if (!buf || !cursor || !out_first || !out_second || !out_third || !out_fourth)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Route through the canonical quad decoder so bounds/overflow behavior
+    // stays identical while preserving explicit no-partial commit semantics.
+    err = GGUFMetadataReadU32QuadChecked(buf,
+                                         buf_nbytes,
+                                         &cur,
+                                         table_end,
+                                         &first,
+                                         &second,
+                                         &third,
+                                         &fourth);
     if (err != GGUF_META_TABLE_OK)
         return err;
 
