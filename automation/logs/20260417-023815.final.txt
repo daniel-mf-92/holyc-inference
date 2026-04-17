@@ -1,0 +1,14 @@
+Done — I completed one full iteration centered on `IQ-161`.
+
+**What Changed**
+- Implemented checked clamp helper `FPQ16ExpClampToInputDomainChecked` and routed `FPQ16Exp` through it while preserving exp saturation semantics in `src/math/intexp.HC:21` and `src/math/intexp.HC:47`.
+- Added host-side parity/contract harness `tests/test_intexp_clamp_to_input_domain_checked.py:1`.
+- Updated queue/ledger in `MASTER_TASKS.md:352` and `MASTER_TASKS.md:364`, and extended rolling queue with new code-focused items `IQ-164..IQ-166` at `MASTER_TASKS.md:355`.
+
+**Validation Output**
+- `python3 tests/test_intexp_clamp_to_input_domain_checked.py` → `intexp_clamp_to_input_domain_checked_reference_checks=ok`
+- `python3 tests/test_rmsnorm_apply_inv_denom_weighted_auto_checked.py && python3 tests/test_rmsnorm_apply_inv_denom_checked.py` → both `...=ok`
+
+**Contract Checks**
+- Queue depth maintained: `17` unchecked `IQ-` items (policy >=15).
+- Central DB logged: `iterations.id=1877`, `task_id=IQ-161`, `status=pass`, `validation_result=ok`.
