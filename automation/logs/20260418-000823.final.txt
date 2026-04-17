@@ -1,0 +1,15 @@
+Completed one full iteration on `IQ-284` with queue depth maintained.
+
+**What Changed**
+- Added HolyC default-end wrapper `GGUFMetadataReadU32QuadCheckedDefault` delegating to canonical checked core in `src/gguf/metadata.HC:2371` (prototype at `src/gguf/metadata.HC:309`).
+- Added focused host parity harness `tests/test_gguf_metadata_read_u32_quad_checked_default.py:1` covering null, short-buffer no-commit, success, overflow passthrough, and randomized parity vs checked core.
+- Marked `IQ-284` done and added one new unchecked queue item `IQ-299` to keep rolling depth at 15 in `MASTER_TASKS.md:478` and `MASTER_TASKS.md:498`.
+- Added one progress ledger line in `MASTER_TASKS.md:505`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_u32_quad_checked_default.py && python3 tests/test_gguf_metadata_read_u32_quad_checked.py && python3 tests/test_gguf_metadata_read_u32_quad_checked_no_partial.py && python3 tests/test_gguf_metadata_parse.py`
+- Output: `ok`, `ok`, `gguf_metadata_reference_checks=ok`
+- Ran: `python3 -m py_compile tests/test_gguf_metadata_read_u32_quad_checked_default.py` (passed, no output).
+
+**Central DB**
+- Logged iteration in `~/Documents/local-codebases/temple-central.db` as `IQ-284` (`id=3280`, status `pass`).
