@@ -79,6 +79,12 @@ I32 GGUFMetadataCursorCanAdvanceChecked(U64 cursor,
                                         U64 table_end,
                                         U64 *out_next_cursor);
 
+I32 GGUFMetadataReadU8Checked(U8 *buf,
+                              U64 buf_nbytes,
+                              U64 *cursor,
+                              U64 table_end,
+                              U8 *out_value);
+
 // Validate metadata table byte-window math before any parser cursor movement.
 // Contract: `out_table_end` is written only on success.
 I32 GGUFMetadataTableSpanValidateChecked(U64 table_start,
@@ -184,6 +190,40 @@ I32 GGUFMetadataCursorCanAdvanceChecked(U64 cursor,
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
 
     *out_next_cursor = next_cursor;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked 1-byte metadata reader used by table-backed decoders.
+// Contract: writes `*out_value` and advances `*cursor` only on success.
+I32 GGUFMetadataReadU8Checked(U8 *buf,
+                              U64 buf_nbytes,
+                              U64 *cursor,
+                              U64 table_end,
+                              U8 *out_value)
+{
+    U64 cur;
+    U64 next_cursor;
+    I32 err;
+
+    if (!buf || !cursor || !out_value)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    // Keep data-plane indexing in positive I64 space to match parser cursor
+    // contracts used across GGUF metadata entrypoints.
+    if (buf_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    cur = *cursor;
+    err = GGUFMetadataCursorCanAdvanceChecked(cur, 1, table_end, &next_cursor);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // The metadata span must live inside the provided byte buffer.
+    if (next_cursor > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    *out_value = buf[cur];
+    *cursor = next_cursor;
     return GGUF_META_TABLE_OK;
 }
 
