@@ -5,6 +5,22 @@
 #define GGUF_VERSION_V2 2
 #define GGUF_VERSION_V3 3
 
+// GGUF v2/v3 fixed header layout (little-endian):
+//   byte  0..3   : magic "GGUF" (U32)
+//   byte  4..7   : version (U32)
+//   byte  8..15  : tensor_count (U64)
+//   byte 16..23  : metadata_kv_count (U64)
+// Keep offsets centralized so all parser entrypoints share one canonical layout.
+#define GGUF_HEADER_MAGIC_OFFSET             0
+#define GGUF_HEADER_VERSION_OFFSET           4
+#define GGUF_HEADER_TENSOR_COUNT_OFFSET      8
+#define GGUF_HEADER_METADATA_COUNT_OFFSET   16
+
+#define GGUF_HEADER_MAGIC_BYTES              4
+#define GGUF_HEADER_VERSION_BYTES            4
+#define GGUF_HEADER_TENSOR_COUNT_BYTES       8
+#define GGUF_HEADER_METADATA_COUNT_BYTES     8
+
 #define GGUF_PARSE_OK 0
 #define GGUF_PARSE_ERR_NULL_PTR 1
 #define GGUF_PARSE_ERR_TRUNCATED 2
@@ -28,7 +44,15 @@ class GGUFHeader
 #define GGUF_HEADER_ERR_BAD_MAGIC   5
 #define GGUF_HEADER_ERR_BAD_VERSION 6
 
-#define GGUF_HEADER_BYTES 24
+#define GGUF_HEADER_BYTES (GGUF_HEADER_MAGIC_BYTES         \
+                         + GGUF_HEADER_VERSION_BYTES       \
+                         + GGUF_HEADER_TENSOR_COUNT_BYTES  \
+                         + GGUF_HEADER_METADATA_COUNT_BYTES)
+
+Bool GGUFHeaderVersionSupported(U32 version)
+{
+    return (version == GGUF_VERSION_V2 || version == GGUF_VERSION_V3);
+}
 
 Bool GGUFHeaderCanReadSpan(U64 total_bytes, U64 offset, U64 need_bytes)
 {
@@ -105,25 +129,34 @@ I32 GGUFHeaderParseChecked(U8 *header_bytes,
     if (header_nbytes < GGUF_HEADER_BYTES)
         return GGUF_HEADER_ERR_TRUNCATED;
 
-    status = GGUFReadU32LEChecked(header_bytes, header_nbytes, 0, &magic_u32);
+    status = GGUFReadU32LEChecked(header_bytes,
+                                  header_nbytes,
+                                  GGUF_HEADER_MAGIC_OFFSET,
+                                  &magic_u32);
     if (status)
         return status;
     if (magic_u32 != GGUF_MAGIC_U32)
         return GGUF_HEADER_ERR_BAD_MAGIC;
 
-    status = GGUFReadU32LEChecked(header_bytes, header_nbytes, 4, &version_u32);
+    status = GGUFReadU32LEChecked(header_bytes,
+                                  header_nbytes,
+                                  GGUF_HEADER_VERSION_OFFSET,
+                                  &version_u32);
     if (status)
         return status;
-    if (version_u32 != GGUF_VERSION_V2 && version_u32 != GGUF_VERSION_V3)
+    if (!GGUFHeaderVersionSupported(version_u32))
         return GGUF_HEADER_ERR_BAD_VERSION;
 
-    status = GGUFReadU64LEChecked(header_bytes, header_nbytes, 8, &tensor_count);
+    status = GGUFReadU64LEChecked(header_bytes,
+                                  header_nbytes,
+                                  GGUF_HEADER_TENSOR_COUNT_OFFSET,
+                                  &tensor_count);
     if (status)
         return status;
 
     status = GGUFReadU64LEChecked(header_bytes,
                                   header_nbytes,
-                                  16,
+                                  GGUF_HEADER_METADATA_COUNT_OFFSET,
                                   &metadata_kv_count);
     if (status)
         return status;
@@ -207,6 +240,9 @@ I64 GGUFParseHeader(U8 *buf, I64 size, GGUFHeader *out, I64 *cursor)
 
     c = *cursor;
 
+    if (!GGUFCanRead(buf, size, c, GGUF_HEADER_BYTES))
+        return GGUF_PARSE_ERR_TRUNCATED;
+
     if (!GGUFReadU32LE(buf, size, &c, &magic))
         return GGUF_PARSE_ERR_TRUNCATED;
     if (magic != GGUF_MAGIC_U32)
@@ -214,7 +250,7 @@ I64 GGUFParseHeader(U8 *buf, I64 size, GGUFHeader *out, I64 *cursor)
 
     if (!GGUFReadU32LE(buf, size, &c, &version))
         return GGUF_PARSE_ERR_TRUNCATED;
-    if (version != GGUF_VERSION_V2 && version != GGUF_VERSION_V3)
+    if (!GGUFHeaderVersionSupported(version))
         return GGUF_PARSE_ERR_BAD_VERSION;
 
     if (!GGUFReadU64LE(buf, size, &c, &tensor_count))

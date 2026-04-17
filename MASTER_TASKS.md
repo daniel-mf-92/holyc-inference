@@ -207,7 +207,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-019 Create `src/math/fixedpoint.HC` skeleton with Q16 constants, core type aliases, and TODO stubs for mul/div helpers (WS1-01)
 - [x] IQ-020 Implement Q16 integer exponent range clamp and base constants in `src/math/intexp.HC` (WS1-02)
 - [x] IQ-021 Add host-side Q16 exp parity harness in `tests/test_intexp_q16.py` against `math.exp` samples (WS1-05)
-- [ ] IQ-022 Implement GGUF header constants and struct layout notes in `src/gguf/header.HC` before parser logic (WS2-01)
+- [x] IQ-022 Implement GGUF header constants and struct layout notes in `src/gguf/header.HC` before parser logic (WS2-01)
 - [ ] IQ-023 Create `src/math/rmsnorm.HC` skeleton with Q16 constants, tensor shape assumptions, and TODO stubs for scale/variance accumulation (WS1-04)
 - [ ] IQ-024 Create `src/gguf/header.HC` skeleton with `GGUFHeader` struct and endian-safe integer read helper stubs (WS2-01)
 - [ ] IQ-025 Add host-side GGUF header parser parity fixture in `tests/test_gguf_header_parse.py` covering valid/magic/version/truncation cases (WS2-01, WS2-05)
@@ -373,6 +373,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] IQ-182 Add host-side parity harness `tests/test_intexp_split_base2_from_clamped_input_checked.py` validating base-2 split invariants (`x = k*ln2 + r`, `0<=r<ln2`) and BAD_PARAM/NULL_PTR contracts for `FPQ16ExpSplitBase2FromClampedInputChecked` (WS1-05)
 - [x] IQ-183 Implement HolyC `GGUFHeaderParseChecked` in `src/gguf/header.HC` to parse magic/version/tensor_count/metadata_count from a byte span with explicit little-endian decoding and BAD_PARAM/OVERFLOW contracts (WS2-01)
 - [ ] IQ-184 Implement HolyC `GGUFHeaderValidateAndSizeChecked` in `src/gguf/header.HC` to enforce supported versions and compute checked header byte size for downstream metadata/tensor table offsets (WS2-01, WS2-05)
+- [ ] IQ-185 Implement HolyC helper `GGUFMetadataTableSpanValidateChecked` in `src/gguf/metadata.HC` to validate metadata KV table byte window (`start+len<=file_size`) with checked overflow guards for WS2 parser cursor safety (WS2-02, WS2-05)
 
 
 ## Progress Ledger
@@ -380,6 +381,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 
 | Date | Iteration | Task | Result | Notes |
 |---|---|---|---|---|
+| 2026-04-17 | loop-161 | IQ-022 GGUF header layout constants | done | Added canonical header byte offsets/widths + shared version predicate in `src/gguf/header.HC`; `python3 tests/test_gguf_header_parse_checked.py` passed |
 | 2026-04-17 | loop-160 | IQ-183 checked GGUF header parser helper | done | Added `GGUFHeaderParseChecked` with explicit little-endian checked decode in `src/gguf/header.HC` and parity harness `tests/test_gguf_header_parse_checked.py`; `python3 tests/test_gguf_header_parse_checked.py` passed |
 | 2026-04-17 | loop-159 | IQ-021 Q16 exp parity harness vs math.exp | done | Added `tests/test_intexp_q16.py`; `python3 tests/test_intexp_q16.py && python3 tests/test_intexp_exp_from_clamped_input_checked.py && python3 tests/test_intexp_exp_array_checked.py` passed |
 | 2026-04-17 | loop-158 | IQ-019 fixedpoint checked skeleton completion | done | Extended `src/math/fixedpoint.HC` with Q16 aliases plus checked mul/div + array helpers and added `tests/test_fixedpoint_q16_checked.py`; `python3 tests/test_fixedpoint_q16_checked.py && python3 tests/test_intexp_exp_from_clamped_input_checked.py` passed |
