@@ -1,0 +1,15 @@
+Completed one full unattended iteration on `IQ-249` with queue maintenance, validation, ledger updates, and DB logging.
+
+**What Changed**
+- Refined `GGUFMetadataReadU16TripleChecked` to stage lanes as `U16Pair + U16Scalar` while preserving atomic cursor/output commit and no-partial-write behavior in `src/gguf/metadata.HC:1071`.
+- Added adversarial coverage for pair-stage failure rollback semantics in `tests/test_gguf_metadata_read_u16_triple_checked.py:160`.
+- Marked `IQ-249` done, added one progress-ledger row, and appended new unchecked `IQ-264` to keep rolling depth in `MASTER_TASKS.md:443`, `MASTER_TASKS.md:465`, and `MASTER_TASKS.md:458`.
+
+**Validation**
+- `python3 tests/test_gguf_metadata_read_u16_triple_checked.py` → `gguf_metadata_read_u16_triple_checked_reference_checks=ok`
+- `python3 tests/test_gguf_metadata_read_u16_pair_checked.py` → `gguf_metadata_read_u16_pair_checked_reference_checks=ok`
+- `python3 tests/test_gguf_metadata_read_u16le_checked.py` → `gguf_metadata_read_u16le_checked_reference_checks=ok`
+
+**Contract Checks**
+- Unchecked inference-queue depth is maintained at 15 after completion (`IQ-250` … `IQ-264`).
+- Central DB logged: `iterations.id=2935`, `agent='inference'`, `task_id='IQ-249'`, `status='pass'`.

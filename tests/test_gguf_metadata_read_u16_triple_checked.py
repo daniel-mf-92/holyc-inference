@@ -157,6 +157,32 @@ def test_null_ptr_and_no_partial_write() -> None:
     assert out_third == [0xCCCC]
 
 
+def test_pair_stage_fail_does_not_commit_outputs_or_cursor() -> None:
+    # Only three bytes available in-table: first U16 can decode, but the second
+    # lane inside pair staging fails. Triple reader must keep cursor/outputs unchanged.
+    buf = [0x34, 0x12, 0xAB]
+
+    cursor = [0]
+    out_first = [0x1111]
+    out_second = [0x2222]
+    out_third = [0x3333]
+
+    err = gguf_metadata_read_u16_triple_checked(
+        buf,
+        len(buf),
+        cursor,
+        len(buf),
+        out_first,
+        out_second,
+        out_third,
+    )
+    assert err == GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
+    assert cursor == [0]
+    assert out_first == [0x1111]
+    assert out_second == [0x2222]
+    assert out_third == [0x3333]
+
+
 def test_third_scalar_fail_does_not_commit_prior_lanes_or_cursor() -> None:
     first = 0x1234
     second = 0x5678
@@ -295,6 +321,7 @@ def test_randomized_parity() -> None:
 
 def run() -> None:
     test_null_ptr_and_no_partial_write()
+    test_pair_stage_fail_does_not_commit_outputs_or_cursor()
     test_third_scalar_fail_does_not_commit_prior_lanes_or_cursor()
     test_success_reads_three_u16_and_advances()
     test_overflow_passthrough_and_no_commit()

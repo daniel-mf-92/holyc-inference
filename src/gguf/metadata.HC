@@ -1087,24 +1087,19 @@ I32 GGUFMetadataReadU16TripleChecked(U8 *buf,
 
     cur = *cursor;
 
-    // Stage all scalar reads through the canonical U16 helper so triple reads
-    // preserve identical bounds/overflow and no-partial-write behavior.
-    err = GGUFMetadataReadU16LEChecked(buf,
-                                       buf_nbytes,
-                                       &cur,
-                                       table_end,
-                                       &first);
+    // Stage the first two lanes through pair-reader composition so compact
+    // tuple helpers share identical scalar decode + bounds behavior.
+    err = GGUFMetadataReadU16PairChecked(buf,
+                                         buf_nbytes,
+                                         &cur,
+                                         table_end,
+                                         &first,
+                                         &second);
     if (err != GGUF_META_TABLE_OK)
         return err;
 
-    err = GGUFMetadataReadU16LEChecked(buf,
-                                       buf_nbytes,
-                                       &cur,
-                                       table_end,
-                                       &second);
-    if (err != GGUF_META_TABLE_OK)
-        return err;
-
+    // Stage the third lane with the canonical scalar U16 decoder. Outputs and
+    // cursor commit only after this succeeds, preserving no-partial semantics.
     err = GGUFMetadataReadU16LEChecked(buf,
                                        buf_nbytes,
                                        &cur,
