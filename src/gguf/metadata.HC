@@ -214,6 +214,12 @@ I32 GGUFMetadataReadArrayHeaderChecked(U8 *buf,
                                        U32 *out_elem_type,
                                        U64 *out_elem_count);
 
+I32 GGUFMetadataArrayPayloadSpanValidateChecked(U64 payload_start,
+                                                U64 payload_bytes,
+                                                U64 table_end,
+                                                U64 buf_nbytes,
+                                                U64 *out_payload_end);
+
 // Validate metadata table byte-window math before any parser cursor movement.
 // Contract: `out_table_end` is written only on success.
 I32 GGUFMetadataTableSpanValidateChecked(U64 table_start,
@@ -319,6 +325,43 @@ I32 GGUFMetadataCursorCanAdvanceChecked(U64 cursor,
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
 
     *out_next_cursor = next_cursor;
+    return GGUF_META_TABLE_OK;
+}
+
+// Validate a metadata-array payload window `[payload_start, payload_end)` where
+// `payload_end = payload_start + payload_bytes`.
+// Contract: `*out_payload_end` is written only on success.
+I32 GGUFMetadataArrayPayloadSpanValidateChecked(U64 payload_start,
+                                                U64 payload_bytes,
+                                                U64 table_end,
+                                                U64 buf_nbytes,
+                                                U64 *out_payload_end)
+{
+    U64 payload_end;
+    I32 err;
+
+    if (!out_payload_end)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    // Keep data-plane indexing in positive I64 space, matching all checked
+    // metadata cursor/table helpers used by parser entrypoints.
+    if (buf_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    // Compose payload window math through shared checked cursor helper so
+    // signed-space + unsigned-overflow surfaces stay identical.
+    err = GGUFMetadataCursorCanAdvanceChecked(payload_start,
+                                              payload_bytes,
+                                              table_end,
+                                              &payload_end);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    // Backing byte span must contain the validated payload window.
+    if (payload_end > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    *out_payload_end = payload_end;
     return GGUF_META_TABLE_OK;
 }
 
