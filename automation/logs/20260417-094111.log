@@ -187,3 +187,10 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_8","type":"todo_list","items":[{"text":"Inspect GGUF metadata helper patterns","completed":true},{"text":"Implement IQ-198 HolyC helper","completed":true},{"text":"Add focused host-side validation test","completed":true},{"text":"Run validation and capture output","completed":true},{"text":"Update tasks and central DB log","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":1593875,"cached_input_tokens":1380992,"output_tokens":10022}}
 Codex final exit code: 0
+[main fa7d3e8] feat(inference): codex iteration 20260417-094111
+ 8 files changed, 1052 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260417-094111.final.txt
+ create mode 100644 tests/test_gguf_metadata_read_bool_checked.py
+ create mode 100644 tests/test_gguf_metadata_read_f64bitsle_checked.py
+ create mode 100644 tests/test_gguf_metadata_read_string_len_u64_checked.py
+=== End iteration 121 (outcome=ok) ===
