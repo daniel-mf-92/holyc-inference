@@ -1,0 +1,23 @@
+Completed one full unattended iteration on `IQ-304` with queue policy preserved.
+
+**What Changed**
+- Implemented HolyC default-end wrapper `GGUFMetadataReadI32QuadCheckedDefault` in `src/gguf/metadata.HC:3419` (prototype added at `src/gguf/metadata.HC:490`), delegating to `GGUFMetadataReadI32QuadChecked` with `table_end=buf_nbytes`.
+- Added focused host-side parity harness `tests/test_gguf_metadata_read_i32_quad_checked_default.py:1` covering null-pointer/no-partial-write, truncation, success decode, randomized parity vs checked core, and default-end boundary behavior.
+- Updated queue item to done: `MASTER_TASKS.md:503` (`IQ-304`).
+- Added one new unchecked queue item to keep depth rolling: `MASTER_TASKS.md:518` (`IQ-319`).
+- Added one progress-ledger line: `MASTER_TASKS.md:525` (`loop-379`).
+
+**Validation**
+- Ran:
+  - `python3 tests/test_gguf_metadata_read_i32_quad_checked_default.py`
+  - `python3 tests/test_gguf_metadata_read_i32_quad_checked.py`
+  - `python3 tests/test_gguf_metadata_read_i32_quad_checked_no_partial.py`
+  - `python3 tests/test_gguf_metadata_parse.py`
+- Output:
+  - `ok`
+  - `gguf_metadata_read_i32_quad_checked_no_partial: ok`
+  - `gguf_metadata_reference_checks=ok`
+
+**Iteration Log**
+- Inserted into central DB `~/Documents/local-codebases/temple-central.db` with `task_id='IQ-304'`, `status='pass'`, validation command/result recorded.
+- Queue depth check after update: `15` unchecked `IQ-` items.
