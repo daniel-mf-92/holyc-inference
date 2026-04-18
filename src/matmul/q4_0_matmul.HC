@@ -204,3 +204,57 @@ I32 Q4_0MatMulTiledAVX2Q32Checked(
 
     return Q4_0_MATMUL_OK;
 }
+
+I32 Q4_0MatMulTiledAVX2Q32CheckedDefaultTiles(
+    Q4_0Block *lhs_matrix_blocks,
+    I64 lhs_rows,
+    I64 lhs_row_stride_blocks,
+    Q4_0Block *rhs_col_blocks,
+    I64 rhs_cols,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_mat_q32,
+    I64 out_row_stride_cols)
+{
+    I64 lhs_block_capacity;
+    I64 rhs_block_capacity;
+    I64 out_capacity;
+
+    // IQ-330 canonical default-tiles wrapper:
+    // - Keep checked-core argument ordering/error precedence unchanged.
+    // - Derive capacities only from visible matrix layout dimensions.
+    // - Default tile traversal is 1x1, so behavior is exact checked-core
+    //   behavior with explicit tile defaults.
+    if (!lhs_matrix_blocks || !rhs_col_blocks || !out_mat_q32)
+        return Q4_0_MATMUL_ERR_NULL_PTR;
+
+    if (lhs_rows < 0 || lhs_row_stride_blocks < 0)
+        return Q4_0_MATMUL_ERR_BAD_LEN;
+    if (rhs_cols < 0 || rhs_col_stride_blocks < 0)
+        return Q4_0_MATMUL_ERR_BAD_LEN;
+    if (k_block_count < 0 || out_row_stride_cols < 0)
+        return Q4_0_MATMUL_ERR_BAD_LEN;
+
+    if (!Q4_0MatMulTryMulI64NonNeg(lhs_rows, lhs_row_stride_blocks, &lhs_block_capacity))
+        return Q4_0_MATMUL_ERR_OVERFLOW;
+    if (!Q4_0MatMulTryMulI64NonNeg(rhs_cols, rhs_col_stride_blocks, &rhs_block_capacity))
+        return Q4_0_MATMUL_ERR_OVERFLOW;
+    if (!Q4_0MatMulTryMulI64NonNeg(lhs_rows, out_row_stride_cols, &out_capacity))
+        return Q4_0_MATMUL_ERR_OVERFLOW;
+
+    return Q4_0MatMulTiledAVX2Q32Checked(
+        lhs_matrix_blocks,
+        lhs_block_capacity,
+        lhs_rows,
+        lhs_row_stride_blocks,
+        rhs_col_blocks,
+        rhs_block_capacity,
+        rhs_cols,
+        rhs_col_stride_blocks,
+        k_block_count,
+        1,
+        1,
+        out_mat_q32,
+        out_capacity,
+        out_row_stride_cols);
+}
