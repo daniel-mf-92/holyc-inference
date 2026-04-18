@@ -1183,6 +1183,53 @@ I32 TokenizerBPEMergePairRankLookupCheckedDefault(I32 left_token,
                                                   out_found);
 }
 
+I32 TokenizerBPEMergePairRankLookupCheckedDefaultNoPartial(I32 left_token,
+                                                           I32 right_token,
+                                                           I32 *rank_left_tokens,
+                                                           I32 *rank_right_tokens,
+                                                           U32 *rank_values,
+                                                           U64 rank_table_count,
+                                                           U32 *out_rank,
+                                                           Bool *out_found)
+{
+    U64 derived_capacity;
+    U32 staged_rank;
+    Bool staged_found;
+    I32 err;
+
+    if (!out_rank || !out_found)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Canonical default-capacity rule: rank tables are tightly packed, so
+    // active row count equals effective storage capacity.
+    if (rank_table_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    derived_capacity = rank_table_count;
+
+    // Stage caller-visible outputs so malformed rank-table pointers/capacity
+    // faults in the checked core cannot partially overwrite caller state.
+    staged_rank = *out_rank;
+    staged_found = *out_found;
+
+    err = TokenizerBPETokenPairRankLookupChecked(left_token,
+                                                 right_token,
+                                                 rank_left_tokens,
+                                                 rank_right_tokens,
+                                                 rank_values,
+                                                 rank_table_count,
+                                                 derived_capacity,
+                                                 &staged_rank,
+                                                 &staged_found);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    // All-or-nothing commit after full checked lookup succeeds.
+    *out_rank = staged_rank;
+    *out_found = staged_found;
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEMergeApplyAtIndexChecked(I32 *token_ids,
                                          U64 token_count,
                                          U64 token_capacity,
