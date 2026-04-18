@@ -1,0 +1,15 @@
+Completed one full iteration on `IQ-344` with queue depth preserved.
+
+**What Changed**
+- Implemented `Q8_0DotRowsAVX2Q32ToQ16CheckedDefault` in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/quant/q8_0_avx2.HC:751` (checked `row_count*row_stride_blocks` derivation, default `vec_block_capacity=vec_block_count`, pass-through to checked core).
+- Added parity harness `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_q8_0_avx2_dot_rows_q32_to_q16_checked_default.py:1`.
+- Updated queue/ledger in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:543`, `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:558`, `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:932` (`IQ-344` checked, new `IQ-359` appended, single ledger line added).
+
+**Validation**
+- `python3 tests/test_q8_0_avx2_dot_rows_q32_to_q16_checked_default.py` → `q8_0_avx2_dot_rows_q32_to_q16_checked_default_reference_checks=ok`
+- `python3 tests/test_q8_0_avx2_rows_q32_to_q16.py` → `q8_0_avx2_rows_q32_to_q16_reference_checks=ok`
+- `python3 tests/test_q8_0_avx2_dot_q32_to_q16_checked_default.py` → `q8_0_avx2_dot_q32_to_q16_checked_default_reference_checks=ok`
+
+**Loop Contract**
+- Queue depth maintained at 15 unchecked (`UNCHECKED 15`, `HAS_344_UNCHECKED False`, `HAS_359_UNCHECKED True`).
+- Central DB logged: `IQ-344` pass in `~/Documents/local-codebases/temple-central.db` with validation command/result.
