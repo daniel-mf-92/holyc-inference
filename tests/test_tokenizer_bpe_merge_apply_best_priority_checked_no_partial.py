@@ -469,6 +469,85 @@ def run_success_parity_case(
     assert out_found[0] == ref_found
 
 
+def run_error_parity_case(
+    *,
+    token_ids: list[int],
+    token_count: int,
+    token_capacity: int,
+    rank_left_tokens: list[int] | None,
+    rank_right_tokens: list[int] | None,
+    rank_values: list[int] | None,
+    rank_merged_tokens: list[int] | None,
+    rank_table_count: int,
+    rank_table_capacity: int,
+    init_merged: int,
+    init_rank: int,
+    init_found: bool,
+    init_count: int,
+) -> None:
+    wrapper_tokens = token_ids.copy()
+    core_tokens = token_ids.copy()
+
+    wrapper_out_merged = [init_merged]
+    wrapper_out_rank = [init_rank]
+    wrapper_out_found = [init_found]
+    wrapper_out_count = [init_count]
+
+    core_out_merged = [init_merged]
+    core_out_rank = [init_rank]
+    core_out_found = [init_found]
+    core_out_count = [init_count]
+
+    wrapper_err = tokenizer_bpe_merge_apply_best_priority_checked_no_partial(
+        wrapper_tokens,
+        token_count,
+        token_capacity,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        wrapper_out_merged,
+        wrapper_out_rank,
+        wrapper_out_found,
+        wrapper_out_count,
+    )
+    core_err = tokenizer_bpe_merge_apply_best_priority_checked(
+        core_tokens,
+        token_count,
+        token_capacity,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        core_out_merged,
+        core_out_rank,
+        core_out_found,
+        core_out_count,
+    )
+
+    assert wrapper_err == core_err
+
+    # No-partial contract: wrapper never commits caller outputs on error,
+    # while successful paths must match the core helper exactly.
+    if wrapper_err != TOKENIZER_BPE_OK:
+        assert wrapper_tokens == core_tokens == token_ids
+        assert wrapper_out_merged[0] == init_merged
+        assert wrapper_out_rank[0] == init_rank
+        assert wrapper_out_found[0] is init_found
+        assert wrapper_out_count[0] == init_count
+        return
+
+    assert wrapper_tokens == core_tokens
+    assert wrapper_out_merged[0] == core_out_merged[0]
+    assert wrapper_out_rank[0] == core_out_rank[0]
+    assert wrapper_out_found[0] == core_out_found[0]
+    assert wrapper_out_count[0] == core_out_count[0]
+
+
 def test_success_parity_with_explicit_staged_composition() -> None:
     run_success_parity_case([10, 20, 30, 20], [10, 20, 30], [20, 30, 20], [7, 4, 9], [120, 230, 320], 1)
     run_success_parity_case([1, 2, 3, 2], [1, 2], [2, 3], [5, 5], [12, 23], 2)
@@ -525,26 +604,94 @@ def test_no_partial_output_writes_on_error_paths() -> None:
     assert out_merged[0] == 111 and out_rank[0] == 222
     assert out_found[0] is True and out_count[0] == 333
 
-    err = tokenizer_bpe_merge_apply_best_priority_checked_no_partial(
-        tokens,
-        len(tokens),
-        len(tokens),
-        [1, 2],
-        [2, 3],
-        [10, 11],
-        [100, 101],
-        2,
-        1,
-        out_merged,
-        out_rank,
-        out_found,
-        out_count,
-    )
-    assert err == TOKENIZER_BPE_ERR_BAD_PARAM
-    assert tokens == baseline
-    assert out_merged[0] == 111 and out_rank[0] == 222
-    assert out_found[0] is True and out_count[0] == 333
 
+def test_error_parity_against_core_for_malformed_capacity_and_rank_vectors() -> None:
+    malformed_rank_rows = [
+        (2, 2, 12, 202),
+        (1, 4, 7, 104),
+        (1, 4, 3, 103),
+        (3, 0, 2, 300),
+        (1, 2, 7, 102),
+    ]
+    rank_left = [row[0] for row in malformed_rank_rows]
+    rank_right = [row[1] for row in malformed_rank_rows]
+    rank_values = [row[2] for row in malformed_rank_rows]
+    rank_merged = [row[3] for row in malformed_rank_rows]
+
+    cases = [
+        {
+            "token_ids": [1, 2, 3, 4],
+            "token_count": 4,
+            "token_capacity": I64_MAX + 1,
+            "rank_left_tokens": rank_left,
+            "rank_right_tokens": rank_right,
+            "rank_values": rank_values,
+            "rank_merged_tokens": rank_merged,
+            "rank_table_count": len(rank_values),
+            "rank_table_capacity": len(rank_values),
+        },
+        {
+            "token_ids": [1, 2, 3, 4],
+            "token_count": 5,
+            "token_capacity": 4,
+            "rank_left_tokens": rank_left,
+            "rank_right_tokens": rank_right,
+            "rank_values": rank_values,
+            "rank_merged_tokens": rank_merged,
+            "rank_table_count": len(rank_values),
+            "rank_table_capacity": len(rank_values),
+        },
+        {
+            "token_ids": [1, 2, 3, 4],
+            "token_count": 4,
+            "token_capacity": 4,
+            "rank_left_tokens": rank_left,
+            "rank_right_tokens": rank_right,
+            "rank_values": rank_values,
+            "rank_merged_tokens": rank_merged,
+            "rank_table_count": len(rank_values),
+            "rank_table_capacity": len(rank_values) - 1,
+        },
+        {
+            "token_ids": [5, 6, 7],
+            "token_count": 3,
+            "token_capacity": 3,
+            "rank_left_tokens": None,
+            "rank_right_tokens": rank_right,
+            "rank_values": rank_values,
+            "rank_merged_tokens": rank_merged,
+            "rank_table_count": 1,
+            "rank_table_capacity": 1,
+        },
+        {
+            "token_ids": [1, 4, 2, 2],
+            "token_count": 4,
+            "token_capacity": 4,
+            "rank_left_tokens": rank_left,
+            "rank_right_tokens": rank_right,
+            "rank_values": rank_values,
+            "rank_merged_tokens": rank_merged,
+            "rank_table_count": len(rank_values),
+            "rank_table_capacity": len(rank_values),
+        },
+    ]
+
+    for i, case in enumerate(cases):
+        run_error_parity_case(
+            token_ids=case["token_ids"],
+            token_count=case["token_count"],
+            token_capacity=case["token_capacity"],
+            rank_left_tokens=case["rank_left_tokens"],
+            rank_right_tokens=case["rank_right_tokens"],
+            rank_values=case["rank_values"],
+            rank_merged_tokens=case["rank_merged_tokens"],
+            rank_table_count=case["rank_table_count"],
+            rank_table_capacity=case["rank_table_capacity"],
+            init_merged=9000 + i,
+            init_rank=10000 + i,
+            init_found=(i % 2) == 0,
+            init_count=11000 + i,
+        )
 
 def test_randomized_parity_against_explicit_staged_reference() -> None:
     rng = random.Random(20260418_370)
@@ -571,5 +718,6 @@ def test_randomized_parity_against_explicit_staged_reference() -> None:
 if __name__ == "__main__":
     test_success_parity_with_explicit_staged_composition()
     test_no_partial_output_writes_on_error_paths()
+    test_error_parity_against_core_for_malformed_capacity_and_rank_vectors()
     test_randomized_parity_against_explicit_staged_reference()
     print("tokenizer_bpe_merge_apply_best_priority_checked_no_partial_reference_checks=ok")
