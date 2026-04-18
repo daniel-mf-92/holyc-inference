@@ -103,3 +103,8 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_2","type":"todo_list","items":[{"text":"Inspect tasks and current queue state","completed":true},{"text":"Refill IQ queue to 15+","completed":true},{"text":"Implement top IQ HolyC work","completed":true},{"text":"Run focused validations","completed":true},{"text":"Log iteration and update ledger","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":2317283,"cached_input_tokens":2147200,"output_tokens":12315}}
 Codex final exit code: 0
+[main 22d2cb4] feat(inference): codex iteration 20260418-093106
+ 6 files changed, 653 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260418-093106.final.txt
+ create mode 100644 tests/test_tokenizer_utf8_decode_span_to_codepoints_checked.py
+=== End iteration 99 (outcome=ok) ===
