@@ -1438,6 +1438,57 @@ I32 TokenizerBPEMergePairTokenLookupCheckedDefault(I32 left_token,
                                                    out_found);
 }
 
+I32 TokenizerBPEMergePairTokenLookupCheckedDefaultValidateRanks(
+                                                   I32 left_token,
+                                                   I32 right_token,
+                                                   I32 *rank_left_tokens,
+                                                   I32 *rank_right_tokens,
+                                                   U32 *rank_values,
+                                                   I32 *rank_merged_tokens,
+                                                   U64 rank_table_count,
+                                                   I32 *out_merged_token,
+                                                   U32 *out_rank,
+                                                   Bool *out_found)
+{
+    U64 i;
+
+    if (!out_merged_token || !out_rank || !out_found)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Keep default-capacity derivation and table scans within signed-positive
+    // I64 bounds to match checked-core overflow contracts.
+    if (rank_table_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (rank_table_count > 0 &&
+        (!rank_left_tokens || !rank_right_tokens || !rank_values || !rank_merged_tokens))
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Guard: binary-search lookup requires lexicographically monotonic
+    // (left,right) ordering across the active rank table.
+    for (i = 1; i < rank_table_count; i++) {
+        if (rank_left_tokens[i - 1] > rank_left_tokens[i])
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        if (rank_left_tokens[i - 1] == rank_left_tokens[i] &&
+            rank_right_tokens[i - 1] > rank_right_tokens[i])
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+    }
+
+    // After monotonic validation, delegate duplicate-pair minimum-rank
+    // selection and merged-token resolution to the canonical default wrapper.
+    return TokenizerBPEMergePairTokenLookupCheckedDefault(left_token,
+                                                          right_token,
+                                                          rank_left_tokens,
+                                                          rank_right_tokens,
+                                                          rank_values,
+                                                          rank_merged_tokens,
+                                                          rank_table_count,
+                                                          out_merged_token,
+                                                          out_rank,
+                                                          out_found);
+}
+
 I32 TokenizerBPEMergePairTokenLookupCheckedDefaultNoPartial(I32 left_token,
                                                             I32 right_token,
                                                             I32 *rank_left_tokens,
