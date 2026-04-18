@@ -1,0 +1,18 @@
+Done — I executed one full loop iteration for `IQ-333` with code, tests, queue maintenance, and DB logging.
+
+**What Changed**
+- Implemented `FPQ16TopPSampleIndexChecked` with integer-only threshold walk, prefix guards, descending/tie-stable semantics, and no-partial-write behavior in `src/math/softmax.HC:917`.
+- Added parity harness `tests/test_softmax_topp_sample_index_checked.py:20` (null/bounds/overflow/domain tests + 2000 randomized cumulative-reference checks).
+- Marked `IQ-333` complete and added one new unchecked monotonic queue item `IQ-348` to keep depth rolling in `MASTER_TASKS.md:532` and `MASTER_TASKS.md:547`.
+- Added one progress-ledger line for this iteration in `MASTER_TASKS.md:555`.
+
+**Validation**
+- `python3 tests/test_softmax_topp_sample_index_checked.py && python3 tests/test_softmax_topp_select_prefix_len_checked.py && python3 tests/test_softmax_topk_sample_from_probabilities_checked.py`
+- Output:
+  - `softmax_topp_sample_index_checked_reference_checks=ok`
+  - `softmax_topp_select_prefix_len_checked_reference_checks=ok`
+  - `softmax_topk_sample_from_probabilities_checked_reference_checks=ok`
+
+**Bookkeeping**
+- Inserted central DB row into `~/Documents/local-codebases/temple-central.db` with `task_id='IQ-333'`, `status='pass'`, validation command/result, and notes.
+- Unchecked queue depth is now `15` (policy satisfied).

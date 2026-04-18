@@ -893,6 +893,105 @@ I32 FPQ16TopPSelectPrefixLenChecked(I64 *probs_q16,
     return FP_Q16_OK;
 }
 
+// Checked deterministic top-p sampler from a descending nucleus window.
+// Output contract:
+//   - Writes exactly one sampled lane index to *out_index on success.
+//   - Sampling domain is probs_q16[0..prefix_len-1] only.
+//   - Selection walk is deterministic: first cumulative bucket strictly above
+//     threshold wins. For ties/equal probabilities this preserves lower-index
+//     priority because the walk is in ascending index order.
+//   - No partial writes on all failure paths.
+// Checked guards:
+//   - probs_q16 and out_index are non-null.
+//   - lane_count > 0.
+//   - prefix_len in [1, lane_count].
+//   - random_q16 in [0, 1.0_q16).
+//   - Pointer-span arithmetic for indexed probs access cannot overflow U64.
+//   - probs_q16[0..prefix_len-1] are descending and each lane in [0, 1.0_q16].
+//   - Prefix cumulative mass is strictly positive and checked for overflow.
+// Notes:
+//   - random_q16 is mapped into prefix mass domain via integer-only
+//     threshold_q16 = floor(random_q16 * prefix_mass_q16 / 1.0_q16).
+//   - If Q16 truncation places threshold on the upper edge, result clamps
+//     deterministically to the last lane in the nucleus window.
+I32 FPQ16TopPSampleIndexChecked(I64 *probs_q16,
+                                I64 lane_count,
+                                I64 prefix_len,
+                                I64 random_q16,
+                                I64 *out_index)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 lane_prob_q16;
+    I64 prev_prob_q16;
+    I64 prefix_mass_q16;
+    I64 cumulative_q16;
+    I64 threshold_q16;
+
+    if (!probs_q16 || !out_index)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count <= 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (prefix_len <= 0 || prefix_len > lane_count)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (random_q16 < 0 || random_q16 >= FP_Q16_ONE)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Guard pointer-span arithmetic before indexed probability access.
+    last_index = prefix_len - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)probs_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Preflight nucleus window probability domain, descending order, and
+    // checked cumulative mass before any output write.
+    prefix_mass_q16 = 0;
+    prev_prob_q16 = FP_Q16_ONE;
+    for (i = 0; i < prefix_len; i++)
+    {
+        lane_prob_q16 = probs_q16[i];
+        if (lane_prob_q16 < 0 || lane_prob_q16 > FP_Q16_ONE)
+            return FP_Q16_ERR_BAD_PARAM;
+        if (lane_prob_q16 > prev_prob_q16)
+            return FP_Q16_ERR_BAD_PARAM;
+        if (lane_prob_q16 > (I64_MAX_VALUE - prefix_mass_q16))
+            return FP_Q16_ERR_OVERFLOW;
+
+        prefix_mass_q16 += lane_prob_q16;
+        prev_prob_q16 = lane_prob_q16;
+    }
+
+    if (prefix_mass_q16 <= 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (prefix_mass_q16 > FP_Q16_ONE)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Map uniform random [0,1) into nucleus cumulative mass [0,prefix_mass).
+    threshold_q16 = (random_q16 * prefix_mass_q16) >> FP_Q16_SHIFT;
+
+    cumulative_q16 = 0;
+    for (i = 0; i < prefix_len; i++)
+    {
+        lane_prob_q16 = probs_q16[i];
+        if (lane_prob_q16 > (I64_MAX_VALUE - cumulative_q16))
+            return FP_Q16_ERR_OVERFLOW;
+
+        cumulative_q16 += lane_prob_q16;
+        if (threshold_q16 < cumulative_q16)
+        {
+            *out_index = i;
+            return FP_Q16_OK;
+        }
+    }
+
+    // Deterministic clamp when threshold lands exactly on upper boundary.
+    *out_index = prefix_len - 1;
+    return FP_Q16_OK;
+}
+
 // Checked deterministic top-k sampler over normalized Q16 probabilities.
 // Output contract:
 //   - Writes exactly one sampled token index to *out_index on success.
