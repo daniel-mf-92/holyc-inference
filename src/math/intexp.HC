@@ -27,6 +27,62 @@
 
 I64 FPQ16Mul(I64 a, I64 b);
 
+// Checked polynomial core for exp(r) on the range-reduced residual domain:
+//   0 <= r < ln(2)
+// Uses a monotonic positive-term series in Q16:
+//   exp(r) ~= 1 + r + r^2/2 + r^3/6 + r^4/24
+// The residual bound keeps coefficients stable and guarantees each term is
+// non-negative, preserving monotonic growth across r.
+I32 FPQ16ExpPolyCoreResidualLn2Q16Checked(I64 residual_q16,
+                                          I64 *out_poly_q16)
+{
+    I64 r2;
+    I64 r3;
+    I64 r4;
+    I64 t1;
+    I64 t2;
+    I64 t3;
+    I64 t4;
+    I64 poly;
+
+    if (!out_poly_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (residual_q16 < 0 || residual_q16 >= EXP_Q16_LN2)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    r2 = FPQ16Mul(residual_q16, residual_q16);
+    r3 = FPQ16Mul(r2, residual_q16);
+    r4 = FPQ16Mul(r3, residual_q16);
+
+    t1 = residual_q16;
+    t2 = r2 / EXP_Q16_POLY_C2_DIV;
+    t3 = r3 / EXP_Q16_POLY_C3_DIV;
+    t4 = r4 / EXP_Q16_POLY_C4_DIV;
+
+    // Terms are non-negative on residual domain; checked adds keep overflow
+    // behavior explicit before pow2 scaling.
+    poly = EXP_Q16_POLY_C0;
+    if (poly > (I64_MAX_VALUE - t1))
+        return FP_Q16_ERR_OVERFLOW;
+    poly += t1;
+
+    if (poly > (I64_MAX_VALUE - t2))
+        return FP_Q16_ERR_OVERFLOW;
+    poly += t2;
+
+    if (poly > (I64_MAX_VALUE - t3))
+        return FP_Q16_ERR_OVERFLOW;
+    poly += t3;
+
+    if (poly > (I64_MAX_VALUE - t4))
+        return FP_Q16_ERR_OVERFLOW;
+    poly += t4;
+
+    *out_poly_q16 = poly;
+    return FP_Q16_OK;
+}
+
 // Checked clamp helper used by scalar exp and vector exp callers.
 // Clamps to the saturating exp input domain [-10.0, +10.0] in Q16.
 I32 FPQ16ExpClampToInputDomainChecked(I64 input_q16,
@@ -146,13 +202,6 @@ I32 FPQ16ExpFromClampedInputChecked(I64 clamped_input_q16,
 {
     I64 k;
     I64 r;
-    I64 r2;
-    I64 r3;
-    I64 r4;
-    I64 t1;
-    I64 t2;
-    I64 t3;
-    I64 t4;
     I64 poly;
     I32 status;
 
@@ -181,17 +230,10 @@ I32 FPQ16ExpFromClampedInputChecked(I64 clamped_input_q16,
     if (status)
         return status;
 
-    // exp(r) ~= 1 + r + r^2/2 + r^3/6 + r^4/24
-    r2 = FPQ16Mul(r, r);
-    r3 = FPQ16Mul(r2, r);
-    r4 = FPQ16Mul(r3, r);
-
-    t1 = r;
-    t2 = r2 / EXP_Q16_POLY_C2_DIV;
-    t3 = r3 / EXP_Q16_POLY_C3_DIV;
-    t4 = r4 / EXP_Q16_POLY_C4_DIV;
-
-    poly = EXP_Q16_POLY_C0 + t1 + t2 + t3 + t4;
+    status = FPQ16ExpPolyCoreResidualLn2Q16Checked(r,
+                                                   &poly);
+    if (status)
+        return status;
 
     if (k >= 0)
     {
