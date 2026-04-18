@@ -2516,9 +2516,24 @@ I32 TokenizerBPEEncodePromptCheckedDefaultCapacity(U8 *bytes,
                                                    U64 *out_token_count)
 {
     U64 derived_capacity;
+    U64 cursor;
 
     if (!bytes || !io_cursor || !out_token_ids || !out_token_count)
         return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (rank_table_count > rank_table_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (prompt_nbytes > byte_len - cursor)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
 
     // Canonical default-capacity rule: byte-level pretokenization emits at
     // most one token per prompt byte before merge passes shrink the sequence.

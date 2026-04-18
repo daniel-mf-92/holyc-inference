@@ -15,6 +15,7 @@ from test_tokenizer_bpe_encode_prompt_checked import (
     TOKENIZER_BPE_ERR_NULL_PTR,
     TOKENIZER_BPE_ERR_OVERFLOW,
     TOKENIZER_BPE_OK,
+    TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS,
     TOKENIZER_UTF8_ERR_TRUNCATED,
     tokenizer_bpe_encode_prompt_checked,
 )
@@ -192,6 +193,106 @@ def test_overflow_guard_for_default_capacity() -> None:
     assert out_count[0] == 123
 
 
+def test_out_of_bounds_prompt_span_rejected() -> None:
+    out = [0x1111] * 16
+    out_count = [0x2222]
+    cursor = [3]
+
+    err = tokenizer_bpe_encode_prompt_checked_default_capacity(
+        [ord("a"), ord("b"), ord("c"), ord("d")],
+        4,
+        cursor,
+        2,
+        [],
+        [],
+        [],
+        [],
+        0,
+        0,
+        out,
+        out_count,
+    )
+    assert err == TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS
+    assert cursor[0] == 3
+    assert out_count[0] == 0x2222
+    assert out == [0x1111] * 16
+
+
+def test_cursor_past_end_rejected() -> None:
+    out = [0x1234] * 16
+    out_count = [0x5678]
+    cursor = [7]
+
+    err = tokenizer_bpe_encode_prompt_checked_default_capacity(
+        [ord("a"), ord("b"), ord("c")],
+        3,
+        cursor,
+        0,
+        [],
+        [],
+        [],
+        [],
+        0,
+        0,
+        out,
+        out_count,
+    )
+    assert err == TOKENIZER_BPE_ERR_BAD_PARAM
+    assert cursor[0] == 7
+    assert out_count[0] == 0x5678
+    assert out == [0x1234] * 16
+
+
+def test_rank_capacity_overflow_guard() -> None:
+    out = [0x3333] * 8
+    out_count = [0x4444]
+    cursor = [0]
+
+    err = tokenizer_bpe_encode_prompt_checked_default_capacity(
+        [ord("a")],
+        1,
+        cursor,
+        1,
+        [],
+        [],
+        [],
+        [],
+        0,
+        I64_MAX + 1,
+        out,
+        out_count,
+    )
+    assert err == TOKENIZER_BPE_ERR_OVERFLOW
+    assert cursor[0] == 0
+    assert out_count[0] == 0x4444
+    assert out == [0x3333] * 8
+
+
+def test_rank_count_capacity_mismatch_rejected() -> None:
+    out = [0xABAB] * 8
+    out_count = [0xCDCD]
+    cursor = [0]
+
+    err = tokenizer_bpe_encode_prompt_checked_default_capacity(
+        [ord("a")],
+        1,
+        cursor,
+        1,
+        [1],
+        [2],
+        [3],
+        [4],
+        2,
+        1,
+        out,
+        out_count,
+    )
+    assert err == TOKENIZER_BPE_ERR_BAD_PARAM
+    assert cursor[0] == 0
+    assert out_count[0] == 0xCDCD
+    assert out == [0xABAB] * 8
+
+
 def test_capacity_adversarial_rank_table_mismatch() -> None:
     out = [0x3333] * 16
     out_count = [0x4444]
@@ -313,6 +414,10 @@ if __name__ == "__main__":
     test_empty_prompt_span_parity()
     test_error_no_partial_output_parity()
     test_overflow_guard_for_default_capacity()
+    test_out_of_bounds_prompt_span_rejected()
+    test_cursor_past_end_rejected()
+    test_rank_capacity_overflow_guard()
+    test_rank_count_capacity_mismatch_rejected()
     test_capacity_adversarial_rank_table_mismatch()
     test_malformed_utf8_parity()
     test_randomized_parity_against_explicit_capacity_core()
