@@ -17,6 +17,31 @@ Bool TokenizerUTF8IsContinuationByte(U8 byte)
     return (byte & 0xC0) == 0x80;
 }
 
+I32 TokenizerUTF8ExpectedLengthFromLeadByteChecked(U8 lead,
+                                                   U8 *out_expected_length)
+{
+    U8 need;
+
+    if (!out_expected_length)
+        return TOKENIZER_UTF8_ERR_NULL_PTR;
+
+    // Valid UTF-8 lead-byte lanes (with C0/C1 and F5..FF rejected).
+    if (lead <= 0x7F)
+        need = 1;
+    else if (lead >= 0xC2 && lead <= 0xDF)
+        need = 2;
+    else if (lead >= 0xE0 && lead <= 0xEF)
+        need = 3;
+    else if (lead >= 0xF0 && lead <= 0xF4)
+        need = 4;
+    else
+        return TOKENIZER_UTF8_ERR_BAD_LEAD_BYTE;
+
+    // Commit output only after classification succeeds.
+    *out_expected_length = need;
+    return TOKENIZER_UTF8_OK;
+}
+
 I32 TokenizerUTF8NextCodepointChecked(U8 *bytes,
                                       U64 byte_len,
                                       U64 *io_cursor,
@@ -29,6 +54,7 @@ I32 TokenizerUTF8NextCodepointChecked(U8 *bytes,
     U32 codepoint;
     U8 cont;
     U64 next_cursor;
+    I32 err;
 
     if (!bytes || !io_cursor || !out_codepoint || !out_bytes_consumed)
         return TOKENIZER_UTF8_ERR_NULL_PTR;
@@ -44,25 +70,21 @@ I32 TokenizerUTF8NextCodepointChecked(U8 *bytes,
         return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
 
     lead = bytes[cursor];
-    need = 0;
     codepoint = 0;
 
     // UTF-8 lead-byte classification with overlong-leading-byte rejection.
-    if (lead <= 0x7F) {
-        need = 1;
+    err = TokenizerUTF8ExpectedLengthFromLeadByteChecked(lead, &need);
+    if (err != TOKENIZER_UTF8_OK)
+        return err;
+
+    if (need == 1)
         codepoint = lead;
-    } else if (lead >= 0xC2 && lead <= 0xDF) {
-        need = 2;
+    else if (need == 2)
         codepoint = lead & 0x1F;
-    } else if (lead >= 0xE0 && lead <= 0xEF) {
-        need = 3;
+    else if (need == 3)
         codepoint = lead & 0x0F;
-    } else if (lead >= 0xF0 && lead <= 0xF4) {
-        need = 4;
+    else
         codepoint = lead & 0x07;
-    } else {
-        return TOKENIZER_UTF8_ERR_BAD_LEAD_BYTE;
-    }
 
     if (byte_len - cursor < need)
         return TOKENIZER_UTF8_ERR_TRUNCATED;

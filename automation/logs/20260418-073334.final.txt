@@ -1,0 +1,20 @@
+Completed one full unattended iteration on `IQ-339` with queue policy preserved.
+
+**What Changed**
+- Implemented `TokenizerUTF8ExpectedLengthFromLeadByteChecked` in `src/tokenizer/bpe.HC:20` (lead-byte classification 1/2/3/4, explicit invalid-lead rejection, no-partial-write output).
+- Refactored `TokenizerUTF8NextCodepointChecked` to use the new helper in `src/tokenizer/bpe.HC:45` and `src/tokenizer/bpe.HC:76`.
+- Added exhaustive parity harness `tests/test_tokenizer_utf8_expected_length_from_lead_byte_checked.py:1` (full `0x00..0xFF` domain + boundary/no-partial checks).
+
+**Task/Queue/Logs**
+- Marked `IQ-339` done in `MASTER_TASKS.md:538`.
+- Added one new unchecked queue item (`IQ-354`) to keep IDs monotonic and queue depth rolling in `MASTER_TASKS.md:553`.
+- Added one progress-ledger line in `MASTER_TASKS.md:561`.
+- Logged central DB iteration row for `IQ-339` in `~/Documents/local-codebases/temple-central.db` (`db_insert=ok`).
+- Unchecked IQ count remains `15` after completion/replenish.
+
+**Validation Ran**
+- `python3 tests/test_tokenizer_utf8_expected_length_from_lead_byte_checked.py`
+- `python3 tests/test_tokenizer_utf8_next_codepoint_checked.py`
+- Output:
+  - `tokenizer_utf8_expected_length_from_lead_byte_checked_reference_checks=ok`
+  - `tokenizer_utf8_next_codepoint_checked_reference_checks=ok`
