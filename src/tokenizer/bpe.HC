@@ -1717,3 +1717,214 @@ I32 TokenizerBPEMergeCandidatesBuildChecked(I32 *token_ids,
     *out_candidate_count = candidate_count;
     return TOKENIZER_BPE_OK;
 }
+
+#define TOKENIZER_BPE_ASCII_CLASS_WORD 1
+#define TOKENIZER_BPE_ASCII_CLASS_DIGIT 2
+#define TOKENIZER_BPE_ASCII_CLASS_WHITESPACE 3
+#define TOKENIZER_BPE_ASCII_CLASS_PUNCT 4
+
+U8 TokenizerBPEASCIIClass(U8 byte)
+{
+    if ((byte >= 'a' && byte <= 'z') ||
+        (byte >= 'A' && byte <= 'Z') ||
+        byte == '_')
+        return TOKENIZER_BPE_ASCII_CLASS_WORD;
+
+    if (byte >= '0' && byte <= '9')
+        return TOKENIZER_BPE_ASCII_CLASS_DIGIT;
+
+    if (byte == ' ' ||
+        byte == '\t' ||
+        byte == '\n' ||
+        byte == '\r' ||
+        byte == '\f' ||
+        byte == '\v')
+        return TOKENIZER_BPE_ASCII_CLASS_WHITESPACE;
+
+    return TOKENIZER_BPE_ASCII_CLASS_PUNCT;
+}
+
+I32 TokenizerBPEEncodePromptChecked(U8 *bytes,
+                                    U64 byte_len,
+                                    U64 *io_cursor,
+                                    U64 prompt_nbytes,
+                                    I32 *rank_left_tokens,
+                                    I32 *rank_right_tokens,
+                                    U32 *rank_values,
+                                    I32 *rank_merged_tokens,
+                                    U64 rank_table_count,
+                                    U64 rank_table_capacity,
+                                    I32 *out_token_ids,
+                                    U64 out_token_capacity,
+                                    U64 *out_token_count)
+{
+    U64 cursor;
+    U64 prompt_end;
+    U64 scan;
+    U64 span_start;
+    U64 span_nbytes;
+    U8 lead;
+    U8 span_class;
+    U8 next_class;
+    U64 span_cursor;
+    U64 span_token_count;
+    U64 remaining_capacity;
+    U64 staged_count;
+    I32 *staged_tokens;
+    U64 staged_capacity;
+    U64 i;
+    U32 staged_codepoint;
+    U8 staged_used;
+    I32 err;
+
+    if (!bytes || !io_cursor || !out_token_ids || !out_token_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        out_token_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (rank_table_count > rank_table_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (rank_table_count > 0 &&
+        (!rank_left_tokens || !rank_right_tokens || !rank_values || !rank_merged_tokens))
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (prompt_nbytes > byte_len - cursor)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    prompt_end = cursor + prompt_nbytes;
+    if (prompt_end < cursor || prompt_end > byte_len)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Stage whole-prompt token output so malformed UTF-8 or capacity failures
+    // never partially mutate caller output buffers or counters.
+    staged_capacity = out_token_capacity;
+    if (!staged_capacity)
+        staged_capacity = 1;
+
+    staged_tokens = MAlloc(sizeof(I32) * staged_capacity);
+    if (!staged_tokens)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    scan = cursor;
+    staged_count = 0;
+
+    while (scan < prompt_end) {
+        span_start = scan;
+        lead = bytes[scan];
+
+        if (lead <= 0x7F) {
+            // ASCII pretokenization classes: words, digits, whitespace, and
+            // punctuation all form independent contiguous merge spans.
+            span_class = TokenizerBPEASCIIClass(lead);
+            scan++;
+
+            while (scan < prompt_end) {
+                if (bytes[scan] > 0x7F)
+                    break;
+
+                next_class = TokenizerBPEASCIIClass(bytes[scan]);
+                if (next_class != span_class)
+                    break;
+
+                scan++;
+            }
+        } else {
+            // Non-ASCII lanes are advanced by checked UTF-8 decode so split
+            // points always align to full codepoints (never inside sequences).
+            err = TokenizerUTF8NextCodepointChecked(bytes,
+                                                    prompt_end,
+                                                    &scan,
+                                                    &staged_codepoint,
+                                                    &staged_used);
+            if (err != TOKENIZER_UTF8_OK) {
+                Free(staged_tokens);
+                return err;
+            }
+
+            // Group contiguous non-ASCII scalars into one span. This mirrors
+            // byte-level BPE behavior while preserving UTF-8 boundary safety.
+            while (scan < prompt_end && bytes[scan] > 0x7F) {
+                err = TokenizerUTF8NextCodepointChecked(bytes,
+                                                        prompt_end,
+                                                        &scan,
+                                                        &staged_codepoint,
+                                                        &staged_used);
+                if (err != TOKENIZER_UTF8_OK) {
+                    Free(staged_tokens);
+                    return err;
+                }
+            }
+        }
+
+        span_nbytes = scan - span_start;
+        if (!span_nbytes) {
+            Free(staged_tokens);
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+        }
+
+        if (staged_count > out_token_capacity) {
+            Free(staged_tokens);
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+        }
+
+        remaining_capacity = out_token_capacity - staged_count;
+        span_cursor = span_start;
+        span_token_count = 0;
+
+        err = TokenizerBPEEncodeSpanChecked(bytes,
+                                            byte_len,
+                                            &span_cursor,
+                                            span_nbytes,
+                                            rank_left_tokens,
+                                            rank_right_tokens,
+                                            rank_values,
+                                            rank_merged_tokens,
+                                            rank_table_count,
+                                            rank_table_capacity,
+                                            staged_tokens + staged_count,
+                                            remaining_capacity,
+                                            &span_token_count);
+        if (err != TOKENIZER_BPE_OK) {
+            Free(staged_tokens);
+            return err;
+        }
+
+        if (span_cursor != scan) {
+            Free(staged_tokens);
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+        }
+
+        if (span_token_count > remaining_capacity) {
+            Free(staged_tokens);
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+        }
+
+        staged_count += span_token_count;
+        if (staged_count < span_token_count || staged_count > out_token_capacity) {
+            Free(staged_tokens);
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+        }
+    }
+
+    if (scan != prompt_end) {
+        Free(staged_tokens);
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    }
+
+    for (i = 0; i < staged_count; i++)
+        out_token_ids[i] = staged_tokens[i];
+
+    *out_token_count = staged_count;
+    *io_cursor = prompt_end;
+    Free(staged_tokens);
+    return TOKENIZER_BPE_OK;
+}
