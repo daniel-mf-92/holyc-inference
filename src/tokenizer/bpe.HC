@@ -2630,6 +2630,155 @@ I32 TokenizerBPEMergeCandidatesBuildCheckedDefaultCapacityNoPartial(
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEMergeCandidatesBuildCheckedDefaultNoPartial(
+                                                   I32 *token_ids,
+                                                   U64 token_count,
+                                                   I32 *rank_left_tokens,
+                                                   I32 *rank_right_tokens,
+                                                   U32 *rank_values,
+                                                   U64 rank_table_count,
+                                                   I32 *out_left_tokens,
+                                                   I32 *out_right_tokens,
+                                                   U64 *out_left_indices,
+                                                   U32 *out_ranks,
+                                                   U64 *out_candidate_count)
+{
+    U64 derived_token_capacity;
+    U64 derived_rank_table_capacity;
+    U64 derived_candidate_capacity;
+    U64 staged_capacity;
+    U64 staged_i32_bytes;
+    U64 staged_u64_bytes;
+    U64 staged_u32_bytes;
+    I32 *staged_left_tokens;
+    I32 *staged_right_tokens;
+    U64 *staged_left_indices;
+    U32 *staged_ranks;
+    U64 staged_count;
+    U64 i;
+    I32 err;
+
+    if (!token_ids ||
+        !out_left_tokens ||
+        !out_right_tokens ||
+        !out_left_indices ||
+        !out_ranks ||
+        !out_candidate_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Canonical checked-default contract: capacities equal logical counts.
+    derived_token_capacity = token_count;
+    derived_rank_table_capacity = rank_table_count;
+
+    // Canonical adjacent-pair default: N tokens can emit at most N-1
+    // merge candidates, with underflow clamped for empty/single-token spans.
+    if (token_count < 2)
+        derived_candidate_capacity = 0;
+    else
+        derived_candidate_capacity = token_count - 1;
+
+    // Stage output tables so any checked-core error leaves caller arrays and
+    // count unchanged (all-or-nothing no-partial-write wrapper contract).
+    staged_capacity = derived_candidate_capacity;
+    if (!staged_capacity)
+        staged_capacity = 1;
+
+    if (staged_capacity > (0x7FFFFFFFFFFFFFFF / sizeof(I32)))
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    staged_i32_bytes = sizeof(I32) * staged_capacity;
+    if (!staged_i32_bytes)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (staged_capacity > (0x7FFFFFFFFFFFFFFF / sizeof(U64)))
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    staged_u64_bytes = sizeof(U64) * staged_capacity;
+    if (!staged_u64_bytes)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (staged_capacity > (0x7FFFFFFFFFFFFFFF / sizeof(U32)))
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    staged_u32_bytes = sizeof(U32) * staged_capacity;
+    if (!staged_u32_bytes)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    staged_left_tokens = MAlloc(staged_i32_bytes);
+    if (!staged_left_tokens)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    staged_right_tokens = MAlloc(staged_i32_bytes);
+    if (!staged_right_tokens) {
+        Free(staged_left_tokens);
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    staged_left_indices = MAlloc(staged_u64_bytes);
+    if (!staged_left_indices) {
+        Free(staged_right_tokens);
+        Free(staged_left_tokens);
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    staged_ranks = MAlloc(staged_u32_bytes);
+    if (!staged_ranks) {
+        Free(staged_left_indices);
+        Free(staged_right_tokens);
+        Free(staged_left_tokens);
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    for (i = 0; i < derived_candidate_capacity; i++) {
+        staged_left_tokens[i] = out_left_tokens[i];
+        staged_right_tokens[i] = out_right_tokens[i];
+        staged_left_indices[i] = out_left_indices[i];
+        staged_ranks[i] = out_ranks[i];
+    }
+
+    staged_count = *out_candidate_count;
+
+    err = TokenizerBPEMergeCandidatesBuildChecked(token_ids,
+                                                  token_count,
+                                                  derived_token_capacity,
+                                                  rank_left_tokens,
+                                                  rank_right_tokens,
+                                                  rank_values,
+                                                  rank_table_count,
+                                                  derived_rank_table_capacity,
+                                                  staged_left_tokens,
+                                                  staged_right_tokens,
+                                                  staged_left_indices,
+                                                  staged_ranks,
+                                                  derived_candidate_capacity,
+                                                  &staged_count);
+    if (err != TOKENIZER_BPE_OK) {
+        Free(staged_ranks);
+        Free(staged_left_indices);
+        Free(staged_right_tokens);
+        Free(staged_left_tokens);
+        return err;
+    }
+
+    // Commit staged candidate tables and count only after checked core returns
+    // success so wrappers never leak partial writes on malformed inputs.
+    for (i = 0; i < derived_candidate_capacity; i++) {
+        out_left_tokens[i] = staged_left_tokens[i];
+        out_right_tokens[i] = staged_right_tokens[i];
+        out_left_indices[i] = staged_left_indices[i];
+        out_ranks[i] = staged_ranks[i];
+    }
+
+    *out_candidate_count = staged_count;
+
+    Free(staged_ranks);
+    Free(staged_left_indices);
+    Free(staged_right_tokens);
+    Free(staged_left_tokens);
+    return TOKENIZER_BPE_OK;
+}
+
 #define TOKENIZER_BPE_ASCII_CLASS_WORD 1
 #define TOKENIZER_BPE_ASCII_CLASS_DIGIT 2
 #define TOKENIZER_BPE_ASCII_CLASS_WHITESPACE 3
