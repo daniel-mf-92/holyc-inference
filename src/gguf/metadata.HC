@@ -558,6 +558,13 @@ I32 GGUFMetadataReadF32BitsTripleCheckedNoPartial(U8 *buf,
                                                   U32 *out_second_bits,
                                                   U32 *out_third_bits);
 
+I32 GGUFMetadataReadF32BitsTripleCheckedDefault(U8 *buf,
+                                                U64 buf_nbytes,
+                                                U64 *cursor,
+                                                U32 *out_first_bits,
+                                                U32 *out_second_bits,
+                                                U32 *out_third_bits);
+
 I32 GGUFMetadataReadF32BitsQuadChecked(U8 *buf,
                                        U64 buf_nbytes,
                                        U64 *cursor,
@@ -3808,6 +3815,26 @@ I32 GGUFMetadataReadF32BitsTripleCheckedNoPartial(U8 *buf,
     *out_third_bits = third_bits;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Canonical default-end wrapper for fixed-layout FLOAT32 raw-bit triple
+// metadata records.
+// Contract: preserves exact checked triple semantics by pinning table_end to
+// buf_nbytes and delegating to GGUFMetadataReadF32BitsTripleChecked.
+I32 GGUFMetadataReadF32BitsTripleCheckedDefault(U8 *buf,
+                                                U64 buf_nbytes,
+                                                U64 *cursor,
+                                                U32 *out_first_bits,
+                                                U32 *out_second_bits,
+                                                U32 *out_third_bits)
+{
+    return GGUFMetadataReadF32BitsTripleChecked(buf,
+                                                buf_nbytes,
+                                                cursor,
+                                                buf_nbytes,
+                                                out_first_bits,
+                                                out_second_bits,
+                                                out_third_bits);
 }
 
 // Checked metadata FLOAT32 raw-bit quad reader.
