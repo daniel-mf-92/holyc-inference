@@ -390,6 +390,117 @@ I32 Q4_0MatMulTiledAVX2Q32ToQ16Checked(
     return Q4_0_MATMUL_OK;
 }
 
+I32 Q4_0MatMulTiledAVX2Q32ToQ16CheckedNoPartial(
+    Q4_0Block *lhs_matrix_blocks,
+    I64 lhs_block_capacity,
+    I64 lhs_rows,
+    I64 lhs_row_stride_blocks,
+    Q4_0Block *rhs_col_blocks,
+    I64 rhs_block_capacity,
+    I64 rhs_cols,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 tile_rows,
+    I64 tile_cols,
+    I64 *out_mat_q16,
+    I64 out_capacity,
+    I64 out_row_stride_cols)
+{
+    I64 required_out_cells;
+    I64 stage_bytes;
+    I64 out_index;
+    I64 *staged_out_q16;
+    I32 status;
+
+    if (!lhs_matrix_blocks || !rhs_col_blocks || !out_mat_q16)
+        return Q4_0_MATMUL_ERR_NULL_PTR;
+
+    if (!lhs_rows)
+        return Q4_0MatMulTiledAVX2Q32ToQ16Checked(lhs_matrix_blocks,
+                                                  lhs_block_capacity,
+                                                  lhs_rows,
+                                                  lhs_row_stride_blocks,
+                                                  rhs_col_blocks,
+                                                  rhs_block_capacity,
+                                                  rhs_cols,
+                                                  rhs_col_stride_blocks,
+                                                  k_block_count,
+                                                  tile_rows,
+                                                  tile_cols,
+                                                  out_mat_q16,
+                                                  out_capacity,
+                                                  out_row_stride_cols);
+
+    if (lhs_rows < 0 || out_row_stride_cols < 0)
+        return Q4_0_MATMUL_ERR_BAD_LEN;
+
+    if (!Q4_0MatMulTryMulI64NonNeg(lhs_rows, out_row_stride_cols, &required_out_cells))
+        return Q4_0_MATMUL_ERR_OVERFLOW;
+
+    if (required_out_cells > out_capacity)
+        return Q4_0_MATMUL_ERR_BAD_LEN;
+
+    if (!required_out_cells)
+        return Q4_0MatMulTiledAVX2Q32ToQ16Checked(lhs_matrix_blocks,
+                                                  lhs_block_capacity,
+                                                  lhs_rows,
+                                                  lhs_row_stride_blocks,
+                                                  rhs_col_blocks,
+                                                  rhs_block_capacity,
+                                                  rhs_cols,
+                                                  rhs_col_stride_blocks,
+                                                  k_block_count,
+                                                  tile_rows,
+                                                  tile_cols,
+                                                  out_mat_q16,
+                                                  out_capacity,
+                                                  out_row_stride_cols);
+
+    if (!Q4_0MatMulTryMulI64NonNeg(required_out_cells, sizeof(I64), &stage_bytes))
+        return Q4_0_MATMUL_ERR_OVERFLOW;
+
+    staged_out_q16 = MAlloc(stage_bytes);
+    if (!staged_out_q16)
+        return Q4_0_MATMUL_ERR_OVERFLOW;
+
+    // Seed staging from caller output so logically inactive lanes
+    // (e.g. row padding when out_row_stride_cols > rhs_cols) preserve
+    // checked-core behavior on success.
+    for (out_index = 0; out_index < required_out_cells; ++out_index)
+        staged_out_q16[out_index] = out_mat_q16[out_index];
+
+    status = Q4_0MatMulTiledAVX2Q32ToQ16Checked(lhs_matrix_blocks,
+                                                lhs_block_capacity,
+                                                lhs_rows,
+                                                lhs_row_stride_blocks,
+                                                rhs_col_blocks,
+                                                rhs_block_capacity,
+                                                rhs_cols,
+                                                rhs_col_stride_blocks,
+                                                k_block_count,
+                                                tile_rows,
+                                                tile_cols,
+                                                staged_out_q16,
+                                                required_out_cells,
+                                                out_row_stride_cols);
+    if (status != Q4_0_MATMUL_OK)
+    {
+        Free(staged_out_q16);
+        return status;
+    }
+
+    // IQ-360 no-partial-write contract:
+    // - Run full tiled conversion in a private stage buffer.
+    // - Publish all visible output cells only after full success.
+    // This preserves checked-core error codes while preventing early-cell
+    // commits when later cells fail due to dot overflow/truncation.
+    for (out_index = 0; out_index < required_out_cells; ++out_index)
+        out_mat_q16[out_index] = staged_out_q16[out_index];
+
+    Free(staged_out_q16);
+    return Q4_0_MATMUL_OK;
+}
+
 I32 Q4_0MatMulTiledAVX2Q32ToQ16CheckedDefaultTiles(
     Q4_0Block *lhs_matrix_blocks,
     I64 lhs_rows,

@@ -1,0 +1,20 @@
+Done — IQ-360 is fully implemented, validated, and logged.
+
+**What Changed**
+- Added HolyC all-or-nothing wrapper `Q4_0MatMulTiledAVX2Q32ToQ16CheckedNoPartial` with staged buffer + commit-on-success semantics in `src/matmul/q4_0_matmul.HC:393`.
+- Preserved checked-core padding-lane behavior by seeding stage from caller output before running core conversion, then committing only on success (`src/matmul/q4_0_matmul.HC:492`).
+- Added parity harness `tests/test_q4_0_matmul_tiled_avx2_q32_to_q16_checked_no_partial.py:143` covering randomized parity, late truncation no-partial behavior, and null/bad-len/overflow paths.
+
+**Validation**
+- Ran: `python3 tests/test_q4_0_matmul_tiled_avx2_q32_to_q16_checked_no_partial.py && python3 tests/test_q4_0_matmul_tiled_avx2_q32_to_q16_checked_default_tiles.py && python3 tests/test_q4_0_matmul_tiled_avx2_q32_checked.py`
+- Output:
+  - `q4_0_matmul_tiled_avx2_q32_to_q16_checked_no_partial_reference_checks=ok`
+  - `q4_0_matmul_tiled_avx2_q32_to_q16_checked_default_tiles_reference_checks=ok`
+  - `q4_0_matmul_tiled_avx2_q32_checked_reference_checks=ok`
+
+**Queue / Ledger / DB**
+- Marked `IQ-360` done in `MASTER_TASKS.md:559`.
+- Added one progress ledger line in `MASTER_TASKS.md:582`.
+- Maintained queue depth by appending `IQ-375` (unchecked) in `MASTER_TASKS.md:574` (unchecked now back to 15).
+- Logged iteration to central DB `~/Documents/local-codebases/temple-central.db` with task `IQ-360`, status `pass`, and validation command/results.
+
