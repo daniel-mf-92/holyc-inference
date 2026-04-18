@@ -804,6 +804,93 @@ I32 FPQ16TopKSelectIndicesChecked(I64 *logits_q16,
     return FP_Q16_OK;
 }
 
+// Checked deterministic stable descending argsort over Q16 logits.
+// Output contract:
+//   - Writes exactly lane_count indices into out_indices[0..lane_count-1].
+//   - Order is descending logit value.
+//   - Tie-break is deterministic and stable: lower token index wins.
+//   - No partial writes on all parameter/preflight failure paths.
+// Checked guards:
+//   - logits_q16 and out_indices are non-null.
+//   - lane_count >= 0 and out_index_capacity >= 0.
+//   - out_index_capacity >= lane_count.
+//   - Pointer-span arithmetic for indexed logits/out accesses cannot overflow U64.
+I32 FPQ16ArgsortDescStableChecked(I64 *logits_q16,
+                                  I64 lane_count,
+                                  I64 *out_indices,
+                                  I64 out_index_capacity)
+{
+    I64 i;
+    I64 j;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 key_index;
+    I64 key_logit_q16;
+    I64 scan_index;
+    I64 scan_logit_q16;
+
+    if (!logits_q16 || !out_indices)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0 || out_index_capacity < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (out_index_capacity < lane_count)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (!lane_count)
+        return FP_Q16_OK;
+
+    // Guard pointer-span arithmetic before indexed logits/out writes.
+    last_index = lane_count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)logits_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)out_indices > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Seed index identity mapping before stable insertion sort.
+    for (i = 0; i < lane_count; i++)
+        out_indices[i] = i;
+
+    // Stable insertion sort:
+    //   - Higher logit lanes move earlier.
+    //   - Equal logits resolve by lower token index first.
+    for (i = 1; i < lane_count; i++)
+    {
+        key_index = out_indices[i];
+        key_logit_q16 = logits_q16[key_index];
+        j = i - 1;
+
+        while (j >= 0)
+        {
+            scan_index = out_indices[j];
+            scan_logit_q16 = logits_q16[scan_index];
+
+            if (scan_logit_q16 < key_logit_q16)
+            {
+                out_indices[j + 1] = scan_index;
+                j--;
+                continue;
+            }
+
+            if (scan_logit_q16 == key_logit_q16 && scan_index > key_index)
+            {
+                out_indices[j + 1] = scan_index;
+                j--;
+                continue;
+            }
+
+            break;
+        }
+
+        out_indices[j + 1] = key_index;
+    }
+
+    return FP_Q16_OK;
+}
+
 // Checked deterministic top-p nucleus-prefix selector over descending Q16
 // probabilities.
 // Output contract:
