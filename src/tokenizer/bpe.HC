@@ -219,6 +219,50 @@ I32 TokenizerUTF8ValidateContinuationSpanCheckedDefault(U8 *bytes,
                                                         out_bytes_consumed);
 }
 
+I32 TokenizerUTF8ValidateContinuationSpanCheckedDefaultNoPartial(U8 *bytes,
+                                                                 U64 byte_len,
+                                                                 U64 *io_cursor,
+                                                                 U64 *out_bytes_consumed)
+{
+    U64 cursor;
+    U64 continuation_count;
+    U64 staged_cursor;
+    U64 staged_consumed;
+    I32 err;
+
+    if (!bytes || !io_cursor || !out_bytes_consumed)
+        return TOKENIZER_UTF8_ERR_NULL_PTR;
+
+    // Keep default-span derivation and staged-call arithmetic inside signed
+    // positive I64 domain used by HolyC runtime checks.
+    if (byte_len > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_UTF8_ERR_OVERFLOW;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_UTF8_ERR_BAD_PARAM;
+
+    // Canonical default count: validate full suffix from caller cursor.
+    continuation_count = byte_len - cursor;
+
+    // Stage caller-visible outputs so malformed suffixes keep cursor/count
+    // unchanged (strict all-or-nothing no-partial semantics).
+    staged_cursor = cursor;
+    staged_consumed = *out_bytes_consumed;
+
+    err = TokenizerUTF8ValidateContinuationSpanChecked(bytes,
+                                                       byte_len,
+                                                       &staged_cursor,
+                                                       continuation_count,
+                                                       &staged_consumed);
+    if (err != TOKENIZER_UTF8_OK)
+        return err;
+
+    *io_cursor = staged_cursor;
+    *out_bytes_consumed = staged_consumed;
+    return TOKENIZER_UTF8_OK;
+}
+
 I32 TokenizerUTF8NextCodepointChecked(U8 *bytes,
                                       U64 byte_len,
                                       U64 *io_cursor,
