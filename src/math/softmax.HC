@@ -804,6 +804,191 @@ I32 FPQ16TopKSelectIndicesChecked(I64 *logits_q16,
     return FP_Q16_OK;
 }
 
+// Checked deterministic top-k sampler over normalized Q16 probabilities.
+// Output contract:
+//   - Writes exactly one sampled token index to *out_index on success.
+//   - Sampling domain is restricted to the top-k highest probabilities.
+//   - Ordering is descending probability with deterministic tie-break:
+//     lower token index wins when probabilities are equal.
+//   - No partial writes on all failure paths.
+// Checked guards:
+//   - probs_q16 and out_index are non-null.
+//   - lane_count >= 0, k >= 0.
+//   - k > 0 and k <= lane_count.
+//   - random_q16 is in [0, 1.0_q16).
+//   - Pointer-span arithmetic for indexed probs access cannot overflow U64.
+//   - Each probability lane is in [0, 1.0_q16].
+//   - Sum(probs_q16[0..lane_count-1]) equals 1.0_q16 exactly.
+//   - Sum(top-k probabilities) is strictly positive.
+// Notes:
+//   - Implementation intentionally avoids hidden containers. Rank selection
+//     uses direct pairwise ordering tests so every comparison remains auditable.
+I32 FPQ16TopKSampleFromProbabilitiesChecked(I64 *probs_q16,
+                                            I64 lane_count,
+                                            I64 k,
+                                            I64 random_q16,
+                                            I64 *out_index)
+{
+    I64 i;
+    I64 j;
+    I64 rank;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 lane_prob_q16;
+    I64 lane_sum_q16;
+    I64 lane_order_rank;
+    I64 selected_index;
+    I64 selected_prob_q16;
+    I64 topk_sum_q16;
+    I64 topk_cumulative_q16;
+    I64 threshold_q16;
+
+    if (!probs_q16 || !out_index)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0 || k < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (!k || k > lane_count)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (random_q16 < 0 || random_q16 >= FP_Q16_ONE)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Guard pointer-span arithmetic before indexed probability access.
+    last_index = lane_count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)probs_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Preflight probability domain and exact normalized sum.
+    lane_sum_q16 = 0;
+    for (i = 0; i < lane_count; i++)
+    {
+        lane_prob_q16 = probs_q16[i];
+        if (lane_prob_q16 < 0 || lane_prob_q16 > FP_Q16_ONE)
+            return FP_Q16_ERR_BAD_PARAM;
+        if (lane_prob_q16 > (I64_MAX_VALUE - lane_sum_q16))
+            return FP_Q16_ERR_OVERFLOW;
+        lane_sum_q16 += lane_prob_q16;
+    }
+    if (lane_sum_q16 != FP_Q16_ONE)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // First pass: compute top-k probability mass via explicit rank lookup.
+    // Rank definition: number of lanes strictly ahead in descending order.
+    topk_sum_q16 = 0;
+    for (rank = 0; rank < k; rank++)
+    {
+        selected_index = -1;
+        selected_prob_q16 = 0;
+
+        for (i = 0; i < lane_count; i++)
+        {
+            lane_order_rank = 0;
+            for (j = 0; j < lane_count; j++)
+            {
+                if (probs_q16[j] > probs_q16[i])
+                    lane_order_rank++;
+                else if (probs_q16[j] == probs_q16[i] && j < i)
+                    lane_order_rank++;
+            }
+
+            if (lane_order_rank == rank)
+            {
+                selected_index = i;
+                selected_prob_q16 = probs_q16[i];
+                break;
+            }
+        }
+
+        if (selected_index < 0)
+            return FP_Q16_ERR_OVERFLOW;
+        if (selected_prob_q16 > (I64_MAX_VALUE - topk_sum_q16))
+            return FP_Q16_ERR_OVERFLOW;
+
+        topk_sum_q16 += selected_prob_q16;
+    }
+
+    if (topk_sum_q16 <= 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (topk_sum_q16 > FP_Q16_ONE)
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Convert uniform random_q16 in [0,1) into top-k mass domain [0,topk_sum).
+    threshold_q16 = (random_q16 * topk_sum_q16) >> FP_Q16_SHIFT;
+
+    // Second pass: walk top-k in stable descending order and select first
+    // cumulative bucket that exceeds threshold.
+    topk_cumulative_q16 = 0;
+    selected_index = -1;
+    for (rank = 0; rank < k; rank++)
+    {
+        I64 rank_index;
+        I64 rank_prob_q16;
+
+        rank_index = -1;
+        rank_prob_q16 = 0;
+        for (i = 0; i < lane_count; i++)
+        {
+            lane_order_rank = 0;
+            for (j = 0; j < lane_count; j++)
+            {
+                if (probs_q16[j] > probs_q16[i])
+                    lane_order_rank++;
+                else if (probs_q16[j] == probs_q16[i] && j < i)
+                    lane_order_rank++;
+            }
+
+            if (lane_order_rank == rank)
+            {
+                rank_index = i;
+                rank_prob_q16 = probs_q16[i];
+                break;
+            }
+        }
+
+        if (rank_index < 0)
+            return FP_Q16_ERR_OVERFLOW;
+        if (rank_prob_q16 > (I64_MAX_VALUE - topk_cumulative_q16))
+            return FP_Q16_ERR_OVERFLOW;
+
+        topk_cumulative_q16 += rank_prob_q16;
+        if (threshold_q16 < topk_cumulative_q16)
+        {
+            selected_index = rank_index;
+            break;
+        }
+    }
+
+    // If truncation to Q16 bucket boundary left threshold on the upper edge,
+    // deterministically clamp to the lowest-priority lane in top-k.
+    if (selected_index < 0)
+    {
+        for (i = 0; i < lane_count; i++)
+        {
+            lane_order_rank = 0;
+            for (j = 0; j < lane_count; j++)
+            {
+                if (probs_q16[j] > probs_q16[i])
+                    lane_order_rank++;
+                else if (probs_q16[j] == probs_q16[i] && j < i)
+                    lane_order_rank++;
+            }
+
+            if (lane_order_rank == (k - 1))
+            {
+                selected_index = i;
+                break;
+            }
+        }
+        if (selected_index < 0)
+            return FP_Q16_ERR_OVERFLOW;
+    }
+
+    *out_index = selected_index;
+    return FP_Q16_OK;
+}
+
 U0 FPQ16Softmax(I64 *logits, I64 *probs, I64 count)
 {
     I64 i;
