@@ -154,6 +154,39 @@ I32 TokenizerUTF8ValidateContinuationSpanChecked(U8 *bytes,
     return TOKENIZER_UTF8_OK;
 }
 
+I32 TokenizerUTF8ValidateContinuationSpanCheckedNoPartial(U8 *bytes,
+                                                          U64 byte_len,
+                                                          U64 *io_cursor,
+                                                          U64 continuation_count,
+                                                          U64 *out_bytes_consumed)
+{
+    U64 staged_cursor;
+    U64 staged_consumed;
+    I32 err;
+
+    if (!bytes || !io_cursor || !out_bytes_consumed)
+        return TOKENIZER_UTF8_ERR_NULL_PTR;
+
+    // Stage caller-visible cursor and count before entering checked core so
+    // malformed continuation spans never partially update caller outputs.
+    staged_cursor = *io_cursor;
+    staged_consumed = *out_bytes_consumed;
+
+    err = TokenizerUTF8ValidateContinuationSpanChecked(bytes,
+                                                       byte_len,
+                                                       &staged_cursor,
+                                                       continuation_count,
+                                                       &staged_consumed);
+    if (err != TOKENIZER_UTF8_OK)
+        return err;
+
+    // All-or-nothing wrapper commit: publish staged cursor/count only when
+    // the full checked continuation span validation succeeds.
+    *io_cursor = staged_cursor;
+    *out_bytes_consumed = staged_consumed;
+    return TOKENIZER_UTF8_OK;
+}
+
 I32 TokenizerUTF8ValidateContinuationSpanCheckedDefault(U8 *bytes,
                                                         U64 byte_len,
                                                         U64 *io_cursor,
