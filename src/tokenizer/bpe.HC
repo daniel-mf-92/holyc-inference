@@ -1598,11 +1598,6 @@ I32 TokenizerBPEMergeApplyBestPriorityCheckedDefaultNoPartial(I32 *token_ids,
 {
     U64 derived_token_capacity;
     U64 derived_rank_table_capacity;
-    I32 staged_merged_token;
-    U32 staged_rank;
-    Bool staged_found;
-    U64 staged_token_count;
-    I32 err;
 
     if (!token_ids ||
         !out_merged_token ||
@@ -1619,34 +1614,21 @@ I32 TokenizerBPEMergeApplyBestPriorityCheckedDefaultNoPartial(I32 *token_ids,
     derived_token_capacity = token_count;
     derived_rank_table_capacity = rank_table_count;
 
-    // Stage caller-visible outputs so checked-core failures preserve the
-    // original caller state exactly (all-or-nothing wrapper semantics).
-    staged_merged_token = *out_merged_token;
-    staged_rank = *out_rank;
-    staged_found = *out_found;
-    staged_token_count = *out_token_count;
-
-    err = TokenizerBPEMergeApplyBestPriorityChecked(token_ids,
-                                                    token_count,
-                                                    derived_token_capacity,
-                                                    rank_left_tokens,
-                                                    rank_right_tokens,
-                                                    rank_values,
-                                                    rank_merged_tokens,
-                                                    rank_table_count,
-                                                    derived_rank_table_capacity,
-                                                    &staged_merged_token,
-                                                    &staged_rank,
-                                                    &staged_found,
-                                                    &staged_token_count);
-    if (err != TOKENIZER_BPE_OK)
-        return err;
-
-    *out_merged_token = staged_merged_token;
-    *out_rank = staged_rank;
-    *out_found = staged_found;
-    *out_token_count = staged_token_count;
-    return TOKENIZER_BPE_OK;
+    // Delegate staged all-or-nothing output commit to the checked no-partial
+    // helper while preserving canonical default-capacity derivation.
+    return TokenizerBPEMergeApplyBestPriorityCheckedNoPartial(token_ids,
+                                                              token_count,
+                                                              derived_token_capacity,
+                                                              rank_left_tokens,
+                                                              rank_right_tokens,
+                                                              rank_values,
+                                                              rank_merged_tokens,
+                                                              rank_table_count,
+                                                              derived_rank_table_capacity,
+                                                              out_merged_token,
+                                                              out_rank,
+                                                              out_found,
+                                                              out_token_count);
 }
 
 I32 TokenizerBPEEncodeMergeLoopChecked(I32 *token_ids,

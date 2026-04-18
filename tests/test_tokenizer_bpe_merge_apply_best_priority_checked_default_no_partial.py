@@ -256,8 +256,53 @@ def test_randomized_parity_against_explicit_staged_composition() -> None:
         )
 
 
+def test_malformed_capacity_adversarial_case_is_unreachable_in_default_no_partial() -> None:
+    merged_core = [1111]
+    rank_core = [2222]
+    found_core = [True]
+    count_core = [3333]
+
+    err_core = tokenizer_bpe_merge_apply_best_priority_checked(
+        [1, 2, 3],
+        3,
+        2,
+        [1, 2],
+        [2, 3],
+        [9, 10],
+        [101, 202],
+        2,
+        2,
+        merged_core,
+        rank_core,
+        found_core,
+        count_core,
+    )
+    assert err_core != TOKENIZER_BPE_OK
+
+    merged_default = [1111]
+    rank_default = [2222]
+    found_default = [True]
+    count_default = [3333]
+
+    err_default = tokenizer_bpe_merge_apply_best_priority_checked_default_no_partial(
+        [1, 2, 3],
+        3,
+        [1, 2],
+        [2, 3],
+        [9, 10],
+        [101, 202],
+        2,
+        merged_default,
+        rank_default,
+        found_default,
+        count_default,
+    )
+    assert err_default == TOKENIZER_BPE_OK
+
+
 if __name__ == "__main__":
     test_known_vectors_parity_vs_explicit_staged_composition()
     test_exact_no_partial_write_parity_on_error_paths()
     test_randomized_parity_against_explicit_staged_composition()
+    test_malformed_capacity_adversarial_case_is_unreachable_in_default_no_partial()
     print("tokenizer_bpe_merge_apply_best_priority_checked_default_no_partial_reference_checks=ok")
