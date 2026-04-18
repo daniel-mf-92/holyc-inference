@@ -5435,6 +5435,142 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultNoPartial(
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEDecodePromptChecked(
+    I32 *token_ids,
+    U64 token_count,
+    U64 *io_token_cursor,
+    U8 *vocab_piece_bytes,
+    U64 vocab_piece_bytes_len,
+    U64 *vocab_piece_offsets,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 vocab_piece_capacity,
+    U8 *out_bytes,
+    U64 out_byte_capacity,
+    U64 *out_byte_count)
+{
+    U64 cursor;
+    U64 span_token_count;
+
+    if (!token_ids || !io_token_cursor || !vocab_piece_bytes ||
+        !vocab_piece_offsets || !vocab_piece_lens || !out_bytes ||
+        !out_byte_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_bytes_len > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_capacity > 0x7FFFFFFFFFFFFFFF ||
+        out_byte_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (vocab_piece_count > vocab_piece_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    cursor = *io_token_cursor;
+    if (cursor > token_count)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Full prompt decode consumes from cursor through the end token.
+    span_token_count = token_count - cursor;
+
+    return TokenizerBPEDecodeTokenSpanChecked(token_ids,
+                                              token_count,
+                                              io_token_cursor,
+                                              span_token_count,
+                                              vocab_piece_bytes,
+                                              vocab_piece_bytes_len,
+                                              vocab_piece_offsets,
+                                              vocab_piece_lens,
+                                              vocab_piece_count,
+                                              vocab_piece_capacity,
+                                              out_bytes,
+                                              out_byte_capacity,
+                                              out_byte_count);
+}
+
+I32 TokenizerBPEDecodePromptCheckedDefaultCapacityNoPartial(
+    I32 *token_ids,
+    U64 token_count,
+    U64 *io_token_cursor,
+    U8 *vocab_piece_bytes,
+    U64 vocab_piece_bytes_len,
+    U64 *vocab_piece_offsets,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U8 *out_bytes,
+    U64 out_byte_capacity,
+    U64 *out_byte_count)
+{
+    U64 staged_cursor;
+    U64 staged_out_count;
+    U64 staged_alloc_capacity;
+    U64 staged_alloc_bytes;
+    U8 *staged_out_bytes;
+    I32 err;
+    U64 i;
+
+    if (!token_ids || !io_token_cursor || !vocab_piece_bytes ||
+        !vocab_piece_offsets || !vocab_piece_lens || !out_bytes ||
+        !out_byte_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_bytes_len > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        out_byte_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Stage caller-visible outputs so this default-capacity wrapper keeps
+    // strict all-or-nothing semantics over the explicit prompt decode core.
+    staged_cursor = *io_token_cursor;
+    staged_out_count = *out_byte_count;
+
+    staged_alloc_capacity = out_byte_capacity;
+    if (!staged_alloc_capacity)
+        staged_alloc_capacity = 1;
+
+    if (staged_alloc_capacity > (0x7FFFFFFFFFFFFFFF / sizeof(U8)))
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    staged_alloc_bytes = sizeof(U8) * staged_alloc_capacity;
+    if (!staged_alloc_bytes)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    staged_out_bytes = MAlloc(staged_alloc_bytes);
+    if (!staged_out_bytes)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    err = TokenizerBPEDecodePromptChecked(token_ids,
+                                          token_count,
+                                          &staged_cursor,
+                                          vocab_piece_bytes,
+                                          vocab_piece_bytes_len,
+                                          vocab_piece_offsets,
+                                          vocab_piece_lens,
+                                          vocab_piece_count,
+                                          vocab_piece_count,
+                                          staged_out_bytes,
+                                          out_byte_capacity,
+                                          &staged_out_count);
+    if (err != TOKENIZER_BPE_OK) {
+        Free(staged_out_bytes);
+        return err;
+    }
+
+    if (staged_out_count > out_byte_capacity) {
+        Free(staged_out_bytes);
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    }
+
+    for (i = 0; i < staged_out_count; i++)
+        out_bytes[i] = staged_out_bytes[i];
+
+    *out_byte_count = staged_out_count;
+    *io_token_cursor = staged_cursor;
+    Free(staged_out_bytes);
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEDecodePromptCheckedDefault(
     I32 *token_ids,
     U64 token_count,
