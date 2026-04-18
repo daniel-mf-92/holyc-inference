@@ -4006,7 +4006,7 @@ I32 GGUFMetadataReadI64QuadChecked(U8 *buf,
 // Canonical default-end wrapper for compact I64-quad metadata records.
 // Contract: preserves explicit no-partial-write quad semantics by pinning
 // table_end to buf_nbytes and delegating to
-// GGUFMetadataReadI64QuadCheckedNoPartial.
+// GGUFMetadataReadI64QuadChecked.
 I32 GGUFMetadataReadI64QuadCheckedDefault(U8 *buf,
                                           U64 buf_nbytes,
                                           U64 *cursor,
@@ -4015,14 +4015,14 @@ I32 GGUFMetadataReadI64QuadCheckedDefault(U8 *buf,
                                           I64 *out_third,
                                           I64 *out_fourth)
 {
-    return GGUFMetadataReadI64QuadCheckedNoPartial(buf,
-                                                   buf_nbytes,
-                                                   cursor,
-                                                   buf_nbytes,
-                                                   out_first,
-                                                   out_second,
-                                                   out_third,
-                                                   out_fourth);
+    return GGUFMetadataReadI64QuadChecked(buf,
+                                          buf_nbytes,
+                                          cursor,
+                                          buf_nbytes,
+                                          out_first,
+                                          out_second,
+                                          out_third,
+                                          out_fourth);
 }
 
 // Checked little-endian FLOAT32 bit-pattern metadata reader.

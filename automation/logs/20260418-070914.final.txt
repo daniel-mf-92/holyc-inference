@@ -1,0 +1,28 @@
+Completed one full loop iteration with IQ queue maintenance, focused validation, DB logging, and ledger updates.
+
+**What changed**
+- Marked `IQ-336` done in `MASTER_TASKS.md:535` after validating existing HolyC implementation + harness.
+- Appended one new unchecked queue item `IQ-351` in `MASTER_TASKS.md:551` to keep queue depth at 15.
+- Added one progress-ledger line in `MASTER_TASKS.md:556`.
+- Kept runtime purity intact (no non-HolyC runtime code introduced).
+
+**Code status**
+- `GGUFMetadataReadI64QuadCheckedNoPartial` already exists and matches IQ-336 scope in `src/gguf/metadata.HC:3919`.
+- I only made a tiny consistency tweak so `GGUFMetadataReadI64QuadCheckedDefault` delegates to `...QuadChecked` wrapper (same behavior path) in `src/gguf/metadata.HC:4010`.
+
+**Validation run**
+- Command:
+  - `python3 tests/test_gguf_metadata_read_i64_quad_checked_no_partial.py && python3 tests/test_gguf_metadata_read_i64_quad_checked_default.py && python3 tests/test_gguf_metadata_read_i64_triple_checked_no_partial.py`
+- Output:
+  - `ok`
+  - `ok`
+  - `gguf_metadata_read_i64_triple_checked_no_partial_reference_checks=ok`
+
+**Central DB log**
+- Inserted iteration row into `~/Documents/local-codebases/temple-central.db`.
+- Latest record check shows:
+  - `3761|inference|IQ-336|pass|ok`
+
+**Queue policy check**
+- Unchecked IQ items now: `15` (policy satisfied).
+- First unchecked is now `IQ-337`; IDs remain monotonic through `IQ-351`.
