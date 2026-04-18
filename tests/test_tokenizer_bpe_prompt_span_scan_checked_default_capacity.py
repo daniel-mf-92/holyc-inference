@@ -144,6 +144,63 @@ def test_default_wrapper_error_contract() -> None:
     assert classes == [0xCC] * 8
 
 
+def test_nonzero_prompt_requires_output_span_tables() -> None:
+    payload = list("ab".encode("utf-8"))
+
+    for starts_none, lengths_none, classes_none in (
+        (None, [0x22] * 4, [0x33] * 4),
+        ([0x11] * 4, None, [0x33] * 4),
+        ([0x11] * 4, [0x22] * 4, None),
+    ):
+        cursor = [0]
+        count = [0x4444]
+        starts_before = None if starts_none is None else starts_none.copy()
+        lengths_before = None if lengths_none is None else lengths_none.copy()
+        classes_before = None if classes_none is None else classes_none.copy()
+
+        err = tokenizer_bpe_prompt_span_scan_checked_default_capacity(
+            payload,
+            len(payload),
+            cursor,
+            len(payload),
+            starts_none,
+            lengths_none,
+            classes_none,
+            count,
+        )
+
+        assert err == TOKENIZER_BPE_ERR_NULL_PTR
+        assert cursor[0] == 0
+        assert count[0] == 0x4444
+        if starts_before is not None:
+            assert starts_none == starts_before
+        if lengths_before is not None:
+            assert lengths_none == lengths_before
+        if classes_before is not None:
+            assert classes_none == classes_before
+
+
+def test_zero_prompt_allows_null_output_tables() -> None:
+    payload = list("abc".encode("utf-8"))
+    cursor = [1]
+    count = [0x5555]
+
+    err = tokenizer_bpe_prompt_span_scan_checked_default_capacity(
+        payload,
+        len(payload),
+        cursor,
+        0,
+        None,
+        None,
+        None,
+        count,
+    )
+
+    assert err == TOKENIZER_BPE_OK
+    assert cursor[0] == 1
+    assert count[0] == 0
+
+
 def test_out_of_bounds_and_bad_cursor_guards() -> None:
     starts = [0x1010] * 8
     lengths = [0x2020] * 8
@@ -241,6 +298,8 @@ if __name__ == "__main__":
     test_malformed_utf8_prompt_tail_parity()
     test_zero_length_prompt_parity()
     test_default_wrapper_error_contract()
+    test_nonzero_prompt_requires_output_span_tables()
+    test_zero_prompt_allows_null_output_tables()
     test_out_of_bounds_and_bad_cursor_guards()
     test_randomized_parity_against_explicit_capacity_core()
     test_overflow_guard_parity()

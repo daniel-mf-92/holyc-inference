@@ -2887,6 +2887,13 @@ I32 TokenizerBPEPromptSpanScanCheckedDefaultCapacity(U8 *bytes,
     // prompt byte span of N bytes can never split into more than N spans.
     derived_capacity = prompt_nbytes;
 
+    // Keep explicit output-pointer contract at this wrapper boundary so
+    // callers get deterministic NULL_PTR surfaces even if core preflight
+    // changes in future refactors.
+    if (derived_capacity > 0 &&
+        (!out_span_starts || !out_span_lengths || !out_span_classes))
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
     return TokenizerBPEPromptSpanScanChecked(bytes,
                                              byte_len,
                                              io_cursor,
