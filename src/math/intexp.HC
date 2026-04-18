@@ -26,14 +26,15 @@
 #define U64_MAX_VALUE 0xFFFFFFFFFFFFFFFF
 
 I64 FPQ16Mul(I64 a, I64 b);
+I32 FPQ16MulChecked(I64 a_q16, I64 b_q16, I64 *out_q16);
 
 // Checked polynomial core for exp(r) on the range-reduced residual domain:
 //   0 <= r < ln(2)
-// Uses a monotonic positive-term series in Q16:
+// Uses monotonic positive-term integer coefficients in Q16:
 //   exp(r) ~= 1 + r + r^2/2 + r^3/6 + r^4/24
-// The residual bound keeps coefficients stable and guarantees each term is
-// non-negative, preserving monotonic growth across r.
-I32 FPQ16ExpPolyCoreResidualLn2Q16Checked(I64 residual_q16,
+// All products are checked (no silent saturation) so every failure surface is
+// explicit and auditable.
+I32 FPQ16ExpPolyCoreLn2ResidualQ16Checked(I64 residual_q16,
                                           I64 *out_poly_q16)
 {
     I64 r2;
@@ -44,6 +45,7 @@ I32 FPQ16ExpPolyCoreResidualLn2Q16Checked(I64 residual_q16,
     I64 t3;
     I64 t4;
     I64 poly;
+    I32 status;
 
     if (!out_poly_q16)
         return FP_Q16_ERR_NULL_PTR;
@@ -51,9 +53,23 @@ I32 FPQ16ExpPolyCoreResidualLn2Q16Checked(I64 residual_q16,
     if (residual_q16 < 0 || residual_q16 >= EXP_Q16_LN2)
         return FP_Q16_ERR_BAD_PARAM;
 
-    r2 = FPQ16Mul(residual_q16, residual_q16);
-    r3 = FPQ16Mul(r2, residual_q16);
-    r4 = FPQ16Mul(r3, residual_q16);
+    status = FPQ16MulChecked(residual_q16,
+                             residual_q16,
+                             &r2);
+    if (status)
+        return status;
+
+    status = FPQ16MulChecked(r2,
+                             residual_q16,
+                             &r3);
+    if (status)
+        return status;
+
+    status = FPQ16MulChecked(r3,
+                             residual_q16,
+                             &r4);
+    if (status)
+        return status;
 
     t1 = residual_q16;
     t2 = r2 / EXP_Q16_POLY_C2_DIV;
@@ -81,6 +97,14 @@ I32 FPQ16ExpPolyCoreResidualLn2Q16Checked(I64 residual_q16,
 
     *out_poly_q16 = poly;
     return FP_Q16_OK;
+}
+
+// Compatibility alias retained for existing call sites/tests.
+I32 FPQ16ExpPolyCoreResidualLn2Q16Checked(I64 residual_q16,
+                                          I64 *out_poly_q16)
+{
+    return FPQ16ExpPolyCoreLn2ResidualQ16Checked(residual_q16,
+                                                 out_poly_q16);
 }
 
 // Checked clamp helper used by scalar exp and vector exp callers.
@@ -315,7 +339,7 @@ I32 FPQ16ExpFromClampedInputChecked(I64 clamped_input_q16,
     if (status)
         return status;
 
-    status = FPQ16ExpPolyCoreResidualLn2Q16Checked(r,
+    status = FPQ16ExpPolyCoreLn2ResidualQ16Checked(r,
                                                    &poly);
     if (status)
         return status;
