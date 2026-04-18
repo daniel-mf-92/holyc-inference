@@ -61,6 +61,43 @@ I32 TokenizerUTF8ValidateCodepointScalarChecked(U32 codepoint,
     return TOKENIZER_UTF8_OK;
 }
 
+I32 TokenizerUTF8ValidateContinuationByteChecked(U8 *bytes,
+                                                 U64 byte_len,
+                                                 U64 *io_cursor,
+                                                 U8 *out_continuation_byte)
+{
+    U64 cursor;
+    U8 continuation;
+    U64 next_cursor;
+
+    if (!bytes || !io_cursor || !out_continuation_byte)
+        return TOKENIZER_UTF8_ERR_NULL_PTR;
+
+    // HolyC integer safety: keep lengths inside signed-positive I64 domain.
+    if (byte_len > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_UTF8_ERR_OVERFLOW;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_UTF8_ERR_BAD_PARAM;
+    if (cursor == byte_len)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    continuation = bytes[cursor];
+    if (!TokenizerUTF8IsContinuationByte(continuation))
+        return TOKENIZER_UTF8_ERR_BAD_CONTINUATION;
+
+    // Deterministic single-byte advance: exactly one byte consumed on success.
+    next_cursor = cursor + 1;
+    if (next_cursor <= cursor || next_cursor > byte_len)
+        return TOKENIZER_UTF8_ERR_OVERFLOW;
+
+    // No-partial semantics: commit cursor and output byte only after all checks.
+    *out_continuation_byte = continuation;
+    *io_cursor = next_cursor;
+    return TOKENIZER_UTF8_OK;
+}
+
 I32 TokenizerUTF8NextCodepointChecked(U8 *bytes,
                                       U64 byte_len,
                                       U64 *io_cursor,
@@ -73,6 +110,7 @@ I32 TokenizerUTF8NextCodepointChecked(U8 *bytes,
     U32 codepoint;
     U8 cont;
     U64 next_cursor;
+    U64 continuation_cursor;
     I32 err;
 
     if (!bytes || !io_cursor || !out_codepoint || !out_bytes_consumed)
@@ -108,27 +146,43 @@ I32 TokenizerUTF8NextCodepointChecked(U8 *bytes,
     if (byte_len - cursor < need)
         return TOKENIZER_UTF8_ERR_TRUNCATED;
 
+    continuation_cursor = cursor + 1;
+    if (need > 1 && continuation_cursor <= cursor)
+        return TOKENIZER_UTF8_ERR_OVERFLOW;
+
     // Decode continuation payload bits with strict 10xxxxxx checks.
     if (need > 1) {
-        cont = bytes[cursor + 1];
-        if (!TokenizerUTF8IsContinuationByte(cont))
-            return TOKENIZER_UTF8_ERR_BAD_CONTINUATION;
+        err = TokenizerUTF8ValidateContinuationByteChecked(bytes,
+                                                           byte_len,
+                                                           &continuation_cursor,
+                                                           &cont);
+        if (err != TOKENIZER_UTF8_OK)
+            return err;
         codepoint = (codepoint << 6) | (cont & 0x3F);
     }
 
     if (need > 2) {
-        cont = bytes[cursor + 2];
-        if (!TokenizerUTF8IsContinuationByte(cont))
-            return TOKENIZER_UTF8_ERR_BAD_CONTINUATION;
+        err = TokenizerUTF8ValidateContinuationByteChecked(bytes,
+                                                           byte_len,
+                                                           &continuation_cursor,
+                                                           &cont);
+        if (err != TOKENIZER_UTF8_OK)
+            return err;
         codepoint = (codepoint << 6) | (cont & 0x3F);
     }
 
     if (need > 3) {
-        cont = bytes[cursor + 3];
-        if (!TokenizerUTF8IsContinuationByte(cont))
-            return TOKENIZER_UTF8_ERR_BAD_CONTINUATION;
+        err = TokenizerUTF8ValidateContinuationByteChecked(bytes,
+                                                           byte_len,
+                                                           &continuation_cursor,
+                                                           &cont);
+        if (err != TOKENIZER_UTF8_OK)
+            return err;
         codepoint = (codepoint << 6) | (cont & 0x3F);
     }
+
+    if (need > 1 && continuation_cursor != cursor + need)
+        return TOKENIZER_UTF8_ERR_BAD_PARAM;
 
     // Reject overlong forms before scalar validation helper.
     if (need == 2 && codepoint < 0x80)
@@ -171,6 +225,7 @@ I32 TokenizerUTF8SequenceSpanValidChecked(U8 *bytes,
     U32 scalar_checked;
     U8 cont;
     U64 next_scan;
+    U64 continuation_cursor;
     I32 err;
 
     if (!bytes || !io_cursor || !out_is_valid)
@@ -213,27 +268,43 @@ I32 TokenizerUTF8SequenceSpanValidChecked(U8 *bytes,
         else
             codepoint = lead & 0x07;
 
+        continuation_cursor = scan + 1;
+        if (need > 1 && continuation_cursor <= scan)
+            return TOKENIZER_UTF8_ERR_OVERFLOW;
+
         // Continuation lane checks and payload-bit assembly.
         if (need > 1) {
-            cont = bytes[scan + 1];
-            if (!TokenizerUTF8IsContinuationByte(cont))
-                return TOKENIZER_UTF8_ERR_BAD_CONTINUATION;
+            err = TokenizerUTF8ValidateContinuationByteChecked(bytes,
+                                                               span_end,
+                                                               &continuation_cursor,
+                                                               &cont);
+            if (err != TOKENIZER_UTF8_OK)
+                return err;
             codepoint = (codepoint << 6) | (cont & 0x3F);
         }
 
         if (need > 2) {
-            cont = bytes[scan + 2];
-            if (!TokenizerUTF8IsContinuationByte(cont))
-                return TOKENIZER_UTF8_ERR_BAD_CONTINUATION;
+            err = TokenizerUTF8ValidateContinuationByteChecked(bytes,
+                                                               span_end,
+                                                               &continuation_cursor,
+                                                               &cont);
+            if (err != TOKENIZER_UTF8_OK)
+                return err;
             codepoint = (codepoint << 6) | (cont & 0x3F);
         }
 
         if (need > 3) {
-            cont = bytes[scan + 3];
-            if (!TokenizerUTF8IsContinuationByte(cont))
-                return TOKENIZER_UTF8_ERR_BAD_CONTINUATION;
+            err = TokenizerUTF8ValidateContinuationByteChecked(bytes,
+                                                               span_end,
+                                                               &continuation_cursor,
+                                                               &cont);
+            if (err != TOKENIZER_UTF8_OK)
+                return err;
             codepoint = (codepoint << 6) | (cont & 0x3F);
         }
+
+        if (need > 1 && continuation_cursor != scan + need)
+            return TOKENIZER_UTF8_ERR_BAD_PARAM;
 
         // Reject overlong forms before Unicode scalar-domain validation.
         if (need == 2 && codepoint < 0x80)
