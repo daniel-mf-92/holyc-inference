@@ -547,3 +547,99 @@ I32 TokenizerBPEMergePairPriorityFindChecked(I32 *token_ids,
     *out_found = TRUE;
     return TOKENIZER_BPE_OK;
 }
+
+I32 TokenizerBPETokenPairRankLookupChecked(I32 left_token,
+                                           I32 right_token,
+                                           I32 *rank_left_tokens,
+                                           I32 *rank_right_tokens,
+                                           U32 *rank_values,
+                                           U64 rank_table_count,
+                                           U64 rank_table_capacity,
+                                           U32 *out_rank,
+                                           Bool *out_found)
+{
+    U64 lo;
+    U64 hi;
+    U64 mid;
+    I32 mid_left;
+    I32 mid_right;
+    U64 first_match;
+    U64 scan;
+    U64 next_scan;
+    U32 best_rank;
+
+    if (!out_rank || !out_found)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (rank_table_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (rank_table_count > rank_table_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (rank_table_count > 0 && (!rank_left_tokens || !rank_right_tokens || !rank_values))
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (!rank_table_count) {
+        *out_found = FALSE;
+        return TOKENIZER_BPE_OK;
+    }
+
+    // Binary-search lower bound for key (left_token,right_token)
+    // in lexicographically sorted rank tables.
+    lo = 0;
+    hi = rank_table_count;
+    while (lo < hi) {
+        mid = lo + ((hi - lo) >> 1);
+
+        mid_left = rank_left_tokens[mid];
+        mid_right = rank_right_tokens[mid];
+
+        if (mid_left < left_token || (mid_left == left_token && mid_right < right_token)) {
+            lo = mid + 1;
+            continue;
+        }
+
+        hi = mid;
+    }
+
+    first_match = lo;
+    if (first_match >= rank_table_count) {
+        *out_found = FALSE;
+        return TOKENIZER_BPE_OK;
+    }
+
+    if (rank_left_tokens[first_match] != left_token ||
+        rank_right_tokens[first_match] != right_token) {
+        *out_found = FALSE;
+        return TOKENIZER_BPE_OK;
+    }
+
+    // Deterministic duplicate-key handling: consume contiguous equal-key run
+    // and keep the lowest rank value for this pair.
+    best_rank = rank_values[first_match];
+
+    scan = first_match + 1;
+    if (scan < first_match)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    while (scan < rank_table_count) {
+        if (rank_left_tokens[scan] != left_token)
+            break;
+        if (rank_right_tokens[scan] != right_token)
+            break;
+
+        if (rank_values[scan] < best_rank)
+            best_rank = rank_values[scan];
+
+        next_scan = scan + 1;
+        if (next_scan <= scan)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+        scan = next_scan;
+    }
+
+    // No-partial-write contract: commit output state only after full lookup.
+    *out_rank = best_rank;
+    *out_found = TRUE;
+    return TOKENIZER_BPE_OK;
+}

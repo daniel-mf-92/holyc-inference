@@ -1,0 +1,17 @@
+Completed one full unattended iteration on `IQ-354` with queue depth preserved.
+
+**What Changed**
+- Implemented `TokenizerBPETokenPairRankLookupChecked` with binary lower-bound search on sorted `(left,right)` keys, deterministic duplicate-key min-rank resolution, and strict no-partial output commit in `src/tokenizer/bpe.HC:551`.
+- Added parity/adversarial harness with hit/miss/boundary/randomized vectors in `tests/test_tokenizer_bpe_token_pair_rank_lookup_checked.py:16`.
+- Updated queue/task ledger: marked `IQ-354` done, appended new unchecked `IQ-369` (monotonic ID), and added one progress-ledger line in `MASTER_TASKS.md:553`, `MASTER_TASKS.md:568`, `MASTER_TASKS.md:576`.
+
+**Validation**
+- Ran: `python3 tests/test_tokenizer_bpe_token_pair_rank_lookup_checked.py && python3 tests/test_tokenizer_bpe_merge_pair_priority_find_checked.py && python3 tests/test_tokenizer_utf8_decode_span_to_codepoints_checked_default_capacity.py`
+- Output:
+  - `tokenizer_bpe_token_pair_rank_lookup_checked_reference_checks=ok`
+  - `tokenizer_bpe_merge_pair_priority_find_checked_reference_checks=ok`
+  - `tokenizer_utf8_decode_span_to_codepoints_checked_default_capacity: ok`
+
+**Queue + DB**
+- Unchecked `IQ-` count is maintained at `15` after completion.
+- Logged iteration to central DB (`temple-central.db`) as `agent=inference`, `task_id=IQ-354`, `status=pass` (row id `3966`).
