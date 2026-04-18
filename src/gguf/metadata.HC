@@ -530,6 +530,21 @@ I32 GGUFMetadataReadI64TripleCheckedNoPartial(U8 *buf,
                                               I64 *out_second,
                                               I64 *out_third);
 
+I32 GGUFMetadataReadI64TripleChecked(U8 *buf,
+                                     U64 buf_nbytes,
+                                     U64 *cursor,
+                                     U64 table_end,
+                                     I64 *out_first,
+                                     I64 *out_second,
+                                     I64 *out_third);
+
+I32 GGUFMetadataReadI64TripleCheckedDefault(U8 *buf,
+                                            U64 buf_nbytes,
+                                            U64 *cursor,
+                                            I64 *out_first,
+                                            I64 *out_second,
+                                            I64 *out_third);
+
 I32 GGUFMetadataReadI64QuadCheckedNoPartial(U8 *buf,
                                             U64 buf_nbytes,
                                             U64 *cursor,
@@ -3612,6 +3627,46 @@ I32 GGUFMetadataReadI64TripleCheckedNoPartial(U8 *buf,
     *out_third = third;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Checked little-endian I64 triple reader.
+// Contract: commits output lanes and cursor only on full triple success.
+I32 GGUFMetadataReadI64TripleChecked(U8 *buf,
+                                     U64 buf_nbytes,
+                                     U64 *cursor,
+                                     U64 table_end,
+                                     I64 *out_first,
+                                     I64 *out_second,
+                                     I64 *out_third)
+{
+    // Keep legacy symbol as the canonical parser entrypoint while routing
+    // decode through the explicit no-partial-write helper.
+    return GGUFMetadataReadI64TripleCheckedNoPartial(buf,
+                                                     buf_nbytes,
+                                                     cursor,
+                                                     table_end,
+                                                     out_first,
+                                                     out_second,
+                                                     out_third);
+}
+
+// Canonical default-end wrapper for compact I64-triple metadata records.
+// Contract: preserves exact checked triple semantics by pinning table_end to
+// buf_nbytes and delegating to GGUFMetadataReadI64TripleChecked.
+I32 GGUFMetadataReadI64TripleCheckedDefault(U8 *buf,
+                                            U64 buf_nbytes,
+                                            U64 *cursor,
+                                            I64 *out_first,
+                                            I64 *out_second,
+                                            I64 *out_third)
+{
+    return GGUFMetadataReadI64TripleChecked(buf,
+                                            buf_nbytes,
+                                            cursor,
+                                            buf_nbytes,
+                                            out_first,
+                                            out_second,
+                                            out_third);
 }
 
 // Checked little-endian I64 quad reader with explicit all-or-nothing

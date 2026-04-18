@@ -1,0 +1,23 @@
+Done — completed one full iteration on `IQ-306` with queue maintenance, validation, DB log, and ledger update.
+
+**What Changed**
+- Implemented `GGUFMetadataReadI64TripleChecked` and `GGUFMetadataReadI64TripleCheckedDefault` in `src/gguf/metadata.HC:3634` as canonical checked + default-end wrappers over the existing no-partial core.
+- Added focused parity harness `tests/test_gguf_metadata_read_i64_triple_checked_default.py:1` covering null-pointer behavior, default-end parity, truncation no-commit behavior, and randomized parity.
+- Marked `IQ-306` complete and appended new unchecked `IQ-321` to keep rolling queue depth policy in `MASTER_TASKS.md:505`.
+- Added one progress-ledger line for this loop in `MASTER_TASKS.md:526`.
+
+**Validation**
+- Ran:
+  - `python3 tests/test_gguf_metadata_read_i64_triple_checked_default.py`
+  - `python3 tests/test_gguf_metadata_read_i64_triple_checked_no_partial.py`
+  - `python3 tests/test_gguf_metadata_read_i64le_checked.py`
+  - `python3 tests/test_gguf_metadata_parse.py`
+- Output:
+  - `ok`
+  - `gguf_metadata_read_i64_triple_checked_no_partial_reference_checks=ok`
+  - `gguf_metadata_read_i64le_checked_reference_checks=ok`
+  - `gguf_metadata_reference_checks=ok`
+
+**Queue/DB**
+- Unchecked queue count is now `15` (policy satisfied).
+- Logged iteration into central DB (`task_id=IQ-306`, status `pass`, validation_result `ok`, row id `3502`).
