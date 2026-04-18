@@ -956,6 +956,28 @@ I32 FPQ16TopKSelectLogitsCheckedNoAlias(I64 *logits_q16,
     return FP_Q16_OK;
 }
 
+// Canonical default-capacity wrapper for checked no-alias top-k selection.
+// Default contract:
+//   - out_lane_capacity is derived as k, so callers only pass the exact
+//     emission length and this wrapper forwards all validation/selection logic
+//     to the checked core helper.
+//   - Success/error/no-partial-write semantics are intentionally identical to
+//     FPQ16TopKSelectLogitsCheckedNoAlias because this wrapper only fixes the
+//     capacity parameter.
+I32 FPQ16TopKSelectLogitsCheckedNoAliasDefault(I64 *logits_q16,
+                                               I64 lane_count,
+                                               I64 k,
+                                               I64 *out_topk_logits_q16,
+                                               I64 *out_topk_indices)
+{
+    return FPQ16TopKSelectLogitsCheckedNoAlias(logits_q16,
+                                               lane_count,
+                                               k,
+                                               out_topk_logits_q16,
+                                               out_topk_indices,
+                                               k);
+}
+
 // Checked deterministic cumulative-mass helper for a caller-supplied top-k
 // index set over normalized Q16 probabilities.
 // Output contract:
