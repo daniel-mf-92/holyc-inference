@@ -1,0 +1,17 @@
+Done — I completed one full iteration for `IQ-326` end-to-end.
+
+**Implemented**
+- Added Q4_0 AVX2 Q32→Q16 conversion path in `src/quant/q4_0_avx2.HC:82`, `src/quant/q4_0_avx2.HC:93`, `src/quant/q4_0_avx2.HC:428`, `src/quant/q4_0_avx2.HC:458`, and default wrapper `src/quant/q4_0_avx2.HC:519`.
+- Added parity/no-partial-write harness `tests/test_q4_0_avx2_dot_rows_q32_to_q16_checked_default.py:1` (main randomized parity test at `tests/test_q4_0_avx2_dot_rows_q32_to_q16_checked_default.py:129`).
+
+**Queue & Ledger**
+- Marked `IQ-326` done and added one new unchecked monotonic item `IQ-341` to keep queue depth rolling at 15 unchecked in `MASTER_TASKS.md:525` and `MASTER_TASKS.md:540`.
+- Added one progress-ledger line for this iteration in `MASTER_TASKS.md:548`.
+
+**Validation**
+- `python3 tests/test_q4_0_avx2_dot_rows_q32_to_q16_checked_default.py` → `q4_0_avx2_dot_rows_q32_to_q16_checked_default_reference_checks=ok`
+- `python3 tests/test_q4_0_avx2_dot_rows_q32_checked.py` → `q4_0_avx2_dot_rows_q32_checked_reference_checks=ok`
+- `python3 tests/test_q4_0_avx2_dot_q32_checked.py` → `q4_0_avx2_dot_q32_checked_reference_checks=ok`
+
+**Central DB**
+- Logged iteration in `temple-central.db` as `IQ-326` (`iterations.id=3690`, status `pass`).

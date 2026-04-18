@@ -79,6 +79,24 @@ I64 Q4_0AVX2RoundShiftRightUnsigned(I64 value, I64 shift)
     return (value + round_bias) >> shift;
 }
 
+I64 Q4_0AVX2RoundShiftRightSigned(I64 value, I64 shift)
+{
+    if (shift <= 0)
+        return value;
+
+    if (value >= 0)
+        return Q4_0AVX2RoundShiftRightUnsigned(value, shift);
+
+    return -Q4_0AVX2RoundShiftRightUnsigned(-value, shift);
+}
+
+I64 Q4_0AVX2DotQ32ToQ16(I64 dot_q32)
+{
+    // Dot products carry Q16*Q16 scale in Q32 during accumulation.
+    // Handoff to Q16 row kernels is one rounded signed downshift by 16.
+    return Q4_0AVX2RoundShiftRightSigned(dot_q32, 16);
+}
+
 I64 Q4_0AVX2F16ToQ16(U16 fp16_bits)
 {
     I64 sign_bit;
@@ -405,4 +423,126 @@ I32 Q4_0DotRowsAVX2Q32CheckedDefault(
                                      vec_block_count,
                                      vec_block_count,
                                      out_rows_q32);
+}
+
+I32 Q4_0DotBlocksAVX2Q32ToQ16Checked(Q4_0Block *lhs,
+                                     Q4_0Block *rhs,
+                                     I64 block_count,
+                                     I64 *out_dot_q16)
+{
+    I64 total_dot_q32;
+    I32 status;
+
+    if (!lhs || !rhs || !out_dot_q16)
+        return Q4_0_AVX2_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q4_0_AVX2_ERR_BAD_LEN;
+
+    // Single-rounding contract for row kernels:
+    // 1) Build checked full Q32 dot over all blocks.
+    // 2) Downshift once Q32->Q16 at the boundary.
+    // This avoids per-block rounding drift and preserves GGML-style intent.
+    status = Q4_0DotProductBlocksQ32AVX2Checked(lhs,
+                                                block_count,
+                                                rhs,
+                                                block_count,
+                                                block_count,
+                                                &total_dot_q32);
+    if (status != Q4_0_AVX2_OK)
+        return status;
+
+    *out_dot_q16 = Q4_0AVX2DotQ32ToQ16(total_dot_q32);
+    return Q4_0_AVX2_OK;
+}
+
+I32 Q4_0DotRowsAVX2Q32ToQ16Checked(
+    Q4_0Block *matrix_blocks,
+    I64 matrix_block_capacity,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q4_0Block *vec_blocks,
+    I64 vec_block_capacity,
+    I64 vec_block_count,
+    I64 *out_rows_q16)
+{
+    I64 row_index;
+    I64 required_matrix_blocks;
+    I64 row_base;
+    Q4_0Block *row_ptr;
+    I64 row_dot_q16;
+    I32 status;
+
+    if (!matrix_blocks || !vec_blocks || !out_rows_q16)
+        return Q4_0_AVX2_ERR_NULL_PTR;
+
+    if (matrix_block_capacity < 0 || vec_block_capacity < 0)
+        return Q4_0_AVX2_ERR_BAD_LEN;
+    if (row_count < 0 || row_stride_blocks < 0 || vec_block_count < 0)
+        return Q4_0_AVX2_ERR_BAD_LEN;
+
+    // Row layout contract mirrors Q32 row helper:
+    // - Row i begins at matrix_blocks + i*row_stride_blocks.
+    // - Each row consumes vec_block_count active blocks for the dot.
+    if (row_count > 0 && row_stride_blocks < vec_block_count)
+        return Q4_0_AVX2_ERR_BAD_LEN;
+    if (vec_block_count > vec_block_capacity)
+        return Q4_0_AVX2_ERR_BAD_LEN;
+
+    if (!Q4_0AVX2TryMulI64(row_count, row_stride_blocks, &required_matrix_blocks))
+        return Q4_0_AVX2_ERR_OVERFLOW;
+    if (required_matrix_blocks > matrix_block_capacity)
+        return Q4_0_AVX2_ERR_BAD_LEN;
+
+    // Single-rounding row contract:
+    // - Build each row dot in checked Q32 precision across all K blocks.
+    // - Downshift once Q32->Q16 after full-row accumulation.
+    // This preserves GGML-style rounding behavior and avoids per-block drift.
+    for (row_index = 0; row_index < row_count; ++row_index)
+    {
+        if (!Q4_0AVX2TryMulI64(row_index, row_stride_blocks, &row_base))
+            return Q4_0_AVX2_ERR_OVERFLOW;
+
+        row_ptr = &matrix_blocks[row_base];
+        status = Q4_0DotBlocksAVX2Q32ToQ16Checked(row_ptr,
+                                                  vec_blocks,
+                                                  vec_block_count,
+                                                  &row_dot_q16);
+        if (status != Q4_0_AVX2_OK)
+            return status;
+
+        out_rows_q16[row_index] = row_dot_q16;
+    }
+
+    return Q4_0_AVX2_OK;
+}
+
+I32 Q4_0DotRowsAVX2Q32ToQ16CheckedDefault(
+    Q4_0Block *matrix_blocks,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q4_0Block *vec_blocks,
+    I64 vec_block_count,
+    I64 *out_rows_q16)
+{
+    I64 matrix_block_capacity;
+
+    // IQ-326 canonical default-capacity Q32->Q16 row wrapper:
+    // - Matrix capacity defaults to `row_count * row_stride_blocks`.
+    // - Vector capacity defaults to `vec_block_count`.
+    // - Negative lengths keep BAD_LEN semantics from checked row core.
+    // - Multiplication is checked so default-capacity derivation never wraps.
+    if (row_count < 0 || row_stride_blocks < 0 || vec_block_count < 0)
+        return Q4_0_AVX2_ERR_BAD_LEN;
+
+    if (!Q4_0AVX2TryMulI64(row_count, row_stride_blocks, &matrix_block_capacity))
+        return Q4_0_AVX2_ERR_OVERFLOW;
+
+    return Q4_0DotRowsAVX2Q32ToQ16Checked(matrix_blocks,
+                                          matrix_block_capacity,
+                                          row_count,
+                                          row_stride_blocks,
+                                          vec_blocks,
+                                          vec_block_count,
+                                          vec_block_count,
+                                          out_rows_q16);
 }
