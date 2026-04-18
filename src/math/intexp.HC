@@ -242,6 +242,38 @@ I32 FPQ16ExpRangeReduceLn2Checked(I64 input_q16,
                                                      out_r_q16);
 }
 
+// Checked all-or-nothing wrapper for ln(2) range reduction.
+// Stages {k,r} so callers can rely on strict no-partial-write behavior:
+//   - On any error, out_k/out_r_q16 remain unchanged.
+//   - On success, staged values are committed atomically.
+// Success/error surfaces intentionally match FPQ16ExpRangeReduceLn2Checked.
+I32 FPQ16ExpRangeReduceLn2CheckedNoPartial(I64 input_q16,
+                                           I64 *out_k,
+                                           I64 *out_r_q16)
+{
+    I64 staged_k;
+    I64 staged_r_q16;
+    I32 status;
+
+    if (!out_k || !out_r_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    // Stage into local scratch only. This wrapper must not depend on prior
+    // caller contents of {out_k,out_r_q16}; it only commits on success.
+    staged_k = 0;
+    staged_r_q16 = 0;
+
+    status = FPQ16ExpRangeReduceLn2Checked(input_q16,
+                                           &staged_k,
+                                           &staged_r_q16);
+    if (status)
+        return status;
+
+    *out_k = staged_k;
+    *out_r_q16 = staged_r_q16;
+    return FP_Q16_OK;
+}
+
 // Checked power-of-two scaler for Q16 exponent assembly paths.
 // Computes:
 //   out_scaled_q16 = base_q16 * (2^k)
