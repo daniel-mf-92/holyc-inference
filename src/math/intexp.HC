@@ -192,6 +192,64 @@ I32 FPQ16ExpSplitBase2FromClampedInputChecked(I64 clamped_input_q16,
     return FP_Q16_OK;
 }
 
+// Checked power-of-two scaler for Q16 exponent assembly paths.
+// Computes:
+//   out_scaled_q16 = base_q16 * (2^k)
+// with signed-k support:
+//   k >= 0  -> checked left shift (overflow returns OVERFLOW)
+//   k < 0   -> arithmetic right shift (very negative shifts clamp to 0)
+//
+// Contracts:
+//   - base_q16 must be non-negative for exp assembly domains.
+//   - base_q16 == 0 always returns 0 (zero-preserving semantics).
+I32 FPQ16ExpMulPow2Checked(I64 base_q16,
+                           I64 k,
+                           I64 *out_scaled_q16)
+{
+    I64 right_shift;
+
+    if (!out_scaled_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (base_q16 < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (!base_q16)
+    {
+        *out_scaled_q16 = 0;
+        return FP_Q16_OK;
+    }
+
+    if (k >= 0)
+    {
+        if (k >= 63)
+            return FP_Q16_ERR_OVERFLOW;
+
+        if (base_q16 > (I64_MAX_VALUE >> k))
+            return FP_Q16_ERR_OVERFLOW;
+
+        *out_scaled_q16 = base_q16 << k;
+        return FP_Q16_OK;
+    }
+
+    // Very large negative shifts deterministically underflow to zero.
+    if (k <= EXP_Q16_RIGHT_SHIFT_ZERO_K)
+    {
+        *out_scaled_q16 = 0;
+        return FP_Q16_OK;
+    }
+
+    right_shift = -k;
+    if (right_shift >= 63)
+    {
+        *out_scaled_q16 = 0;
+        return FP_Q16_OK;
+    }
+
+    *out_scaled_q16 = base_q16 >> right_shift;
+    return FP_Q16_OK;
+}
+
 // Checked Q16 exp evaluation for callers that already performed input-domain
 // clamping. This helper refuses out-of-domain inputs instead of clamping:
 //   requires EXP_Q16_MIN_INPUT <= clamped_input_q16 <= EXP_Q16_MAX_INPUT
@@ -203,6 +261,7 @@ I32 FPQ16ExpFromClampedInputChecked(I64 clamped_input_q16,
     I64 k;
     I64 r;
     I64 poly;
+    I64 scaled;
     I32 status;
 
     if (!out_exp_q16)
@@ -235,31 +294,28 @@ I32 FPQ16ExpFromClampedInputChecked(I64 clamped_input_q16,
     if (status)
         return status;
 
-    if (k >= 0)
+    if (k >= EXP_Q16_LEFT_SHIFT_SAT_K)
     {
-        if (k >= EXP_Q16_LEFT_SHIFT_SAT_K)
-        {
-            *out_exp_q16 = EXP_Q16_SAT_MAX_OUTPUT;
-            return FP_Q16_OK;
-        }
-
-        if (poly > (I64_MAX_VALUE >> k))
-        {
-            *out_exp_q16 = EXP_Q16_SAT_MAX_OUTPUT;
-            return FP_Q16_OK;
-        }
-
-        *out_exp_q16 = poly << k;
+        *out_exp_q16 = EXP_Q16_SAT_MAX_OUTPUT;
         return FP_Q16_OK;
     }
 
-    if (k <= EXP_Q16_RIGHT_SHIFT_ZERO_K)
+    status = FPQ16ExpMulPow2Checked(poly,
+                                    k,
+                                    &scaled);
+    if (status == FP_Q16_ERR_OVERFLOW)
     {
-        *out_exp_q16 = EXP_Q16_SAT_MIN_OUTPUT;
+        // Keep scalar exp saturation behavior stable for overflowed scaling.
+        if (k >= 0)
+            *out_exp_q16 = EXP_Q16_SAT_MAX_OUTPUT;
+        else
+            *out_exp_q16 = EXP_Q16_SAT_MIN_OUTPUT;
         return FP_Q16_OK;
     }
+    if (status)
+        return status;
 
-    *out_exp_q16 = poly >> (-k);
+    *out_exp_q16 = scaled;
     return FP_Q16_OK;
 }
 
