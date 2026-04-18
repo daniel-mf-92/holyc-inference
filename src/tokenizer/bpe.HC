@@ -1959,3 +1959,76 @@ I32 TokenizerBPEEncodePromptChecked(U8 *bytes,
     Free(staged_tokens);
     return TOKENIZER_BPE_OK;
 }
+
+I32 TokenizerBPEEncodePromptCheckedNoPartial(U8 *bytes,
+                                             U64 byte_len,
+                                             U64 *io_cursor,
+                                             U64 prompt_nbytes,
+                                             I32 *rank_left_tokens,
+                                             I32 *rank_right_tokens,
+                                             U32 *rank_values,
+                                             I32 *rank_merged_tokens,
+                                             U64 rank_table_count,
+                                             U64 rank_table_capacity,
+                                             I32 *out_token_ids,
+                                             U64 out_token_capacity,
+                                             U64 *out_token_count)
+{
+    U64 staged_cursor;
+    U64 staged_token_count;
+    U64 staged_token_capacity;
+    I32 *staged_tokens;
+    I32 err;
+    U64 i;
+
+    if (!bytes || !io_cursor || !out_token_ids || !out_token_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (out_token_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Stage caller-visible state first so failures preserve cursor/count.
+    staged_cursor = *io_cursor;
+    staged_token_count = *out_token_count;
+
+    // Always provide non-null token storage to the checked prompt core.
+    staged_token_capacity = out_token_capacity;
+    if (!staged_token_capacity)
+        staged_token_capacity = 1;
+
+    staged_tokens = MAlloc(sizeof(I32) * staged_token_capacity);
+    if (!staged_tokens)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    err = TokenizerBPEEncodePromptChecked(bytes,
+                                          byte_len,
+                                          &staged_cursor,
+                                          prompt_nbytes,
+                                          rank_left_tokens,
+                                          rank_right_tokens,
+                                          rank_values,
+                                          rank_merged_tokens,
+                                          rank_table_count,
+                                          rank_table_capacity,
+                                          staged_tokens,
+                                          out_token_capacity,
+                                          &staged_token_count);
+    if (err != TOKENIZER_BPE_OK) {
+        Free(staged_tokens);
+        return err;
+    }
+
+    if (staged_token_count > out_token_capacity) {
+        Free(staged_tokens);
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    }
+
+    // Commit output tokens only after successful full-prompt encode.
+    for (i = 0; i < staged_token_count; i++)
+        out_token_ids[i] = staged_tokens[i];
+
+    *out_token_count = staged_token_count;
+    *io_cursor = staged_cursor;
+    Free(staged_tokens);
+    return TOKENIZER_BPE_OK;
+}
