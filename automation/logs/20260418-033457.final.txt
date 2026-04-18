@@ -1,0 +1,26 @@
+Done — I completed this iteration on `IQ-314` end-to-end with queue rollover preserved.
+
+**What I Changed**
+- Expanded parity hardening in `~/Documents/local-codebases/holyc-inference/tests/test_gguf_metadata_read_i64_triple_checked_default.py:344` with:
+  - `test_exhaustive_payload_truncation_frontier` (0..26 byte frontier around 24-byte triple payload),
+  - `test_start_cursor_past_default_end_is_bad_param`,
+  - `test_i64_max_cursor_overflow_guard_matches_checked`.
+- Updated test runner coverage in `~/Documents/local-codebases/holyc-inference/tests/test_gguf_metadata_read_i64_triple_checked_default.py:447`.
+- Marked `IQ-314` done in `~/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:513`.
+- Appended new unchecked queue item `IQ-329` (monotonic ID, .HC-targeted) in `~/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:528`.
+- Added one progress ledger line for this loop in `~/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:535`.
+
+**Validation**
+- Ran:
+  - `python3 tests/test_gguf_metadata_read_i64_triple_checked_default.py`
+  - `python3 tests/test_gguf_metadata_read_i64_triple_checked_no_partial.py`
+  - `python3 tests/test_gguf_metadata_parse.py`
+- Output:
+  - `ok`
+  - `gguf_metadata_read_i64_triple_checked_no_partial_reference_checks=ok`
+  - `gguf_metadata_reference_checks=ok`
+
+**Queue + DB**
+- Unchecked queue depth is maintained at **15** after completion and rollover.
+- Logged central DB iteration:
+  - table `iterations`, row id `3570`, `task_id='IQ-314'`, `status='pass'`, `lines_added=109`, `validation_result='ok'`.

@@ -341,9 +341,115 @@ def test_randomized_parity_with_checked_core() -> None:
         assert out_default == out_checked
 
 
+def test_exhaustive_payload_truncation_frontier() -> None:
+    """Every payload byte-count near 24-byte boundary keeps exact parity."""
+
+    values = [-(1 << 63), 0, (1 << 63) - 1]
+    full_payload = []
+    for value in values:
+        full_payload.extend(_le_u64(_i64_to_u64_bits(value)))
+
+    for payload_nbytes in range(0, 27):
+        payload = full_payload[:payload_nbytes]
+        buf = [0x7A, 0x7B] + payload + [0x7C]
+        start = 2
+
+        cur_default = [start]
+        cur_checked = [start]
+        out_default = [[-101], [-202], [-303]]
+        out_checked = [[-101], [-202], [-303]]
+
+        err_default = gguf_metadata_read_i64_triple_checked_default(
+            buf,
+            len(buf),
+            cur_default,
+            out_default[0],
+            out_default[1],
+            out_default[2],
+        )
+        err_checked = gguf_metadata_read_i64_triple_checked(
+            buf,
+            len(buf),
+            cur_checked,
+            len(buf),
+            out_checked[0],
+            out_checked[1],
+            out_checked[2],
+        )
+
+        assert err_default == err_checked
+        assert cur_default == cur_checked
+        assert out_default == out_checked
+
+
+def test_start_cursor_past_default_end_is_bad_param() -> None:
+    buf = [0xAA] * 32
+
+    cur_default = [len(buf) + 1]
+    cur_checked = [len(buf) + 1]
+    out_default = [[17], [18], [19]]
+    out_checked = [[17], [18], [19]]
+
+    err_default = gguf_metadata_read_i64_triple_checked_default(
+        buf,
+        len(buf),
+        cur_default,
+        out_default[0],
+        out_default[1],
+        out_default[2],
+    )
+    err_checked = gguf_metadata_read_i64_triple_checked(
+        buf,
+        len(buf),
+        cur_checked,
+        len(buf),
+        out_checked[0],
+        out_checked[1],
+        out_checked[2],
+    )
+
+    assert err_default == err_checked == GGUF_META_TABLE_ERR_BAD_PARAM
+    assert cur_default == cur_checked == [len(buf) + 1]
+    assert out_default == out_checked == [[17], [18], [19]]
+
+
+def test_i64_max_cursor_overflow_guard_matches_checked() -> None:
+    buf = [0x11, 0x22, 0x33]
+
+    cur_default = [I64_MAX]
+    cur_checked = [I64_MAX]
+    out_default = [[9], [8], [7]]
+    out_checked = [[9], [8], [7]]
+
+    err_default = gguf_metadata_read_i64_triple_checked_default(
+        buf,
+        len(buf),
+        cur_default,
+        out_default[0],
+        out_default[1],
+        out_default[2],
+    )
+    err_checked = gguf_metadata_read_i64_triple_checked(
+        buf,
+        len(buf),
+        cur_checked,
+        len(buf),
+        out_checked[0],
+        out_checked[1],
+        out_checked[2],
+    )
+
+    assert err_default == err_checked == GGUF_META_TABLE_ERR_BAD_PARAM
+    assert cur_default == cur_checked == [I64_MAX]
+    assert out_default == out_checked == [[9], [8], [7]]
+
+
 if __name__ == "__main__":
     test_null_ptr_and_no_partial_write()
     test_success_matches_checked_core_exactly()
     test_default_end_truncation_matches_checked_no_commit()
     test_randomized_parity_with_checked_core()
+    test_exhaustive_payload_truncation_frontier()
+    test_start_cursor_past_default_end_is_bad_param()
+    test_i64_max_cursor_overflow_guard_matches_checked()
     print("ok")
