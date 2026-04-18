@@ -1,0 +1,16 @@
+Done — this iteration fully executed and closed.
+
+**Completed**
+- Implemented `TokenizerUTF8DecodeSpanToCodepointsChecked` with strict no-partial-write semantics, two-pass validation/materialization, and capacity guards in `src/tokenizer/bpe.HC:342`.
+- Added full parity harness for multilingual valid spans, malformed UTF-8, capacity failures, and randomized fuzz cases in `tests/test_tokenizer_utf8_decode_span_to_codepoints_checked.py:1`.
+- Marked `IQ-352` complete in `MASTER_TASKS.md:551`.
+- Kept queue depth policy satisfied by appending new unchecked item `IQ-367` in `MASTER_TASKS.md:566` (unchecked IQ count remains 15).
+- Added one progress-ledger line only in `MASTER_TASKS.md:948`.
+- Logged central DB iteration row: `iterations.id=3924`, `agent=inference`, `task_id=IQ-352`, `status=pass`.
+
+**Validation**
+- `python3 tests/test_tokenizer_utf8_decode_span_to_codepoints_checked.py && python3 tests/test_tokenizer_utf8_next_codepoint_checked.py && python3 tests/test_tokenizer_utf8_sequence_span_valid_checked.py`
+- Output:
+  - `tokenizer_utf8_decode_span_to_codepoints_checked_reference_checks=ok`
+  - `tokenizer_utf8_next_codepoint_checked_reference_checks=ok`
+  - `tokenizer_utf8_sequence_span_valid_checked_reference_checks=ok`
