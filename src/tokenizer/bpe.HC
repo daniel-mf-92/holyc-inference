@@ -2485,6 +2485,100 @@ I32 TokenizerBPEMergeCandidatesBuildCheckedDefault(I32 *token_ids,
                                                    out_candidate_count);
 }
 
+I32 TokenizerBPEMergeCandidatesBuildCheckedDefaultValidateRanks(
+                                                   I32 *token_ids,
+                                                   U64 token_count,
+                                                   I32 *rank_left_tokens,
+                                                   I32 *rank_right_tokens,
+                                                   U32 *rank_values,
+                                                   U64 rank_table_count,
+                                                   I32 *out_left_tokens,
+                                                   I32 *out_right_tokens,
+                                                   U64 *out_left_indices,
+                                                   U32 *out_ranks,
+                                                   U64 *out_candidate_count)
+{
+    U64 i;
+    U64 run_start;
+    U64 run_scan;
+    I32 key_left;
+    I32 key_right;
+    U32 min_rank;
+    Bool min_rank_set;
+
+    if (!token_ids ||
+        !out_left_tokens ||
+        !out_right_tokens ||
+        !out_left_indices ||
+        !out_ranks ||
+        !out_candidate_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (rank_table_count > 0 &&
+        (!rank_left_tokens || !rank_right_tokens || !rank_values))
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Guard 1: rank-table keys must be monotonic in lexicographic
+    // (left,right) order so binary-search-based rank lookup remains valid.
+    for (i = 1; i < rank_table_count; i++) {
+        if (rank_left_tokens[i - 1] > rank_left_tokens[i])
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        if (rank_left_tokens[i - 1] == rank_left_tokens[i] &&
+            rank_right_tokens[i - 1] > rank_right_tokens[i])
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+    }
+
+    // Guard 2: explicitly walk duplicate-key runs and derive the minimal rank
+    // for each run so duplicate-key determinism is validated before dispatch.
+    run_start = 0;
+    while (run_start < rank_table_count) {
+        key_left = rank_left_tokens[run_start];
+        key_right = rank_right_tokens[run_start];
+        min_rank_set = FALSE;
+        run_scan = run_start;
+
+        while (run_scan < rank_table_count) {
+            if (rank_left_tokens[run_scan] != key_left)
+                break;
+            if (rank_right_tokens[run_scan] != key_right)
+                break;
+
+            if (!min_rank_set || rank_values[run_scan] < min_rank) {
+                min_rank = rank_values[run_scan];
+                min_rank_set = TRUE;
+            }
+
+            run_scan++;
+            if (run_scan == 0)
+                return TOKENIZER_BPE_ERR_OVERFLOW;
+        }
+
+        if (!min_rank_set)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        run_start = run_scan;
+    }
+
+    // Delegate all checked default-capacity candidate materialization to the
+    // canonical checked-default wrapper after rank-table guards pass.
+    return TokenizerBPEMergeCandidatesBuildCheckedDefault(token_ids,
+                                                          token_count,
+                                                          rank_left_tokens,
+                                                          rank_right_tokens,
+                                                          rank_values,
+                                                          rank_table_count,
+                                                          out_left_tokens,
+                                                          out_right_tokens,
+                                                          out_left_indices,
+                                                          out_ranks,
+                                                          out_candidate_count);
+}
+
 I32 TokenizerBPEMergeCandidatesBuildCheckedDefaultCapacityNoPartial(
                                                 I32 *token_ids,
                                                 U64 token_count,
