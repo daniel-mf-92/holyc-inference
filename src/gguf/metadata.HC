@@ -468,6 +468,12 @@ I32 GGUFMetadataReadI32PairChecked(U8 *buf,
                                    I32 *out_first,
                                    I32 *out_second);
 
+I32 GGUFMetadataReadI32PairCheckedDefault(U8 *buf,
+                                          U64 buf_nbytes,
+                                          U64 *cursor,
+                                          I32 *out_first,
+                                          I32 *out_second);
+
 I32 GGUFMetadataReadI32TripleChecked(U8 *buf,
                                      U64 buf_nbytes,
                                      U64 *cursor,
@@ -3279,6 +3285,23 @@ I32 GGUFMetadataReadI32PairChecked(U8 *buf,
     *out_second = second;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Canonical default-end wrapper for compact I32-pair metadata records.
+// Contract: preserves exact checked pair semantics by pinning table_end to
+// buf_nbytes and delegating to GGUFMetadataReadI32PairChecked.
+I32 GGUFMetadataReadI32PairCheckedDefault(U8 *buf,
+                                          U64 buf_nbytes,
+                                          U64 *cursor,
+                                          I32 *out_first,
+                                          I32 *out_second)
+{
+    return GGUFMetadataReadI32PairChecked(buf,
+                                          buf_nbytes,
+                                          cursor,
+                                          buf_nbytes,
+                                          out_first,
+                                          out_second);
 }
 
 // Checked little-endian I32 tuple reader for compact metadata triple fields.
