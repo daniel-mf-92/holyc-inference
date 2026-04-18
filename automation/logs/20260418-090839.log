@@ -98,3 +98,8 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_23","type":"todo_list","items":[{"text":"Implement IQ-349 HolyC no-partial wrapper","completed":true},{"text":"Add IQ-349 parity test harness","completed":true},{"text":"Run focused metadata validation tests","completed":true},{"text":"Update tasks file and iteration DB","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":1895510,"cached_input_tokens":1702144,"output_tokens":8947}}
 Codex final exit code: 0
+[main 33225f8] feat(inference): codex iteration 20260418-090839
+ 6 files changed, 520 insertions(+), 8 deletions(-)
+ create mode 100644 automation/logs/20260418-090839.final.txt
+ create mode 100644 tests/test_gguf_metadata_read_i32_pair_checked_no_partial.py
+=== End iteration 96 (outcome=ok) ===
