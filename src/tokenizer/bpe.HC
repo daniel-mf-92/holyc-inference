@@ -7306,7 +7306,7 @@ I32 TokenizerBPEDecodeSingleTokenCheckedDefaultNoPartialValidateCursor(
     if (!staged_out_bytes)
         return TOKENIZER_BPE_ERR_OVERFLOW;
 
-    err = TokenizerBPEDecodeSingleTokenCheckedDefault(token_id,
+    err = TokenizerBPEDecodeSingleTokenCheckedDefaultNoPartial(token_id,
                                                       vocab_piece_bytes,
                                                       vocab_piece_bytes_len,
                                                       vocab_piece_offsets,

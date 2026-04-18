@@ -10,8 +10,8 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent))
 
 from test_tokenizer_bpe_decode_single_token_checked import build_vocab_tables
-from test_tokenizer_bpe_decode_single_token_checked_default import (
-    tokenizer_bpe_decode_single_token_checked_default,
+from test_tokenizer_bpe_decode_single_token_checked_default_no_partial import (
+    tokenizer_bpe_decode_single_token_checked_default_no_partial,
 )
 from test_tokenizer_bpe_encode_prompt_checked import (
     I64_MAX,
@@ -65,7 +65,7 @@ def tokenizer_bpe_decode_single_token_checked_default_no_partial_validate_cursor
     staged_count = [out_byte_count[0]]
     staged_bytes = [0] * max(derived_out_byte_capacity, 1)
 
-    err = tokenizer_bpe_decode_single_token_checked_default(
+    err = tokenizer_bpe_decode_single_token_checked_default_no_partial(
         token_id,
         vocab_piece_bytes,
         vocab_piece_bytes_len,
@@ -99,7 +99,7 @@ def tokenizer_bpe_decode_single_token_checked_default_no_partial_validate_cursor
     return TOKENIZER_BPE_OK
 
 
-def explicit_staged_core_composition(
+def explicit_staged_no_partial_composition(
     token_id: int,
     vocab_piece_bytes: list[int],
     vocab_piece_bytes_len: int,
@@ -132,7 +132,7 @@ def explicit_staged_core_composition(
     staged_count = [out_byte_count[0]]
     staged_bytes = [0] * max(derived_out_byte_capacity, 1)
 
-    err = tokenizer_bpe_decode_single_token_checked_default(
+    err = tokenizer_bpe_decode_single_token_checked_default_no_partial(
         token_id,
         vocab_piece_bytes,
         vocab_piece_bytes_len,
@@ -196,7 +196,7 @@ def run_case(
         count_wrapper,
     )
 
-    err_ref = explicit_staged_core_composition(
+    err_ref = explicit_staged_no_partial_composition(
         token_id,
         blob,
         len(blob),
@@ -215,7 +215,7 @@ def run_case(
     assert cursor_wrapper[0] == cursor_ref[0]
 
 
-def test_multilingual_parity_vs_explicit_staged_core() -> None:
+def test_multilingual_parity_vs_explicit_staged_no_partial() -> None:
     pieces = [
         b"hello",
         b" ",
@@ -356,7 +356,7 @@ def test_randomized_parity() -> None:
             count_wrapper,
         )
 
-        err_ref = explicit_staged_core_composition(
+        err_ref = explicit_staged_no_partial_composition(
             token_id,
             blob,
             len(blob),
@@ -376,7 +376,7 @@ def test_randomized_parity() -> None:
 
 
 if __name__ == "__main__":
-    test_multilingual_parity_vs_explicit_staged_core()
+    test_multilingual_parity_vs_explicit_staged_no_partial()
     test_adversarial_cursor_and_token_vectors()
     test_null_and_overflow_contracts()
     test_randomized_parity()
