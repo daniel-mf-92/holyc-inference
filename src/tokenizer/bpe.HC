@@ -1230,6 +1230,93 @@ I32 TokenizerBPEMergePairRankLookupCheckedDefaultNoPartial(I32 left_token,
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEMergePairRankLookupCheckedDefaultValidateRanks(
+                                                           I32 left_token,
+                                                           I32 right_token,
+                                                           I32 *rank_left_tokens,
+                                                           I32 *rank_right_tokens,
+                                                           U32 *rank_values,
+                                                           U64 rank_table_count,
+                                                           U32 *out_rank,
+                                                           Bool *out_found)
+{
+    U64 i;
+    U64 run_start;
+    U64 run_scan;
+    U64 next_scan;
+    I32 key_left;
+    I32 key_right;
+    Bool min_rank_set;
+    U32 min_rank;
+
+    if (!out_rank || !out_found)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Keep default-capacity derivation and validation loops inside signed I64
+    // range to match checked-core overflow contracts.
+    if (rank_table_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (rank_table_count > 0 &&
+        (!rank_left_tokens || !rank_right_tokens || !rank_values))
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Binary-search rank lookup requires lexicographically monotonic
+    // (left,right) ordering across active rows.
+    for (i = 1; i < rank_table_count; i++) {
+        if (rank_left_tokens[i - 1] > rank_left_tokens[i])
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        if (rank_left_tokens[i - 1] == rank_left_tokens[i] &&
+            rank_right_tokens[i - 1] > rank_right_tokens[i])
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+    }
+
+    // Deterministic duplicate-pair guard: each equal-key run must contain at
+    // least one row so "minimum rank wins" semantics are always defined.
+    run_start = 0;
+    while (run_start < rank_table_count) {
+        key_left = rank_left_tokens[run_start];
+        key_right = rank_right_tokens[run_start];
+
+        min_rank_set = FALSE;
+        min_rank = 0;
+        run_scan = run_start;
+        while (run_scan < rank_table_count) {
+            if (rank_left_tokens[run_scan] != key_left)
+                break;
+            if (rank_right_tokens[run_scan] != key_right)
+                break;
+
+            if (!min_rank_set || rank_values[run_scan] < min_rank) {
+                min_rank = rank_values[run_scan];
+                min_rank_set = TRUE;
+            }
+
+            next_scan = run_scan + 1;
+            if (next_scan <= run_scan)
+                return TOKENIZER_BPE_ERR_OVERFLOW;
+            run_scan = next_scan;
+        }
+
+        if (!min_rank_set)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        run_start = run_scan;
+    }
+
+    // After strict sorted-table and duplicate-run validation, dispatch to the
+    // canonical default-capacity wrapper for rank lookup.
+    return TokenizerBPEMergePairRankLookupCheckedDefault(left_token,
+                                                         right_token,
+                                                         rank_left_tokens,
+                                                         rank_right_tokens,
+                                                         rank_values,
+                                                         rank_table_count,
+                                                         out_rank,
+                                                         out_found);
+}
+
 I32 TokenizerBPEMergeApplyAtIndexChecked(I32 *token_ids,
                                          U64 token_count,
                                          U64 token_capacity,
