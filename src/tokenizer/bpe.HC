@@ -736,6 +736,50 @@ I32 TokenizerUTF8CountCodepointsCheckedDefaultSpan(U8 *bytes,
                                                out_codepoint_count);
 }
 
+I32 TokenizerUTF8CountCodepointsCheckedDefaultSpanNoPartial(U8 *bytes,
+                                                            U64 byte_len,
+                                                            U64 *io_cursor,
+                                                            U64 *out_codepoint_count)
+{
+    U64 cursor;
+    U64 in_nbytes;
+    U64 staged_cursor;
+    U64 staged_count;
+    I32 err;
+
+    if (!bytes || !io_cursor || !out_codepoint_count)
+        return TOKENIZER_UTF8_ERR_NULL_PTR;
+
+    // Keep default-span derivation inside signed-positive I64 range.
+    if (byte_len > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_UTF8_ERR_OVERFLOW;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_UTF8_ERR_BAD_PARAM;
+
+    // Canonical suffix span starts at caller cursor and extends to byte_len.
+    in_nbytes = byte_len - cursor;
+
+    // Stage caller-visible cursor/count so malformed UTF-8 suffixes cannot
+    // partially commit decode progress.
+    staged_cursor = cursor;
+    staged_count = *out_codepoint_count;
+
+    err = TokenizerUTF8CountCodepointsChecked(bytes,
+                                              byte_len,
+                                              &staged_cursor,
+                                              in_nbytes,
+                                              &staged_count);
+    if (err != TOKENIZER_UTF8_OK)
+        return err;
+
+    // All-or-nothing commit after checked full-suffix count success.
+    *io_cursor = staged_cursor;
+    *out_codepoint_count = staged_count;
+    return TOKENIZER_UTF8_OK;
+}
+
 I32 TokenizerBPEMergePairPriorityFindChecked(I32 *token_ids,
                                              U64 token_count,
                                              U64 token_capacity,
