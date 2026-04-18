@@ -3375,6 +3375,270 @@ I32 TokenizerBPEEncodePromptChecked(U8 *bytes,
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEEncodePromptCheckedViaSpanTable(U8 *bytes,
+                                                U64 byte_len,
+                                                U64 *io_cursor,
+                                                U64 prompt_nbytes,
+                                                I32 *rank_left_tokens,
+                                                I32 *rank_right_tokens,
+                                                U32 *rank_values,
+                                                I32 *rank_merged_tokens,
+                                                U64 rank_table_count,
+                                                U64 rank_table_capacity,
+                                                I32 *out_token_ids,
+                                                U64 out_token_capacity,
+                                                U64 *out_token_count)
+{
+    U64 cursor;
+    U64 prompt_end;
+    U64 span_capacity;
+    U64 span_alloc_capacity;
+    U64 span_starts_bytes;
+    U64 span_lengths_bytes;
+    U64 span_classes_bytes;
+    U64 *span_starts;
+    U64 *span_lengths;
+    U8 *span_classes;
+    U64 span_count;
+    U64 span_index;
+    U64 expected_span_start;
+    U64 span_start;
+    U64 span_nbytes;
+    U64 span_end;
+    U8 span_class;
+    U64 token_alloc_capacity;
+    U64 token_alloc_bytes;
+    I32 *staged_tokens;
+    U64 staged_token_count;
+    U64 remaining_capacity;
+    U64 span_cursor;
+    U64 span_token_count;
+    U64 i;
+    U64 scan_cursor;
+    I32 err;
+
+    if (!bytes || !io_cursor || !out_token_ids || !out_token_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        out_token_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (rank_table_count > rank_table_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (rank_table_count > 0 &&
+        (!rank_left_tokens || !rank_right_tokens || !rank_values || !rank_merged_tokens))
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (prompt_nbytes > byte_len - cursor)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    prompt_end = cursor + prompt_nbytes;
+    if (prompt_end < cursor || prompt_end > byte_len)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    span_capacity = prompt_nbytes;
+    span_alloc_capacity = span_capacity;
+    if (!span_alloc_capacity)
+        span_alloc_capacity = 1;
+
+    if (span_alloc_capacity > (0x7FFFFFFFFFFFFFFF / sizeof(U64)))
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    span_starts_bytes = sizeof(U64) * span_alloc_capacity;
+    span_lengths_bytes = sizeof(U64) * span_alloc_capacity;
+
+    if (span_alloc_capacity > (0x7FFFFFFFFFFFFFFF / sizeof(U8)))
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    span_classes_bytes = sizeof(U8) * span_alloc_capacity;
+
+    if (!span_starts_bytes || !span_lengths_bytes || !span_classes_bytes)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    span_starts = MAlloc(span_starts_bytes);
+    if (!span_starts)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    span_lengths = MAlloc(span_lengths_bytes);
+    if (!span_lengths) {
+        Free(span_starts);
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    span_classes = MAlloc(span_classes_bytes);
+    if (!span_classes) {
+        Free(span_lengths);
+        Free(span_starts);
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    scan_cursor = cursor;
+    span_count = 0;
+
+    err = TokenizerBPEPromptSpanScanChecked(bytes,
+                                            byte_len,
+                                            &scan_cursor,
+                                            prompt_nbytes,
+                                            span_starts,
+                                            span_lengths,
+                                            span_classes,
+                                            span_capacity,
+                                            &span_count);
+    if (err != TOKENIZER_BPE_OK) {
+        Free(span_classes);
+        Free(span_lengths);
+        Free(span_starts);
+        return err;
+    }
+
+    if (scan_cursor != prompt_end || span_count > span_capacity) {
+        Free(span_classes);
+        Free(span_lengths);
+        Free(span_starts);
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    }
+
+    token_alloc_capacity = out_token_capacity;
+    if (!token_alloc_capacity)
+        token_alloc_capacity = 1;
+
+    if (token_alloc_capacity > (0x7FFFFFFFFFFFFFFF / sizeof(I32))) {
+        Free(span_classes);
+        Free(span_lengths);
+        Free(span_starts);
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    token_alloc_bytes = sizeof(I32) * token_alloc_capacity;
+    if (!token_alloc_bytes) {
+        Free(span_classes);
+        Free(span_lengths);
+        Free(span_starts);
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    staged_tokens = MAlloc(token_alloc_bytes);
+    if (!staged_tokens) {
+        Free(span_classes);
+        Free(span_lengths);
+        Free(span_starts);
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    staged_token_count = 0;
+    expected_span_start = cursor;
+
+    for (span_index = 0; span_index < span_count; span_index++) {
+        span_start = span_starts[span_index];
+        span_nbytes = span_lengths[span_index];
+        span_class = span_classes[span_index];
+
+        if (span_class < TOKENIZER_BPE_ASCII_CLASS_WORD ||
+            span_class > TOKENIZER_BPE_ASCII_CLASS_NON_ASCII) {
+            Free(staged_tokens);
+            Free(span_classes);
+            Free(span_lengths);
+            Free(span_starts);
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+        }
+
+        if (!span_nbytes || span_start != expected_span_start || span_start >= prompt_end) {
+            Free(staged_tokens);
+            Free(span_classes);
+            Free(span_lengths);
+            Free(span_starts);
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+        }
+
+        span_end = span_start + span_nbytes;
+        if (span_end < span_start || span_end > prompt_end) {
+            Free(staged_tokens);
+            Free(span_classes);
+            Free(span_lengths);
+            Free(span_starts);
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+        }
+
+        if (staged_token_count > out_token_capacity) {
+            Free(staged_tokens);
+            Free(span_classes);
+            Free(span_lengths);
+            Free(span_starts);
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+        }
+
+        remaining_capacity = out_token_capacity - staged_token_count;
+        span_cursor = span_start;
+        span_token_count = 0;
+
+        err = TokenizerBPEEncodeSpanChecked(bytes,
+                                            byte_len,
+                                            &span_cursor,
+                                            span_nbytes,
+                                            rank_left_tokens,
+                                            rank_right_tokens,
+                                            rank_values,
+                                            rank_merged_tokens,
+                                            rank_table_count,
+                                            rank_table_capacity,
+                                            staged_tokens + staged_token_count,
+                                            remaining_capacity,
+                                            &span_token_count);
+        if (err != TOKENIZER_BPE_OK) {
+            Free(staged_tokens);
+            Free(span_classes);
+            Free(span_lengths);
+            Free(span_starts);
+            return err;
+        }
+
+        if (span_cursor != span_end || span_token_count > remaining_capacity) {
+            Free(staged_tokens);
+            Free(span_classes);
+            Free(span_lengths);
+            Free(span_starts);
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+        }
+
+        staged_token_count += span_token_count;
+        if (staged_token_count < span_token_count || staged_token_count > out_token_capacity) {
+            Free(staged_tokens);
+            Free(span_classes);
+            Free(span_lengths);
+            Free(span_starts);
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+        }
+
+        expected_span_start = span_end;
+    }
+
+    if (expected_span_start != prompt_end) {
+        Free(staged_tokens);
+        Free(span_classes);
+        Free(span_lengths);
+        Free(span_starts);
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    }
+
+    for (i = 0; i < staged_token_count; i++)
+        out_token_ids[i] = staged_tokens[i];
+
+    *out_token_count = staged_token_count;
+    *io_cursor = prompt_end;
+
+    Free(staged_tokens);
+    Free(span_classes);
+    Free(span_lengths);
+    Free(span_starts);
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEEncodePromptCheckedNoPartial(U8 *bytes,
                                              U64 byte_len,
                                              U64 *io_cursor,
