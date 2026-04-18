@@ -1454,6 +1454,52 @@ I32 TokenizerBPEMergeApplyBestPriorityCheckedNoPartial(I32 *token_ids,
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEMergeApplyBestPriorityCheckedDefault(I32 *token_ids,
+                                                     U64 token_count,
+                                                     I32 *rank_left_tokens,
+                                                     I32 *rank_right_tokens,
+                                                     U32 *rank_values,
+                                                     I32 *rank_merged_tokens,
+                                                     U64 rank_table_count,
+                                                     I32 *out_merged_token,
+                                                     U32 *out_rank,
+                                                     Bool *out_found,
+                                                     U64 *out_token_count)
+{
+    U64 derived_token_capacity;
+    U64 derived_rank_table_capacity;
+
+    if (!token_ids ||
+        !out_merged_token ||
+        !out_rank ||
+        !out_found ||
+        !out_token_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Canonical checked-default contract: capacities are exactly logical counts.
+    if (token_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    derived_token_capacity = token_count;
+    derived_rank_table_capacity = rank_table_count;
+
+    // Delegate merge selection, merge application, and no-partial semantics.
+    return TokenizerBPEMergeApplyBestPriorityChecked(token_ids,
+                                                     token_count,
+                                                     derived_token_capacity,
+                                                     rank_left_tokens,
+                                                     rank_right_tokens,
+                                                     rank_values,
+                                                     rank_merged_tokens,
+                                                     rank_table_count,
+                                                     derived_rank_table_capacity,
+                                                     out_merged_token,
+                                                     out_rank,
+                                                     out_found,
+                                                     out_token_count);
+}
+
 I32 TokenizerBPEEncodeMergeLoopChecked(I32 *token_ids,
                                        U64 token_count,
                                        U64 token_capacity,
