@@ -2199,6 +2199,61 @@ I32 TokenizerBPEMergeCandidatesBuildCheckedDefaultCapacity(
                                                    out_candidate_count);
 }
 
+I32 TokenizerBPEMergeCandidatesBuildCheckedDefault(I32 *token_ids,
+                                                   U64 token_count,
+                                                   I32 *rank_left_tokens,
+                                                   I32 *rank_right_tokens,
+                                                   U32 *rank_values,
+                                                   U64 rank_table_count,
+                                                   I32 *out_left_tokens,
+                                                   I32 *out_right_tokens,
+                                                   U64 *out_left_indices,
+                                                   U32 *out_ranks,
+                                                   U64 *out_candidate_count)
+{
+    U64 derived_token_capacity;
+    U64 derived_rank_table_capacity;
+    U64 derived_candidate_capacity;
+
+    if (!token_ids ||
+        !out_left_tokens ||
+        !out_right_tokens ||
+        !out_left_indices ||
+        !out_ranks ||
+        !out_candidate_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Canonical checked-default contract: capacities equal logical counts.
+    if (token_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    derived_token_capacity = token_count;
+    derived_rank_table_capacity = rank_table_count;
+
+    // Adjacent-pair bound: N tokens can emit at most N-1 merge candidates.
+    if (token_count < 2)
+        derived_candidate_capacity = 0;
+    else
+        derived_candidate_capacity = token_count - 1;
+
+    // Delegate exact lookup, bounds, and no-partial output semantics.
+    return TokenizerBPEMergeCandidatesBuildChecked(token_ids,
+                                                   token_count,
+                                                   derived_token_capacity,
+                                                   rank_left_tokens,
+                                                   rank_right_tokens,
+                                                   rank_values,
+                                                   rank_table_count,
+                                                   derived_rank_table_capacity,
+                                                   out_left_tokens,
+                                                   out_right_tokens,
+                                                   out_left_indices,
+                                                   out_ranks,
+                                                   derived_candidate_capacity,
+                                                   out_candidate_count);
+}
+
 I32 TokenizerBPEMergeCandidatesBuildCheckedDefaultCapacityNoPartial(
                                                 I32 *token_ids,
                                                 U64 token_count,
