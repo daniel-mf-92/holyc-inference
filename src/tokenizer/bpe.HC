@@ -643,3 +643,64 @@ I32 TokenizerBPETokenPairRankLookupChecked(I32 left_token,
     *out_found = TRUE;
     return TOKENIZER_BPE_OK;
 }
+
+I32 TokenizerBPEMergeApplyAtIndexChecked(I32 *token_ids,
+                                         U64 token_count,
+                                         U64 token_capacity,
+                                         U64 left_index,
+                                         I32 merged_token,
+                                         U64 *out_token_count)
+{
+    U64 right_index;
+    U64 src_index;
+    U64 next_src_index;
+    U64 dst_index;
+    U64 next_count;
+
+    if (!token_ids || !out_token_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (token_count > token_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Merge needs two adjacent tokens: [left_index] and [left_index+1].
+    if (token_count < 2)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (left_index >= token_count)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    right_index = left_index + 1;
+    if (right_index <= left_index)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    if (right_index >= token_count)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // No-partial-write contract: all checks complete above this line.
+    token_ids[left_index] = merged_token;
+
+    // Collapse right token by shifting tail one slot left.
+    src_index = right_index + 1;
+    if (src_index < right_index)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    while (src_index < token_count) {
+        dst_index = src_index - 1;
+        if (dst_index >= token_capacity)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+
+        token_ids[dst_index] = token_ids[src_index];
+
+        next_src_index = src_index + 1;
+        if (next_src_index <= src_index)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+        src_index = next_src_index;
+    }
+
+    next_count = token_count - 1;
+    *out_token_count = next_count;
+    return TOKENIZER_BPE_OK;
+}
