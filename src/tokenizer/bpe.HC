@@ -1353,6 +1353,44 @@ I32 TokenizerBPEMergePairTokenLookupChecked(I32 left_token,
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEMergePairTokenLookupCheckedDefault(I32 left_token,
+                                                   I32 right_token,
+                                                   I32 *rank_left_tokens,
+                                                   I32 *rank_right_tokens,
+                                                   U32 *rank_values,
+                                                   I32 *rank_merged_tokens,
+                                                   U64 rank_table_count,
+                                                   I32 *out_merged_token,
+                                                   U32 *out_rank,
+                                                   Bool *out_found)
+{
+    U64 derived_capacity;
+
+    if (!out_merged_token || !out_rank || !out_found)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Canonical default-capacity rule: BPE rank rows are tightly packed, so
+    // the active row count is also the effective capacity.
+    if (rank_table_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    derived_capacity = rank_table_count;
+
+    // Delegate duplicate-rank resolution and no-partial-write behavior to the
+    // checked core by passing the canonical derived capacity.
+    return TokenizerBPEMergePairTokenLookupChecked(left_token,
+                                                   right_token,
+                                                   rank_left_tokens,
+                                                   rank_right_tokens,
+                                                   rank_values,
+                                                   rank_merged_tokens,
+                                                   rank_table_count,
+                                                   derived_capacity,
+                                                   out_merged_token,
+                                                   out_rank,
+                                                   out_found);
+}
+
 I32 TokenizerBPEMergeApplyBestPriorityChecked(I32 *token_ids,
                                               U64 token_count,
                                               U64 token_capacity,
