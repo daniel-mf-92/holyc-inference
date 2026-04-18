@@ -234,6 +234,14 @@ I32 GGUFMetadataReadU16QuadCheckedNoPartial(U8 *buf,
                                             U16 *out_third,
                                             U16 *out_fourth);
 
+I32 GGUFMetadataReadU16QuadCheckedDefault(U8 *buf,
+                                          U64 buf_nbytes,
+                                          U64 *cursor,
+                                          U16 *out_first,
+                                          U16 *out_second,
+                                          U16 *out_third,
+                                          U16 *out_fourth);
+
 I32 GGUFMetadataReadI16LEChecked(U8 *buf,
                                  U64 buf_nbytes,
                                  U64 *cursor,
@@ -1954,6 +1962,27 @@ I32 GGUFMetadataReadU16QuadCheckedNoPartial(U8 *buf,
     *out_fourth = fourth;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Canonical default-end wrapper for fixed-layout U16-quad metadata records.
+// Contract: preserves exact checked quad semantics by pinning table_end to
+// buf_nbytes and delegating to GGUFMetadataReadU16QuadChecked.
+I32 GGUFMetadataReadU16QuadCheckedDefault(U8 *buf,
+                                          U64 buf_nbytes,
+                                          U64 *cursor,
+                                          U16 *out_first,
+                                          U16 *out_second,
+                                          U16 *out_third,
+                                          U16 *out_fourth)
+{
+    return GGUFMetadataReadU16QuadChecked(buf,
+                                          buf_nbytes,
+                                          cursor,
+                                          buf_nbytes,
+                                          out_first,
+                                          out_second,
+                                          out_third,
+                                          out_fourth);
 }
 
 // Checked little-endian I16 metadata reader.
