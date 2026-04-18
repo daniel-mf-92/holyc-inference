@@ -3614,6 +3614,111 @@ I32 TokenizerBPEEncodePromptCheckedDefaultCapacityNoPartial(
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEEncodePromptCheckedDefaultCapacityNoPartialValidateRanks(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    I32 *out_token_ids,
+    U64 *out_token_count)
+{
+    U64 i;
+    U64 run_start;
+    U64 run_scan;
+    I32 key_left;
+    I32 key_right;
+    U32 min_rank;
+    Bool min_rank_set;
+    Bool min_merged_set;
+    I32 min_rank_merged_token;
+
+    if (!bytes || !io_cursor || !out_token_ids || !out_token_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (rank_table_count > rank_table_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (rank_table_count > 0 &&
+        (!rank_left_tokens || !rank_right_tokens || !rank_values || !rank_merged_tokens))
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Guard 1: enforce lexicographically sorted (left,right) rank-table keys
+    // so binary-search style pair lookup remains deterministic.
+    for (i = 1; i < rank_table_count; i++) {
+        if (rank_left_tokens[i - 1] > rank_left_tokens[i])
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        if (rank_left_tokens[i - 1] == rank_left_tokens[i] &&
+            rank_right_tokens[i - 1] > rank_right_tokens[i])
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+    }
+
+    // Guard 2: within each duplicate-key run, all rows tying for minimum rank
+    // must choose the same merged token to keep merge picks deterministic.
+    run_start = 0;
+    while (run_start < rank_table_count) {
+        key_left = rank_left_tokens[run_start];
+        key_right = rank_right_tokens[run_start];
+        min_rank_set = FALSE;
+        min_merged_set = FALSE;
+        run_scan = run_start;
+
+        while (run_scan < rank_table_count) {
+            if (rank_left_tokens[run_scan] != key_left)
+                break;
+            if (rank_right_tokens[run_scan] != key_right)
+                break;
+
+            if (!min_rank_set || rank_values[run_scan] < min_rank) {
+                min_rank = rank_values[run_scan];
+                min_rank_merged_token = rank_merged_tokens[run_scan];
+                min_rank_set = TRUE;
+                min_merged_set = TRUE;
+            } else if (rank_values[run_scan] == min_rank) {
+                if (!min_merged_set) {
+                    min_rank_merged_token = rank_merged_tokens[run_scan];
+                    min_merged_set = TRUE;
+                } else if (rank_merged_tokens[run_scan] != min_rank_merged_token) {
+                    return TOKENIZER_BPE_ERR_BAD_PARAM;
+                }
+            }
+
+            run_scan++;
+            if (run_scan == 0)
+                return TOKENIZER_BPE_ERR_OVERFLOW;
+        }
+
+        run_start = run_scan;
+    }
+
+    // Delegate all staged no-partial prompt-encode behavior to the canonical
+    // default-capacity wrapper once rank validation passes.
+    return TokenizerBPEEncodePromptCheckedDefaultCapacityNoPartial(
+        bytes,
+        byte_len,
+        io_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        out_token_ids,
+        out_token_count);
+}
+
 I32 TokenizerBPEEncodePromptCheckedDefaultNoPartial(U8 *bytes,
                                                     U64 byte_len,
                                                     U64 *io_cursor,
