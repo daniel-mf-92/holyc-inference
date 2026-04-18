@@ -339,6 +339,37 @@ I32 TokenizerUTF8SequenceSpanValidChecked(U8 *bytes,
     return TOKENIZER_UTF8_OK;
 }
 
+I32 TokenizerUTF8SequenceSpanValidCheckedDefault(U8 *bytes,
+                                                 U64 byte_len,
+                                                 U64 *io_cursor,
+                                                 Bool *out_is_valid)
+{
+    U64 cursor;
+    U64 span_nbytes;
+
+    if (!bytes || !io_cursor || !out_is_valid)
+        return TOKENIZER_UTF8_ERR_NULL_PTR;
+
+    // Keep default-span derivation in the same signed-positive I64 envelope.
+    if (byte_len > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_UTF8_ERR_OVERFLOW;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_UTF8_ERR_BAD_PARAM;
+
+    // Canonical full-tail span: validate from cursor to end-of-buffer.
+    span_nbytes = byte_len - cursor;
+
+    // Delegate all UTF-8 sequence validation and no-partial state semantics
+    // to the checked explicit-span core implementation.
+    return TokenizerUTF8SequenceSpanValidChecked(bytes,
+                                                 byte_len,
+                                                 io_cursor,
+                                                 span_nbytes,
+                                                 out_is_valid);
+}
+
 I32 TokenizerUTF8DecodeSpanToCodepointsChecked(U8 *bytes,
                                                U64 byte_len,
                                                U64 *io_cursor,
