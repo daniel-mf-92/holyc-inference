@@ -804,6 +804,158 @@ I32 FPQ16TopKSelectIndicesChecked(I64 *logits_q16,
     return FP_Q16_OK;
 }
 
+// Checked deterministic top-k selector that emits both logits and indices into
+// disjoint caller-owned output buffers.
+// Output contract:
+//   - Writes exactly k lanes to out_topk_logits_q16[0..k-1] and
+//     out_topk_indices[0..k-1].
+//   - Emitted order is descending logit value with deterministic tie-break:
+//     lower token index wins when logits are equal.
+//   - No partial writes on all parameter/preflight failure paths.
+// Checked guards:
+//   - logits_q16, out_topk_logits_q16, out_topk_indices are non-null.
+//   - lane_count >= 0, k >= 0, out_lane_capacity >= 0.
+//   - k <= lane_count and k <= out_lane_capacity.
+//   - Pointer-span arithmetic for every indexed read/write cannot overflow U64.
+//   - Strict no-alias: logits/input span, top-k logit output span, and top-k
+//     index output span must be pairwise disjoint.
+// Notes:
+//   - Selection uses explicit rank counting (stable descending order) so every
+//     ordering decision is visible and auditable.
+I32 FPQ16TopKSelectLogitsCheckedNoAlias(I64 *logits_q16,
+                                        I64 lane_count,
+                                        I64 k,
+                                        I64 *out_topk_logits_q16,
+                                        I64 *out_topk_indices,
+                                        I64 out_lane_capacity)
+{
+    I64 i;
+    I64 j;
+    I64 rank;
+    I64 lane_order_rank;
+    I64 selected_index;
+    I64 selected_logit_q16;
+    I64 last_index;
+    I64 last_byte_offset;
+    U64 logits_start;
+    U64 logits_end;
+    U64 out_logits_start;
+    U64 out_logits_end;
+    U64 out_indices_start;
+    U64 out_indices_end;
+
+    if (!logits_q16 || !out_topk_logits_q16 || !out_topk_indices)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0 || k < 0 || out_lane_capacity < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (k > lane_count)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (k > out_lane_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (!k)
+        return FP_Q16_OK;
+
+    // Guard full input span for indexed logit reads.
+    last_index = lane_count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)logits_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    logits_start = (U64)logits_q16;
+    logits_end = logits_start + (U64)last_byte_offset;
+
+    // Guard full output-capacity spans so callers can safely reuse the same
+    // checked capacity contract across all top-k emitters.
+    last_index = out_lane_capacity - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+
+    if ((U64)out_topk_logits_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)out_topk_indices > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    out_logits_start = (U64)out_topk_logits_q16;
+    out_logits_end = out_logits_start + (U64)last_byte_offset;
+    out_indices_start = (U64)out_topk_indices;
+    out_indices_end = out_indices_start + (U64)last_byte_offset;
+
+    // Strict no-alias policy: every participating span must be disjoint.
+    if (!(logits_end < out_logits_start || out_logits_end < logits_start))
+        return FP_Q16_ERR_BAD_PARAM;
+    if (!(logits_end < out_indices_start || out_indices_end < logits_start))
+        return FP_Q16_ERR_BAD_PARAM;
+    if (!(out_logits_end < out_indices_start || out_indices_end < out_logits_start))
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Preflight full rank-selection to guarantee no-partial-write semantics.
+    for (rank = 0; rank < k; rank++)
+    {
+        selected_index = -1;
+        selected_logit_q16 = 0;
+
+        for (i = 0; i < lane_count; i++)
+        {
+            lane_order_rank = 0;
+            for (j = 0; j < lane_count; j++)
+            {
+                if (logits_q16[j] > logits_q16[i])
+                    lane_order_rank++;
+                else if (logits_q16[j] == logits_q16[i] && j < i)
+                    lane_order_rank++;
+            }
+
+            if (lane_order_rank == rank)
+            {
+                selected_index = i;
+                selected_logit_q16 = logits_q16[i];
+                break;
+            }
+        }
+
+        if (selected_index < 0)
+            return FP_Q16_ERR_OVERFLOW;
+    }
+
+    // Commit pass writes both output vectors in rank order.
+    for (rank = 0; rank < k; rank++)
+    {
+        selected_index = -1;
+        selected_logit_q16 = 0;
+
+        for (i = 0; i < lane_count; i++)
+        {
+            lane_order_rank = 0;
+            for (j = 0; j < lane_count; j++)
+            {
+                if (logits_q16[j] > logits_q16[i])
+                    lane_order_rank++;
+                else if (logits_q16[j] == logits_q16[i] && j < i)
+                    lane_order_rank++;
+            }
+
+            if (lane_order_rank == rank)
+            {
+                selected_index = i;
+                selected_logit_q16 = logits_q16[i];
+                break;
+            }
+        }
+
+        if (selected_index < 0)
+            return FP_Q16_ERR_OVERFLOW;
+
+        out_topk_indices[rank] = selected_index;
+        out_topk_logits_q16[rank] = selected_logit_q16;
+    }
+
+    return FP_Q16_OK;
+}
+
 // Checked deterministic stable descending argsort over Q16 logits.
 // Output contract:
 //   - Writes exactly lane_count indices into out_indices[0..lane_count-1].
