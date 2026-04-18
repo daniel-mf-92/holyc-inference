@@ -103,6 +103,57 @@ I32 TokenizerUTF8ValidateContinuationByteChecked(U8 *bytes,
     return TOKENIZER_UTF8_OK;
 }
 
+I32 TokenizerUTF8ValidateContinuationSpanChecked(U8 *bytes,
+                                                 U64 byte_len,
+                                                 U64 *io_cursor,
+                                                 U64 continuation_count,
+                                                 U64 *out_bytes_consumed)
+{
+    U64 cursor;
+    U64 staged_cursor;
+    U64 consumed;
+    U64 next_consumed;
+    U8 continuation;
+    I32 err;
+
+    if (!bytes || !io_cursor || !out_bytes_consumed)
+        return TOKENIZER_UTF8_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_UTF8_ERR_OVERFLOW;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_UTF8_ERR_BAD_PARAM;
+
+    // Entire continuation run must fit from the caller's current cursor.
+    if (continuation_count > byte_len - cursor)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    staged_cursor = cursor;
+    consumed = 0;
+
+    // Compose the single-byte checked validator for each continuation lane.
+    while (consumed < continuation_count) {
+        err = TokenizerUTF8ValidateContinuationByteChecked(bytes,
+                                                           byte_len,
+                                                           &staged_cursor,
+                                                           &continuation);
+        if (err != TOKENIZER_UTF8_OK)
+            return err;
+
+        next_consumed = consumed + 1;
+        if (next_consumed <= consumed)
+            return TOKENIZER_UTF8_ERR_OVERFLOW;
+        consumed = next_consumed;
+    }
+
+    // All-or-nothing commit: cursor/count update only after full span success.
+    *out_bytes_consumed = consumed;
+    *io_cursor = staged_cursor;
+    return TOKENIZER_UTF8_OK;
+}
+
 I32 TokenizerUTF8NextCodepointChecked(U8 *bytes,
                                       U64 byte_len,
                                       U64 *io_cursor,
