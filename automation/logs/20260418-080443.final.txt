@@ -1,0 +1,23 @@
+Completed one full iteration on `IQ-341` with HolyC runtime-only changes.
+
+**What Changed**
+- Added `Q4_0DotBlocksAVX2Q32ToQ16CheckedDefault` as canonical pass-through default wrapper in `src/quant/q4_0_avx2.HC:458`.
+- Added parity harness `tests/test_q4_0_avx2_dot_q32_to_q16_checked_default.py:1` covering success/error/no-partial-write parity with checked core.
+- Updated queue/ledger in `MASTER_TASKS.md:540` (checked `IQ-341`), added new unchecked `IQ-357` at `MASTER_TASKS.md:556`, and added one ledger line at `MASTER_TASKS.md:564`.
+
+**Validation**
+- Ran:
+  - `python3 tests/test_q4_0_avx2_dot_q32_to_q16_checked_default.py`
+  - `python3 tests/test_q4_0_avx2_dot_q32_checked_default.py`
+  - `python3 tests/test_q4_0_avx2_dot_rows_q32_to_q16_checked_default.py`
+- Output:
+  - `q4_0_avx2_dot_q32_to_q16_checked_default_reference_checks=ok`
+  - `q4_0_avx2_dot_q32_checked_default_reference_checks=ok`
+  - `q4_0_avx2_dot_rows_q32_to_q16_checked_default_reference_checks=ok`
+
+**Central DB Log**
+- Inserted iteration row into `~/Documents/local-codebases/temple-central.db` with `agent='inference'`, `task_id='IQ-341'`, `status='pass'`.
+- Verification query returned: `3814|inference|IQ-341|pass|ok`.
+
+**Queue Policy**
+- Unchecked `IQ-` depth is maintained at `15` after completion and replenishment.

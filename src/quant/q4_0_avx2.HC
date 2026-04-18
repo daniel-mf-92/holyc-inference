@@ -455,6 +455,22 @@ I32 Q4_0DotBlocksAVX2Q32ToQ16Checked(Q4_0Block *lhs,
     return Q4_0_AVX2_OK;
 }
 
+I32 Q4_0DotBlocksAVX2Q32ToQ16CheckedDefault(Q4_0Block *lhs,
+                                            Q4_0Block *rhs,
+                                            I64 block_count,
+                                            I64 *out_dot_q16)
+{
+    // IQ-341 canonical default-capacity wrapper:
+    // - Checked Q32->Q16 block-dot core is already capacity-complete because
+    //   active extent is exactly `block_count` for lhs and rhs.
+    // - Expose one stable default entry point that preserves exact checked
+    //   success/error codes and no-partial-write behavior.
+    return Q4_0DotBlocksAVX2Q32ToQ16Checked(lhs,
+                                            rhs,
+                                            block_count,
+                                            out_dot_q16);
+}
+
 I32 Q4_0DotRowsAVX2Q32ToQ16Checked(
     Q4_0Block *matrix_blocks,
     I64 matrix_block_capacity,
