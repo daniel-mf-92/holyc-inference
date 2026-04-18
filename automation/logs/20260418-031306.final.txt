@@ -1,0 +1,17 @@
+Completed one full iteration on `IQ-311` with queue roll-forward and logging.
+
+**What Changed**
+- Added HolyC default-capacity wrapper `Q4_0DotRowsAVX2Q32CheckedDefault` in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/quant/q4_0_avx2.HC:379`.
+- Added focused parity harness in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_q4_0_avx2_dot_rows_q32_checked_default.py:1`.
+- Updated queue/ledger in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:510` (IQ-311 checked), `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:525` (new IQ-326 appended), and `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:532` (single ledger line added, loop-384).
+
+**Validation**
+- Ran: `python3 tests/test_q4_0_avx2_dot_rows_q32_checked_default.py && python3 tests/test_q4_0_avx2_dot_rows_q32_checked.py && python3 tests/test_q4_0_avx2_dot_q32_checked_default.py`
+- Output:
+  - `q4_0_avx2_dot_rows_q32_checked_default_reference_checks=ok`
+  - `q4_0_avx2_dot_rows_q32_checked_reference_checks=ok`
+  - `q4_0_avx2_dot_q32_checked_default_reference_checks=ok`
+
+**Contract Checks**
+- Queue depth maintained at 15 unchecked IQ items after completion.
+- Central DB logged: `iterations.id=3550`, `task_id=IQ-311`, `status=pass`, `validation_result=ok` in `~/Documents/local-codebases/temple-central.db`.
