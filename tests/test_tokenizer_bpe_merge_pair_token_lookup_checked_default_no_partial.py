@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent))
 
 from test_tokenizer_bpe_merge_apply_best_priority_checked import (
+    TOKENIZER_BPE_ERR_BAD_PARAM,
     I64_MAX,
     TOKENIZER_BPE_ERR_NULL_PTR,
     TOKENIZER_BPE_ERR_OVERFLOW,
@@ -184,6 +185,47 @@ def test_known_vectors_duplicate_rank_and_missing_pair() -> None:
     run_case(5, 5, rank_left, rank_right, rank_values, rank_merged, len(rank_rows))
 
 
+def test_duplicate_rank_keeps_first_min_rank_merged_token() -> None:
+    # Determinism contract for duplicate keys: choose the earliest merged token
+    # among rows that share the minimum rank for the queried pair.
+    rank_rows = sorted(
+        [
+            (12, 34, 9, 2009),
+            (12, 34, 4, 2004),
+            (12, 34, 4, 2005),
+            (12, 34, 7, 2007),
+            (12, 35, 1, 2035),
+        ],
+        key=lambda x: (x[0], x[1]),
+    )
+
+    rank_left = [row[0] for row in rank_rows]
+    rank_right = [row[1] for row in rank_rows]
+    rank_values = [row[2] for row in rank_rows]
+    rank_merged = [row[3] for row in rank_rows]
+
+    out_merged = [0x1111]
+    out_rank = [0x2222]
+    out_found = [False]
+
+    err = tokenizer_bpe_merge_pair_token_lookup_checked_default_no_partial(
+        12,
+        34,
+        rank_left,
+        rank_right,
+        rank_values,
+        rank_merged,
+        len(rank_rows),
+        out_merged,
+        out_rank,
+        out_found,
+    )
+    assert err == TOKENIZER_BPE_OK
+    assert out_found[0] is True
+    assert out_rank[0] == 4
+    assert out_merged[0] == 2004
+
+
 def test_no_partial_malformed_table_and_null_output_contracts() -> None:
     out_merged = [0x7777]
     out_rank = [0x6666]
@@ -237,9 +279,32 @@ def test_no_partial_malformed_table_and_null_output_contracts() -> None:
     )
     assert err == TOKENIZER_BPE_ERR_NULL_PTR
 
+    # Truncated column vectors are malformed table input: checked core should
+    # reject via bad-param/exception path and wrapper must preserve outputs.
+    try:
+        err = tokenizer_bpe_merge_pair_token_lookup_checked_default_no_partial(
+            4,
+            7,
+            [4],
+            [7],
+            [2],
+            [],
+            1,
+            out_merged,
+            out_rank,
+            out_found,
+        )
+        assert err == TOKENIZER_BPE_ERR_BAD_PARAM
+    except IndexError:
+        pass
+
+    assert out_merged[0] == 0x7777
+    assert out_rank[0] == 0x6666
+    assert out_found[0] is True
+
 
 def test_randomized_parity_vs_explicit_staged_composition() -> None:
-    rng = random.Random(20260418_397)
+    rng = random.Random(20260418_400)
 
     for _ in range(6000):
         n = rng.randint(0, 320)
@@ -275,6 +340,7 @@ def test_randomized_parity_vs_explicit_staged_composition() -> None:
 
 if __name__ == "__main__":
     test_known_vectors_duplicate_rank_and_missing_pair()
+    test_duplicate_rank_keeps_first_min_rank_merged_token()
     test_no_partial_malformed_table_and_null_output_contracts()
     test_randomized_parity_vs_explicit_staged_composition()
     print("tokenizer_bpe_merge_pair_token_lookup_checked_default_no_partial_reference_checks=ok")
