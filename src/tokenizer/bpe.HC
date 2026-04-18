@@ -2225,6 +2225,207 @@ U8 TokenizerBPEASCIIClass(U8 byte)
     return TOKENIZER_BPE_ASCII_CLASS_PUNCT;
 }
 
+#define TOKENIZER_BPE_ASCII_CLASS_NON_ASCII 5
+
+I32 TokenizerBPEPromptSpanScanChecked(U8 *bytes,
+                                      U64 byte_len,
+                                      U64 *io_cursor,
+                                      U64 prompt_nbytes,
+                                      U64 *out_span_starts,
+                                      U64 *out_span_lengths,
+                                      U8 *out_span_classes,
+                                      U64 out_span_capacity,
+                                      U64 *out_span_count)
+{
+    U64 cursor;
+    U64 prompt_end;
+    U64 scan;
+    U64 span_start;
+    U64 span_nbytes;
+    U8 lead;
+    U8 span_class;
+    U8 next_class;
+    U64 staged_count;
+    U64 staged_capacity;
+    U64 staged_starts_bytes;
+    U64 staged_lengths_bytes;
+    U64 staged_classes_bytes;
+    U64 *staged_starts;
+    U64 *staged_lengths;
+    U8 *staged_classes;
+    U64 i;
+    U32 staged_codepoint;
+    U8 staged_used;
+    I32 err;
+
+    if (!bytes || !io_cursor || !out_span_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        out_span_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (out_span_capacity > 0 &&
+        (!out_span_starts || !out_span_lengths || !out_span_classes))
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (prompt_nbytes > byte_len - cursor)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    prompt_end = cursor + prompt_nbytes;
+    if (prompt_end < cursor || prompt_end > byte_len)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Empty prompt is valid and commits deterministic empty span output.
+    if (!prompt_nbytes) {
+        *out_span_count = 0;
+        *io_cursor = cursor;
+        return TOKENIZER_BPE_OK;
+    }
+
+    // Non-empty prompts require storage for at least one span.
+    if (!out_span_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    staged_capacity = out_span_capacity;
+
+    // Stage span tables privately so malformed UTF-8 never partially mutates
+    // caller output buffers or cursor.
+    if (staged_capacity > (0x7FFFFFFFFFFFFFFF / sizeof(U64)))
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    staged_starts_bytes = sizeof(U64) * staged_capacity;
+    staged_lengths_bytes = sizeof(U64) * staged_capacity;
+
+    if (staged_capacity > (0x7FFFFFFFFFFFFFFF / sizeof(U8)))
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    staged_classes_bytes = sizeof(U8) * staged_capacity;
+
+    if (!staged_starts_bytes || !staged_lengths_bytes || !staged_classes_bytes)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    staged_starts = MAlloc(staged_starts_bytes);
+    if (!staged_starts)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    staged_lengths = MAlloc(staged_lengths_bytes);
+    if (!staged_lengths) {
+        Free(staged_starts);
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    staged_classes = MAlloc(staged_classes_bytes);
+    if (!staged_classes) {
+        Free(staged_lengths);
+        Free(staged_starts);
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    scan = cursor;
+    staged_count = 0;
+
+    while (scan < prompt_end) {
+        span_start = scan;
+        lead = bytes[scan];
+
+        if (lead <= 0x7F) {
+            span_class = TokenizerBPEASCIIClass(lead);
+            scan++;
+
+            while (scan < prompt_end) {
+                if (bytes[scan] > 0x7F)
+                    break;
+
+                next_class = TokenizerBPEASCIIClass(bytes[scan]);
+                if (next_class != span_class)
+                    break;
+
+                scan++;
+            }
+        } else {
+            span_class = TOKENIZER_BPE_ASCII_CLASS_NON_ASCII;
+
+            err = TokenizerUTF8NextCodepointChecked(bytes,
+                                                    prompt_end,
+                                                    &scan,
+                                                    &staged_codepoint,
+                                                    &staged_used);
+            if (err != TOKENIZER_UTF8_OK) {
+                Free(staged_classes);
+                Free(staged_lengths);
+                Free(staged_starts);
+                return err;
+            }
+
+            while (scan < prompt_end && bytes[scan] > 0x7F) {
+                err = TokenizerUTF8NextCodepointChecked(bytes,
+                                                        prompt_end,
+                                                        &scan,
+                                                        &staged_codepoint,
+                                                        &staged_used);
+                if (err != TOKENIZER_UTF8_OK) {
+                    Free(staged_classes);
+                    Free(staged_lengths);
+                    Free(staged_starts);
+                    return err;
+                }
+            }
+        }
+
+        span_nbytes = scan - span_start;
+        if (!span_nbytes) {
+            Free(staged_classes);
+            Free(staged_lengths);
+            Free(staged_starts);
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+        }
+
+        if (staged_count >= staged_capacity) {
+            Free(staged_classes);
+            Free(staged_lengths);
+            Free(staged_starts);
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+        }
+
+        staged_starts[staged_count] = span_start;
+        staged_lengths[staged_count] = span_nbytes;
+        staged_classes[staged_count] = span_class;
+        staged_count++;
+
+        if (!staged_count || staged_count > staged_capacity) {
+            Free(staged_classes);
+            Free(staged_lengths);
+            Free(staged_starts);
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+        }
+    }
+
+    if (scan != prompt_end) {
+        Free(staged_classes);
+        Free(staged_lengths);
+        Free(staged_starts);
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    }
+
+    for (i = 0; i < staged_count; i++) {
+        out_span_starts[i] = staged_starts[i];
+        out_span_lengths[i] = staged_lengths[i];
+        out_span_classes[i] = staged_classes[i];
+    }
+
+    *out_span_count = staged_count;
+    *io_cursor = prompt_end;
+
+    Free(staged_classes);
+    Free(staged_lengths);
+    Free(staged_starts);
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEEncodePromptChecked(U8 *bytes,
                                     U64 byte_len,
                                     U64 *io_cursor,
