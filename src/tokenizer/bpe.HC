@@ -1391,6 +1391,61 @@ I32 TokenizerBPEMergePairTokenLookupCheckedDefault(I32 left_token,
                                                    out_found);
 }
 
+I32 TokenizerBPEMergePairTokenLookupCheckedDefaultNoPartial(I32 left_token,
+                                                            I32 right_token,
+                                                            I32 *rank_left_tokens,
+                                                            I32 *rank_right_tokens,
+                                                            U32 *rank_values,
+                                                            I32 *rank_merged_tokens,
+                                                            U64 rank_table_count,
+                                                            I32 *out_merged_token,
+                                                            U32 *out_rank,
+                                                            Bool *out_found)
+{
+    U64 derived_capacity;
+    I32 staged_merged_token;
+    U32 staged_rank;
+    Bool staged_found;
+    I32 err;
+
+    if (!out_merged_token || !out_rank || !out_found)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Canonical default-capacity rule: BPE rank rows are tightly packed, so
+    // active count is the effective capacity exposed to checked core helpers.
+    if (rank_table_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    derived_capacity = rank_table_count;
+
+    // Stage caller-visible outputs so malformed rank-table pointers/capacity
+    // faults in the checked core cannot partially overwrite caller state.
+    staged_merged_token = *out_merged_token;
+    staged_rank = *out_rank;
+    staged_found = *out_found;
+
+    err = TokenizerBPEMergePairTokenLookupChecked(left_token,
+                                                  right_token,
+                                                  rank_left_tokens,
+                                                  rank_right_tokens,
+                                                  rank_values,
+                                                  rank_merged_tokens,
+                                                  rank_table_count,
+                                                  derived_capacity,
+                                                  &staged_merged_token,
+                                                  &staged_rank,
+                                                  &staged_found);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    // Commit only after successful checked lookup to preserve all-or-nothing
+    // wrapper semantics under adversarial malformed-table inputs.
+    *out_merged_token = staged_merged_token;
+    *out_rank = staged_rank;
+    *out_found = staged_found;
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEMergeApplyBestPriorityChecked(I32 *token_ids,
                                               U64 token_count,
                                               U64 token_capacity,
