@@ -1858,6 +1858,59 @@ I32 TokenizerBPEMergeCandidatesBuildChecked(I32 *token_ids,
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEMergeCandidatesBuildCheckedDefaultCapacity(
+                                                I32 *token_ids,
+                                                U64 token_count,
+                                                U64 token_capacity,
+                                                I32 *rank_left_tokens,
+                                                I32 *rank_right_tokens,
+                                                U32 *rank_values,
+                                                U64 rank_table_count,
+                                                U64 rank_table_capacity,
+                                                I32 *out_left_tokens,
+                                                I32 *out_right_tokens,
+                                                U64 *out_left_indices,
+                                                U32 *out_ranks,
+                                                U64 *out_candidate_count)
+{
+    U64 derived_capacity;
+
+    if (!token_ids ||
+        !out_left_tokens ||
+        !out_right_tokens ||
+        !out_left_indices ||
+        !out_ranks ||
+        !out_candidate_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_capacity > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Canonical default-capacity rule for adjacent pair candidates:
+    // a token span of N entries has at most N-1 adjacent pairs.
+    if (token_count < 2)
+        derived_capacity = 0;
+    else
+        derived_capacity = token_count - 1;
+
+    // Delegate exact checked lookup/writes/no-partial semantics to core helper.
+    return TokenizerBPEMergeCandidatesBuildChecked(token_ids,
+                                                   token_count,
+                                                   token_capacity,
+                                                   rank_left_tokens,
+                                                   rank_right_tokens,
+                                                   rank_values,
+                                                   rank_table_count,
+                                                   rank_table_capacity,
+                                                   out_left_tokens,
+                                                   out_right_tokens,
+                                                   out_left_indices,
+                                                   out_ranks,
+                                                   derived_capacity,
+                                                   out_candidate_count);
+}
+
 #define TOKENIZER_BPE_ASCII_CLASS_WORD 1
 #define TOKENIZER_BPE_ASCII_CLASS_DIGIT 2
 #define TOKENIZER_BPE_ASCII_CLASS_WHITESPACE 3
