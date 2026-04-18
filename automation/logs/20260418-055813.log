@@ -95,3 +95,8 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_29","type":"todo_list","items":[{"text":"Inspect IQ-329 target and surrounding APIs","completed":true},{"text":"Implement HolyC default-end U8 pair wrapper","completed":true},{"text":"Add focused host parity harness","completed":true},{"text":"Run validations and record iteration","completed":true},{"text":"Update MASTER_TASKS queue and ledger","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":1877006,"cached_input_tokens":1780992,"output_tokens":6822}}
 Codex final exit code: 0
+[main 1fcbc9f] feat(inference): codex iteration 20260418-055813
+ 6 files changed, 359 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260418-055813.final.txt
+ create mode 100644 tests/test_gguf_metadata_read_u8_pair_checked_default.py
+=== End iteration 75 (outcome=ok) ===
