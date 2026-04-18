@@ -915,6 +915,61 @@ I32 TokenizerBPEMergePairPriorityFindCheckedDefault(I32 *token_ids,
                                                     out_found);
 }
 
+I32 TokenizerBPEMergePairPriorityFindCheckedDefaultNoPartial(I32 *token_ids,
+                                                             U64 token_count,
+                                                             I32 *rank_left_tokens,
+                                                             I32 *rank_right_tokens,
+                                                             U32 *rank_values,
+                                                             U64 rank_table_count,
+                                                             U64 *out_left_index,
+                                                             U32 *out_rank,
+                                                             Bool *out_found)
+{
+    U64 derived_token_capacity;
+    U64 derived_rank_table_capacity;
+    U64 staged_left_index;
+    U32 staged_rank;
+    Bool staged_found;
+    I32 err;
+
+    if (!token_ids || !out_left_index || !out_rank || !out_found)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Canonical default-capacity contract: active token/rank spans are packed.
+    if (token_count > 0x7FFFFFFFFFFFFFFF || rank_table_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    derived_token_capacity = token_count;
+    derived_rank_table_capacity = rank_table_count;
+
+    // Stage caller-visible outputs so this wrapper stays all-or-nothing even
+    // when the checked core fails on malformed rank tables.
+    staged_left_index = *out_left_index;
+    staged_rank = *out_rank;
+    staged_found = *out_found;
+
+    err = TokenizerBPEMergePairPriorityFindChecked(token_ids,
+                                                   token_count,
+                                                   derived_token_capacity,
+                                                   rank_left_tokens,
+                                                   rank_right_tokens,
+                                                   rank_values,
+                                                   rank_table_count,
+                                                   derived_rank_table_capacity,
+                                                   &staged_left_index,
+                                                   &staged_rank,
+                                                   &staged_found);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    // Commit outputs only after default-capacity derivation + checked scan
+    // both complete successfully.
+    *out_left_index = staged_left_index;
+    *out_rank = staged_rank;
+    *out_found = staged_found;
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPETokenPairRankLookupChecked(I32 left_token,
                                            I32 right_token,
                                            I32 *rank_left_tokens,
