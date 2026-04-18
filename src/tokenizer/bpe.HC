@@ -426,6 +426,35 @@ I32 TokenizerUTF8DecodeSpanToCodepointsChecked(U8 *bytes,
     return TOKENIZER_UTF8_OK;
 }
 
+I32 TokenizerUTF8DecodeSpanToCodepointsCheckedDefaultCapacity(U8 *bytes,
+                                                              U64 byte_len,
+                                                              U64 *io_cursor,
+                                                              U64 in_nbytes,
+                                                              U32 *out_codepoints,
+                                                              U64 *out_codepoint_count)
+{
+    U64 derived_capacity;
+
+    if (!bytes || !io_cursor || !out_codepoints || !out_codepoint_count)
+        return TOKENIZER_UTF8_ERR_NULL_PTR;
+
+    // Canonical default-capacity rule: each UTF-8 byte can decode to at most
+    // one Unicode scalar, so in_nbytes is a strict upper bound on output count.
+    if (in_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_UTF8_ERR_OVERFLOW;
+
+    derived_capacity = in_nbytes;
+
+    // Preserve checked-core semantics exactly (including no-partial writes).
+    return TokenizerUTF8DecodeSpanToCodepointsChecked(bytes,
+                                                      byte_len,
+                                                      io_cursor,
+                                                      in_nbytes,
+                                                      out_codepoints,
+                                                      derived_capacity,
+                                                      out_codepoint_count);
+}
+
 I32 TokenizerBPEMergePairPriorityFindChecked(I32 *token_ids,
                                              U64 token_count,
                                              U64 token_capacity,
