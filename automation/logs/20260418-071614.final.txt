@@ -1,0 +1,25 @@
+Completed one full iteration on `IQ-337` end-to-end.
+
+**What Changed**
+- Added HolyC UTF-8 decoder in `~/Documents/local-codebases/holyc-inference/src/tokenizer/bpe.HC:1`.
+- Implemented `TokenizerUTF8NextCodepointChecked` with strict checked contracts:
+  - lead-byte classification (ASCII, 2/3/4-byte forms),
+  - continuation-byte validation,
+  - overlong/surrogate/>`0x10FFFF` rejection,
+  - no-partial-write behavior on failures (cursor/output commit only on success).
+- Added parity harness `~/Documents/local-codebases/holyc-inference/tests/test_tokenizer_utf8_next_codepoint_checked.py:1` with:
+  - valid corpus checks,
+  - invalid sequence checks,
+  - parameter/error contract checks,
+  - randomized multilingual roundtrip,
+  - randomized malformed-byte no-partial-write checks.
+- Updated task status + ledger in `~/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:536` and `~/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:558`.
+- Kept queue rolling at 15 unchecked by appending `IQ-352` in `~/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:551`.
+
+**Validation**
+- Ran: `python3 tests/test_tokenizer_utf8_next_codepoint_checked.py`
+- Output: `tokenizer_utf8_next_codepoint_checked_reference_checks=ok`
+
+**Central DB Log**
+- Inserted iteration row into `~/Documents/local-codebases/temple-central.db` for `IQ-337` with status `pass`.
+
