@@ -1,0 +1,16 @@
+Completed one full iteration for `IQ-302` with queue policy preserved.
+
+**What Changed**
+- Added required host parity harness `tests/test_q8_0_avx2_dot_rows_q32_checked.py:1` covering known vectors, randomized parity vs scalar row-dot reference, stride-padding behavior, overflow guards, and no-partial-output error semantics.
+- Marked `IQ-302` done in `MASTER_TASKS.md:501`.
+- Appended new unchecked item `IQ-317` in `MASTER_TASKS.md:516` to keep rolling queue depth.
+- Added one progress-ledger line in `MASTER_TASKS.md:523`.
+
+**Validation**
+- `python3 tests/test_q8_0_avx2_dot_rows_q32_checked.py` → `ok`
+- `python3 tests/test_q8_0_avx2_rows_q32.py` → `ok`
+- `python3 tests/test_q8_0_avx2_blocks_q32.py` → `q8_0_avx2_blocks_q32_reference_checks=ok`
+
+**Queue/DB**
+- Unchecked `IQ-` count after update: `15` (meets minimum policy), max ID now `317` (monotonic).
+- Logged central DB iteration: `iterations.id=3461`, `task_id=IQ-302`, `status=pass`.
