@@ -596,6 +596,37 @@ I32 TokenizerUTF8CountCodepointsChecked(U8 *bytes,
     return TOKENIZER_UTF8_OK;
 }
 
+I32 TokenizerUTF8CountCodepointsCheckedDefaultSpan(U8 *bytes,
+                                                   U64 byte_len,
+                                                   U64 *io_cursor,
+                                                   U64 *out_codepoint_count)
+{
+    U64 cursor;
+    U64 in_nbytes;
+
+    if (!bytes || !io_cursor || !out_codepoint_count)
+        return TOKENIZER_UTF8_ERR_NULL_PTR;
+
+    // Keep default-span arithmetic inside signed-positive I64 range.
+    if (byte_len > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_UTF8_ERR_OVERFLOW;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_UTF8_ERR_BAD_PARAM;
+
+    // Canonical wrapper span: count from current cursor to end-of-buffer.
+    in_nbytes = byte_len - cursor;
+
+    // Delegate exact cursor/count commit and UTF-8 validation semantics
+    // to the explicit-span checked core helper.
+    return TokenizerUTF8CountCodepointsChecked(bytes,
+                                               byte_len,
+                                               io_cursor,
+                                               in_nbytes,
+                                               out_codepoint_count);
+}
+
 I32 TokenizerBPEMergePairPriorityFindChecked(I32 *token_ids,
                                              U64 token_count,
                                              U64 token_capacity,
