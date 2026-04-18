@@ -1,0 +1,23 @@
+Completed one full unattended iteration on `IQ-343` end-to-end.
+
+**What Changed**
+- Implemented `TokenizerUTF8ValidateCodepointScalarChecked` in `src/tokenizer/bpe.HC:45`.
+- Refactored `TokenizerUTF8NextCodepointChecked` in `src/tokenizer/bpe.HC:130` to call the new scalar validator (surrogate + `<=0x10FFFF` checks centralized).
+- Added parity harness `tests/test_tokenizer_utf8_validate_codepoint_scalar_checked.py:1` with boundary, exhaustive BMP, near-max sweep, and randomized U32-domain checks.
+- Updated queue/task state in `MASTER_TASKS.md:539` (`IQ-343` marked done).
+- Kept queue rolling at 15 unchecked by appending `IQ-358` in `MASTER_TASKS.md:557`.
+- Added one-line progress ledger entry in `MASTER_TASKS.md:562`.
+
+**Validation Run**
+- `python3 tests/test_tokenizer_utf8_validate_codepoint_scalar_checked.py && python3 tests/test_tokenizer_utf8_next_codepoint_checked.py && python3 tests/test_tokenizer_utf8_expected_length_from_lead_byte_checked.py`
+- Output:
+  - `tokenizer_utf8_validate_codepoint_scalar_checked_reference_checks=ok`
+  - `tokenizer_utf8_next_codepoint_checked_reference_checks=ok`
+  - `tokenizer_utf8_expected_length_from_lead_byte_checked_reference_checks=ok`
+
+**Central DB Log**
+- Inserted iteration row into `~/Documents/local-codebases/temple-central.db`:
+  - `agent='inference'`, `task_id='IQ-343'`, `status='pass'`
+  - `files_changed='src/tokenizer/bpe.HC,tests/test_tokenizer_utf8_validate_codepoint_scalar_checked.py,MASTER_TASKS.md'`
+  - `lines_added=32`
+  - validation command/result and notes recorded.

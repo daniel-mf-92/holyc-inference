@@ -42,6 +42,25 @@ I32 TokenizerUTF8ExpectedLengthFromLeadByteChecked(U8 lead,
     return TOKENIZER_UTF8_OK;
 }
 
+I32 TokenizerUTF8ValidateCodepointScalarChecked(U32 codepoint,
+                                                U32 *out_codepoint)
+{
+    if (!out_codepoint)
+        return TOKENIZER_UTF8_ERR_NULL_PTR;
+
+    // Unicode scalar values exclude surrogate halves.
+    if (codepoint >= 0xD800 && codepoint <= 0xDFFF)
+        return TOKENIZER_UTF8_ERR_BAD_CODEPOINT;
+
+    // Unicode range is capped at U+10FFFF.
+    if (codepoint > 0x10FFFF)
+        return TOKENIZER_UTF8_ERR_BAD_CODEPOINT;
+
+    // Commit output only after all scalar checks pass.
+    *out_codepoint = codepoint;
+    return TOKENIZER_UTF8_OK;
+}
+
 I32 TokenizerUTF8NextCodepointChecked(U8 *bytes,
                                       U64 byte_len,
                                       U64 *io_cursor,
@@ -111,23 +130,20 @@ I32 TokenizerUTF8NextCodepointChecked(U8 *bytes,
         codepoint = (codepoint << 6) | (cont & 0x3F);
     }
 
-    // Reject overlong and out-of-range scalar forms.
+    // Reject overlong forms before scalar validation helper.
     if (need == 2 && codepoint < 0x80)
         return TOKENIZER_UTF8_ERR_BAD_CODEPOINT;
 
-    if (need == 3) {
-        if (codepoint < 0x800)
-            return TOKENIZER_UTF8_ERR_BAD_CODEPOINT;
-        if (codepoint >= 0xD800 && codepoint <= 0xDFFF)
-            return TOKENIZER_UTF8_ERR_BAD_CODEPOINT;
-    }
+    if (need == 3 && codepoint < 0x800)
+        return TOKENIZER_UTF8_ERR_BAD_CODEPOINT;
 
-    if (need == 4) {
-        if (codepoint < 0x10000)
-            return TOKENIZER_UTF8_ERR_BAD_CODEPOINT;
-        if (codepoint > 0x10FFFF)
-            return TOKENIZER_UTF8_ERR_BAD_CODEPOINT;
-    }
+    if (need == 4 && codepoint < 0x10000)
+        return TOKENIZER_UTF8_ERR_BAD_CODEPOINT;
+
+    // Centralized scalar-domain check (surrogates + max bound).
+    err = TokenizerUTF8ValidateCodepointScalarChecked(codepoint, &codepoint);
+    if (err != TOKENIZER_UTF8_OK)
+        return err;
 
     next_cursor = cursor + need;
     if (next_cursor < cursor || next_cursor > byte_len)
