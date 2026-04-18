@@ -1,0 +1,19 @@
+Done — I executed this iteration end-to-end for `IQ-362`.
+
+**What Changed**
+- Implemented HolyC no-alias wrapper `FPQ16TopPSelectPrefixLenCheckedNoAlias` with explicit overlap and pointer-span overflow guards, then delegated to checked core for identical non-alias semantics in `src/math/softmax.HC:1301`.
+- Added parity harness covering alias/non-alias, overflow, and randomized parity vs core reference in `tests/test_softmax_topp_select_prefix_len_checked_no_alias.py:1`.
+- Marked `IQ-362` complete, appended new rolling queue item `IQ-377`, and added one progress ledger line in `MASTER_TASKS.md:561`, `MASTER_TASKS.md:576`, `MASTER_TASKS.md:584`.
+
+**Validation**
+- Ran: `python3 tests/test_softmax_topp_select_prefix_len_checked_no_alias.py && python3 tests/test_softmax_topp_select_logit_cutoff_checked.py && python3 tests/test_softmax_topp_sample_index_checked.py`
+- Output:
+  - `ok`
+  - `softmax_topp_select_logit_cutoff_checked_reference_checks=ok`
+  - `softmax_topp_sample_index_checked_reference_checks=ok`
+
+**Central DB**
+- Logged iteration to `~/Documents/local-codebases/temple-central.db`:
+  - `agent=inference`, `task_id=IQ-362`, `status=pass`, `validation_result=ok`
+  - Verified row: `rowid=4098` for `IQ-362`.
+

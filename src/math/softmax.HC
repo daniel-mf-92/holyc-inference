@@ -1286,6 +1286,59 @@ I32 FPQ16TopPSelectPrefixLenChecked(I64 *probs_q16,
     return FP_Q16_OK;
 }
 
+// Checked no-alias top-p nucleus-prefix selector wrapper.
+// Contract:
+//   - Matches FPQ16TopPSelectPrefixLenChecked semantics exactly on all
+//     non-alias input domains.
+//   - Rejects any overlap between probs_q16[lane_count] storage and
+//     out_prefix_len scalar storage.
+//   - Preserves no-partial-write behavior from the checked core helper.
+// Checked guards:
+//   - All core input guards are inherited from
+//     FPQ16TopPSelectPrefixLenChecked.
+//   - For lane_count > 0, validates span arithmetic for both probs and the
+//     output scalar, then rejects any byte-range overlap.
+I32 FPQ16TopPSelectPrefixLenCheckedNoAlias(I64 *probs_q16,
+                                           I64 lane_count,
+                                           I64 top_p_q16,
+                                           I64 *out_prefix_len)
+{
+    I64 probs_last_index;
+    I64 probs_last_byte_offset;
+    U64 probs_start;
+    U64 probs_end;
+    U64 out_start;
+    U64 out_end;
+
+    if (!probs_q16 || !out_prefix_len)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count <= 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    probs_last_index = lane_count - 1;
+    if (probs_last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    probs_last_byte_offset = probs_last_index << 3;
+
+    probs_start = (U64)probs_q16;
+    if (probs_start > (U64_MAX_VALUE - (U64)probs_last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    probs_end = probs_start + (U64)probs_last_byte_offset;
+
+    out_start = (U64)out_prefix_len;
+    if (out_start > (U64_MAX_VALUE - 7))
+        return FP_Q16_ERR_OVERFLOW;
+    out_end = out_start + 7;
+
+    if (!(probs_end < out_start || out_end < probs_start))
+        return FP_Q16_ERR_BAD_PARAM;
+
+    return FPQ16TopPSelectPrefixLenChecked(probs_q16,
+                                           lane_count,
+                                           top_p_q16,
+                                           out_prefix_len);
+}
+
 // Checked deterministic top-p nucleus logit-cutoff selector.
 // Output contract:
 //   - Writes cutoff logit to *out_cutoff_logit_q16 and final nucleus length to
