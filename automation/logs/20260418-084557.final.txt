@@ -1,0 +1,22 @@
+Done — I completed one full iteration for `IQ-346` end-to-end.
+
+**What Changed**
+- Implemented `TokenizerUTF8SequenceSpanValidChecked` with strict no-partial commit semantics in `src/tokenizer/bpe.HC:159`.
+- Added parity harness `tests/test_tokenizer_utf8_sequence_span_valid_checked.py:1` with valid/malformed multilingual spans, contract checks, and randomized fuzz cases.
+- Updated queue/ledger in `MASTER_TASKS.md:545` (marked `IQ-346` done), added new unchecked `IQ-361` in `MASTER_TASKS.md:560`, and added one ledger line in `MASTER_TASKS.md:936`.
+
+**Validation**
+- Ran:
+  - `python3 tests/test_tokenizer_utf8_sequence_span_valid_checked.py`
+  - `python3 tests/test_tokenizer_utf8_next_codepoint_checked.py`
+  - `python3 tests/test_tokenizer_utf8_validate_codepoint_scalar_checked.py`
+  - `python3 tests/test_tokenizer_utf8_expected_length_from_lead_byte_checked.py`
+- Output:
+  - `tokenizer_utf8_sequence_span_valid_checked_reference_checks=ok`
+  - `tokenizer_utf8_next_codepoint_checked_reference_checks=ok`
+  - `tokenizer_utf8_validate_codepoint_scalar_checked_reference_checks=ok`
+  - `tokenizer_utf8_expected_length_from_lead_byte_checked_reference_checks=ok`
+
+**Queue/DB Contract**
+- Queue depth maintained at 15 unchecked `IQ-` items after completion.
+- Logged iteration to central DB `~/Documents/local-codebases/temple-central.db` with `task_id='IQ-346'`, `status='pass'`, and validation command/result recorded.

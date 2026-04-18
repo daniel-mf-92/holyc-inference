@@ -155,3 +155,110 @@ I32 TokenizerUTF8NextCodepointChecked(U8 *bytes,
     *io_cursor = next_cursor;
     return TOKENIZER_UTF8_OK;
 }
+
+I32 TokenizerUTF8SequenceSpanValidChecked(U8 *bytes,
+                                          U64 byte_len,
+                                          U64 *io_cursor,
+                                          U64 span_nbytes,
+                                          Bool *out_is_valid)
+{
+    U64 cursor;
+    U64 span_end;
+    U64 scan;
+    U8 lead;
+    U8 need;
+    U32 codepoint;
+    U32 scalar_checked;
+    U8 cont;
+    U64 next_scan;
+    I32 err;
+
+    if (!bytes || !io_cursor || !out_is_valid)
+        return TOKENIZER_UTF8_ERR_NULL_PTR;
+
+    // HolyC signed integer runtime: keep lengths in signed-positive range.
+    if (byte_len > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_UTF8_ERR_OVERFLOW;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_UTF8_ERR_BAD_PARAM;
+
+    // Caller selects the exact byte span to validate from the current cursor.
+    if (span_nbytes > byte_len - cursor)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    span_end = cursor + span_nbytes;
+    if (span_end < cursor || span_end > byte_len)
+        return TOKENIZER_UTF8_ERR_OVERFLOW;
+
+    scan = cursor;
+    while (scan < span_end) {
+        lead = bytes[scan];
+
+        // Lead-byte lane selection (1/2/3/4-byte sequence shape).
+        err = TokenizerUTF8ExpectedLengthFromLeadByteChecked(lead, &need);
+        if (err != TOKENIZER_UTF8_OK)
+            return err;
+
+        if (span_end - scan < need)
+            return TOKENIZER_UTF8_ERR_TRUNCATED;
+
+        if (need == 1)
+            codepoint = lead;
+        else if (need == 2)
+            codepoint = lead & 0x1F;
+        else if (need == 3)
+            codepoint = lead & 0x0F;
+        else
+            codepoint = lead & 0x07;
+
+        // Continuation lane checks and payload-bit assembly.
+        if (need > 1) {
+            cont = bytes[scan + 1];
+            if (!TokenizerUTF8IsContinuationByte(cont))
+                return TOKENIZER_UTF8_ERR_BAD_CONTINUATION;
+            codepoint = (codepoint << 6) | (cont & 0x3F);
+        }
+
+        if (need > 2) {
+            cont = bytes[scan + 2];
+            if (!TokenizerUTF8IsContinuationByte(cont))
+                return TOKENIZER_UTF8_ERR_BAD_CONTINUATION;
+            codepoint = (codepoint << 6) | (cont & 0x3F);
+        }
+
+        if (need > 3) {
+            cont = bytes[scan + 3];
+            if (!TokenizerUTF8IsContinuationByte(cont))
+                return TOKENIZER_UTF8_ERR_BAD_CONTINUATION;
+            codepoint = (codepoint << 6) | (cont & 0x3F);
+        }
+
+        // Reject overlong forms before Unicode scalar-domain validation.
+        if (need == 2 && codepoint < 0x80)
+            return TOKENIZER_UTF8_ERR_BAD_CODEPOINT;
+
+        if (need == 3 && codepoint < 0x800)
+            return TOKENIZER_UTF8_ERR_BAD_CODEPOINT;
+
+        if (need == 4 && codepoint < 0x10000)
+            return TOKENIZER_UTF8_ERR_BAD_CODEPOINT;
+
+        err = TokenizerUTF8ValidateCodepointScalarChecked(codepoint,
+                                                          &scalar_checked);
+        if (err != TOKENIZER_UTF8_OK)
+            return err;
+
+        next_scan = scan + need;
+        if (next_scan < scan || next_scan > span_end)
+            return TOKENIZER_UTF8_ERR_OVERFLOW;
+
+        scan = next_scan;
+    }
+
+    // No-partial semantics: only here do we commit cursor/output state.
+    *out_is_valid = TRUE;
+    *io_cursor = span_end;
+    return TOKENIZER_UTF8_OK;
+}
