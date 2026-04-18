@@ -1,0 +1,18 @@
+Completed one full iteration for `IQ-329` with HolyC runtime purity preserved.
+
+**What Changed**
+- Added prototype + implementation of `GGUFMetadataReadU8PairCheckedDefault` delegating to the checked core with `table_end=buf_nbytes` in `src/gguf/metadata.HC:165` and `src/gguf/metadata.HC:1392`.
+- Added focused host parity harness at `tests/test_gguf_metadata_read_u8_pair_checked_default.py:2` (null-pointer, success, truncation/no-partial-write, randomized parity vs explicit-end core).
+- Marked `IQ-329` done and added one ledger line in `MASTER_TASKS.md:528` and `MASTER_TASKS.md:550`.
+- Logged iteration to central DB (`temple-central.db`) as row `id=3697` for task `IQ-329`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_u8_pair_checked_default.py && python3 tests/test_gguf_metadata_read_u8_pair_checked.py && python3 tests/test_gguf_metadata_read_u8_checked.py && python3 tests/test_gguf_metadata_parse.py`
+- Output:
+  - `gguf_metadata_read_u8_pair_checked_default_reference_checks=ok`
+  - `gguf_metadata_read_u8_pair_checked_reference_checks=ok`
+  - `gguf_metadata_read_u8_checked_reference_checks=ok`
+  - `gguf_metadata_reference_checks=ok`
+
+**Queue Policy**
+- Unchecked `IQ-` depth is now `15` (meets the `>=15` rolling requirement).

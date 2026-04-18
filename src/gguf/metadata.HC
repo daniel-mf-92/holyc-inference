@@ -162,6 +162,12 @@ I32 GGUFMetadataReadU8PairChecked(U8 *buf,
                                   U8 *out_first,
                                   U8 *out_second);
 
+I32 GGUFMetadataReadU8PairCheckedDefault(U8 *buf,
+                                         U64 buf_nbytes,
+                                         U64 *cursor,
+                                         U8 *out_first,
+                                         U8 *out_second);
+
 I32 GGUFMetadataReadU8TripleChecked(U8 *buf,
                                     U64 buf_nbytes,
                                     U64 *cursor,
@@ -1378,6 +1384,23 @@ I32 GGUFMetadataReadU8PairChecked(U8 *buf,
     *out_second = second;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Canonical default-end wrapper for compact U8-pair metadata records.
+// Contract: preserves exact checked pair semantics by pinning table_end to
+// buf_nbytes and delegating to GGUFMetadataReadU8PairChecked.
+I32 GGUFMetadataReadU8PairCheckedDefault(U8 *buf,
+                                         U64 buf_nbytes,
+                                         U64 *cursor,
+                                         U8 *out_first,
+                                         U8 *out_second)
+{
+    return GGUFMetadataReadU8PairChecked(buf,
+                                         buf_nbytes,
+                                         cursor,
+                                         buf_nbytes,
+                                         out_first,
+                                         out_second);
 }
 
 // Checked three-byte tuple reader for compact metadata fields.
