@@ -2426,6 +2426,126 @@ I32 TokenizerBPEPromptSpanScanChecked(U8 *bytes,
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEPromptSpanScanCheckedNoPartial(U8 *bytes,
+                                               U64 byte_len,
+                                               U64 *io_cursor,
+                                               U64 prompt_nbytes,
+                                               U64 *out_span_starts,
+                                               U64 *out_span_lengths,
+                                               U8 *out_span_classes,
+                                               U64 out_span_capacity,
+                                               U64 *out_span_count)
+{
+    U64 cursor;
+    U64 staged_cursor;
+    U64 staged_count;
+    U64 staged_alloc_capacity;
+    U64 staged_starts_bytes;
+    U64 staged_lengths_bytes;
+    U64 staged_classes_bytes;
+    U64 *staged_starts;
+    U64 *staged_lengths;
+    U8 *staged_classes;
+    I32 err;
+    U64 i;
+
+    if (!bytes || !io_cursor || !out_span_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        out_span_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (out_span_capacity > 0 &&
+        (!out_span_starts || !out_span_lengths || !out_span_classes))
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (prompt_nbytes > byte_len - cursor)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    // Stage caller-visible cursor/span-count so checked-core failures do not
+    // partially mutate visible state.
+    staged_cursor = cursor;
+    staged_count = *out_span_count;
+
+    staged_alloc_capacity = out_span_capacity;
+    if (!staged_alloc_capacity)
+        staged_alloc_capacity = 1;
+
+    // Guard allocator byte-size multiplication before private staging writes.
+    if (staged_alloc_capacity > (0x7FFFFFFFFFFFFFFF / sizeof(U64)))
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    staged_starts_bytes = sizeof(U64) * staged_alloc_capacity;
+    staged_lengths_bytes = sizeof(U64) * staged_alloc_capacity;
+
+    if (staged_alloc_capacity > (0x7FFFFFFFFFFFFFFF / sizeof(U8)))
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    staged_classes_bytes = sizeof(U8) * staged_alloc_capacity;
+
+    if (!staged_starts_bytes || !staged_lengths_bytes || !staged_classes_bytes)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    staged_starts = MAlloc(staged_starts_bytes);
+    if (!staged_starts)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    staged_lengths = MAlloc(staged_lengths_bytes);
+    if (!staged_lengths) {
+        Free(staged_starts);
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    staged_classes = MAlloc(staged_classes_bytes);
+    if (!staged_classes) {
+        Free(staged_lengths);
+        Free(staged_starts);
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    err = TokenizerBPEPromptSpanScanChecked(bytes,
+                                            byte_len,
+                                            &staged_cursor,
+                                            prompt_nbytes,
+                                            staged_starts,
+                                            staged_lengths,
+                                            staged_classes,
+                                            out_span_capacity,
+                                            &staged_count);
+    if (err != TOKENIZER_BPE_OK) {
+        Free(staged_classes);
+        Free(staged_lengths);
+        Free(staged_starts);
+        return err;
+    }
+
+    if (staged_count > out_span_capacity) {
+        Free(staged_classes);
+        Free(staged_lengths);
+        Free(staged_starts);
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    }
+
+    // Commit staged span tables only after complete checked scan success.
+    for (i = 0; i < staged_count; i++) {
+        out_span_starts[i] = staged_starts[i];
+        out_span_lengths[i] = staged_lengths[i];
+        out_span_classes[i] = staged_classes[i];
+    }
+
+    *out_span_count = staged_count;
+    *io_cursor = staged_cursor;
+
+    Free(staged_classes);
+    Free(staged_lengths);
+    Free(staged_starts);
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEEncodePromptChecked(U8 *bytes,
                                     U64 byte_len,
                                     U64 *io_cursor,
