@@ -1,0 +1,14 @@
+Completed one full iteration on `IQ-338` end-to-end.
+
+**What Changed**
+- Added HolyC wrapper `GGUFMetadataReadI64QuadCheckedNoPartialDefault` in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/gguf/metadata.HC:3996` (prototype at `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/gguf/metadata.HC:611`).
+- Added parity harness `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_gguf_metadata_read_i64_quad_checked_no_partial_default.py:1`.
+- Marked `IQ-338` done, appended one ledger line, and added new unchecked `IQ-353` to keep queue rolling at 15+ in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:537`, `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:552`, `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:560`.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_i64_quad_checked_no_partial_default.py && python3 tests/test_gguf_metadata_read_i64_quad_checked_no_partial.py && python3 tests/test_gguf_metadata_read_i64_quad_checked_default.py`
+- Output: `ok` / `ok` / `ok`
+- Queue depth after update: `unchecked_iq=15`
+
+**Central DB**
+- Logged iteration into `~/Documents/local-codebases/temple-central.db` as `IQ-338` with status `pass` (row id `3783`).

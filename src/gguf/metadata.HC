@@ -608,6 +608,14 @@ I32 GGUFMetadataReadI64QuadCheckedNoPartial(U8 *buf,
                                             I64 *out_third,
                                             I64 *out_fourth);
 
+I32 GGUFMetadataReadI64QuadCheckedNoPartialDefault(U8 *buf,
+                                                   U64 buf_nbytes,
+                                                   U64 *cursor,
+                                                   I64 *out_first,
+                                                   I64 *out_second,
+                                                   I64 *out_third,
+                                                   I64 *out_fourth);
+
 I32 GGUFMetadataReadI64QuadChecked(U8 *buf,
                                    U64 buf_nbytes,
                                    U64 *cursor,
@@ -3979,6 +3987,28 @@ I32 GGUFMetadataReadI64QuadCheckedNoPartial(U8 *buf,
     *out_fourth = fourth;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Canonical default-end wrapper for explicit no-partial I64-quad metadata
+// reads. Contract: preserves exact checked-no-partial quad semantics by
+// pinning table_end to buf_nbytes and delegating to
+// GGUFMetadataReadI64QuadCheckedNoPartial.
+I32 GGUFMetadataReadI64QuadCheckedNoPartialDefault(U8 *buf,
+                                                   U64 buf_nbytes,
+                                                   U64 *cursor,
+                                                   I64 *out_first,
+                                                   I64 *out_second,
+                                                   I64 *out_third,
+                                                   I64 *out_fourth)
+{
+    return GGUFMetadataReadI64QuadCheckedNoPartial(buf,
+                                                    buf_nbytes,
+                                                    cursor,
+                                                    buf_nbytes,
+                                                    out_first,
+                                                    out_second,
+                                                    out_third,
+                                                    out_fourth);
 }
 
 // Canonical checked wrapper for compact I64-quad metadata records.
