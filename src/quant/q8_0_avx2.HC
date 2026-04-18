@@ -423,6 +423,37 @@ I32 Q8_0DotRowsAVX2Q32Checked(
     return Q8_0_AVX2_OK;
 }
 
+I32 Q8_0DotRowsAVX2Q32CheckedDefault(
+    Q8_0Block *matrix_blocks,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q8_0Block *vec_blocks,
+    I64 vec_block_count,
+    I64 *out_rows_q32)
+{
+    I64 matrix_block_capacity;
+
+    // IQ-313 canonical default-capacity row wrapper:
+    // - Matrix capacity defaults to `row_count * row_stride_blocks`.
+    // - Vector capacity defaults to `vec_block_count`.
+    // - Negative lengths preserve checked-core BAD_LEN semantics.
+    // - Capacity multiplication is checked so default derivation never wraps.
+    if (row_count < 0 || row_stride_blocks < 0 || vec_block_count < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    if (!Q8_0AVX2TryMulI64(row_count, row_stride_blocks, &matrix_block_capacity))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+
+    return Q8_0DotRowsAVX2Q32Checked(matrix_blocks,
+                                     matrix_block_capacity,
+                                     row_count,
+                                     row_stride_blocks,
+                                     vec_blocks,
+                                     vec_block_count,
+                                     vec_block_count,
+                                     out_rows_q32);
+}
+
 I32 Q8_0MatMulTiledAVX2Q32Checked(
     Q8_0Block *lhs_matrix_blocks,
     I64 lhs_block_capacity,

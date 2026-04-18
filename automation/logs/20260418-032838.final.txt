@@ -1,0 +1,20 @@
+Done — one full unattended iteration is complete for `IQ-313`.
+
+**What Changed**
+- Implemented `Q8_0DotRowsAVX2Q32CheckedDefault` in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/quant/q8_0_avx2.HC:449` as a checked default-capacity wrapper over `Q8_0DotRowsAVX2Q32Checked`.
+- Added parity harness `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_q8_0_avx2_dot_rows_q32_checked_default.py:1`.
+- Updated queue/ledger in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:512`:
+  - Marked `IQ-313` done.
+  - Appended new unchecked `IQ-328` (monotonic ID) to keep rolling queue depth.
+  - Added one progress-ledger line (`loop-386`).
+
+**Validation Run**
+- `python3 tests/test_q8_0_avx2_dot_rows_q32_checked_default.py` → `q8_0_avx2_dot_rows_q32_checked_default_reference_checks=ok`
+- `python3 tests/test_q8_0_avx2_dot_rows_q32_checked.py` → `ok`
+
+**Queue/DB**
+- Unchecked `IQ-` depth after completion/replenish: `15` (policy satisfied).
+- Logged central DB row: `iterations.id=3560`, `agent=inference`, `task_id=IQ-313`, `status=pass`, `validation_result=ok`.
+
+**Note**
+- Repo also has pre-existing loop-log churn in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/automation/logs/20260418-032838.log:1` and `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/automation/logs/loop.heartbeat:1` untouched by implementation logic.
