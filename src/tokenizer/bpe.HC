@@ -1066,6 +1066,46 @@ I32 TokenizerBPETokenPairRankLookupChecked(I32 left_token,
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEMergePairRankLookupCheckedNoPartial(I32 left_token,
+                                                    I32 right_token,
+                                                    I32 *rank_left_tokens,
+                                                    I32 *rank_right_tokens,
+                                                    U32 *rank_values,
+                                                    U64 rank_table_count,
+                                                    U64 rank_table_capacity,
+                                                    U32 *out_rank,
+                                                    Bool *out_found)
+{
+    U32 staged_rank;
+    Bool staged_found;
+    I32 err;
+
+    if (!out_rank || !out_found)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Stage caller-visible outputs so malformed-capacity or pointer faults
+    // in the checked core cannot partially overwrite the caller state.
+    staged_rank = *out_rank;
+    staged_found = *out_found;
+
+    err = TokenizerBPETokenPairRankLookupChecked(left_token,
+                                                 right_token,
+                                                 rank_left_tokens,
+                                                 rank_right_tokens,
+                                                 rank_values,
+                                                 rank_table_count,
+                                                 rank_table_capacity,
+                                                 &staged_rank,
+                                                 &staged_found);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    // All-or-nothing commit after full checked lookup succeeds.
+    *out_rank = staged_rank;
+    *out_found = staged_found;
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEMergePairRankLookupCheckedDefault(I32 left_token,
                                                   I32 right_token,
                                                   I32 *rank_left_tokens,
