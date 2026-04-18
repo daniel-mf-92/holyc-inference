@@ -704,3 +704,277 @@ I32 TokenizerBPEMergeApplyAtIndexChecked(I32 *token_ids,
     *out_token_count = next_count;
     return TOKENIZER_BPE_OK;
 }
+
+I32 TokenizerBPEMergePairTokenLookupChecked(I32 left_token,
+                                            I32 right_token,
+                                            I32 *rank_left_tokens,
+                                            I32 *rank_right_tokens,
+                                            U32 *rank_values,
+                                            I32 *rank_merged_tokens,
+                                            U64 rank_table_count,
+                                            U64 rank_table_capacity,
+                                            I32 *out_merged_token,
+                                            U32 *out_rank,
+                                            Bool *out_found)
+{
+    U64 lo;
+    U64 hi;
+    U64 mid;
+    I32 mid_left;
+    I32 mid_right;
+    U64 first_match;
+    U64 scan;
+    U64 next_scan;
+    Bool found;
+    U32 best_rank;
+    I32 best_merged;
+
+    if (!out_merged_token || !out_rank || !out_found)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (rank_table_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (rank_table_count > rank_table_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (rank_table_count > 0 &&
+        (!rank_left_tokens || !rank_right_tokens || !rank_values || !rank_merged_tokens))
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (!rank_table_count) {
+        *out_found = FALSE;
+        return TOKENIZER_BPE_OK;
+    }
+
+    // Binary-search lower bound for key (left_token,right_token)
+    // in lexicographically sorted rank tables.
+    lo = 0;
+    hi = rank_table_count;
+    while (lo < hi) {
+        mid = lo + ((hi - lo) >> 1);
+
+        mid_left = rank_left_tokens[mid];
+        mid_right = rank_right_tokens[mid];
+
+        if (mid_left < left_token || (mid_left == left_token && mid_right < right_token)) {
+            lo = mid + 1;
+            continue;
+        }
+
+        hi = mid;
+    }
+
+    first_match = lo;
+    if (first_match >= rank_table_count) {
+        *out_found = FALSE;
+        return TOKENIZER_BPE_OK;
+    }
+
+    if (rank_left_tokens[first_match] != left_token ||
+        rank_right_tokens[first_match] != right_token) {
+        *out_found = FALSE;
+        return TOKENIZER_BPE_OK;
+    }
+
+    // Deterministic duplicate-key handling: keep the lowest rank and its
+    // first-seen merged token for that rank.
+    scan = first_match;
+    found = FALSE;
+    best_rank = 0;
+    best_merged = 0;
+
+    while (scan < rank_table_count) {
+        if (rank_left_tokens[scan] != left_token)
+            break;
+        if (rank_right_tokens[scan] != right_token)
+            break;
+
+        if (!found || rank_values[scan] < best_rank) {
+            best_rank = rank_values[scan];
+            best_merged = rank_merged_tokens[scan];
+            found = TRUE;
+        }
+
+        next_scan = scan + 1;
+        if (next_scan <= scan)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+        scan = next_scan;
+    }
+
+    if (!found) {
+        *out_found = FALSE;
+        return TOKENIZER_BPE_OK;
+    }
+
+    // No-partial-write contract: commit output state only after full lookup.
+    *out_merged_token = best_merged;
+    *out_rank = best_rank;
+    *out_found = TRUE;
+    return TOKENIZER_BPE_OK;
+}
+
+I32 TokenizerBPEEncodeSpanChecked(U8 *bytes,
+                                  U64 byte_len,
+                                  U64 *io_cursor,
+                                  U64 span_nbytes,
+                                  I32 *rank_left_tokens,
+                                  I32 *rank_right_tokens,
+                                  U32 *rank_values,
+                                  I32 *rank_merged_tokens,
+                                  U64 rank_table_count,
+                                  U64 rank_table_capacity,
+                                  I32 *out_token_ids,
+                                  U64 out_token_capacity,
+                                  U64 *out_token_count)
+{
+    U64 cursor;
+    U64 span_end;
+    U64 valid_cursor;
+    Bool span_is_valid;
+    I32 err;
+    I32 *working_tokens;
+    U64 working_count;
+    U64 working_capacity;
+    U64 i;
+    U64 next_i;
+    Bool pair_found;
+    U32 pair_rank;
+    I32 pair_merged;
+    Bool best_found;
+    U64 best_left_index;
+    U32 best_rank;
+    I32 best_merged;
+    U64 next_count;
+
+    if (!bytes || !io_cursor || !out_token_ids || !out_token_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        out_token_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (rank_table_count > rank_table_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (rank_table_count > 0 &&
+        (!rank_left_tokens || !rank_right_tokens || !rank_values || !rank_merged_tokens))
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (span_nbytes > byte_len - cursor)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    span_end = cursor + span_nbytes;
+    if (span_end < cursor || span_end > byte_len)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Input span is pretokenized UTF-8; reject malformed sequences up-front.
+    valid_cursor = cursor;
+    span_is_valid = FALSE;
+    err = TokenizerUTF8SequenceSpanValidChecked(bytes,
+                                                byte_len,
+                                                &valid_cursor,
+                                                span_nbytes,
+                                                &span_is_valid);
+    if (err != TOKENIZER_UTF8_OK)
+        return err;
+    if (!span_is_valid || valid_cursor != span_end)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Base pretokenization: one token per byte before merge passes.
+    if (span_nbytes > out_token_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (!span_nbytes) {
+        *out_token_count = 0;
+        *io_cursor = span_end;
+        return TOKENIZER_BPE_OK;
+    }
+
+    working_capacity = span_nbytes;
+    working_tokens = MAlloc(sizeof(I32) * working_capacity);
+    if (!working_tokens)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    for (i = 0; i < span_nbytes; i++)
+        working_tokens[i] = bytes[cursor + i];
+    working_count = span_nbytes;
+
+    // Deterministic BPE merge loop: repeatedly apply lowest-rank adjacent pair.
+    while (working_count >= 2) {
+        best_found = FALSE;
+        best_left_index = 0;
+        best_rank = 0;
+        best_merged = 0;
+
+        for (i = 0; i + 1 < working_count; i++) {
+            next_i = i + 1;
+            if (next_i <= i || next_i >= working_count) {
+                Free(working_tokens);
+                return TOKENIZER_BPE_ERR_OVERFLOW;
+            }
+
+            err = TokenizerBPEMergePairTokenLookupChecked(working_tokens[i],
+                                                          working_tokens[next_i],
+                                                          rank_left_tokens,
+                                                          rank_right_tokens,
+                                                          rank_values,
+                                                          rank_merged_tokens,
+                                                          rank_table_count,
+                                                          rank_table_capacity,
+                                                          &pair_merged,
+                                                          &pair_rank,
+                                                          &pair_found);
+            if (err != TOKENIZER_BPE_OK) {
+                Free(working_tokens);
+                return err;
+            }
+
+            if (!pair_found)
+                continue;
+
+            // Lowest rank wins; equal ranks preserve leftmost pair index.
+            if (!best_found || pair_rank < best_rank) {
+                best_rank = pair_rank;
+                best_left_index = i;
+                best_merged = pair_merged;
+                best_found = TRUE;
+            }
+        }
+
+        if (!best_found)
+            break;
+
+        err = TokenizerBPEMergeApplyAtIndexChecked(working_tokens,
+                                                   working_count,
+                                                   working_capacity,
+                                                   best_left_index,
+                                                   best_merged,
+                                                   &next_count);
+        if (err != TOKENIZER_BPE_OK) {
+            Free(working_tokens);
+            return err;
+        }
+
+        working_count = next_count;
+    }
+
+    if (working_count > out_token_capacity) {
+        Free(working_tokens);
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    }
+
+    // No-partial-write output contract: materialize output only on full success.
+    for (i = 0; i < working_count; i++)
+        out_token_ids[i] = working_tokens[i];
+
+    *out_token_count = working_count;
+    *io_cursor = span_end;
+    Free(working_tokens);
+    return TOKENIZER_BPE_OK;
+}
