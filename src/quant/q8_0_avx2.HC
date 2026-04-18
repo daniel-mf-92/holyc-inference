@@ -748,6 +748,70 @@ I32 Q8_0DotRowsAVX2Q32ToQ16Checked(
     return Q8_0_AVX2_OK;
 }
 
+I32 Q8_0DotRowsAVX2Q32ToQ16CheckedNoPartial(
+    Q8_0Block *matrix_blocks,
+    I64 matrix_block_capacity,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q8_0Block *vec_blocks,
+    I64 vec_block_capacity,
+    I64 vec_block_count,
+    I64 *out_rows_q16)
+{
+    I64 stage_bytes;
+    I64 row_index;
+    I64 *staged_rows_q16;
+    I32 status;
+
+    if (!matrix_blocks || !vec_blocks || !out_rows_q16)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+    if (row_count < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    // IQ-359 all-or-nothing wrapper contract:
+    // - Materialize row dots into a private staging span.
+    // - Reuse checked core helper for the full row conversion path.
+    // - Commit caller output lanes only after full success.
+    // This makes row conversion externally no-partial-write even when a later
+    // row fails after earlier rows were already computable.
+    if (!row_count)
+        return Q8_0DotRowsAVX2Q32ToQ16Checked(matrix_blocks,
+                                              matrix_block_capacity,
+                                              row_count,
+                                              row_stride_blocks,
+                                              vec_blocks,
+                                              vec_block_capacity,
+                                              vec_block_count,
+                                              out_rows_q16);
+
+    if (!Q8_0AVX2TryMulI64(row_count, sizeof(I64), &stage_bytes))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+
+    staged_rows_q16 = MAlloc(stage_bytes);
+    if (!staged_rows_q16)
+        return Q8_0_AVX2_ERR_OVERFLOW;
+
+    status = Q8_0DotRowsAVX2Q32ToQ16Checked(matrix_blocks,
+                                            matrix_block_capacity,
+                                            row_count,
+                                            row_stride_blocks,
+                                            vec_blocks,
+                                            vec_block_capacity,
+                                            vec_block_count,
+                                            staged_rows_q16);
+    if (status != Q8_0_AVX2_OK)
+    {
+        Free(staged_rows_q16);
+        return status;
+    }
+
+    for (row_index = 0; row_index < row_count; ++row_index)
+        out_rows_q16[row_index] = staged_rows_q16[row_index];
+
+    Free(staged_rows_q16);
+    return Q8_0_AVX2_OK;
+}
+
 I32 Q8_0DotRowsAVX2Q32ToQ16CheckedDefault(
     Q8_0Block *matrix_blocks,
     I64 row_count,
