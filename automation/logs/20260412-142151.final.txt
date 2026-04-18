@@ -1,8 +1,0 @@
-Done — this iteration completed exactly one IQ task and kept the queue rolling.
-
-- Completed `IQ-001` by confirming required directories exist: `src/`, `tests/`, `docs/`, `automation/`, `models/`.
-- Updated queue state and ledger in `MASTER_TASKS.md:122` and `MASTER_TASKS.md:144`.
-- Maintained queue depth by appending `IQ-016` in `MASTER_TASKS.md:137` (unchecked IQ count is now 15).
-- Focused validation command run: `for d in src tests docs automation models; do [ -d "$d" ] && echo "OK $d" || echo "MISSING $d"; done`
-- Validation output: `OK src`, `OK tests`, `OK docs`, `OK automation`, `OK models`.
-
