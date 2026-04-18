@@ -717,6 +717,12 @@ I32 GGUFMetadataReadBoolPairChecked(U8 *buf,
                                     Bool *out_first,
                                     Bool *out_second);
 
+I32 GGUFMetadataReadBoolPairCheckedDefault(U8 *buf,
+                                           U64 buf_nbytes,
+                                           U64 *cursor,
+                                           Bool *out_first,
+                                           Bool *out_second);
+
 I32 GGUFMetadataReadBoolTripleChecked(U8 *buf,
                                       U64 buf_nbytes,
                                       U64 *cursor,
@@ -4508,6 +4514,23 @@ I32 GGUFMetadataReadBoolPairChecked(U8 *buf,
     *out_second = second;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Canonical default-end wrapper for compact BOOL-pair metadata records.
+// Contract: preserves exact checked pair semantics by pinning table_end to
+// buf_nbytes and delegating to GGUFMetadataReadBoolPairChecked.
+I32 GGUFMetadataReadBoolPairCheckedDefault(U8 *buf,
+                                           U64 buf_nbytes,
+                                           U64 *cursor,
+                                           Bool *out_first,
+                                           Bool *out_second)
+{
+    return GGUFMetadataReadBoolPairChecked(buf,
+                                           buf_nbytes,
+                                           cursor,
+                                           buf_nbytes,
+                                           out_first,
+                                           out_second);
 }
 
 // Checked metadata BOOL triple reader (`U8 in {0,1}` for each lane).

@@ -1,0 +1,14 @@
+Done — I completed one full unattended iteration for `IQ-318` and kept queue depth compliant.
+
+**Changes**
+- Added HolyC default-end wrapper `GGUFMetadataReadBoolPairCheckedDefault` in `src/gguf/metadata.HC:720` and implementation in `src/gguf/metadata.HC:4522`.
+- Added focused host-side parity harness `tests/test_gguf_metadata_read_bool_pair_checked_default.py:1` (success, truncation, bad-bool, randomized parity/no-partial-write).
+- Updated task board: marked `IQ-318` done at `MASTER_TASKS.md:517`, added ledger line at `MASTER_TASKS.md:539`, and appended new unchecked queue item `IQ-333` at `MASTER_TASKS.md:532` to maintain rolling depth.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_bool_pair_checked_default.py && python3 tests/test_gguf_metadata_read_bool_pair_checked.py && python3 tests/test_gguf_metadata_read_bool_triple_checked_default.py && python3 tests/test_gguf_metadata_parse.py`
+- Output: `ok`, `gguf_metadata_read_bool_pair_checked_reference_checks=ok`, `ok`, `gguf_metadata_reference_checks=ok`.
+
+**Ledger/DB**
+- Inserted central log row into `~/Documents/local-codebases/temple-central.db` for `IQ-318` with status `pass`.
+- Unchecked `IQ-` queue count is now `15` (policy satisfied).
