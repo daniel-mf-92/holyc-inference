@@ -108,3 +108,8 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_3","type":"todo_list","items":[{"text":"Read tasks and research context","completed":true},{"text":"Top up IQ queue to >=15","completed":true},{"text":"Implement highest-priority IQ item","completed":true},{"text":"Run focused validations","completed":true},{"text":"Log DB row and update tasks","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":2476769,"cached_input_tokens":2396032,"output_tokens":12422}}
 Codex final exit code: 0
+[main bcfecbf] feat(inference): codex iteration 20260418-073957
+ 6 files changed, 601 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260418-073957.final.txt
+ create mode 100644 tests/test_softmax_topk_select_logits_checked_no_alias.py
+=== End iteration 87 (outcome=ok) ===
