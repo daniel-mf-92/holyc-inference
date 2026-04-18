@@ -439,6 +439,12 @@ I32 GGUFMetadataReadU64PairCheckedNoPartial(U8 *buf,
                                             U64 *out_first,
                                             U64 *out_second);
 
+I32 GGUFMetadataReadU64PairCheckedNoPartialDefault(U8 *buf,
+                                                   U64 buf_nbytes,
+                                                   U64 *cursor,
+                                                   U64 *out_first,
+                                                   U64 *out_second);
+
 I32 GGUFMetadataReadU64TripleCheckedNoPartial(U8 *buf,
                                               U64 buf_nbytes,
                                               U64 *cursor,
@@ -2983,6 +2989,25 @@ I32 GGUFMetadataReadU64PairCheckedNoPartial(U8 *buf,
     *out_second = second;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Canonical default-end wrapper for explicit no-partial U64 pair metadata
+// reads.
+// Contract: preserves exact checked-no-partial pair semantics by pinning
+// table_end to buf_nbytes and delegating to
+// GGUFMetadataReadU64PairCheckedNoPartial.
+I32 GGUFMetadataReadU64PairCheckedNoPartialDefault(U8 *buf,
+                                                   U64 buf_nbytes,
+                                                   U64 *cursor,
+                                                   U64 *out_first,
+                                                   U64 *out_second)
+{
+    return GGUFMetadataReadU64PairCheckedNoPartial(buf,
+                                                   buf_nbytes,
+                                                   cursor,
+                                                   buf_nbytes,
+                                                   out_first,
+                                                   out_second);
 }
 
 // Canonical default-end wrapper for fixed-layout U64 pair metadata tuples.

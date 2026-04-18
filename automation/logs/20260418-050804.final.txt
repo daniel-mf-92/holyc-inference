@@ -1,0 +1,17 @@
+Done — I completed one full unattended iteration for `IQ-322` end-to-end.
+
+**What Changed**
+- Added HolyC prototype + implementation for `GGUFMetadataReadU64PairCheckedNoPartialDefault` as canonical default-end wrapper over no-partial core in `src/gguf/metadata.HC:442` and `src/gguf/metadata.HC:2999`.
+- Added focused parity harness in `tests/test_gguf_metadata_read_u64_pair_checked_no_partial_default.py:1`.
+- Marked queue item complete in `MASTER_TASKS.md:521`.
+- Added exactly one ledger line for this iteration in `MASTER_TASKS.md:545` (`loop-395`).
+
+**Validation Output**
+- `python3 tests/test_gguf_metadata_read_u64_pair_checked_no_partial_default.py` → `gguf_metadata_read_u64_pair_checked_no_partial_default_parity=ok`
+- `python3 tests/test_gguf_metadata_read_u64_pair_checked_no_partial.py` → `gguf_metadata_read_u64_pair_checked_no_partial_reference_checks=ok`
+- `python3 tests/test_gguf_metadata_read_u64_pair_checked_default.py` → `ok`
+- `python3 tests/test_gguf_metadata_parse.py` → `gguf_metadata_reference_checks=ok`
+
+**Queue + DB**
+- Queue depth policy maintained: `15` unchecked `IQ-` items remain (min `IQ-324`, max `IQ-338`).
+- Logged to central DB: row `id=3661`, `agent=inference`, `task_id=IQ-322`, `status=pass`.
