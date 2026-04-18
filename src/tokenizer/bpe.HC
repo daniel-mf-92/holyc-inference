@@ -11,6 +11,11 @@
 #define TOKENIZER_UTF8_ERR_BAD_CODEPOINT 7
 #define TOKENIZER_UTF8_ERR_TRUNCATED 8
 
+#define TOKENIZER_BPE_OK 0
+#define TOKENIZER_BPE_ERR_NULL_PTR 101
+#define TOKENIZER_BPE_ERR_BAD_PARAM 102
+#define TOKENIZER_BPE_ERR_OVERFLOW 103
+
 Bool TokenizerUTF8IsContinuationByte(U8 byte)
 {
     // Continuation bytes are exactly the 10xxxxxx lane.
@@ -332,4 +337,97 @@ I32 TokenizerUTF8SequenceSpanValidChecked(U8 *bytes,
     *out_is_valid = TRUE;
     *io_cursor = span_end;
     return TOKENIZER_UTF8_OK;
+}
+
+I32 TokenizerBPEMergePairPriorityFindChecked(I32 *token_ids,
+                                             U64 token_count,
+                                             U64 token_capacity,
+                                             I32 *rank_left_tokens,
+                                             I32 *rank_right_tokens,
+                                             U32 *rank_values,
+                                             U64 rank_table_count,
+                                             U64 rank_table_capacity,
+                                             U64 *out_left_index,
+                                             U32 *out_rank,
+                                             Bool *out_found)
+{
+    U64 i;
+    U64 j;
+    U64 next_i;
+    Bool found;
+    Bool pair_rank_found;
+    U64 best_left_index;
+    U32 best_rank;
+    I32 left;
+    I32 right;
+    U32 pair_rank;
+
+    if (!token_ids || !out_left_index || !out_rank || !out_found)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_capacity > 0x7FFFFFFFFFFFFFFF || rank_table_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (token_count > token_capacity || rank_table_count > rank_table_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (rank_table_count > 0 && (!rank_left_tokens || !rank_right_tokens || !rank_values))
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_count < 2) {
+        *out_found = FALSE;
+        return TOKENIZER_BPE_OK;
+    }
+
+    found = FALSE;
+    best_left_index = 0;
+    best_rank = 0;
+
+    // Scan adjacent token pairs and choose the lowest-rank merge.
+    // Deterministic tie-break: first pair index wins when ranks are equal.
+    for (i = 0; i + 1 < token_count; i++) {
+        next_i = i + 1;
+        if (next_i <= i || next_i >= token_count)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+
+        left = token_ids[i];
+        right = token_ids[next_i];
+
+        pair_rank_found = FALSE;
+        pair_rank = 0;
+
+        // Search ranked merge table for this adjacent pair.
+        // Duplicate entries are resolved to the lowest rank.
+        for (j = 0; j < rank_table_count; j++) {
+            if (rank_left_tokens[j] != left)
+                continue;
+            if (rank_right_tokens[j] != right)
+                continue;
+
+            if (!pair_rank_found || rank_values[j] < pair_rank) {
+                pair_rank = rank_values[j];
+                pair_rank_found = TRUE;
+            }
+        }
+
+        if (!pair_rank_found)
+            continue;
+
+        if (!found || pair_rank < best_rank) {
+            best_rank = pair_rank;
+            best_left_index = i;
+            found = TRUE;
+        }
+    }
+
+    // No-partial-write contract: commit output state only after full scan.
+    if (!found) {
+        *out_found = FALSE;
+        return TOKENIZER_BPE_OK;
+    }
+
+    *out_left_index = best_left_index;
+    *out_rank = best_rank;
+    *out_found = TRUE;
+    return TOKENIZER_BPE_OK;
 }
