@@ -10,12 +10,63 @@
 #define Q4_0_AVX2_OK               0
 #define Q4_0_AVX2_ERR_NULL_PTR     1
 #define Q4_0_AVX2_ERR_BAD_LEN      2
+#define Q4_0_AVX2_ERR_OVERFLOW     3
+
+#define Q4_0_AVX2_I64_MAX          0x7FFFFFFFFFFFFFFF
+#define Q4_0_AVX2_I64_MIN          (-0x7FFFFFFFFFFFFFFF - 1)
 
 class Q4_0Block
 {
     U16 d_fp16;
     U8 qs[Q4_0_AVX2_PACKED_BYTES];
 };
+
+Bool Q4_0AVX2TryMulI64(I64 lhs, I64 rhs, I64 *out_prod)
+{
+    if (!out_prod)
+        return FALSE;
+
+    if (!lhs || !rhs)
+    {
+        *out_prod = 0;
+        return TRUE;
+    }
+
+    if (lhs == -1 && rhs == Q4_0_AVX2_I64_MIN)
+        return FALSE;
+    if (rhs == -1 && lhs == Q4_0_AVX2_I64_MIN)
+        return FALSE;
+
+    if (lhs > 0)
+    {
+        if (rhs > 0)
+        {
+            if (lhs > Q4_0_AVX2_I64_MAX / rhs)
+                return FALSE;
+        }
+        else
+        {
+            if (rhs < Q4_0_AVX2_I64_MIN / lhs)
+                return FALSE;
+        }
+    }
+    else
+    {
+        if (rhs > 0)
+        {
+            if (lhs < Q4_0_AVX2_I64_MIN / rhs)
+                return FALSE;
+        }
+        else
+        {
+            if (lhs < Q4_0_AVX2_I64_MAX / rhs)
+                return FALSE;
+        }
+    }
+
+    *out_prod = lhs * rhs;
+    return TRUE;
+}
 
 I64 Q4_0AVX2RoundShiftRightUnsigned(I64 value, I64 shift)
 {
@@ -246,4 +297,63 @@ I32 Q4_0DotProductBlocksQ32AVX2Checked(
                                        rhs,
                                        block_count,
                                        out_dot_q32);
+}
+
+I32 Q4_0DotRowsAVX2Q32Checked(
+    Q4_0Block *matrix_blocks,
+    I64 matrix_block_capacity,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q4_0Block *vec_blocks,
+    I64 vec_block_capacity,
+    I64 vec_block_count,
+    I64 *out_rows_q32)
+{
+    I64 row_index;
+    I64 required_matrix_blocks;
+    I64 row_base;
+    Q4_0Block *row_ptr;
+    I64 row_dot_q32;
+    I32 status;
+
+    if (!matrix_blocks || !vec_blocks || !out_rows_q32)
+        return Q4_0_AVX2_ERR_NULL_PTR;
+
+    if (matrix_block_capacity < 0 || vec_block_capacity < 0)
+        return Q4_0_AVX2_ERR_BAD_LEN;
+    if (row_count < 0 || row_stride_blocks < 0 || vec_block_count < 0)
+        return Q4_0_AVX2_ERR_BAD_LEN;
+
+    // Row i lives at matrix_blocks + i*row_stride_blocks.
+    // Each row consumes vec_block_count active blocks for its dot.
+    if (row_count > 0 && row_stride_blocks < vec_block_count)
+        return Q4_0_AVX2_ERR_BAD_LEN;
+    if (vec_block_count > vec_block_capacity)
+        return Q4_0_AVX2_ERR_BAD_LEN;
+
+    // Prove that the strided matrix window is representable and in-bounds.
+    if (!Q4_0AVX2TryMulI64(row_count, row_stride_blocks, &required_matrix_blocks))
+        return Q4_0_AVX2_ERR_OVERFLOW;
+    if (required_matrix_blocks > matrix_block_capacity)
+        return Q4_0_AVX2_ERR_BAD_LEN;
+
+    for (row_index = 0; row_index < row_count; ++row_index)
+    {
+        if (!Q4_0AVX2TryMulI64(row_index, row_stride_blocks, &row_base))
+            return Q4_0_AVX2_ERR_OVERFLOW;
+
+        row_ptr = &matrix_blocks[row_base];
+        status = Q4_0DotProductBlocksQ32AVX2Checked(row_ptr,
+                                                    matrix_block_capacity - row_base,
+                                                    vec_blocks,
+                                                    vec_block_capacity,
+                                                    vec_block_count,
+                                                    &row_dot_q32);
+        if (status != Q4_0_AVX2_OK)
+            return status;
+
+        out_rows_q32[row_index] = row_dot_q32;
+    }
+
+    return Q4_0_AVX2_OK;
 }
