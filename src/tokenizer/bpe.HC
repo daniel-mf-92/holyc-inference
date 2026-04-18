@@ -1003,6 +1003,133 @@ I32 TokenizerBPEMergePairTokenLookupChecked(I32 left_token,
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEMergeApplyBestPriorityChecked(I32 *token_ids,
+                                              U64 token_count,
+                                              U64 token_capacity,
+                                              I32 *rank_left_tokens,
+                                              I32 *rank_right_tokens,
+                                              U32 *rank_values,
+                                              I32 *rank_merged_tokens,
+                                              U64 rank_table_count,
+                                              U64 rank_table_capacity,
+                                              I32 *out_merged_token,
+                                              U32 *out_rank,
+                                              Bool *out_found,
+                                              U64 *out_token_count)
+{
+    I32 *staged_tokens;
+    U64 i;
+    U64 best_left_index;
+    U64 best_right_index;
+    U32 best_rank;
+    Bool best_found;
+    I32 merged_token;
+    U32 pair_rank;
+    Bool pair_found;
+    U64 next_token_count;
+    I32 err;
+
+    if (!token_ids ||
+        !out_merged_token ||
+        !out_rank ||
+        !out_found ||
+        !out_token_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_capacity > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (token_count > token_capacity || rank_table_count > rank_table_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (rank_table_count > 0 &&
+        (!rank_left_tokens || !rank_right_tokens || !rank_values || !rank_merged_tokens))
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_count < 2) {
+        *out_found = FALSE;
+        *out_token_count = token_count;
+        return TOKENIZER_BPE_OK;
+    }
+
+    // Step 1 (greedy): resolve the best-ranked adjacent pair.
+    best_left_index = 0;
+    best_rank = 0;
+    best_found = FALSE;
+    err = TokenizerBPEMergePairPriorityFindChecked(token_ids,
+                                                   token_count,
+                                                   token_capacity,
+                                                   rank_left_tokens,
+                                                   rank_right_tokens,
+                                                   rank_values,
+                                                   rank_table_count,
+                                                   rank_table_capacity,
+                                                   &best_left_index,
+                                                   &best_rank,
+                                                   &best_found);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    if (!best_found) {
+        *out_found = FALSE;
+        *out_token_count = token_count;
+        return TOKENIZER_BPE_OK;
+    }
+
+    best_right_index = best_left_index + 1;
+    if (best_right_index <= best_left_index || best_right_index >= token_count)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Resolve merged token for the selected pair and verify rank agreement.
+    err = TokenizerBPEMergePairTokenLookupChecked(token_ids[best_left_index],
+                                                  token_ids[best_right_index],
+                                                  rank_left_tokens,
+                                                  rank_right_tokens,
+                                                  rank_values,
+                                                  rank_merged_tokens,
+                                                  rank_table_count,
+                                                  rank_table_capacity,
+                                                  &merged_token,
+                                                  &pair_rank,
+                                                  &pair_found);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    if (!pair_found || pair_rank != best_rank)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Step 2 (all-or-nothing): stage the token span, apply merge on staged
+    // memory, and commit only if the merge operation fully succeeds.
+    staged_tokens = MAlloc(sizeof(I32) * token_count);
+    if (!staged_tokens)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    for (i = 0; i < token_count; i++)
+        staged_tokens[i] = token_ids[i];
+
+    err = TokenizerBPEMergeApplyAtIndexChecked(staged_tokens,
+                                               token_count,
+                                               token_capacity,
+                                               best_left_index,
+                                               merged_token,
+                                               &next_token_count);
+    if (err != TOKENIZER_BPE_OK) {
+        Free(staged_tokens);
+        return err;
+    }
+
+    for (i = 0; i < next_token_count; i++)
+        token_ids[i] = staged_tokens[i];
+
+    Free(staged_tokens);
+    *out_merged_token = merged_token;
+    *out_rank = best_rank;
+    *out_found = TRUE;
+    *out_token_count = next_token_count;
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEEncodeMergeLoopChecked(I32 *token_ids,
                                        U64 token_count,
                                        U64 token_capacity,
