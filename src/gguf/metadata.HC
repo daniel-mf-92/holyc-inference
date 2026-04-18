@@ -4076,6 +4076,44 @@ I32 GGUFMetadataReadF32BitsPairChecked(U8 *buf,
     return GGUF_META_TABLE_OK;
 }
 
+// Canonical checked-no-partial wrapper for FLOAT32 raw-bit pair metadata
+// records.
+// Contract: preserves exact pair decode semantics (all-or-nothing output and
+// cursor commit) by delegating to GGUFMetadataReadF32BitsPairChecked.
+I32 GGUFMetadataReadF32BitsPairCheckedNoPartial(U8 *buf,
+                                                U64 buf_nbytes,
+                                                U64 *cursor,
+                                                U64 table_end,
+                                                U32 *out_first_bits,
+                                                U32 *out_second_bits)
+{
+    return GGUFMetadataReadF32BitsPairChecked(buf,
+                                              buf_nbytes,
+                                              cursor,
+                                              table_end,
+                                              out_first_bits,
+                                              out_second_bits);
+}
+
+// Canonical default-end wrapper for explicit no-partial FLOAT32 raw-bit pair
+// metadata records.
+// Contract: preserves exact checked-no-partial pair semantics by pinning
+// table_end to buf_nbytes and delegating to
+// GGUFMetadataReadF32BitsPairCheckedNoPartial.
+I32 GGUFMetadataReadF32BitsPairCheckedNoPartialDefault(U8 *buf,
+                                                       U64 buf_nbytes,
+                                                       U64 *cursor,
+                                                       U32 *out_first_bits,
+                                                       U32 *out_second_bits)
+{
+    return GGUFMetadataReadF32BitsPairCheckedNoPartial(buf,
+                                                       buf_nbytes,
+                                                       cursor,
+                                                       buf_nbytes,
+                                                       out_first_bits,
+                                                       out_second_bits);
+}
+
 // Canonical default-end wrapper for fixed-layout FLOAT32 raw-bit pair
 // metadata records.
 // Contract: preserves exact checked pair semantics by pinning table_end to
