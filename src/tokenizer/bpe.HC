@@ -2128,6 +2128,56 @@ I32 TokenizerBPEMergeApplyBestPriorityCheckedDefaultNoPartial(I32 *token_ids,
                                                               out_token_count);
 }
 
+I32 TokenizerBPEMergeApplyBestPriorityCheckedDefaultNoPartialValidateRanks(
+                                                              I32 *token_ids,
+                                                              U64 token_count,
+                                                              I32 *rank_left_tokens,
+                                                              I32 *rank_right_tokens,
+                                                              U32 *rank_values,
+                                                              I32 *rank_merged_tokens,
+                                                              U64 rank_table_count,
+                                                              I32 *out_merged_token,
+                                                              U32 *out_rank,
+                                                              Bool *out_found,
+                                                              U64 *out_token_count)
+{
+    U64 derived_token_capacity;
+    U64 derived_rank_table_capacity;
+
+    if (!token_ids ||
+        !out_merged_token ||
+        !out_rank ||
+        !out_found ||
+        !out_token_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Canonical default-capacity contract: caller logical counts define
+    // storage extents for token and rank tables.
+    derived_token_capacity = token_count;
+    derived_rank_table_capacity = rank_table_count;
+
+    // Compose rank-table monotonic-key + duplicate minimum-rank deterministic
+    // merge-token validation with no-partial greedy best-priority merge apply.
+    return TokenizerBPEMergeApplyBestPriorityCheckedNoPartialValidateRanks(
+                                                              token_ids,
+                                                              token_count,
+                                                              derived_token_capacity,
+                                                              rank_left_tokens,
+                                                              rank_right_tokens,
+                                                              rank_values,
+                                                              rank_merged_tokens,
+                                                              rank_table_count,
+                                                              derived_rank_table_capacity,
+                                                              out_merged_token,
+                                                              out_rank,
+                                                              out_found,
+                                                              out_token_count);
+}
+
 I32 TokenizerBPEEncodeMergeLoopChecked(I32 *token_ids,
                                        U64 token_count,
                                        U64 token_capacity,
