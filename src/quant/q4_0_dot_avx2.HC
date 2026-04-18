@@ -145,6 +145,77 @@ I64 Q4_0DotAVX2NibbleToSigned(U8 packed, Bool upper)
     return q_unsigned - 8;
 }
 
+I32 Q4_0DotAVX2UnpackBlockToI16Lanes(U8 *packed_qs,
+                                     I64 packed_len,
+                                     I16 *dst_lanes,
+                                     I64 dst_len)
+{
+    I64 byte_index;
+    I64 lane_base;
+
+    if (!packed_qs || !dst_lanes)
+        return Q4_0_DOT_AVX2_ERR_NULL_PTR;
+    if (packed_len < Q4_0_DOT_AVX2_PACKED_BYTES)
+        return Q4_0_DOT_AVX2_ERR_BAD_LEN;
+    if (dst_len < Q4_0_DOT_AVX2_VALUES_PER_BLOCK)
+        return Q4_0_DOT_AVX2_ERR_BAD_LEN;
+
+    // AVX2 unpack contract:
+    // packed byte i -> lane (2*i) low nibble, lane (2*i+1) high nibble.
+    for (byte_index = 0; byte_index < Q4_0_DOT_AVX2_PACKED_BYTES; ++byte_index)
+    {
+        lane_base = byte_index << 1;
+        dst_lanes[lane_base] = (I16)Q4_0DotAVX2NibbleToSigned(packed_qs[byte_index], FALSE);
+        dst_lanes[lane_base + 1] = (I16)Q4_0DotAVX2NibbleToSigned(packed_qs[byte_index], TRUE);
+    }
+
+    return Q4_0_DOT_AVX2_OK;
+}
+
+I32 Q4_0DotAVX2I16LanesToQ0(I16 *lhs_lanes,
+                            I64 lhs_len,
+                            I16 *rhs_lanes,
+                            I64 rhs_len,
+                            I64 *out_q0)
+{
+    I32 pair_partials[16];
+    I64 pair_index;
+    I64 lane0;
+    I64 lane1;
+    I64 lane_base;
+    I64 q0_accum;
+    I64 term;
+
+    if (!lhs_lanes || !rhs_lanes || !out_q0)
+        return Q4_0_DOT_AVX2_ERR_NULL_PTR;
+    if (lhs_len < Q4_0_DOT_AVX2_VALUES_PER_BLOCK)
+        return Q4_0_DOT_AVX2_ERR_BAD_LEN;
+    if (rhs_len < Q4_0_DOT_AVX2_VALUES_PER_BLOCK)
+        return Q4_0_DOT_AVX2_ERR_BAD_LEN;
+
+    // AVX2 vpmaddwd-shape reduction:
+    // - pair_partials[i] accumulates lanes (2*i,2*i+1) as one I32 term.
+    // - horizontal sum over 16 terms yields q_dot_q0.
+    for (pair_index = 0; pair_index < 16; ++pair_index)
+    {
+        lane_base = pair_index << 1;
+        lane0 = ((I64)lhs_lanes[lane_base]) * ((I64)rhs_lanes[lane_base]);
+        lane1 = ((I64)lhs_lanes[lane_base + 1]) * ((I64)rhs_lanes[lane_base + 1]);
+        pair_partials[pair_index] = (I32)(lane0 + lane1);
+    }
+
+    q0_accum = 0;
+    for (pair_index = 0; pair_index < 16; ++pair_index)
+    {
+        term = (I64)pair_partials[pair_index];
+        if (!Q4_0DotAVX2TryAddI64(q0_accum, term, &q0_accum))
+            return Q4_0_DOT_AVX2_ERR_OVERFLOW;
+    }
+
+    *out_q0 = q0_accum;
+    return Q4_0_DOT_AVX2_OK;
+}
+
 Bool Q4_0DotAVX2KernelEnabled()
 {
     // TempleOS inline-asm AVX2 dispatch hook:
@@ -195,6 +266,54 @@ I32 Q4_0DotProductBlockQ32Checked(Q4_0Block *lhs, Q4_0Block *rhs, I64 *out_dot_q
     return Q4_0_DOT_AVX2_OK;
 }
 
+I32 Q4_0DotProductBlockQ32AVX2CoreChecked(Q4_0Block *lhs,
+                                          Q4_0Block *rhs,
+                                          I64 *out_dot_q32)
+{
+    I16 lhs_lanes[Q4_0_DOT_AVX2_VALUES_PER_BLOCK];
+    I16 rhs_lanes[Q4_0_DOT_AVX2_VALUES_PER_BLOCK];
+    I64 lhs_scale_q16;
+    I64 rhs_scale_q16;
+    I64 scale_prod_q32;
+    I64 dot_q0;
+    I32 status;
+
+    if (!lhs || !rhs || !out_dot_q32)
+        return Q4_0_DOT_AVX2_ERR_NULL_PTR;
+
+    status = Q4_0DotAVX2UnpackBlockToI16Lanes(lhs->qs,
+                                              Q4_0_DOT_AVX2_PACKED_BYTES,
+                                              lhs_lanes,
+                                              Q4_0_DOT_AVX2_VALUES_PER_BLOCK);
+    if (status != Q4_0_DOT_AVX2_OK)
+        return status;
+
+    status = Q4_0DotAVX2UnpackBlockToI16Lanes(rhs->qs,
+                                              Q4_0_DOT_AVX2_PACKED_BYTES,
+                                              rhs_lanes,
+                                              Q4_0_DOT_AVX2_VALUES_PER_BLOCK);
+    if (status != Q4_0_DOT_AVX2_OK)
+        return status;
+
+    status = Q4_0DotAVX2I16LanesToQ0(lhs_lanes,
+                                     Q4_0_DOT_AVX2_VALUES_PER_BLOCK,
+                                     rhs_lanes,
+                                     Q4_0_DOT_AVX2_VALUES_PER_BLOCK,
+                                     &dot_q0);
+    if (status != Q4_0_DOT_AVX2_OK)
+        return status;
+
+    lhs_scale_q16 = Q4_0DotAVX2F16ToQ16(lhs->d_fp16);
+    rhs_scale_q16 = Q4_0DotAVX2F16ToQ16(rhs->d_fp16);
+
+    if (!Q4_0DotAVX2TryMulI64(lhs_scale_q16, rhs_scale_q16, &scale_prod_q32))
+        return Q4_0_DOT_AVX2_ERR_OVERFLOW;
+    if (!Q4_0DotAVX2TryMulI64(scale_prod_q32, dot_q0, out_dot_q32))
+        return Q4_0_DOT_AVX2_ERR_OVERFLOW;
+
+    return Q4_0_DOT_AVX2_OK;
+}
+
 I32 Q4_0DotProductBlocksQ32Checked(Q4_0Block *lhs,
                                    Q4_0Block *rhs,
                                    I64 block_count,
@@ -214,6 +333,38 @@ I32 Q4_0DotProductBlocksQ32Checked(Q4_0Block *lhs,
     for (block_index = 0; block_index < block_count; ++block_index)
     {
         status = Q4_0DotProductBlockQ32Checked(&lhs[block_index], &rhs[block_index], &block_dot_q32);
+        if (status != Q4_0_DOT_AVX2_OK)
+            return status;
+
+        if (!Q4_0DotAVX2TryAddI64(total_dot_q32, block_dot_q32, &total_dot_q32))
+            return Q4_0_DOT_AVX2_ERR_OVERFLOW;
+    }
+
+    *out_dot_q32 = total_dot_q32;
+    return Q4_0_DOT_AVX2_OK;
+}
+
+I32 Q4_0DotProductBlocksQ32AVX2CoreChecked(Q4_0Block *lhs,
+                                           Q4_0Block *rhs,
+                                           I64 block_count,
+                                           I64 *out_dot_q32)
+{
+    I64 block_index;
+    I64 block_dot_q32;
+    I64 total_dot_q32;
+    I32 status;
+
+    if (!lhs || !rhs || !out_dot_q32)
+        return Q4_0_DOT_AVX2_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q4_0_DOT_AVX2_ERR_BAD_LEN;
+
+    total_dot_q32 = 0;
+    for (block_index = 0; block_index < block_count; ++block_index)
+    {
+        status = Q4_0DotProductBlockQ32AVX2CoreChecked(&lhs[block_index],
+                                                       &rhs[block_index],
+                                                       &block_dot_q32);
         if (status != Q4_0_DOT_AVX2_OK)
             return status;
 
@@ -257,10 +408,10 @@ I32 Q4_0DotProductBlocksAVX2Checked(Q4_0Block *lhs,
         return Q4_0_DOT_AVX2_OK;
     }
 
-    avx2_status = Q4_0DotProductBlocksQ32Checked(lhs,
-                                                 rhs,
-                                                 block_count,
-                                                 &avx2_dot_q32);
+    avx2_status = Q4_0DotProductBlocksQ32AVX2CoreChecked(lhs,
+                                                         rhs,
+                                                         block_count,
+                                                         &avx2_dot_q32);
 
     if (avx2_status != scalar_status)
         return Q4_0_DOT_AVX2_ERR_PARITY;
@@ -272,4 +423,3 @@ I32 Q4_0DotProductBlocksAVX2Checked(Q4_0Block *lhs,
     *out_dot_q32 = avx2_dot_q32;
     return Q4_0_DOT_AVX2_OK;
 }
-

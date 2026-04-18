@@ -119,14 +119,97 @@ def q4_0_dot_product_blocks_q32_checked(lhs_blocks, rhs_blocks, block_count: int
     return Q4_0_DOT_AVX2_OK, total
 
 
+def _unpack_block_to_i16_lanes(packed_qs: bytes):
+    if len(packed_qs) < Q4_0_PACKED_BYTES:
+        return Q4_0_DOT_AVX2_ERR_BAD_LEN, []
+
+    lanes = [0] * Q4_0_VALUES_PER_BLOCK
+    for byte_index, packed in enumerate(packed_qs[:Q4_0_PACKED_BYTES]):
+        lane_base = byte_index << 1
+        lanes[lane_base] = _nibble_to_signed(packed, False)
+        lanes[lane_base + 1] = _nibble_to_signed(packed, True)
+    return Q4_0_DOT_AVX2_OK, lanes
+
+
+def _dot_i16_lanes_to_q0(lhs_lanes: list[int], rhs_lanes: list[int]):
+    if len(lhs_lanes) < Q4_0_VALUES_PER_BLOCK or len(rhs_lanes) < Q4_0_VALUES_PER_BLOCK:
+        return Q4_0_DOT_AVX2_ERR_BAD_LEN, 0
+
+    pair_partials = [0] * 16
+    for pair_index in range(16):
+        lane_base = pair_index << 1
+        pair_partials[pair_index] = (
+            lhs_lanes[lane_base] * rhs_lanes[lane_base]
+            + lhs_lanes[lane_base + 1] * rhs_lanes[lane_base + 1]
+        )
+
+    q0_accum = 0
+    for term in pair_partials:
+        ok, q0_accum = _try_add_i64(q0_accum, term)
+        if not ok:
+            return Q4_0_DOT_AVX2_ERR_OVERFLOW, 0
+
+    return Q4_0_DOT_AVX2_OK, q0_accum
+
+
+def q4_0_dot_product_block_q32_avx2_core_checked(lhs_block, rhs_block):
+    lhs_scale_fp16, lhs_qs = lhs_block
+    rhs_scale_fp16, rhs_qs = rhs_block
+
+    err, lhs_lanes = _unpack_block_to_i16_lanes(lhs_qs)
+    if err != Q4_0_DOT_AVX2_OK:
+        return err, 0
+    err, rhs_lanes = _unpack_block_to_i16_lanes(rhs_qs)
+    if err != Q4_0_DOT_AVX2_OK:
+        return err, 0
+
+    err, dot_q0 = _dot_i16_lanes_to_q0(lhs_lanes, rhs_lanes)
+    if err != Q4_0_DOT_AVX2_OK:
+        return err, 0
+
+    lhs_scale_q16 = _f16_to_q16(lhs_scale_fp16)
+    rhs_scale_q16 = _f16_to_q16(rhs_scale_fp16)
+
+    ok, scale_prod_q32 = _try_mul_i64(lhs_scale_q16, rhs_scale_q16)
+    if not ok:
+        return Q4_0_DOT_AVX2_ERR_OVERFLOW, 0
+    ok, block_q32 = _try_mul_i64(scale_prod_q32, dot_q0)
+    if not ok:
+        return Q4_0_DOT_AVX2_ERR_OVERFLOW, 0
+
+    return Q4_0_DOT_AVX2_OK, block_q32
+
+
+def q4_0_dot_product_blocks_q32_avx2_core_checked(lhs_blocks, rhs_blocks, block_count: int):
+    if lhs_blocks is None or rhs_blocks is None:
+        return Q4_0_DOT_AVX2_ERR_NULL_PTR, 0
+    if block_count < 0:
+        return Q4_0_DOT_AVX2_ERR_BAD_LEN, 0
+    if block_count > len(lhs_blocks) or block_count > len(rhs_blocks):
+        return Q4_0_DOT_AVX2_ERR_BAD_LEN, 0
+
+    total = 0
+    for index in range(block_count):
+        err, block_q32 = q4_0_dot_product_block_q32_avx2_core_checked(
+            lhs_blocks[index], rhs_blocks[index]
+        )
+        if err != Q4_0_DOT_AVX2_OK:
+            return err, 0
+
+        ok, total = _try_add_i64(total, block_q32)
+        if not ok:
+            return Q4_0_DOT_AVX2_ERR_OVERFLOW, 0
+
+    return Q4_0_DOT_AVX2_OK, total
+
+
 def q4_0_dot_product_blocks_avx2_checked(lhs_blocks, rhs_blocks, block_count: int):
     err_ref, ref_q32 = q4_0_dot_product_blocks_q32_checked(lhs_blocks, rhs_blocks, block_count)
-    if err_ref != Q4_0_DOT_AVX2_OK:
-        return err_ref, 0
-
-    err_avx2, avx2_q32 = q4_0_dot_product_blocks_q32_checked(lhs_blocks, rhs_blocks, block_count)
+    err_avx2, avx2_q32 = q4_0_dot_product_blocks_q32_avx2_core_checked(lhs_blocks, rhs_blocks, block_count)
     if err_avx2 != err_ref:
         return Q4_0_DOT_AVX2_ERR_PARITY, 0
+    if err_ref != Q4_0_DOT_AVX2_OK:
+        return err_ref, 0
     if avx2_q32 != ref_q32:
         return Q4_0_DOT_AVX2_ERR_PARITY, 0
 

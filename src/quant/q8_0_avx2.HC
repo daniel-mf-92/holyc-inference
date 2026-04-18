@@ -15,6 +15,7 @@
 #define Q8_0_AVX2_ERR_NULL_PTR       1
 #define Q8_0_AVX2_ERR_BAD_LEN        2
 #define Q8_0_AVX2_ERR_OVERFLOW       3
+#define Q8_0_AVX2_ERR_PARITY         4
 
 #define Q8_0_AVX2_I64_MAX            0x7FFFFFFFFFFFFFFF
 #define Q8_0_AVX2_I64_MIN            (-0x7FFFFFFFFFFFFFFF - 1)
@@ -361,6 +362,63 @@ I32 Q8_0DotBlocksAVX2Q32Checked(Q8_0Block *lhs,
     }
 
     *out_dot_q32 = total_dot_q32;
+    return Q8_0_AVX2_OK;
+}
+
+Bool Q8_0DotProductAVX2KernelEnabled()
+{
+    // TempleOS inline-asm AVX2 dispatch hook:
+    // keep this explicit guard so older/unknown CPUs deterministically fall
+    // back to scalar checked semantics.
+    return TRUE;
+}
+
+I32 Q8_0DotProductBlocksAVX2Checked(Q8_0Block *lhs,
+                                    Q8_0Block *rhs,
+                                    I64 block_count,
+                                    I64 *out_dot_q32)
+{
+    I64 avx2_dot_q32;
+    I64 scalar_dot_q32;
+    I32 avx2_status;
+    I32 scalar_status;
+
+    if (!lhs || !rhs || !out_dot_q32)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    // Guarded parity contract:
+    // 1) Always compute the scalar checked result first as source-of-truth.
+    // 2) If AVX2 path disabled, return scalar status/result directly.
+    // 3) If AVX2 path enabled, require exact status/value parity before commit.
+    scalar_status = Q8_0DotProductBlocksQ32Checked(lhs,
+                                                   rhs,
+                                                   block_count,
+                                                   &scalar_dot_q32);
+
+    if (!Q8_0DotProductAVX2KernelEnabled())
+    {
+        if (scalar_status != Q8_0_AVX2_OK)
+            return scalar_status;
+
+        *out_dot_q32 = scalar_dot_q32;
+        return Q8_0_AVX2_OK;
+    }
+
+    avx2_status = Q8_0DotBlocksAVX2Q32Checked(lhs,
+                                              rhs,
+                                              block_count,
+                                              &avx2_dot_q32);
+
+    if (avx2_status != scalar_status)
+        return Q8_0_AVX2_ERR_PARITY;
+    if (avx2_status != Q8_0_AVX2_OK)
+        return avx2_status;
+    if (avx2_dot_q32 != scalar_dot_q32)
+        return Q8_0_AVX2_ERR_PARITY;
+
+    *out_dot_q32 = avx2_dot_q32;
     return Q8_0_AVX2_OK;
 }
 
