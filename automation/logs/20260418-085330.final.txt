@@ -1,0 +1,16 @@
+Completed one full iteration on `IQ-347` with queue maintenance and ledger/db updates.
+
+**What Changed**
+- Implemented `FPQ16TopPSelectLogitCutoffChecked` in `src/math/softmax.HC:1262` with checked span guards, descending-logit validation, composed prefix selection via `FPQ16TopPSelectPrefixLenChecked`, and deterministic tie-extension of nucleus length.
+- Added parity harness `tests/test_softmax_topp_select_logit_cutoff_checked.py:2` covering null/bad-param/overflow/no-partial-write semantics, tie-extension behavior, and randomized cumulative-reference vectors.
+- Marked `IQ-347` done in `MASTER_TASKS.md:546`.
+- Kept queue depth at 15 unchecked by appending `IQ-362` in `MASTER_TASKS.md:561`.
+- Added one progress-ledger line for this iteration in `MASTER_TASKS.md:569`.
+- Logged central DB iteration row in `~/Documents/local-codebases/temple-central.db` for `IQ-347` (`status=pass`, `lines_added=400`).
+
+**Validation**
+- `python3 tests/test_softmax_topp_select_logit_cutoff_checked.py && python3 tests/test_softmax_topp_select_prefix_len_checked.py && python3 tests/test_softmax_topp_sample_index_checked.py`
+- Output:
+  - `softmax_topp_select_logit_cutoff_checked_reference_checks=ok`
+  - `softmax_topp_select_prefix_len_checked_reference_checks=ok`
+  - `softmax_topp_sample_index_checked_reference_checks=ok`

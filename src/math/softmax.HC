@@ -1242,6 +1242,96 @@ I32 FPQ16TopPSelectPrefixLenChecked(I64 *probs_q16,
     return FP_Q16_OK;
 }
 
+// Checked deterministic top-p nucleus logit-cutoff selector.
+// Output contract:
+//   - Writes cutoff logit to *out_cutoff_logit_q16 and final nucleus length to
+//     *out_nucleus_len on success.
+//   - First chooses the minimal top-p prefix via
+//     FPQ16TopPSelectPrefixLenChecked(probs_q16,...).
+//   - Then performs deterministic tie-extension over descending logits:
+//     include every trailing lane with logit == boundary logit.
+//   - No partial writes on all failure paths.
+// Checked guards:
+//   - logits_q16, probs_q16, out_cutoff_logit_q16, out_nucleus_len are
+//     non-null.
+//   - lane_count > 0.
+//   - top_p_q16 in (0, 1.0_q16].
+//   - Pointer-span arithmetic for indexed logits/probabilities cannot overflow
+//     U64.
+//   - logits_q16 is monotone non-increasing (descending with ties).
+I32 FPQ16TopPSelectLogitCutoffChecked(I64 *logits_q16,
+                                      I64 *probs_q16,
+                                      I64 lane_count,
+                                      I64 top_p_q16,
+                                      I64 *out_cutoff_logit_q16,
+                                      I64 *out_nucleus_len)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 prev_logit_q16;
+    I64 current_logit_q16;
+    I64 prefix_len;
+    I64 cutoff_index;
+    I64 cutoff_logit_q16;
+    I64 extended_len;
+    I32 status;
+
+    if (!logits_q16 || !probs_q16 || !out_cutoff_logit_q16 || !out_nucleus_len)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count <= 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (top_p_q16 <= 0 || top_p_q16 > FP_Q16_ONE)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Guard pointer-span arithmetic before indexed logit/probability access.
+    last_index = lane_count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)logits_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)probs_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Preflight descending-logit contract over the full lane span.
+    prev_logit_q16 = logits_q16[0];
+    for (i = 1; i < lane_count; i++)
+    {
+        current_logit_q16 = logits_q16[i];
+        if (current_logit_q16 > prev_logit_q16)
+            return FP_Q16_ERR_BAD_PARAM;
+        prev_logit_q16 = current_logit_q16;
+    }
+
+    // Compose canonical top-p prefix selector over normalized probabilities.
+    status = FPQ16TopPSelectPrefixLenChecked(probs_q16,
+                                             lane_count,
+                                             top_p_q16,
+                                             &prefix_len);
+    if (status)
+        return status;
+    if (prefix_len <= 0 || prefix_len > lane_count)
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Boundary logit at first top-p crossing.
+    cutoff_index = prefix_len - 1;
+    cutoff_logit_q16 = logits_q16[cutoff_index];
+
+    // Deterministic tie-extension: include all trailing equal-logit lanes.
+    extended_len = prefix_len;
+    while (extended_len < lane_count)
+    {
+        if (logits_q16[extended_len] != cutoff_logit_q16)
+            break;
+        extended_len++;
+    }
+
+    *out_cutoff_logit_q16 = cutoff_logit_q16;
+    *out_nucleus_len = extended_len;
+    return FP_Q16_OK;
+}
+
 // Checked deterministic top-p sampler from a descending nucleus window.
 // Output contract:
 //   - Writes exactly one sampled lane index to *out_index on success.
