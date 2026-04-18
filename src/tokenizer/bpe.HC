@@ -2426,6 +2426,47 @@ I32 TokenizerBPEPromptSpanScanChecked(U8 *bytes,
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEPromptSpanScanCheckedDefaultCapacity(U8 *bytes,
+                                                     U64 byte_len,
+                                                     U64 *io_cursor,
+                                                     U64 prompt_nbytes,
+                                                     U64 *out_span_starts,
+                                                     U64 *out_span_lengths,
+                                                     U8 *out_span_classes,
+                                                     U64 *out_span_count)
+{
+    U64 cursor;
+    U64 derived_capacity;
+
+    if (!bytes || !io_cursor || !out_span_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (prompt_nbytes > byte_len - cursor)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    // Canonical default-capacity contract:
+    // prompt byte span of N bytes can never split into more than N spans.
+    derived_capacity = prompt_nbytes;
+
+    return TokenizerBPEPromptSpanScanChecked(bytes,
+                                             byte_len,
+                                             io_cursor,
+                                             prompt_nbytes,
+                                             out_span_starts,
+                                             out_span_lengths,
+                                             out_span_classes,
+                                             derived_capacity,
+                                             out_span_count);
+}
+
 I32 TokenizerBPEPromptSpanScanCheckedNoPartial(U8 *bytes,
                                                U64 byte_len,
                                                U64 *io_cursor,
