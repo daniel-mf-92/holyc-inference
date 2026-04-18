@@ -1,0 +1,20 @@
+Done — this iteration is complete end-to-end with `IQ-310` progressed.
+
+**What Changed**
+- Implemented `FPQ16TemperatureScaleLogitsChecked` in `src/math/softmax.HC:45`.
+- Added strict guards: null pointers, `lane_count < 0`, `temperature_q16 <= 0`, pointer-span overflow checks, and no-partial-write preflight.
+- Arithmetic path is integer-only Q16 and reuses `FPQ16MulDivRoundedChecked` for deterministic one-rounding behavior.
+- Added parity harness `tests/test_softmax_temperature_scale_q16_checked.py:1` with deterministic contract checks and randomized coverage.
+- Updated queue/ledger in `MASTER_TASKS.md:509` (checked `IQ-310`) and added new unchecked `IQ-325` at `MASTER_TASKS.md:524` to keep queue rolling/deep.
+
+**Validation**
+- `python3 tests/test_softmax_temperature_scale_q16_checked.py` → `softmax_temperature_scale_q16_checked_reference_checks=ok`
+- `python3 tests/test_softmax_from_preclamped_checked_with_sum_out.py` → `softmax_from_preclamped_checked_with_sum_out_reference_checks=ok`
+- `python3 tests/test_softmax_normalize_phase_checked.py` → `softmax_normalize_phase_checked_reference_checks=ok`
+- `python3 tests/test_fixedpoint_q16_muldiv_checked.py` → `fixedpoint_q16_muldiv_checked_reference_checks=ok`
+
+**Bookkeeping**
+- Queue depth maintained at 15 unchecked IQ items.
+- Central DB logged: `iterations.id=3533`, `task_id=IQ-310`, `status=pass` in `~/Documents/local-codebases/temple-central.db`.
+- Progress ledger line appended: `loop-366 | IQ-310 softmax Q16 temperature scaling`.
+

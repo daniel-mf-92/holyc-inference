@@ -29,6 +29,75 @@ I32 FPQ16ExpArrayCheckedNoAliasChecked(I64 *input_q16,
                                        I64 *output_q16,
                                        I64 count);
 
+// Checked Q16 temperature scaling helper for logits:
+//   scaled_logits_q16[i] = round_half_up(logits_q16[i] / temperature_q16)
+// which is equivalent to multiplying by reciprocal-temperature in Q16.
+// Contracts:
+//   - logits_q16 and scaled_logits_q16 are non-null.
+//   - lane_count >= 0.
+//   - temperature_q16 > 0 (rejects divide-by-zero and non-physical negative T).
+//   - logits_q16 and scaled_logits_q16 each address lane_count I64 lanes.
+//   - No partial writes: full lane preflight runs before output commit.
+// Notes:
+//   - Arithmetic routes through FPQ16MulDivRoundedChecked with b=1.0_q16 so
+//     scaling uses the same one-rounding checked divider as the rest of Q16
+//     softmax math.
+I32 FPQ16TemperatureScaleLogitsChecked(I64 *logits_q16,
+                                       I64 lane_count,
+                                       I64 temperature_q16,
+                                       I64 *scaled_logits_q16)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 lane_value;
+    I32 status;
+
+    if (!logits_q16 || !scaled_logits_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (temperature_q16 <= 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (!lane_count)
+        return FP_Q16_OK;
+
+    // Guard pointer-span arithmetic before indexed lane access.
+    last_index = lane_count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)logits_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)scaled_logits_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Preflight all lanes first so error paths never partially write output.
+    for (i = 0; i < lane_count; i++)
+    {
+        status = FPQ16MulDivRoundedChecked(logits_q16[i],
+                                           FP_Q16_ONE,
+                                           temperature_q16,
+                                           &lane_value);
+        if (status)
+            return status;
+    }
+
+    for (i = 0; i < lane_count; i++)
+    {
+        status = FPQ16MulDivRoundedChecked(logits_q16[i],
+                                           FP_Q16_ONE,
+                                           temperature_q16,
+                                           &scaled_logits_q16[i]);
+        if (status)
+            return status;
+    }
+
+    return FP_Q16_OK;
+}
+
 // Checked softmax split-phase helper for pre-clamped logits.
 // Phase performed here:
 //   1) exp_lanes_q16[i] = exp(preclamped_logits_q16[i])
