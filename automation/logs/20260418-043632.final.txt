@@ -1,0 +1,16 @@
+Done — completed one full unattended iteration on `IQ-320` with queue maintenance and DB logging.
+
+**What Changed**
+- Added HolyC helper prototype `GGUFMetadataReadU16QuadCheckedNoPartialDefault` in `src/gguf/metadata.HC:245`.
+- Implemented canonical default-end wrapper logic (delegates to checked-no-partial core with `table_end = buf_nbytes`) in `src/gguf/metadata.HC:2056`.
+- Added parity harness `tests/test_gguf_metadata_read_u16_quad_checked_no_partial_default.py:1` (null/error parity, short-read no-commit, randomized parity loop).
+- Updated queue/ledger in `MASTER_TASKS.md:519` (IQ-320 checked), `MASTER_TASKS.md:534` (new IQ-335..IQ-337), and `MASTER_TASKS.md:544` (single ledger line for this iteration).
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_u16_quad_checked_no_partial_default.py && python3 tests/test_gguf_metadata_read_u16_quad_checked_no_partial.py && python3 tests/test_gguf_metadata_read_u16_quad_checked_default.py && python3 tests/test_gguf_metadata_parse.py`
+- Output: `ok`, `ok`, `ok`, `gguf_metadata_reference_checks=ok`
+
+**Contract Checks**
+- Queue depth maintained: `17` unchecked `IQ-` items after completion (policy satisfied).
+- Exactly one queue item progressed: `IQ-320` moved to done.
+- Central DB logged: inserted `iterations` row for `task_id='IQ-320'` (`agent='inference'`, `status='pass'`, `validation_result='ok'`).
