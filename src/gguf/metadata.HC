@@ -139,6 +139,14 @@ I32 GGUFMetadataReadI8QuadCheckedNoPartial(U8 *buf,
                                            I8 *out_third,
                                            I8 *out_fourth);
 
+I32 GGUFMetadataReadI8QuadCheckedDefault(U8 *buf,
+                                         U64 buf_nbytes,
+                                         U64 *cursor,
+                                         I8 *out_first,
+                                         I8 *out_second,
+                                         I8 *out_third,
+                                         I8 *out_fourth);
+
 I32 GGUFMetadataReadU8PairChecked(U8 *buf,
                                   U64 buf_nbytes,
                                   U64 *cursor,
@@ -1681,6 +1689,28 @@ I32 GGUFMetadataReadI8QuadCheckedNoPartial(U8 *buf,
                                          buf_nbytes,
                                          cursor,
                                          table_end,
+                                         out_first,
+                                         out_second,
+                                         out_third,
+                                         out_fourth);
+}
+
+// Canonical default-end wrapper for fixed-layout signed-I8 quad metadata
+// records.
+// Contract: preserves exact checked quad semantics by pinning table_end to
+// buf_nbytes and delegating to GGUFMetadataReadI8QuadChecked.
+I32 GGUFMetadataReadI8QuadCheckedDefault(U8 *buf,
+                                         U64 buf_nbytes,
+                                         U64 *cursor,
+                                         I8 *out_first,
+                                         I8 *out_second,
+                                         I8 *out_third,
+                                         I8 *out_fourth)
+{
+    return GGUFMetadataReadI8QuadChecked(buf,
+                                         buf_nbytes,
+                                         cursor,
+                                         buf_nbytes,
                                          out_first,
                                          out_second,
                                          out_third,
