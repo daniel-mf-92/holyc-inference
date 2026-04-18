@@ -1,0 +1,16 @@
+Done — this iteration fully progressed `IQ-315` with code, validation, DB log, and queue maintenance.
+
+**What Changed**
+- Added HolyC tiled kernel `Q4_0MatMulTiledAVX2Q32Checked` with explicit non-negative mul/add overflow guards, stride/capacity checks, and tiled row/col traversal via `Q4_0DotRowsAVX2Q32Checked` in `src/matmul/q4_0_matmul.HC:75`.
+- Added helper guard primitives in `src/matmul/q4_0_matmul.HC:35`.
+- Added focused parity harness `tests/test_q4_0_matmul_tiled_avx2_q32_checked.py:99` including randomized shape/tile checks at `tests/test_q4_0_matmul_tiled_avx2_q32_checked.py:310`.
+
+**Validation**
+- `python3 tests/test_q4_0_matmul_tiled_avx2_q32_checked.py && python3 tests/test_q4_0_avx2_dot_rows_q32_checked.py && python3 tests/test_q4_0_avx2_dot_q32_checked.py`
+- Output: `q4_0_matmul_tiled_avx2_q32_checked_reference_checks=ok`, `q4_0_avx2_dot_rows_q32_checked_reference_checks=ok`, `q4_0_avx2_dot_q32_checked_reference_checks=ok`.
+
+**Task Board + Ledger**
+- Marked `IQ-315` done in `MASTER_TASKS.md:514`.
+- Added new queue item `IQ-330` (monotonic ID) in `MASTER_TASKS.md:529` to keep unchecked queue depth at 15.
+- Added one progress ledger line in `MASTER_TASKS.md:536` (`loop-388`).
+- Logged central DB iteration: `temple-central.db` row `id=3578`, `agent=inference`, `task_id=IQ-315`, `status=pass`.
