@@ -5696,6 +5696,46 @@ I32 TokenizerBPEDecodePromptChecked(
                                               out_byte_count);
 }
 
+I32 TokenizerBPEDecodePromptCheckedDefaultCapacity(
+    I32 *token_ids,
+    U64 token_count,
+    U64 *io_token_cursor,
+    U8 *vocab_piece_bytes,
+    U64 vocab_piece_bytes_len,
+    U64 *vocab_piece_offsets,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U8 *out_bytes,
+    U64 out_byte_capacity,
+    U64 *out_byte_count)
+{
+    if (!token_ids || !io_token_cursor || !vocab_piece_bytes ||
+        !vocab_piece_offsets || !vocab_piece_lens || !out_bytes ||
+        !out_byte_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_bytes_len > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        out_byte_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Canonical decode vocab-table capacity rule:
+    // wrappers that omit capacity set it to active piece count.
+    return TokenizerBPEDecodePromptChecked(token_ids,
+                                           token_count,
+                                           io_token_cursor,
+                                           vocab_piece_bytes,
+                                           vocab_piece_bytes_len,
+                                           vocab_piece_offsets,
+                                           vocab_piece_lens,
+                                           vocab_piece_count,
+                                           vocab_piece_count,
+                                           out_bytes,
+                                           out_byte_capacity,
+                                           out_byte_count);
+}
+
 I32 TokenizerBPEDecodePromptCheckedDefaultCapacityNoPartial(
     I32 *token_ids,
     U64 token_count,
