@@ -689,6 +689,54 @@ I32 TokenizerBPEMergePairPriorityFindChecked(I32 *token_ids,
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEMergePairPriorityFindCheckedNoPartial(I32 *token_ids,
+                                                      U64 token_count,
+                                                      U64 token_capacity,
+                                                      I32 *rank_left_tokens,
+                                                      I32 *rank_right_tokens,
+                                                      U32 *rank_values,
+                                                      U64 rank_table_count,
+                                                      U64 rank_table_capacity,
+                                                      U64 *out_left_index,
+                                                      U32 *out_rank,
+                                                      Bool *out_found)
+{
+    U64 staged_left_index;
+    U32 staged_rank;
+    Bool staged_found;
+    I32 err;
+
+    if (!token_ids || !out_left_index || !out_rank || !out_found)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Stage outputs from caller-visible values so "no merge found" success
+    // mirrors the checked core exactly (index/rank remain unchanged).
+    staged_left_index = *out_left_index;
+    staged_rank = *out_rank;
+    staged_found = *out_found;
+
+    err = TokenizerBPEMergePairPriorityFindChecked(token_ids,
+                                                   token_count,
+                                                   token_capacity,
+                                                   rank_left_tokens,
+                                                   rank_right_tokens,
+                                                   rank_values,
+                                                   rank_table_count,
+                                                   rank_table_capacity,
+                                                   &staged_left_index,
+                                                   &staged_rank,
+                                                   &staged_found);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    // All-or-nothing commit: caller outputs change only after checked core
+    // fully succeeds.
+    *out_left_index = staged_left_index;
+    *out_rank = staged_rank;
+    *out_found = staged_found;
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPETokenPairRankLookupChecked(I32 left_token,
                                            I32 right_token,
                                            I32 *rank_left_tokens,
