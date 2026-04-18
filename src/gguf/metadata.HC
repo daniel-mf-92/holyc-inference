@@ -587,6 +587,12 @@ I32 GGUFMetadataReadF32BitsPairChecked(U8 *buf,
                                        U32 *out_first_bits,
                                        U32 *out_second_bits);
 
+I32 GGUFMetadataReadF32BitsPairCheckedDefault(U8 *buf,
+                                              U64 buf_nbytes,
+                                              U64 *cursor,
+                                              U32 *out_first_bits,
+                                              U32 *out_second_bits);
+
 I32 GGUFMetadataReadF32BitsTripleChecked(U8 *buf,
                                          U64 buf_nbytes,
                                          U64 *cursor,
@@ -3892,6 +3898,24 @@ I32 GGUFMetadataReadF32BitsPairChecked(U8 *buf,
     *out_second_bits = second_bits;
     *cursor = cur;
     return GGUF_META_TABLE_OK;
+}
+
+// Canonical default-end wrapper for fixed-layout FLOAT32 raw-bit pair
+// metadata records.
+// Contract: preserves exact checked pair semantics by pinning table_end to
+// buf_nbytes and delegating to GGUFMetadataReadF32BitsPairChecked.
+I32 GGUFMetadataReadF32BitsPairCheckedDefault(U8 *buf,
+                                              U64 buf_nbytes,
+                                              U64 *cursor,
+                                              U32 *out_first_bits,
+                                              U32 *out_second_bits)
+{
+    return GGUFMetadataReadF32BitsPairChecked(buf,
+                                              buf_nbytes,
+                                              cursor,
+                                              buf_nbytes,
+                                              out_first_bits,
+                                              out_second_bits);
 }
 
 // Checked metadata FLOAT32 raw-bit triple reader.
