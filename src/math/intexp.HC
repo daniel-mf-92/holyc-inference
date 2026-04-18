@@ -192,6 +192,32 @@ I32 FPQ16ExpSplitBase2FromClampedInputChecked(I64 clamped_input_q16,
     return FP_Q16_OK;
 }
 
+// Checked ln(2)-based range reducer for exp callers that start from an
+// unclamped Q16 input. Performs canonical scalar-domain clamp first, then
+// decomposes the clamped lane into:
+//   clamped_x = k*ln(2) + r
+//   0 <= r < ln(2)
+// This keeps all FPQ16Exp range-reduction call sites on one auditable path.
+I32 FPQ16ExpRangeReduceLn2Checked(I64 input_q16,
+                                  I64 *out_k,
+                                  I64 *out_r_q16)
+{
+    I64 clamped_q16;
+    I32 status;
+
+    if (!out_k || !out_r_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    status = FPQ16ExpClampToInputDomainChecked(input_q16,
+                                               &clamped_q16);
+    if (status)
+        return status;
+
+    return FPQ16ExpSplitBase2FromClampedInputChecked(clamped_q16,
+                                                     out_k,
+                                                     out_r_q16);
+}
+
 // Checked power-of-two scaler for Q16 exponent assembly paths.
 // Computes:
 //   out_scaled_q16 = base_q16 * (2^k)
@@ -283,9 +309,9 @@ I32 FPQ16ExpFromClampedInputChecked(I64 clamped_input_q16,
         return FP_Q16_OK;
     }
 
-    status = FPQ16ExpSplitBase2FromClampedInputChecked(clamped_input_q16,
-                                                       &k,
-                                                       &r);
+    status = FPQ16ExpRangeReduceLn2Checked(clamped_input_q16,
+                                           &k,
+                                           &r);
     if (status)
         return status;
 
