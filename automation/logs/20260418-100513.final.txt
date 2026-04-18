@@ -1,0 +1,12 @@
+Done — I completed `IQ-356` end-to-end with HolyC runtime purity preserved.
+
+- Implemented default-capacity wrapper `FPQ16TopKPrefixMassQ16CheckedDefault` in `src/math/softmax.HC:1099` (delegates to checked core with `out_mass_capacity=k`, no new runtime deps).
+- Added parity harness `tests/test_softmax_topk_prefix_mass_q16_checked_default.py:1` validating success/error/no-partial-write parity vs explicit-capacity core across fixed + randomized adversarial vectors.
+- Updated task board: marked `IQ-356` done at `MASTER_TASKS.md:555`, appended new unchecked `IQ-371` at `MASTER_TASKS.md:570`, and added one-line ledger entry at `MASTER_TASKS.md:578`.
+- Queue depth policy maintained: 15 unchecked `IQ-` items remain (first unchecked `IQ-357`, last `IQ-371`).
+- Logged iteration to central DB `~/Documents/local-codebases/temple-central.db` for `IQ-356` with validation command and `ok` result.
+
+Validation output:
+- `python3 tests/test_softmax_topk_prefix_mass_q16_checked_default.py` → `ok`
+- `python3 tests/test_softmax_topk_prefix_mass_q16_checked.py` → `softmax_topk_prefix_mass_q16_checked_reference_checks=ok`
+- `python3 tests/test_softmax_topp_select_prefix_len_checked.py` → `softmax_topp_select_prefix_len_checked_reference_checks=ok`

@@ -1088,6 +1088,28 @@ I32 FPQ16TopKPrefixMassQ16Checked(I64 *probs_q16,
     return FP_Q16_OK;
 }
 
+// Canonical default-capacity wrapper for checked top-k prefix-mass emission.
+// Default contract:
+//   - out_mass_capacity is derived as k so callers pass only the target top-k
+//     length, while this wrapper forwards all checked validation/mass logic to
+//     the canonical core helper.
+//   - Success/error/no-partial-write semantics intentionally match
+//     FPQ16TopKPrefixMassQ16Checked exactly because this wrapper only fixes the
+//     output-capacity parameter.
+I32 FPQ16TopKPrefixMassQ16CheckedDefault(I64 *probs_q16,
+                                         I64 lane_count,
+                                         I64 *topk_indices,
+                                         I64 k,
+                                         I64 *out_prefix_mass_q16)
+{
+    return FPQ16TopKPrefixMassQ16Checked(probs_q16,
+                                         lane_count,
+                                         topk_indices,
+                                         k,
+                                         out_prefix_mass_q16,
+                                         k);
+}
+
 // Checked deterministic stable descending argsort over Q16 logits.
 // Output contract:
 //   - Writes exactly lane_count indices into out_indices[0..lane_count-1].
