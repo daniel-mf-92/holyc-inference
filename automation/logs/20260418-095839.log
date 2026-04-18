@@ -75,3 +75,8 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_20","type":"todo_list","items":[{"text":"Implement IQ-355 HolyC merge helper","completed":true},{"text":"Add IQ-355 parity harness","completed":true},{"text":"Run focused tokenizer validations","completed":true},{"text":"Update queue, ledger, central DB","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":1316876,"cached_input_tokens":1147008,"output_tokens":7098}}
 Codex final exit code: 0
+[main e0e2cc0] feat(inference): codex iteration 20260418-095839
+ 6 files changed, 350 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260418-095839.final.txt
+ create mode 100644 tests/test_tokenizer_bpe_merge_apply_at_index_checked.py
+=== End iteration 102 (outcome=ok) ===
