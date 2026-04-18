@@ -455,6 +455,65 @@ I32 TokenizerUTF8DecodeSpanToCodepointsCheckedDefaultCapacity(U8 *bytes,
                                                       out_codepoint_count);
 }
 
+I32 TokenizerUTF8CountCodepointsChecked(U8 *bytes,
+                                        U64 byte_len,
+                                        U64 *io_cursor,
+                                        U64 in_nbytes,
+                                        U64 *out_codepoint_count)
+{
+    U64 cursor;
+    U64 span_end;
+    U64 scan;
+    U64 decoded_count;
+    U32 codepoint;
+    U8 bytes_used;
+    I32 err;
+
+    if (!bytes || !io_cursor || !out_codepoint_count)
+        return TOKENIZER_UTF8_ERR_NULL_PTR;
+
+    // Keep arithmetic inside the signed-positive I64 safety envelope.
+    if (byte_len > 0x7FFFFFFFFFFFFFFF || in_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_UTF8_ERR_OVERFLOW;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_UTF8_ERR_BAD_PARAM;
+
+    if (in_nbytes > byte_len - cursor)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    span_end = cursor + in_nbytes;
+    if (span_end < cursor || span_end > byte_len)
+        return TOKENIZER_UTF8_ERR_OVERFLOW;
+
+    scan = cursor;
+    decoded_count = 0;
+    while (scan < span_end) {
+        // Compose through the checked UTF-8 decoder so lead-byte, continuation,
+        // overlong, and scalar-domain rules stay centralized in one path.
+        err = TokenizerUTF8NextCodepointChecked(bytes,
+                                                span_end,
+                                                &scan,
+                                                &codepoint,
+                                                &bytes_used);
+        if (err != TOKENIZER_UTF8_OK)
+            return err;
+
+        decoded_count++;
+        if (decoded_count == 0)
+            return TOKENIZER_UTF8_ERR_OVERFLOW;
+    }
+
+    if (scan != span_end)
+        return TOKENIZER_UTF8_ERR_BAD_PARAM;
+
+    // No-partial semantics: commit count/cursor only after full-span success.
+    *out_codepoint_count = decoded_count;
+    *io_cursor = span_end;
+    return TOKENIZER_UTF8_OK;
+}
+
 I32 TokenizerBPEMergePairPriorityFindChecked(I32 *token_ids,
                                              U64 token_count,
                                              U64 token_capacity,

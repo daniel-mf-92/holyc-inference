@@ -1,0 +1,20 @@
+Done — I completed one full loop iteration on `IQ-358` with HolyC runtime code + host-side parity validation.
+
+**What Changed**
+- Added HolyC helper `TokenizerUTF8CountCodepointsChecked` with strict no-partial commit semantics in `src/tokenizer/bpe.HC:458`.
+- Added parity harness covering multilingual valid spans, malformed UTF-8, bounds/null contracts, randomized corpora in `tests/test_tokenizer_utf8_count_codepoints_checked.py:1`.
+- Marked queue item complete in `MASTER_TASKS.md:557`.
+- Appended one new unchecked IQ item (`IQ-373`) to keep rolling queue depth at 15+ in `MASTER_TASKS.md:572`.
+- Added one progress-ledger line for this completion in `MASTER_TASKS.md:960`.
+- Logged iteration to central DB (`temple-central.db`), row id `4040`, task `IQ-358`, status `pass`.
+
+**Validation**
+- Command: `python3 tests/test_tokenizer_utf8_count_codepoints_checked.py && python3 tests/test_tokenizer_utf8_decode_span_to_codepoints_checked.py && python3 tests/test_tokenizer_utf8_next_codepoint_checked.py`
+- Output:
+  - `ok`
+  - `tokenizer_utf8_decode_span_to_codepoints_checked_reference_checks=ok`
+  - `tokenizer_utf8_next_codepoint_checked_reference_checks=ok`
+
+**Queue/Contract Check**
+- Unchecked `IQ-` count is `15` after this iteration (policy satisfied).
+- Exactly one queue item progressed: `IQ-358`.
