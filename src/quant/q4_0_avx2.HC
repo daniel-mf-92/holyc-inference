@@ -357,3 +357,21 @@ I32 Q4_0DotRowsAVX2Q32Checked(
 
     return Q4_0_AVX2_OK;
 }
+
+I32 Q4_0DotProductBlocksQ32AVX2CheckedDefault(
+    Q4_0Block *lhs,
+    Q4_0Block *rhs,
+    I64 block_count,
+    I64 *out_dot_q32)
+{
+    // IQ-301 canonical default-capacity wrapper:
+    // - Caller provides the active block span only.
+    // - Capacity defaults to `block_count` on both sides.
+    // - All null/bounds/no-partial-write contracts come from the checked core.
+    return Q4_0DotProductBlocksQ32AVX2Checked(lhs,
+                                              block_count,
+                                              rhs,
+                                              block_count,
+                                              block_count,
+                                              out_dot_q32);
+}

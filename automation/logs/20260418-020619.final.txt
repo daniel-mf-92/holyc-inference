@@ -1,0 +1,22 @@
+Done — one full unattended iteration is completed for `IQ-301` with queue depth preserved at 15 unchecked items.
+
+**What changed**
+- Implemented HolyC default wrapper `Q4_0DotProductBlocksQ32AVX2CheckedDefault` in `src/quant/q4_0_avx2.HC:384`.
+- Added parity harness `tests/test_q4_0_avx2_dot_q32_checked_default.py:1` validating default-wrapper parity vs checked core (`success/error/no-partial-write`).
+- Updated task status and ledger in `MASTER_TASKS.md:500` and `MASTER_TASKS.md:522`.
+- Kept queue rolling by appending one new unchecked item `IQ-316` in `MASTER_TASKS.md:515` after completing `IQ-301` (unchecked count remains 15).
+
+**Validation run**
+- `python3 tests/test_q4_0_avx2_dot_q32_checked_default.py && python3 tests/test_q4_0_avx2_dot_q32_checked.py && python3 tests/test_q4_0_avx2_dot_q32.py`
+- Output:
+  - `q4_0_avx2_dot_q32_checked_default_reference_checks=ok`
+  - `q4_0_avx2_dot_q32_checked_reference_checks=ok`
+  - `q4_0_avx2_dot_q32_reference_checks=ok`
+
+**Central DB log**
+- Inserted iteration row into `~/Documents/local-codebases/temple-central.db`:
+  - `agent='inference'`
+  - `task_id='IQ-301'`
+  - `status='pass'`
+  - `validation_result='ok'`
+  - Notes include wrapper + parity completion and queue maintenance.
