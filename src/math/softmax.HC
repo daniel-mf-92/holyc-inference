@@ -956,6 +956,116 @@ I32 FPQ16TopKSelectLogitsCheckedNoAlias(I64 *logits_q16,
     return FP_Q16_OK;
 }
 
+// Checked deterministic cumulative-mass helper for a caller-supplied top-k
+// index set over normalized Q16 probabilities.
+// Output contract:
+//   - Writes exactly k cumulative prefix masses to
+//     out_prefix_mass_q16[0..k-1].
+//   - Prefix mass i equals sum(probs_q16[topk_indices[0..i]]).
+//   - No partial writes on all parameter/preflight failure paths.
+// Checked guards:
+//   - probs_q16, topk_indices, out_prefix_mass_q16 are non-null.
+//   - lane_count >= 0, k >= 0, out_mass_capacity >= 0.
+//   - k <= lane_count and k <= out_mass_capacity.
+//   - Pointer-span arithmetic for indexed reads/writes cannot overflow U64.
+//   - Every selected index is in [0, lane_count).
+//   - Selected indices are unique (top-k set semantics).
+//   - Every selected probability lane is in [0, 1.0_q16].
+//   - Checked cumulative mass cannot overflow I64 and cannot exceed 1.0_q16.
+I32 FPQ16TopKPrefixMassQ16Checked(I64 *probs_q16,
+                                  I64 lane_count,
+                                  I64 *topk_indices,
+                                  I64 k,
+                                  I64 *out_prefix_mass_q16,
+                                  I64 out_mass_capacity)
+{
+    I64 rank;
+    I64 prior;
+    I64 selected_index;
+    I64 lane_prob_q16;
+    I64 cumulative_q16;
+    I64 prev_cumulative_q16;
+    I64 last_index;
+    I64 last_byte_offset;
+
+    if (!probs_q16 || !topk_indices || !out_prefix_mass_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0 || k < 0 || out_mass_capacity < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (k > lane_count)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (k > out_mass_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (!k)
+        return FP_Q16_OK;
+
+    // Guard full probability input span before indexed reads.
+    last_index = lane_count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)probs_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Guard selected-index and output spans for checked top-k traversal.
+    last_index = k - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)topk_indices > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_index = out_mass_capacity - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)out_prefix_mass_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Preflight uniqueness/domain/overflow over the whole selected set.
+    cumulative_q16 = 0;
+    prev_cumulative_q16 = 0;
+    for (rank = 0; rank < k; rank++)
+    {
+        selected_index = topk_indices[rank];
+        if (selected_index < 0 || selected_index >= lane_count)
+            return FP_Q16_ERR_BAD_PARAM;
+
+        for (prior = 0; prior < rank; prior++)
+        {
+            if (topk_indices[prior] == selected_index)
+                return FP_Q16_ERR_BAD_PARAM;
+        }
+
+        lane_prob_q16 = probs_q16[selected_index];
+        if (lane_prob_q16 < 0 || lane_prob_q16 > FP_Q16_ONE)
+            return FP_Q16_ERR_BAD_PARAM;
+        if (lane_prob_q16 > (I64_MAX_VALUE - cumulative_q16))
+            return FP_Q16_ERR_OVERFLOW;
+
+        cumulative_q16 += lane_prob_q16;
+        if (cumulative_q16 < prev_cumulative_q16)
+            return FP_Q16_ERR_OVERFLOW;
+        if (cumulative_q16 > FP_Q16_ONE)
+            return FP_Q16_ERR_BAD_PARAM;
+
+        prev_cumulative_q16 = cumulative_q16;
+    }
+
+    // Commit pass writes deterministic prefix masses in caller-selected order.
+    cumulative_q16 = 0;
+    for (rank = 0; rank < k; rank++)
+    {
+        selected_index = topk_indices[rank];
+        lane_prob_q16 = probs_q16[selected_index];
+        cumulative_q16 += lane_prob_q16;
+        out_prefix_mass_q16[rank] = cumulative_q16;
+    }
+
+    return FP_Q16_OK;
+}
+
 // Checked deterministic stable descending argsort over Q16 logits.
 // Output contract:
 //   - Writes exactly lane_count indices into out_indices[0..lane_count-1].

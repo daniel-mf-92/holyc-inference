@@ -1,0 +1,17 @@
+Completed a full unattended iteration for `IQ-342` end-to-end.
+
+**What I changed**
+- Implemented HolyC helper `FPQ16TopKPrefixMassQ16Checked` with checked preflight + no-partial-write commit semantics in `src/math/softmax.HC:975`.
+- Added parity/edge-case validation harness in `tests/test_softmax_topk_prefix_mass_q16_checked.py:19`.
+- Updated queue/ledger: marked `IQ-342` done, added new unchecked `IQ-356`, and logged this loop entry in `MASTER_TASKS.md:541`, `MASTER_TASKS.md:555`, `MASTER_TASKS.md:563`.
+- Logged iteration to central DB (`task_id=IQ-342`, `status=pass`) in `~/Documents/local-codebases/temple-central.db`.
+
+**Queue policy**
+- Unchecked `IQ-` depth is maintained at `15` after completion (rolling queue preserved, monotonic IDs up to `IQ-356`).
+
+**Validation run (captured output)**
+- Command: `python3 tests/test_softmax_topk_prefix_mass_q16_checked.py && python3 tests/test_softmax_topk_select_logits_checked_no_alias.py && python3 tests/test_softmax_topp_select_prefix_len_checked.py`
+- Output:
+  - `softmax_topk_prefix_mass_q16_checked_reference_checks=ok`
+  - `softmax_topk_select_logits_checked_no_alias_reference_checks=ok`
+  - `softmax_topp_select_prefix_len_checked_reference_checks=ok`
