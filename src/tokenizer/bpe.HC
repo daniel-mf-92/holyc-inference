@@ -1119,3 +1119,125 @@ I32 TokenizerBPEEncodeSpanChecked(U8 *bytes,
     Free(working_tokens);
     return TOKENIZER_BPE_OK;
 }
+
+I32 TokenizerBPEMergeCandidatesBuildChecked(I32 *token_ids,
+                                            U64 token_count,
+                                            U64 token_capacity,
+                                            I32 *rank_left_tokens,
+                                            I32 *rank_right_tokens,
+                                            U32 *rank_values,
+                                            U64 rank_table_count,
+                                            U64 rank_table_capacity,
+                                            I32 *out_left_tokens,
+                                            I32 *out_right_tokens,
+                                            U64 *out_left_indices,
+                                            U32 *out_ranks,
+                                            U64 out_candidate_capacity,
+                                            U64 *out_candidate_count)
+{
+    U64 i;
+    U64 next_i;
+    U64 candidate_count;
+    I32 left_token;
+    I32 right_token;
+    U32 rank;
+    Bool found;
+    I32 err;
+
+    if (!token_ids ||
+        !out_left_tokens ||
+        !out_right_tokens ||
+        !out_left_indices ||
+        !out_ranks ||
+        !out_candidate_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_capacity > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        out_candidate_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (token_count > token_capacity || rank_table_count > rank_table_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (rank_table_count > 0 && (!rank_left_tokens || !rank_right_tokens || !rank_values))
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Zero/one-token spans have no adjacent pair candidates.
+    if (token_count < 2) {
+        *out_candidate_count = 0;
+        return TOKENIZER_BPE_OK;
+    }
+
+    // Pass 1: count rank-resolved adjacent pairs with no output writes.
+    candidate_count = 0;
+    for (i = 0; i + 1 < token_count; i++) {
+        next_i = i + 1;
+        if (next_i <= i || next_i >= token_count)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+
+        left_token = token_ids[i];
+        right_token = token_ids[next_i];
+
+        err = TokenizerBPETokenPairRankLookupChecked(left_token,
+                                                     right_token,
+                                                     rank_left_tokens,
+                                                     rank_right_tokens,
+                                                     rank_values,
+                                                     rank_table_count,
+                                                     rank_table_capacity,
+                                                     &rank,
+                                                     &found);
+        if (err != TOKENIZER_BPE_OK)
+            return err;
+
+        if (!found)
+            continue;
+
+        if (candidate_count == out_candidate_capacity)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        candidate_count++;
+        if (candidate_count == 0)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    // Pass 2: materialize candidates only after pass-1 capacity checks succeed.
+    candidate_count = 0;
+    for (i = 0; i + 1 < token_count; i++) {
+        next_i = i + 1;
+        if (next_i <= i || next_i >= token_count)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+
+        left_token = token_ids[i];
+        right_token = token_ids[next_i];
+
+        err = TokenizerBPETokenPairRankLookupChecked(left_token,
+                                                     right_token,
+                                                     rank_left_tokens,
+                                                     rank_right_tokens,
+                                                     rank_values,
+                                                     rank_table_count,
+                                                     rank_table_capacity,
+                                                     &rank,
+                                                     &found);
+        if (err != TOKENIZER_BPE_OK)
+            return err;
+
+        if (!found)
+            continue;
+
+        if (candidate_count >= out_candidate_capacity)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+
+        out_left_tokens[candidate_count] = left_token;
+        out_right_tokens[candidate_count] = right_token;
+        out_left_indices[candidate_count] = i;
+        out_ranks[candidate_count] = rank;
+
+        candidate_count++;
+    }
+
+    *out_candidate_count = candidate_count;
+    return TOKENIZER_BPE_OK;
+}
