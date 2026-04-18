@@ -21,6 +21,7 @@ TOKENIZER_BPE_ERR_BAD_PARAM = 102
 TOKENIZER_BPE_ERR_OVERFLOW = 103
 
 I64_MAX = (1 << 63) - 1
+I32_BYTES = 4
 
 TOKENIZER_BPE_ASCII_CLASS_WORD = 1
 TOKENIZER_BPE_ASCII_CLASS_DIGIT = 2
@@ -358,6 +359,8 @@ def tokenizer_bpe_encode_prompt_checked(
         or rank_table_capacity > I64_MAX
         or out_token_capacity > I64_MAX
     ):
+        return TOKENIZER_BPE_ERR_OVERFLOW
+    if out_token_capacity != 0 and out_token_capacity > (I64_MAX // I32_BYTES):
         return TOKENIZER_BPE_ERR_OVERFLOW
     if rank_table_count > rank_table_capacity:
         return TOKENIZER_BPE_ERR_BAD_PARAM

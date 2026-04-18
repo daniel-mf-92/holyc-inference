@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent))
 
 from test_tokenizer_bpe_encode_prompt_checked import (
+    I32_BYTES,
     I64_MAX,
     TOKENIZER_BPE_ERR_BAD_PARAM,
     TOKENIZER_BPE_ERR_NULL_PTR,
@@ -39,6 +40,8 @@ def tokenizer_bpe_encode_prompt_checked_no_partial(
         return TOKENIZER_BPE_ERR_NULL_PTR
 
     if out_token_capacity > I64_MAX:
+        return TOKENIZER_BPE_ERR_OVERFLOW
+    if out_token_capacity != 0 and out_token_capacity > (I64_MAX // I32_BYTES):
         return TOKENIZER_BPE_ERR_OVERFLOW
 
     staged_cursor = [io_cursor[0]]
@@ -252,6 +255,32 @@ def test_null_and_overflow_contract() -> None:
     assert cursor[0] == 0 and out_count[0] == 0x22 and out == [0x11] * 8
 
 
+def test_staging_allocation_size_overflow_contract() -> None:
+    out = [0xAAAA] * 8
+    out_count = [0xBBBB]
+    cursor = [0]
+
+    err = tokenizer_bpe_encode_prompt_checked_no_partial(
+        [ord("a")],
+        1,
+        cursor,
+        1,
+        [],
+        [],
+        [],
+        [],
+        0,
+        0,
+        out,
+        (I64_MAX // I32_BYTES) + 1,
+        out_count,
+    )
+    assert err == TOKENIZER_BPE_ERR_OVERFLOW
+    assert cursor[0] == 0
+    assert out_count[0] == 0xBBBB
+    assert out == [0xAAAA] * 8
+
+
 def test_randomized_parity_against_core() -> None:
     rng = random.Random(20260418_374)
 
@@ -301,5 +330,6 @@ if __name__ == "__main__":
     test_known_prompt_fixture_parity()
     test_no_partial_write_on_error_paths()
     test_null_and_overflow_contract()
+    test_staging_allocation_size_overflow_contract()
     test_randomized_parity_against_core()
     print("ok")

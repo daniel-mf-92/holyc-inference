@@ -2209,6 +2209,7 @@ I32 TokenizerBPEEncodePromptChecked(U8 *bytes,
     U64 staged_count;
     I32 *staged_tokens;
     U64 staged_capacity;
+    U64 staged_alloc_bytes;
     U64 i;
     U32 staged_codepoint;
     U8 staged_used;
@@ -2247,7 +2248,15 @@ I32 TokenizerBPEEncodePromptChecked(U8 *bytes,
     if (!staged_capacity)
         staged_capacity = 1;
 
-    staged_tokens = MAlloc(sizeof(I32) * staged_capacity);
+    // Guard allocator byte-size multiplication before staging writes.
+    if (staged_capacity > (0x7FFFFFFFFFFFFFFF / sizeof(I32)))
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    staged_alloc_bytes = sizeof(I32) * staged_capacity;
+    if (!staged_alloc_bytes)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    staged_tokens = MAlloc(staged_alloc_bytes);
     if (!staged_tokens)
         return TOKENIZER_BPE_ERR_OVERFLOW;
 
@@ -2383,6 +2392,7 @@ I32 TokenizerBPEEncodePromptCheckedNoPartial(U8 *bytes,
     U64 staged_cursor;
     U64 staged_token_count;
     U64 staged_token_capacity;
+    U64 staged_alloc_bytes;
     I32 *staged_tokens;
     I32 err;
     U64 i;
@@ -2402,7 +2412,16 @@ I32 TokenizerBPEEncodePromptCheckedNoPartial(U8 *bytes,
     if (!staged_token_capacity)
         staged_token_capacity = 1;
 
-    staged_tokens = MAlloc(sizeof(I32) * staged_token_capacity);
+    // No-partial wrapper stages into private memory first; validate the
+    // backing allocation size exactly like the core prompt encoder.
+    if (staged_token_capacity > (0x7FFFFFFFFFFFFFFF / sizeof(I32)))
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    staged_alloc_bytes = sizeof(I32) * staged_token_capacity;
+    if (!staged_alloc_bytes)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    staged_tokens = MAlloc(staged_alloc_bytes);
     if (!staged_tokens)
         return TOKENIZER_BPE_ERR_OVERFLOW;
 
