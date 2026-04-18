@@ -95,3 +95,8 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_25","type":"todo_list","items":[{"text":"Inspect queue and target IQ-323 scope","completed":true},{"text":"Implement IQ-323 HolyC wrapper","completed":true},{"text":"Add IQ-323 parity harness tests","completed":true},{"text":"Run focused validation","completed":true},{"text":"Log iteration and refresh queue depth","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":1879177,"cached_input_tokens":1772800,"output_tokens":8673}}
 Codex final exit code: 0
+[main af4317f] feat(inference): codex iteration 20260418-044604
+ 6 files changed, 517 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260418-044604.final.txt
+ create mode 100644 tests/test_gguf_metadata_read_i8_quad_checked_no_partial_default.py
+=== End iteration 68 (outcome=ok) ===
