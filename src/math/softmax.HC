@@ -699,6 +699,111 @@ I32 FPQ16SoftmaxFromPreclampedCheckedWithSumOut(I64 *preclamped_logits_q16,
                                              probs_q16);
 }
 
+// Checked deterministic top-k selector over Q16 logits.
+// Output contract:
+//   - Writes exactly k indices to out_indices[0..k-1].
+//   - Ordering is descending logit value with deterministic tie-break:
+//     lower token index wins when logits are equal.
+//   - No partial writes on parameter/preflight failures.
+// Checked guards:
+//   - logits_q16 and out_indices are non-null.
+//   - lane_count >= 0, k >= 0, out_index_capacity >= 0.
+//   - k <= lane_count and k <= out_index_capacity.
+//   - Pointer-span arithmetic for indexed accesses cannot overflow U64.
+// Notes:
+//   - Implementation is intentionally direct O(k*lane_count*k) scanning.
+//     TempleOS purity goal favors transparent, auditable math/selection flow.
+I32 FPQ16TopKSelectIndicesChecked(I64 *logits_q16,
+                                  I64 lane_count,
+                                  I64 k,
+                                  I64 *out_indices,
+                                  I64 out_index_capacity)
+{
+    I64 i;
+    I64 rank;
+    I64 prior;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 best_index;
+    I64 best_logit_q16;
+    I64 candidate_logit_q16;
+    Bool already_selected;
+
+    if (!logits_q16 || !out_indices)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0 || k < 0 || out_index_capacity < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (k > lane_count)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (k > out_index_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (!k)
+        return FP_Q16_OK;
+
+    // Guard pointer-span arithmetic before indexed logits/out writes.
+    last_index = lane_count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)logits_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_index = k - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)out_indices > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Deterministic repeated max-select with stable lower-index tie-break.
+    // All error paths are preflighted above; selection/write loop is total.
+    for (rank = 0; rank < k; rank++)
+    {
+        best_index = -1;
+        best_logit_q16 = 0;
+
+        for (i = 0; i < lane_count; i++)
+        {
+            already_selected = FALSE;
+            for (prior = 0; prior < rank; prior++)
+            {
+                if (out_indices[prior] == i)
+                {
+                    already_selected = TRUE;
+                    break;
+                }
+            }
+
+            if (already_selected)
+                continue;
+
+            candidate_logit_q16 = logits_q16[i];
+            if (best_index < 0)
+            {
+                best_index = i;
+                best_logit_q16 = candidate_logit_q16;
+            }
+            else if (candidate_logit_q16 > best_logit_q16)
+            {
+                best_index = i;
+                best_logit_q16 = candidate_logit_q16;
+            }
+            else if (candidate_logit_q16 == best_logit_q16 && i < best_index)
+            {
+                best_index = i;
+            }
+        }
+
+        if (best_index < 0)
+            return FP_Q16_ERR_OVERFLOW;
+
+        out_indices[rank] = best_index;
+    }
+
+    return FP_Q16_OK;
+}
+
 U0 FPQ16Softmax(I64 *logits, I64 *probs, I64 count)
 {
     I64 i;
