@@ -833,6 +833,39 @@ I32 TokenizerBPETokenPairRankLookupChecked(I32 left_token,
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEMergePairRankLookupCheckedDefault(I32 left_token,
+                                                  I32 right_token,
+                                                  I32 *rank_left_tokens,
+                                                  I32 *rank_right_tokens,
+                                                  U32 *rank_values,
+                                                  U64 rank_table_count,
+                                                  U32 *out_rank,
+                                                  Bool *out_found)
+{
+    U64 derived_capacity;
+
+    if (!out_rank || !out_found)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Canonical default-capacity rule: table is assumed tightly packed, so
+    // the effective storage capacity equals the active row count.
+    if (rank_table_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    derived_capacity = rank_table_count;
+
+    // Delegate lookup semantics and no-partial-write contracts to checked core.
+    return TokenizerBPETokenPairRankLookupChecked(left_token,
+                                                  right_token,
+                                                  rank_left_tokens,
+                                                  rank_right_tokens,
+                                                  rank_values,
+                                                  rank_table_count,
+                                                  derived_capacity,
+                                                  out_rank,
+                                                  out_found);
+}
+
 I32 TokenizerBPEMergeApplyAtIndexChecked(I32 *token_ids,
                                          U64 token_count,
                                          U64 token_capacity,
