@@ -804,6 +804,95 @@ I32 FPQ16TopKSelectIndicesChecked(I64 *logits_q16,
     return FP_Q16_OK;
 }
 
+// Checked deterministic top-p nucleus-prefix selector over descending Q16
+// probabilities.
+// Output contract:
+//   - Writes exactly one prefix length to *out_prefix_len on success.
+//   - Returned prefix length is the minimal k in [1, lane_count] such that
+//     cumulative_sum(probs_q16[0..k-1]) >= top_p_q16.
+//   - If cumulative mass never reaches top_p_q16 due to rounding residue,
+//     returns lane_count.
+//   - No partial writes on all failure paths.
+// Checked guards:
+//   - probs_q16 and out_prefix_len are non-null.
+//   - lane_count > 0.
+//   - top_p_q16 in (0, 1.0_q16].
+//   - Pointer-span arithmetic for indexed probs access cannot overflow U64.
+//   - Each probability lane is in [0, 1.0_q16].
+//   - Probabilities are monotone non-increasing (descending with ties).
+//   - Checked cumulative-sum monotonicity + I64 overflow guards.
+//   - Total probability mass equals 1.0_q16 exactly.
+I32 FPQ16TopPSelectPrefixLenChecked(I64 *probs_q16,
+                                    I64 lane_count,
+                                    I64 top_p_q16,
+                                    I64 *out_prefix_len)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 lane_prob_q16;
+    I64 prev_prob_q16;
+    I64 prev_cumulative_q16;
+    I64 cumulative_q16;
+    I64 prefix_len;
+
+    if (!probs_q16 || !out_prefix_len)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count <= 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (top_p_q16 <= 0 || top_p_q16 > FP_Q16_ONE)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Guard pointer-span arithmetic before indexed probability access.
+    last_index = lane_count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)probs_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Scan descending probabilities, track checked cumulative mass, and stop
+    // at the first prefix crossing top_p_q16.
+    cumulative_q16 = 0;
+    prev_cumulative_q16 = 0;
+    prefix_len = -1;
+    prev_prob_q16 = FP_Q16_ONE;
+
+    for (i = 0; i < lane_count; i++)
+    {
+        lane_prob_q16 = probs_q16[i];
+        if (lane_prob_q16 < 0 || lane_prob_q16 > FP_Q16_ONE)
+            return FP_Q16_ERR_BAD_PARAM;
+        if (lane_prob_q16 > prev_prob_q16)
+            return FP_Q16_ERR_BAD_PARAM;
+        if (lane_prob_q16 > (I64_MAX_VALUE - cumulative_q16))
+            return FP_Q16_ERR_OVERFLOW;
+
+        cumulative_q16 += lane_prob_q16;
+        if (cumulative_q16 < prev_cumulative_q16)
+            return FP_Q16_ERR_OVERFLOW;
+        if (cumulative_q16 > FP_Q16_ONE)
+            return FP_Q16_ERR_BAD_PARAM;
+
+        if (prefix_len < 0 && cumulative_q16 >= top_p_q16)
+            prefix_len = i + 1;
+
+        prev_prob_q16 = lane_prob_q16;
+        prev_cumulative_q16 = cumulative_q16;
+    }
+
+    if (cumulative_q16 != FP_Q16_ONE)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Preserve deterministic progress even when finite Q16 rounding leaves
+    // top_p_q16 just above the final prefix mass.
+    if (prefix_len < 0)
+        prefix_len = lane_count;
+
+    *out_prefix_len = prefix_len;
+    return FP_Q16_OK;
+}
+
 // Checked deterministic top-k sampler over normalized Q16 probabilities.
 // Output contract:
 //   - Writes exactly one sampled token index to *out_index on success.

@@ -1,0 +1,21 @@
+Done — I completed one deep queue item end-to-end (`IQ-332`) with HolyC runtime code plus parity validation.
+
+**What Changed**
+- Added `FPQ16TopPSelectPrefixLenChecked` in `src/math/softmax.HC:825` (integer-only top‑p prefix length over descending Q16 probs, with null/param/span/overflow/monotonicity/exact-sum guards and no-partial-write semantics).
+- Added parity harness `tests/test_softmax_topp_select_prefix_len_checked.py:1` (edge thresholds, descending/domain guards, pointer-span overflow, randomized cumulative-reference parity).
+- Marked `IQ-332` done in `MASTER_TASKS.md:531`.
+- Appended one new unchecked queue item `IQ-347` in `MASTER_TASKS.md:546` to keep queue rolling and code-focused.
+- Added one progress-ledger line in `MASTER_TASKS.md:554`.
+
+**Validation**
+- `python3 tests/test_softmax_topp_select_prefix_len_checked.py && python3 tests/test_softmax_topk_sample_from_probabilities_checked.py && python3 tests/test_softmax_topk_select_indices_checked.py`
+- Output:
+  - `softmax_topp_select_prefix_len_checked_reference_checks=ok`
+  - `softmax_topk_sample_from_probabilities_checked_reference_checks=ok`
+  - `softmax_topk_select_indices_checked_reference_checks=ok`
+
+**Central DB Log**
+- Inserted iteration row in `~/Documents/local-codebases/temple-central.db` for `IQ-332` (`inference|IQ-332|pass|ok` confirmed).
+
+**Queue Policy**
+- Unchecked `IQ-` depth is maintained at `15` (meets 15+ requirement).
