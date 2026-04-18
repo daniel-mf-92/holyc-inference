@@ -5385,3 +5385,52 @@ I32 TokenizerBPEDecodeSingleTokenChecked(I32 token_id,
     *io_out_cursor = write_cursor;
     return TOKENIZER_BPE_OK;
 }
+
+I32 TokenizerBPEDecodeSingleTokenCheckedDefault(
+    I32 token_id,
+    U8 *vocab_piece_bytes,
+    U64 vocab_piece_bytes_len,
+    U64 *vocab_piece_offsets,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 max_piece_bytes,
+    U8 *out_bytes,
+    U64 *io_out_cursor,
+    U64 *out_byte_count)
+{
+    U64 out_cursor;
+    U64 derived_out_byte_capacity;
+
+    if (!vocab_piece_bytes || !vocab_piece_offsets || !vocab_piece_lens ||
+        !out_bytes || !io_out_cursor || !out_byte_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (vocab_piece_bytes_len > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        max_piece_bytes > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    out_cursor = *io_out_cursor;
+    if (out_cursor > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Canonical default-capacity rule for one-token decode:
+    // allow at most `max_piece_bytes` appended at current output cursor.
+    if (max_piece_bytes > 0x7FFFFFFFFFFFFFFF - out_cursor)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    derived_out_byte_capacity = out_cursor + max_piece_bytes;
+
+    // Canonical default vocab table-capacity derivation:
+    // `vocab_piece_capacity = vocab_piece_count`.
+    return TokenizerBPEDecodeSingleTokenChecked(token_id,
+                                                vocab_piece_bytes,
+                                                vocab_piece_bytes_len,
+                                                vocab_piece_offsets,
+                                                vocab_piece_lens,
+                                                vocab_piece_count,
+                                                vocab_piece_count,
+                                                out_bytes,
+                                                derived_out_byte_capacity,
+                                                io_out_cursor,
+                                                out_byte_count);
+}
