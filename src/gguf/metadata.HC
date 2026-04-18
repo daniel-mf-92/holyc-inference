@@ -502,6 +502,12 @@ I32 GGUFMetadataReadI32PairCheckedDefault(U8 *buf,
                                           I32 *out_first,
                                           I32 *out_second);
 
+I32 GGUFMetadataReadI32PairCheckedNoPartialDefault(U8 *buf,
+                                                   U64 buf_nbytes,
+                                                   U64 *cursor,
+                                                   I32 *out_first,
+                                                   I32 *out_second);
+
 I32 GGUFMetadataReadI32TripleChecked(U8 *buf,
                                      U64 buf_nbytes,
                                      U64 *cursor,
@@ -3421,6 +3427,23 @@ I32 GGUFMetadataReadI32PairCheckedDefault(U8 *buf,
                                           U64 *cursor,
                                           I32 *out_first,
                                           I32 *out_second)
+{
+    return GGUFMetadataReadI32PairChecked(buf,
+                                          buf_nbytes,
+                                          cursor,
+                                          buf_nbytes,
+                                          out_first,
+                                          out_second);
+}
+
+// Canonical default-end wrapper for no-partial I32-pair metadata reads.
+// Contract: pins table_end to buf_nbytes and delegates to the explicit-end
+// checked core so success/error/cursor/output behavior remains identical.
+I32 GGUFMetadataReadI32PairCheckedNoPartialDefault(U8 *buf,
+                                                   U64 buf_nbytes,
+                                                   U64 *cursor,
+                                                   I32 *out_first,
+                                                   I32 *out_second)
 {
     return GGUFMetadataReadI32PairChecked(buf,
                                           buf_nbytes,
