@@ -496,6 +496,13 @@ I32 GGUFMetadataReadI32PairChecked(U8 *buf,
                                    I32 *out_first,
                                    I32 *out_second);
 
+I32 GGUFMetadataReadI32PairCheckedNoPartial(U8 *buf,
+                                            U64 buf_nbytes,
+                                            U64 *cursor,
+                                            U64 table_end,
+                                            I32 *out_first,
+                                            I32 *out_second);
+
 I32 GGUFMetadataReadI32PairCheckedDefault(U8 *buf,
                                           U64 buf_nbytes,
                                           U64 *cursor,
@@ -3444,6 +3451,43 @@ I32 GGUFMetadataReadI32PairCheckedDefault(U8 *buf,
                                           out_second);
 }
 
+// Explicit no-partial wrapper for compact I32-pair metadata records.
+// Contract: routes through canonical staged I32-pair decoding while staging
+// output lanes + cursor locally, then commits all-or-nothing on success.
+I32 GGUFMetadataReadI32PairCheckedNoPartial(U8 *buf,
+                                            U64 buf_nbytes,
+                                            U64 *cursor,
+                                            U64 table_end,
+                                            I32 *out_first,
+                                            I32 *out_second)
+{
+    U64 cur;
+    I32 first;
+    I32 second;
+    I32 err;
+
+    if (!buf || !cursor || !out_first || !out_second)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    cur = *cursor;
+
+    // Reuse canonical staged pair decode to preserve exact signed-I32
+    // bounds/overflow behavior while making no-partial commit explicit.
+    err = GGUFMetadataReadI32PairChecked(buf,
+                                         buf_nbytes,
+                                         &cur,
+                                         table_end,
+                                         &first,
+                                         &second);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_first = first;
+    *out_second = second;
+    *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
 // Canonical default-end wrapper for no-partial I32-pair metadata reads.
 // Contract: pins table_end to buf_nbytes and delegates to the explicit-end
 // checked core so success/error/cursor/output behavior remains identical.
@@ -3453,12 +3497,12 @@ I32 GGUFMetadataReadI32PairCheckedNoPartialDefault(U8 *buf,
                                                    I32 *out_first,
                                                    I32 *out_second)
 {
-    return GGUFMetadataReadI32PairChecked(buf,
-                                          buf_nbytes,
-                                          cursor,
-                                          buf_nbytes,
-                                          out_first,
-                                          out_second);
+    return GGUFMetadataReadI32PairCheckedNoPartial(buf,
+                                                   buf_nbytes,
+                                                   cursor,
+                                                   buf_nbytes,
+                                                   out_first,
+                                                   out_second);
 }
 
 // Checked little-endian I32 tuple reader for compact metadata triple fields.
