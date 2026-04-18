@@ -4889,6 +4889,28 @@ I32 GGUFMetadataReadBoolQuadCheckedNoPartial(U8 *buf,
                                            out_fourth);
 }
 
+// Canonical default-end wrapper for explicit no-partial BOOL-quad metadata
+// reads. Contract: preserves exact checked-no-partial quad semantics by
+// pinning table_end to buf_nbytes and delegating to
+// GGUFMetadataReadBoolQuadCheckedNoPartial.
+I32 GGUFMetadataReadBoolQuadCheckedNoPartialDefault(U8 *buf,
+                                                    U64 buf_nbytes,
+                                                    U64 *cursor,
+                                                    Bool *out_first,
+                                                    Bool *out_second,
+                                                    Bool *out_third,
+                                                    Bool *out_fourth)
+{
+    return GGUFMetadataReadBoolQuadCheckedNoPartial(buf,
+                                                    buf_nbytes,
+                                                    cursor,
+                                                    buf_nbytes,
+                                                    out_first,
+                                                    out_second,
+                                                    out_third,
+                                                    out_fourth);
+}
+
 // Canonical default-end wrapper for compact BOOL-quad metadata records.
 // Contract: preserves exact checked quad semantics by pinning table_end to
 // buf_nbytes and delegating to GGUFMetadataReadBoolQuadChecked.

@@ -1,0 +1,18 @@
+Done — completed one full iteration on `IQ-324` with queue depth preserved.
+
+**Implemented**
+- Added HolyC default no-partial wrapper `GGUFMetadataReadBoolQuadCheckedNoPartialDefault` in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/src/gguf/metadata.HC:4896`.
+- Added focused parity harness `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/tests/test_gguf_metadata_read_bool_quad_checked_no_partial_default.py:1` (null/error/success/truncation/overflow + randomized parity vs explicit-end no-partial core).
+
+**Queue + Ledger**
+- Marked `IQ-324` done in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:523`.
+- Added new unchecked queue item `IQ-339` (HolyC tokenizer UTF-8 lead-byte classifier) in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:538`.
+- Added one progress-ledger line (`loop-396`) in `/Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/MASTER_TASKS.md:546`.
+- Unchecked queue count is maintained at 15.
+
+**Validation**
+- Ran: `python3 tests/test_gguf_metadata_read_bool_quad_checked_no_partial_default.py && python3 tests/test_gguf_metadata_read_bool_quad_checked_no_partial.py && python3 tests/test_gguf_metadata_read_bool_quad_checked_default.py`
+- Output: `gguf_metadata_read_bool_quad_checked_no_partial_default_parity=ok`, `ok`, `ok`.
+
+**Central DB**
+- Logged iteration in `~/Documents/local-codebases/temple-central.db` as `id=3662`, `task_id=IQ-324`, `status=pass`, `validation_result=ok`.
