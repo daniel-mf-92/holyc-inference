@@ -154,6 +154,38 @@ I32 TokenizerUTF8ValidateContinuationSpanChecked(U8 *bytes,
     return TOKENIZER_UTF8_OK;
 }
 
+I32 TokenizerUTF8ValidateContinuationSpanCheckedDefault(U8 *bytes,
+                                                        U64 byte_len,
+                                                        U64 *io_cursor,
+                                                        U64 *out_bytes_consumed)
+{
+    U64 cursor;
+    U64 continuation_count;
+
+    if (!bytes || !io_cursor || !out_bytes_consumed)
+        return TOKENIZER_UTF8_ERR_NULL_PTR;
+
+    // Keep default-span arithmetic inside signed-positive I64 bounds.
+    if (byte_len > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_UTF8_ERR_OVERFLOW;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_UTF8_ERR_BAD_PARAM;
+
+    // Canonical tail-span derivation: validate all remaining bytes from
+    // the caller cursor as continuation bytes.
+    continuation_count = byte_len - cursor;
+
+    // Delegate no-partial cursor/consumed commit semantics to explicit-count
+    // checked implementation.
+    return TokenizerUTF8ValidateContinuationSpanChecked(bytes,
+                                                        byte_len,
+                                                        io_cursor,
+                                                        continuation_count,
+                                                        out_bytes_consumed);
+}
+
 I32 TokenizerUTF8NextCodepointChecked(U8 *bytes,
                                       U64 byte_len,
                                       U64 *io_cursor,
