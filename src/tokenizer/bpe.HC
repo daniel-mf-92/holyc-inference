@@ -3582,6 +3582,53 @@ I32 TokenizerBPEPromptSpanScanCheckedDefault(U8 *bytes,
                                              out_span_count);
 }
 
+I32 TokenizerBPEPromptSpanScanCheckedDefaultValidateCursor(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    U64 *out_span_starts,
+    U64 *out_span_lengths,
+    U8 *out_span_classes,
+    U64 *out_span_count)
+{
+    U64 cursor;
+    U64 derived_capacity;
+
+    if (!bytes || !io_cursor || !out_span_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    cursor = *io_cursor;
+
+    // Strict monotonic cursor contract: cursor must point within the source
+    // byte buffer before any prompt-window arithmetic occurs.
+    if (cursor > byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Strict window contract: requested prompt span must fit entirely inside
+    // [cursor, byte_len], guarding underflow in (byte_len - cursor).
+    if (prompt_nbytes > byte_len - cursor)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    // Canonical default-capacity derivation: an N-byte prompt can produce at
+    // most N spans in the class-partition scanner.
+    derived_capacity = prompt_nbytes;
+
+    return TokenizerBPEPromptSpanScanChecked(bytes,
+                                             byte_len,
+                                             io_cursor,
+                                             prompt_nbytes,
+                                             out_span_starts,
+                                             out_span_lengths,
+                                             out_span_classes,
+                                             derived_capacity,
+                                             out_span_count);
+}
+
 I32 TokenizerBPEPromptSpanScanCheckedDefaultCapacityNoPartial(
     U8 *bytes,
     U64 byte_len,
