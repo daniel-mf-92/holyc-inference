@@ -4938,3 +4938,79 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultNoPartial(
     Free(staged_out_bytes);
     return TOKENIZER_BPE_OK;
 }
+
+I32 TokenizerBPEDecodeSingleTokenChecked(I32 token_id,
+                                         U8 *vocab_piece_bytes,
+                                         U64 vocab_piece_bytes_len,
+                                         U64 *vocab_piece_offsets,
+                                         U64 *vocab_piece_lens,
+                                         U64 vocab_piece_count,
+                                         U64 vocab_piece_capacity,
+                                         U8 *out_bytes,
+                                         U64 out_byte_capacity,
+                                         U64 *io_out_cursor,
+                                         U64 *out_byte_count)
+{
+    U64 token_id_u64;
+    U64 piece_offset;
+    U64 piece_len;
+    U64 out_cursor;
+    U64 staged_out_count;
+    U64 write_cursor;
+    U64 i;
+
+    if (!vocab_piece_bytes || !vocab_piece_offsets || !vocab_piece_lens ||
+        !out_bytes || !io_out_cursor || !out_byte_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (vocab_piece_bytes_len > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_capacity > 0x7FFFFFFFFFFFFFFF ||
+        out_byte_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (vocab_piece_capacity < vocab_piece_count)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    out_cursor = *io_out_cursor;
+    if (out_cursor > out_byte_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (token_id < 0)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    token_id_u64 = token_id;
+    if (token_id_u64 >= vocab_piece_count)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    piece_offset = vocab_piece_offsets[token_id_u64];
+    piece_len = vocab_piece_lens[token_id_u64];
+
+    if (piece_offset > vocab_piece_bytes_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (piece_len > vocab_piece_bytes_len - piece_offset)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Single-token checked decode still obeys caller output cursor/capacity.
+    if (piece_len > out_byte_capacity - out_cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    staged_out_count = piece_len;
+    write_cursor = out_cursor;
+
+    // All bounds are validated above, so this loop is deterministic and safe.
+    for (i = 0; i < piece_len; i++) {
+        out_bytes[write_cursor] = vocab_piece_bytes[piece_offset + i];
+
+        write_cursor++;
+        if (write_cursor <= out_cursor)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    if (write_cursor != out_cursor + staged_out_count)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // No-partial commit: publish count/cursor only after full copy succeeds.
+    *out_byte_count = staged_out_count;
+    *io_out_cursor = write_cursor;
+    return TOKENIZER_BPE_OK;
+}
