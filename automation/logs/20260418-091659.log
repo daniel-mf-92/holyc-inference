@@ -109,3 +109,8 @@ Reading additional input from stdin...
 {"type":"item.completed","item":{"id":"item_23","type":"todo_list","items":[{"text":"Inspect queue and choose top IQ","completed":true},{"text":"Implement IQ-350 in softmax.HC","completed":true},{"text":"Add focused parity test script","completed":true},{"text":"Run validation commands","completed":true},{"text":"Update MASTER_TASKS and central DB","completed":true}]}}
 {"type":"turn.completed","usage":{"input_tokens":2141426,"cached_input_tokens":1986304,"output_tokens":7923}}
 Codex final exit code: 0
+[main 40ad470] feat(inference): codex iteration 20260418-091659
+ 6 files changed, 306 insertions(+), 2 deletions(-)
+ create mode 100644 automation/logs/20260418-091659.final.txt
+ create mode 100644 tests/test_softmax_topk_select_logits_checked_no_alias_default.py
+=== End iteration 97 (outcome=ok) ===
