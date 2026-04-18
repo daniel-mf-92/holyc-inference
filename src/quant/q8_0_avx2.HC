@@ -670,6 +670,23 @@ I32 Q8_0DotBlocksAVX2Q32ToQ16Checked(Q8_0Block *lhs,
     return Q8_0_AVX2_OK;
 }
 
+I32 Q8_0DotBlocksAVX2Q32ToQ16CheckedDefault(Q8_0Block *lhs,
+                                            Q8_0Block *rhs,
+                                            I64 block_count,
+                                            I64 *out_dot_q16)
+{
+    // IQ-328 canonical default-capacity wrapper:
+    // - Q32->Q16 checked block-dot core already operates on active span only
+    //   (`block_count`) and does not expose extra capacity arguments.
+    // - Default wrapper is a direct pass-through so callers can depend on one
+    //   stable default entry point while preserving exact checked-core success,
+    //   error, and no-partial-write semantics.
+    return Q8_0DotBlocksAVX2Q32ToQ16Checked(lhs,
+                                            rhs,
+                                            block_count,
+                                            out_dot_q16);
+}
+
 I32 Q8_0DotRowsAVX2Q32ToQ16Checked(
     Q8_0Block *matrix_blocks,
     I64 matrix_block_capacity,
