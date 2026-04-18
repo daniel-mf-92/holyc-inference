@@ -2032,3 +2032,45 @@ I32 TokenizerBPEEncodePromptCheckedNoPartial(U8 *bytes,
     Free(staged_tokens);
     return TOKENIZER_BPE_OK;
 }
+
+I32 TokenizerBPEEncodePromptCheckedDefaultCapacity(U8 *bytes,
+                                                   U64 byte_len,
+                                                   U64 *io_cursor,
+                                                   U64 prompt_nbytes,
+                                                   I32 *rank_left_tokens,
+                                                   I32 *rank_right_tokens,
+                                                   U32 *rank_values,
+                                                   I32 *rank_merged_tokens,
+                                                   U64 rank_table_count,
+                                                   U64 rank_table_capacity,
+                                                   I32 *out_token_ids,
+                                                   U64 *out_token_count)
+{
+    U64 derived_capacity;
+
+    if (!bytes || !io_cursor || !out_token_ids || !out_token_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Canonical default-capacity rule: byte-level pretokenization emits at
+    // most one token per prompt byte before merge passes shrink the sequence.
+    if (prompt_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    derived_capacity = prompt_nbytes;
+
+    // Delegate checked UTF-8 bounds, rank-table, and no-partial semantics
+    // to the explicit-capacity prompt encoder core.
+    return TokenizerBPEEncodePromptChecked(bytes,
+                                           byte_len,
+                                           io_cursor,
+                                           prompt_nbytes,
+                                           rank_left_tokens,
+                                           rank_right_tokens,
+                                           rank_values,
+                                           rank_merged_tokens,
+                                           rank_table_count,
+                                           rank_table_capacity,
+                                           out_token_ids,
+                                           derived_capacity,
+                                           out_token_count);
+}
