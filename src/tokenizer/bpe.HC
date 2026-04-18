@@ -1163,6 +1163,64 @@ I32 TokenizerBPEMergeApplyBestPriorityChecked(I32 *token_ids,
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEMergeApplyBestPriorityCheckedNoPartial(I32 *token_ids,
+                                                       U64 token_count,
+                                                       U64 token_capacity,
+                                                       I32 *rank_left_tokens,
+                                                       I32 *rank_right_tokens,
+                                                       U32 *rank_values,
+                                                       I32 *rank_merged_tokens,
+                                                       U64 rank_table_count,
+                                                       U64 rank_table_capacity,
+                                                       I32 *out_merged_token,
+                                                       U32 *out_rank,
+                                                       Bool *out_found,
+                                                       U64 *out_token_count)
+{
+    I32 staged_merged_token;
+    U32 staged_rank;
+    Bool staged_found;
+    U64 staged_token_count;
+    I32 err;
+
+    if (!token_ids ||
+        !out_merged_token ||
+        !out_rank ||
+        !out_found ||
+        !out_token_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Stage caller-visible outputs first so any checked-core failure path keeps
+    // the original output state unchanged.
+    staged_merged_token = *out_merged_token;
+    staged_rank = *out_rank;
+    staged_found = *out_found;
+    staged_token_count = *out_token_count;
+
+    err = TokenizerBPEMergeApplyBestPriorityChecked(token_ids,
+                                                    token_count,
+                                                    token_capacity,
+                                                    rank_left_tokens,
+                                                    rank_right_tokens,
+                                                    rank_values,
+                                                    rank_merged_tokens,
+                                                    rank_table_count,
+                                                    rank_table_capacity,
+                                                    &staged_merged_token,
+                                                    &staged_rank,
+                                                    &staged_found,
+                                                    &staged_token_count);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    // All-or-nothing output commit after the checked core has finished.
+    *out_merged_token = staged_merged_token;
+    *out_rank = staged_rank;
+    *out_found = staged_found;
+    *out_token_count = staged_token_count;
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEEncodeMergeLoopChecked(I32 *token_ids,
                                        U64 token_count,
                                        U64 token_capacity,
