@@ -124,13 +124,16 @@ def run_case(
     assert out_new == out_ref
 
 
-def test_source_contains_wrapper_and_no_heap_alloc() -> None:
+def test_source_contains_two_pass_noalloc_wrapper() -> None:
     source = Path("src/tokenizer/bpe.HC").read_text(encoding="utf-8")
     assert "I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAlloc(" in source
     section = source.split(
         "I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAlloc", 1
     )[1].split("I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityNoPartial", 1)[0]
-    assert "TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursor(" in section
+    assert "staged_out_count = 0;" in section
+    assert "// Pass 1:" in section
+    assert "// Pass 2:" in section
+    assert "TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursor(" not in section
     assert "MAlloc(" not in section
 
 
@@ -291,7 +294,7 @@ def test_randomized_parity() -> None:
 
 
 def run() -> None:
-    test_source_contains_wrapper_and_no_heap_alloc()
+    test_source_contains_two_pass_noalloc_wrapper()
     test_multilingual_success_parity()
     test_null_overflow_and_window_contracts()
     test_randomized_parity()

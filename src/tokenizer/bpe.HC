@@ -5374,23 +5374,109 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAlloc(
     U64 out_byte_capacity,
     U64 *out_byte_count)
 {
-    // No-allocation alias over the checked default-capacity validate-cursor
-    // decode path. The delegated helper already performs deterministic
-    // two-pass decode (validate span then copy) with exact cursor/count
-    // commit ordering, so this wrapper preserves parity without heap staging.
-    return TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursor(
-        token_ids,
-        token_count,
-        io_token_cursor,
-        span_token_count,
-        vocab_piece_bytes,
-        vocab_piece_bytes_len,
-        vocab_piece_offsets,
-        vocab_piece_lens,
-        vocab_piece_count,
-        out_bytes,
-        out_byte_capacity,
-        out_byte_count);
+    U64 cursor;
+    U64 decode_count;
+    U64 decode_end;
+    U64 staged_out_count;
+    U64 scan;
+    U64 token_id_u64;
+    U64 piece_offset;
+    U64 piece_len;
+    U64 write_cursor;
+    U64 copy_i;
+
+    if (!token_ids || !io_token_cursor || !vocab_piece_bytes ||
+        !vocab_piece_offsets || !vocab_piece_lens || !out_bytes ||
+        !out_byte_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_count > 0x7FFFFFFFFFFFFFFF ||
+        span_token_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_bytes_len > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        out_byte_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    cursor = *io_token_cursor;
+
+    // Strict decode-window guard matching ValidateCursor contract.
+    if (cursor > token_count)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    decode_count = span_token_count;
+    if (decode_count > token_count - cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    decode_end = cursor + decode_count;
+    if (decode_end < cursor || decode_end > token_count)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Pass 1: validate every token/piece bound and accumulate total output
+    // bytes before writing caller output, preserving deterministic decode shape
+    // and exact error surfaces.
+    staged_out_count = 0;
+    scan = cursor;
+    while (scan < decode_end) {
+        if (token_ids[scan] < 0)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        token_id_u64 = token_ids[scan];
+        if (token_id_u64 >= vocab_piece_count)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        piece_offset = vocab_piece_offsets[token_id_u64];
+        piece_len = vocab_piece_lens[token_id_u64];
+
+        if (piece_offset > vocab_piece_bytes_len)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        if (piece_len > vocab_piece_bytes_len - piece_offset)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        if (piece_len > out_byte_capacity - staged_out_count)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        staged_out_count += piece_len;
+        if (staged_out_count > out_byte_capacity)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+
+        scan++;
+        if (scan == 0)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    // Pass 2: deterministic byte copy after full validation.
+    write_cursor = 0;
+    scan = cursor;
+    while (scan < decode_end) {
+        token_id_u64 = token_ids[scan];
+        piece_offset = vocab_piece_offsets[token_id_u64];
+        piece_len = vocab_piece_lens[token_id_u64];
+
+        copy_i = 0;
+        while (copy_i < piece_len) {
+            out_bytes[write_cursor] = vocab_piece_bytes[piece_offset + copy_i];
+
+            write_cursor++;
+            if (write_cursor > staged_out_count)
+                return TOKENIZER_BPE_ERR_OVERFLOW;
+
+            copy_i++;
+            if (copy_i == 0)
+                return TOKENIZER_BPE_ERR_OVERFLOW;
+        }
+
+        scan++;
+        if (scan == 0)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    if (write_cursor != staged_out_count)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    *out_byte_count = staged_out_count;
+    *io_token_cursor = decode_end;
+    return TOKENIZER_BPE_OK;
 }
 
 I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityNoPartial(
