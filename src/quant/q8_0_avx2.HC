@@ -832,28 +832,27 @@ I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultTiles(
     I64 lhs_block_capacity;
     I64 rhs_block_capacity;
     I64 out_capacity;
+    I32 status;
 
     // IQ-317 canonical default-tiling wrapper:
     // - Preserve checked-core argument ordering for error precedence.
     // - Derive capacities from visible matrix layout dimensions only.
     // - Default traversal tiles are 1x1 so wrapper behavior is exact checked
     //   core behavior with explicit default tile parameters.
-    if (!lhs_matrix_blocks || !rhs_col_blocks || !out_mat_q32)
-        return Q8_0_AVX2_ERR_NULL_PTR;
-
-    if (lhs_rows < 0 || lhs_row_stride_blocks < 0)
-        return Q8_0_AVX2_ERR_BAD_LEN;
-    if (rhs_cols < 0 || rhs_col_stride_blocks < 0)
-        return Q8_0_AVX2_ERR_BAD_LEN;
-    if (k_block_count < 0 || out_row_stride_cols < 0)
-        return Q8_0_AVX2_ERR_BAD_LEN;
-
-    if (!Q8_0AVX2TryMulI64(lhs_rows, lhs_row_stride_blocks, &lhs_block_capacity))
-        return Q8_0_AVX2_ERR_OVERFLOW;
-    if (!Q8_0AVX2TryMulI64(rhs_cols, rhs_col_stride_blocks, &rhs_block_capacity))
-        return Q8_0_AVX2_ERR_OVERFLOW;
-    if (!Q8_0AVX2TryMulI64(lhs_rows, out_row_stride_cols, &out_capacity))
-        return Q8_0_AVX2_ERR_OVERFLOW;
+    status = Q8_0MatMulTiledAVX2Q32CheckedDefaultPreflight(lhs_matrix_blocks,
+                                                           lhs_rows,
+                                                           lhs_row_stride_blocks,
+                                                           rhs_col_blocks,
+                                                           rhs_cols,
+                                                           rhs_col_stride_blocks,
+                                                           k_block_count,
+                                                           out_mat_q32,
+                                                           out_row_stride_cols,
+                                                           &lhs_block_capacity,
+                                                           &rhs_block_capacity,
+                                                           &out_capacity);
+    if (status != Q8_0_AVX2_OK)
+        return status;
 
     return Q8_0MatMulTiledAVX2Q32Checked(
         lhs_matrix_blocks,
@@ -870,6 +869,41 @@ I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultTiles(
         out_mat_q32,
         out_capacity,
         out_row_stride_cols);
+}
+
+I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultPreflight(
+    Q8_0Block *lhs_matrix_blocks,
+    I64 lhs_rows,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_col_blocks,
+    I64 rhs_cols,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_mat_q32,
+    I64 out_row_stride_cols,
+    I64 *out_lhs_block_capacity,
+    I64 *out_rhs_block_capacity,
+    I64 *out_out_capacity)
+{
+    if (!lhs_matrix_blocks || !rhs_col_blocks || !out_mat_q32 ||
+        !out_lhs_block_capacity || !out_rhs_block_capacity || !out_out_capacity)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+
+    if (lhs_rows < 0 || lhs_row_stride_blocks < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (rhs_cols < 0 || rhs_col_stride_blocks < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (k_block_count < 0 || out_row_stride_cols < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    if (!Q8_0AVX2TryMulI64(lhs_rows, lhs_row_stride_blocks, out_lhs_block_capacity))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+    if (!Q8_0AVX2TryMulI64(rhs_cols, rhs_col_stride_blocks, out_rhs_block_capacity))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+    if (!Q8_0AVX2TryMulI64(lhs_rows, out_row_stride_cols, out_out_capacity))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+
+    return Q8_0_AVX2_OK;
 }
 
 I32 Q8_0MatMulTiledAVX2Q32CheckedDefault(
@@ -909,6 +943,8 @@ I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartial(
     I64 out_row_stride_cols)
 {
     I64 staged_out_capacity;
+    I64 lhs_block_capacity;
+    I64 rhs_block_capacity;
     I64 staged_out_bytes;
     I64 *staged_out_mat_q32;
     I64 idx;
@@ -919,12 +955,20 @@ I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartial(
     if (!lhs_matrix_blocks || !rhs_col_blocks)
         return Q8_0_AVX2_ERR_NULL_PTR;
 
-    if (lhs_rows < 0 || lhs_row_stride_blocks < 0)
-        return Q8_0_AVX2_ERR_BAD_LEN;
-    if (rhs_cols < 0 || rhs_col_stride_blocks < 0)
-        return Q8_0_AVX2_ERR_BAD_LEN;
-    if (k_block_count < 0 || out_row_stride_cols < 0)
-        return Q8_0_AVX2_ERR_BAD_LEN;
+    status = Q8_0MatMulTiledAVX2Q32CheckedDefaultPreflight(lhs_matrix_blocks,
+                                                           lhs_rows,
+                                                           lhs_row_stride_blocks,
+                                                           rhs_col_blocks,
+                                                           rhs_cols,
+                                                           rhs_col_stride_blocks,
+                                                           k_block_count,
+                                                           out_mat_q32,
+                                                           out_row_stride_cols,
+                                                           &lhs_block_capacity,
+                                                           &rhs_block_capacity,
+                                                           &staged_out_capacity);
+    if (status != Q8_0_AVX2_OK)
+        return status;
 
     // Preserve default-wrapper behavior for degenerate result spans.
     // Route through default-tiles entry so no-partial staging keeps one
@@ -940,8 +984,6 @@ I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartial(
                                                          out_mat_q32,
                                                          out_row_stride_cols);
 
-    if (!Q8_0AVX2TryMulI64(lhs_rows, out_row_stride_cols, &staged_out_capacity))
-        return Q8_0_AVX2_ERR_OVERFLOW;
     if (staged_out_capacity <= 0)
         return Q8_0_AVX2_ERR_BAD_LEN;
 
