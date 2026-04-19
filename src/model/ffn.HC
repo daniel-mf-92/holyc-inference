@@ -667,3 +667,42 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartial(I64 *gate_q16,
     Free(staging_out_q16);
     return FFN_Q16_OK;
 }
+
+// Deterministic default-stride row wrapper for SwiGLU batch apply.
+//
+// Default stride means each row is dense with no padding, so every row
+// starts exactly lane_count cells after the previous row.
+I32 FFNQ16SwiGLUApplyRowsCheckedDefaultStride(I64 *gate_q16,
+                                              I64 gate_capacity,
+                                              I64 *up_q16,
+                                              I64 up_capacity,
+                                              I64 *out_q16,
+                                              I64 out_capacity,
+                                              I64 row_count,
+                                              I64 lane_count)
+{
+    I64 default_row_stride;
+
+    if (!gate_q16 || !up_q16 || !out_q16)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (row_count < 0 || lane_count < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    if (!row_count || !lane_count)
+        return FFN_Q16_OK;
+
+    default_row_stride = lane_count;
+
+    return FFNQ16SwiGLUApplyRowsChecked(gate_q16,
+                                        gate_capacity,
+                                        default_row_stride,
+                                        up_q16,
+                                        up_capacity,
+                                        default_row_stride,
+                                        out_q16,
+                                        out_capacity,
+                                        default_row_stride,
+                                        row_count,
+                                        lane_count);
+}
