@@ -53,6 +53,18 @@ I32 RoPEQ16RotateHeadRangeByPositionCheckedStrided(I64 *head_cells_q16,
                                                    I64 pair_stride_cells,
                                                    I64 freq_base_q16,
                                                    I64 position);
+I32 RoPEQ16RotateHeadRangeByPositionCheckedStridedNoPartial(I64 *head_cells_q16,
+                                                            I64 head_cell_capacity,
+                                                            I64 token_base_index,
+                                                            I64 token_stride_q16,
+                                                            I64 token_index,
+                                                            I64 range_base_index,
+                                                            I64 head_count,
+                                                            I64 head_stride_cells,
+                                                            I64 head_dim,
+                                                            I64 pair_stride_cells,
+                                                            I64 freq_base_q16,
+                                                            I64 position);
 I32 RoPEQ16RotateHeadRangeByTokenWindowCheckedStrided(I64 *head_cells_q16,
                                                       I64 head_cell_capacity,
                                                       I64 token_base_index,
@@ -1158,6 +1170,87 @@ I32 RoPEQ16RotateHeadRangeByPositionCheckedStrided(I64 *head_cells_q16,
                                                                pair_stride_cells,
                                                                freq_base_q16,
                                                                position);
+}
+
+// Staged all-or-nothing wrapper over
+// `RoPEQ16RotateHeadRangeByPositionCheckedStrided`.
+//
+// Contract:
+//   - On success, rotated cells are committed to `head_cells_q16[]`.
+//   - On failure, `head_cells_q16[]` remains bit-identical to input.
+I32 RoPEQ16RotateHeadRangeByPositionCheckedStridedNoPartial(I64 *head_cells_q16,
+                                                            I64 head_cell_capacity,
+                                                            I64 token_base_index,
+                                                            I64 token_stride_q16,
+                                                            I64 token_index,
+                                                            I64 range_base_index,
+                                                            I64 head_count,
+                                                            I64 head_stride_cells,
+                                                            I64 head_dim,
+                                                            I64 pair_stride_cells,
+                                                            I64 freq_base_q16,
+                                                            I64 position)
+{
+    I64 scratch_bytes;
+    I64 idx;
+    I64 *scratch_cells_q16;
+    I32 status;
+
+    if (!head_cells_q16)
+        return ROPE_Q16_ERR_NULL_PTR;
+    if (head_cell_capacity < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    if (!head_count)
+        return RoPEQ16RotateHeadRangeByPositionCheckedStrided(head_cells_q16,
+                                                              head_cell_capacity,
+                                                              token_base_index,
+                                                              token_stride_q16,
+                                                              token_index,
+                                                              range_base_index,
+                                                              head_count,
+                                                              head_stride_cells,
+                                                              head_dim,
+                                                              pair_stride_cells,
+                                                              freq_base_q16,
+                                                              position);
+
+    status = RoPETryMulI64Checked(head_cell_capacity,
+                                  sizeof(I64),
+                                  &scratch_bytes);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    scratch_cells_q16 = MAlloc(scratch_bytes);
+    if (!scratch_cells_q16)
+        return ROPE_Q16_ERR_OVERFLOW;
+
+    for (idx = 0; idx < head_cell_capacity; idx++)
+        scratch_cells_q16[idx] = head_cells_q16[idx];
+
+    status = RoPEQ16RotateHeadRangeByPositionCheckedStrided(scratch_cells_q16,
+                                                            head_cell_capacity,
+                                                            token_base_index,
+                                                            token_stride_q16,
+                                                            token_index,
+                                                            range_base_index,
+                                                            head_count,
+                                                            head_stride_cells,
+                                                            head_dim,
+                                                            pair_stride_cells,
+                                                            freq_base_q16,
+                                                            position);
+    if (status != ROPE_Q16_OK)
+    {
+        Free(scratch_cells_q16);
+        return status;
+    }
+
+    for (idx = 0; idx < head_cell_capacity; idx++)
+        head_cells_q16[idx] = scratch_cells_q16[idx];
+
+    Free(scratch_cells_q16);
+    return ROPE_Q16_OK;
 }
 
 // Rotate a contiguous range of heads after full range preflight.
