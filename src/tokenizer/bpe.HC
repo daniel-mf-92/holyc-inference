@@ -6749,6 +6749,40 @@ I32 TokenizerBPEComputeMaxPieceBytesChecked(U64 *vocab_piece_lens,
     return TOKENIZER_BPE_OK;
 }
 
+// Computes a checked default decode capacity for prompt decoding from only
+// token count + vocabulary piece lengths:
+//   prompt_out_byte_capacity = token_count * max_piece_bytes
+// where max_piece_bytes is derived by scanning vocab_piece_lens over the
+// active vocab span. This keeps callers on one auditable integer path for
+// capacity math with explicit overflow checks.
+I32 TokenizerBPEComputePromptDecodeCapacityFromLensChecked(U64 token_count,
+                                                           U64 *vocab_piece_lens,
+                                                           U64 vocab_piece_count,
+                                                           U64 *out_prompt_out_byte_capacity)
+{
+    U64 max_piece_bytes;
+    I32 err;
+
+    if (!vocab_piece_lens || !out_prompt_out_byte_capacity)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    err = TokenizerBPEComputeMaxPieceBytesChecked(vocab_piece_lens,
+                                                  vocab_piece_count,
+                                                  &max_piece_bytes);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    if (token_count && max_piece_bytes > 0x7FFFFFFFFFFFFFFF / token_count)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    *out_prompt_out_byte_capacity = token_count * max_piece_bytes;
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoPartialNoAllocFromMaxPiece(
     I32 *token_ids,
     U64 token_count,
