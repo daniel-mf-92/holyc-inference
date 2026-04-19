@@ -1113,6 +1113,12 @@ I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartialNoAlloc(
     if (provided_stage_bytes < required_stage_bytes)
         return Q8_0_AVX2_ERR_BAD_LEN;
 
+    // No-partial contract requires distinct staging/output spans.
+    // If caller aliases staging with final output, a tile failure could
+    // partially mutate `out_mat_q32` before checked status is returned.
+    if (staged_out_q32 == out_mat_q32)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
     status = Q8_0MatMulTiledAVX2Q32CheckedDefaultTiles(lhs_matrix_blocks,
                                                        lhs_rows,
                                                        lhs_row_stride_blocks,
@@ -1129,6 +1135,41 @@ I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartialNoAlloc(
         out_mat_q32[idx] = staged_out_q32[idx];
 
     return Q8_0_AVX2_OK;
+}
+
+I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartialNoAllocDefaultStage(
+    Q8_0Block *lhs_matrix_blocks,
+    I64 lhs_rows,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_col_blocks,
+    I64 rhs_cols,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_mat_q32,
+    I64 out_row_stride_cols,
+    I64 *staged_out_q32)
+{
+    I64 staged_out_capacity;
+
+    // IQ-538 default-stage wrapper:
+    // - Keep no-partial/no-allocation semantics centralized in IQ-537 core.
+    // - Derive caller stage capacity from the visible output layout
+    //   (`lhs_rows * out_row_stride_cols`) using checked I64 multiply.
+    // - Delegate all null/length/overflow/no-partial contracts to IQ-537.
+    if (!Q8_0AVX2TryMulI64(lhs_rows, out_row_stride_cols, &staged_out_capacity))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+
+    return Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartialNoAlloc(lhs_matrix_blocks,
+                                                                lhs_rows,
+                                                                lhs_row_stride_blocks,
+                                                                rhs_col_blocks,
+                                                                rhs_cols,
+                                                                rhs_col_stride_blocks,
+                                                                k_block_count,
+                                                                out_mat_q32,
+                                                                out_row_stride_cols,
+                                                                staged_out_q32,
+                                                                staged_out_capacity);
 }
 
 I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartialPreflight(

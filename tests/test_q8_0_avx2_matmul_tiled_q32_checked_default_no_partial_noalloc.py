@@ -83,6 +83,8 @@ def q8_0_matmul_tiled_avx2_q32_checked_default_no_partial_noalloc(
         return Q8_0_AVX2_ERR_OVERFLOW
     if staged_bytes_provided < staged_bytes[0]:
         return Q8_0_AVX2_ERR_BAD_LEN
+    if staged_out_q32 is out_mat_q32:
+        return Q8_0_AVX2_ERR_BAD_LEN
 
     err, staged_ref = q8_0_matmul_tiled_avx2_q32_checked_default_tiles(
         lhs_matrix_blocks,
@@ -176,6 +178,8 @@ def explicit_staged_composition_reference(
         return Q8_0_AVX2_ERR_OVERFLOW
     if staged_out_bytes < staged_bytes:
         return Q8_0_AVX2_ERR_BAD_LEN
+    if staged_out_q32 is out_mat_q32:
+        return Q8_0_AVX2_ERR_BAD_LEN
 
     err, staged = q8_0_matmul_tiled_avx2_q32_checked_default_tiles(
         lhs_matrix_blocks,
@@ -214,6 +218,7 @@ def test_source_contains_noalloc_wrapper_shape() -> None:
     assert "if (staged_out_capacity < required_stage_capacity)" in body
     assert "if (!Q8_0AVX2TryMulI64(staged_out_capacity, sizeof(I64), &provided_stage_bytes))" in body
     assert "if (provided_stage_bytes < required_stage_bytes)" in body
+    assert "if (staged_out_q32 == out_mat_q32)" in body
 
 
 def test_error_surface_and_no_partial_behavior() -> None:
@@ -311,6 +316,26 @@ def test_error_surface_and_no_partial_behavior() -> None:
         == Q8_0_AVX2_ERR_BAD_LEN
     )
 
+    alias_buf = [33] * 16
+    alias_baseline = list(alias_buf)
+    assert (
+        q8_0_matmul_tiled_avx2_q32_checked_default_no_partial_noalloc(
+            lhs,
+            2,
+            2,
+            rhs,
+            2,
+            2,
+            2,
+            alias_buf,
+            4,
+            alias_buf,
+            16,
+        )
+        == Q8_0_AVX2_ERR_BAD_LEN
+    )
+    assert alias_buf == alias_baseline
+
 
 def test_randomized_parity_vs_explicit_staged_composition() -> None:
     rng = random.Random(20260419_523_2)
@@ -359,6 +384,10 @@ def test_randomized_parity_vs_explicit_staged_composition() -> None:
 
         staged_got = None if null_mode == 3 else [rng.randint(-20, 20) for _ in range(1024)]
         staged_want = None if staged_got is None else list(staged_got)
+
+        if out_got is not None and staged_got is not None and rng.randint(0, 19) == 0:
+            staged_got = out_got
+            staged_want = out_want
 
         if rng.randint(0, 14) == 0:
             staged_cap = -rng.randint(1, 32)
