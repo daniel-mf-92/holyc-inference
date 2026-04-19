@@ -878,6 +878,20 @@ I32 FPQ16ExpArrayFromClampedInputCheckedNoPartial(I64 *input_q16,
     return FP_Q16_OK;
 }
 
+// Canonical default-capacity wrapper for pre-clamped vector exp.
+// This wrapper intentionally keeps semantics pass-through to the checked core:
+//   - length defines the active lane span
+//   - success/error contracts are identical
+//   - no-partial write guarantees remain those of the checked core helper
+I32 FPQ16ExpArrayFromClampedInputCheckedDefault(I64 *input_q16,
+                                                I64 *output_q16,
+                                                I64 length)
+{
+    return FPQ16ExpArrayFromClampedInputChecked(input_q16,
+                                                output_q16,
+                                                length);
+}
+
 // Checked no-alias vector exp helper for pre-clamped lanes.
 // Contract is explicit for immutable-source call sites:
 //   - input_q16 and output_q16 must both be non-null
