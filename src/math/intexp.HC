@@ -27,6 +27,10 @@
 
 I64 FPQ16Mul(I64 a, I64 b);
 I32 FPQ16MulChecked(I64 a_q16, I64 b_q16, I64 *out_q16);
+I32 FPQ16ExpArrayCheckedNoPartialPreflight(I64 *input_q16,
+                                           I64 *output_q16,
+                                           I64 count,
+                                           I64 *out_staged_bytes);
 
 // Checked polynomial core for exp(r) on the range-reduced residual domain:
 //   0 <= r < ln(2)
@@ -928,35 +932,18 @@ I32 FPQ16ExpArrayCheckedNoPartial(I64 *input_q16,
                                   I64 count)
 {
     I64 i;
-    I64 last_index;
-    I64 last_byte_offset;
     I64 staged_bytes;
     I64 *staged_output_q16;
     I32 status;
 
-    if (!input_q16 || !output_q16)
-        return FP_Q16_ERR_NULL_PTR;
-    if (count < 0)
-        return FP_Q16_ERR_BAD_PARAM;
+    status = FPQ16ExpArrayCheckedNoPartialPreflight(input_q16,
+                                                    output_q16,
+                                                    count,
+                                                    &staged_bytes);
+    if (status)
+        return status;
     if (!count)
         return FP_Q16_OK;
-
-    // Guard pointer-span arithmetic before indexed lane access.
-    last_index = count - 1;
-    if (last_index > (I64_MAX_VALUE >> 3))
-        return FP_Q16_ERR_OVERFLOW;
-
-    last_byte_offset = last_index << 3;
-    if ((U64)input_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
-        return FP_Q16_ERR_OVERFLOW;
-    if ((U64)output_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
-        return FP_Q16_ERR_OVERFLOW;
-
-    if (count > (I64_MAX_VALUE >> 3))
-        return FP_Q16_ERR_OVERFLOW;
-    staged_bytes = count << 3;
-    if (!staged_bytes)
-        return FP_Q16_ERR_OVERFLOW;
 
     staged_output_q16 = MAlloc(staged_bytes);
     if (!staged_output_q16)
@@ -975,6 +962,52 @@ I32 FPQ16ExpArrayCheckedNoPartial(I64 *input_q16,
         output_q16[i] = staged_output_q16[i];
 
     Free(staged_output_q16);
+    return FP_Q16_OK;
+}
+
+// Shared checked preflight for staged no-partial vector exp wrappers.
+// Validates pointer/count/overflow contracts and returns required staging
+// bytes for non-zero lane spans.
+I32 FPQ16ExpArrayCheckedNoPartialPreflight(I64 *input_q16,
+                                           I64 *output_q16,
+                                           I64 count,
+                                           I64 *out_staged_bytes)
+{
+    I64 last_index;
+    I64 last_byte_offset;
+
+    if (!out_staged_bytes)
+        return FP_Q16_ERR_NULL_PTR;
+
+    *out_staged_bytes = 0;
+
+    if (!input_q16 || !output_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (!count)
+        return FP_Q16_OK;
+
+    last_index = count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)input_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)output_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    if (count > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    *out_staged_bytes = count << 3;
+    if (*out_staged_bytes <= 0)
+    {
+        *out_staged_bytes = 0;
+        return FP_Q16_ERR_OVERFLOW;
+    }
+
     return FP_Q16_OK;
 }
 
