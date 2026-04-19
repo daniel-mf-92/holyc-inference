@@ -59,6 +59,22 @@ I32 AttentionQ16ComputeScaledQKRowCheckedPreflightOnly(
     I64 *out_required_k_cells,
     I64 *out_required_out_cells);
 
+I32 AttentionQ16ComputeScaledQKRowCheckedNoPartialPreflightOnly(
+    I64 *q_row_q16,
+    I64 q_row_capacity,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 k_row_stride_q16,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 out_score_stride,
+    I64 *out_last_k_base_index,
+    I64 *out_last_out_base_index,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells);
+
 I32 AttentionQ16ComputeScaledQKRowCheckedDefaultStrideNoPartialPreflightOnly(
     I64 *q_row_q16,
     I64 q_row_capacity,
@@ -872,7 +888,7 @@ I32 AttentionQ16ComputeScaledQKRowCheckedDefaultStrideNoPartialPreflightOnly(
     default_k_row_stride_q16 = head_dim;
     default_out_score_stride = token_count;
 
-    return AttentionQ16ComputeScaledQKRowCheckedPreflightOnly(
+    return AttentionQ16ComputeScaledQKRowCheckedNoPartialPreflightOnly(
         q_row_q16,
         q_row_capacity,
         k_rows_q16,
@@ -883,6 +899,43 @@ I32 AttentionQ16ComputeScaledQKRowCheckedDefaultStrideNoPartialPreflightOnly(
         out_scores_q32,
         out_scores_capacity,
         default_out_score_stride,
+        out_last_k_base_index,
+        out_last_out_base_index,
+        out_required_k_cells,
+        out_required_out_cells);
+}
+
+I32 AttentionQ16ComputeScaledQKRowCheckedNoPartialPreflightOnly(
+    I64 *q_row_q16,
+    I64 q_row_capacity,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 k_row_stride_q16,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 out_score_stride,
+    I64 *out_last_k_base_index,
+    I64 *out_last_out_base_index,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells)
+{
+    // IQ-563 no-partial row diagnostics are intentionally identical to the
+    // checked row preflight contract. Staged wrappers use this helper before
+    // any score writes so all required spans and base indices are validated
+    // up-front with exact overflow/error behavior.
+    return AttentionQ16ComputeScaledQKRowCheckedPreflightOnly(
+        q_row_q16,
+        q_row_capacity,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        k_row_stride_q16,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        out_score_stride,
         out_last_k_base_index,
         out_last_out_base_index,
         out_required_k_cells,
@@ -962,7 +1015,7 @@ I32 AttentionQ16ComputeScaledQKRowCheckedNoPartial(I64 *q_row_q16,
         out_score_stride < 0)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    status = AttentionQ16ComputeScaledQKRowCheckedPreflightOnly(
+    status = AttentionQ16ComputeScaledQKRowCheckedNoPartialPreflightOnly(
         q_row_q16,
         q_row_capacity,
         k_rows_q16,
