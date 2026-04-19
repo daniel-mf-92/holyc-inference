@@ -380,6 +380,18 @@ I32 AttentionTryMulI64Checked(I64 lhs, I64 rhs, I64 *out_prod)
                                                   out_prod);
 }
 
+I32 AttentionTryAddU64Checked(U64 lhs, U64 rhs, U64 *out_sum)
+{
+    if (!out_sum)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (lhs > ATTN_U64_MAX_VALUE - rhs)
+        return ATTN_Q16_ERR_OVERFLOW;
+
+    *out_sum = lhs + rhs;
+    return ATTN_Q16_OK;
+}
+
 I32 AttentionQ32ScaleByQ16Checked(I64 value_q32,
                                   I64 scale_q16,
                                   I64 *out_value_q32)
@@ -1181,15 +1193,25 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAlloc(
 {
     I64 default_score_stride;
     I64 default_row_stride;
+    I64 last_row_base_index;
     I64 required_in_cells;
     I64 required_out_cells;
     I64 required_stage_cells;
+    I64 required_stage_bytes;
+    I64 required_in_bytes;
+    I64 required_out_bytes;
     I64 row_base;
     I64 row_index;
     I64 token_index;
     I64 stage_index;
     I64 out_index;
     I64 next_row_base;
+    U64 staged_begin;
+    U64 staged_end;
+    U64 in_begin;
+    U64 in_end;
+    U64 out_begin;
+    U64 out_end;
     I32 status;
 
     if (!in_scores_q32 || !out_scores_q32)
@@ -1201,15 +1223,26 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAlloc(
     if (row_count < 0 || token_count < 0)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    status = AttentionQ16ApplyScoreScaleRowsCheckedDefaultStrideNoPartialPreflightOnly(
+    // IQ-589 no-alloc no-partial default-stride contract:
+    // all score and row strides are derived from token_count so callers can
+    // stage deterministic row-major slabs without hidden allocations.
+    default_score_stride = token_count;
+    default_row_stride = token_count;
+
+    status = AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnly(
         in_scores_q32,
         in_scores_capacity,
         row_count,
         token_count,
+        default_score_stride,
+        default_score_stride,
+        default_row_stride,
         out_scores_q32,
         out_scores_capacity,
+        &last_row_base_index,
         &required_in_cells,
-        &required_out_cells);
+        &required_out_cells,
+        &required_stage_cells);
     if (status != ATTN_Q16_OK)
         return status;
 
@@ -1219,24 +1252,56 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAlloc(
     if (!staged_scores_q32)
         return ATTN_Q16_ERR_NULL_PTR;
 
-    status = AttentionTryMulI64Checked(row_count,
-                                       token_count,
-                                       &required_stage_cells);
-    if (status != ATTN_Q16_OK)
-        return status;
-
     if (staged_scores_capacity < required_stage_cells)
         return ATTN_Q16_ERR_BAD_PARAM;
 
+    status = AttentionTryMulI64Checked(required_stage_cells,
+                                       sizeof(I64),
+                                       &required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryMulI64Checked(required_in_cells,
+                                       sizeof(I64),
+                                       &required_in_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryMulI64Checked(required_out_cells,
+                                       sizeof(I64),
+                                       &required_out_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (required_stage_bytes <= 0 || required_in_bytes <= 0 ||
+        required_out_bytes <= 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
     // No-partial contract: staging must be disjoint from live sources/sinks.
-    if (staged_scores_q32 == in_scores_q32)
+    staged_begin = (U64)staged_scores_q32;
+    in_begin = (U64)in_scores_q32;
+    out_begin = (U64)out_scores_q32;
+
+    status = AttentionTryAddU64Checked(staged_begin,
+                                       (U64)required_stage_bytes,
+                                       &staged_end);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddU64Checked(in_begin,
+                                       (U64)required_in_bytes,
+                                       &in_end);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddU64Checked(out_begin,
+                                       (U64)required_out_bytes,
+                                       &out_end);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (staged_begin < in_end && in_begin < staged_end)
         return ATTN_Q16_ERR_BAD_PARAM;
-    if (staged_scores_q32 == out_scores_q32)
+    if (staged_begin < out_end && out_begin < staged_end)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    default_score_stride = token_count;
-    default_row_stride = token_count;
-
+    // Stage first; commit only if every row scales successfully.
     status = AttentionQ16ApplyScoreScaleRowsChecked(in_scores_q32,
                                                     in_scores_capacity,
                                                     row_count,
