@@ -944,6 +944,53 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(I64 r
     return FFN_Q16_OK;
 }
 
+// Commit-capacity diagnostics helper for caller-staged default-stride
+// no-alloc no-partial SwiGLU rows.
+//
+// IQ-608 contract:
+// - derive canonical stage/out requirements through RequiredBytes helper;
+// - validate commit scratch cell+byte capacities in one checked path;
+// - expose exact required diagnostics for commit-only dispatchers.
+I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitCapacity(
+    I64 row_count,
+    I64 lane_count,
+    I64 commit_stage_cell_capacity,
+    I64 commit_stage_byte_capacity,
+    I64 *out_commit_required_stage_cells,
+    I64 *out_commit_required_stage_bytes,
+    I64 *out_required_out_cells)
+{
+    I64 commit_required_stage_cells;
+    I64 commit_required_stage_bytes;
+    I64 required_out_cells;
+    I32 status;
+
+    if (!out_commit_required_stage_cells || !out_commit_required_stage_bytes ||
+        !out_required_out_cells)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (commit_stage_cell_capacity < 0 || commit_stage_byte_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    status = FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
+        row_count,
+        lane_count,
+        commit_stage_cell_capacity,
+        &commit_required_stage_cells,
+        &commit_required_stage_bytes,
+        &required_out_cells);
+    if (status)
+        return status;
+
+    if (commit_required_stage_bytes > commit_stage_byte_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    *out_commit_required_stage_cells = commit_required_stage_cells;
+    *out_commit_required_stage_bytes = commit_required_stage_bytes;
+    *out_required_out_cells = required_out_cells;
+    return FFN_Q16_OK;
+}
+
 // Caller-staged no-alloc preflight diagnostics for default-stride
 // no-partial SwiGLU rows.
 //
