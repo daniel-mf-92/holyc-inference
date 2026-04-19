@@ -555,7 +555,7 @@ I32 Q8_0DotRowsAVX2Q32CheckedDefault(
     I64 matrix_block_capacity;
     I32 status;
 
-    // IQ-313 canonical default-capacity row wrapper:
+    // IQ-313 + IQ-525 canonical default-capacity row wrapper:
     // - Matrix capacity defaults to `row_count * row_stride_blocks`.
     // - Vector capacity defaults to `vec_block_count`.
     // - Negative lengths preserve checked-core BAD_LEN semantics.
@@ -604,7 +604,7 @@ I32 Q8_0DotRowsAVX2Q32CheckedDefaultPreflightNoAlloc(
     if (row_count < 0 || row_stride_blocks < 0 || vec_block_count < 0)
         return Q8_0_AVX2_ERR_BAD_LEN;
 
-    // Canonical no-allocation preflight for checked-default row dots:
+    // IQ-525 canonical no-allocation preflight for checked-default row dots:
     // prove row-stride domain, guard matrix span multiplication, and derive
     // row staging bytes for wrappers that require all-or-nothing commit.
     if (row_count > 0 && row_stride_blocks < vec_block_count)
