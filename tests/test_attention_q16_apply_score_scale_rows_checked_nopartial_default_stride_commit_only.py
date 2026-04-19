@@ -29,31 +29,21 @@ def attention_q16_apply_score_scale_rows_checked_nopartial_default_stride_commit
     if staged_scores_q32 is None or out_scores_q32 is None:
         return ATTN_Q16_ERR_NULL_PTR
 
-    if row_count < 0 or token_count < 0:
-        return ATTN_Q16_ERR_BAD_PARAM
-    if staged_scores_capacity < 0 or out_scores_capacity < 0:
-        return ATTN_Q16_ERR_BAD_PARAM
-
-    if row_count == 0 or token_count == 0:
-        return ATTN_Q16_OK
+    err, _, _ = (
+        attention_q16_apply_score_scale_rows_checked_nopartial_default_stride_commit_only_preflight_only(
+            row_count,
+            token_count,
+            staged_scores_capacity,
+            out_scores_capacity,
+        )
+    )
+    if err != ATTN_Q16_OK:
+        return err
 
     default_row_stride = token_count
 
-    err, required_stage_cells = try_mul_i64_checked(row_count, token_count)
-    if err != ATTN_Q16_OK:
-        return err
-
-    err, required_out_cells = try_mul_i64_checked(row_count - 1, default_row_stride)
-    if err != ATTN_Q16_OK:
-        return err
-    err, required_out_cells = try_add_i64_checked(required_out_cells, token_count)
-    if err != ATTN_Q16_OK:
-        return err
-
-    if required_stage_cells > staged_scores_capacity:
-        return ATTN_Q16_ERR_BAD_PARAM
-    if required_out_cells > out_scores_capacity:
-        return ATTN_Q16_ERR_BAD_PARAM
+    if row_count == 0 or token_count == 0:
+        return ATTN_Q16_OK
 
     for row_index in range(row_count):
         err, row_base = try_mul_i64_checked(row_index, default_row_stride)
@@ -150,6 +140,39 @@ def explicit_checked_copy_loops(
     return ATTN_Q16_OK
 
 
+def attention_q16_apply_score_scale_rows_checked_nopartial_default_stride_commit_only_preflight_only(
+    row_count: int,
+    token_count: int,
+    staged_scores_capacity: int,
+    out_scores_capacity: int,
+) -> tuple[int, int, int]:
+    if row_count < 0 or token_count < 0:
+        return ATTN_Q16_ERR_BAD_PARAM, 0, 0
+    if staged_scores_capacity < 0 or out_scores_capacity < 0:
+        return ATTN_Q16_ERR_BAD_PARAM, 0, 0
+
+    if row_count == 0 or token_count == 0:
+        return ATTN_Q16_OK, 0, 0
+
+    err, required_stage_cells = try_mul_i64_checked(row_count, token_count)
+    if err != ATTN_Q16_OK:
+        return err, 0, 0
+
+    err, required_out_cells = try_mul_i64_checked(row_count - 1, token_count)
+    if err != ATTN_Q16_OK:
+        return err, 0, 0
+    err, required_out_cells = try_add_i64_checked(required_out_cells, token_count)
+    if err != ATTN_Q16_OK:
+        return err, 0, 0
+
+    if required_stage_cells > staged_scores_capacity:
+        return ATTN_Q16_ERR_BAD_PARAM, 0, 0
+    if required_out_cells > out_scores_capacity:
+        return ATTN_Q16_ERR_BAD_PARAM, 0, 0
+
+    return ATTN_Q16_OK, required_stage_cells, required_out_cells
+
+
 def test_source_contains_commit_only_helper() -> None:
     source = Path("src/model/attention.HC").read_text(encoding="utf-8")
     signature = (
@@ -159,11 +182,25 @@ def test_source_contains_commit_only_helper() -> None:
 
     body = source.split(signature, 1)[1]
     assert "default_row_stride = token_count;" in body
+    assert (
+        "AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideCommitOnlyPreflightOnly(" in body
+    )
     assert "required_stage_cells" in body
     assert "required_out_cells" in body
     assert "for (row_index = 0; row_index < row_count; row_index++)" in body
     assert "for (token_index = 0; token_index < token_count; token_index++)" in body
     assert "out_scores_q32[out_index] = staged_scores_q32[stage_index];" in body
+
+
+def test_source_contains_commit_only_preflight_helper() -> None:
+    source = Path("src/model/attention.HC").read_text(encoding="utf-8")
+    signature = (
+        "I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideCommitOnlyPreflightOnly("
+    )
+    assert signature in source
+    body = source.rsplit(signature, 1)[1]
+    assert "*out_required_stage_cells = required_stage_cells;" in body
+    assert "*out_required_out_cells = required_out_cells;" in body
 
 
 
@@ -319,6 +356,7 @@ def test_randomized_adversarial_parity() -> None:
 
 def main() -> None:
     test_source_contains_commit_only_helper()
+    test_source_contains_commit_only_preflight_helper()
     test_noalloc_wrapper_uses_commit_only_helper()
     test_known_vector_matches_explicit_checked_copy()
     test_error_paths_preserve_output()
