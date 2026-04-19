@@ -7239,6 +7239,51 @@ I32 TokenizerBPEDecodeSingleTokenCheckedDefault(
                                                 out_byte_count);
 }
 
+I32 TokenizerBPEDecodeSingleTokenCheckedDefaultCapacityValidateCursor(
+    I32 token_id,
+    U8 *vocab_piece_bytes,
+    U64 vocab_piece_bytes_len,
+    U64 *vocab_piece_offsets,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U8 *out_bytes,
+    U64 out_byte_capacity,
+    U64 *io_out_cursor,
+    U64 *out_byte_count)
+{
+    U64 cursor;
+
+    if (!vocab_piece_bytes || !vocab_piece_offsets || !vocab_piece_lens ||
+        !out_bytes || !io_out_cursor || !out_byte_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (vocab_piece_bytes_len > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        out_byte_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    cursor = *io_out_cursor;
+
+    // Strict output-window guard for wrapper callers: cursor must be
+    // inside [0, out_byte_capacity] before single-token decode runs.
+    if (cursor > out_byte_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Canonical default-capacity contract for one-token decode wrappers:
+    // logical vocab capacity is exactly the active piece count.
+    return TokenizerBPEDecodeSingleTokenChecked(token_id,
+                                                vocab_piece_bytes,
+                                                vocab_piece_bytes_len,
+                                                vocab_piece_offsets,
+                                                vocab_piece_lens,
+                                                vocab_piece_count,
+                                                vocab_piece_count,
+                                                out_bytes,
+                                                out_byte_capacity,
+                                                io_out_cursor,
+                                                out_byte_count);
+}
+
 I32 TokenizerBPEDecodeSingleTokenCheckedNoPartial(
     I32 token_id,
     U8 *vocab_piece_bytes,
