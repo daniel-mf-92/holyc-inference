@@ -59,6 +59,9 @@ def q8_0_matmul_tiled_avx2_q32_checked_default_no_partial_noalloc(
     if err != Q8_0_AVX2_OK:
         return err
 
+    if lhs_matrix_blocks is None or rhs_col_blocks is None:
+        return Q8_0_AVX2_ERR_NULL_PTR
+
     if lhs_rows == 0 or rhs_cols == 0:
         err, _ = q8_0_matmul_tiled_avx2_q32_checked_default_tiles(
             lhs_matrix_blocks,
