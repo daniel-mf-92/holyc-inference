@@ -503,6 +503,47 @@ I32 FPQ16ExpRangeReduceLn2ArrayCheckedNoPartial(I64 *input_q16,
     return FP_Q16_OK;
 }
 
+// Canonical default-capacity wrapper for vector ln(2) range reduction.
+// Default contract:
+//   - `length` is the active lane span (no extra capacity parameter).
+//   - Pointer-span overflow guards are preflighted here so default callers
+//     get deterministic guard behavior before checked-core dispatch.
+//   - Success/error semantics remain exact pass-through to
+//     FPQ16ExpRangeReduceLn2ArrayChecked.
+I32 FPQ16ExpRangeReduceLn2ArrayCheckedDefault(I64 *input_q16,
+                                              I64 *out_k,
+                                              I64 *out_r_q16,
+                                              I64 length)
+{
+    I64 last_index;
+    I64 last_byte_offset;
+
+    if (!input_q16 || !out_k || !out_r_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (length < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (!length)
+        return FP_Q16_OK;
+
+    // Guard indexed span before checked-core dispatch.
+    last_index = length - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)input_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)out_k > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)out_r_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    return FPQ16ExpRangeReduceLn2ArrayChecked(input_q16,
+                                              out_k,
+                                              out_r_q16,
+                                              length);
+}
+
 // Checked power-of-two scaler for Q16 exponent assembly paths.
 // Computes:
 //   out_scaled_q16 = base_q16 * (2^k)
