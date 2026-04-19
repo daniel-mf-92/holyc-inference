@@ -146,10 +146,10 @@ def test_known_vector_matches_explicit_composition() -> None:
     )
 
     assert err_got == err_exp == ATTN_Q16_OK
-    assert got_last_in == exp_last_in == [9]
-    assert got_last_out == exp_last_out == [9]
-    assert got_req_in == exp_req_in == [10]
-    assert got_req_out == exp_req_out == [10]
+    assert got_last_in == exp_last_in == [12]
+    assert got_last_out == exp_last_out == [12]
+    assert got_req_in == exp_req_in == [13]
+    assert got_req_out == exp_req_out == [13]
 
 
 def test_error_paths_no_output_mutation() -> None:

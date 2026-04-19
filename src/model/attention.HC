@@ -43,6 +43,22 @@ I32 AttentionQ16ApplyScoreScaleCheckedDefaultStrideNoPartialPreflightOnly(
     I64 *out_required_in_cells,
     I64 *out_required_out_cells);
 
+I32 AttentionQ16ComputeScaledQKRowCheckedPreflightOnly(
+    I64 *q_row_q16,
+    I64 q_row_capacity,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 k_row_stride_q16,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 out_score_stride,
+    I64 *out_last_k_base_index,
+    I64 *out_last_out_base_index,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells);
+
 U64 AttentionAbsToU64(I64 x)
 {
     if (x >= 0)
@@ -603,6 +619,11 @@ I32 AttentionQ16ApplyScoreScaleCheckedNoPartialDefaultStride(
     I64 out_scores_capacity)
 {
     I64 default_score_stride;
+    I64 last_in_base_index;
+    I64 last_out_base_index;
+    I64 required_in_cells;
+    I64 required_out_cells;
+    I32 status;
 
     if (!in_scores_q32 || !out_scores_q32)
         return ATTN_Q16_ERR_NULL_PTR;
@@ -612,11 +633,24 @@ I32 AttentionQ16ApplyScoreScaleCheckedNoPartialDefaultStride(
     if (token_count < 0)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    // IQ-551 no-partial default-stride contract:
+    // IQ-551/IQ-557 no-partial default-stride contract:
     // rows are token-major with one score lane every token_count cells.
-    // Delegate to the checked no-partial core so all staging and overflow
-    // surfaces stay identical to explicit composition.
+    // Run default-stride no-partial preflight first so this wrapper exports
+    // the same checked diagnostics path used by staged compositions.
     default_score_stride = token_count;
+
+    status = AttentionQ16ApplyScoreScaleCheckedDefaultStrideNoPartialPreflightOnly(
+        in_scores_q32,
+        in_scores_capacity,
+        token_count,
+        out_scores_q32,
+        out_scores_capacity,
+        &last_in_base_index,
+        &last_out_base_index,
+        &required_in_cells,
+        &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
 
     return AttentionQ16ApplyScoreScaleCheckedNoPartial(in_scores_q32,
                                                        in_scores_capacity,
@@ -640,16 +674,29 @@ I32 AttentionQ16ComputeScaledQKRowChecked(I64 *q_row_q16,
                                           I64 out_scores_capacity,
                                           I64 out_score_stride)
 {
+    I64 last_k_base_index;
+    I64 last_out_base_index;
+    I64 required_k_cells;
+    I64 required_out_cells;
     I32 status;
 
-    if (!q_row_q16 || !k_rows_q16 || !out_scores_q32)
-        return ATTN_Q16_ERR_NULL_PTR;
-
-    if (q_row_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0)
-        return ATTN_Q16_ERR_BAD_PARAM;
-    if (token_count < 0 || k_row_stride_q16 < 0 || head_dim < 0 ||
-        out_score_stride < 0)
-        return ATTN_Q16_ERR_BAD_PARAM;
+    status = AttentionQ16ComputeScaledQKRowCheckedPreflightOnly(
+        q_row_q16,
+        q_row_capacity,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        k_row_stride_q16,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        out_score_stride,
+        &last_k_base_index,
+        &last_out_base_index,
+        &required_k_cells,
+        &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
 
     // Stage 1: compute unscaled Q·K row in Q32 lanes.
     status = AttentionQ16ComputeQKDotRowChecked(q_row_q16,
@@ -675,6 +722,93 @@ I32 AttentionQ16ComputeScaledQKRowChecked(I64 *q_row_q16,
                                               out_scores_q32,
                                               out_scores_capacity,
                                               out_score_stride);
+}
+
+I32 AttentionQ16ComputeScaledQKRowCheckedPreflightOnly(
+    I64 *q_row_q16,
+    I64 q_row_capacity,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 k_row_stride_q16,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 out_score_stride,
+    I64 *out_last_k_base_index,
+    I64 *out_last_out_base_index,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells)
+{
+    I64 required_k_cells;
+    I64 required_out_cells;
+    I64 last_k_base_index;
+    I64 last_out_base_index;
+    I32 status;
+
+    if (!q_row_q16 || !k_rows_q16 || !out_scores_q32 ||
+        !out_last_k_base_index || !out_last_out_base_index ||
+        !out_required_k_cells || !out_required_out_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_row_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (token_count < 0 || k_row_stride_q16 < 0 || head_dim < 0 ||
+        out_score_stride < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (head_dim > q_row_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (!token_count)
+    {
+        *out_last_k_base_index = 0;
+        *out_last_out_base_index = 0;
+        *out_required_k_cells = 0;
+        *out_required_out_cells = 0;
+        return ATTN_Q16_OK;
+    }
+
+    if (k_row_stride_q16 < head_dim)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (out_score_stride < 1)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // Keep K/output span checks identical to QK-row checked core so wrappers
+    // can preflight with exact success/error diagnostics before score writes.
+    status = AttentionTryMulI64Checked(token_count,
+                                       k_row_stride_q16,
+                                       &required_k_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (required_k_cells > k_rows_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionTryMulI64Checked(token_count - 1,
+                                       k_row_stride_q16,
+                                       &last_k_base_index);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(token_count - 1,
+                                       out_score_stride,
+                                       &last_out_base_index);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddI64Checked(last_out_base_index,
+                                       1,
+                                       &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (required_out_cells > out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    *out_last_k_base_index = last_k_base_index;
+    *out_last_out_base_index = last_out_base_index;
+    *out_required_k_cells = required_k_cells;
+    *out_required_out_cells = required_out_cells;
+
+    return ATTN_Q16_OK;
 }
 
 I32 AttentionQ16ComputeScaledQKRowCheckedDefaultStride(I64 *q_row_q16,
