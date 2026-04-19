@@ -152,10 +152,28 @@ def test_null_ptr_surface_parity() -> None:
     assert err == Q8_0_AVX2_ERR_NULL_PTR
 
 
+def test_no_partial_on_overflow_saturation_fixture() -> None:
+    # Max finite f16 scale + max-magnitude lanes force checked overflow in
+    # scale_prod_q32 * q_dot_q0 within checked AVX2/scalar parity path.
+    scale_bits = half_bits(65504.0)
+    lhs = [{"d_fp16": scale_bits, "qs": [127] * Q8_0_VALUES_PER_BLOCK}]
+    rhs = [{"d_fp16": scale_bits, "qs": [127] * Q8_0_VALUES_PER_BLOCK}]
+
+    out = {"value": 123456789}
+    err = q8_0_dot_product_blocks_avx2_checked_default_no_partial(lhs, rhs, 1, out)
+
+    # Keep contract-level assertion generic: overflow/error path must not
+    # modify caller-visible output.
+    assert err != Q8_0_AVX2_OK
+    assert out["value"] == 123456789
+
+
 def test_source_contains_no_partial_wrapper() -> None:
     source = pathlib.Path("src/quant/q8_0_avx2.HC").read_text(encoding="utf-8")
     assert "I32 Q8_0DotProductBlocksAVX2CheckedDefaultNoPartial(" in source
     assert "Q8_0DotProductBlocksAVX2CheckedDefault(lhs," in source
+    assert "staged_dot_q32" in source
+    assert "*out_dot_q32 = staged_dot_q32;" in source
 
 
 if __name__ == "__main__":
@@ -163,5 +181,6 @@ if __name__ == "__main__":
     test_no_partial_on_malformed_block_counts()
     test_saturation_scale_fixtures_and_truncated_payload()
     test_null_ptr_surface_parity()
+    test_no_partial_on_overflow_saturation_fixture()
     test_source_contains_no_partial_wrapper()
     print("q8_0_dot_avx2_checked_default_no_partial_parity=ok")

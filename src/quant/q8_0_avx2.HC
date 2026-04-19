@@ -452,6 +452,8 @@ I32 Q8_0DotProductBlocksAVX2CheckedDefaultNoPartial(Q8_0Block *lhs,
 
     // IQ-474 strict all-or-nothing default-capacity wrapper:
     // - Preserve exact success/error surfaces from checked-default helper.
+    // - Route writes through local staging so caller output is untouched on
+    //   every failure path (NULL/BAD_LEN/OVERFLOW/PARITY).
     // - Commit caller-visible output only after successful staged completion.
     staged_dot_q32 = 0;
     status = Q8_0DotProductBlocksAVX2CheckedDefault(lhs,
