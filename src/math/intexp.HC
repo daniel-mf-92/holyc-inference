@@ -362,6 +362,85 @@ I32 FPQ16ExpRangeReduceLn2ArrayChecked(I64 *input_q16,
     return FP_Q16_OK;
 }
 
+// Checked all-or-nothing vector wrapper for ln(2) range reduction.
+// This wrapper preserves exact lane math/error surfaces from
+// FPQ16ExpRangeReduceLn2ArrayChecked while strengthening write semantics:
+//   - No caller writes to out_k/out_r_q16 on any failure.
+//   - Full-lane staged results are committed only after checked core success.
+// Pointer-span overflow guards match the checked core before any indexed reads
+// or writes, keeping array contracts auditable and deterministic.
+I32 FPQ16ExpRangeReduceLn2ArrayCheckedNoPartial(I64 *input_q16,
+                                                I64 *out_k,
+                                                I64 *out_r_q16,
+                                                I64 count)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 staged_bytes;
+    I64 *staged_k;
+    I64 *staged_r_q16;
+    I32 status;
+
+    if (!input_q16 || !out_k || !out_r_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (!count)
+        return FP_Q16_OK;
+
+    // Guard pointer-span arithmetic before any indexed lane access.
+    last_index = count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)input_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)out_k > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)out_r_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    if (count > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    staged_bytes = count << 3;
+    if (!staged_bytes)
+        return FP_Q16_ERR_OVERFLOW;
+
+    staged_k = MAlloc(staged_bytes);
+    if (!staged_k)
+        return FP_Q16_ERR_OVERFLOW;
+
+    staged_r_q16 = MAlloc(staged_bytes);
+    if (!staged_r_q16)
+    {
+        Free(staged_k);
+        return FP_Q16_ERR_OVERFLOW;
+    }
+
+    status = FPQ16ExpRangeReduceLn2ArrayChecked(input_q16,
+                                                staged_k,
+                                                staged_r_q16,
+                                                count);
+    if (status)
+    {
+        Free(staged_r_q16);
+        Free(staged_k);
+        return status;
+    }
+
+    for (i = 0; i < count; i++)
+    {
+        out_k[i] = staged_k[i];
+        out_r_q16[i] = staged_r_q16[i];
+    }
+
+    Free(staged_r_q16);
+    Free(staged_k);
+    return FP_Q16_OK;
+}
+
 // Checked power-of-two scaler for Q16 exponent assembly paths.
 // Computes:
 //   out_scaled_q16 = base_q16 * (2^k)
