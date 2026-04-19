@@ -824,10 +824,10 @@ I32 FFNQ16SwiGLUApplyRowsCheckedDefaultStride(I64 *gate_q16,
 // Default stride means each row is dense with no padding, so all source and
 // destination row strides collapse to lane_count.
 I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStride(I64 *gate_q16,
-                                                       I64 gate_capacity,
-                                                       I64 *up_q16,
-                                                       I64 up_capacity,
-                                                       I64 *out_q16,
+                                                        I64 gate_capacity,
+                                                        I64 *up_q16,
+                                                        I64 up_capacity,
+                                                        I64 *out_q16,
                                                        I64 out_capacity,
                                                        I64 row_count,
                                                        I64 lane_count)
@@ -873,6 +873,77 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStride(I64 *gate_q16,
                                                  lane_count);
 }
 
+// No-alloc required-bytes helper for default-stride no-partial SwiGLU
+// commit pipelines.
+//
+// Computes checked diagnostics used by caller-managed staging paths:
+// - required_stage_cells = row_count * lane_count
+// - required_stage_bytes = required_stage_cells * sizeof(I64)
+// - required_out_cells from default row-major span math
+I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(I64 row_count,
+                                                                            I64 lane_count,
+                                                                            I64 stage_cell_capacity,
+                                                                            I64 *out_required_stage_cells,
+                                                                            I64 *out_required_stage_bytes,
+                                                                            I64 *out_required_out_cells)
+{
+    I64 default_row_stride;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
+    I64 required_out_cells;
+    I32 status;
+
+    if (!out_required_stage_cells || !out_required_stage_bytes ||
+        !out_required_out_cells)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (row_count < 0 || lane_count < 0 || stage_cell_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    if (!row_count || !lane_count)
+    {
+        *out_required_stage_cells = 0;
+        *out_required_stage_bytes = 0;
+        *out_required_out_cells = 0;
+        return FFN_Q16_OK;
+    }
+
+    // Stage footprint is one dense row-major slab of live lanes.
+    status = FFNTryMulI64Checked(row_count,
+                                 lane_count,
+                                 &required_stage_cells);
+    if (status)
+        return status;
+
+    // Convert stage cells to bytes with checked overflow math.
+    status = FFNTryMulI64Checked(required_stage_cells,
+                                 sizeof(I64),
+                                 &required_stage_bytes);
+    if (status)
+        return status;
+
+    // Default-stride destination rows are token/lane-major contiguous.
+    default_row_stride = lane_count;
+    status = FFNTryMulI64Checked(row_count - 1,
+                                 default_row_stride,
+                                 &required_out_cells);
+    if (status)
+        return status;
+    status = FFNTryAddI64Checked(required_out_cells,
+                                 lane_count,
+                                 &required_out_cells);
+    if (status)
+        return status;
+
+    if (required_stage_cells > stage_cell_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    *out_required_stage_cells = required_stage_cells;
+    *out_required_stage_bytes = required_stage_bytes;
+    *out_required_out_cells = required_out_cells;
+    return FFN_Q16_OK;
+}
+
 // Caller-staged no-alloc preflight diagnostics for default-stride
 // no-partial SwiGLU rows.
 //
@@ -897,6 +968,7 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(I64 g
     I64 required_out_cells;
     I64 required_stage_cells;
     I64 required_stage_bytes;
+    I64 required_out_cells_from_required_bytes;
     I32 status;
 
     if (!out_required_stage_cells || !out_required_stage_bytes ||
@@ -925,19 +997,19 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(I64 g
     if (status)
         return status;
 
-    status = FFNTryMulI64Checked(row_count,
-                                 lane_count,
-                                 &required_stage_cells);
+    status = FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
+        row_count,
+        lane_count,
+        stage_capacity,
+        &required_stage_cells,
+        &required_stage_bytes,
+        &required_out_cells_from_required_bytes);
     if (status)
         return status;
 
-    status = FFNTryMulI64Checked(required_stage_cells,
-                                 sizeof(I64),
-                                 &required_stage_bytes);
-    if (status)
-        return status;
-
-    if (required_stage_cells > stage_capacity)
+    // Required-bytes helper and full preflight must agree on the exact live
+    // default-stride destination span before no-alloc commit pipelines proceed.
+    if (required_out_cells_from_required_bytes != required_out_cells)
         return FFN_Q16_ERR_BAD_PARAM;
 
     *out_required_stage_cells = required_stage_cells;
