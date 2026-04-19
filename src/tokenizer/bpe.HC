@@ -6108,6 +6108,8 @@ I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAlloc(
     }
 
     // Pass 2 copies deterministically into caller buffer (no heap staging).
+    // Because pass 1 computed exact staged_out_count with full bounds checks,
+    // this pass only advances forward and cannot overrun without corruption.
     write_cursor = 0;
     scan = cursor;
     while (scan < decode_end) {
@@ -6117,12 +6119,12 @@ I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAlloc(
 
         copy_i = 0;
         while (copy_i < piece_len) {
+            if (write_cursor >= staged_out_count)
+                return TOKENIZER_BPE_ERR_OVERFLOW;
+
             out_bytes[write_cursor] = vocab_piece_bytes[piece_offset + copy_i];
 
             write_cursor++;
-            if (write_cursor > staged_out_count)
-                return TOKENIZER_BPE_ERR_OVERFLOW;
-
             copy_i++;
             if (copy_i == 0)
                 return TOKENIZER_BPE_ERR_OVERFLOW;

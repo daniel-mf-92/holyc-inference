@@ -267,6 +267,36 @@ def test_null_and_overflow_surfaces() -> None:
     )
 
 
+def test_failure_keeps_outputs_unchanged() -> None:
+    pieces = [b"A", b"BC", b"DEF"]
+    blob, offsets, lens = build_vocab_tables(pieces)
+
+    out = [0x55] * 32
+    out_before = out.copy()
+    count = [0xBEEF]
+    cursor = [1]
+
+    # token id 9 is out of vocab; pass1 must fail before any caller writes.
+    err = tokenizer_bpe_decode_prompt_checked_default_capacity_validate_cursor_noalloc(
+        [0, 9, 1],
+        3,
+        cursor,
+        blob,
+        len(blob),
+        offsets,
+        lens,
+        3,
+        out,
+        32,
+        count,
+    )
+
+    assert err == TOKENIZER_BPE_ERR_BAD_PARAM
+    assert cursor[0] == 1
+    assert count[0] == 0xBEEF
+    assert out == out_before
+
+
 def test_randomized_parity_against_allocating_wrapper() -> None:
     rng = random.Random(20260419_453)
     pieces = [
@@ -332,6 +362,7 @@ def run() -> None:
     test_multilingual_success_parity_against_allocating_wrapper()
     test_cursor_capacity_adversarial_vectors()
     test_null_and_overflow_surfaces()
+    test_failure_keeps_outputs_unchanged()
     test_randomized_parity_against_allocating_wrapper()
     print("tokenizer_bpe_decode_prompt_checked_default_capacity_validate_cursor_noalloc=ok")
 
