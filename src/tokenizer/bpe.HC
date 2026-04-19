@@ -7679,6 +7679,33 @@ I32 TokenizerBPEDecodeSingleTokenCheckedDefaultCapacityValidateCursor(
                                                 out_byte_count);
 }
 
+I32 TokenizerBPEDecodeSingleTokenCheckedDefaultCapacityValidateCursorNoAlloc(
+    I32 token_id,
+    U8 *vocab_piece_bytes,
+    U64 vocab_piece_bytes_len,
+    U64 *vocab_piece_offsets,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U8 *out_bytes,
+    U64 out_byte_capacity,
+    U64 *io_out_cursor,
+    U64 *out_byte_count)
+{
+    // No-allocation wrapper: keep behavior byte-for-byte aligned with the
+    // canonical validate-cursor helper while guaranteeing zero heap staging.
+    return TokenizerBPEDecodeSingleTokenCheckedDefaultCapacityValidateCursor(
+        token_id,
+        vocab_piece_bytes,
+        vocab_piece_bytes_len,
+        vocab_piece_offsets,
+        vocab_piece_lens,
+        vocab_piece_count,
+        out_bytes,
+        out_byte_capacity,
+        io_out_cursor,
+        out_byte_count);
+}
+
 I32 TokenizerBPEDecodeSingleTokenCheckedDefaultCapacityValidateCursorNoPartial(
     I32 token_id,
     U8 *vocab_piece_bytes,
