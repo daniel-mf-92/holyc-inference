@@ -828,6 +828,24 @@ I32 FPQ16ExpArrayCheckedNoPartial(I64 *input_q16,
     return FP_Q16_OK;
 }
 
+// Canonical default-capacity all-or-nothing wrapper for unclamped vector exp.
+// Default contract:
+//   - `count` is the active lane span (no extra capacity parameter).
+//   - Success/error behavior is exact pass-through to
+//     FPQ16ExpArrayCheckedNoPartial.
+//   - No-partial-write semantics stay centralized in one checked helper.
+I32 FPQ16ExpArrayCheckedNoPartialDefault(I64 *input_q16,
+                                         I64 *output_q16,
+                                         I64 count)
+{
+    I32 status;
+
+    status = FPQ16ExpArrayCheckedNoPartial(input_q16,
+                                           output_q16,
+                                           count);
+    return status;
+}
+
 // Checked vector exp helper for callers that already pre-clamped lanes into
 // the scalar-domain contract:
 //   EXP_Q16_MIN_INPUT <= input_q16[i] <= EXP_Q16_MAX_INPUT
