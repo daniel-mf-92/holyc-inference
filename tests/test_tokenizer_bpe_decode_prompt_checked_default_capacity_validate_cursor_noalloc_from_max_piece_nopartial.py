@@ -12,6 +12,9 @@ sys.path.append(str(Path(__file__).resolve().parent))
 from test_tokenizer_bpe_decode_prompt_checked_default_capacity_validate_cursor_noalloc_from_max_piece import (
     tokenizer_bpe_decode_prompt_checked_default_capacity_validate_cursor_noalloc_from_max_piece,
 )
+from test_tokenizer_bpe_decode_prompt_checked_default_capacity_validate_cursor_noalloc_nopartial import (
+    tokenizer_bpe_decode_prompt_checked_default_capacity_validate_cursor_noalloc_nopartial,
+)
 from test_tokenizer_bpe_decode_token_span_checked import build_vocab_tables
 from test_tokenizer_bpe_encode_prompt_checked import (
     I64_MAX,
@@ -62,9 +65,10 @@ def tokenizer_bpe_decode_prompt_checked_default_capacity_validate_cursor_noalloc
 
     if token_count and max_piece_bytes > I64_MAX // token_count:
         return TOKENIZER_BPE_ERR_OVERFLOW
+
     derived_out_capacity = token_count * max_piece_bytes
 
-    return tokenizer_bpe_decode_prompt_checked_default_capacity_validate_cursor_noalloc_from_max_piece(
+    return tokenizer_bpe_decode_prompt_checked_default_capacity_validate_cursor_noalloc_nopartial(
         token_ids,
         token_count,
         io_token_cursor,
@@ -89,8 +93,6 @@ def run_case(token_ids: list[int], token_cursor: int, pieces: list[bytes]) -> No
     cursor_ref = [token_cursor]
     cursor_new = [token_cursor]
 
-    max_piece_bytes = max((len(piece) for piece in pieces), default=0)
-
     err_ref = tokenizer_bpe_decode_prompt_checked_default_capacity_validate_cursor_noalloc_from_max_piece(
         token_ids,
         len(token_ids),
@@ -101,7 +103,6 @@ def run_case(token_ids: list[int], token_cursor: int, pieces: list[bytes]) -> No
         lens,
         len(pieces),
         out_ref,
-        len(token_ids) * max_piece_bytes,
         count_ref,
     )
 
@@ -131,7 +132,8 @@ def test_source_contains_wrapper_and_delegation() -> None:
         "I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartial", 1
     )[1].split("I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocNoPartialFromMaxPiece", 1)[0]
     assert "TokenizerBPEComputeMaxPieceBytesChecked" in body
-    assert "TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocFromMaxPiece(" in body
+    assert "TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocNoPartial(" in body
+    assert "MAlloc(" not in body
 
 
 def test_multilingual_success_vectors() -> None:
@@ -264,8 +266,6 @@ def test_randomized_parity_against_staged_composition() -> None:
         cursor_ref = [cursor_seed]
         cursor_new = [cursor_seed]
 
-        max_piece_bytes = max((len(piece) for piece in pieces), default=0)
-
         err_ref = tokenizer_bpe_decode_prompt_checked_default_capacity_validate_cursor_noalloc_from_max_piece(
             token_ids,
             token_count,
@@ -276,7 +276,6 @@ def test_randomized_parity_against_staged_composition() -> None:
             lens,
             len(pieces),
             out_ref,
-            token_count * max_piece_bytes,
             count_ref,
         )
         err_new = tokenizer_bpe_decode_prompt_checked_default_capacity_validate_cursor_noalloc_from_max_piece_nopartial(
