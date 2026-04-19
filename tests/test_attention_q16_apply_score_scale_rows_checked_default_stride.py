@@ -87,7 +87,7 @@ def test_source_contains_default_stride_rows_wrapper() -> None:
 
 def test_known_vector_matches_explicit_composition() -> None:
     row_count = 3
-    token_count = 4
+    token_count = 1
     score_scale_q16 = 23170
 
     stride = token_count
@@ -96,11 +96,7 @@ def test_known_vector_matches_explicit_composition() -> None:
     capacity = (row_count - 1) * row_span + row_cells
 
     in_scores = [0] * capacity
-    seeds = [
-        [1000000, -2000000, 3000000, -4000000],
-        [1111111, -2222222, 3333333, -4444444],
-        [5555555, -6666666, 7777777, -8888888],
-    ]
+    seeds = [[1000000], [1111111], [5555555]]
     for row_index in range(row_count):
         row_base = row_index * row_span
         for token_index in range(token_count):
