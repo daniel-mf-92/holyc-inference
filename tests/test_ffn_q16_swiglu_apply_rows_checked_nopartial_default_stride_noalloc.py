@@ -104,6 +104,7 @@ def test_source_contains_noalloc_wrapper() -> None:
     assert "staging_out_q16 == gate_q16" in body
     assert "staging_out_q16 == up_q16" in body
     assert "staging_out_q16 == out_q16" in body
+    assert "FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(" in body
 
 
 def test_known_vectors_match_explicit_staged_default_stride() -> None:

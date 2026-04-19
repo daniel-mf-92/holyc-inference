@@ -946,6 +946,133 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(I64 g
     return FFN_Q16_OK;
 }
 
+// Commit-only helper for caller-staged default-stride no-alloc no-partial
+// SwiGLU rows.
+//
+// Performs checked two-pass copy semantics:
+// 1) validate every `{row_base + lane_index}` source/destination index;
+// 2) commit live lane cells only after full validation succeeds.
+I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(I64 row_count,
+                                                                         I64 lane_count,
+                                                                         I64 *staging_out_q16,
+                                                                         I64 staging_out_capacity,
+                                                                         I64 stage_cell_capacity,
+                                                                         I64 *out_q16,
+                                                                         I64 out_capacity)
+{
+    I64 default_row_stride;
+    I64 required_stage_cells;
+    I64 required_out_cells;
+    I64 row_index;
+    I64 lane_index;
+    I64 row_base;
+    I64 stage_row_base;
+    I64 out_index;
+    I64 stage_index;
+    I32 status;
+
+    if (!staging_out_q16 || !out_q16)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (row_count < 0 || lane_count < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (staging_out_capacity < 0 || stage_cell_capacity < 0 || out_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    if (!row_count || !lane_count)
+        return FFN_Q16_OK;
+
+    status = FFNTryMulI64Checked(row_count,
+                                 lane_count,
+                                 &required_stage_cells);
+    if (status)
+        return status;
+
+    default_row_stride = lane_count;
+
+    status = FFNTryMulI64Checked(row_count - 1,
+                                 default_row_stride,
+                                 &required_out_cells);
+    if (status)
+        return status;
+    status = FFNTryAddI64Checked(required_out_cells,
+                                 lane_count,
+                                 &required_out_cells);
+    if (status)
+        return status;
+
+    if (required_stage_cells > staging_out_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (required_stage_cells > stage_cell_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (required_out_cells > out_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        status = FFNTryMulI64Checked(row_index,
+                                     default_row_stride,
+                                     &row_base);
+        if (status)
+            return status;
+
+        status = FFNTryMulI64Checked(row_index,
+                                     lane_count,
+                                     &stage_row_base);
+        if (status)
+            return status;
+
+        for (lane_index = 0; lane_index < lane_count; lane_index++)
+        {
+            status = FFNTryAddI64Checked(row_base,
+                                         lane_index,
+                                         &out_index);
+            if (status)
+                return status;
+
+            status = FFNTryAddI64Checked(stage_row_base,
+                                         lane_index,
+                                         &stage_index);
+            if (status)
+                return status;
+        }
+    }
+
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        status = FFNTryMulI64Checked(row_index,
+                                     default_row_stride,
+                                     &row_base);
+        if (status)
+            return status;
+
+        status = FFNTryMulI64Checked(row_index,
+                                     lane_count,
+                                     &stage_row_base);
+        if (status)
+            return status;
+
+        for (lane_index = 0; lane_index < lane_count; lane_index++)
+        {
+            status = FFNTryAddI64Checked(row_base,
+                                         lane_index,
+                                         &out_index);
+            if (status)
+                return status;
+
+            status = FFNTryAddI64Checked(stage_row_base,
+                                         lane_index,
+                                         &stage_index);
+            if (status)
+                return status;
+
+            out_q16[out_index] = staging_out_q16[stage_index];
+        }
+    }
+
+    return FFN_Q16_OK;
+}
+
 // Caller-staged no-allocation default-stride no-partial SwiGLU wrapper.
 //
 // All-or-nothing contract:
@@ -963,15 +1090,9 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAlloc(I64 *gate_q16,
                                                               I64 *staging_out_q16,
                                                               I64 staging_out_capacity)
 {
-    I64 default_row_stride;
     I64 required_stage_cells;
     I64 required_stage_bytes;
     I64 required_out_cells;
-    I64 row_index;
-    I64 lane_index;
-    I64 out_row_base;
-    I64 next_out_row_base;
-    I64 out_index;
     I32 status;
 
     if (!gate_q16 || !up_q16 || !out_q16)
@@ -992,8 +1113,6 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAlloc(I64 *gate_q16,
 
     if (!row_count || !lane_count)
         return FFN_Q16_OK;
-
-    default_row_stride = lane_count;
 
     if (!staging_out_q16)
         return FFN_Q16_ERR_NULL_PTR;
@@ -1020,28 +1139,12 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAlloc(I64 *gate_q16,
     if (status)
         return status;
 
-    out_row_base = 0;
-    for (row_index = 0; row_index < row_count; row_index++)
-    {
-        for (lane_index = 0; lane_index < lane_count; lane_index++)
-        {
-            status = FFNTryAddI64Checked(out_row_base,
-                                         lane_index,
-                                         &out_index);
-            if (status)
-                return status;
-
-            out_q16[out_index] = staging_out_q16[out_index];
-        }
-
-        status = FFNTryAddI64Checked(out_row_base,
-                                     default_row_stride,
-                                     &next_out_row_base);
-        if (status)
-            return status;
-
-        out_row_base = next_out_row_base;
-    }
-
-    return FFN_Q16_OK;
+    return FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(
+        row_count,
+        lane_count,
+        staging_out_q16,
+        staging_out_capacity,
+        staging_out_capacity,
+        out_q16,
+        out_capacity);
 }
