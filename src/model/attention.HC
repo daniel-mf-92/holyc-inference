@@ -1738,7 +1738,7 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialPreflightOnly(
     default_k_row_stride_q16 = head_dim;
     default_out_row_stride = token_count;
 
-    status = AttentionQ16ComputeScaledQKRowsCheckedPreflightOnly(
+    status = AttentionQ16ComputeScaledQKRowsCheckedNoPartialPreflightOnly(
         q_rows_q16,
         q_rows_capacity,
         query_row_count,
