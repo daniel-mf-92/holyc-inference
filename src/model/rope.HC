@@ -78,6 +78,19 @@ I32 RoPEQ16RotateHeadRangeByTokenWindowCheckedStrided(I64 *head_cells_q16,
                                                       I64 position_start,
                                                       I64 token_count,
                                                       I64 position_step);
+I32 RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedNoPartialDefaultStride(I64 *head_cells_q16,
+                                                                             I64 head_cell_capacity,
+                                                                             I64 token_base_index,
+                                                                             I64 head_cell_stride,
+                                                                             I64 range_base_index,
+                                                                             I64 head_count,
+                                                                             I64 head_stride_cells,
+                                                                             I64 head_dim,
+                                                                             I64 pair_stride_cells,
+                                                                             I64 freq_base_q16,
+                                                                             I64 position_start,
+                                                                             I64 token_count,
+                                                                             I64 position_step);
 
 I32 RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedPreflightOnly(I64 head_cell_capacity,
                                                                     I64 token_base_index,
@@ -1337,6 +1350,51 @@ I32 RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedNoPartial(I64 *head_cells_q
 
     Free(staged_head_cells_q16);
     return ROPE_Q16_OK;
+}
+
+// Default-stride no-partial wrapper over token-window rotation.
+//
+// This helper is the canonical KV-cache row path where each token starts
+// `head_cell_stride` cells after the previous token. The arithmetic is fully
+// delegated to the checked no-partial core path:
+//   token_base(token_index) = token_base_index + token_index * head_cell_stride
+//
+// Semantics are intentionally identical to the explicit composition call using
+// `RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedNoPartial` with
+// `token_stride_q16=head_cell_stride`:
+//   - Success returns ROPE_Q16_OK with full rotation committed.
+//   - Any error returns the same code and leaves `head_cells_q16[]` unchanged.
+I32 RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedNoPartialDefaultStride(I64 *head_cells_q16,
+                                                                             I64 head_cell_capacity,
+                                                                             I64 token_base_index,
+                                                                             I64 head_cell_stride,
+                                                                             I64 range_base_index,
+                                                                             I64 head_count,
+                                                                             I64 head_stride_cells,
+                                                                             I64 head_dim,
+                                                                             I64 pair_stride_cells,
+                                                                             I64 freq_base_q16,
+                                                                             I64 position_start,
+                                                                             I64 token_count,
+                                                                             I64 position_step)
+{
+    I64 token_stride_q16;
+
+    token_stride_q16 = head_cell_stride;
+
+    return RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedNoPartial(head_cells_q16,
+                                                                       head_cell_capacity,
+                                                                       token_base_index,
+                                                                       token_stride_q16,
+                                                                       range_base_index,
+                                                                       head_count,
+                                                                       head_stride_cells,
+                                                                       head_dim,
+                                                                       pair_stride_cells,
+                                                                       freq_base_q16,
+                                                                       position_start,
+                                                                       token_count,
+                                                                       position_step);
 }
 
 // Rotate a contiguous range of heads after full range preflight.
