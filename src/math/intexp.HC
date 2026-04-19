@@ -121,6 +121,68 @@ I32 FPQ16ExpPolyCoreLn2ResidualQ16CheckedNoPartial(I64 residual_q16,
     return FP_Q16_OK;
 }
 
+// Checked vector ln(2)-residual polynomial core evaluator.
+// For each lane i:
+//   residual_q16[i] -> out_poly_q16[i]
+// where scalar-domain constraints are preserved exactly:
+//   0 <= residual_q16[i] < EXP_Q16_LN2
+//
+// No-partial-write semantics:
+//   - Pass 1 validates every lane through the scalar checked core.
+//   - Pass 2 commits outputs only after full preflight success.
+I32 FPQ16ExpPolyCoreLn2ResidualQ16ArrayChecked(I64 *residual_q16,
+                                               I64 *out_poly_q16,
+                                               I64 count)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 staged_poly_q16;
+    I32 status;
+
+    if (!residual_q16 || !out_poly_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (!count)
+        return FP_Q16_OK;
+
+    // Guard pointer-span arithmetic before indexed lane access.
+    last_index = count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)residual_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)out_poly_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Pass 1: validate every lane without caller-buffer writes.
+    for (i = 0; i < count; i++)
+    {
+        status = FPQ16ExpPolyCoreLn2ResidualQ16Checked(residual_q16[i],
+                                                       &staged_poly_q16);
+        if (status)
+            return status;
+    }
+
+    // Pass 2: deterministic commit after successful preflight.
+    // Use scalar no-partial staging per lane so caller output write happens
+    // exactly once per lane (after successful scalar evaluation).
+    for (i = 0; i < count; i++)
+    {
+        status = FPQ16ExpPolyCoreLn2ResidualQ16CheckedNoPartial(residual_q16[i],
+                                                                &staged_poly_q16);
+        if (status)
+            return status;
+
+        out_poly_q16[i] = staged_poly_q16;
+    }
+
+    return FP_Q16_OK;
+}
+
 // Compatibility alias retained for existing call sites/tests.
 I32 FPQ16ExpPolyCoreResidualLn2Q16Checked(I64 residual_q16,
                                           I64 *out_poly_q16)
