@@ -694,6 +694,66 @@ I32 FPQ16ExpArrayFromClampedInputChecked(I64 *input_q16,
     return FP_Q16_OK;
 }
 
+// Checked all-or-nothing wrapper for pre-clamped vector exp.
+// Keeps scalar/domain semantics from FPQ16ExpArrayFromClampedInputChecked,
+// but strengthens write behavior:
+//   - no writes to caller output on any error path
+//   - staged lane results commit only after full checked-core success
+I32 FPQ16ExpArrayFromClampedInputCheckedNoPartial(I64 *input_q16,
+                                                  I64 *output_q16,
+                                                  I64 count)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 staged_bytes;
+    I64 *staged_output_q16;
+    I32 status;
+
+    if (!input_q16 || !output_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (!count)
+        return FP_Q16_OK;
+
+    // Guard pointer-span arithmetic before indexed lane access.
+    last_index = count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)input_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)output_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    if (count > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    staged_bytes = count << 3;
+    if (!staged_bytes)
+        return FP_Q16_ERR_OVERFLOW;
+
+    staged_output_q16 = MAlloc(staged_bytes);
+    if (!staged_output_q16)
+        return FP_Q16_ERR_OVERFLOW;
+
+    status = FPQ16ExpArrayFromClampedInputChecked(input_q16,
+                                                  staged_output_q16,
+                                                  count);
+    if (status)
+    {
+        Free(staged_output_q16);
+        return status;
+    }
+
+    for (i = 0; i < count; i++)
+        output_q16[i] = staged_output_q16[i];
+
+    Free(staged_output_q16);
+    return FP_Q16_OK;
+}
+
 // Checked no-alias vector exp helper for pre-clamped lanes.
 // Contract is explicit for immutable-source call sites:
 //   - input_q16 and output_q16 must both be non-null
