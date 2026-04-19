@@ -746,6 +746,20 @@ I32 FPQ16ExpArrayChecked(I64 *input_q16,
     return FP_Q16_OK;
 }
 
+// Canonical default-capacity wrapper for unclamped vector exp.
+// This wrapper intentionally keeps semantics pass-through to the checked core:
+//   - count defines the active lane span
+//   - success/error contracts are identical
+//   - clamp+eval lane math remains centralized in one auditable core helper
+I32 FPQ16ExpArrayCheckedDefault(I64 *input_q16,
+                                I64 *output_q16,
+                                I64 count)
+{
+    return FPQ16ExpArrayChecked(input_q16,
+                                output_q16,
+                                count);
+}
+
 // Checked all-or-nothing wrapper for unclamped vector exp.
 // Stages full lane output from FPQ16ExpArrayChecked before commit so callers
 // never observe partial writes on any error path.
