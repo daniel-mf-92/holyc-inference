@@ -6230,6 +6230,7 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMa
 {
     U64 max_piece_bytes;
     U64 derived_out_byte_capacity;
+    U64 cursor;
     U64 staged_cursor;
     U64 staged_out_count;
     U64 staged_alloc_bytes;
@@ -6247,6 +6248,21 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMa
         vocab_piece_bytes_len > 0x7FFFFFFFFFFFFFFF ||
         vocab_piece_count > 0x7FFFFFFFFFFFFFFF)
         return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    cursor = *io_token_cursor;
+    if (cursor > token_count)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (span_token_count > token_count - cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Zero-span decode is a valid no-op; preserve strict no-partial semantics
+    // without staging/allocation work.
+    if (!span_token_count) {
+        *out_byte_count = 0;
+        *io_token_cursor = cursor;
+        return TOKENIZER_BPE_OK;
+    }
 
     // Stage default-capacity derivation so we can run decode into temporary
     // output storage and commit caller buffers only on full success.
@@ -6269,7 +6285,7 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMa
     if (!staged_out_bytes)
         return TOKENIZER_BPE_ERR_OVERFLOW;
 
-    staged_cursor = *io_token_cursor;
+    staged_cursor = cursor;
     staged_out_count = *out_byte_count;
 
     err = TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPiece(
