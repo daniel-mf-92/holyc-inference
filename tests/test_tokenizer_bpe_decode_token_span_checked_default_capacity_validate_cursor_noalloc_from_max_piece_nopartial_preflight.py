@@ -79,8 +79,14 @@ def tokenizer_bpe_decode_token_span_checked_default_capacity_validate_cursor_noa
     if span_token_count and max_piece > I64_MAX // span_token_count:
         return TOKENIZER_BPE_ERR_OVERFLOW
 
+    derived_capacity = span_token_count * max_piece
+    if out_byte_count[0] > I64_MAX:
+        return TOKENIZER_BPE_ERR_OVERFLOW
+    if out_byte_count[0] > derived_capacity:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+
     out_max_piece_bytes[0] = max_piece
-    out_derived_out_byte_capacity[0] = span_token_count * max_piece
+    out_derived_out_byte_capacity[0] = derived_capacity
     return TOKENIZER_BPE_OK
 
 
@@ -102,6 +108,8 @@ def test_source_contains_from_max_piece_nopartial_preflight_and_wrapper_use() ->
     assert "TokenizerBPEComputeMaxPieceBytesChecked(vocab_piece_lens," in body
     assert "if (span_token_count &&" in body
     assert "max_piece_bytes > 0x7FFFFFFFFFFFFFFF / span_token_count" in body
+    assert "if (*out_byte_count > 0x7FFFFFFFFFFFFFFF)" in body
+    assert "if (*out_byte_count > derived_out_byte_capacity)" in body
 
     wrapper_body = source.split(
         "I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartial(",
@@ -195,6 +203,27 @@ def test_null_overflow_and_cursor_span_error_surfaces() -> None:
     assert err == TOKENIZER_BPE_ERR_BAD_PARAM
     assert out_max[0] == 0x11
     assert out_cap[0] == 0x22
+
+    out_max = [0x77]
+    out_cap = [0x88]
+    err = tokenizer_bpe_decode_token_span_checked_default_capacity_validate_cursor_noalloc_from_max_piece_nopartial_preflight(
+        [0, 1, 2],
+        3,
+        [0],
+        2,
+        blob,
+        len(blob),
+        offsets,
+        lens,
+        len(lens),
+        [0],
+        [7],
+        out_max,
+        out_cap,
+    )
+    assert err == TOKENIZER_BPE_ERR_BAD_PARAM
+    assert out_max[0] == 0x77
+    assert out_cap[0] == 0x88
 
 
 def test_multilingual_and_randomized_inline_parity() -> None:
