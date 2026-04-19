@@ -6669,9 +6669,9 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMa
     if (cursor > token_count)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
 
-    // Canonical strict default-span decode: consume tail from cursor to end
-    // and preserve all-or-nothing semantics via the no-partial wrapper.
-    span_token_count = token_count - cursor;
+    // Canonical strict default-span decode: consume exactly the remaining
+    // tail from the live cursor and preserve all-or-nothing semantics.
+    span_token_count = token_count - *io_token_cursor;
 
     return TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartial(
         token_ids,

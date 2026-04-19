@@ -127,7 +127,7 @@ def test_source_contains_helper_signature_and_default_span_derivation() -> None:
         1,
     )[0]
     assert "if (cursor > token_count)" in body
-    assert "span_token_count = token_count - cursor;" in body
+    assert "span_token_count = token_count - *io_token_cursor;" in body
     assert (
         "TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartial("
         in body
@@ -286,9 +286,79 @@ def test_randomized_default_span_parity() -> None:
         assert out_a == out_b
 
 
+def test_error_state_parity_matrix_against_explicit_composition() -> None:
+    random.seed(546)
+
+    pieces = [b"A", b"BC", "世界".encode("utf-8"), b"\x00", b"tail"]
+    blob, offsets, lens = build_vocab_tables(pieces)
+
+    for _ in range(220):
+        token_count = random.randint(0, 24)
+        token_ids = [random.randrange(len(pieces)) for _ in range(token_count)]
+        cursor = random.randint(0, token_count + 4)
+
+        out_a = [0x4A] * 256
+        out_b = out_a.copy()
+        count_a = [random.randint(0, 99)]
+        count_b = [count_a[0]]
+        cursor_a = [cursor]
+        cursor_b = [cursor]
+
+        err_a = tokenizer_bpe_decode_token_span_checked_default_capacity_validate_cursor_noalloc_from_max_piece_nopartial_default_span(
+            token_ids,
+            token_count,
+            cursor_a,
+            blob,
+            len(blob),
+            offsets,
+            lens,
+            len(lens),
+            out_a,
+            count_a,
+        )
+        err_b = explicit_default_span_composition(
+            token_ids,
+            token_count,
+            cursor_b,
+            blob,
+            len(blob),
+            offsets,
+            lens,
+            len(lens),
+            out_b,
+            count_b,
+        )
+
+        assert err_a == err_b
+        assert cursor_a[0] == cursor_b[0]
+        assert count_a[0] == count_b[0]
+        assert out_a == out_b
+
+    overflow_count = [0x55]
+    overflow_out = [0x22] * 32
+    overflow_cursor = [0]
+    overflow_err = tokenizer_bpe_decode_token_span_checked_default_capacity_validate_cursor_noalloc_from_max_piece_nopartial_default_span(
+        [0],
+        I64_MAX + 1,
+        overflow_cursor,
+        blob,
+        len(blob),
+        offsets,
+        lens,
+        len(lens),
+        overflow_out,
+        overflow_count,
+    )
+    assert overflow_err == TOKENIZER_BPE_ERR_OVERFLOW
+    assert overflow_cursor[0] == 0
+    assert overflow_count[0] == 0x55
+    assert overflow_out == [0x22] * 32
+
+
 if __name__ == "__main__":
     test_source_contains_helper_signature_and_default_span_derivation()
     test_multilingual_and_adversarial_prompt_tail_parity()
     test_no_partial_failures_preserve_outputs()
     test_randomized_default_span_parity()
+    test_error_state_parity_matrix_against_explicit_composition()
     print("ok")
