@@ -551,7 +551,9 @@ I32 Q8_0DotRowsAVX2Q32CheckedDefault(
     I64 vec_block_count,
     I64 *out_rows_q32)
 {
+    I64 stage_bytes;
     I64 matrix_block_capacity;
+    I32 status;
 
     // IQ-313 canonical default-capacity row wrapper:
     // - Matrix capacity defaults to `row_count * row_stride_blocks`.
@@ -564,6 +566,16 @@ I32 Q8_0DotRowsAVX2Q32CheckedDefault(
     if (!Q8_0AVX2TryMulI64(row_count, row_stride_blocks, &matrix_block_capacity))
         return Q8_0_AVX2_ERR_OVERFLOW;
 
+    status = Q8_0DotRowsAVX2Q32CheckedDefaultPreflightNoAlloc(matrix_blocks,
+                                                              row_count,
+                                                              row_stride_blocks,
+                                                              vec_blocks,
+                                                              vec_block_count,
+                                                              out_rows_q32,
+                                                              &stage_bytes);
+    if (status != Q8_0_AVX2_OK)
+        return status;
+
     return Q8_0DotRowsAVX2Q32Checked(matrix_blocks,
                                      matrix_block_capacity,
                                      row_count,
@@ -572,6 +584,48 @@ I32 Q8_0DotRowsAVX2Q32CheckedDefault(
                                      vec_block_count,
                                      vec_block_count,
                                      out_rows_q32);
+}
+
+I32 Q8_0DotRowsAVX2Q32CheckedDefaultPreflightNoAlloc(
+    Q8_0Block *matrix_blocks,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q8_0Block *vec_blocks,
+    I64 vec_block_count,
+    I64 *out_rows_q32,
+    I64 *out_stage_bytes)
+{
+    I64 required_matrix_blocks;
+    I64 stage_bytes;
+
+    if (!matrix_blocks || !vec_blocks || !out_rows_q32 || !out_stage_bytes)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+
+    if (row_count < 0 || row_stride_blocks < 0 || vec_block_count < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    // Canonical no-allocation preflight for checked-default row dots:
+    // prove row-stride domain, guard matrix span multiplication, and derive
+    // row staging bytes for wrappers that require all-or-nothing commit.
+    if (row_count > 0 && row_stride_blocks < vec_block_count)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    if (!Q8_0AVX2TryMulI64(row_count, row_stride_blocks, &required_matrix_blocks))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+
+    if (!row_count)
+    {
+        *out_stage_bytes = 0;
+        return Q8_0_AVX2_OK;
+    }
+
+    if (!Q8_0AVX2TryMulI64(row_count, sizeof(I64), &stage_bytes))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+    if (stage_bytes <= 0)
+        return Q8_0_AVX2_ERR_OVERFLOW;
+
+    *out_stage_bytes = stage_bytes;
+    return Q8_0_AVX2_OK;
 }
 
 I32 Q8_0DotRowsAVX2Q32CheckedDefaultNoPartial(
@@ -639,16 +693,14 @@ I32 Q8_0DotRowsAVX2Q32CheckedDefaultNoPartialPreflightNoAlloc(
     I64 *out_rows_q32,
     I64 *out_stage_bytes)
 {
-    // IQ-515 no-allocation preflight alias:
-    // keep strict row/stride/null/overflow gating centralized in one checked
-    // helper so staged wrappers can validate fully before any MAlloc attempt.
-    return Q8_0DotRowsAVX2Q32CheckedDefaultNoPartialPreflight(matrix_blocks,
-                                                              row_count,
-                                                              row_stride_blocks,
-                                                              vec_blocks,
-                                                              vec_block_count,
-                                                              out_rows_q32,
-                                                              out_stage_bytes);
+    // No-partial no-allocation alias over the canonical default preflight.
+    return Q8_0DotRowsAVX2Q32CheckedDefaultPreflightNoAlloc(matrix_blocks,
+                                                            row_count,
+                                                            row_stride_blocks,
+                                                            vec_blocks,
+                                                            vec_block_count,
+                                                            out_rows_q32,
+                                                            out_stage_bytes);
 }
 
 I32 Q8_0DotRowsAVX2Q32CheckedDefaultNoPartialPreflight(
@@ -660,42 +712,15 @@ I32 Q8_0DotRowsAVX2Q32CheckedDefaultNoPartialPreflight(
     I64 *out_rows_q32,
     I64 *out_stage_bytes)
 {
-    I64 required_matrix_blocks;
-    I64 stage_bytes;
-
-    if (!matrix_blocks || !vec_blocks || !out_rows_q32 || !out_stage_bytes)
-        return Q8_0_AVX2_ERR_NULL_PTR;
-
-    if (row_count < 0 || row_stride_blocks < 0 || vec_block_count < 0)
-        return Q8_0_AVX2_ERR_BAD_LEN;
-
-    // IQ-513 default no-partial row preflight contract:
-    // - Fail fast on caller-facing pointer/length domain violations before
-    //   any transient allocation attempt.
-    // - Prove default matrix capacity multiplication once
-    //   (`row_count * row_stride_blocks`) with checked overflow so wrappers
-    //   do not stage-allocate for impossible matrix spans.
-    // - Keep decode math delegated to checked-default core while preserving
-    //   strict no-partial semantics for malformed shape/stride contracts.
-    if (row_count > 0 && row_stride_blocks < vec_block_count)
-        return Q8_0_AVX2_ERR_BAD_LEN;
-
-    if (!Q8_0AVX2TryMulI64(row_count, row_stride_blocks, &required_matrix_blocks))
-        return Q8_0_AVX2_ERR_OVERFLOW;
-
-    if (!row_count)
-    {
-        *out_stage_bytes = 0;
-        return Q8_0_AVX2_OK;
-    }
-
-    if (!Q8_0AVX2TryMulI64(row_count, sizeof(I64), &stage_bytes))
-        return Q8_0_AVX2_ERR_OVERFLOW;
-    if (stage_bytes <= 0)
-        return Q8_0_AVX2_ERR_OVERFLOW;
-
-    *out_stage_bytes = stage_bytes;
-    return Q8_0_AVX2_OK;
+    // IQ-525 centralizes strict row-dot preflight in one helper reused by
+    // checked-default + no-partial wrappers to keep one auditable guard path.
+    return Q8_0DotRowsAVX2Q32CheckedDefaultPreflightNoAlloc(matrix_blocks,
+                                                            row_count,
+                                                            row_stride_blocks,
+                                                            vec_blocks,
+                                                            vec_block_count,
+                                                            out_rows_q32,
+                                                            out_stage_bytes);
 }
 
 I32 Q8_0MatMulTiledAVX2Q32Checked(
