@@ -128,9 +128,11 @@ def test_source_contains_wrapper_and_delegation() -> None:
     source = Path("src/tokenizer/bpe.HC").read_text(encoding="utf-8")
     assert "TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocNoPartialFromMaxPiece" in source
     body = source.split(
-        "I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocNoPartialFromMaxPiece", 1
-    )[1].split("I32 TokenizerBPEDecodePromptCheckedDefault", 1)[0]
-    assert "TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocFromMaxPiecePreflight" in body
+        "I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocNoPartialFromMaxPiece(", 1
+    )[1].split(
+        "I32 TokenizerBPEDecodePromptCheckedDefault", 1
+    )[0]
+    assert "TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocNoPartialFromMaxPiecePreflight" in body
     assert "TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocNoPartial" in body
 
 
