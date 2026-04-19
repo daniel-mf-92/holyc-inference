@@ -43,6 +43,18 @@ I32 AttentionQ16ApplyScoreScaleCheckedDefaultStrideNoPartialPreflightOnly(
     I64 *out_required_in_cells,
     I64 *out_required_out_cells);
 
+I32 AttentionQ16ApplyScoreScaleRowsChecked(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 in_score_stride,
+    I64 out_score_stride,
+    I64 row_stride,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity);
+
 I32 AttentionQ16ComputeScaledQKRowCheckedPreflightOnly(
     I64 *q_row_q16,
     I64 q_row_capacity,
@@ -724,6 +736,124 @@ I32 AttentionQ16ApplyScoreScaleCheckedNoPartialDefaultStride(
                                                        out_scores_q32,
                                                        out_scores_capacity,
                                                        default_score_stride);
+}
+
+I32 AttentionQ16ApplyScoreScaleRowsChecked(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 in_score_stride,
+    I64 out_score_stride,
+    I64 row_stride,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity)
+{
+    I64 in_row_cells;
+    I64 out_row_cells;
+    I64 required_in_cells;
+    I64 required_out_cells;
+    I64 row_index;
+    I64 row_base;
+    I32 status;
+
+    if (!in_scores_q32 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (in_scores_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (in_score_stride < 0 || out_score_stride < 0 || row_stride < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (!row_count || !token_count)
+        return ATTN_Q16_OK;
+
+    if (row_stride < 1)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (in_score_stride < 1 || out_score_stride < 1)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // Compute per-row active span for source and destination score layouts.
+    status = AttentionTryMulI64Checked(token_count - 1,
+                                       in_score_stride,
+                                       &in_row_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddI64Checked(in_row_cells,
+                                       1,
+                                       &in_row_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(token_count - 1,
+                                       out_score_stride,
+                                       &out_row_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddI64Checked(out_row_cells,
+                                       1,
+                                       &out_row_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    // Rows are laid out at fixed row_stride; each row must fit its active
+    // token span so batched execution remains deterministic and auditable.
+    if (row_stride < in_row_cells || row_stride < out_row_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionTryMulI64Checked(row_count - 1,
+                                       row_stride,
+                                       &required_in_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddI64Checked(required_in_cells,
+                                       in_row_cells,
+                                       &required_in_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(row_count - 1,
+                                       row_stride,
+                                       &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddI64Checked(required_out_cells,
+                                       out_row_cells,
+                                       &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (required_in_cells > in_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_out_cells > out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // Deterministic row-major dispatch: row 0 .. row_count-1.
+    row_base = 0;
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        status = AttentionQ16ApplyScoreScaleChecked(in_scores_q32 + row_base,
+                                                    in_row_cells,
+                                                    token_count,
+                                                    in_score_stride,
+                                                    score_scale_q16,
+                                                    out_scores_q32 + row_base,
+                                                    out_row_cells,
+                                                    out_score_stride);
+        if (status != ATTN_Q16_OK)
+            return status;
+
+        status = AttentionTryAddI64Checked(row_base,
+                                           row_stride,
+                                           &row_base);
+        if (status != ATTN_Q16_OK)
+            return status;
+    }
+
+    return ATTN_Q16_OK;
 }
 
 I32 AttentionQ16ComputeScaledQKRowChecked(I64 *q_row_q16,
