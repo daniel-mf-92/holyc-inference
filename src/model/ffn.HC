@@ -279,3 +279,104 @@ I32 FFNQ16SwiGLUApplyChecked(I64 *gate_q16,
 
     return FFN_Q16_OK;
 }
+
+// Checked all-or-nothing wrapper over FFNQ16SwiGLUApplyChecked.
+//
+// Behavior:
+// - validates output-span math up-front
+// - computes into staging buffer first
+// - commits only active output lanes on success
+// - preserves out_q16 on any error (no partial caller-visible writes)
+I32 FFNQ16SwiGLUApplyCheckedNoPartial(I64 *gate_q16,
+                                      I64 gate_capacity,
+                                      I64 gate_stride,
+                                      I64 *up_q16,
+                                      I64 up_capacity,
+                                      I64 up_stride,
+                                      I64 *out_q16,
+                                      I64 out_capacity,
+                                      I64 out_stride,
+                                      I64 lane_count)
+{
+    I64 last_lane;
+    I64 required_out_cells;
+    I64 staging_bytes;
+    I64 lane_index;
+    I64 out_base;
+    I64 *staging_out_q16;
+    I32 status;
+
+    if (!gate_q16 || !up_q16 || !out_q16)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (gate_capacity < 0 || up_capacity < 0 || out_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (gate_stride < 0 || up_stride < 0 || out_stride < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (lane_count < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    if (!lane_count)
+        return FFN_Q16_OK;
+
+    if (out_stride < 1)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    last_lane = lane_count - 1;
+    status = FFNTryMulI64Checked(last_lane,
+                                 out_stride,
+                                 &required_out_cells);
+    if (status)
+        return status;
+    status = FFNTryAddI64Checked(required_out_cells,
+                                 1,
+                                 &required_out_cells);
+    if (status)
+        return status;
+
+    if (required_out_cells > out_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    status = FFNTryMulI64Checked(required_out_cells,
+                                 8,
+                                 &staging_bytes);
+    if (status)
+        return status;
+
+    staging_out_q16 = MAlloc(staging_bytes);
+    if (!staging_out_q16)
+        return FFN_Q16_ERR_OVERFLOW;
+
+    status = FFNQ16SwiGLUApplyChecked(gate_q16,
+                                      gate_capacity,
+                                      gate_stride,
+                                      up_q16,
+                                      up_capacity,
+                                      up_stride,
+                                      staging_out_q16,
+                                      required_out_cells,
+                                      out_stride,
+                                      lane_count);
+    if (status)
+    {
+        Free(staging_out_q16);
+        return status;
+    }
+
+    for (lane_index = 0; lane_index < lane_count; lane_index++)
+    {
+        status = FFNTryMulI64Checked(lane_index,
+                                     out_stride,
+                                     &out_base);
+        if (status)
+        {
+            Free(staging_out_q16);
+            return status;
+        }
+
+        out_q16[out_base] = staging_out_q16[out_base];
+    }
+
+    Free(staging_out_q16);
+    return FFN_Q16_OK;
+}

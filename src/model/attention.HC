@@ -963,24 +963,27 @@ I32 AttentionQ16ComputeScaledQKRowCheckedDefaultStride(I64 *q_row_q16,
     if (token_count < 0 || head_dim < 0)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    // IQ-552 default row-major contracts:
+    // IQ-564 default row-major no-partial bridge contracts:
     // - K rows are tightly packed by head_dim lanes.
     // - Output score row is spaced by token_count lanes.
-    // Core helper owns full overflow/span checks for these derived strides.
+    // Delegate through the no-partial row helper so this default wrapper
+    // preserves staged all-or-nothing semantics while keeping the same
+    // stride derivation and checked overflow/span validation.
     default_k_row_stride_q16 = head_dim;
     default_out_score_stride = token_count;
 
-    return AttentionQ16ComputeScaledQKRowChecked(q_row_q16,
-                                                 q_row_capacity,
-                                                 k_rows_q16,
-                                                 k_rows_capacity,
-                                                 token_count,
-                                                 default_k_row_stride_q16,
-                                                 head_dim,
-                                                 score_scale_q16,
-                                                 out_scores_q32,
-                                                 out_scores_capacity,
-                                                 default_out_score_stride);
+    return AttentionQ16ComputeScaledQKRowCheckedNoPartial(
+        q_row_q16,
+        q_row_capacity,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        default_k_row_stride_q16,
+        head_dim,
+        score_scale_q16,
+        out_scores_q32,
+        out_scores_capacity,
+        default_out_score_stride);
 }
 
 I32 AttentionQ16ComputeScaledQKRowCheckedNoPartial(I64 *q_row_q16,
