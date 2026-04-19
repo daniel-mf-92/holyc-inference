@@ -7542,6 +7542,52 @@ I32 TokenizerBPEDecodePromptCheckedDefaultNoPartialFromMaxPieceValidateCursorNoA
         out_byte_count);
 }
 
+I32 TokenizerBPEDecodePromptCheckedDefaultNoPartialFromMaxPieceValidateCursorNoAllocNoPartialDefaultCapacity(
+    I32 *token_ids,
+    U64 token_count,
+    U64 *io_token_cursor,
+    U8 *vocab_piece_bytes,
+    U64 vocab_piece_bytes_len,
+    U64 *vocab_piece_offsets,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 max_piece_bytes,
+    U8 *out_bytes,
+    U64 *out_byte_count)
+{
+    U64 derived_vocab_piece_capacity;
+
+    if (!token_ids || !io_token_cursor || !vocab_piece_bytes ||
+        !vocab_piece_offsets || !vocab_piece_lens || !out_bytes ||
+        !out_byte_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_bytes_len > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        max_piece_bytes > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Canonical default-capacity contract for prompt decode wrappers:
+    // use the active vocabulary count as capacity to keep bounds aligned with
+    // GGUF piece tables while preserving the same no-alloc/no-partial behavior.
+    derived_vocab_piece_capacity = vocab_piece_count;
+
+    return TokenizerBPEDecodePromptCheckedDefaultNoPartialFromMaxPieceValidateCursorNoAllocNoPartial(
+        token_ids,
+        token_count,
+        io_token_cursor,
+        vocab_piece_bytes,
+        vocab_piece_bytes_len,
+        vocab_piece_offsets,
+        vocab_piece_lens,
+        vocab_piece_count,
+        derived_vocab_piece_capacity,
+        max_piece_bytes,
+        out_bytes,
+        out_byte_count);
+}
+
 I32 TokenizerBPEDecodePromptCheckedDefaultNoPartialValidateCursor(
     I32 *token_ids,
     U64 token_count,
