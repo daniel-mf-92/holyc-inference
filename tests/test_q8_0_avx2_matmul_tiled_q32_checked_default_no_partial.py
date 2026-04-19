@@ -104,7 +104,14 @@ def q8_0_matmul_tiled_avx2_q32_checked_default_no_partial(
 ):
     if out_mat_q32 is None:
         return Q8_0_AVX2_ERR_NULL_PTR
-    if lhs_rows < 0 or out_row_stride_cols < 0:
+    if lhs_matrix_blocks is None or rhs_col_blocks is None:
+        return Q8_0_AVX2_ERR_NULL_PTR
+
+    if lhs_rows < 0 or lhs_row_stride_blocks < 0:
+        return Q8_0_AVX2_ERR_BAD_LEN
+    if rhs_cols < 0 or rhs_col_stride_blocks < 0:
+        return Q8_0_AVX2_ERR_BAD_LEN
+    if k_block_count < 0 or out_row_stride_cols < 0:
         return Q8_0_AVX2_ERR_BAD_LEN
 
     if lhs_rows == 0 or rhs_cols == 0:
@@ -165,7 +172,14 @@ def explicit_staged_composition(
 ):
     if out_mat_q32 is None:
         return Q8_0_AVX2_ERR_NULL_PTR
-    if lhs_rows < 0 or out_row_stride_cols < 0:
+    if lhs_matrix_blocks is None or rhs_col_blocks is None:
+        return Q8_0_AVX2_ERR_NULL_PTR
+
+    if lhs_rows < 0 or lhs_row_stride_blocks < 0:
+        return Q8_0_AVX2_ERR_BAD_LEN
+    if rhs_cols < 0 or rhs_col_stride_blocks < 0:
+        return Q8_0_AVX2_ERR_BAD_LEN
+    if k_block_count < 0 or out_row_stride_cols < 0:
         return Q8_0_AVX2_ERR_BAD_LEN
 
     sentinel = list(out_mat_q32)
@@ -241,6 +255,36 @@ def test_null_and_bad_len_surfaces() -> None:
         == Q8_0_AVX2_ERR_NULL_PTR
     )
 
+    assert (
+        q8_0_matmul_tiled_avx2_q32_checked_default_no_partial(
+            None,
+            2,
+            2,
+            rhs,
+            2,
+            2,
+            2,
+            out,
+            4,
+        )
+        == Q8_0_AVX2_ERR_NULL_PTR
+    )
+
+    assert (
+        q8_0_matmul_tiled_avx2_q32_checked_default_no_partial(
+            lhs,
+            2,
+            2,
+            None,
+            2,
+            2,
+            2,
+            out,
+            4,
+        )
+        == Q8_0_AVX2_ERR_NULL_PTR
+    )
+
     sentinel = out.copy()
     err = q8_0_matmul_tiled_avx2_q32_checked_default_no_partial(
         lhs,
@@ -255,6 +299,101 @@ def test_null_and_bad_len_surfaces() -> None:
     )
     assert err == Q8_0_AVX2_ERR_BAD_LEN
     assert out == sentinel
+
+    sentinel = out.copy()
+    err = q8_0_matmul_tiled_avx2_q32_checked_default_no_partial(
+        lhs,
+        1,
+        -1,
+        rhs,
+        2,
+        2,
+        2,
+        out,
+        4,
+    )
+    assert err == Q8_0_AVX2_ERR_BAD_LEN
+    assert out == sentinel
+
+    sentinel = out.copy()
+    err = q8_0_matmul_tiled_avx2_q32_checked_default_no_partial(
+        lhs,
+        1,
+        2,
+        rhs,
+        2,
+        -1,
+        2,
+        out,
+        4,
+    )
+    assert err == Q8_0_AVX2_ERR_BAD_LEN
+    assert out == sentinel
+
+    sentinel = out.copy()
+    err = q8_0_matmul_tiled_avx2_q32_checked_default_no_partial(
+        lhs,
+        1,
+        2,
+        rhs,
+        2,
+        2,
+        -1,
+        out,
+        4,
+    )
+    assert err == Q8_0_AVX2_ERR_BAD_LEN
+    assert out == sentinel
+
+
+def test_zero_span_passthrough_and_stage_byte_overflow() -> None:
+    rng = random.Random(20260419_505_4)
+    lhs = build_matrix_rows_as_blocks(2, 2, 2, rng)
+    rhs = build_matrix_cols_as_blocks(2, 2, 2, rng)
+
+    out = [31415] * 8
+    sentinel = out.copy()
+
+    err_wrap = q8_0_matmul_tiled_avx2_q32_checked_default_no_partial(
+        lhs,
+        0,
+        2,
+        rhs,
+        2,
+        2,
+        2,
+        out,
+        4,
+    )
+    err_ref = explicit_staged_composition(
+        lhs,
+        0,
+        2,
+        rhs,
+        2,
+        2,
+        2,
+        sentinel,
+        4,
+    )
+    assert err_wrap == Q8_0_AVX2_OK == err_ref
+    assert out == [31415] * 8
+    assert sentinel == [31415] * 8
+
+    huge_stride = (I64_MAX // 8) + 1
+    err = q8_0_matmul_tiled_avx2_q32_checked_default_no_partial(
+        lhs,
+        2,
+        2,
+        rhs,
+        2,
+        2,
+        2,
+        out,
+        huge_stride,
+    )
+    assert err == Q8_0_AVX2_ERR_OVERFLOW
+    assert out == [31415] * 8
 
 
 def test_no_partial_on_underprovisioned_rhs_failure() -> None:
@@ -352,6 +491,7 @@ def run() -> None:
     test_source_contains_default_and_no_partial_shapes()
     test_null_and_bad_len_surfaces()
     test_no_partial_on_underprovisioned_rhs_failure()
+    test_zero_span_passthrough_and_stage_byte_overflow()
     test_overflow_passthrough_and_randomized_parity()
     print("q8_0_avx2_matmul_tiled_q32_checked_default_no_partial=ok")
 

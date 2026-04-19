@@ -849,7 +849,14 @@ I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartial(
 
     if (!out_mat_q32)
         return Q8_0_AVX2_ERR_NULL_PTR;
-    if (lhs_rows < 0 || out_row_stride_cols < 0)
+    if (!lhs_matrix_blocks || !rhs_col_blocks)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+
+    if (lhs_rows < 0 || lhs_row_stride_blocks < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (rhs_cols < 0 || rhs_col_stride_blocks < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (k_block_count < 0 || out_row_stride_cols < 0)
         return Q8_0_AVX2_ERR_BAD_LEN;
 
     // Preserve default-wrapper behavior for degenerate result spans.
