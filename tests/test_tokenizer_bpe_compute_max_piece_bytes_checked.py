@@ -143,7 +143,10 @@ def test_source_contains_new_helper_and_integration_call() -> None:
     wrapper = source.split(
         "I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoPartialNoAllocFromMaxPiece", 1
     )[1].split("I32 TokenizerBPEDecodePromptCheckedDefault", 1)[0]
-    assert "TokenizerBPEComputeMaxPieceBytesChecked(" in wrapper
+    assert (
+        "TokenizerBPEComputeMaxPieceBytesChecked(" in wrapper
+        or "TokenizerBPEComputePromptDecodeCapacityFromMaxPieceChecked(" in wrapper
+    )
 
 
 def test_scalar_empty_and_multilingual_vectors() -> None:

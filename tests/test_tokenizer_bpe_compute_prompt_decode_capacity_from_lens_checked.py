@@ -111,8 +111,9 @@ def test_source_contains_helper_signature_and_core_composition() -> None:
         "I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoPartialNoAllocFromMaxPiece",
         1,
     )[0]
-    assert "TokenizerBPEComputeMaxPieceBytesChecked(vocab_piece_lens," in body
-    assert "*out_prompt_out_byte_capacity = token_count * max_piece_bytes;" in body
+    assert "TokenizerBPEComputePromptDecodeCapacityFromMaxPieceChecked(" in body
+    assert "TokenizerBPEComputePromptDecodeCapacityFromMaxPieceChecked(" in body
+    assert "out_prompt_out_byte_capacity" in body
 
 
 def test_empty_and_multilingual_vectors() -> None:

@@ -6188,16 +6188,14 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMa
 
     // Derive max-piece capacity here (IQ-511 contract), then delegate actual
     // decode/cursor contracts to the checked no-allocation span decoder.
-    err = TokenizerBPEComputeMaxPieceBytesChecked(vocab_piece_lens,
-                                                  vocab_piece_count,
-                                                  &max_piece_bytes);
+    err = TokenizerBPEComputePromptDecodeCapacityFromMaxPieceChecked(
+        span_token_count,
+        vocab_piece_lens,
+        vocab_piece_count,
+        &max_piece_bytes,
+        &derived_out_byte_capacity);
     if (err != TOKENIZER_BPE_OK)
         return err;
-
-    if (span_token_count &&
-        max_piece_bytes > 0x7FFFFFFFFFFFFFFF / span_token_count)
-        return TOKENIZER_BPE_ERR_OVERFLOW;
-    derived_out_byte_capacity = span_token_count * max_piece_bytes;
 
     return TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAlloc(
         token_ids,
@@ -6255,16 +6253,14 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMa
     // Derive default output byte capacity from active span width and the
     // maximum vocabulary piece length, then delegate decode window/copy
     // semantics to the canonical validate-cursor no-allocation helper.
-    err = TokenizerBPEComputeMaxPieceBytesChecked(vocab_piece_lens,
-                                                  vocab_piece_count,
-                                                  &max_piece_bytes);
+    err = TokenizerBPEComputePromptDecodeCapacityFromMaxPieceChecked(
+        span_token_count,
+        vocab_piece_lens,
+        vocab_piece_count,
+        &max_piece_bytes,
+        &derived_out_byte_capacity);
     if (err != TOKENIZER_BPE_OK)
         return err;
-
-    if (span_token_count &&
-        max_piece_bytes > 0x7FFFFFFFFFFFFFFF / span_token_count)
-        return TOKENIZER_BPE_ERR_OVERFLOW;
-    derived_out_byte_capacity = span_token_count * max_piece_bytes;
 
     // No-partial staging seeds staged_out_count from caller state; guard it
     // here so staged decode never starts from an impossible byte cursor.
@@ -7115,6 +7111,43 @@ I32 TokenizerBPEComputeMaxPieceBytesChecked(U64 *vocab_piece_lens,
     return TOKENIZER_BPE_OK;
 }
 
+// Computes checked default decode capacity directly from vocabulary piece
+// lengths by deriving max_piece_bytes then applying guarded integer multiply:
+//   prompt_out_byte_capacity = token_count * max_piece_bytes
+// Outputs are staged and committed only on success so callers can safely use
+// this helper in preflight/no-partial wrappers without partial state updates.
+I32 TokenizerBPEComputePromptDecodeCapacityFromMaxPieceChecked(
+    U64 token_count,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 *out_max_piece_bytes,
+    U64 *out_prompt_out_byte_capacity)
+{
+    U64 max_piece_bytes;
+    I32 err;
+
+    if (!vocab_piece_lens || !out_max_piece_bytes ||
+        !out_prompt_out_byte_capacity)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    err = TokenizerBPEComputeMaxPieceBytesChecked(vocab_piece_lens,
+                                                  vocab_piece_count,
+                                                  &max_piece_bytes);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    if (token_count && max_piece_bytes > 0x7FFFFFFFFFFFFFFF / token_count)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    *out_max_piece_bytes = max_piece_bytes;
+    *out_prompt_out_byte_capacity = token_count * max_piece_bytes;
+    return TOKENIZER_BPE_OK;
+}
+
 // Computes a checked default decode capacity for prompt decoding from only
 // token count + vocabulary piece lengths:
 //   prompt_out_byte_capacity = token_count * max_piece_bytes
@@ -7136,16 +7169,15 @@ I32 TokenizerBPEComputePromptDecodeCapacityFromLensChecked(U64 token_count,
         vocab_piece_count > 0x7FFFFFFFFFFFFFFF)
         return TOKENIZER_BPE_ERR_OVERFLOW;
 
-    err = TokenizerBPEComputeMaxPieceBytesChecked(vocab_piece_lens,
-                                                  vocab_piece_count,
-                                                  &max_piece_bytes);
+    err = TokenizerBPEComputePromptDecodeCapacityFromMaxPieceChecked(
+        token_count,
+        vocab_piece_lens,
+        vocab_piece_count,
+        &max_piece_bytes,
+        out_prompt_out_byte_capacity);
     if (err != TOKENIZER_BPE_OK)
         return err;
 
-    if (token_count && max_piece_bytes > 0x7FFFFFFFFFFFFFFF / token_count)
-        return TOKENIZER_BPE_ERR_OVERFLOW;
-
-    *out_prompt_out_byte_capacity = token_count * max_piece_bytes;
     return TOKENIZER_BPE_OK;
 }
 
@@ -7207,15 +7239,14 @@ I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoPartialNoAlloc
     if (cursor > token_count)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
 
-    err = TokenizerBPEComputeMaxPieceBytesChecked(vocab_piece_lens,
-                                                  vocab_piece_count,
-                                                  &max_piece_bytes);
+    err = TokenizerBPEComputePromptDecodeCapacityFromMaxPieceChecked(
+        token_count,
+        vocab_piece_lens,
+        vocab_piece_count,
+        &max_piece_bytes,
+        &derived_out_byte_capacity);
     if (err != TOKENIZER_BPE_OK)
         return err;
-
-    if (token_count && max_piece_bytes > 0x7FFFFFFFFFFFFFFF / token_count)
-        return TOKENIZER_BPE_ERR_OVERFLOW;
-    derived_out_byte_capacity = token_count * max_piece_bytes;
 
     // Prompt decode consumes [cursor, token_count).
     decode_end = token_count;
@@ -7364,15 +7395,14 @@ I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocFromMaxPi
 
     // Derive default output capacity from max piece size, then delegate to
     // canonical validate-cursor no-allocation decode path.
-    err = TokenizerBPEComputeMaxPieceBytesChecked(vocab_piece_lens,
-                                                  vocab_piece_count,
-                                                  &max_piece_bytes);
+    err = TokenizerBPEComputePromptDecodeCapacityFromMaxPieceChecked(
+        token_count,
+        vocab_piece_lens,
+        vocab_piece_count,
+        &max_piece_bytes,
+        &derived_out_byte_capacity);
     if (err != TOKENIZER_BPE_OK)
         return err;
-
-    if (token_count && max_piece_bytes > 0x7FFFFFFFFFFFFFFF / token_count)
-        return TOKENIZER_BPE_ERR_OVERFLOW;
-    derived_out_byte_capacity = token_count * max_piece_bytes;
 
     *out_max_piece_bytes = max_piece_bytes;
     *out_derived_out_byte_capacity = derived_out_byte_capacity;
@@ -7417,15 +7447,14 @@ I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocNoPartial
 
     // Derive canonical max-piece upper bound and checked full-prompt
     // capacity: token_count * max_piece_bytes.
-    err = TokenizerBPEComputeMaxPieceBytesChecked(vocab_piece_lens,
-                                                  vocab_piece_count,
-                                                  &max_piece_bytes);
+    err = TokenizerBPEComputePromptDecodeCapacityFromMaxPieceChecked(
+        token_count,
+        vocab_piece_lens,
+        vocab_piece_count,
+        &max_piece_bytes,
+        &derived_out_byte_capacity);
     if (err != TOKENIZER_BPE_OK)
         return err;
-
-    if (token_count && max_piece_bytes > 0x7FFFFFFFFFFFFFFF / token_count)
-        return TOKENIZER_BPE_ERR_OVERFLOW;
-    derived_out_byte_capacity = token_count * max_piece_bytes;
 
     *out_max_piece_bytes = max_piece_bytes;
     *out_derived_out_byte_capacity = derived_out_byte_capacity;
