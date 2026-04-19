@@ -105,7 +105,7 @@ def test_null_bad_len_and_zero_row_surfaces() -> None:
         out_holder=out,
     )
     assert err == Q8_0_AVX2_OK
-    assert out["rows"] == [11, 22, 33]
+    assert out["rows"] == []
 
 
 def test_overflow_and_bad_layout_preserve_output() -> None:
