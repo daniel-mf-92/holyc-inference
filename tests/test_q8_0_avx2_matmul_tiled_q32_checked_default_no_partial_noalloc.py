@@ -15,8 +15,8 @@ from test_q8_0_avx2_blocks_q32 import (
     Q8_0_AVX2_ERR_NULL_PTR,
     Q8_0_AVX2_ERR_OVERFLOW,
 )
-from test_q8_0_avx2_matmul_tiled_q32_checked_default_no_partial_preflight import (
-    q8_0_matmul_tiled_avx2_q32_checked_default_no_partial_preflight,
+from test_q8_0_avx2_matmul_tiled_q32_checked_default_no_partial_preflight_noalloc import (
+    q8_0_matmul_tiled_avx2_q32_checked_default_no_partial_preflight_noalloc,
 )
 from test_q8_0_avx2_matmul_tiled_q32_checked_default_no_partial import (
     q8_0_matmul_tiled_avx2_q32_checked_default_tiles,
@@ -43,7 +43,7 @@ def q8_0_matmul_tiled_avx2_q32_checked_default_no_partial_noalloc(
 ):
     staged_cap = [0]
     staged_bytes = [0]
-    err = q8_0_matmul_tiled_avx2_q32_checked_default_no_partial_preflight(
+    err = q8_0_matmul_tiled_avx2_q32_checked_default_no_partial_preflight_noalloc(
         lhs_matrix_blocks,
         lhs_rows,
         lhs_row_stride_blocks,
@@ -212,7 +212,7 @@ def test_source_contains_noalloc_wrapper_shape() -> None:
         "I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartialPreflight(",
         1,
     )[0]
-    assert "Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartialPreflight(" in body
+    assert "Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartialPreflightNoAlloc(" in body
     assert "if (!staged_out_q32)" in body
     assert "if (staged_out_capacity < 0)" in body
     assert "if (staged_out_capacity < required_stage_capacity)" in body
