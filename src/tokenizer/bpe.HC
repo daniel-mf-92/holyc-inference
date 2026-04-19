@@ -6682,6 +6682,8 @@ I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoPartialNoAlloc
     }
 
     // Pass 2 copies bytes after all bounds and capacity checks succeeded.
+    // Keep this phase side-effect-only (no new error exits) so any failure
+    // must occur in Pass 1 before caller-visible output bytes are touched.
     write_cursor = 0;
     scan = cursor;
     while (scan < decode_end) {
@@ -6692,19 +6694,11 @@ I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoPartialNoAlloc
         copy_i = 0;
         while (copy_i < piece_len) {
             out_bytes[write_cursor] = vocab_piece_bytes[piece_offset + copy_i];
-
             write_cursor++;
-            if (write_cursor > staged_out_count)
-                return TOKENIZER_BPE_ERR_OVERFLOW;
-
             copy_i++;
-            if (copy_i == 0)
-                return TOKENIZER_BPE_ERR_OVERFLOW;
         }
 
         scan++;
-        if (scan == 0)
-            return TOKENIZER_BPE_ERR_OVERFLOW;
     }
 
     if (write_cursor != staged_out_count)
