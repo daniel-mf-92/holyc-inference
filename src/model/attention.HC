@@ -231,6 +231,15 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAlloc(
     I64 *staged_scores_q32,
     I64 staged_scores_capacity);
 
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(
+    I64 row_count,
+    I64 token_count,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 stage_cell_capacity,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity);
+
 I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideCommitOnly(
     I64 row_count,
     I64 token_count,
@@ -1621,6 +1630,54 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocPreflight
         return ATTN_Q16_ERR_BAD_PARAM;
 
     return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(
+    I64 row_count,
+    I64 token_count,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 stage_cell_capacity,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity)
+{
+    I64 required_stage_cells;
+    I64 required_out_cells;
+    I32 status;
+
+    if (!staged_scores_q32 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (staged_scores_capacity < 0 || out_scores_capacity < 0 ||
+        stage_cell_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status =
+        AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideCommitOnlyPreflightOnly(
+            row_count,
+            token_count,
+            staged_scores_capacity,
+            out_scores_capacity,
+            &required_stage_cells,
+            &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    // IQ-595 no-alloc commit-only contract:
+    // caller announces scratch/stage budget in cells, and commit path must
+    // reject writes if required staged slab exceeds that budget.
+    if (required_stage_cells > stage_cell_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    return AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideCommitOnly(
+        row_count,
+        token_count,
+        staged_scores_q32,
+        staged_scores_capacity,
+        out_scores_q32,
+        out_scores_capacity);
 }
 
 I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideCommitOnly(
