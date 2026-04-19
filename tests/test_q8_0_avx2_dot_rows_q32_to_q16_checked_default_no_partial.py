@@ -45,6 +45,9 @@ def q8_0_dot_rows_avx2_q32_to_q16_checked_default_no_partial_ptr(
             out_holder=out_holder,
         )
 
+    if row_count > (I64_MAX >> 3):
+        return Q8_0_AVX2_ERR_OVERFLOW
+
     stage_rows = [0] * row_count
     stage_holder = {"rows": stage_rows}
 
