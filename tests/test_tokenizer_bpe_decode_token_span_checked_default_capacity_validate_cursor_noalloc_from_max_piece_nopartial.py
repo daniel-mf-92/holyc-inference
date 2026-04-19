@@ -170,7 +170,7 @@ def test_source_contains_wrapper_and_staged_shape() -> None:
     body = source.split(
         "I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartial", 1
     )[1].split("I32 TokenizerBPEDecodePromptChecked", 1)[0]
-    assert "TokenizerBPEComputeMaxPieceBytesChecked" in body
+    assert "TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPiecePreflight(" in body
     assert "TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPiece(" in body
     assert "MAlloc(" in body
     assert "if (staged_out_count > 0x7FFFFFFFFFFFFFFF)" in body

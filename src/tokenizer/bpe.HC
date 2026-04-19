@@ -6264,6 +6264,37 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMa
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocNoPartialFromMaxPiecePreflight(
+    I32 *token_ids,
+    U64 token_count,
+    U64 *io_token_cursor,
+    U64 span_token_count,
+    U8 *vocab_piece_bytes,
+    U64 vocab_piece_bytes_len,
+    U64 *vocab_piece_offsets,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U8 *out_bytes,
+    U64 *out_byte_count,
+    U64 *out_max_piece_bytes,
+    U64 *out_derived_out_byte_capacity)
+{
+    return TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPiecePreflight(
+        token_ids,
+        token_count,
+        io_token_cursor,
+        span_token_count,
+        vocab_piece_bytes,
+        vocab_piece_bytes_len,
+        vocab_piece_offsets,
+        vocab_piece_lens,
+        vocab_piece_count,
+        out_bytes,
+        out_byte_count,
+        out_max_piece_bytes,
+        out_derived_out_byte_capacity);
+}
+
 I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartial(
     I32 *token_ids,
     U64 token_count,
@@ -6287,23 +6318,24 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMa
     U8 *staged_out_bytes;
     I32 err;
 
-    if (!token_ids || !io_token_cursor || !vocab_piece_bytes ||
-        !vocab_piece_offsets || !vocab_piece_lens || !out_bytes ||
-        !out_byte_count)
-        return TOKENIZER_BPE_ERR_NULL_PTR;
-
-    if (token_count > 0x7FFFFFFFFFFFFFFF ||
-        span_token_count > 0x7FFFFFFFFFFFFFFF ||
-        vocab_piece_bytes_len > 0x7FFFFFFFFFFFFFFF ||
-        vocab_piece_count > 0x7FFFFFFFFFFFFFFF)
-        return TOKENIZER_BPE_ERR_OVERFLOW;
+    err = TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocNoPartialFromMaxPiecePreflight(
+        token_ids,
+        token_count,
+        io_token_cursor,
+        span_token_count,
+        vocab_piece_bytes,
+        vocab_piece_bytes_len,
+        vocab_piece_offsets,
+        vocab_piece_lens,
+        vocab_piece_count,
+        out_bytes,
+        out_byte_count,
+        &max_piece_bytes,
+        &derived_out_byte_capacity);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
 
     cursor = *io_token_cursor;
-    if (cursor > token_count)
-        return TOKENIZER_BPE_ERR_BAD_PARAM;
-
-    if (span_token_count > token_count - cursor)
-        return TOKENIZER_BPE_ERR_BAD_PARAM;
 
     // Zero-span decode is a valid no-op; preserve strict no-partial semantics
     // without staging/allocation work.
@@ -6313,18 +6345,8 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMa
         return TOKENIZER_BPE_OK;
     }
 
-    // Stage default-capacity derivation so we can run decode into temporary
-    // output storage and commit caller buffers only on full success.
-    err = TokenizerBPEComputeMaxPieceBytesChecked(vocab_piece_lens,
-                                                  vocab_piece_count,
-                                                  &max_piece_bytes);
-    if (err != TOKENIZER_BPE_OK)
-        return err;
-
-    if (span_token_count &&
-        max_piece_bytes > 0x7FFFFFFFFFFFFFFF / span_token_count)
-        return TOKENIZER_BPE_ERR_OVERFLOW;
-    derived_out_byte_capacity = span_token_count * max_piece_bytes;
+    // Preflight already derived max-piece/capacity under strict checked
+    // cursor/null/overflow contracts; use staged buffer for no-partial commit.
 
     staged_alloc_bytes = derived_out_byte_capacity;
     if (!staged_alloc_bytes)
