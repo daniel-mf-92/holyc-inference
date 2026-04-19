@@ -930,23 +930,23 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAlloc(I64 *gate_q16,
     if (staging_out_capacity < required_out_cells)
         return FFN_Q16_ERR_BAD_PARAM;
 
-    // No-partial guarantee requires distinct staging and output spans.
+    // No-partial guarantee requires staging to be disjoint from all
+    // live input/output buffers used by the compute and commit phases.
+    if (staging_out_q16 == gate_q16)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (staging_out_q16 == up_q16)
+        return FFN_Q16_ERR_BAD_PARAM;
     if (staging_out_q16 == out_q16)
         return FFN_Q16_ERR_BAD_PARAM;
 
-    // Compute directly with resolved default stride to avoid re-running
-    // wrapper preflight and keep no-alloc staging path deterministic.
-    status = FFNQ16SwiGLUApplyRowsChecked(gate_q16,
-                                          gate_capacity,
-                                          default_row_stride,
-                                          up_q16,
-                                          up_capacity,
-                                          default_row_stride,
-                                          staging_out_q16,
-                                          required_out_cells,
-                                          default_row_stride,
-                                          row_count,
-                                          lane_count);
+    status = FFNQ16SwiGLUApplyRowsCheckedDefaultStride(gate_q16,
+                                                       gate_capacity,
+                                                       up_q16,
+                                                       up_capacity,
+                                                       staging_out_q16,
+                                                       staging_out_capacity,
+                                                       row_count,
+                                                       lane_count);
     if (status)
         return status;
 

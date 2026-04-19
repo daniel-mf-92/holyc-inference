@@ -62,6 +62,10 @@ def ffn_q16_swiglu_apply_rows_checked_nopartial_default_stride_noalloc(
         return FFN_Q16_ERR_BAD_PARAM
     if staging_out_capacity < required_out_cells[0]:
         return FFN_Q16_ERR_BAD_PARAM
+    if staging_out_q16 is gate_q16:
+        return FFN_Q16_ERR_BAD_PARAM
+    if staging_out_q16 is up_q16:
+        return FFN_Q16_ERR_BAD_PARAM
     if staging_out_q16 is out_q16:
         return FFN_Q16_ERR_BAD_PARAM
 
@@ -94,6 +98,8 @@ def test_source_contains_noalloc_wrapper() -> None:
     body = source.split(signature, 1)[1]
     assert "FFNQ16SwiGLUApplyRowsCheckedDefaultStridePreflightOnly(" in body
     assert "FFNQ16SwiGLUApplyRowsCheckedDefaultStride(gate_q16," in body
+    assert "staging_out_q16 == gate_q16" in body
+    assert "staging_out_q16 == up_q16" in body
     assert "staging_out_q16 == out_q16" in body
 
 
@@ -190,6 +196,18 @@ def test_staging_guards() -> None:
     assert (
         ffn_q16_swiglu_apply_rows_checked_nopartial_default_stride_noalloc(
             gate, 4, up, 4, out, 4, 2, 2, stage, 3
+        )
+        == FFN_Q16_ERR_BAD_PARAM
+    )
+    assert (
+        ffn_q16_swiglu_apply_rows_checked_nopartial_default_stride_noalloc(
+            gate, 4, up, 4, out, 4, 2, 2, gate, 4
+        )
+        == FFN_Q16_ERR_BAD_PARAM
+    )
+    assert (
+        ffn_q16_swiglu_apply_rows_checked_nopartial_default_stride_noalloc(
+            gate, 4, up, 4, out, 4, 2, 2, up, 4
         )
         == FFN_Q16_ERR_BAD_PARAM
     )
