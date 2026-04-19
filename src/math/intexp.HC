@@ -274,6 +274,72 @@ I32 FPQ16ExpRangeReduceLn2CheckedNoPartial(I64 input_q16,
     return FP_Q16_OK;
 }
 
+// Checked vector ln(2) range reducer for Q16 exp paths.
+// For each lane i:
+//   input_q16[i] -> {out_k[i], out_r_q16[i]}
+// where the scalar contract is preserved exactly:
+//   clamped_x = clamp(input_q16[i], EXP_Q16_MIN_INPUT, EXP_Q16_MAX_INPUT)
+//   clamped_x = out_k[i] * ln(2) + out_r_q16[i]
+//   0 <= out_r_q16[i] < ln(2)
+//
+// No-partial-write semantics:
+//   - First pass validates every lane through scalar checked reduction.
+//   - Second pass commits outputs only after global preflight succeeds.
+I32 FPQ16ExpRangeReduceLn2ArrayChecked(I64 *input_q16,
+                                       I64 *out_k,
+                                       I64 *out_r_q16,
+                                       I64 count)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 staged_k;
+    I64 staged_r_q16;
+    I32 status;
+
+    if (!input_q16 || !out_k || !out_r_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (!count)
+        return FP_Q16_OK;
+
+    // Guard pointer-span arithmetic before indexed lane access.
+    last_index = count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)input_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)out_k > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)out_r_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Pass 1: full-lane validation without caller-buffer writes.
+    for (i = 0; i < count; i++)
+    {
+        status = FPQ16ExpRangeReduceLn2Checked(input_q16[i],
+                                               &staged_k,
+                                               &staged_r_q16);
+        if (status)
+            return status;
+    }
+
+    // Pass 2: deterministic commit after successful preflight.
+    for (i = 0; i < count; i++)
+    {
+        status = FPQ16ExpRangeReduceLn2Checked(input_q16[i],
+                                               &out_k[i],
+                                               &out_r_q16[i]);
+        if (status)
+            return status;
+    }
+
+    return FP_Q16_OK;
+}
+
 // Checked power-of-two scaler for Q16 exponent assembly paths.
 // Computes:
 //   out_scaled_q16 = base_q16 * (2^k)
