@@ -130,7 +130,7 @@ def test_source_contains_wrapper_and_delegation() -> None:
     body = source.split(
         "I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocNoPartialFromMaxPiece", 1
     )[1].split("I32 TokenizerBPEDecodePromptCheckedDefault", 1)[0]
-    assert "TokenizerBPEComputeMaxPieceBytesChecked" in body
+    assert "TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocFromMaxPiecePreflight" in body
     assert "TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocNoPartial" in body
 
 
