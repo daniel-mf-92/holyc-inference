@@ -121,6 +121,26 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedPreflightOnly(
     I64 *out_required_k_cells,
     I64 *out_required_out_cells);
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialPreflightOnly(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 query_row_stride_q16,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 k_row_stride_q16,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 out_row_stride,
+    I64 *out_last_q_base_index,
+    I64 *out_last_k_base_index,
+    I64 *out_last_out_base_index,
+    I64 *out_required_q_cells,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells);
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialPreflightOnly(
     I64 *q_rows_q16,
     I64 q_rows_capacity,
@@ -831,7 +851,8 @@ I32 AttentionQ16ApplyScoreScaleRowsChecked(
     if (required_out_cells > out_scores_capacity)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    // Deterministic row-major dispatch: row 0 .. row_count-1.
+    // IQ-571: deterministic row-major dispatch with checked per-row score
+    // scaling and explicit span guards before first caller-visible write.
     row_base = 0;
     for (row_index = 0; row_index < row_count; row_index++)
     {
@@ -1399,6 +1420,51 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedPreflightOnly(
     return ATTN_Q16_OK;
 }
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialPreflightOnly(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 query_row_stride_q16,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 k_row_stride_q16,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 out_row_stride,
+    I64 *out_last_q_base_index,
+    I64 *out_last_k_base_index,
+    I64 *out_last_out_base_index,
+    I64 *out_required_q_cells,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells)
+{
+    // IQ-587 strict no-partial row-batch diagnostics are intentionally
+    // identical to checked preflight diagnostics. No-partial wrappers call
+    // this helper before any writes so required spans/base indices are fully
+    // validated up-front with the same overflow/error behavior.
+    return AttentionQ16ComputeScaledQKRowsCheckedPreflightOnly(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        query_row_stride_q16,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        k_row_stride_q16,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        out_row_stride,
+        out_last_q_base_index,
+        out_last_k_base_index,
+        out_last_out_base_index,
+        out_required_q_cells,
+        out_required_k_cells,
+        out_required_out_cells);
+}
+
 I32 AttentionQ16ComputeScaledQKRowsChecked(I64 *q_rows_q16,
                                            I64 q_rows_capacity,
                                            I64 query_row_count,
@@ -1542,7 +1608,7 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartial(I64 *q_rows_q16,
             out_row_stride);
     }
 
-    status = AttentionQ16ComputeScaledQKRowsCheckedPreflightOnly(
+    status = AttentionQ16ComputeScaledQKRowsCheckedNoPartialPreflightOnly(
         q_rows_q16,
         q_rows_capacity,
         query_row_count,
