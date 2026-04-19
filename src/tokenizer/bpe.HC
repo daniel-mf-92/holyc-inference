@@ -6330,6 +6330,13 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocNoPart
         return TOKENIZER_BPE_ERR_OVERFLOW;
     derived_out_byte_capacity = span_token_count * max_piece_bytes;
 
+    // No-partial staging seeds staged_out_count from caller state; guard it
+    // here so staged decode never starts from an impossible byte cursor.
+    if (*out_byte_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    if (*out_byte_count > derived_out_byte_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
     *out_max_piece_bytes = max_piece_bytes;
     *out_derived_out_byte_capacity = derived_out_byte_capacity;
     return TOKENIZER_BPE_OK;
