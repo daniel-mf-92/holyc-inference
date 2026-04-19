@@ -159,6 +159,7 @@ def test_source_contains_noalloc_wrapper_without_malloc() -> None:
         "I32 TokenizerBPEDecodePromptCheckedDefaultNoPartialValidateCursor", 1
     )[0]
     assert "MAlloc(" not in body
+    assert "TokenizerBPEDecodeTokenSpanCheckedDefaultNoPartialValidateCursorNoAlloc(" not in body
 
 
 def test_multilingual_success_parity_against_allocating_wrapper() -> None:
