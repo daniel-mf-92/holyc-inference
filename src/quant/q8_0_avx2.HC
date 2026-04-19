@@ -1002,6 +1002,85 @@ I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartial(
     return Q8_0_AVX2_OK;
 }
 
+I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartialNoAlloc(
+    Q8_0Block *lhs_matrix_blocks,
+    I64 lhs_rows,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_col_blocks,
+    I64 rhs_cols,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_mat_q32,
+    I64 out_row_stride_cols,
+    I64 *staged_out_q32,
+    I64 staged_out_capacity)
+{
+    I64 required_stage_capacity;
+    I64 required_stage_bytes;
+    I64 provided_stage_bytes;
+    I64 idx;
+    I32 status;
+
+    status = Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartialPreflight(lhs_matrix_blocks,
+                                                                    lhs_rows,
+                                                                    lhs_row_stride_blocks,
+                                                                    rhs_col_blocks,
+                                                                    rhs_cols,
+                                                                    rhs_col_stride_blocks,
+                                                                    k_block_count,
+                                                                    out_mat_q32,
+                                                                    out_row_stride_cols,
+                                                                    &required_stage_capacity,
+                                                                    &required_stage_bytes);
+    if (status != Q8_0_AVX2_OK)
+        return status;
+
+    // Preserve canonical default-wrapper behavior for zero-span outputs.
+    // No staging storage is required when the result matrix has zero cells.
+    if (!lhs_rows || !rhs_cols)
+        return Q8_0MatMulTiledAVX2Q32CheckedDefaultTiles(lhs_matrix_blocks,
+                                                         lhs_rows,
+                                                         lhs_row_stride_blocks,
+                                                         rhs_col_blocks,
+                                                         rhs_cols,
+                                                         rhs_col_stride_blocks,
+                                                         k_block_count,
+                                                         out_mat_q32,
+                                                         out_row_stride_cols);
+
+    // Caller-staged no-allocation contract:
+    // - Non-empty outputs require a writable staging matrix.
+    // - Staging capacity must cover the full preflighted output span.
+    // - `out_mat_q32` is untouched on any failure after this point.
+    if (!staged_out_q32)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+    if (staged_out_capacity < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (staged_out_capacity < required_stage_capacity)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (!Q8_0AVX2TryMulI64(staged_out_capacity, sizeof(I64), &provided_stage_bytes))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+    if (provided_stage_bytes < required_stage_bytes)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    status = Q8_0MatMulTiledAVX2Q32CheckedDefaultTiles(lhs_matrix_blocks,
+                                                       lhs_rows,
+                                                       lhs_row_stride_blocks,
+                                                       rhs_col_blocks,
+                                                       rhs_cols,
+                                                       rhs_col_stride_blocks,
+                                                       k_block_count,
+                                                       staged_out_q32,
+                                                       out_row_stride_cols);
+    if (status != Q8_0_AVX2_OK)
+        return status;
+
+    for (idx = 0; idx < required_stage_capacity; ++idx)
+        out_mat_q32[idx] = staged_out_q32[idx];
+
+    return Q8_0_AVX2_OK;
+}
+
 I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartialPreflight(
     Q8_0Block *lhs_matrix_blocks,
     I64 lhs_rows,

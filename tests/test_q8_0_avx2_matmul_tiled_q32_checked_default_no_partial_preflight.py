@@ -165,7 +165,7 @@ def test_source_contains_no_partial_preflight_shape() -> None:
     assert "status = Q8_0MatMulTiledAVX2Q32CheckedDefaultPreflight(" in body
     assert "if (!lhs_rows || !rhs_cols)" in body
     assert "if (staged_out_capacity <= 0)" in body
-    assert "if (!Q8_0AVX2TryMulI64(staged_out_capacity, sizeof(I64), out_staged_out_bytes))" in body
+    assert "if (!Q8_0AVX2TryMulI64(staged_out_capacity, sizeof(I64), &staged_out_bytes))" in body
 
     no_partial_body = source.split(
         "I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartial(",
