@@ -748,6 +748,78 @@ I32 Q8_0DotRowsAVX2Q32CheckedDefaultNoPartialPreflight(
                                                             out_stage_bytes);
 }
 
+I32 Q8_0DotRowsAVX2Q32CheckedDefaultNoPartialNoAlloc(
+    Q8_0Block *matrix_blocks,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q8_0Block *vec_blocks,
+    I64 vec_block_count,
+    I64 *out_rows_q32,
+    I64 *staged_rows_q32,
+    I64 staged_row_capacity)
+{
+    I64 required_stage_bytes;
+    I64 required_stage_capacity;
+    I64 provided_stage_bytes;
+    I64 row_index;
+    I32 status;
+
+    status = Q8_0DotRowsAVX2Q32CheckedDefaultNoPartialPreflightNoAlloc(
+        matrix_blocks,
+        row_count,
+        row_stride_blocks,
+        vec_blocks,
+        vec_block_count,
+        out_rows_q32,
+        &required_stage_bytes);
+    if (status != Q8_0_AVX2_OK)
+        return status;
+
+    // Preserve canonical checked-default behavior for empty output spans.
+    if (!row_count)
+        return Q8_0DotRowsAVX2Q32CheckedDefault(matrix_blocks,
+                                                row_count,
+                                                row_stride_blocks,
+                                                vec_blocks,
+                                                vec_block_count,
+                                                out_rows_q32);
+
+    // Caller-staged no-allocation contract:
+    // - Staging/output buffers must both be valid for non-empty spans.
+    // - Staging capacity must cover all row results in I64 cells/bytes.
+    // - `out_rows_q32` stays untouched on any failure after this point.
+    if (!matrix_blocks || !vec_blocks || !staged_rows_q32)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+    if (staged_row_capacity < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    required_stage_capacity = row_count;
+    if (staged_row_capacity < required_stage_capacity)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+    if (!Q8_0AVX2TryMulI64(staged_row_capacity, sizeof(I64), &provided_stage_bytes))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+    if (provided_stage_bytes < required_stage_bytes)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    // No-partial guarantee requires separate staging/output spans.
+    if (staged_rows_q32 == out_rows_q32)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    status = Q8_0DotRowsAVX2Q32CheckedDefault(matrix_blocks,
+                                              row_count,
+                                              row_stride_blocks,
+                                              vec_blocks,
+                                              vec_block_count,
+                                              staged_rows_q32);
+    if (status != Q8_0_AVX2_OK)
+        return status;
+
+    for (row_index = 0; row_index < required_stage_capacity; ++row_index)
+        out_rows_q32[row_index] = staged_rows_q32[row_index];
+
+    return Q8_0_AVX2_OK;
+}
+
 I32 Q8_0MatMulTiledAVX2Q32Checked(
     Q8_0Block *lhs_matrix_blocks,
     I64 lhs_block_capacity,

@@ -7612,6 +7612,65 @@ I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocFromMaxPi
         out_byte_count);
 }
 
+I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceViaCapacityHelper(
+    I32 *token_ids,
+    U64 token_count,
+    U64 *io_token_cursor,
+    U8 *vocab_piece_bytes,
+    U64 vocab_piece_bytes_len,
+    U64 *vocab_piece_offsets,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U8 *out_bytes,
+    U64 *out_byte_count)
+{
+    U64 cursor;
+    U64 max_piece_bytes;
+    U64 derived_out_byte_capacity;
+    I32 status;
+
+    if (!token_ids || !io_token_cursor || !vocab_piece_bytes ||
+        !vocab_piece_offsets || !vocab_piece_lens || !out_bytes ||
+        !out_byte_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_bytes_len > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Validate-cursor contract: reject invalid cursor before any capacity
+    // derivation so caller-visible cursor/output state never mutates on
+    // failure paths.
+    cursor = *io_token_cursor;
+    if (cursor > token_count)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Route derived default capacity through the canonical helper that does
+    // one auditable max-piece scan plus checked token_count*max_piece math.
+    status = TokenizerBPEComputePromptDecodeCapacityFromMaxPieceChecked(
+        token_count,
+        vocab_piece_lens,
+        vocab_piece_count,
+        &max_piece_bytes,
+        &derived_out_byte_capacity);
+    if (status != TOKENIZER_BPE_OK)
+        return status;
+
+    return TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAlloc(
+        token_ids,
+        token_count,
+        io_token_cursor,
+        vocab_piece_bytes,
+        vocab_piece_bytes_len,
+        vocab_piece_offsets,
+        vocab_piece_lens,
+        vocab_piece_count,
+        out_bytes,
+        derived_out_byte_capacity,
+        out_byte_count);
+}
+
 I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocFromMaxPiecePreflight(
     I32 *token_ids,
     U64 token_count,
