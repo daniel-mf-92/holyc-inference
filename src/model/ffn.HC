@@ -280,6 +280,36 @@ I32 FFNQ16SwiGLUApplyChecked(I64 *gate_q16,
     return FFN_Q16_OK;
 }
 
+// Canonical default-capacity wrapper over FFNQ16SwiGLUApplyChecked.
+//
+// Default contracts:
+// - gate/up/out spans are contiguous (stride = 1)
+// - capacities are exactly lane_count for all buffers
+// - all pointer/null and negative-lane guards are explicit here so call-sites
+//   can use one predictable entrypoint for dense lane vectors
+I32 FFNQ16SwiGLUApplyCheckedDefaultCapacity(I64 *gate_q16,
+                                            I64 *up_q16,
+                                            I64 *out_q16,
+                                            I64 lane_count)
+{
+    if (!gate_q16 || !up_q16 || !out_q16)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (lane_count < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    return FFNQ16SwiGLUApplyChecked(gate_q16,
+                                    lane_count,
+                                    1,
+                                    up_q16,
+                                    lane_count,
+                                    1,
+                                    out_q16,
+                                    lane_count,
+                                    1,
+                                    lane_count);
+}
+
 // Checked all-or-nothing wrapper over FFNQ16SwiGLUApplyChecked.
 //
 // Behavior:
@@ -379,4 +409,44 @@ I32 FFNQ16SwiGLUApplyCheckedNoPartial(I64 *gate_q16,
 
     Free(staging_out_q16);
     return FFN_Q16_OK;
+}
+
+// Canonical default-capacity wrapper for lane-major SwiGLU apply.
+//
+// The core helper already validates all stride/span math; this wrapper only
+// derives the natural capacity contract for tightly packed inputs/outputs:
+//   gate_capacity = up_capacity = out_capacity = lane_count.
+//
+// This keeps call sites explicit about lane_count while avoiding duplicated
+// capacity literals and preserving exact checked error semantics.
+I32 FFNQ16SwiGLUApplyCheckedDefaultCapacity(I64 *gate_q16,
+                                            I64 gate_stride,
+                                            I64 *up_q16,
+                                            I64 up_stride,
+                                            I64 *out_q16,
+                                            I64 out_stride,
+                                            I64 lane_count)
+{
+    I64 default_capacity;
+
+    if (!gate_q16 || !up_q16 || !out_q16)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (gate_stride < 0 || up_stride < 0 || out_stride < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (lane_count < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    default_capacity = lane_count;
+
+    return FFNQ16SwiGLUApplyChecked(gate_q16,
+                                    default_capacity,
+                                    gate_stride,
+                                    up_q16,
+                                    default_capacity,
+                                    up_stride,
+                                    out_q16,
+                                    default_capacity,
+                                    out_stride,
+                                    lane_count);
 }
