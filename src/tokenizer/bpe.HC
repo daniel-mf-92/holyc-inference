@@ -6279,20 +6279,45 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocNoPart
     U64 *out_max_piece_bytes,
     U64 *out_derived_out_byte_capacity)
 {
-    return TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPiecePreflight(
-        token_ids,
-        token_count,
-        io_token_cursor,
-        span_token_count,
-        vocab_piece_bytes,
-        vocab_piece_bytes_len,
-        vocab_piece_offsets,
-        vocab_piece_lens,
-        vocab_piece_count,
-        out_bytes,
-        out_byte_count,
-        out_max_piece_bytes,
-        out_derived_out_byte_capacity);
+    U64 max_piece_bytes;
+    U64 derived_out_byte_capacity;
+    U64 cursor;
+    I32 err;
+
+    if (!token_ids || !io_token_cursor || !vocab_piece_bytes ||
+        !vocab_piece_offsets || !vocab_piece_lens || !out_bytes ||
+        !out_byte_count || !out_max_piece_bytes ||
+        !out_derived_out_byte_capacity)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_count > 0x7FFFFFFFFFFFFFFF ||
+        span_token_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_bytes_len > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    cursor = *io_token_cursor;
+    if (cursor > token_count)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (span_token_count > token_count - cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // No-partial wrappers stage decode/copy separately, so this helper keeps a
+    // dedicated checked preflight path with exact max-piece/capacity derivation.
+    err = TokenizerBPEComputeMaxPieceBytesChecked(vocab_piece_lens,
+                                                  vocab_piece_count,
+                                                  &max_piece_bytes);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    if (span_token_count &&
+        max_piece_bytes > 0x7FFFFFFFFFFFFFFF / span_token_count)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    derived_out_byte_capacity = span_token_count * max_piece_bytes;
+
+    *out_max_piece_bytes = max_piece_bytes;
+    *out_derived_out_byte_capacity = derived_out_byte_capacity;
+    return TOKENIZER_BPE_OK;
 }
 
 I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartial(

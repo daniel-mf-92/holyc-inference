@@ -587,16 +587,18 @@ I32 Q8_0DotRowsAVX2Q32CheckedDefaultNoPartial(
     I64 *staged_rows_q32;
     I32 status;
 
-    if (!matrix_blocks || !vec_blocks || !out_rows_q32)
-        return Q8_0_AVX2_ERR_NULL_PTR;
-    if (row_count < 0)
-        return Q8_0_AVX2_ERR_BAD_LEN;
+    status = Q8_0DotRowsAVX2Q32CheckedDefaultNoPartialPreflight(matrix_blocks,
+                                                                row_count,
+                                                                row_stride_blocks,
+                                                                vec_blocks,
+                                                                vec_block_count,
+                                                                out_rows_q32,
+                                                                &stage_bytes);
+    if (status != Q8_0_AVX2_OK)
+        return status;
 
-    // IQ-489 strict all-or-nothing default-capacity row wrapper:
-    // - Route checked-default row dots into private staging memory first.
-    // - Preserve exact checked-default error surface (BAD_LEN/OVERFLOW/PARITY).
-    // - Commit caller output only after full staged success.
-    // This prevents visible partial row writes when a later row fails.
+    // Zero-row pass-through preserves checked-default behavior exactly and
+    // avoids transient staging allocation for empty output spans.
     if (!row_count)
         return Q8_0DotRowsAVX2Q32CheckedDefault(matrix_blocks,
                                                 row_count,
@@ -604,9 +606,6 @@ I32 Q8_0DotRowsAVX2Q32CheckedDefaultNoPartial(
                                                 vec_blocks,
                                                 vec_block_count,
                                                 out_rows_q32);
-
-    if (!Q8_0AVX2TryMulI64(row_count, sizeof(I64), &stage_bytes))
-        return Q8_0_AVX2_ERR_OVERFLOW;
 
     staged_rows_q32 = MAlloc(stage_bytes);
     if (!staged_rows_q32)
@@ -628,6 +627,53 @@ I32 Q8_0DotRowsAVX2Q32CheckedDefaultNoPartial(
         out_rows_q32[row_index] = staged_rows_q32[row_index];
 
     Free(staged_rows_q32);
+    return Q8_0_AVX2_OK;
+}
+
+I32 Q8_0DotRowsAVX2Q32CheckedDefaultNoPartialPreflight(
+    Q8_0Block *matrix_blocks,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q8_0Block *vec_blocks,
+    I64 vec_block_count,
+    I64 *out_rows_q32,
+    I64 *out_stage_bytes)
+{
+    I64 required_matrix_blocks;
+    I64 stage_bytes;
+
+    if (!matrix_blocks || !vec_blocks || !out_rows_q32 || !out_stage_bytes)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+
+    if (row_count < 0 || row_stride_blocks < 0 || vec_block_count < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    // IQ-513 default no-partial row preflight contract:
+    // - Fail fast on caller-facing pointer/length domain violations before
+    //   any transient allocation attempt.
+    // - Prove default matrix capacity multiplication once
+    //   (`row_count * row_stride_blocks`) with checked overflow so wrappers
+    //   do not stage-allocate for impossible matrix spans.
+    // - Keep decode math delegated to checked-default core while preserving
+    //   strict no-partial semantics for malformed shape/stride contracts.
+    if (row_count > 0 && row_stride_blocks < vec_block_count)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    if (!Q8_0AVX2TryMulI64(row_count, row_stride_blocks, &required_matrix_blocks))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+
+    if (!row_count)
+    {
+        *out_stage_bytes = 0;
+        return Q8_0_AVX2_OK;
+    }
+
+    if (!Q8_0AVX2TryMulI64(row_count, sizeof(I64), &stage_bytes))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+    if (stage_bytes <= 0)
+        return Q8_0_AVX2_ERR_OVERFLOW;
+
+    *out_stage_bytes = stage_bytes;
     return Q8_0_AVX2_OK;
 }
 

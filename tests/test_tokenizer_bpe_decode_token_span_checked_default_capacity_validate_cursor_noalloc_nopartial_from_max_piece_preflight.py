@@ -67,7 +67,11 @@ def test_source_contains_helper_signature_and_delegate() -> None:
         "I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartial",
         1,
     )[0]
-    assert "TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPiecePreflight(" in body
+    assert "if (cursor > token_count)" in body
+    assert "if (span_token_count > token_count - cursor)" in body
+    assert "TokenizerBPEComputeMaxPieceBytesChecked(vocab_piece_lens," in body
+    assert "*out_max_piece_bytes = max_piece_bytes;" in body
+    assert "*out_derived_out_byte_capacity = derived_out_byte_capacity;" in body
 
 
 
