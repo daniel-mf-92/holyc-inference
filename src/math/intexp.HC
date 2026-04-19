@@ -183,6 +183,64 @@ I32 FPQ16ExpPolyCoreLn2ResidualQ16ArrayChecked(I64 *residual_q16,
     return FP_Q16_OK;
 }
 
+// Checked no-partial wrapper for ln(2)-residual vector polynomial core.
+// Delegates scalar-domain math to the canonical checked array evaluator,
+// but stages all output lanes so caller-visible out buffer is untouched on
+// any failure.
+I32 FPQ16ExpPolyCoreLn2ResidualQ16ArrayCheckedNoPartial(I64 *residual_q16,
+                                                        I64 *out_poly_q16,
+                                                        I64 count)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 staging_bytes;
+    I64 *staging_out_poly_q16;
+    I32 status;
+
+    if (!residual_q16 || !out_poly_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (!count)
+        return FP_Q16_OK;
+
+    // Guard pointer-span arithmetic before indexed lane access.
+    last_index = count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)residual_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)out_poly_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    if (count > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    staging_bytes = count << 3;
+    if (staging_bytes <= 0)
+        return FP_Q16_ERR_OVERFLOW;
+
+    staging_out_poly_q16 = MAlloc(staging_bytes);
+    if (!staging_out_poly_q16)
+        return FP_Q16_ERR_OVERFLOW;
+
+    status = FPQ16ExpPolyCoreLn2ResidualQ16ArrayChecked(residual_q16,
+                                                        staging_out_poly_q16,
+                                                        count);
+    if (status) {
+        Free(staging_out_poly_q16);
+        return status;
+    }
+
+    for (i = 0; i < count; i++)
+        out_poly_q16[i] = staging_out_poly_q16[i];
+
+    Free(staging_out_poly_q16);
+    return FP_Q16_OK;
+}
+
 // Compatibility alias retained for existing call sites/tests.
 I32 FPQ16ExpPolyCoreResidualLn2Q16Checked(I64 residual_q16,
                                           I64 *out_poly_q16)
@@ -969,6 +1027,65 @@ I32 FPQ16ExpArrayFromClampedInputCheckedDefault(I64 *input_q16,
     return FPQ16ExpArrayFromClampedInputChecked(input_q16,
                                                 output_q16,
                                                 length);
+}
+
+// Checked all-or-nothing default-capacity wrapper for pre-clamped vector exp.
+// Stages the default-capacity checked-core outputs and commits to caller buffer
+// only after full success, so any lane/domain/overflow failure leaves
+// output_q16[] untouched.
+I32 FPQ16ExpArrayFromClampedInputCheckedDefaultNoPartial(I64 *input_q16,
+                                                         I64 *output_q16,
+                                                         I64 length)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 staging_bytes;
+    I64 *staging_output_q16;
+    I32 status;
+
+    if (!input_q16 || !output_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (length < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (!length)
+        return FP_Q16_OK;
+
+    // Guard pointer-span arithmetic before indexed lane access.
+    last_index = length - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)input_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)output_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    if (length > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    staging_bytes = length << 3;
+    if (staging_bytes <= 0)
+        return FP_Q16_ERR_OVERFLOW;
+
+    staging_output_q16 = MAlloc(staging_bytes);
+    if (!staging_output_q16)
+        return FP_Q16_ERR_OVERFLOW;
+
+    status = FPQ16ExpArrayFromClampedInputCheckedDefault(input_q16,
+                                                         staging_output_q16,
+                                                         length);
+    if (status)
+    {
+        Free(staging_output_q16);
+        return status;
+    }
+
+    for (i = 0; i < length; i++)
+        output_q16[i] = staging_output_q16[i];
+
+    Free(staging_output_q16);
+    return FP_Q16_OK;
 }
 
 // Checked no-alias vector exp helper for pre-clamped lanes.
