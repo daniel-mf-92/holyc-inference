@@ -77,7 +77,7 @@ def test_wrapper_uses_nopartial_preflight() -> None:
         "I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartial(",
         1,
     )[1].split("I32 TokenizerBPEDecodePromptChecked", 1)[0]
-    assert "TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocNoPartialFromMaxPiecePreflight(" in wrapper_body
+    assert "TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartialPreflight(" in wrapper_body
 
 
 
