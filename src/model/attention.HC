@@ -19,6 +19,19 @@
 #define ATTN_U64_MAX_VALUE  0xFFFFFFFFFFFFFFFF
 #define ATTN_Q16_SHIFT       16
 
+I32 AttentionQ16ApplyScoreScaleCheckedNoPartialPreflightOnly(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 token_count,
+    I64 in_score_stride,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 out_score_stride,
+    I64 *out_last_in_base_index,
+    I64 *out_last_out_base_index,
+    I64 *out_required_in_cells,
+    I64 *out_required_out_cells);
+
 U64 AttentionAbsToU64(I64 x)
 {
     if (x >= 0)
@@ -327,8 +340,6 @@ I32 AttentionQ16ApplyScoreScaleCheckedNoPartial(I64 *in_scores_q32,
                                                 I64 out_scores_capacity,
                                                 I64 out_score_stride)
 {
-    I64 total_in_cells;
-    I64 total_out_cells;
     I64 last_in_base_index;
     I64 last_out_base_index;
     I64 required_in_cells;
@@ -340,60 +351,23 @@ I32 AttentionQ16ApplyScoreScaleCheckedNoPartial(I64 *in_scores_q32,
     I64 *staged_scores_q32;
     I32 status;
 
-    if (!in_scores_q32 || !out_scores_q32)
-        return ATTN_Q16_ERR_NULL_PTR;
-
-    if (in_scores_capacity < 0 || out_scores_capacity < 0)
-        return ATTN_Q16_ERR_BAD_PARAM;
-    if (token_count < 0 || in_score_stride < 0 || out_score_stride < 0)
-        return ATTN_Q16_ERR_BAD_PARAM;
+    status = AttentionQ16ApplyScoreScaleCheckedNoPartialPreflightOnly(
+        in_scores_q32,
+        in_scores_capacity,
+        token_count,
+        in_score_stride,
+        out_scores_q32,
+        out_scores_capacity,
+        out_score_stride,
+        &last_in_base_index,
+        &last_out_base_index,
+        &required_in_cells,
+        &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
 
     if (!token_count)
         return ATTN_Q16_OK;
-
-    // One score lane per token for both source and destination paths.
-    if (in_score_stride < 1 || out_score_stride < 1)
-        return ATTN_Q16_ERR_BAD_PARAM;
-
-    // Explicit full-span multiply gates keep stride math auditable before
-    // calling the checked scaler core.
-    status = AttentionTryMulI64Checked(token_count,
-                                       in_score_stride,
-                                       &total_in_cells);
-    if (status != ATTN_Q16_OK)
-        return status;
-
-    status = AttentionTryMulI64Checked(token_count,
-                                       out_score_stride,
-                                       &total_out_cells);
-    if (status != ATTN_Q16_OK)
-        return status;
-
-    status = AttentionTryMulI64Checked(token_count - 1,
-                                       in_score_stride,
-                                       &last_in_base_index);
-    if (status != ATTN_Q16_OK)
-        return status;
-    status = AttentionTryAddI64Checked(last_in_base_index,
-                                       1,
-                                       &required_in_cells);
-    if (status != ATTN_Q16_OK)
-        return status;
-    if (required_in_cells > in_scores_capacity)
-        return ATTN_Q16_ERR_BAD_PARAM;
-
-    status = AttentionTryMulI64Checked(token_count - 1,
-                                       out_score_stride,
-                                       &last_out_base_index);
-    if (status != ATTN_Q16_OK)
-        return status;
-    status = AttentionTryAddI64Checked(last_out_base_index,
-                                       1,
-                                       &required_out_cells);
-    if (status != ATTN_Q16_OK)
-        return status;
-    if (required_out_cells > out_scores_capacity)
-        return ATTN_Q16_ERR_BAD_PARAM;
 
     // Alias-safe no-partial staging: compute all scaled scores in an isolated
     // dense buffer first, then commit to caller output only on full success.
@@ -439,6 +413,98 @@ I32 AttentionQ16ApplyScoreScaleCheckedNoPartial(I64 *in_scores_q32,
     }
 
     Free(staged_scores_q32);
+    return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ApplyScoreScaleCheckedNoPartialPreflightOnly(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 token_count,
+    I64 in_score_stride,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 out_score_stride,
+    I64 *out_last_in_base_index,
+    I64 *out_last_out_base_index,
+    I64 *out_required_in_cells,
+    I64 *out_required_out_cells)
+{
+    I64 total_in_cells;
+    I64 total_out_cells;
+    I64 last_in_base_index;
+    I64 last_out_base_index;
+    I64 required_in_cells;
+    I64 required_out_cells;
+    I32 status;
+
+    if (!in_scores_q32 || !out_scores_q32 || !out_last_in_base_index ||
+        !out_last_out_base_index || !out_required_in_cells ||
+        !out_required_out_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (in_scores_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (token_count < 0 || in_score_stride < 0 || out_score_stride < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (!token_count)
+    {
+        *out_last_in_base_index = 0;
+        *out_last_out_base_index = 0;
+        *out_required_in_cells = 0;
+        *out_required_out_cells = 0;
+        return ATTN_Q16_OK;
+    }
+
+    // One score lane per token for both source and destination paths.
+    if (in_score_stride < 1 || out_score_stride < 1)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // Explicit full-span multiply gates keep stride math auditable before
+    // calling the checked scaler core.
+    status = AttentionTryMulI64Checked(token_count,
+                                       in_score_stride,
+                                       &total_in_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(token_count,
+                                       out_score_stride,
+                                       &total_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(token_count - 1,
+                                       in_score_stride,
+                                       &last_in_base_index);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddI64Checked(last_in_base_index,
+                                       1,
+                                       &required_in_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (required_in_cells > in_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionTryMulI64Checked(token_count - 1,
+                                       out_score_stride,
+                                       &last_out_base_index);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddI64Checked(last_out_base_index,
+                                       1,
+                                       &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (required_out_cells > out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    *out_last_in_base_index = last_in_base_index;
+    *out_last_out_base_index = last_out_base_index;
+    *out_required_in_cells = required_in_cells;
+    *out_required_out_cells = required_out_cells;
+
     return ATTN_Q16_OK;
 }
 

@@ -827,6 +827,10 @@ I32 Q8_0DotRowsAVX2Q32CheckedDefaultNoPartialNoAlloc(
     I64 row_index;
     I32 status;
 
+    // IQ-545 caller-staged no-allocation contract:
+    // 1) Canonical no-partial metadata preflight (no writes to output on fail).
+    // 2) Checked default-row kernel executes into caller staging.
+    // 3) Commit to caller output only after full success.
     status = Q8_0DotRowsAVX2Q32CheckedDefaultNoPartialPreflightNoAlloc(
         matrix_blocks,
         row_count,
