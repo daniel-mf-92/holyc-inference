@@ -6817,11 +6817,15 @@ I32 TokenizerBPEDecodePromptCheckedDefaultNoPartialFromMaxPieceValidateCursorNoA
     U64 *out_byte_count)
 {
     U64 cursor;
-    U64 decode_count;
+    U64 decode_end;
     U64 derived_out_byte_capacity;
-    U64 staged_cursor;
     U64 staged_out_count;
-    I32 err;
+    U64 scan;
+    U64 token_id_u64;
+    U64 piece_offset;
+    U64 piece_len;
+    U64 write_cursor;
+    U64 copy_i;
 
     if (!token_ids || !io_token_cursor || !vocab_piece_bytes ||
         !vocab_piece_offsets || !vocab_piece_lens || !out_bytes ||
@@ -6843,44 +6847,79 @@ I32 TokenizerBPEDecodePromptCheckedDefaultNoPartialFromMaxPieceValidateCursorNoA
     if (cursor > token_count)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
 
-    // Prompt decode always consumes [cursor, token_count).
-    decode_count = token_count - cursor;
-    if (decode_count > token_count - cursor)
-        return TOKENIZER_BPE_ERR_BAD_PARAM;
-
     // Canonical max-piece default capacity used by prompt wrappers.
     if (token_count && max_piece_bytes > 0x7FFFFFFFFFFFFFFF / token_count)
         return TOKENIZER_BPE_ERR_OVERFLOW;
     derived_out_byte_capacity = token_count * max_piece_bytes;
 
-    // Stage only scalar outputs; no-allocation span helper guarantees no-partial
-    // out_bytes writes and deterministic two-pass validation/copy behavior.
-    staged_cursor = cursor;
-    staged_out_count = *out_byte_count;
+    // Prompt decode consumes [cursor, token_count).
+    decode_end = token_count;
 
-    err = TokenizerBPEDecodeTokenSpanCheckedDefaultNoPartialValidateCursorNoAlloc(
-        token_ids,
-        token_count,
-        &staged_cursor,
-        decode_count,
-        vocab_piece_bytes,
-        vocab_piece_bytes_len,
-        vocab_piece_offsets,
-        vocab_piece_lens,
-        vocab_piece_count,
-        vocab_piece_capacity,
-        max_piece_bytes,
-        out_bytes,
-        &staged_out_count);
-    if (err != TOKENIZER_BPE_OK)
-        return err;
+    // Pass 1: validate entire decode window and compute exact output length.
+    // This preserves strict no-partial semantics: caller-visible output state is
+    // committed only after full window validation succeeds.
+    staged_out_count = 0;
+    scan = cursor;
+    while (scan < decode_end) {
+        if (token_ids[scan] < 0)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
 
-    if (staged_cursor != token_count ||
-        staged_out_count > derived_out_byte_capacity)
+        token_id_u64 = token_ids[scan];
+        if (token_id_u64 >= vocab_piece_count)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        piece_offset = vocab_piece_offsets[token_id_u64];
+        piece_len = vocab_piece_lens[token_id_u64];
+
+        if (piece_offset > vocab_piece_bytes_len)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        if (piece_len > vocab_piece_bytes_len - piece_offset)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        if (piece_len > derived_out_byte_capacity - staged_out_count)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        staged_out_count += piece_len;
+        if (staged_out_count > derived_out_byte_capacity)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+
+        scan++;
+        if (!scan)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    // Pass 2: deterministic copy after validation, bounded by staged_out_count.
+    write_cursor = 0;
+    scan = cursor;
+    while (scan < decode_end) {
+        token_id_u64 = token_ids[scan];
+        piece_offset = vocab_piece_offsets[token_id_u64];
+        piece_len = vocab_piece_lens[token_id_u64];
+
+        copy_i = 0;
+        while (copy_i < piece_len) {
+            out_bytes[write_cursor] = vocab_piece_bytes[piece_offset + copy_i];
+
+            write_cursor++;
+            if (write_cursor > staged_out_count)
+                return TOKENIZER_BPE_ERR_OVERFLOW;
+
+            copy_i++;
+            if (!copy_i)
+                return TOKENIZER_BPE_ERR_OVERFLOW;
+        }
+
+        scan++;
+        if (!scan)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    if (write_cursor != staged_out_count)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
 
     *out_byte_count = staged_out_count;
-    *io_token_cursor = staged_cursor;
+    *io_token_cursor = decode_end;
     return TOKENIZER_BPE_OK;
 }
 
