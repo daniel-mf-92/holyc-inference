@@ -149,10 +149,10 @@ def test_source_contains_noalloc_preflight_only_helper() -> None:
     body = source.split(signature, 1)[1]
 
     assert "FFNQ16SwiGLUApplyRowsCheckedDefaultStridePreflightOnly(" in body
-    assert "status = FFNTryMulI64Checked(row_count," in body
-    assert "status = FFNTryMulI64Checked(required_stage_cells," in body
-    assert "sizeof(I64)" in body
-    assert "if (required_stage_cells > stage_capacity)" in body
+    assert "FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(" in body
+    assert "&required_stage_cells," in body
+    assert "&required_stage_bytes," in body
+    assert "required_out_cells_from_required_bytes" in body
 
 
 def test_known_vectors_and_stage_capacity_gate() -> None:
