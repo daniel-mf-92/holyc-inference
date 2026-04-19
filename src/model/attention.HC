@@ -171,6 +171,18 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedDefaultStride(
     I64 *out_scores_q32,
     I64 out_scores_capacity);
 
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartial(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 in_score_stride,
+    I64 out_score_stride,
+    I64 row_stride,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity);
+
 I32 AttentionQ16ApplyScoreScaleRowsCheckedDefaultStrideNoPartialPreflightOnly(
     I64 *in_scores_q32,
     I64 in_scores_capacity,
@@ -206,6 +218,14 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAlloc(
     I64 out_scores_capacity,
     I64 *staged_scores_q32,
     I64 staged_scores_capacity);
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideCommitOnly(
+    I64 query_row_count,
+    I64 token_count,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity);
 
 I32 AttentionQ16ComputeScaledQKRowCheckedPreflightOnly(
     I64 *q_row_q16,
@@ -1077,6 +1097,181 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedDefaultStride(
                                                   score_scale_q16,
                                                   out_scores_q32,
                                                   out_scores_capacity);
+}
+
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartial(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 in_score_stride,
+    I64 out_score_stride,
+    I64 row_stride,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity)
+{
+    I64 last_row_base_index;
+    I64 required_in_cells;
+    I64 required_out_cells;
+    I64 required_stage_cells;
+    I64 in_row_cells;
+    I64 stage_bytes;
+    I64 row_index;
+    I64 row_base;
+    I64 next_row_base;
+    I64 stage_row_base;
+    I64 token_index;
+    I64 out_index;
+    I64 stage_index;
+    I64 *staged_scores_q32;
+    I32 status;
+
+    if (!in_scores_q32 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (in_scores_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (in_score_stride < 0 || out_score_stride < 0 || row_stride < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnly(
+        in_scores_q32,
+        in_scores_capacity,
+        row_count,
+        token_count,
+        in_score_stride,
+        out_score_stride,
+        row_stride,
+        out_scores_q32,
+        out_scores_capacity,
+        &last_row_base_index,
+        &required_in_cells,
+        &required_out_cells,
+        &required_stage_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (!row_count || !token_count)
+        return ATTN_Q16_OK;
+
+    // Row-local source span used by per-row no-partial scaling calls.
+    status = AttentionTryMulI64Checked(token_count - 1,
+                                       in_score_stride,
+                                       &in_row_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddI64Checked(in_row_cells,
+                                       1,
+                                       &in_row_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(required_stage_cells,
+                                       sizeof(I64),
+                                       &stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (stage_bytes <= 0)
+        return ATTN_Q16_ERR_OVERFLOW;
+
+    staged_scores_q32 = MAlloc(stage_bytes);
+    if (!staged_scores_q32)
+        return ATTN_Q16_ERR_OVERFLOW;
+
+    // Stage each row into a tight row-major slab first. Any failure returns
+    // without touching caller output, preserving strict no-partial semantics.
+    row_base = 0;
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        status = AttentionTryMulI64Checked(row_index,
+                                           token_count,
+                                           &stage_row_base);
+        if (status != ATTN_Q16_OK)
+        {
+            Free(staged_scores_q32);
+            return status;
+        }
+
+        status = AttentionQ16ApplyScoreScaleCheckedNoPartial(
+            in_scores_q32 + row_base,
+            in_row_cells,
+            token_count,
+            in_score_stride,
+            score_scale_q16,
+            staged_scores_q32 + stage_row_base,
+            token_count,
+            1);
+        if (status != ATTN_Q16_OK)
+        {
+            Free(staged_scores_q32);
+            return status;
+        }
+
+        status = AttentionTryAddI64Checked(row_base,
+                                           row_stride,
+                                           &next_row_base);
+        if (status != ATTN_Q16_OK)
+        {
+            Free(staged_scores_q32);
+            return status;
+        }
+
+        row_base = next_row_base;
+    }
+
+    // Commit only active token cells; caller row padding remains unchanged.
+    row_base = 0;
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        status = AttentionTryMulI64Checked(row_index,
+                                           token_count,
+                                           &stage_row_base);
+        if (status != ATTN_Q16_OK)
+        {
+            Free(staged_scores_q32);
+            return status;
+        }
+
+        for (token_index = 0; token_index < token_count; token_index++)
+        {
+            status = AttentionTryAddI64Checked(row_base,
+                                               token_index,
+                                               &out_index);
+            if (status != ATTN_Q16_OK)
+            {
+                Free(staged_scores_q32);
+                return status;
+            }
+
+            status = AttentionTryAddI64Checked(stage_row_base,
+                                               token_index,
+                                               &stage_index);
+            if (status != ATTN_Q16_OK)
+            {
+                Free(staged_scores_q32);
+                return status;
+            }
+
+            out_scores_q32[out_index] = staged_scores_q32[stage_index];
+        }
+
+        status = AttentionTryAddI64Checked(row_base,
+                                           row_stride,
+                                           &next_row_base);
+        if (status != ATTN_Q16_OK)
+        {
+            Free(staged_scores_q32);
+            return status;
+        }
+
+        row_base = next_row_base;
+    }
+
+    Free(staged_scores_q32);
+    return ATTN_Q16_OK;
 }
 
 I32 AttentionQ16ApplyScoreScaleRowsCheckedDefaultStrideNoPartialPreflightOnly(
@@ -2256,6 +2451,134 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialPreflightOnly(
         out_required_k_cells,
         out_required_out_cells);
     return status;
+}
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideCommitOnly(
+    I64 query_row_count,
+    I64 token_count,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity)
+{
+    I64 default_out_row_stride;
+    I64 required_stage_cells;
+    I64 required_out_cells;
+    I64 row_index;
+    I64 token_index;
+    I64 row_base;
+    I64 stage_row_base;
+    I64 out_index;
+    I64 stage_index;
+    I32 status;
+
+    if (!staged_scores_q32 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (query_row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_scores_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (!query_row_count || !token_count)
+        return ATTN_Q16_OK;
+
+    // IQ-591 commit-only contract:
+    // staged rows are tightly packed by `token_count`, and destination rows
+    // use the same default stride. Commit only live token lanes with checked
+    // `{row_base + token_index}` math so no-partial callers keep deterministic
+    // all-or-nothing semantics.
+    default_out_row_stride = token_count;
+
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       token_count,
+                                       &required_stage_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(query_row_count - 1,
+                                       default_out_row_stride,
+                                       &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddI64Checked(required_out_cells,
+                                       token_count,
+                                       &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (required_stage_cells > staged_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_out_cells > out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // First pass validates every source/destination index. If any checked
+    // index operation fails, return without touching caller output.
+    for (row_index = 0; row_index < query_row_count; row_index++)
+    {
+        status = AttentionTryMulI64Checked(row_index,
+                                           default_out_row_stride,
+                                           &row_base);
+        if (status != ATTN_Q16_OK)
+            return status;
+
+        status = AttentionTryMulI64Checked(row_index,
+                                           token_count,
+                                           &stage_row_base);
+        if (status != ATTN_Q16_OK)
+            return status;
+
+        for (token_index = 0; token_index < token_count; token_index++)
+        {
+            status = AttentionTryAddI64Checked(row_base,
+                                               token_index,
+                                               &out_index);
+            if (status != ATTN_Q16_OK)
+                return status;
+
+            status = AttentionTryAddI64Checked(stage_row_base,
+                                               token_index,
+                                               &stage_index);
+            if (status != ATTN_Q16_OK)
+                return status;
+        }
+    }
+
+    // Commit pass copies only live token lanes; destination padding remains
+    // untouched by construction because writes are limited to `token_count`.
+    for (row_index = 0; row_index < query_row_count; row_index++)
+    {
+        status = AttentionTryMulI64Checked(row_index,
+                                           default_out_row_stride,
+                                           &row_base);
+        if (status != ATTN_Q16_OK)
+            return status;
+
+        status = AttentionTryMulI64Checked(row_index,
+                                           token_count,
+                                           &stage_row_base);
+        if (status != ATTN_Q16_OK)
+            return status;
+
+        for (token_index = 0; token_index < token_count; token_index++)
+        {
+            status = AttentionTryAddI64Checked(row_base,
+                                               token_index,
+                                               &out_index);
+            if (status != ATTN_Q16_OK)
+                return status;
+
+            status = AttentionTryAddI64Checked(stage_row_base,
+                                               token_index,
+                                               &stage_index);
+            if (status != ATTN_Q16_OK)
+                return status;
+
+            out_scores_q32[out_index] = staged_scores_q32[stage_index];
+        }
+    }
+
+    return ATTN_Q16_OK;
 }
 
 I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStride(
