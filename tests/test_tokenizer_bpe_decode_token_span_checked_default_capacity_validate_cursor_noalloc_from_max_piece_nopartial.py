@@ -173,6 +173,9 @@ def test_source_contains_wrapper_and_staged_shape() -> None:
     assert "TokenizerBPEComputeMaxPieceBytesChecked" in body
     assert "TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPiece(" in body
     assert "MAlloc(" in body
+    assert "if (staged_out_count > 0x7FFFFFFFFFFFFFFF)" in body
+    assert "if (staged_cursor < cursor)" in body
+    assert "if (staged_cursor > token_count)" in body
 
 
 def run_case(
