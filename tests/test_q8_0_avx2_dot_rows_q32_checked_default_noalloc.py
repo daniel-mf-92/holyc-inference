@@ -215,7 +215,10 @@ def test_randomized_parity_vs_explicit_composition() -> None:
                 for _ in range(max(0, vec_block_count))
             ]
 
-        out_len = max(4, row_count + 2) if row_count >= 0 else 8
+        if row_count < 0 or row_count > 1024:
+            out_len = 8
+        else:
+            out_len = max(4, row_count + 2)
         out_a = [77771] * out_len
         out_b = [88882] * out_len
 
