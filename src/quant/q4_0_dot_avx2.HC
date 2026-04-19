@@ -440,3 +440,30 @@ I32 Q4_0DotProductBlocksAVX2CheckedDefault(Q4_0Block *lhs,
                                            block_count,
                                            out_dot_q32);
 }
+
+I32 Q4_0DotProductBlocksAVX2CheckedDefaultNoPartial(Q4_0Block *lhs,
+                                                    Q4_0Block *rhs,
+                                                    I64 block_count,
+                                                    I64 *out_dot_q32)
+{
+    I64 staged_dot_q32;
+    I32 status;
+
+    if (!out_dot_q32)
+        return Q4_0_DOT_AVX2_ERR_NULL_PTR;
+
+    // IQ-468 staged all-or-nothing default wrapper:
+    // - Compose the canonical default-capacity symbol.
+    // - Preserve exact status surfaces from checked default path.
+    // - Commit caller output only on success.
+    staged_dot_q32 = 0;
+    status = Q4_0DotProductBlocksAVX2CheckedDefault(lhs,
+                                                    rhs,
+                                                    block_count,
+                                                    &staged_dot_q32);
+    if (status != Q4_0_DOT_AVX2_OK)
+        return status;
+
+    *out_dot_q32 = staged_dot_q32;
+    return Q4_0_DOT_AVX2_OK;
+}
