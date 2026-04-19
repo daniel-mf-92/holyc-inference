@@ -378,6 +378,15 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocPreflight
     I64 *out_required_stage_cells,
     I64 *out_required_out_cells);
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(
+    I64 query_row_count,
+    I64 token_count,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 stage_cell_capacity,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity);
+
 U64 AttentionAbsToU64(I64 x)
 {
     if (x >= 0)
@@ -2954,6 +2963,70 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideCommitOnly(
     }
 
     return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(
+    I64 query_row_count,
+    I64 token_count,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 stage_cell_capacity,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity)
+{
+    I64 default_out_row_stride;
+    I64 required_stage_cells;
+    I64 required_out_cells;
+    I32 status;
+
+    if (!staged_scores_q32 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (query_row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_scores_capacity < 0 || stage_cell_capacity < 0 ||
+        out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (!query_row_count || !token_count)
+        return ATTN_Q16_OK;
+
+    // IQ-599 no-alloc commit-only contract:
+    // - staged rows are tightly packed by `token_count`;
+    // - destination rows use default token-major stride;
+    // - caller-provided stage capacity is validated before commit.
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       token_count,
+                                       &required_stage_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    default_out_row_stride = token_count;
+    status = AttentionTryMulI64Checked(query_row_count - 1,
+                                       default_out_row_stride,
+                                       &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddI64Checked(required_out_cells,
+                                       token_count,
+                                       &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (required_stage_cells > staged_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_stage_cells > stage_cell_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_out_cells > out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    return AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideCommitOnly(
+        query_row_count,
+        token_count,
+        staged_scores_q32,
+        staged_scores_capacity,
+        out_scores_q32,
+        out_scores_capacity);
 }
 
 I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStride(
