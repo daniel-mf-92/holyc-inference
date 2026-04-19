@@ -545,3 +545,125 @@ I32 FFNQ16SwiGLUApplyRowsChecked(I64 *gate_q16,
 
     return FFN_Q16_OK;
 }
+
+// Checked all-or-nothing row-major wrapper over FFNQ16SwiGLUApplyRowsChecked.
+//
+// Behavior:
+// - validates row/lane/stride output-span math up front
+// - computes complete row batch into a staging buffer first
+// - commits only live lane_count cells per row on success
+// - preserves caller out_q16 on any failure (no partial writes)
+I32 FFNQ16SwiGLUApplyRowsCheckedNoPartial(I64 *gate_q16,
+                                          I64 gate_capacity,
+                                          I64 gate_row_stride,
+                                          I64 *up_q16,
+                                          I64 up_capacity,
+                                          I64 up_row_stride,
+                                          I64 *out_q16,
+                                          I64 out_capacity,
+                                          I64 out_row_stride,
+                                          I64 row_count,
+                                          I64 lane_count)
+{
+    I64 last_row;
+    I64 required_out_cells;
+    I64 staging_bytes;
+    I64 row_index;
+    I64 lane_index;
+    I64 out_row_base;
+    I64 next_out_row_base;
+    I64 out_index;
+    I64 *staging_out_q16;
+    I32 status;
+
+    if (!gate_q16 || !up_q16 || !out_q16)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (gate_capacity < 0 || up_capacity < 0 || out_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (gate_row_stride < 0 || up_row_stride < 0 || out_row_stride < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || lane_count < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    if (!row_count || !lane_count)
+        return FFN_Q16_OK;
+
+    if (gate_row_stride < lane_count || up_row_stride < lane_count ||
+        out_row_stride < lane_count)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    last_row = row_count - 1;
+    status = FFNTryMulI64Checked(last_row,
+                                 out_row_stride,
+                                 &required_out_cells);
+    if (status)
+        return status;
+    status = FFNTryAddI64Checked(required_out_cells,
+                                 lane_count,
+                                 &required_out_cells);
+    if (status)
+        return status;
+
+    if (required_out_cells > out_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    status = FFNTryMulI64Checked(required_out_cells,
+                                 8,
+                                 &staging_bytes);
+    if (status)
+        return status;
+
+    staging_out_q16 = MAlloc(staging_bytes);
+    if (!staging_out_q16)
+        return FFN_Q16_ERR_OVERFLOW;
+
+    status = FFNQ16SwiGLUApplyRowsChecked(gate_q16,
+                                          gate_capacity,
+                                          gate_row_stride,
+                                          up_q16,
+                                          up_capacity,
+                                          up_row_stride,
+                                          staging_out_q16,
+                                          required_out_cells,
+                                          out_row_stride,
+                                          row_count,
+                                          lane_count);
+    if (status)
+    {
+        Free(staging_out_q16);
+        return status;
+    }
+
+    out_row_base = 0;
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        for (lane_index = 0; lane_index < lane_count; lane_index++)
+        {
+            status = FFNTryAddI64Checked(out_row_base,
+                                         lane_index,
+                                         &out_index);
+            if (status)
+            {
+                Free(staging_out_q16);
+                return status;
+            }
+
+            out_q16[out_index] = staging_out_q16[out_index];
+        }
+
+        status = FFNTryAddI64Checked(out_row_base,
+                                     out_row_stride,
+                                     &next_out_row_base);
+        if (status)
+        {
+            Free(staging_out_q16);
+            return status;
+        }
+
+        out_row_base = next_out_row_base;
+    }
+
+    Free(staging_out_q16);
+    return FFN_Q16_OK;
+}
