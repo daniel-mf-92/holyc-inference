@@ -6305,6 +6305,11 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMa
         return err;
     }
 
+    if (staged_out_count > 0x7FFFFFFFFFFFFFFF) {
+        Free(staged_out_bytes);
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
     if (staged_out_count > derived_out_byte_capacity) {
         Free(staged_out_bytes);
         return TOKENIZER_BPE_ERR_BAD_PARAM;
