@@ -630,6 +630,27 @@ I32 Q8_0DotRowsAVX2Q32CheckedDefaultNoPartial(
     return Q8_0_AVX2_OK;
 }
 
+I32 Q8_0DotRowsAVX2Q32CheckedDefaultNoPartialPreflightNoAlloc(
+    Q8_0Block *matrix_blocks,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q8_0Block *vec_blocks,
+    I64 vec_block_count,
+    I64 *out_rows_q32,
+    I64 *out_stage_bytes)
+{
+    // IQ-515 no-allocation preflight alias:
+    // keep strict row/stride/null/overflow gating centralized in one checked
+    // helper so staged wrappers can validate fully before any MAlloc attempt.
+    return Q8_0DotRowsAVX2Q32CheckedDefaultNoPartialPreflight(matrix_blocks,
+                                                              row_count,
+                                                              row_stride_blocks,
+                                                              vec_blocks,
+                                                              vec_block_count,
+                                                              out_rows_q32,
+                                                              out_stage_bytes);
+}
+
 I32 Q8_0DotRowsAVX2Q32CheckedDefaultNoPartialPreflight(
     Q8_0Block *matrix_blocks,
     I64 row_count,

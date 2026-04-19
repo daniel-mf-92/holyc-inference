@@ -1169,20 +1169,21 @@ I32 FPQ16ExpArrayFromClampedInputCheckedDefault(I64 *input_q16,
                                                 length);
 }
 
-// Checked all-or-nothing default-capacity wrapper for pre-clamped vector exp.
-// Stages the default-capacity checked-core outputs and commits to caller buffer
-// only after full success, so any lane/domain/overflow failure leaves
-// output_q16[] untouched.
-I32 FPQ16ExpArrayFromClampedInputCheckedDefaultNoPartial(I64 *input_q16,
-                                                         I64 *output_q16,
-                                                         I64 length)
+// Shared checked preflight for default-capacity no-partial pre-clamped exp.
+// Computes staging allocation bytes while centralizing strict pointer-span
+// guards so wrappers can fail before any transient allocation attempt.
+I32 FPQ16ExpArrayFromClampedInputCheckedDefaultNoPartialPreflight(I64 *input_q16,
+                                                                  I64 *output_q16,
+                                                                  I64 length,
+                                                                  I64 *out_staging_bytes)
 {
-    I64 i;
     I64 last_index;
     I64 last_byte_offset;
-    I64 staging_bytes;
-    I64 *staging_output_q16;
-    I32 status;
+
+    if (!out_staging_bytes)
+        return FP_Q16_ERR_NULL_PTR;
+
+    *out_staging_bytes = 0;
 
     if (!input_q16 || !output_q16)
         return FP_Q16_ERR_NULL_PTR;
@@ -1191,7 +1192,7 @@ I32 FPQ16ExpArrayFromClampedInputCheckedDefaultNoPartial(I64 *input_q16,
     if (!length)
         return FP_Q16_OK;
 
-    // Guard pointer-span arithmetic before indexed lane access.
+    // Range proof for indexed lane access into input/output vectors.
     last_index = length - 1;
     if (last_index > (I64_MAX_VALUE >> 3))
         return FP_Q16_ERR_OVERFLOW;
@@ -1204,9 +1205,38 @@ I32 FPQ16ExpArrayFromClampedInputCheckedDefaultNoPartial(I64 *input_q16,
 
     if (length > (I64_MAX_VALUE >> 3))
         return FP_Q16_ERR_OVERFLOW;
-    staging_bytes = length << 3;
-    if (staging_bytes <= 0)
+
+    *out_staging_bytes = length << 3;
+    if (*out_staging_bytes <= 0)
+    {
+        *out_staging_bytes = 0;
         return FP_Q16_ERR_OVERFLOW;
+    }
+
+    return FP_Q16_OK;
+}
+
+// Checked all-or-nothing default-capacity wrapper for pre-clamped vector exp.
+// Stages the default-capacity checked-core outputs and commits to caller buffer
+// only after full success, so any lane/domain/overflow failure leaves
+// output_q16[] untouched.
+I32 FPQ16ExpArrayFromClampedInputCheckedDefaultNoPartial(I64 *input_q16,
+                                                         I64 *output_q16,
+                                                         I64 length)
+{
+    I64 i;
+    I64 staging_bytes;
+    I64 *staging_output_q16;
+    I32 status;
+
+    status = FPQ16ExpArrayFromClampedInputCheckedDefaultNoPartialPreflight(input_q16,
+                                                                            output_q16,
+                                                                            length,
+                                                                            &staging_bytes);
+    if (status)
+        return status;
+    if (!length)
+        return FP_Q16_OK;
 
     staging_output_q16 = MAlloc(staging_bytes);
     if (!staging_output_q16)
