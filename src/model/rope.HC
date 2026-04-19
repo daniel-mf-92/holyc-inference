@@ -1408,9 +1408,32 @@ I32 RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedNoPartialDefaultStride(I64 
                                                                              I64 token_count,
                                                                              I64 position_step)
 {
+    I32 status;
+    I64 last_abs_range_base;
+    I64 last_head_base_index;
+    I64 last_head_last_pair_y_index;
+    I64 last_token_position;
     I64 token_stride_q16;
 
     token_stride_q16 = head_cell_stride;
+
+    status = RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedNoPartialPreflightOnlyDefaultStride(head_cell_capacity,
+                                                                                                    token_base_index,
+                                                                                                    head_cell_stride,
+                                                                                                    range_base_index,
+                                                                                                    head_count,
+                                                                                                    head_stride_cells,
+                                                                                                    head_dim,
+                                                                                                    pair_stride_cells,
+                                                                                                    position_start,
+                                                                                                    token_count,
+                                                                                                    position_step,
+                                                                                                    &last_abs_range_base,
+                                                                                                    &last_head_base_index,
+                                                                                                    &last_head_last_pair_y_index,
+                                                                                                    &last_token_position);
+    if (status != ROPE_Q16_OK)
+        return status;
 
     return RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedNoPartial(head_cells_q16,
                                                                        head_cell_capacity,

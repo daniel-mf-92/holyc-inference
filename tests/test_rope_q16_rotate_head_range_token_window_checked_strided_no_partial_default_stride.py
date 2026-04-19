@@ -92,6 +92,8 @@ def test_source_contains_default_stride_signature_and_delegate_shape() -> None:
     body = source.split(signature, 1)[1]
     assert "I64 token_stride_q16;" in body
     assert "token_stride_q16 = head_cell_stride;" in body
+    assert "RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedNoPartialPreflightOnlyDefaultStride(" in body
+    assert "if (status != ROPE_Q16_OK)" in body
     assert "RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedNoPartial(head_cells_q16," in body
     assert "token_stride_q16," in body
 
@@ -201,10 +203,48 @@ def test_randomized_parity_vs_explicit_default_stride_composition() -> None:
         assert got == want
 
 
+def test_randomized_no_partial_on_error_preserves_input() -> None:
+    rng = random.Random(20260419_521)
+    base_q16 = ref.q16_from_float(10000.0)
+
+    for _ in range(800):
+        head_cell_capacity = rng.randint(1, 256)
+        head_dim = rng.choice([8, 16, 24, 32])
+        pair_stride_cells = rng.choice([1, 2, 3, 4])
+        head_count = rng.randint(1, 4)
+        head_stride_cells = max(head_dim * pair_stride_cells, 1)
+        head_cell_stride = max(head_stride_cells * head_count, 1)
+        token_base_index = rng.randint(0, max(0, head_cell_capacity - 1))
+
+        buf = make_head_buffer(head_cell_capacity, rng.randint(1, 1_000_000))
+        original = list(buf)
+
+        # Force bad token positions after first token to trigger an error.
+        args = (
+            buf,
+            head_cell_capacity,
+            token_base_index,
+            head_cell_stride,
+            0,
+            head_count,
+            head_stride_cells,
+            head_dim,
+            pair_stride_cells,
+            base_q16,
+            0,
+            rng.randint(1, 8),
+            -1,
+        )
+        err, out = rope_q16_rotate_head_range_by_token_window_checked_strided_no_partial_default_stride(*args)
+        if err != ref.ROPE_Q16_OK:
+            assert out == original
+
+
 def run() -> None:
     test_source_contains_default_stride_signature_and_delegate_shape()
     test_boundary_and_overflow_fixtures()
     test_randomized_parity_vs_explicit_default_stride_composition()
+    test_randomized_no_partial_on_error_preserves_input()
     print("rope_q16_rotate_head_range_token_window_checked_strided_no_partial_default_stride=ok")
 
 

@@ -1143,6 +1143,12 @@ I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartialNoAlloc(
     I64 idx;
     I32 status;
 
+    // Preserve wrapper-level payload contracts: staged preflight intentionally
+    // allows null matrix pointers, but checked default/no-partial wrappers
+    // still require concrete matrix payload storage.
+    if (!lhs_matrix_blocks || !rhs_col_blocks)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+
     status = Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartialPreflightNoAlloc(lhs_matrix_blocks,
                                                                             lhs_rows,
                                                                             lhs_row_stride_blocks,
@@ -1156,12 +1162,6 @@ I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartialNoAlloc(
                                                                             &required_stage_bytes);
     if (status != Q8_0_AVX2_OK)
         return status;
-
-    // Preserve wrapper-level payload contracts: staged preflight intentionally
-    // allows null matrix pointers, but executing the checked tiles path still
-    // requires concrete matrix payload storage.
-    if (!lhs_matrix_blocks || !rhs_col_blocks)
-        return Q8_0_AVX2_ERR_NULL_PTR;
 
     // Preserve canonical default-wrapper behavior for zero-span outputs.
     // No staging storage is required when the result matrix has zero cells.
