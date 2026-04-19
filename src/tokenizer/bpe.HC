@@ -7000,6 +7000,25 @@ I32 TokenizerBPEComputePromptDecodeCapacityFromLensChecked(U64 token_count,
     return TOKENIZER_BPE_OK;
 }
 
+// Canonical default-capacity wrapper for prompt capacity derivation from
+// vocabulary piece lengths. Default capacity means "active span only", so
+// `vocab_piece_capacity` is bound to `vocab_piece_count` before delegating.
+I32 TokenizerBPEComputePromptDecodeCapacityFromLensCheckedDefault(
+    U64 token_count,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 *out_prompt_out_byte_capacity)
+{
+    U64 vocab_piece_capacity;
+
+    vocab_piece_capacity = vocab_piece_count;
+    return TokenizerBPEComputePromptDecodeCapacityFromLensChecked(
+        token_count,
+        vocab_piece_lens,
+        vocab_piece_capacity,
+        out_prompt_out_byte_capacity);
+}
+
 I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoPartialNoAllocFromMaxPiece(
     I32 *token_ids,
     U64 token_count,
