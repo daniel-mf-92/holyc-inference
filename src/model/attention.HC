@@ -196,6 +196,17 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnly(
     I64 *out_required_out_cells,
     I64 *out_required_stage_cells);
 
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAlloc(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity);
+
 I32 AttentionQ16ComputeScaledQKRowCheckedPreflightOnly(
     I64 *q_row_q16,
     I64 q_row_capacity,
@@ -780,7 +791,6 @@ I32 AttentionQ16ApplyScoreScaleCheckedDefaultStride(I64 *in_scores_q32,
                                                     I64 out_scores_capacity)
 {
     I64 default_score_stride;
-    I64 default_row_stride;
 
     if (!in_scores_q32 || !out_scores_q32)
         return ATTN_Q16_ERR_NULL_PTR;
@@ -1029,6 +1039,7 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedDefaultStride(
     I64 out_scores_capacity)
 {
     I64 default_score_stride;
+    I64 default_row_stride;
 
     if (!in_scores_q32 || !out_scores_q32)
         return ATTN_Q16_ERR_NULL_PTR;
@@ -1039,11 +1050,10 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedDefaultStride(
     if (row_count < 0 || token_count < 0)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    // IQ-588 default-stride contract for existing row helper signature:
-    // each row is contiguous token-major scores (score stride 1), and rows
-    // are laid out back-to-back at token_count cells.
-    default_score_stride = 1;
+    // IQ-588 default-stride contract for row-batched score scaling:
+    // score lanes and row slabs both advance at token_count cells.
     default_row_stride = token_count;
+    default_score_stride = token_count;
 
     return AttentionQ16ApplyScoreScaleRowsChecked(in_scores_q32,
                                                   in_scores_capacity,
@@ -1155,6 +1165,126 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedDefaultStrideNoPartialPreflightOnly(
 
     *out_required_in_cells = required_in_cells;
     *out_required_out_cells = required_out_cells;
+    return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAlloc(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity)
+{
+    I64 default_score_stride;
+    I64 default_row_stride;
+    I64 required_in_cells;
+    I64 required_out_cells;
+    I64 required_stage_cells;
+    I64 row_base;
+    I64 row_index;
+    I64 token_index;
+    I64 stage_index;
+    I64 out_index;
+    I64 next_row_base;
+    I32 status;
+
+    if (!in_scores_q32 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (in_scores_capacity < 0 || out_scores_capacity < 0 ||
+        staged_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionQ16ApplyScoreScaleRowsCheckedDefaultStrideNoPartialPreflightOnly(
+        in_scores_q32,
+        in_scores_capacity,
+        row_count,
+        token_count,
+        out_scores_q32,
+        out_scores_capacity,
+        &required_in_cells,
+        &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (!row_count || !token_count)
+        return ATTN_Q16_OK;
+
+    if (!staged_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    status = AttentionTryMulI64Checked(row_count,
+                                       token_count,
+                                       &required_stage_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (staged_scores_capacity < required_stage_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // No-partial contract: staging must be disjoint from live sources/sinks.
+    if (staged_scores_q32 == in_scores_q32)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_scores_q32 == out_scores_q32)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    default_score_stride = token_count;
+    default_row_stride = token_count;
+
+    status = AttentionQ16ApplyScoreScaleRowsChecked(in_scores_q32,
+                                                    in_scores_capacity,
+                                                    row_count,
+                                                    token_count,
+                                                    default_score_stride,
+                                                    default_score_stride,
+                                                    default_row_stride,
+                                                    score_scale_q16,
+                                                    staged_scores_q32,
+                                                    staged_scores_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    // Commit only live token lanes. Row padding in destination remains intact.
+    row_base = 0;
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        for (token_index = 0; token_index < token_count; token_index++)
+        {
+            status = AttentionTryAddI64Checked(row_base,
+                                               token_index,
+                                               &out_index);
+            if (status != ATTN_Q16_OK)
+                return status;
+
+            status = AttentionTryMulI64Checked(row_index,
+                                               token_count,
+                                               &stage_index);
+            if (status != ATTN_Q16_OK)
+                return status;
+            status = AttentionTryAddI64Checked(stage_index,
+                                               token_index,
+                                               &stage_index);
+            if (status != ATTN_Q16_OK)
+                return status;
+
+            out_scores_q32[out_index] = staged_scores_q32[stage_index];
+        }
+
+        status = AttentionTryAddI64Checked(row_base,
+                                           default_row_stride,
+                                           &next_row_base);
+        if (status != ATTN_Q16_OK)
+            return status;
+
+        row_base = next_row_base;
+    }
+
     return ATTN_Q16_OK;
 }
 
