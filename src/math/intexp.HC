@@ -99,6 +99,28 @@ I32 FPQ16ExpPolyCoreLn2ResidualQ16Checked(I64 residual_q16,
     return FP_Q16_OK;
 }
 
+// Checked all-or-nothing wrapper for the ln2-residual polynomial core.
+// This preserves exact status surfaces from the checked core while ensuring
+// caller-visible output is only committed on success.
+I32 FPQ16ExpPolyCoreLn2ResidualQ16CheckedNoPartial(I64 residual_q16,
+                                                   I64 *out_poly_q16)
+{
+    I64 staged_poly_q16;
+    I32 status;
+
+    if (!out_poly_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    staged_poly_q16 = 0;
+    status = FPQ16ExpPolyCoreLn2ResidualQ16Checked(residual_q16,
+                                                   &staged_poly_q16);
+    if (status)
+        return status;
+
+    *out_poly_q16 = staged_poly_q16;
+    return FP_Q16_OK;
+}
+
 // Compatibility alias retained for existing call sites/tests.
 I32 FPQ16ExpPolyCoreResidualLn2Q16Checked(I64 residual_q16,
                                           I64 *out_poly_q16)
