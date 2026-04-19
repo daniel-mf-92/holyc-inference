@@ -378,6 +378,21 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocPreflight
     I64 *out_required_stage_cells,
     I64 *out_required_out_cells);
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 stage_cell_capacity,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_required_out_cells);
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(
     I64 query_row_count,
     I64 token_count,
@@ -2833,6 +2848,62 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocPreflight
         return ATTN_Q16_ERR_BAD_PARAM;
 
     *out_required_stage_cells = required_stage_cells;
+    *out_required_out_cells = required_out_cells;
+    return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 stage_cell_capacity,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_required_out_cells)
+{
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
+    I64 required_out_cells;
+    I32 status;
+
+    if (!out_required_stage_cells || !out_required_stage_bytes ||
+        !out_required_out_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    // IQ-601 no-alloc required-bytes contract:
+    // reuse the strict no-alloc preflight for span/shape validation, then
+    // convert checked stage-cell diagnostics into byte diagnostics for caller
+    // managed staging buffers used by commit-only pipelines.
+    status = AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        stage_cell_capacity,
+        &required_stage_cells,
+        &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(required_stage_cells,
+                                       sizeof(I64),
+                                       &required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    *out_required_stage_cells = required_stage_cells;
+    *out_required_stage_bytes = required_stage_bytes;
     *out_required_out_cells = required_out_cells;
     return ATTN_Q16_OK;
 }
