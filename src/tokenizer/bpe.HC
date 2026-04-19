@@ -6473,7 +6473,9 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocNoPart
     // the remaining tail from cursor to token_count.
     span_token_count = token_count - cursor;
 
-    return TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartialPreflight(
+    // Route through the canonical no-alloc/no-partial preflight helper so
+    // default-span callers share identical strict staging diagnostics.
+    return TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocNoPartialFromMaxPiecePreflight(
         token_ids,
         token_count,
         io_token_cursor,

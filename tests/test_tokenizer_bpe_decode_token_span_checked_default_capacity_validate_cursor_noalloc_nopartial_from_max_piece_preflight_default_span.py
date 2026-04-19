@@ -143,7 +143,7 @@ def test_source_contains_helper_signature_and_default_span_derivation() -> None:
     assert "if (cursor > token_count)" in body
     assert "span_token_count = token_count - cursor;" in body
     assert (
-        "TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartialPreflight("
+        "TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocNoPartialFromMaxPiecePreflight("
         in body
     )
 

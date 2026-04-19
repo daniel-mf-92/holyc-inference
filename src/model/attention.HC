@@ -317,3 +317,159 @@ I32 AttentionQ16ApplyScoreScaleChecked(I64 *in_scores_q32,
 
     return ATTN_Q16_OK;
 }
+
+I32 AttentionQ16ApplyScoreScaleCheckedNoPartial(I64 *in_scores_q32,
+                                                I64 in_scores_capacity,
+                                                I64 token_count,
+                                                I64 in_score_stride,
+                                                I64 score_scale_q16,
+                                                I64 *out_scores_q32,
+                                                I64 out_scores_capacity,
+                                                I64 out_score_stride)
+{
+    I64 total_in_cells;
+    I64 total_out_cells;
+    I64 last_in_base_index;
+    I64 last_out_base_index;
+    I64 required_in_cells;
+    I64 required_out_cells;
+    I64 stage_cells;
+    I64 stage_bytes;
+    I64 token_index;
+    I64 out_base;
+    I64 *staged_scores_q32;
+    I32 status;
+
+    if (!in_scores_q32 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (in_scores_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (token_count < 0 || in_score_stride < 0 || out_score_stride < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (!token_count)
+        return ATTN_Q16_OK;
+
+    // One score lane per token for both source and destination paths.
+    if (in_score_stride < 1 || out_score_stride < 1)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // Explicit full-span multiply gates keep stride math auditable before
+    // calling the checked scaler core.
+    status = AttentionTryMulI64Checked(token_count,
+                                       in_score_stride,
+                                       &total_in_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(token_count,
+                                       out_score_stride,
+                                       &total_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(token_count - 1,
+                                       in_score_stride,
+                                       &last_in_base_index);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddI64Checked(last_in_base_index,
+                                       1,
+                                       &required_in_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (required_in_cells > in_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionTryMulI64Checked(token_count - 1,
+                                       out_score_stride,
+                                       &last_out_base_index);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddI64Checked(last_out_base_index,
+                                       1,
+                                       &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (required_out_cells > out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // Alias-safe no-partial staging: compute all scaled scores in an isolated
+    // dense buffer first, then commit to caller output only on full success.
+    stage_cells = token_count;
+    status = AttentionTryMulI64Checked(stage_cells,
+                                       sizeof(I64),
+                                       &stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (stage_bytes <= 0)
+        return ATTN_Q16_ERR_OVERFLOW;
+
+    staged_scores_q32 = MAlloc(stage_bytes);
+    if (!staged_scores_q32)
+        return ATTN_Q16_ERR_OVERFLOW;
+
+    status = AttentionQ16ApplyScoreScaleChecked(in_scores_q32,
+                                                in_scores_capacity,
+                                                token_count,
+                                                in_score_stride,
+                                                score_scale_q16,
+                                                staged_scores_q32,
+                                                stage_cells,
+                                                1);
+    if (status != ATTN_Q16_OK)
+    {
+        Free(staged_scores_q32);
+        return status;
+    }
+
+    for (token_index = 0; token_index < token_count; token_index++)
+    {
+        status = AttentionTryMulI64Checked(token_index,
+                                           out_score_stride,
+                                           &out_base);
+        if (status != ATTN_Q16_OK)
+        {
+            Free(staged_scores_q32);
+            return status;
+        }
+
+        out_scores_q32[out_base] = staged_scores_q32[token_index];
+    }
+
+    Free(staged_scores_q32);
+    return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ApplyScoreScaleCheckedDefaultStride(I64 *in_scores_q32,
+                                                    I64 in_scores_capacity,
+                                                    I64 token_count,
+                                                    I64 score_scale_q16,
+                                                    I64 *out_scores_q32,
+                                                    I64 out_scores_capacity)
+{
+    I64 default_score_stride;
+
+    if (!in_scores_q32 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (in_scores_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-548 default-stride contract for row-major attention score buffers:
+    // score[token_index] is addressed at base + token_index * token_count.
+    // The checked core owns all overflow and span validation for this stride.
+    default_score_stride = token_count;
+
+    return AttentionQ16ApplyScoreScaleChecked(in_scores_q32,
+                                              in_scores_capacity,
+                                              token_count,
+                                              default_score_stride,
+                                              score_scale_q16,
+                                              out_scores_q32,
+                                              out_scores_capacity,
+                                              default_score_stride);
+}
