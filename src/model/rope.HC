@@ -1253,6 +1253,92 @@ I32 RoPEQ16RotateHeadRangeByPositionCheckedStridedNoPartial(I64 *head_cells_q16,
     return ROPE_Q16_OK;
 }
 
+// Checked all-or-nothing wrapper over token-window strided rotation.
+// The wrapper stages full head memory and commits only on success, so callers
+// can depend on explicit no-partial semantics even if the underlying checked
+// implementation changes internally.
+I32 RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedNoPartial(I64 *head_cells_q16,
+                                                               I64 head_cell_capacity,
+                                                               I64 token_base_index,
+                                                               I64 token_stride_q16,
+                                                               I64 range_base_index,
+                                                               I64 head_count,
+                                                               I64 head_stride_cells,
+                                                               I64 head_dim,
+                                                               I64 pair_stride_cells,
+                                                               I64 freq_base_q16,
+                                                               I64 position_start,
+                                                               I64 token_count,
+                                                               I64 position_step)
+{
+    I64 stage_bytes;
+    I64 cell_index;
+    I64 *staged_head_cells_q16;
+    I32 status;
+
+    if (!head_cells_q16)
+        return ROPE_Q16_ERR_NULL_PTR;
+    if (head_cell_capacity < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    // Zero-capacity path delegates directly so checked-domain errors for
+    // token/stride/head contracts remain canonical.
+    if (!head_cell_capacity)
+        return RoPEQ16RotateHeadRangeByTokenWindowCheckedStrided(head_cells_q16,
+                                                                  head_cell_capacity,
+                                                                  token_base_index,
+                                                                  token_stride_q16,
+                                                                  range_base_index,
+                                                                  head_count,
+                                                                  head_stride_cells,
+                                                                  head_dim,
+                                                                  pair_stride_cells,
+                                                                  freq_base_q16,
+                                                                  position_start,
+                                                                  token_count,
+                                                                  position_step);
+
+    status = RoPETryMulI64Checked(head_cell_capacity,
+                                  sizeof(I64),
+                                  &stage_bytes);
+    if (status != ROPE_Q16_OK)
+        return status;
+    if (stage_bytes <= 0)
+        return ROPE_Q16_ERR_OVERFLOW;
+
+    staged_head_cells_q16 = MAlloc(stage_bytes);
+    if (!staged_head_cells_q16)
+        return ROPE_Q16_ERR_OVERFLOW;
+
+    for (cell_index = 0; cell_index < head_cell_capacity; cell_index++)
+        staged_head_cells_q16[cell_index] = head_cells_q16[cell_index];
+
+    status = RoPEQ16RotateHeadRangeByTokenWindowCheckedStrided(staged_head_cells_q16,
+                                                                head_cell_capacity,
+                                                                token_base_index,
+                                                                token_stride_q16,
+                                                                range_base_index,
+                                                                head_count,
+                                                                head_stride_cells,
+                                                                head_dim,
+                                                                pair_stride_cells,
+                                                                freq_base_q16,
+                                                                position_start,
+                                                                token_count,
+                                                                position_step);
+    if (status != ROPE_Q16_OK)
+    {
+        Free(staged_head_cells_q16);
+        return status;
+    }
+
+    for (cell_index = 0; cell_index < head_cell_capacity; cell_index++)
+        head_cells_q16[cell_index] = staged_head_cells_q16[cell_index];
+
+    Free(staged_head_cells_q16);
+    return ROPE_Q16_OK;
+}
+
 // Rotate a contiguous range of heads after full range preflight.
 //
 // Preflight contract:
