@@ -643,6 +643,68 @@ I32 FPQ16ExpArrayChecked(I64 *input_q16,
     return FP_Q16_OK;
 }
 
+// Checked all-or-nothing wrapper for unclamped vector exp.
+// Stages full lane output from FPQ16ExpArrayChecked before commit so callers
+// never observe partial writes on any error path.
+// Semantics are intentionally pass-through to FPQ16ExpArrayChecked:
+//   - exact clamp + scalar eval behavior per lane
+//   - exact status/error surfaces
+//   - output commit only after full checked-core success
+I32 FPQ16ExpArrayCheckedNoPartial(I64 *input_q16,
+                                  I64 *output_q16,
+                                  I64 count)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 staged_bytes;
+    I64 *staged_output_q16;
+    I32 status;
+
+    if (!input_q16 || !output_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (!count)
+        return FP_Q16_OK;
+
+    // Guard pointer-span arithmetic before indexed lane access.
+    last_index = count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)input_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)output_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    if (count > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    staged_bytes = count << 3;
+    if (!staged_bytes)
+        return FP_Q16_ERR_OVERFLOW;
+
+    staged_output_q16 = MAlloc(staged_bytes);
+    if (!staged_output_q16)
+        return FP_Q16_ERR_OVERFLOW;
+
+    status = FPQ16ExpArrayChecked(input_q16,
+                                  staged_output_q16,
+                                  count);
+    if (status)
+    {
+        Free(staged_output_q16);
+        return status;
+    }
+
+    for (i = 0; i < count; i++)
+        output_q16[i] = staged_output_q16[i];
+
+    Free(staged_output_q16);
+    return FP_Q16_OK;
+}
+
 // Checked vector exp helper for callers that already pre-clamped lanes into
 // the scalar-domain contract:
 //   EXP_Q16_MIN_INPUT <= input_q16[i] <= EXP_Q16_MAX_INPUT
