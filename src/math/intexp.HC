@@ -245,6 +245,21 @@ I32 FPQ16ExpPolyCoreLn2ResidualQ16ArrayCheckedNoPartial(I64 *residual_q16,
     return FP_Q16_OK;
 }
 
+// Canonical default-count no-partial wrapper for ln(2)-residual vector core.
+// Delegates directly to the checked no-partial array helper so status surfaces
+// and all-or-nothing output semantics stay centralized in one implementation.
+I32 FPQ16ExpPolyCoreLn2ResidualQ16ArrayCheckedNoPartialDefault(I64 *residual_q16,
+                                                               I64 *out_poly_q16,
+                                                               I64 count)
+{
+    I32 status;
+
+    status = FPQ16ExpPolyCoreLn2ResidualQ16ArrayCheckedNoPartial(residual_q16,
+                                                                  out_poly_q16,
+                                                                  count);
+    return status;
+}
+
 // Compatibility alias retained for existing call sites/tests.
 I32 FPQ16ExpPolyCoreResidualLn2Q16Checked(I64 residual_q16,
                                           I64 *out_poly_q16)
