@@ -40,7 +40,8 @@ def fpq16_exp_array_checked_default(
 def test_source_contains_default_wrapper_shape() -> None:
     source = pathlib.Path("src/math/intexp.HC").read_text(encoding="utf-8")
     assert "FPQ16ExpArrayCheckedDefault" in source
-    assert "return FPQ16ExpArrayChecked(input_q16," in source
+    assert "status = FPQ16ExpArrayChecked(input_q16," in source
+    assert "return status;" in source
 
 
 def test_null_pointer_and_negative_count_surfaces() -> None:

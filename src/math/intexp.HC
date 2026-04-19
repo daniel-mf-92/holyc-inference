@@ -755,9 +755,15 @@ I32 FPQ16ExpArrayCheckedDefault(I64 *input_q16,
                                 I64 *output_q16,
                                 I64 count)
 {
-    return FPQ16ExpArrayChecked(input_q16,
-                                output_q16,
-                                count);
+    I32 status;
+
+    // Keep wrapper behavior intentionally transparent and pass-through:
+    // checked core owns all pointer/count guards and lane math, while this
+    // default-capacity entrypoint provides one stable WS1 call surface.
+    status = FPQ16ExpArrayChecked(input_q16,
+                                  output_q16,
+                                  count);
+    return status;
 }
 
 // Checked all-or-nothing wrapper for unclamped vector exp.
