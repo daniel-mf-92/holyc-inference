@@ -1440,11 +1440,23 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialPreflightOnly(
     I64 *out_required_k_cells,
     I64 *out_required_out_cells)
 {
-    // IQ-587 strict no-partial row-batch diagnostics are intentionally
-    // identical to checked preflight diagnostics. No-partial wrappers call
-    // this helper before any writes so required spans/base indices are fully
-    // validated up-front with the same overflow/error behavior.
-    return AttentionQ16ComputeScaledQKRowsCheckedPreflightOnly(
+    I64 last_q_base_index;
+    I64 last_k_base_index;
+    I64 last_out_base_index;
+    I64 required_q_cells;
+    I64 required_k_cells;
+    I64 required_out_cells;
+    I32 status;
+
+    if (!out_last_q_base_index || !out_last_k_base_index ||
+        !out_last_out_base_index || !out_required_q_cells ||
+        !out_required_k_cells || !out_required_out_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    // IQ-587: preserve strict no-partial diagnostics semantics by staging
+    // all preflight outputs locally and committing to caller pointers only on
+    // full success.
+    status = AttentionQ16ComputeScaledQKRowsCheckedPreflightOnly(
         q_rows_q16,
         q_rows_capacity,
         query_row_count,
@@ -1457,12 +1469,22 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialPreflightOnly(
         out_scores_q32,
         out_scores_capacity,
         out_row_stride,
-        out_last_q_base_index,
-        out_last_k_base_index,
-        out_last_out_base_index,
-        out_required_q_cells,
-        out_required_k_cells,
-        out_required_out_cells);
+        &last_q_base_index,
+        &last_k_base_index,
+        &last_out_base_index,
+        &required_q_cells,
+        &required_k_cells,
+        &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    *out_last_q_base_index = last_q_base_index;
+    *out_last_k_base_index = last_k_base_index;
+    *out_last_out_base_index = last_out_base_index;
+    *out_required_q_cells = required_q_cells;
+    *out_required_k_cells = required_k_cells;
+    *out_required_out_cells = required_out_cells;
+    return ATTN_Q16_OK;
 }
 
 I32 AttentionQ16ComputeScaledQKRowsChecked(I64 *q_rows_q16,
