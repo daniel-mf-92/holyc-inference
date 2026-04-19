@@ -17,6 +17,7 @@
 #define ATTN_I64_MAX_VALUE  0x7FFFFFFFFFFFFFFF
 #define ATTN_I64_MIN_VALUE -0x8000000000000000
 #define ATTN_U64_MAX_VALUE  0xFFFFFFFFFFFFFFFF
+#define ATTN_Q16_SHIFT       16
 
 U64 AttentionAbsToU64(I64 x)
 {
@@ -89,6 +90,40 @@ I32 AttentionTryMulI64Checked(I64 lhs, I64 rhs, I64 *out_prod)
     return AttentionApplySignFromMagnitudeChecked(abs_prod,
                                                   is_negative,
                                                   out_prod);
+}
+
+I32 AttentionQ32ScaleByQ16Checked(I64 value_q32,
+                                  I64 scale_q16,
+                                  I64 *out_value_q32)
+{
+    U64 abs_value;
+    U64 abs_scale;
+    U64 abs_prod;
+    U64 round_bias;
+    U64 rounded;
+    Bool is_negative;
+
+    if (!out_value_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    abs_value = AttentionAbsToU64(value_q32);
+    abs_scale = AttentionAbsToU64(scale_q16);
+    is_negative = ((value_q32 < 0) ^ (scale_q16 < 0));
+
+    if (abs_value && abs_scale && abs_value > (ATTN_U64_MAX_VALUE / abs_scale))
+        return ATTN_Q16_ERR_OVERFLOW;
+
+    abs_prod = abs_value * abs_scale;
+    round_bias = ((U64)1) << (ATTN_Q16_SHIFT - 1);
+
+    if (abs_prod > ATTN_U64_MAX_VALUE - round_bias)
+        rounded = ATTN_U64_MAX_VALUE >> ATTN_Q16_SHIFT;
+    else
+        rounded = (abs_prod + round_bias) >> ATTN_Q16_SHIFT;
+
+    return AttentionApplySignFromMagnitudeChecked(rounded,
+                                                  is_negative,
+                                                  out_value_q32);
 }
 
 I32 AttentionQ16ComputeQKDotRowChecked(I64 *q_row_q16,
@@ -190,6 +225,94 @@ I32 AttentionQ16ComputeQKDotRowChecked(I64 *q_row_q16,
         }
 
         out_scores_q32[out_base] = score_q32;
+    }
+
+    return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ApplyScoreScaleChecked(I64 *in_scores_q32,
+                                       I64 in_scores_capacity,
+                                       I64 token_count,
+                                       I64 in_score_stride,
+                                       I64 score_scale_q16,
+                                       I64 *out_scores_q32,
+                                       I64 out_scores_capacity,
+                                       I64 out_score_stride)
+{
+    I64 required_in_cells;
+    I64 required_out_cells;
+    I64 token_index;
+    I64 in_base;
+    I64 out_base;
+    I64 scaled_score_q32;
+    I32 status;
+
+    if (!in_scores_q32 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (in_scores_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (token_count < 0 || in_score_stride < 0 || out_score_stride < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (!token_count)
+        return ATTN_Q16_OK;
+
+    // Strides must expose one scalar score per token.
+    if (in_score_stride < 1 || out_score_stride < 1)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // Validate full source span: token_count rows spaced by in_score_stride.
+    status = AttentionTryMulI64Checked(token_count - 1,
+                                       in_score_stride,
+                                       &required_in_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryAddI64Checked(required_in_cells,
+                                       1,
+                                       &required_in_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (required_in_cells > in_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // Validate full destination span: token_count rows spaced by out_score_stride.
+    status = AttentionTryMulI64Checked(token_count - 1,
+                                       out_score_stride,
+                                       &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryAddI64Checked(required_out_cells,
+                                       1,
+                                       &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (required_out_cells > out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    for (token_index = 0; token_index < token_count; token_index++)
+    {
+        status = AttentionTryMulI64Checked(token_index,
+                                           in_score_stride,
+                                           &in_base);
+        if (status != ATTN_Q16_OK)
+            return status;
+
+        status = AttentionTryMulI64Checked(token_index,
+                                           out_score_stride,
+                                           &out_base);
+        if (status != ATTN_Q16_OK)
+            return status;
+
+        status = AttentionQ32ScaleByQ16Checked(in_scores_q32[in_base],
+                                               score_scale_q16,
+                                               &scaled_score_q32);
+        if (status != ATTN_Q16_OK)
+            return status;
+
+        out_scores_q32[out_base] = scaled_score_q32;
     }
 
     return ATTN_Q16_OK;
