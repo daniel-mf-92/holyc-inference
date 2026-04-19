@@ -586,6 +586,48 @@ I32 Q8_0DotRowsAVX2Q32CheckedDefault(
                                      out_rows_q32);
 }
 
+I32 Q8_0DotRowsAVX2Q32CheckedDefaultNoAlloc(
+    Q8_0Block *matrix_blocks,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q8_0Block *vec_blocks,
+    I64 vec_block_count,
+    I64 *out_rows_q32)
+{
+    I64 stage_bytes;
+    I64 matrix_block_capacity;
+    I32 status;
+
+    // IQ-540 strict no-allocation default row-dot wrapper:
+    // 1) Derive matrix view capacity once with checked multiplication.
+    // 2) Reuse canonical preflight helper for error surface parity.
+    // 3) Dispatch checked core with default vector capacity.
+    if (row_count < 0 || row_stride_blocks < 0 || vec_block_count < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    if (!Q8_0AVX2TryMulI64(row_count, row_stride_blocks, &matrix_block_capacity))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+
+    status = Q8_0DotRowsAVX2Q32CheckedDefaultPreflightNoAlloc(matrix_blocks,
+                                                              row_count,
+                                                              row_stride_blocks,
+                                                              vec_blocks,
+                                                              vec_block_count,
+                                                              out_rows_q32,
+                                                              &stage_bytes);
+    if (status != Q8_0_AVX2_OK)
+        return status;
+
+    return Q8_0DotRowsAVX2Q32Checked(matrix_blocks,
+                                     matrix_block_capacity,
+                                     row_count,
+                                     row_stride_blocks,
+                                     vec_blocks,
+                                     vec_block_count,
+                                     vec_block_count,
+                                     out_rows_q32);
+}
+
 I32 Q8_0DotRowsAVX2Q32CheckedDefaultPreflightNoAlloc(
     Q8_0Block *matrix_blocks,
     I64 row_count,
