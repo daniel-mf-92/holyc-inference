@@ -824,6 +824,52 @@ I32 FPQ16ExpArrayCheckedDefault(I64 *input_q16,
     return status;
 }
 
+// Shared checked preflight for default-capacity no-partial vector exp wrappers.
+// Computes staging allocation bytes for successful non-zero spans while keeping
+// pointer/count overflow guards centralized and auditable.
+I32 FPQ16ExpArrayCheckedDefaultNoPartialPreflight(I64 *input_q16,
+                                                  I64 *output_q16,
+                                                  I64 count,
+                                                  I64 *out_staging_bytes)
+{
+    I64 last_index;
+    I64 last_byte_offset;
+
+    if (!out_staging_bytes)
+        return FP_Q16_ERR_NULL_PTR;
+
+    *out_staging_bytes = 0;
+
+    if (!input_q16 || !output_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (!count)
+        return FP_Q16_OK;
+
+    last_index = count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)input_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)output_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    if (count > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    *out_staging_bytes = count << 3;
+    if (*out_staging_bytes <= 0)
+    {
+        *out_staging_bytes = 0;
+        return FP_Q16_ERR_OVERFLOW;
+    }
+
+    return FP_Q16_OK;
+}
+
 // Checked all-or-nothing default-capacity wrapper for unclamped vector exp.
 // Stages full-lane output from FPQ16ExpArrayCheckedDefault and commits to
 // caller output only after complete success.
@@ -837,35 +883,18 @@ I32 FPQ16ExpArrayCheckedDefaultNoPartial(I64 *input_q16,
                                          I64 count)
 {
     I64 i;
-    I64 last_index;
-    I64 last_byte_offset;
     I64 staging_bytes;
     I64 *staged_output_q16;
     I32 status;
 
-    if (!input_q16 || !output_q16)
-        return FP_Q16_ERR_NULL_PTR;
-    if (count < 0)
-        return FP_Q16_ERR_BAD_PARAM;
+    status = FPQ16ExpArrayCheckedDefaultNoPartialPreflight(input_q16,
+                                                           output_q16,
+                                                           count,
+                                                           &staging_bytes);
+    if (status)
+        return status;
     if (!count)
         return FP_Q16_OK;
-
-    // Guard pointer-span arithmetic before indexed lane access.
-    last_index = count - 1;
-    if (last_index > (I64_MAX_VALUE >> 3))
-        return FP_Q16_ERR_OVERFLOW;
-
-    last_byte_offset = last_index << 3;
-    if ((U64)input_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
-        return FP_Q16_ERR_OVERFLOW;
-    if ((U64)output_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
-        return FP_Q16_ERR_OVERFLOW;
-
-    if (count > (I64_MAX_VALUE >> 3))
-        return FP_Q16_ERR_OVERFLOW;
-    staging_bytes = count << 3;
-    if (staging_bytes <= 0)
-        return FP_Q16_ERR_OVERFLOW;
 
     staged_output_q16 = MAlloc(staging_bytes);
     if (!staged_output_q16)
