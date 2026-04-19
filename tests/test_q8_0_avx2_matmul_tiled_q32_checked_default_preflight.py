@@ -91,20 +91,37 @@ def explicit_inline_preflight(
     out_rhs_block_capacity: list[int] | None,
     out_out_capacity: list[int] | None,
 ) -> int:
-    return q8_0_matmul_tiled_avx2_q32_checked_default_preflight(
-        lhs_matrix_blocks,
-        lhs_rows,
-        lhs_row_stride_blocks,
-        rhs_col_blocks,
-        rhs_cols,
-        rhs_col_stride_blocks,
-        k_block_count,
-        out_mat_q32,
-        out_row_stride_cols,
-        out_lhs_block_capacity,
-        out_rhs_block_capacity,
-        out_out_capacity,
-    )
+    if (
+        lhs_matrix_blocks is None
+        or rhs_col_blocks is None
+        or out_mat_q32 is None
+        or out_lhs_block_capacity is None
+        or out_rhs_block_capacity is None
+        or out_out_capacity is None
+    ):
+        return Q8_0_AVX2_ERR_NULL_PTR
+
+    if lhs_rows < 0 or lhs_row_stride_blocks < 0:
+        return Q8_0_AVX2_ERR_BAD_LEN
+    if rhs_cols < 0 or rhs_col_stride_blocks < 0:
+        return Q8_0_AVX2_ERR_BAD_LEN
+    if k_block_count < 0 or out_row_stride_cols < 0:
+        return Q8_0_AVX2_ERR_BAD_LEN
+
+    ok, lhs_capacity = try_mul_i64(lhs_rows, lhs_row_stride_blocks)
+    if not ok:
+        return Q8_0_AVX2_ERR_OVERFLOW
+    ok, rhs_capacity = try_mul_i64(rhs_cols, rhs_col_stride_blocks)
+    if not ok:
+        return Q8_0_AVX2_ERR_OVERFLOW
+    ok, out_capacity = try_mul_i64(lhs_rows, out_row_stride_cols)
+    if not ok:
+        return Q8_0_AVX2_ERR_OVERFLOW
+
+    out_lhs_block_capacity[0] = lhs_capacity
+    out_rhs_block_capacity[0] = rhs_capacity
+    out_out_capacity[0] = out_capacity
+    return Q8_0_AVX2_OK
 
 
 def test_source_contains_default_preflight_and_wrapper_use() -> None:
@@ -115,7 +132,7 @@ def test_source_contains_default_preflight_and_wrapper_use() -> None:
         "I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultPreflight(",
         1,
     )[1].split(
-        "I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultTiles(",
+        "I32 Q8_0MatMulTiledAVX2Q32CheckedDefault(",
         1,
     )[0]
     assert "!out_lhs_block_capacity || !out_rhs_block_capacity || !out_out_capacity" in preflight_body

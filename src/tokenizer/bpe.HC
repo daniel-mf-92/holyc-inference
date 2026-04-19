@@ -6286,37 +6286,6 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocNoPart
     U64 *out_max_piece_bytes,
     U64 *out_derived_out_byte_capacity)
 {
-    return TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartialPreflight(
-        token_ids,
-        token_count,
-        io_token_cursor,
-        span_token_count,
-        vocab_piece_bytes,
-        vocab_piece_bytes_len,
-        vocab_piece_offsets,
-        vocab_piece_lens,
-        vocab_piece_count,
-        out_bytes,
-        out_byte_count,
-        out_max_piece_bytes,
-        out_derived_out_byte_capacity);
-}
-
-I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartialPreflight(
-    I32 *token_ids,
-    U64 token_count,
-    U64 *io_token_cursor,
-    U64 span_token_count,
-    U8 *vocab_piece_bytes,
-    U64 vocab_piece_bytes_len,
-    U64 *vocab_piece_offsets,
-    U64 *vocab_piece_lens,
-    U64 vocab_piece_count,
-    U8 *out_bytes,
-    U64 *out_byte_count,
-    U64 *out_max_piece_bytes,
-    U64 *out_derived_out_byte_capacity)
-{
     U64 max_piece_bytes;
     U64 derived_out_byte_capacity;
     U64 cursor;
@@ -6340,8 +6309,9 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMa
     if (span_token_count > token_count - cursor)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
 
-    // No-partial wrappers stage decode/copy separately, so this helper keeps a
-    // dedicated checked preflight path with exact max-piece/capacity derivation.
+    // IQ-514: canonical strict no-partial from-max-piece preflight gate.
+    // Keep max-piece derivation + span capacity overflow checks centralized
+    // here so all staged no-partial wrappers share one audit path.
     err = TokenizerBPEComputeMaxPieceBytesChecked(vocab_piece_lens,
                                                   vocab_piece_count,
                                                   &max_piece_bytes);
@@ -6356,6 +6326,37 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMa
     *out_max_piece_bytes = max_piece_bytes;
     *out_derived_out_byte_capacity = derived_out_byte_capacity;
     return TOKENIZER_BPE_OK;
+}
+
+I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartialPreflight(
+    I32 *token_ids,
+    U64 token_count,
+    U64 *io_token_cursor,
+    U64 span_token_count,
+    U8 *vocab_piece_bytes,
+    U64 vocab_piece_bytes_len,
+    U64 *vocab_piece_offsets,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U8 *out_bytes,
+    U64 *out_byte_count,
+    U64 *out_max_piece_bytes,
+    U64 *out_derived_out_byte_capacity)
+{
+    return TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocNoPartialFromMaxPiecePreflight(
+        token_ids,
+        token_count,
+        io_token_cursor,
+        span_token_count,
+        vocab_piece_bytes,
+        vocab_piece_bytes_len,
+        vocab_piece_offsets,
+        vocab_piece_lens,
+        vocab_piece_count,
+        out_bytes,
+        out_byte_count,
+        out_max_piece_bytes,
+        out_derived_out_byte_capacity);
 }
 
 I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartial(

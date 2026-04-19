@@ -87,14 +87,14 @@ def tokenizer_bpe_decode_token_span_checked_default_capacity_validate_cursor_noa
 def test_source_contains_from_max_piece_nopartial_preflight_and_wrapper_use() -> None:
     source = Path("src/tokenizer/bpe.HC").read_text(encoding="utf-8")
     assert (
-        "I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartialPreflight(" in source
+        "I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocNoPartialFromMaxPiecePreflight(" in source
     )
 
     body = source.split(
-        "I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartialPreflight(",
+        "I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocNoPartialFromMaxPiecePreflight(",
         1,
     )[1].split(
-        "I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartial",
+        "I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceNoPartialPreflight",
         1,
     )[0]
     assert "if (cursor > token_count)" in body
