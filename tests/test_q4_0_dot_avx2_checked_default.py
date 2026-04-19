@@ -90,6 +90,24 @@ def test_default_wrapper_null_ptr_paths() -> None:
     assert err == Q4_0_DOT_AVX2_ERR_NULL_PTR
 
 
+
+
+def test_default_wrapper_malformed_block_payload_matches_core_error() -> None:
+    # Deliberately malformed packed payload lengths must surface BAD_LEN
+    # identically for default wrapper and checked core path.
+    lhs = [(0x3C00, b"\x11" * 15)]
+    rhs = [(0x3C00, b"\x22" * 16)]
+    out_default = {"value": 123}
+    out_core = {"value": 456}
+
+    err_default = q4_0_dot_product_blocks_avx2_checked_default(lhs, rhs, 1, out_default)
+    err_core = q4_0_dot_product_blocks_avx2_checked_ptr(lhs, rhs, 1, out_core)
+
+    assert err_default == Q4_0_DOT_AVX2_ERR_BAD_LEN
+    assert err_default == err_core
+    assert out_default["value"] == 123
+    assert out_core["value"] == 456
+
 def test_source_contains_default_wrapper() -> None:
     source = open("src/quant/q4_0_dot_avx2.HC", "r", encoding="utf-8").read()
     assert "I32 Q4_0DotProductBlocksAVX2CheckedDefault(" in source
@@ -101,5 +119,6 @@ if __name__ == "__main__":
     test_default_wrapper_negative_count_no_partial_write()
     test_default_wrapper_extent_shortfall_no_partial_write()
     test_default_wrapper_null_ptr_paths()
+    test_default_wrapper_malformed_block_payload_matches_core_error()
     test_source_contains_default_wrapper()
     print("q4_0_dot_avx2_checked_default_reference_checks=ok")

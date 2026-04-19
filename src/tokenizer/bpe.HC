@@ -6437,6 +6437,134 @@ I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoPartialNoAlloc
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoPartialNoAllocFromMaxPiece(
+    I32 *token_ids,
+    U64 token_count,
+    U64 *io_token_cursor,
+    U8 *vocab_piece_bytes,
+    U64 vocab_piece_bytes_len,
+    U64 *vocab_piece_offsets,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U8 *out_bytes,
+    U64 *out_byte_count)
+{
+    U64 cursor;
+    U64 decode_end;
+    U64 max_piece_bytes;
+    U64 piece_scan;
+    U64 piece_len;
+    U64 derived_out_byte_capacity;
+    U64 staged_out_count;
+    U64 scan;
+    U64 token_id_u64;
+    U64 piece_offset;
+    U64 write_cursor;
+    U64 copy_i;
+
+    if (!token_ids || !io_token_cursor || !vocab_piece_bytes ||
+        !vocab_piece_offsets || !vocab_piece_lens || !out_bytes ||
+        !out_byte_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_bytes_len > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    cursor = *io_token_cursor;
+    if (cursor > token_count)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Derive max token-piece byte span from the active default-capacity vocab.
+    // This keeps prompt output-capacity math pure integer and fully auditable.
+    max_piece_bytes = 0;
+    piece_scan = 0;
+    while (piece_scan < vocab_piece_count) {
+        piece_len = vocab_piece_lens[piece_scan];
+        if (piece_len > 0x7FFFFFFFFFFFFFFF)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+        if (piece_len > max_piece_bytes)
+            max_piece_bytes = piece_len;
+
+        piece_scan++;
+        if (piece_scan == 0)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    if (token_count && max_piece_bytes > 0x7FFFFFFFFFFFFFFF / token_count)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    derived_out_byte_capacity = token_count * max_piece_bytes;
+
+    // Prompt decode consumes [cursor, token_count).
+    decode_end = token_count;
+
+    // Pass 1 validates full decode window and computes exact output bytes.
+    // No caller-visible state mutates until this pass fully succeeds.
+    staged_out_count = 0;
+    scan = cursor;
+    while (scan < decode_end) {
+        if (token_ids[scan] < 0)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        token_id_u64 = token_ids[scan];
+        if (token_id_u64 >= vocab_piece_count)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        piece_offset = vocab_piece_offsets[token_id_u64];
+        piece_len = vocab_piece_lens[token_id_u64];
+
+        if (piece_offset > vocab_piece_bytes_len)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+        if (piece_len > vocab_piece_bytes_len - piece_offset)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        if (piece_len > derived_out_byte_capacity - staged_out_count)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+        staged_out_count += piece_len;
+        if (staged_out_count > derived_out_byte_capacity)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+
+        scan++;
+        if (scan == 0)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    // Pass 2 copies bytes after all bounds and capacity checks succeeded.
+    write_cursor = 0;
+    scan = cursor;
+    while (scan < decode_end) {
+        token_id_u64 = token_ids[scan];
+        piece_offset = vocab_piece_offsets[token_id_u64];
+        piece_len = vocab_piece_lens[token_id_u64];
+
+        copy_i = 0;
+        while (copy_i < piece_len) {
+            out_bytes[write_cursor] = vocab_piece_bytes[piece_offset + copy_i];
+
+            write_cursor++;
+            if (write_cursor > staged_out_count)
+                return TOKENIZER_BPE_ERR_OVERFLOW;
+
+            copy_i++;
+            if (copy_i == 0)
+                return TOKENIZER_BPE_ERR_OVERFLOW;
+        }
+
+        scan++;
+        if (scan == 0)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    if (write_cursor != staged_out_count)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    *out_byte_count = staged_out_count;
+    *io_token_cursor = decode_end;
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEDecodePromptCheckedDefault(
     I32 *token_ids,
     U64 token_count,
