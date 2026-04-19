@@ -7195,6 +7195,39 @@ I32 TokenizerBPEDecodePromptCheckedDefaultNoPartialFromMaxPieceValidateCursorNoA
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEDecodePromptCheckedDefaultNoPartialFromMaxPieceValidateCursorNoAllocNoPartial(
+    I32 *token_ids,
+    U64 token_count,
+    U64 *io_token_cursor,
+    U8 *vocab_piece_bytes,
+    U64 vocab_piece_bytes_len,
+    U64 *vocab_piece_offsets,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 vocab_piece_capacity,
+    U64 max_piece_bytes,
+    U8 *out_bytes,
+    U64 *out_byte_count)
+{
+    // Keep wrapper layering explicit for call sites that require both names:
+    // NoAlloc core + NoPartial commit contract. The delegated no-alloc helper
+    // already validates full span before copy and only commits outputs on
+    // success, so behavior remains byte-for-byte identical and deterministic.
+    return TokenizerBPEDecodePromptCheckedDefaultNoPartialFromMaxPieceValidateCursorNoAlloc(
+        token_ids,
+        token_count,
+        io_token_cursor,
+        vocab_piece_bytes,
+        vocab_piece_bytes_len,
+        vocab_piece_offsets,
+        vocab_piece_lens,
+        vocab_piece_count,
+        vocab_piece_capacity,
+        max_piece_bytes,
+        out_bytes,
+        out_byte_count);
+}
+
 I32 TokenizerBPEDecodePromptCheckedDefaultNoPartialValidateCursor(
     I32 *token_ids,
     U64 token_count,
