@@ -873,6 +873,79 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStride(I64 *gate_q16,
                                                  lane_count);
 }
 
+// Caller-staged no-alloc preflight diagnostics for default-stride
+// no-partial SwiGLU rows.
+//
+// Returns checked staging/output requirements used by no-alloc commit wrappers:
+// - required_stage_cells = row_count * lane_count
+// - required_stage_bytes = required_stage_cells * sizeof(I64)
+// - required_out_cells from default-stride span preflight
+I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(I64 gate_capacity,
+                                                                            I64 up_capacity,
+                                                                            I64 out_capacity,
+                                                                            I64 row_count,
+                                                                            I64 lane_count,
+                                                                            I64 stage_capacity,
+                                                                            I64 *out_required_stage_cells,
+                                                                            I64 *out_required_stage_bytes,
+                                                                            I64 *out_required_out_cells)
+{
+    I64 default_row_stride;
+    I64 last_row_index;
+    I64 required_gate_cells;
+    I64 required_up_cells;
+    I64 required_out_cells;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
+    I32 status;
+
+    if (!out_required_stage_cells || !out_required_stage_bytes ||
+        !out_required_out_cells)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (gate_capacity < 0 || up_capacity < 0 || out_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || lane_count < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (stage_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    default_row_stride = lane_count;
+
+    status = FFNQ16SwiGLUApplyRowsCheckedDefaultStridePreflightOnly(gate_capacity,
+                                                                    up_capacity,
+                                                                    out_capacity,
+                                                                    row_count,
+                                                                    lane_count,
+                                                                    &default_row_stride,
+                                                                    &last_row_index,
+                                                                    &required_gate_cells,
+                                                                    &required_up_cells,
+                                                                    &required_out_cells);
+    if (status)
+        return status;
+
+    status = FFNTryMulI64Checked(row_count,
+                                 lane_count,
+                                 &required_stage_cells);
+    if (status)
+        return status;
+
+    status = FFNTryMulI64Checked(required_stage_cells,
+                                 sizeof(I64),
+                                 &required_stage_bytes);
+    if (status)
+        return status;
+
+    if (required_stage_cells > stage_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    *out_required_stage_cells = required_stage_cells;
+    *out_required_stage_bytes = required_stage_bytes;
+    *out_required_out_cells = required_out_cells;
+    return FFN_Q16_OK;
+}
+
 // Caller-staged no-allocation default-stride no-partial SwiGLU wrapper.
 //
 // All-or-nothing contract:
@@ -891,9 +964,8 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAlloc(I64 *gate_q16,
                                                               I64 staging_out_capacity)
 {
     I64 default_row_stride;
-    I64 last_row_index;
-    I64 required_gate_cells;
-    I64 required_up_cells;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
     I64 required_out_cells;
     I64 row_index;
     I64 lane_index;
@@ -905,29 +977,27 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAlloc(I64 *gate_q16,
     if (!gate_q16 || !up_q16 || !out_q16)
         return FFN_Q16_ERR_NULL_PTR;
 
-    default_row_stride = lane_count;
-
-    status = FFNQ16SwiGLUApplyRowsCheckedDefaultStridePreflightOnly(gate_capacity,
-                                                                    up_capacity,
-                                                                    out_capacity,
-                                                                    row_count,
-                                                                    lane_count,
-                                                                    &default_row_stride,
-                                                                    &last_row_index,
-                                                                    &required_gate_cells,
-                                                                    &required_up_cells,
-                                                                    &required_out_cells);
+    status = FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(
+        gate_capacity,
+        up_capacity,
+        out_capacity,
+        row_count,
+        lane_count,
+        staging_out_capacity,
+        &required_stage_cells,
+        &required_stage_bytes,
+        &required_out_cells);
     if (status)
         return status;
 
     if (!row_count || !lane_count)
         return FFN_Q16_OK;
 
+    default_row_stride = lane_count;
+
     if (!staging_out_q16)
         return FFN_Q16_ERR_NULL_PTR;
-    if (staging_out_capacity < 0)
-        return FFN_Q16_ERR_BAD_PARAM;
-    if (staging_out_capacity < required_out_cells)
+    if (staging_out_capacity < required_stage_cells)
         return FFN_Q16_ERR_BAD_PARAM;
 
     // No-partial guarantee requires staging to be disjoint from all
