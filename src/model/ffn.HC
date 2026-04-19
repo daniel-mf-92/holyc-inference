@@ -411,42 +411,137 @@ I32 FFNQ16SwiGLUApplyCheckedNoPartial(I64 *gate_q16,
     return FFN_Q16_OK;
 }
 
-// Canonical default-capacity wrapper for lane-major SwiGLU apply.
+// Checked batched row-major SwiGLU apply composed from lane helper.
 //
-// The core helper already validates all stride/span math; this wrapper only
-// derives the natural capacity contract for tightly packed inputs/outputs:
-//   gate_capacity = up_capacity = out_capacity = lane_count.
-//
-// This keeps call sites explicit about lane_count while avoiding duplicated
-// capacity literals and preserving exact checked error semantics.
-I32 FFNQ16SwiGLUApplyCheckedDefaultCapacity(I64 *gate_q16,
-                                            I64 gate_stride,
-                                            I64 *up_q16,
-                                            I64 up_stride,
-                                            I64 *out_q16,
-                                            I64 out_stride,
-                                            I64 lane_count)
+// Each row is a dense lane vector of length lane_count (lane stride = 1).
+// Row strides are measured in I64 lanes between row bases.
+I32 FFNQ16SwiGLUApplyRowsChecked(I64 *gate_q16,
+                                 I64 gate_capacity,
+                                 I64 gate_row_stride,
+                                 I64 *up_q16,
+                                 I64 up_capacity,
+                                 I64 up_row_stride,
+                                 I64 *out_q16,
+                                 I64 out_capacity,
+                                 I64 out_row_stride,
+                                 I64 row_count,
+                                 I64 lane_count)
 {
-    I64 default_capacity;
+    I64 last_row;
+    I64 required_gate_cells;
+    I64 required_up_cells;
+    I64 required_out_cells;
+    I64 row_index;
+    I64 gate_row_base;
+    I64 up_row_base;
+    I64 out_row_base;
+    I64 next_gate_row_base;
+    I64 next_up_row_base;
+    I64 next_out_row_base;
+    I32 status;
 
     if (!gate_q16 || !up_q16 || !out_q16)
         return FFN_Q16_ERR_NULL_PTR;
 
-    if (gate_stride < 0 || up_stride < 0 || out_stride < 0)
+    if (gate_capacity < 0 || up_capacity < 0 || out_capacity < 0)
         return FFN_Q16_ERR_BAD_PARAM;
-    if (lane_count < 0)
+    if (gate_row_stride < 0 || up_row_stride < 0 || out_row_stride < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || lane_count < 0)
         return FFN_Q16_ERR_BAD_PARAM;
 
-    default_capacity = lane_count;
+    if (!row_count || !lane_count)
+        return FFN_Q16_OK;
 
-    return FFNQ16SwiGLUApplyChecked(gate_q16,
-                                    default_capacity,
-                                    gate_stride,
-                                    up_q16,
-                                    default_capacity,
-                                    up_stride,
-                                    out_q16,
-                                    default_capacity,
-                                    out_stride,
-                                    lane_count);
+    if (gate_row_stride < lane_count || up_row_stride < lane_count ||
+        out_row_stride < lane_count)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    last_row = row_count - 1;
+
+    status = FFNTryMulI64Checked(last_row,
+                                 gate_row_stride,
+                                 &required_gate_cells);
+    if (status)
+        return status;
+    status = FFNTryAddI64Checked(required_gate_cells,
+                                 lane_count,
+                                 &required_gate_cells);
+    if (status)
+        return status;
+
+    status = FFNTryMulI64Checked(last_row,
+                                 up_row_stride,
+                                 &required_up_cells);
+    if (status)
+        return status;
+    status = FFNTryAddI64Checked(required_up_cells,
+                                 lane_count,
+                                 &required_up_cells);
+    if (status)
+        return status;
+
+    status = FFNTryMulI64Checked(last_row,
+                                 out_row_stride,
+                                 &required_out_cells);
+    if (status)
+        return status;
+    status = FFNTryAddI64Checked(required_out_cells,
+                                 lane_count,
+                                 &required_out_cells);
+    if (status)
+        return status;
+
+    if (required_gate_cells > gate_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (required_up_cells > up_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (required_out_cells > out_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    // Deterministic row-major execution: row 0 -> row N-1,
+    // each row writes exactly lane_count dense cells.
+    gate_row_base = 0;
+    up_row_base = 0;
+    out_row_base = 0;
+
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        status = FFNQ16SwiGLUApplyChecked(gate_q16 + gate_row_base,
+                                          lane_count,
+                                          1,
+                                          up_q16 + up_row_base,
+                                          lane_count,
+                                          1,
+                                          out_q16 + out_row_base,
+                                          lane_count,
+                                          1,
+                                          lane_count);
+        if (status)
+            return status;
+
+        status = FFNTryAddI64Checked(gate_row_base,
+                                     gate_row_stride,
+                                     &next_gate_row_base);
+        if (status)
+            return status;
+
+        status = FFNTryAddI64Checked(up_row_base,
+                                     up_row_stride,
+                                     &next_up_row_base);
+        if (status)
+            return status;
+
+        status = FFNTryAddI64Checked(out_row_base,
+                                     out_row_stride,
+                                     &next_out_row_base);
+        if (status)
+            return status;
+
+        gate_row_base = next_gate_row_base;
+        up_row_base = next_up_row_base;
+        out_row_base = next_out_row_base;
+    }
+
+    return FFN_Q16_OK;
 }
