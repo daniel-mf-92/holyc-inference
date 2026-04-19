@@ -562,3 +562,59 @@ I32 Q4_0DotRowsAVX2Q32ToQ16CheckedDefault(
                                           vec_block_count,
                                           out_rows_q16);
 }
+
+I32 Q4_0DotRowsAVX2Q32ToQ16CheckedDefaultNoPartial(
+    Q4_0Block *matrix_blocks,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q4_0Block *vec_blocks,
+    I64 vec_block_count,
+    I64 *out_rows_q16)
+{
+    I64 stage_bytes;
+    I64 row_index;
+    I64 *staged_rows_q16;
+    I32 status;
+
+    if (!out_rows_q16)
+        return Q4_0_AVX2_ERR_NULL_PTR;
+    if (row_count < 0)
+        return Q4_0_AVX2_ERR_BAD_LEN;
+
+    // IQ-483 strict all-or-nothing default-capacity wrapper:
+    // - Run default checked row conversion into a private staging span.
+    // - Preserve exact status/error ordering from checked-default helper.
+    // - Commit caller rows only after full staged success.
+    if (!row_count)
+        return Q4_0DotRowsAVX2Q32ToQ16CheckedDefault(matrix_blocks,
+                                                     row_count,
+                                                     row_stride_blocks,
+                                                     vec_blocks,
+                                                     vec_block_count,
+                                                     out_rows_q16);
+
+    if (!Q4_0AVX2TryMulI64(row_count, sizeof(I64), &stage_bytes))
+        return Q4_0_AVX2_ERR_OVERFLOW;
+
+    staged_rows_q16 = MAlloc(stage_bytes);
+    if (!staged_rows_q16)
+        return Q4_0_AVX2_ERR_OVERFLOW;
+
+    status = Q4_0DotRowsAVX2Q32ToQ16CheckedDefault(matrix_blocks,
+                                                   row_count,
+                                                   row_stride_blocks,
+                                                   vec_blocks,
+                                                   vec_block_count,
+                                                   staged_rows_q16);
+    if (status != Q4_0_AVX2_OK)
+    {
+        Free(staged_rows_q16);
+        return status;
+    }
+
+    for (row_index = 0; row_index < row_count; ++row_index)
+        out_rows_q16[row_index] = staged_rows_q16[row_index];
+
+    Free(staged_rows_q16);
+    return Q4_0_AVX2_OK;
+}
