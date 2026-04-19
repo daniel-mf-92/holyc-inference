@@ -944,6 +944,45 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(I64 r
     return FFN_Q16_OK;
 }
 
+// Default-capacity wrapper for no-alloc required-bytes diagnostics.
+//
+// IQ-610 contract:
+// - derive default_stage_cell_capacity = row_count * lane_count with checked
+//   overflow math;
+// - route diagnostics through canonical RequiredBytes helper so capacity,
+//   required-byte, and out-span checks stay in one shared path.
+I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesDefaultCapacity(
+    I64 row_count,
+    I64 lane_count,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_required_out_cells)
+{
+    I64 default_stage_cell_capacity;
+    I32 status;
+
+    if (!out_required_stage_cells || !out_required_stage_bytes ||
+        !out_required_out_cells)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (row_count < 0 || lane_count < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    status = FFNTryMulI64Checked(row_count,
+                                 lane_count,
+                                 &default_stage_cell_capacity);
+    if (status)
+        return status;
+
+    return FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
+        row_count,
+        lane_count,
+        default_stage_cell_capacity,
+        out_required_stage_cells,
+        out_required_stage_bytes,
+        out_required_out_cells);
+}
+
 // Commit-capacity diagnostics helper for caller-staged default-stride
 // no-alloc no-partial SwiGLU rows.
 //
