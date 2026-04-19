@@ -5411,6 +5411,14 @@ I32 TokenizerBPEDecodeTokenSpanCheckedDefaultCapacityValidateCursorNoAlloc(
     if (decode_end < cursor || decode_end > token_count)
         return TOKENIZER_BPE_ERR_OVERFLOW;
 
+    // Zero-span decode is a valid no-op: commit canonical empty output and
+    // preserve caller cursor exactly.
+    if (!decode_count) {
+        *out_byte_count = 0;
+        *io_token_cursor = cursor;
+        return TOKENIZER_BPE_OK;
+    }
+
     // Pass 1: validate every token/piece bound and accumulate total output
     // bytes before writing caller output, preserving deterministic decode shape
     // and exact error surfaces.

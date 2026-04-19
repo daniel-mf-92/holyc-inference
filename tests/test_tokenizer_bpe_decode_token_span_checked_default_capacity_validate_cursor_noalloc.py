@@ -224,6 +224,35 @@ def test_null_overflow_and_window_contracts() -> None:
     assert out == out_seed
 
 
+def test_zero_span_resets_out_count_and_preserves_cursor() -> None:
+    pieces = [b"hello", b" ", b"world"]
+    blob, offsets, lens = build_vocab_tables(pieces)
+
+    out = [0x77] * 32
+    count = [19]
+    cursor = [2]
+
+    err = tokenizer_bpe_decode_token_span_checked_default_capacity_validate_cursor_noalloc(
+        [0, 1, 2],
+        3,
+        cursor,
+        0,
+        blob,
+        len(blob),
+        offsets,
+        lens,
+        len(pieces),
+        out,
+        len(out),
+        count,
+    )
+
+    assert err == TOKENIZER_BPE_OK
+    assert cursor[0] == 2
+    assert count[0] == 0
+    assert out == [0x77] * 32
+
+
 def test_randomized_parity() -> None:
     rng = random.Random(20260419_480)
 
