@@ -407,6 +407,35 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredB
     I64 *out_required_stage_bytes,
     I64 *out_required_out_cells);
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAlloc(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 stage_cell_capacity,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity);
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocDefaultCapacity(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity);
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(
     I64 query_row_count,
     I64 token_count,
@@ -3034,6 +3063,220 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredB
     *out_commit_required_stage_bytes = commit_required_stage_bytes;
     *out_required_out_cells = required_out_cells;
     return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAlloc(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 stage_cell_capacity,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity)
+{
+    I64 required_stage_cells;
+    I64 required_out_cells;
+    I64 required_stage_bytes;
+    I64 staging_capacity_bytes;
+    I32 status;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_rows_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0 ||
+        staged_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_row_count < 0 || token_count < 0 || head_dim < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-604 no-alloc no-partial default-stride contract:
+    // 1) preflight all q/k/out/staging spans with checked math;
+    // 2) compute full batch into caller-owned staging slab;
+    // 3) commit through no-alloc commit-only helper for all-or-nothing writes.
+    status = AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        stage_cell_capacity,
+        &required_stage_cells,
+        &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (!query_row_count || !token_count)
+        return ATTN_Q16_OK;
+
+    if (!staged_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+    if (staged_scores_capacity < required_stage_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionTryMulI64Checked(required_stage_cells,
+                                       sizeof(I64),
+                                       &required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryMulI64Checked(staged_scores_capacity,
+                                       sizeof(I64),
+                                       &staging_capacity_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (required_stage_bytes > staging_capacity_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // Staging must not alias live tensors or destination output.
+    if (staged_scores_q32 == q_rows_q16)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_scores_q32 == k_rows_q16)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_scores_q32 == out_scores_q32)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionQ16ComputeScaledQKRowsCheckedDefaultStride(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        head_dim,
+        score_scale_q16,
+        staged_scores_q32,
+        staged_scores_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (required_out_cells > out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    return AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(
+        query_row_count,
+        token_count,
+        staged_scores_q32,
+        staged_scores_capacity,
+        required_stage_cells,
+        out_scores_q32,
+        out_scores_capacity);
+}
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocDefaultCapacity(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity)
+{
+    I64 default_stage_cell_capacity;
+    I64 staging_capacity_bytes;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
+    I64 required_out_cells;
+    I32 status;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_rows_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0 ||
+        staged_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_row_count < 0 || token_count < 0 || head_dim < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       token_count,
+                                       &default_stage_cell_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(staged_scores_capacity,
+                                       sizeof(I64),
+                                       &staging_capacity_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    // IQ-607 default-capacity no-alloc contract:
+    // derive stage capacity from the exact live score slab
+    // (`query_row_count * token_count`) and route staging diagnostics
+    // through commit-capacity required-bytes validation before compute.
+    status = AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitCapacity(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        default_stage_cell_capacity,
+        staging_capacity_bytes,
+        &required_stage_cells,
+        &required_stage_bytes,
+        &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (!query_row_count || !token_count)
+        return ATTN_Q16_OK;
+
+    if (!staged_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (required_stage_cells > staged_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_stage_bytes > staging_capacity_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // No-partial guarantee for destination output requires caller staging to
+    // be separate from source/destination tensor buffers.
+    if (staged_scores_q32 == q_rows_q16)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_scores_q32 == k_rows_q16)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_scores_q32 == out_scores_q32)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionQ16ComputeScaledQKRowsCheckedDefaultStride(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        head_dim,
+        score_scale_q16,
+        staged_scores_q32,
+        staged_scores_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    return AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(
+        query_row_count,
+        token_count,
+        staged_scores_q32,
+        staged_scores_capacity,
+        required_stage_cells,
+        out_scores_q32,
+        out_scores_capacity);
 }
 
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideCommitOnly(
