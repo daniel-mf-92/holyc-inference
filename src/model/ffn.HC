@@ -668,6 +668,103 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartial(I64 *gate_q16,
     return FFN_Q16_OK;
 }
 
+// Default-stride preflight helper for row-wise SwiGLU wrappers.
+//
+// Exposes exact checked diagnostics shared by default-stride wrappers:
+// - default_row_stride (always lane_count)
+// - last_row_index (row_count - 1 when rows are present)
+// - required_{gate,up,out}_cells for capacity guards
+I32 FFNQ16SwiGLUApplyRowsCheckedDefaultStridePreflightOnly(I64 gate_capacity,
+                                                           I64 up_capacity,
+                                                           I64 out_capacity,
+                                                           I64 row_count,
+                                                           I64 lane_count,
+                                                           I64 *out_default_row_stride,
+                                                           I64 *out_last_row_index,
+                                                           I64 *out_required_gate_cells,
+                                                           I64 *out_required_up_cells,
+                                                           I64 *out_required_out_cells)
+{
+    I64 default_row_stride;
+    I64 last_row_index;
+    I64 required_gate_cells;
+    I64 required_up_cells;
+    I64 required_out_cells;
+    I32 status;
+
+    if (!out_default_row_stride || !out_last_row_index ||
+        !out_required_gate_cells || !out_required_up_cells ||
+        !out_required_out_cells)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (gate_capacity < 0 || up_capacity < 0 || out_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || lane_count < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    default_row_stride = lane_count;
+
+    if (!row_count || !lane_count)
+    {
+        *out_default_row_stride = default_row_stride;
+        *out_last_row_index = 0;
+        *out_required_gate_cells = 0;
+        *out_required_up_cells = 0;
+        *out_required_out_cells = 0;
+        return FFN_Q16_OK;
+    }
+
+    last_row_index = row_count - 1;
+
+    status = FFNTryMulI64Checked(last_row_index,
+                                 default_row_stride,
+                                 &required_gate_cells);
+    if (status)
+        return status;
+    status = FFNTryAddI64Checked(required_gate_cells,
+                                 lane_count,
+                                 &required_gate_cells);
+    if (status)
+        return status;
+
+    status = FFNTryMulI64Checked(last_row_index,
+                                 default_row_stride,
+                                 &required_up_cells);
+    if (status)
+        return status;
+    status = FFNTryAddI64Checked(required_up_cells,
+                                 lane_count,
+                                 &required_up_cells);
+    if (status)
+        return status;
+
+    status = FFNTryMulI64Checked(last_row_index,
+                                 default_row_stride,
+                                 &required_out_cells);
+    if (status)
+        return status;
+    status = FFNTryAddI64Checked(required_out_cells,
+                                 lane_count,
+                                 &required_out_cells);
+    if (status)
+        return status;
+
+    if (required_gate_cells > gate_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (required_up_cells > up_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (required_out_cells > out_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    *out_default_row_stride = default_row_stride;
+    *out_last_row_index = last_row_index;
+    *out_required_gate_cells = required_gate_cells;
+    *out_required_up_cells = required_up_cells;
+    *out_required_out_cells = required_out_cells;
+
+    return FFN_Q16_OK;
+}
+
 // Deterministic default-stride row wrapper for SwiGLU batch apply.
 //
 // Default stride means each row is dense with no padding, so every row
@@ -682,17 +779,32 @@ I32 FFNQ16SwiGLUApplyRowsCheckedDefaultStride(I64 *gate_q16,
                                               I64 lane_count)
 {
     I64 default_row_stride;
+    I64 last_row_index;
+    I64 required_gate_cells;
+    I64 required_up_cells;
+    I64 required_out_cells;
+    I32 status;
 
     if (!gate_q16 || !up_q16 || !out_q16)
         return FFN_Q16_ERR_NULL_PTR;
 
-    if (row_count < 0 || lane_count < 0)
-        return FFN_Q16_ERR_BAD_PARAM;
+    default_row_stride = lane_count;
+
+    status = FFNQ16SwiGLUApplyRowsCheckedDefaultStridePreflightOnly(gate_capacity,
+                                                                    up_capacity,
+                                                                    out_capacity,
+                                                                    row_count,
+                                                                    lane_count,
+                                                                    &default_row_stride,
+                                                                    &last_row_index,
+                                                                    &required_gate_cells,
+                                                                    &required_up_cells,
+                                                                    &required_out_cells);
+    if (status)
+        return status;
 
     if (!row_count || !lane_count)
         return FFN_Q16_OK;
-
-    default_row_stride = lane_count;
 
     return FFNQ16SwiGLUApplyRowsChecked(gate_q16,
                                         gate_capacity,
@@ -721,17 +833,32 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStride(I64 *gate_q16,
                                                        I64 lane_count)
 {
     I64 default_row_stride;
+    I64 last_row_index;
+    I64 required_gate_cells;
+    I64 required_up_cells;
+    I64 required_out_cells;
+    I32 status;
 
     if (!gate_q16 || !up_q16 || !out_q16)
         return FFN_Q16_ERR_NULL_PTR;
 
-    if (row_count < 0 || lane_count < 0)
-        return FFN_Q16_ERR_BAD_PARAM;
+    default_row_stride = lane_count;
+
+    status = FFNQ16SwiGLUApplyRowsCheckedDefaultStridePreflightOnly(gate_capacity,
+                                                                    up_capacity,
+                                                                    out_capacity,
+                                                                    row_count,
+                                                                    lane_count,
+                                                                    &default_row_stride,
+                                                                    &last_row_index,
+                                                                    &required_gate_cells,
+                                                                    &required_up_cells,
+                                                                    &required_out_cells);
+    if (status)
+        return status;
 
     if (!row_count || !lane_count)
         return FFN_Q16_OK;
-
-    default_row_stride = lane_count;
 
     return FFNQ16SwiGLUApplyRowsCheckedNoPartial(gate_q16,
                                                  gate_capacity,
