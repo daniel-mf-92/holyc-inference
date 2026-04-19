@@ -853,16 +853,18 @@ I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartial(
         return Q8_0_AVX2_ERR_BAD_LEN;
 
     // Preserve default-wrapper behavior for degenerate result spans.
+    // Route through default-tiles entry so no-partial staging keeps one
+    // canonical checked core path for default tile semantics.
     if (!lhs_rows || !rhs_cols)
-        return Q8_0MatMulTiledAVX2Q32CheckedDefault(lhs_matrix_blocks,
-                                                    lhs_rows,
-                                                    lhs_row_stride_blocks,
-                                                    rhs_col_blocks,
-                                                    rhs_cols,
-                                                    rhs_col_stride_blocks,
-                                                    k_block_count,
-                                                    out_mat_q32,
-                                                    out_row_stride_cols);
+        return Q8_0MatMulTiledAVX2Q32CheckedDefaultTiles(lhs_matrix_blocks,
+                                                         lhs_rows,
+                                                         lhs_row_stride_blocks,
+                                                         rhs_col_blocks,
+                                                         rhs_cols,
+                                                         rhs_col_stride_blocks,
+                                                         k_block_count,
+                                                         out_mat_q32,
+                                                         out_row_stride_cols);
 
     if (!Q8_0AVX2TryMulI64(lhs_rows, out_row_stride_cols, &staged_out_capacity))
         return Q8_0_AVX2_ERR_OVERFLOW;
@@ -878,15 +880,15 @@ I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartial(
     if (!staged_out_mat_q32)
         return Q8_0_AVX2_ERR_OVERFLOW;
 
-    status = Q8_0MatMulTiledAVX2Q32CheckedDefault(lhs_matrix_blocks,
-                                                  lhs_rows,
-                                                  lhs_row_stride_blocks,
-                                                  rhs_col_blocks,
-                                                  rhs_cols,
-                                                  rhs_col_stride_blocks,
-                                                  k_block_count,
-                                                  staged_out_mat_q32,
-                                                  out_row_stride_cols);
+    status = Q8_0MatMulTiledAVX2Q32CheckedDefaultTiles(lhs_matrix_blocks,
+                                                       lhs_rows,
+                                                       lhs_row_stride_blocks,
+                                                       rhs_col_blocks,
+                                                       rhs_cols,
+                                                       rhs_col_stride_blocks,
+                                                       k_block_count,
+                                                       staged_out_mat_q32,
+                                                       out_row_stride_cols);
     if (status != Q8_0_AVX2_OK)
     {
         Free(staged_out_mat_q32);

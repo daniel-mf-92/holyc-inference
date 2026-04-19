@@ -69,6 +69,28 @@ def q8_0_matmul_tiled_avx2_q32_checked_default(
     )
 
 
+def q8_0_matmul_tiled_avx2_q32_checked_default_tiles(
+    lhs_matrix_blocks,
+    lhs_rows: int,
+    lhs_row_stride_blocks: int,
+    rhs_col_blocks,
+    rhs_cols: int,
+    rhs_col_stride_blocks: int,
+    k_block_count: int,
+    out_row_stride_cols: int,
+):
+    return q8_0_matmul_tiled_avx2_q32_checked_default(
+        lhs_matrix_blocks,
+        lhs_rows,
+        lhs_row_stride_blocks,
+        rhs_col_blocks,
+        rhs_cols,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_row_stride_cols,
+    )
+
+
 def q8_0_matmul_tiled_avx2_q32_checked_default_no_partial(
     lhs_matrix_blocks,
     lhs_rows: int,
@@ -86,7 +108,7 @@ def q8_0_matmul_tiled_avx2_q32_checked_default_no_partial(
         return Q8_0_AVX2_ERR_BAD_LEN
 
     if lhs_rows == 0 or rhs_cols == 0:
-        err, _ = q8_0_matmul_tiled_avx2_q32_checked_default(
+        err, _ = q8_0_matmul_tiled_avx2_q32_checked_default_tiles(
             lhs_matrix_blocks,
             lhs_rows,
             lhs_row_stride_blocks,
@@ -111,7 +133,7 @@ def q8_0_matmul_tiled_avx2_q32_checked_default_no_partial(
     if staged_out_bytes <= 0:
         return Q8_0_AVX2_ERR_OVERFLOW
 
-    err, staged = q8_0_matmul_tiled_avx2_q32_checked_default(
+    err, staged = q8_0_matmul_tiled_avx2_q32_checked_default_tiles(
         lhs_matrix_blocks,
         lhs_rows,
         lhs_row_stride_blocks,
@@ -193,8 +215,9 @@ def test_source_contains_default_and_no_partial_shapes() -> None:
     source = pathlib.Path("src/quant/q8_0_avx2.HC").read_text(encoding="utf-8")
     assert "I32 Q8_0MatMulTiledAVX2Q32CheckedDefault(" in source
     assert "I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartial(" in source
+    assert "I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultTiles(" in source
     assert "return Q8_0MatMulTiledAVX2Q32CheckedDefaultTiles(" in source
-    assert "status = Q8_0MatMulTiledAVX2Q32CheckedDefault(lhs_matrix_blocks," in source
+    assert "status = Q8_0MatMulTiledAVX2Q32CheckedDefaultTiles(lhs_matrix_blocks," in source
 
 
 def test_null_and_bad_len_surfaces() -> None:
