@@ -422,6 +422,23 @@ I32 Q8_0DotProductBlocksAVX2Checked(Q8_0Block *lhs,
     return Q8_0_AVX2_OK;
 }
 
+I32 Q8_0DotProductBlocksAVX2CheckedDefault(Q8_0Block *lhs,
+                                           Q8_0Block *rhs,
+                                           I64 block_count,
+                                           I64 *out_dot_q32)
+{
+    // IQ-471 canonical default-capacity wrapper:
+    // - Dot-product checked core already consumes only active span
+    //   (`block_count`) and exposes no extra capacity arguments.
+    // - Default wrapper is strict pass-through so callers get one stable
+    //   entry point while preserving exact checked-core status and commit
+    //   behavior on both success and failure.
+    return Q8_0DotProductBlocksAVX2Checked(lhs,
+                                           rhs,
+                                           block_count,
+                                           out_dot_q32);
+}
+
 I32 Q8_0DotBlocksAVX2Q32CheckedDefault(Q8_0Block *lhs,
                                        Q8_0Block *rhs,
                                        I64 block_count,
