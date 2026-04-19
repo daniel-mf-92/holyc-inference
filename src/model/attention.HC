@@ -761,3 +761,47 @@ I32 AttentionQ16ComputeScaledQKRowCheckedNoPartial(I64 *q_row_q16,
     Free(staged_scores_q32);
     return ATTN_Q16_OK;
 }
+
+I32 AttentionQ16ComputeScaledQKRowCheckedNoPartialDefaultStride(
+    I64 *q_row_q16,
+    I64 q_row_capacity,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity)
+{
+    I64 default_k_row_stride_q16;
+    I64 default_out_score_stride;
+
+    if (!q_row_q16 || !k_rows_q16 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_row_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (token_count < 0 || head_dim < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-554 default-stride no-partial contract:
+    // - key rows are tightly packed with head_dim cells per token.
+    // - output scores are token-major with token_count stride.
+    // Delegate to the checked no-partial core so staged all-or-nothing
+    // semantics and overflow validation stay identical to explicit composition.
+    default_k_row_stride_q16 = head_dim;
+    default_out_score_stride = token_count;
+
+    return AttentionQ16ComputeScaledQKRowCheckedNoPartial(
+        q_row_q16,
+        q_row_capacity,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        default_k_row_stride_q16,
+        head_dim,
+        score_scale_q16,
+        out_scores_q32,
+        out_scores_capacity,
+        default_out_score_stride);
+}
