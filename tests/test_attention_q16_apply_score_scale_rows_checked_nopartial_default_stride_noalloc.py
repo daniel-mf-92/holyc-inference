@@ -220,7 +220,7 @@ def test_source_contains_noalloc_default_stride_wrapper() -> None:
     body = source.rsplit(signature, 1)[1]
     assert "default_score_stride = token_count;" in body
     assert "default_row_stride = token_count;" in body
-    assert "AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnly(" in body
+    assert "AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(" in body
     assert "AttentionQ16ApplyScoreScaleRowsChecked(in_scores_q32," in body
     assert "staged_begin < in_end && in_begin < staged_end" in body
     assert "staged_begin < out_end && out_begin < staged_end" in body

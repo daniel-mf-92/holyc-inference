@@ -43,6 +43,18 @@ I32 AttentionQ16ApplyScoreScaleCheckedDefaultStrideNoPartialPreflightOnly(
     I64 *out_required_in_cells,
     I64 *out_required_out_cells);
 
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 stage_cell_capacity,
+    I64 *out_required_in_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_cells);
+
 I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnly(
     I64 *in_scores_q32,
     I64 in_scores_capacity,
@@ -1444,7 +1456,6 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAlloc(
 {
     I64 default_score_stride;
     I64 default_row_stride;
-    I64 last_row_base_index;
     I64 required_in_cells;
     I64 required_out_cells;
     I64 required_stage_cells;
@@ -1459,32 +1470,21 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAlloc(
     U64 out_end;
     I32 status;
 
-    if (!in_scores_q32 || !out_scores_q32)
-        return ATTN_Q16_ERR_NULL_PTR;
-
-    if (in_scores_capacity < 0 || out_scores_capacity < 0 ||
-        staged_scores_capacity < 0)
-        return ATTN_Q16_ERR_BAD_PARAM;
-    if (row_count < 0 || token_count < 0)
-        return ATTN_Q16_ERR_BAD_PARAM;
-
     // IQ-589 no-alloc no-partial default-stride contract:
     // all score and row strides are derived from token_count so callers can
     // stage deterministic row-major slabs without hidden allocations.
     default_score_stride = token_count;
     default_row_stride = token_count;
 
-    status = AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnly(
+    status =
+        AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(
         in_scores_q32,
         in_scores_capacity,
         row_count,
         token_count,
-        default_score_stride,
-        default_score_stride,
-        default_row_stride,
         out_scores_q32,
         out_scores_capacity,
-        &last_row_base_index,
+        staged_scores_capacity,
         &required_in_cells,
         &required_out_cells,
         &required_stage_cells);
@@ -1496,9 +1496,6 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAlloc(
 
     if (!staged_scores_q32)
         return ATTN_Q16_ERR_NULL_PTR;
-
-    if (staged_scores_capacity < required_stage_cells)
-        return ATTN_Q16_ERR_BAD_PARAM;
 
     status = AttentionTryMulI64Checked(required_stage_cells,
                                        sizeof(I64),
@@ -1567,6 +1564,63 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAlloc(
         staged_scores_capacity,
         out_scores_q32,
         out_scores_capacity);
+}
+
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 stage_cell_capacity,
+    I64 *out_required_in_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_cells)
+{
+    I64 default_score_stride;
+    I64 default_row_stride;
+    I64 last_row_base_index;
+    I32 status;
+
+    if (!in_scores_q32 || !out_scores_q32 || !out_required_in_cells ||
+        !out_required_out_cells || !out_required_stage_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (in_scores_capacity < 0 || out_scores_capacity < 0 ||
+        stage_cell_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-594 no-alloc default-stride preflight contract:
+    // derive score/row strides from token_count, then reuse the strict
+    // no-partial row preflight helper so all span/overflow checks stay
+    // centralized before staged compute or commit paths run.
+    default_score_stride = token_count;
+    default_row_stride = token_count;
+
+    status = AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnly(
+        in_scores_q32,
+        in_scores_capacity,
+        row_count,
+        token_count,
+        default_score_stride,
+        default_score_stride,
+        default_row_stride,
+        out_scores_q32,
+        out_scores_capacity,
+        &last_row_base_index,
+        out_required_in_cells,
+        out_required_out_cells,
+        out_required_stage_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (*out_required_stage_cells > stage_cell_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    return ATTN_Q16_OK;
 }
 
 I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideCommitOnly(
