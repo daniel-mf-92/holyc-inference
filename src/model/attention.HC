@@ -55,6 +55,15 @@ I32 AttentionQ16ApplyScoreScaleRowsChecked(
     I64 *out_scores_q32,
     I64 out_scores_capacity);
 
+I32 AttentionQ16ApplyScoreScaleRowsCheckedDefaultStride(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity);
+
 I32 AttentionQ16ComputeScaledQKRowCheckedPreflightOnly(
     I64 *q_row_q16,
     I64 q_row_capacity,
@@ -639,6 +648,7 @@ I32 AttentionQ16ApplyScoreScaleCheckedDefaultStride(I64 *in_scores_q32,
                                                     I64 out_scores_capacity)
 {
     I64 default_score_stride;
+    I64 default_row_stride;
 
     if (!in_scores_q32 || !out_scores_q32)
         return ATTN_Q16_ERR_NULL_PTR;
@@ -875,6 +885,44 @@ I32 AttentionQ16ApplyScoreScaleRowsChecked(
     }
 
     return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ApplyScoreScaleRowsCheckedDefaultStride(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity)
+{
+    I64 default_score_stride;
+
+    if (!in_scores_q32 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (in_scores_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-588 default-stride contract for existing row helper signature:
+    // each row is contiguous token-major scores (score stride 1), and rows
+    // are laid out back-to-back at token_count cells.
+    default_score_stride = 1;
+    default_row_stride = token_count;
+
+    return AttentionQ16ApplyScoreScaleRowsChecked(in_scores_q32,
+                                                  in_scores_capacity,
+                                                  row_count,
+                                                  token_count,
+                                                  default_score_stride,
+                                                  default_score_stride,
+                                                  default_row_stride,
+                                                  score_scale_q16,
+                                                  out_scores_q32,
+                                                  out_scores_capacity);
 }
 
 I32 AttentionQ16ComputeScaledQKRowChecked(I64 *q_row_q16,
