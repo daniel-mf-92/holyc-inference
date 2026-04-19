@@ -59,6 +59,20 @@ I32 AttentionQ16ComputeScaledQKRowCheckedPreflightOnly(
     I64 *out_required_k_cells,
     I64 *out_required_out_cells);
 
+I32 AttentionQ16ComputeScaledQKRowCheckedDefaultStrideNoPartialPreflightOnly(
+    I64 *q_row_q16,
+    I64 q_row_capacity,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_last_k_base_index,
+    I64 *out_last_out_base_index,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells);
+
 U64 AttentionAbsToU64(I64 x)
 {
     if (x >= 0)
@@ -811,6 +825,56 @@ I32 AttentionQ16ComputeScaledQKRowCheckedPreflightOnly(
     return ATTN_Q16_OK;
 }
 
+I32 AttentionQ16ComputeScaledQKRowCheckedDefaultStrideNoPartialPreflightOnly(
+    I64 *q_row_q16,
+    I64 q_row_capacity,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_last_k_base_index,
+    I64 *out_last_out_base_index,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells)
+{
+    I64 default_k_row_stride_q16;
+    I64 default_out_score_stride;
+
+    if (!q_row_q16 || !k_rows_q16 || !out_scores_q32 ||
+        !out_last_k_base_index || !out_last_out_base_index ||
+        !out_required_k_cells || !out_required_out_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_row_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (token_count < 0 || head_dim < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-559 default-stride no-partial diagnostics:
+    // derive the same row-major strides used by staged no-partial wrappers
+    // so callers can validate full K/output spans before score writes.
+    default_k_row_stride_q16 = head_dim;
+    default_out_score_stride = token_count;
+
+    return AttentionQ16ComputeScaledQKRowCheckedPreflightOnly(
+        q_row_q16,
+        q_row_capacity,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        default_k_row_stride_q16,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        default_out_score_stride,
+        out_last_k_base_index,
+        out_last_out_base_index,
+        out_required_k_cells,
+        out_required_out_cells);
+}
+
 I32 AttentionQ16ComputeScaledQKRowCheckedDefaultStride(I64 *q_row_q16,
                                                        I64 q_row_capacity,
                                                        I64 *k_rows_q16,
@@ -864,6 +928,9 @@ I32 AttentionQ16ComputeScaledQKRowCheckedNoPartial(I64 *q_row_q16,
                                                    I64 out_scores_capacity,
                                                    I64 out_score_stride)
 {
+    I64 last_k_base_index;
+    I64 last_out_base_index;
+    I64 required_k_cells;
     I64 stage_cells;
     I64 stage_bytes;
     I64 required_out_cells;
@@ -881,24 +948,26 @@ I32 AttentionQ16ComputeScaledQKRowCheckedNoPartial(I64 *q_row_q16,
         out_score_stride < 0)
         return ATTN_Q16_ERR_BAD_PARAM;
 
+    status = AttentionQ16ComputeScaledQKRowCheckedPreflightOnly(
+        q_row_q16,
+        q_row_capacity,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        k_row_stride_q16,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        out_score_stride,
+        &last_k_base_index,
+        &last_out_base_index,
+        &required_k_cells,
+        &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
     if (!token_count)
         return ATTN_Q16_OK;
-
-    if (out_score_stride < 1)
-        return ATTN_Q16_ERR_BAD_PARAM;
-
-    status = AttentionTryMulI64Checked(token_count - 1,
-                                       out_score_stride,
-                                       &required_out_cells);
-    if (status != ATTN_Q16_OK)
-        return status;
-    status = AttentionTryAddI64Checked(required_out_cells,
-                                       1,
-                                       &required_out_cells);
-    if (status != ATTN_Q16_OK)
-        return status;
-    if (required_out_cells > out_scores_capacity)
-        return ATTN_Q16_ERR_BAD_PARAM;
 
     // Stage into a dense contiguous token row first so failures never mutate
     // caller output. Commit to strided output only after full success.
