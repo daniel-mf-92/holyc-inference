@@ -5961,20 +5961,19 @@ I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursor(
     if (decode_count > token_count - cursor)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
 
-    // Delegate to canonical explicit-capacity decode with
-    // default-capacity derivation (capacity == active piece count).
-    return TokenizerBPEDecodePromptChecked(token_ids,
-                                           token_count,
-                                           io_token_cursor,
-                                           vocab_piece_bytes,
-                                           vocab_piece_bytes_len,
-                                           vocab_piece_offsets,
-                                           vocab_piece_lens,
-                                           vocab_piece_count,
-                                           vocab_piece_count,
-                                           out_bytes,
-                                           out_byte_capacity,
-                                           out_byte_count);
+    // Delegate to canonical default-capacity prompt decode wrapper so this
+    // helper stays a strict decode-window guard layer over the default path.
+    return TokenizerBPEDecodePromptCheckedDefaultCapacity(token_ids,
+                                                          token_count,
+                                                          io_token_cursor,
+                                                          vocab_piece_bytes,
+                                                          vocab_piece_bytes_len,
+                                                          vocab_piece_offsets,
+                                                          vocab_piece_lens,
+                                                          vocab_piece_count,
+                                                          out_bytes,
+                                                          out_byte_capacity,
+                                                          out_byte_count);
 }
 
 I32 TokenizerBPEDecodePromptCheckedDefaultCapacityNoPartial(

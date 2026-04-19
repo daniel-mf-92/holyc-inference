@@ -401,6 +401,31 @@ I32 FPQ16ExpFromClampedInputChecked(I64 clamped_input_q16,
     return FP_Q16_OK;
 }
 
+// Checked all-or-nothing wrapper for clamped-input scalar exp.
+// Stages the output so callers get strict no-partial-write behavior:
+//   - on error, *out_exp_q16 is unchanged
+//   - on success, staged exp output commits atomically
+// Status/error surfaces are intentionally identical to
+// FPQ16ExpFromClampedInputChecked.
+I32 FPQ16ExpFromClampedInputCheckedNoPartial(I64 clamped_input_q16,
+                                             I64 *out_exp_q16)
+{
+    I64 staged_exp_q16;
+    I32 status;
+
+    if (!out_exp_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    staged_exp_q16 = 0;
+    status = FPQ16ExpFromClampedInputChecked(clamped_input_q16,
+                                             &staged_exp_q16);
+    if (status)
+        return status;
+
+    *out_exp_q16 = staged_exp_q16;
+    return FP_Q16_OK;
+}
+
 // Checked vector exp helper for softmax precompute lanes.
 // For each lane i, this composes the scalar checked path directly:
 //   clamped = clamp(input_q16[i], EXP_Q16_MIN_INPUT, EXP_Q16_MAX_INPUT)
