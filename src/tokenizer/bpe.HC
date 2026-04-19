@@ -6556,6 +6556,37 @@ I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoPartialNoAlloc
     return TOKENIZER_BPE_OK;
 }
 
+// Checked staged no-partial wrapper over the default-capacity validate-cursor
+// no-allocation prompt decoder. Naming keeps call sites explicit about the
+// layering order (NoAlloc core + NoPartial commit semantics) while behavior
+// remains exactly aligned with the canonical no-partial no-allocation helper.
+I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocNoPartial(
+    I32 *token_ids,
+    U64 token_count,
+    U64 *io_token_cursor,
+    U8 *vocab_piece_bytes,
+    U64 vocab_piece_bytes_len,
+    U64 *vocab_piece_offsets,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U8 *out_bytes,
+    U64 out_byte_capacity,
+    U64 *out_byte_count)
+{
+    return TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoPartialNoAlloc(
+        token_ids,
+        token_count,
+        io_token_cursor,
+        vocab_piece_bytes,
+        vocab_piece_bytes_len,
+        vocab_piece_offsets,
+        vocab_piece_lens,
+        vocab_piece_count,
+        out_bytes,
+        out_byte_capacity,
+        out_byte_count);
+}
+
 I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoPartialNoAllocFromMaxPiece(
     I32 *token_ids,
     U64 token_count,
