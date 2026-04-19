@@ -439,6 +439,32 @@ I32 Q8_0DotProductBlocksAVX2CheckedDefault(Q8_0Block *lhs,
                                            out_dot_q32);
 }
 
+I32 Q8_0DotProductBlocksAVX2CheckedDefaultNoPartial(Q8_0Block *lhs,
+                                                    Q8_0Block *rhs,
+                                                    I64 block_count,
+                                                    I64 *out_dot_q32)
+{
+    I64 staged_dot_q32;
+    I32 status;
+
+    if (!out_dot_q32)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+
+    // IQ-474 strict all-or-nothing default-capacity wrapper:
+    // - Preserve exact success/error surfaces from checked-default helper.
+    // - Commit caller-visible output only after successful staged completion.
+    staged_dot_q32 = 0;
+    status = Q8_0DotProductBlocksAVX2CheckedDefault(lhs,
+                                                    rhs,
+                                                    block_count,
+                                                    &staged_dot_q32);
+    if (status != Q8_0_AVX2_OK)
+        return status;
+
+    *out_dot_q32 = staged_dot_q32;
+    return Q8_0_AVX2_OK;
+}
+
 I32 Q8_0DotBlocksAVX2Q32CheckedDefault(Q8_0Block *lhs,
                                        Q8_0Block *rhs,
                                        I64 block_count,
