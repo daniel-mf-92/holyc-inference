@@ -6587,6 +6587,41 @@ I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocNoPartial
         out_byte_count);
 }
 
+I32 TokenizerBPEComputeMaxPieceBytesChecked(U64 *vocab_piece_lens,
+                                            U64 vocab_piece_count,
+                                            U64 *out_max_piece_bytes)
+{
+    U64 scan;
+    U64 piece_len;
+    U64 max_piece_bytes;
+
+    if (!vocab_piece_lens || !out_max_piece_bytes)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (vocab_piece_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Default-capacity contract: caller may only request max over active span.
+    // Keep this check explicit so wrappers cannot accidentally overrun tables.
+    scan = 0;
+    max_piece_bytes = 0;
+    while (scan < vocab_piece_count) {
+        piece_len = vocab_piece_lens[scan];
+        if (piece_len > 0x7FFFFFFFFFFFFFFF)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+
+        if (piece_len > max_piece_bytes)
+            max_piece_bytes = piece_len;
+
+        scan++;
+        if (scan == 0)
+            return TOKENIZER_BPE_ERR_BAD_PARAM;
+    }
+
+    *out_max_piece_bytes = max_piece_bytes;
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoPartialNoAllocFromMaxPiece(
     I32 *token_ids,
     U64 token_count,
@@ -6602,7 +6637,6 @@ I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoPartialNoAlloc
     U64 cursor;
     U64 decode_end;
     U64 max_piece_bytes;
-    U64 piece_scan;
     U64 piece_len;
     U64 derived_out_byte_capacity;
     U64 staged_out_count;
@@ -6611,6 +6645,7 @@ I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoPartialNoAlloc
     U64 piece_offset;
     U64 write_cursor;
     U64 copy_i;
+    I32 err;
 
     if (!token_ids || !io_token_cursor || !vocab_piece_bytes ||
         !vocab_piece_offsets || !vocab_piece_lens || !out_bytes ||
@@ -6626,21 +6661,11 @@ I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoPartialNoAlloc
     if (cursor > token_count)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
 
-    // Derive max token-piece byte span from the active default-capacity vocab.
-    // This keeps prompt output-capacity math pure integer and fully auditable.
-    max_piece_bytes = 0;
-    piece_scan = 0;
-    while (piece_scan < vocab_piece_count) {
-        piece_len = vocab_piece_lens[piece_scan];
-        if (piece_len > 0x7FFFFFFFFFFFFFFF)
-            return TOKENIZER_BPE_ERR_OVERFLOW;
-        if (piece_len > max_piece_bytes)
-            max_piece_bytes = piece_len;
-
-        piece_scan++;
-        if (piece_scan == 0)
-            return TOKENIZER_BPE_ERR_OVERFLOW;
-    }
+    err = TokenizerBPEComputeMaxPieceBytesChecked(vocab_piece_lens,
+                                                  vocab_piece_count,
+                                                  &max_piece_bytes);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
 
     if (token_count && max_piece_bytes > 0x7FFFFFFFFFFFFFFF / token_count)
         return TOKENIZER_BPE_ERR_OVERFLOW;
