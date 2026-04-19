@@ -693,14 +693,39 @@ I32 Q8_0DotRowsAVX2Q32CheckedDefaultNoPartialPreflightNoAlloc(
     I64 *out_rows_q32,
     I64 *out_stage_bytes)
 {
-    // No-partial no-allocation alias over the canonical default preflight.
-    return Q8_0DotRowsAVX2Q32CheckedDefaultPreflightNoAlloc(matrix_blocks,
-                                                            row_count,
-                                                            row_stride_blocks,
-                                                            vec_blocks,
-                                                            vec_block_count,
-                                                            out_rows_q32,
-                                                            out_stage_bytes);
+    I64 required_matrix_blocks;
+    I64 stage_bytes;
+
+    // IQ-529 strict no-allocation no-partial preflight:
+    // - Metadata-only guard path for staged wrappers.
+    // - Matrix/vector payload pointers are intentionally not required yet.
+    // - Output metadata sinks remain required so failure paths never mutate
+    //   caller-visible stage sizing state unexpectedly.
+    if (!out_rows_q32 || !out_stage_bytes)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+
+    if (row_count < 0 || row_stride_blocks < 0 || vec_block_count < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    if (row_count > 0 && row_stride_blocks < vec_block_count)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    if (!Q8_0AVX2TryMulI64(row_count, row_stride_blocks, &required_matrix_blocks))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+
+    if (!row_count)
+    {
+        *out_stage_bytes = 0;
+        return Q8_0_AVX2_OK;
+    }
+
+    if (!Q8_0AVX2TryMulI64(row_count, sizeof(I64), &stage_bytes))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+    if (stage_bytes <= 0)
+        return Q8_0_AVX2_ERR_OVERFLOW;
+
+    *out_stage_bytes = stage_bytes;
+    return Q8_0_AVX2_OK;
 }
 
 I32 Q8_0DotRowsAVX2Q32CheckedDefaultNoPartialPreflight(
