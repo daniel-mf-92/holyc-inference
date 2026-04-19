@@ -805,6 +805,101 @@ I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultTiles(
         out_row_stride_cols);
 }
 
+I32 Q8_0MatMulTiledAVX2Q32CheckedDefault(
+    Q8_0Block *lhs_matrix_blocks,
+    I64 lhs_rows,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_col_blocks,
+    I64 rhs_cols,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_mat_q32,
+    I64 out_row_stride_cols)
+{
+    // Canonical default-capacity/default-tile matmul wrapper.
+    // Delegate to IQ-317 default-tiles helper so checked semantics stay
+    // centralized in one auditable implementation.
+    return Q8_0MatMulTiledAVX2Q32CheckedDefaultTiles(lhs_matrix_blocks,
+                                                     lhs_rows,
+                                                     lhs_row_stride_blocks,
+                                                     rhs_col_blocks,
+                                                     rhs_cols,
+                                                     rhs_col_stride_blocks,
+                                                     k_block_count,
+                                                     out_mat_q32,
+                                                     out_row_stride_cols);
+}
+
+I32 Q8_0MatMulTiledAVX2Q32CheckedDefaultNoPartial(
+    Q8_0Block *lhs_matrix_blocks,
+    I64 lhs_rows,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_col_blocks,
+    I64 rhs_cols,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_mat_q32,
+    I64 out_row_stride_cols)
+{
+    I64 staged_out_capacity;
+    I64 staged_out_bytes;
+    I64 *staged_out_mat_q32;
+    I64 idx;
+    I32 status;
+
+    if (!out_mat_q32)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+    if (lhs_rows < 0 || out_row_stride_cols < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    // Preserve default-wrapper behavior for degenerate result spans.
+    if (!lhs_rows || !rhs_cols)
+        return Q8_0MatMulTiledAVX2Q32CheckedDefault(lhs_matrix_blocks,
+                                                    lhs_rows,
+                                                    lhs_row_stride_blocks,
+                                                    rhs_col_blocks,
+                                                    rhs_cols,
+                                                    rhs_col_stride_blocks,
+                                                    k_block_count,
+                                                    out_mat_q32,
+                                                    out_row_stride_cols);
+
+    if (!Q8_0AVX2TryMulI64(lhs_rows, out_row_stride_cols, &staged_out_capacity))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+    if (staged_out_capacity <= 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    if (!Q8_0AVX2TryMulI64(staged_out_capacity, sizeof(I64), &staged_out_bytes))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+    if (staged_out_bytes <= 0)
+        return Q8_0_AVX2_ERR_OVERFLOW;
+
+    staged_out_mat_q32 = MAlloc(staged_out_bytes);
+    if (!staged_out_mat_q32)
+        return Q8_0_AVX2_ERR_OVERFLOW;
+
+    status = Q8_0MatMulTiledAVX2Q32CheckedDefault(lhs_matrix_blocks,
+                                                  lhs_rows,
+                                                  lhs_row_stride_blocks,
+                                                  rhs_col_blocks,
+                                                  rhs_cols,
+                                                  rhs_col_stride_blocks,
+                                                  k_block_count,
+                                                  staged_out_mat_q32,
+                                                  out_row_stride_cols);
+    if (status != Q8_0_AVX2_OK)
+    {
+        Free(staged_out_mat_q32);
+        return status;
+    }
+
+    for (idx = 0; idx < staged_out_capacity; ++idx)
+        out_mat_q32[idx] = staged_out_mat_q32[idx];
+
+    Free(staged_out_mat_q32);
+    return Q8_0_AVX2_OK;
+}
+
 I32 Q8_0DotBlocksAVX2Q32ToQ16Checked(Q8_0Block *lhs,
                                      Q8_0Block *rhs,
                                      I64 block_count,
