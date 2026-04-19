@@ -1111,15 +1111,18 @@ I32 Q8_0DotRowsAVX2Q32ToQ16CheckedDefaultNoPartial(
     I64 *staged_rows_q16;
     I32 status;
 
-    if (!out_rows_q16)
-        return Q8_0_AVX2_ERR_NULL_PTR;
-    if (row_count < 0)
-        return Q8_0_AVX2_ERR_BAD_LEN;
+    status = Q8_0DotRowsAVX2Q32ToQ16CheckedDefaultNoPartialPreflight(matrix_blocks,
+                                                                     row_count,
+                                                                     row_stride_blocks,
+                                                                     vec_blocks,
+                                                                     vec_block_count,
+                                                                     out_rows_q16,
+                                                                     &stage_bytes);
+    if (status != Q8_0_AVX2_OK)
+        return status;
 
-    // IQ-501 strict all-or-nothing default-capacity row wrapper:
-    // - Route checked-default Q32->Q16 row outputs into private staging memory.
-    // - Preserve exact checked-default error surface and ordering.
-    // - Commit caller output rows only after full staged success.
+    // Zero-row pass-through preserves checked-default behavior exactly and
+    // avoids transient staging allocation for empty output spans.
     if (!row_count)
         return Q8_0DotRowsAVX2Q32ToQ16CheckedDefault(matrix_blocks,
                                                      row_count,
@@ -1127,9 +1130,6 @@ I32 Q8_0DotRowsAVX2Q32ToQ16CheckedDefaultNoPartial(
                                                      vec_blocks,
                                                      vec_block_count,
                                                      out_rows_q16);
-
-    if (!Q8_0AVX2TryMulI64(row_count, sizeof(I64), &stage_bytes))
-        return Q8_0_AVX2_ERR_OVERFLOW;
 
     staged_rows_q16 = MAlloc(stage_bytes);
     if (!staged_rows_q16)
@@ -1151,5 +1151,42 @@ I32 Q8_0DotRowsAVX2Q32ToQ16CheckedDefaultNoPartial(
         out_rows_q16[row_index] = staged_rows_q16[row_index];
 
     Free(staged_rows_q16);
+    return Q8_0_AVX2_OK;
+}
+
+I32 Q8_0DotRowsAVX2Q32ToQ16CheckedDefaultNoPartialPreflight(
+    Q8_0Block *matrix_blocks,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q8_0Block *vec_blocks,
+    I64 vec_block_count,
+    I64 *out_rows_q16,
+    I64 *out_stage_bytes)
+{
+    I64 stage_bytes;
+
+    if (!out_rows_q16 || !out_stage_bytes)
+        return Q8_0_AVX2_ERR_NULL_PTR;
+    if (row_count < 0)
+        return Q8_0_AVX2_ERR_BAD_LEN;
+
+    // IQ-504 preflight contract for default no-partial row wrappers:
+    // - Validate caller-facing pointer/null and signed-length domain first.
+    // - Compute checked staging-byte count once so wrappers share one audited
+    //   overflow surface instead of duplicating `row_count * sizeof(I64)`.
+    // - Keep matrix/stride/vector semantics delegated to checked-default core
+    //   so error ordering stays centralized and parity remains exact.
+    if (!row_count)
+    {
+        *out_stage_bytes = 0;
+        return Q8_0_AVX2_OK;
+    }
+
+    if (!Q8_0AVX2TryMulI64(row_count, sizeof(I64), &stage_bytes))
+        return Q8_0_AVX2_ERR_OVERFLOW;
+    if (stage_bytes <= 0)
+        return Q8_0_AVX2_ERR_OVERFLOW;
+
+    *out_stage_bytes = stage_bytes;
     return Q8_0_AVX2_OK;
 }
