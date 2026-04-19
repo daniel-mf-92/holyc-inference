@@ -2978,6 +2978,64 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredB
         out_required_out_cells);
 }
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitCapacity(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 commit_stage_cell_capacity,
+    I64 commit_stage_byte_capacity,
+    I64 *out_commit_required_stage_cells,
+    I64 *out_commit_required_stage_bytes,
+    I64 *out_required_out_cells)
+{
+    I64 commit_required_stage_cells;
+    I64 commit_required_stage_bytes;
+    I64 required_out_cells;
+    I32 status;
+
+    if (!out_commit_required_stage_cells || !out_commit_required_stage_bytes ||
+        !out_required_out_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (commit_stage_cell_capacity < 0 || commit_stage_byte_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-606 commit-capacity diagnostics contract:
+    // derive strict required stage cells/bytes through the canonical no-alloc
+    // required-bytes helper, then validate those diagnostics against caller
+    // commit scratch limits before routing to commit-only paths.
+    status = AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        commit_stage_cell_capacity,
+        &commit_required_stage_cells,
+        &commit_required_stage_bytes,
+        &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (commit_required_stage_bytes > commit_stage_byte_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    *out_commit_required_stage_cells = commit_required_stage_cells;
+    *out_commit_required_stage_bytes = commit_required_stage_bytes;
+    *out_required_out_cells = required_out_cells;
+    return ATTN_Q16_OK;
+}
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideCommitOnly(
     I64 query_row_count,
     I64 token_count,

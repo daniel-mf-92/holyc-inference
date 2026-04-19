@@ -1032,8 +1032,8 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(I64 row_
                                                                          I64 *out_q16,
                                                                          I64 out_capacity)
 {
-    I64 default_row_stride;
     I64 required_stage_cells;
+    I64 required_stage_bytes;
     I64 required_out_cells;
     I64 row_index;
     I64 lane_index;
@@ -1054,22 +1054,18 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(I64 row_
     if (!row_count || !lane_count)
         return FFN_Q16_OK;
 
-    status = FFNTryMulI64Checked(row_count,
-                                 lane_count,
-                                 &required_stage_cells);
-    if (status)
-        return status;
+    // Commit helper is destination-only: staging and output must remain
+    // disjoint so validation pass cannot be affected by in-place writes.
+    if (staging_out_q16 == out_q16)
+        return FFN_Q16_ERR_BAD_PARAM;
 
-    default_row_stride = lane_count;
-
-    status = FFNTryMulI64Checked(row_count - 1,
-                                 default_row_stride,
-                                 &required_out_cells);
-    if (status)
-        return status;
-    status = FFNTryAddI64Checked(required_out_cells,
-                                 lane_count,
-                                 &required_out_cells);
+    status = FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
+        row_count,
+        lane_count,
+        stage_cell_capacity,
+        &required_stage_cells,
+        &required_stage_bytes,
+        &required_out_cells);
     if (status)
         return status;
 
@@ -1083,7 +1079,7 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(I64 row_
     for (row_index = 0; row_index < row_count; row_index++)
     {
         status = FFNTryMulI64Checked(row_index,
-                                     default_row_stride,
+                                     lane_count,
                                      &row_base);
         if (status)
             return status;
@@ -1101,19 +1097,27 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(I64 row_
                                          &out_index);
             if (status)
                 return status;
+            if (out_index < 0 || out_index >= required_out_cells)
+                return FFN_Q16_ERR_BAD_PARAM;
+            if (out_index >= out_capacity)
+                return FFN_Q16_ERR_BAD_PARAM;
 
             status = FFNTryAddI64Checked(stage_row_base,
                                          lane_index,
                                          &stage_index);
             if (status)
                 return status;
+            if (stage_index < 0 || stage_index >= required_stage_cells)
+                return FFN_Q16_ERR_BAD_PARAM;
+            if (stage_index >= staging_out_capacity)
+                return FFN_Q16_ERR_BAD_PARAM;
         }
     }
 
     for (row_index = 0; row_index < row_count; row_index++)
     {
         status = FFNTryMulI64Checked(row_index,
-                                     default_row_stride,
+                                     lane_count,
                                      &row_base);
         if (status)
             return status;
@@ -1131,12 +1135,20 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(I64 row_
                                          &out_index);
             if (status)
                 return status;
+            if (out_index < 0 || out_index >= required_out_cells)
+                return FFN_Q16_ERR_BAD_PARAM;
+            if (out_index >= out_capacity)
+                return FFN_Q16_ERR_BAD_PARAM;
 
             status = FFNTryAddI64Checked(stage_row_base,
                                          lane_index,
                                          &stage_index);
             if (status)
                 return status;
+            if (stage_index < 0 || stage_index >= required_stage_cells)
+                return FFN_Q16_ERR_BAD_PARAM;
+            if (stage_index >= staging_out_capacity)
+                return FFN_Q16_ERR_BAD_PARAM;
 
             out_q16[out_index] = staging_out_q16[stage_index];
         }
@@ -1165,6 +1177,7 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAlloc(I64 *gate_q16,
     I64 required_stage_cells;
     I64 required_stage_bytes;
     I64 required_out_cells;
+    I64 staging_capacity_bytes;
     I32 status;
 
     if (!gate_q16 || !up_q16 || !out_q16)
@@ -1189,6 +1202,14 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAlloc(I64 *gate_q16,
     if (!staging_out_q16)
         return FFN_Q16_ERR_NULL_PTR;
     if (staging_out_capacity < required_stage_cells)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    status = FFNTryMulI64Checked(staging_out_capacity,
+                                 sizeof(I64),
+                                 &staging_capacity_bytes);
+    if (status)
+        return status;
+    if (required_stage_bytes > staging_capacity_bytes)
         return FFN_Q16_ERR_BAD_PARAM;
 
     // No-partial guarantee requires staging to be disjoint from all
@@ -1216,7 +1237,7 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAlloc(I64 *gate_q16,
         lane_count,
         staging_out_q16,
         staging_out_capacity,
-        staging_out_capacity,
+        required_stage_cells,
         out_q16,
         out_capacity);
 }

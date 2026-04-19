@@ -39,13 +39,18 @@ def ffn_q16_swiglu_apply_rows_checked_nopartial_default_stride_noalloc_commit_on
     if row_count == 0 or lane_count == 0:
         return FFN_Q16_OK
 
+    if staging_out_q16 is out_q16:
+        return FFN_Q16_ERR_BAD_PARAM
+
     err, required_stage_cells = i64_mul_checked(row_count, lane_count)
     if err != FFN_Q16_OK:
         return err
 
-    default_row_stride = lane_count
+    err, required_stage_bytes = i64_mul_checked(required_stage_cells, 8)
+    if err != FFN_Q16_OK:
+        return err
 
-    err, required_out_cells = i64_mul_checked(row_count - 1, default_row_stride)
+    err, required_out_cells = i64_mul_checked(row_count - 1, lane_count)
     if err != FFN_Q16_OK:
         return err
     err, required_out_cells = i64_add_checked(required_out_cells, lane_count)
@@ -58,27 +63,11 @@ def ffn_q16_swiglu_apply_rows_checked_nopartial_default_stride_noalloc_commit_on
         return FFN_Q16_ERR_BAD_PARAM
     if required_out_cells > out_capacity:
         return FFN_Q16_ERR_BAD_PARAM
+    if required_stage_bytes < 0:
+        return FFN_Q16_ERR_BAD_PARAM
 
     for row_index in range(row_count):
-        err, row_base = i64_mul_checked(row_index, default_row_stride)
-        if err != FFN_Q16_OK:
-            return err
-
-        err, stage_row_base = i64_mul_checked(row_index, lane_count)
-        if err != FFN_Q16_OK:
-            return err
-
-        for lane_index in range(lane_count):
-            err, _ = i64_add_checked(row_base, lane_index)
-            if err != FFN_Q16_OK:
-                return err
-
-            err, _ = i64_add_checked(stage_row_base, lane_index)
-            if err != FFN_Q16_OK:
-                return err
-
-    for row_index in range(row_count):
-        err, row_base = i64_mul_checked(row_index, default_row_stride)
+        err, row_base = i64_mul_checked(row_index, lane_count)
         if err != FFN_Q16_OK:
             return err
 
@@ -90,10 +79,44 @@ def ffn_q16_swiglu_apply_rows_checked_nopartial_default_stride_noalloc_commit_on
             err, out_index = i64_add_checked(row_base, lane_index)
             if err != FFN_Q16_OK:
                 return err
+            if out_index < 0 or out_index >= required_out_cells:
+                return FFN_Q16_ERR_BAD_PARAM
+            if out_index >= out_capacity:
+                return FFN_Q16_ERR_BAD_PARAM
 
             err, stage_index = i64_add_checked(stage_row_base, lane_index)
             if err != FFN_Q16_OK:
                 return err
+            if stage_index < 0 or stage_index >= required_stage_cells:
+                return FFN_Q16_ERR_BAD_PARAM
+            if stage_index >= staging_out_capacity:
+                return FFN_Q16_ERR_BAD_PARAM
+
+    for row_index in range(row_count):
+        err, row_base = i64_mul_checked(row_index, lane_count)
+        if err != FFN_Q16_OK:
+            return err
+
+        err, stage_row_base = i64_mul_checked(row_index, lane_count)
+        if err != FFN_Q16_OK:
+            return err
+
+        for lane_index in range(lane_count):
+            err, out_index = i64_add_checked(row_base, lane_index)
+            if err != FFN_Q16_OK:
+                return err
+            if out_index < 0 or out_index >= required_out_cells:
+                return FFN_Q16_ERR_BAD_PARAM
+            if out_index >= out_capacity:
+                return FFN_Q16_ERR_BAD_PARAM
+
+            err, stage_index = i64_add_checked(stage_row_base, lane_index)
+            if err != FFN_Q16_OK:
+                return err
+            if stage_index < 0 or stage_index >= required_stage_cells:
+                return FFN_Q16_ERR_BAD_PARAM
+            if stage_index >= staging_out_capacity:
+                return FFN_Q16_ERR_BAD_PARAM
 
             out_q16[out_index] = staging_out_q16[stage_index]
 
@@ -119,6 +142,9 @@ def explicit_checked_copy_loops(
 
     if row_count == 0 or lane_count == 0:
         return FFN_Q16_OK
+
+    if staging_out_q16 is out_q16:
+        return FFN_Q16_ERR_BAD_PARAM
 
     err, required_stage_cells = i64_mul_checked(row_count, lane_count)
     if err != FFN_Q16_OK:
@@ -153,8 +179,11 @@ def test_source_contains_noalloc_commit_only_helper() -> None:
     assert signature in source
     body = source.split(signature, 1)[1]
 
-    assert "required_stage_cells" in body
+    assert "FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(" in body
+    assert "if (staging_out_q16 == out_q16)" in body
     assert "if (required_stage_cells > stage_cell_capacity)" in body
+    assert "if (out_index < 0 || out_index >= required_out_cells)" in body
+    assert "if (stage_index < 0 || stage_index >= required_stage_cells)" in body
     assert "for (row_index = 0; row_index < row_count; row_index++)" in body
     assert "for (lane_index = 0; lane_index < lane_count; lane_index++)" in body
     assert "out_q16[out_index] = staging_out_q16[stage_index];" in body
@@ -267,6 +296,27 @@ def test_error_paths_preserve_output() -> None:
 
     assert err_new == err_ref == FFN_Q16_ERR_NULL_PTR
     assert out_new == out_ref == out_seed
+
+    shared = [9, 8, 7, 6, 5, 4]
+    err_new = ffn_q16_swiglu_apply_rows_checked_nopartial_default_stride_noalloc_commit_only(
+        2,
+        3,
+        shared,
+        len(shared),
+        len(shared),
+        shared,
+        len(shared),
+    )
+    err_ref = explicit_checked_copy_loops(
+        2,
+        3,
+        shared,
+        len(shared),
+        len(shared),
+        shared,
+        len(shared),
+    )
+    assert err_new == err_ref == FFN_Q16_ERR_BAD_PARAM
 
 
 def test_overflow_contract() -> None:
