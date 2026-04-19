@@ -7940,6 +7940,9 @@ I32 TokenizerBPEDecodeSingleTokenCheckedDefaultNoPartialValidateCursorNoAlloc(
         staged_cursor > derived_out_byte_capacity)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
 
+    if (staged_out_count > 0x7FFFFFFFFFFFFFFF - cursor)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
     committed_count = staged_cursor - cursor;
     if (committed_count != staged_out_count)
         return TOKENIZER_BPE_ERR_BAD_PARAM;

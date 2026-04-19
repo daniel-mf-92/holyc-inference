@@ -423,3 +423,19 @@ I32 Q4_0DotProductBlocksAVX2Checked(Q4_0Block *lhs,
     *out_dot_q32 = avx2_dot_q32;
     return Q4_0_DOT_AVX2_OK;
 }
+
+I32 Q4_0DotProductBlocksAVX2CheckedDefault(Q4_0Block *lhs,
+                                           Q4_0Block *rhs,
+                                           I64 block_count,
+                                           I64 *out_dot_q32)
+{
+    // Canonical default wrapper:
+    // - Core checked kernel already consumes only active span (`block_count`).
+    // - Keep this as a direct pass-through default entrypoint so callers can
+    //   rely on one stable symbol while preserving exact checked-core
+    //   success/error/no-partial-write semantics.
+    return Q4_0DotProductBlocksAVX2Checked(lhs,
+                                           rhs,
+                                           block_count,
+                                           out_dot_q32);
+}
