@@ -7567,6 +7567,90 @@ I32 TokenizerBPEDecodeSingleTokenCheckedDefaultCapacityNoPartialValidateCursor(
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEDecodeSingleTokenCheckedDefaultCapacityNoPartialValidateCursorNoAlloc(
+    I32 token_id,
+    U8 *vocab_piece_bytes,
+    U64 vocab_piece_bytes_len,
+    U64 *vocab_piece_offsets,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U8 *out_bytes,
+    U64 out_byte_capacity,
+    U64 *io_out_cursor,
+    U64 *out_byte_count)
+{
+    U64 token_id_u64;
+    U64 cursor;
+    U64 piece_offset;
+    U64 piece_len;
+    U64 staged_out_count;
+    U64 staged_cursor;
+    U64 write_cursor;
+    U64 i;
+
+    if (!vocab_piece_bytes || !vocab_piece_offsets || !vocab_piece_lens ||
+        !out_bytes || !io_out_cursor || !out_byte_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (vocab_piece_bytes_len > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        out_byte_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    cursor = *io_out_cursor;
+
+    // Strict output-window guard: caller cursor must be in-range before decode.
+    if (cursor > out_byte_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (token_id < 0)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    token_id_u64 = token_id;
+    if (token_id_u64 >= vocab_piece_count)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    piece_offset = vocab_piece_offsets[token_id_u64];
+    piece_len = vocab_piece_lens[token_id_u64];
+
+    // Pass 1: validate exact piece span and output capacity without writes.
+    if (piece_offset > vocab_piece_bytes_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (piece_len > vocab_piece_bytes_len - piece_offset)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (piece_len > out_byte_capacity - cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    staged_out_count = piece_len;
+    if (staged_out_count > out_byte_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (staged_out_count > 0x7FFFFFFFFFFFFFFF - cursor)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    staged_cursor = cursor + staged_out_count;
+    if (staged_cursor < cursor || staged_cursor > out_byte_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Pass 2: deterministic caller-buffer copy once all checks pass.
+    write_cursor = cursor;
+    for (i = 0; i < staged_out_count; i++) {
+        out_bytes[write_cursor] = vocab_piece_bytes[piece_offset + i];
+
+        write_cursor++;
+        if (write_cursor <= cursor)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+        if (write_cursor > staged_cursor)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    if (write_cursor != staged_cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // All-or-nothing commit: publish count/cursor after full validated copy.
+    *out_byte_count = staged_out_count;
+    *io_out_cursor = staged_cursor;
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEDecodeSingleTokenCheckedDefaultNoPartialValidateCursor(
     I32 token_id,
     U8 *vocab_piece_bytes,
