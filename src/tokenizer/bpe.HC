@@ -7614,6 +7614,45 @@ I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocFromMaxPi
         out_byte_count);
 }
 
+I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceDefaultCursor(
+    I32 *token_ids,
+    U64 token_count,
+    U8 *vocab_piece_bytes,
+    U64 vocab_piece_bytes_len,
+    U64 *vocab_piece_offsets,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U8 *out_bytes,
+    U64 *out_byte_count)
+{
+    U64 cursor;
+
+    if (!token_ids || !vocab_piece_bytes || !vocab_piece_offsets ||
+        !vocab_piece_lens || !out_bytes || !out_byte_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (token_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_bytes_len > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Canonical default-cursor prompt decode starts at token zero and routes
+    // through the validated from-max-piece wrapper for capacity + cursor
+    // semantics. Failure paths keep caller-visible state unchanged.
+    cursor = 0;
+    return TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocFromMaxPiece(
+        token_ids,
+        token_count,
+        &cursor,
+        vocab_piece_bytes,
+        vocab_piece_bytes_len,
+        vocab_piece_offsets,
+        vocab_piece_lens,
+        vocab_piece_count,
+        out_bytes,
+        out_byte_count);
+}
+
 I32 TokenizerBPEDecodePromptCheckedDefaultCapacityValidateCursorNoAllocFromMaxPieceViaCapacityHelper(
     I32 *token_ids,
     U64 token_count,

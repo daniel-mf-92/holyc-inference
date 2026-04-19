@@ -46,10 +46,6 @@ def q8_0_dot_rows_avx2_q32_checked_default_noalloc(
     if row_count < 0 or row_stride_blocks < 0 or vec_block_count < 0:
         return Q8_0_AVX2_ERR_BAD_LEN
 
-    ok, _matrix_block_capacity = _try_mul_i64(row_count, row_stride_blocks)
-    if not ok:
-        return Q8_0_AVX2_ERR_OVERFLOW
-
     stage = {"value": 123456}
     err = q8_0_dot_rows_avx2_q32_checked_default_preflight_noalloc(
         matrix_blocks=matrix_blocks,
@@ -62,6 +58,10 @@ def q8_0_dot_rows_avx2_q32_checked_default_noalloc(
     )
     if err != Q8_0_AVX2_OK:
         return err
+
+    ok, _matrix_block_capacity = _try_mul_i64(row_count, row_stride_blocks)
+    if not ok:
+        return Q8_0_AVX2_ERR_OVERFLOW
 
     err, rows = q8_0_dot_rows_avx2_q32_checked_default(
         matrix_blocks=matrix_blocks,
@@ -90,10 +90,6 @@ def explicit_composition_reference(
     if row_count < 0 or row_stride_blocks < 0 or vec_block_count < 0:
         return Q8_0_AVX2_ERR_BAD_LEN
 
-    ok, _matrix_block_capacity = _try_mul_i64(row_count, row_stride_blocks)
-    if not ok:
-        return Q8_0_AVX2_ERR_OVERFLOW
-
     stage = {"value": 123456}
     err = q8_0_dot_rows_avx2_q32_checked_default_preflight_noalloc(
         matrix_blocks=matrix_blocks,
@@ -106,6 +102,10 @@ def explicit_composition_reference(
     )
     if err != Q8_0_AVX2_OK:
         return err
+
+    ok, _matrix_block_capacity = _try_mul_i64(row_count, row_stride_blocks)
+    if not ok:
+        return Q8_0_AVX2_ERR_OVERFLOW
 
     err, rows = q8_0_dot_rows_avx2_q32_checked_default(
         matrix_blocks=matrix_blocks,
@@ -132,9 +132,8 @@ def test_source_contains_default_noalloc_wrapper_shape() -> None:
         1,
     )[1].split("I32 Q8_0DotRowsAVX2Q32CheckedDefaultPreflightNoAlloc(", 1)[0]
 
-    assert "if (row_count < 0 || row_stride_blocks < 0 || vec_block_count < 0)" in body
-    assert "if (!Q8_0AVX2TryMulI64(row_count, row_stride_blocks, &matrix_block_capacity))" in body
-    assert "status = Q8_0DotRowsAVX2Q32CheckedDefaultPreflightNoAlloc(" in body
+    assert "Q8_0DotRowsAVX2Q32CheckedDefaultPreflightNoAllocWithMatrixCapacity(" in body
+    assert "&matrix_block_capacity," in body
     assert "return Q8_0DotRowsAVX2Q32Checked(matrix_blocks," in body
 
 

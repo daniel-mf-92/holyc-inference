@@ -602,19 +602,15 @@ I32 Q8_0DotRowsAVX2Q32CheckedDefaultNoAlloc(
     // 1) Derive matrix view capacity once with checked multiplication.
     // 2) Reuse canonical preflight helper for error surface parity.
     // 3) Dispatch checked core with default vector capacity.
-    if (row_count < 0 || row_stride_blocks < 0 || vec_block_count < 0)
-        return Q8_0_AVX2_ERR_BAD_LEN;
-
-    if (!Q8_0AVX2TryMulI64(row_count, row_stride_blocks, &matrix_block_capacity))
-        return Q8_0_AVX2_ERR_OVERFLOW;
-
-    status = Q8_0DotRowsAVX2Q32CheckedDefaultPreflightNoAlloc(matrix_blocks,
-                                                              row_count,
-                                                              row_stride_blocks,
-                                                              vec_blocks,
-                                                              vec_block_count,
-                                                              out_rows_q32,
-                                                              &stage_bytes);
+    status = Q8_0DotRowsAVX2Q32CheckedDefaultPreflightNoAllocWithMatrixCapacity(
+        matrix_blocks,
+        row_count,
+        row_stride_blocks,
+        vec_blocks,
+        vec_block_count,
+        out_rows_q32,
+        &matrix_block_capacity,
+        &stage_bytes);
     if (status != Q8_0_AVX2_OK)
         return status;
 
@@ -637,10 +633,34 @@ I32 Q8_0DotRowsAVX2Q32CheckedDefaultPreflightNoAlloc(
     I64 *out_rows_q32,
     I64 *out_stage_bytes)
 {
+    I64 matrix_block_capacity_unused;
+
+    return Q8_0DotRowsAVX2Q32CheckedDefaultPreflightNoAllocWithMatrixCapacity(
+        matrix_blocks,
+        row_count,
+        row_stride_blocks,
+        vec_blocks,
+        vec_block_count,
+        out_rows_q32,
+        &matrix_block_capacity_unused,
+        out_stage_bytes);
+}
+
+I32 Q8_0DotRowsAVX2Q32CheckedDefaultPreflightNoAllocWithMatrixCapacity(
+    Q8_0Block *matrix_blocks,
+    I64 row_count,
+    I64 row_stride_blocks,
+    Q8_0Block *vec_blocks,
+    I64 vec_block_count,
+    I64 *out_rows_q32,
+    I64 *out_matrix_block_capacity,
+    I64 *out_stage_bytes)
+{
     I64 required_matrix_blocks;
     I64 stage_bytes;
 
-    if (!matrix_blocks || !vec_blocks || !out_rows_q32 || !out_stage_bytes)
+    if (!matrix_blocks || !vec_blocks || !out_rows_q32 || !out_stage_bytes ||
+        !out_matrix_block_capacity)
         return Q8_0_AVX2_ERR_NULL_PTR;
 
     if (row_count < 0 || row_stride_blocks < 0 || vec_block_count < 0)
@@ -654,6 +674,7 @@ I32 Q8_0DotRowsAVX2Q32CheckedDefaultPreflightNoAlloc(
 
     if (!Q8_0AVX2TryMulI64(row_count, row_stride_blocks, &required_matrix_blocks))
         return Q8_0_AVX2_ERR_OVERFLOW;
+    *out_matrix_block_capacity = required_matrix_blocks;
 
     if (!row_count)
     {
