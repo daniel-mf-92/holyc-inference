@@ -1639,6 +1639,73 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocDefaultCapacity(I64
 // - Commit scratch bounds (`commit_stage_cell_capacity`,
 //   `commit_stage_byte_capacity`) are enforced before staged compute.
 // - Two-pass commit keeps strict no-partial writes on `out_q16`.
+I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacity(I64 *gate_q16,
+                                                                                     I64 gate_capacity,
+                                                                                     I64 *up_q16,
+                                                                                     I64 up_capacity,
+                                                                                     I64 *out_q16,
+                                                                                     I64 out_capacity,
+                                                                                     I64 row_count,
+                                                                                     I64 lane_count,
+                                                                                     I64 in_row_stride_q16,
+                                                                                     I64 out_row_stride_q16,
+                                                                                     I64 commit_stage_cell_capacity,
+                                                                                     I64 commit_stage_byte_capacity,
+                                                                                     I64 *out_required_in_cells,
+                                                                                     I64 *out_commit_required_stage_cells,
+                                                                                     I64 *out_commit_required_stage_bytes,
+                                                                                     I64 *out_required_out_cells)
+{
+    I64 required_in_cells;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
+    I64 required_out_cells;
+    I32 status;
+
+    if (!out_required_in_cells || !out_commit_required_stage_cells ||
+        !out_commit_required_stage_bytes || !out_required_out_cells)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (!gate_q16 || !up_q16 || !out_q16)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (gate_capacity < 0 || up_capacity < 0 || out_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || lane_count < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (in_row_stride_q16 < 0 || out_row_stride_q16 < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (commit_stage_cell_capacity < 0 || commit_stage_byte_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    // IQ-642 explicit-stride no-alloc diagnostics contract:
+    // 1) centralize all checked span/capacity math via commit-capacity
+    //    preflight helper; 2) stage diagnostics locally; 3) commit caller
+    //    output pointers only on full success (strict no-partial semantics).
+    status = FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocCommitCapacityPreflightOnly(
+        gate_capacity,
+        up_capacity,
+        out_capacity,
+        row_count,
+        lane_count,
+        in_row_stride_q16,
+        out_row_stride_q16,
+        commit_stage_cell_capacity,
+        commit_stage_byte_capacity,
+        &required_in_cells,
+        &required_stage_cells,
+        &required_stage_bytes,
+        &required_out_cells);
+    if (status)
+        return status;
+
+    *out_required_in_cells = required_in_cells;
+    *out_commit_required_stage_cells = required_stage_cells;
+    *out_commit_required_stage_bytes = required_stage_bytes;
+    *out_required_out_cells = required_out_cells;
+    return FFN_Q16_OK;
+}
+
 I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocCommitCapacityPreflightOnly(I64 gate_capacity,
                                                                                      I64 up_capacity,
                                                                                      I64 out_capacity,
