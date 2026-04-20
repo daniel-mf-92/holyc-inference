@@ -1465,6 +1465,62 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacity(I64 
         out_capacity);
 }
 
+I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacityDefaultCapacity(I64 *gate_q16,
+                                                                                             I64 gate_capacity,
+                                                                                             I64 *up_q16,
+                                                                                             I64 up_capacity,
+                                                                                             I64 *out_q16,
+                                                                                             I64 out_capacity,
+                                                                                             I64 row_count,
+                                                                                             I64 lane_count,
+                                                                                             I64 *staging_out_q16,
+                                                                                             I64 staging_out_capacity)
+{
+    I64 default_commit_stage_cell_capacity;
+    I64 default_commit_stage_byte_capacity;
+    I32 status;
+
+    if (!gate_q16 || !up_q16 || !out_q16)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (gate_capacity < 0 || up_capacity < 0 || out_capacity < 0 ||
+        staging_out_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || lane_count < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    // IQ-620 default-capacity commit contract:
+    // derive commit scratch limits from live row/lane geometry
+    // (`row_count * lane_count`) and caller staging bytes
+    // (`staging_out_capacity * sizeof(I64)`), then route all
+    // no-partial semantics through the canonical commit-capacity wrapper.
+    status = FFNTryMulI64Checked(row_count,
+                                 lane_count,
+                                 &default_commit_stage_cell_capacity);
+    if (status)
+        return status;
+
+    status = FFNTryMulI64Checked(staging_out_capacity,
+                                 sizeof(I64),
+                                 &default_commit_stage_byte_capacity);
+    if (status)
+        return status;
+
+    return FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacity(
+        gate_q16,
+        gate_capacity,
+        up_q16,
+        up_capacity,
+        out_q16,
+        out_capacity,
+        row_count,
+        lane_count,
+        default_commit_stage_cell_capacity,
+        default_commit_stage_byte_capacity,
+        staging_out_q16,
+        staging_out_capacity);
+}
+
 I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocDefaultCapacity(I64 *gate_q16,
                                                                               I64 gate_capacity,
                                                                               I64 *up_q16,
