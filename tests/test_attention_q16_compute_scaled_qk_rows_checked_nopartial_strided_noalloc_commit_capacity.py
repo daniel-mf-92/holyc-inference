@@ -202,7 +202,95 @@ def explicit_checked_commit_capacity_composition(
     staged_scores_q32,
     staged_scores_capacity: int,
 ) -> int:
-    return attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commit_capacity(
+    if q_rows_q16 is None or k_rows_q16 is None or out_scores_q32 is None:
+        return ATTN_Q16_ERR_NULL_PTR
+
+    if (
+        q_rows_capacity < 0
+        or k_rows_capacity < 0
+        or out_scores_capacity < 0
+        or staged_scores_capacity < 0
+    ):
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    if (
+        query_row_count < 0
+        or query_row_stride_q16 < 0
+        or token_count < 0
+        or k_row_stride_q16 < 0
+        or head_dim < 0
+        or out_row_stride < 0
+    ):
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    if commit_stage_cell_capacity < 0 or commit_stage_byte_capacity < 0:
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    err, staging_capacity_bytes = try_mul_i64_checked(staged_scores_capacity, 8)
+    if err != ATTN_Q16_OK:
+        return err
+
+    last_q = [0]
+    last_k = [0]
+    last_out = [0]
+    required_q = [0]
+    required_k = [0]
+    required_out = [0]
+
+    err = attention_q16_compute_scaled_qk_rows_checked_nopartial_preflight_only(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        query_row_stride_q16,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        k_row_stride_q16,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        out_row_stride,
+        last_q,
+        last_k,
+        last_out,
+        required_q,
+        required_k,
+        required_out,
+    )
+    if err != ATTN_Q16_OK:
+        return err
+
+    err, required_stage_cells = try_mul_i64_checked(query_row_count, token_count)
+    if err != ATTN_Q16_OK:
+        return err
+
+    err, required_stage_bytes = try_mul_i64_checked(required_stage_cells, 8)
+    if err != ATTN_Q16_OK:
+        return err
+
+    if required_stage_cells > commit_stage_cell_capacity:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if required_stage_bytes > commit_stage_byte_capacity:
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    if query_row_count == 0 or token_count == 0:
+        return ATTN_Q16_OK
+
+    if staged_scores_q32 is None:
+        return ATTN_Q16_ERR_NULL_PTR
+    if required_stage_cells > staged_scores_capacity:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if required_stage_bytes > staging_capacity_bytes:
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    if staged_scores_q32 is q_rows_q16:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if staged_scores_q32 is k_rows_q16:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if staged_scores_q32 is out_scores_q32:
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    err = attention_q16_compute_scaled_qk_rows_checked(
         q_rows_q16,
         q_rows_capacity,
         query_row_count,
@@ -213,14 +301,37 @@ def explicit_checked_commit_capacity_composition(
         k_row_stride_q16,
         head_dim,
         score_scale_q16,
-        out_scores_q32,
-        out_scores_capacity,
-        out_row_stride,
-        commit_stage_cell_capacity,
-        commit_stage_byte_capacity,
         staged_scores_q32,
         staged_scores_capacity,
+        token_count,
     )
+    if err != ATTN_Q16_OK:
+        return err
+
+    if required_out[0] > out_scores_capacity:
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    for row_index in range(query_row_count):
+        err, out_row_base = try_mul_i64_checked(row_index, out_row_stride)
+        if err != ATTN_Q16_OK:
+            return err
+
+        err, stage_row_base = try_mul_i64_checked(row_index, token_count)
+        if err != ATTN_Q16_OK:
+            return err
+
+        for token_index in range(token_count):
+            err, out_index = try_add_i64_checked(out_row_base, token_index)
+            if err != ATTN_Q16_OK:
+                return err
+
+            err, stage_index = try_add_i64_checked(stage_row_base, token_index)
+            if err != ATTN_Q16_OK:
+                return err
+
+            out_scores_q32[out_index] = staged_scores_q32[stage_index]
+
+    return ATTN_Q16_OK
 
 
 def test_source_contains_strided_noalloc_commit_capacity_wrapper() -> None:
@@ -233,8 +344,7 @@ def test_source_contains_strided_noalloc_commit_capacity_wrapper() -> None:
 
     assert "AttentionQ16ComputeScaledQKRowsCheckedNoPartialPreflightOnly(" in body
     assert "AttentionQ16ComputeScaledQKRowsChecked(" in body
-    assert "if (required_stage_cells > commit_stage_cell_capacity)" in body
-    assert "if (required_stage_bytes > commit_stage_byte_capacity)" in body
+    assert "AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacity(" in body
     assert "if (staged_scores_q32 == out_scores_q32)" in body
 
 
@@ -425,8 +535,14 @@ def test_randomized_parity_vs_explicit_checked_composition() -> None:
         else:
             commit_stage_byte_capacity = max(0, stage_need * 8 + rng.randint(-16, 24))
 
-        staged_a = [0] * max(staged_capacity, 1)
-        staged_b = [0] * max(staged_capacity, 1)
+        if staged_capacity > 100000:
+            staged_a = [0]
+            staged_b = [0]
+        else:
+            staged_a = [0] * max(staged_capacity, 1)
+            staged_b = [0] * max(staged_capacity, 1)
+
+        score_scale_q16 = rng.randint(-200000, 200000)
 
         err_a = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commit_capacity(
             q_rows,
@@ -438,7 +554,7 @@ def test_randomized_parity_vs_explicit_checked_composition() -> None:
             token_count,
             k_row_stride_q16,
             head_dim,
-            rng.randint(-200000, 200000),
+            score_scale_q16,
             out_a,
             out_capacity,
             out_row_stride,
@@ -458,7 +574,7 @@ def test_randomized_parity_vs_explicit_checked_composition() -> None:
             token_count,
             k_row_stride_q16,
             head_dim,
-            rng.randint(-200000, 200000),
+            score_scale_q16,
             out_b,
             out_capacity,
             out_row_stride,
