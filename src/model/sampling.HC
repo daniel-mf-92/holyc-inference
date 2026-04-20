@@ -89,6 +89,23 @@ I32 InferenceGenerateTokensPreflightCheckedDefaultTopP(
     I64 *out_required_topk_capacity,
     I64 *out_required_random_capacity,
     I64 *out_required_generated_capacity);
+I32 InferenceGenerateTokensPreflightCheckedTopKDefault(
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 workspace_stage_logits_capacity,
+    I64 workspace_topk_logits_capacity,
+    I64 workspace_topk_index_capacity,
+    I64 random_q16_capacity,
+    I64 generated_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_history_capacity,
+    I64 *out_required_stage_logits_capacity,
+    I64 *out_required_topk_capacity,
+    I64 *out_required_random_capacity,
+    I64 *out_required_generated_capacity);
 I32 InferenceGenerateTokensPreflightCheckedGreedyDefaultTopK(
     I64 step_logits_capacity,
     I64 vocab_size,
@@ -1591,6 +1608,52 @@ I32 InferenceGenerateTokensPreflightCheckedDefaultTopK(
 // so this helper forwards to canonical preflight and preserves exact
 // BAD_PARAM/OVERFLOW classification with strict no-partial output writes.
 I32 InferenceGenerateTokensPreflightCheckedDefaultTopP(
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 workspace_stage_logits_capacity,
+    I64 workspace_topk_logits_capacity,
+    I64 workspace_topk_index_capacity,
+    I64 random_q16_capacity,
+    I64 generated_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_history_capacity,
+    I64 *out_required_stage_logits_capacity,
+    I64 *out_required_topk_capacity,
+    I64 *out_required_random_capacity,
+    I64 *out_required_generated_capacity)
+{
+    return InferenceGenerateTokensPreflightChecked(
+        step_logits_capacity,
+        vocab_size,
+        max_new_tokens,
+        token_history_capacity,
+        token_history_count,
+        workspace_stage_logits_capacity,
+        workspace_topk_logits_capacity,
+        workspace_topk_index_capacity,
+        random_q16_capacity,
+        generated_capacity,
+        out_required_step_logits_cells,
+        out_required_history_capacity,
+        out_required_stage_logits_capacity,
+        out_required_topk_capacity,
+        out_required_random_capacity,
+        out_required_generated_capacity);
+}
+
+// WS7 preflight wrapper for deterministic top-k-default generation API.
+//
+// Runtime top-k-default generation fixes:
+// - temperature_q16 = SAMPLING_Q16_ONE
+// - repetition_penalty_q16 = SAMPLING_Q16_ONE
+//
+// Capacity diagnostics are independent of those sampling constants, so this
+// helper forwards directly to canonical checked preflight to preserve exact
+// BAD_PARAM/OVERFLOW surfaces and strict no-partial output semantics.
+I32 InferenceGenerateTokensPreflightCheckedTopKDefault(
     I64 step_logits_capacity,
     I64 vocab_size,
     I64 max_new_tokens,
