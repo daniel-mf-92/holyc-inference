@@ -55,6 +55,18 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocPreflight
     I64 *out_required_out_cells,
     I64 *out_required_stage_cells);
 
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 stage_cell_capacity,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_required_out_cells);
+
 I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnly(
     I64 *in_scores_q32,
     I64 in_scores_capacity,
@@ -1648,7 +1660,7 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAlloc(
     default_row_stride = token_count;
 
     status =
-        AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(
+        AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
         in_scores_q32,
         in_scores_capacity,
         row_count,
@@ -1656,11 +1668,17 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAlloc(
         out_scores_q32,
         out_scores_capacity,
         staged_scores_capacity,
-        &required_in_cells,
+        &required_stage_cells,
+        &required_stage_bytes,
         &required_out_cells,
-        &required_stage_cells);
+        );
     if (status != ATTN_Q16_OK)
         return status;
+
+    // For default-stride score scaling the source and destination row spans
+    // are both token_count-based, so required source cells match required
+    // destination cells. Keep this explicit for later alias-window checks.
+    required_in_cells = required_out_cells;
 
     if (!row_count || !token_count)
         return ATTN_Q16_OK;
@@ -1668,11 +1686,6 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAlloc(
     if (!staged_scores_q32)
         return ATTN_Q16_ERR_NULL_PTR;
 
-    status = AttentionTryMulI64Checked(required_stage_cells,
-                                       sizeof(I64),
-                                       &required_stage_bytes);
-    if (status != ATTN_Q16_OK)
-        return status;
     status = AttentionTryMulI64Checked(required_in_cells,
                                        sizeof(I64),
                                        &required_in_bytes);
@@ -1791,6 +1804,66 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocPreflight
     if (*out_required_stage_cells > stage_cell_capacity)
         return ATTN_Q16_ERR_BAD_PARAM;
 
+    return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 stage_cell_capacity,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_required_out_cells)
+{
+    I64 required_in_cells;
+    I64 required_out_cells;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
+    I32 status;
+
+    if (!in_scores_q32 || !out_scores_q32 || !out_required_stage_cells ||
+        !out_required_stage_bytes || !out_required_out_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (in_scores_capacity < 0 || out_scores_capacity < 0 ||
+        stage_cell_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-621 required-bytes helper contract for default-stride no-alloc rows:
+    // 1) reuse the canonical no-alloc preflight helper for checked in/out/stage
+    //    span validation;
+    // 2) convert required stage cells to bytes with checked I64 multiply;
+    // 3) publish only the diagnostics needed by no-alloc staging callers.
+    status =
+        AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(
+            in_scores_q32,
+            in_scores_capacity,
+            row_count,
+            token_count,
+            out_scores_q32,
+            out_scores_capacity,
+            stage_cell_capacity,
+            &required_in_cells,
+            &required_out_cells,
+            &required_stage_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(required_stage_cells,
+                                       sizeof(I64),
+                                       &required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    *out_required_stage_cells = required_stage_cells;
+    *out_required_stage_bytes = required_stage_bytes;
+    *out_required_out_cells = required_out_cells;
     return ATTN_Q16_OK;
 }
 
