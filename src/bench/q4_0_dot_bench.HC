@@ -239,6 +239,111 @@ I32 Q4_0DotBenchRunShape(I64 shape_index,
     return Q4_0_DOT_BENCH_OK;
 }
 
+// Diagnostics-only preflight for the deterministic default benchmark suite.
+//
+// The helper publishes default-suite geometry without touching benchmark
+// working buffers or dispatching kernel loops:
+// - shape_count: fixed number of suite shapes
+// - required_max_blocks: max block_count over all suite shapes
+// - required_max_rows: max row_count over all suite shapes
+// - required_row_matrix_blocks: max row_count*row_stride_blocks over suite
+//
+// No-partial contract: output diagnostics are committed only after all bounds
+// checks succeed, so caller sees either a full tuple or no updates.
+I32 Q4_0DotBenchRunDefaultSuiteNoPartialPreflightOnly(
+    I64 cpu_hz,
+    I64 *out_shape_count,
+    I64 *out_required_max_blocks,
+    I64 *out_required_max_rows,
+    I64 *out_required_row_matrix_blocks)
+{
+    Q4_0DotBenchShape shapes[4];
+    I64 shape_count;
+    I64 shape_index;
+    I64 row_matrix_blocks;
+    I64 required_max_blocks;
+    I64 required_max_rows;
+    I64 required_row_matrix_blocks;
+    I32 status;
+
+    if (!out_shape_count || !out_required_max_blocks || !out_required_max_rows ||
+        !out_required_row_matrix_blocks)
+        return Q4_0_DOT_BENCH_ERR_NULL_PTR;
+
+    if (cpu_hz <= 0)
+        return Q4_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    // Mirror the canonical deterministic suite geometry from
+    // `Q4_0DotBenchRunDefaultSuite`.
+    shapes[0].block_count = 4;
+    shapes[0].row_count = 1;
+    shapes[0].row_stride_blocks = 4;
+    shapes[0].iters = 8192;
+
+    shapes[1].block_count = 8;
+    shapes[1].row_count = 2;
+    shapes[1].row_stride_blocks = 8;
+    shapes[1].iters = 4096;
+
+    shapes[2].block_count = 16;
+    shapes[2].row_count = 4;
+    shapes[2].row_stride_blocks = 16;
+    shapes[2].iters = 2048;
+
+    shapes[3].block_count = 32;
+    shapes[3].row_count = 8;
+    shapes[3].row_stride_blocks = 32;
+    shapes[3].iters = 1024;
+
+    shape_count = 4;
+    required_max_blocks = 0;
+    required_max_rows = 0;
+    required_row_matrix_blocks = 0;
+
+    for (shape_index = 0; shape_index < shape_count; ++shape_index)
+    {
+        if (shapes[shape_index].block_count <= 0 ||
+            shapes[shape_index].row_count <= 0 ||
+            shapes[shape_index].row_stride_blocks <= 0 ||
+            shapes[shape_index].iters <= 0)
+            return Q4_0_DOT_BENCH_ERR_BAD_PARAM;
+
+        if (shapes[shape_index].row_stride_blocks < shapes[shape_index].block_count)
+            return Q4_0_DOT_BENCH_ERR_BAD_PARAM;
+
+        if (shapes[shape_index].block_count > Q4_0_DOT_BENCH_MAX_BLOCKS)
+            return Q4_0_DOT_BENCH_ERR_BAD_PARAM;
+        if (shapes[shape_index].row_count > Q4_0_DOT_BENCH_MAX_ROWS)
+            return Q4_0_DOT_BENCH_ERR_BAD_PARAM;
+
+        status = Q4_0DotBenchTryMulI64(shapes[shape_index].row_count,
+                                       shapes[shape_index].row_stride_blocks,
+                                       &row_matrix_blocks);
+        if (status != Q4_0_DOT_BENCH_OK)
+            return status;
+
+        if (row_matrix_blocks > (Q4_0_DOT_BENCH_MAX_BLOCKS * Q4_0_DOT_BENCH_MAX_ROWS))
+            return Q4_0_DOT_BENCH_ERR_BAD_PARAM;
+
+        if (shapes[shape_index].block_count > required_max_blocks)
+            required_max_blocks = shapes[shape_index].block_count;
+        if (shapes[shape_index].row_count > required_max_rows)
+            required_max_rows = shapes[shape_index].row_count;
+        if (row_matrix_blocks > required_row_matrix_blocks)
+            required_row_matrix_blocks = row_matrix_blocks;
+    }
+
+    if (required_max_blocks <= 0 || required_max_rows <= 0 ||
+        required_row_matrix_blocks <= 0)
+        return Q4_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    *out_shape_count = shape_count;
+    *out_required_max_blocks = required_max_blocks;
+    *out_required_max_rows = required_max_rows;
+    *out_required_row_matrix_blocks = required_row_matrix_blocks;
+    return Q4_0_DOT_BENCH_OK;
+}
+
 I32 Q4_0DotBenchRunDefaultSuite(I64 cpu_hz)
 {
     Q4_0DotBenchShape shapes[4];

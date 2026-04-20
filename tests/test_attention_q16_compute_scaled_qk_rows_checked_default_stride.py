@@ -12,6 +12,7 @@ sys.path.append(str(Path(__file__).resolve().parent))
 from test_attention_q16_apply_score_scale_checked import (
     ATTN_Q16_ERR_BAD_PARAM,
     ATTN_Q16_ERR_NULL_PTR,
+    ATTN_Q16_ERR_OVERFLOW,
     ATTN_Q16_OK,
 )
 from test_attention_q16_compute_scaled_qk_rows_checked import (
@@ -312,9 +313,46 @@ def test_randomized_parity() -> None:
         assert out_a == out_b
 
 
+def test_overflow_parity() -> None:
+    huge = 1 << 62
+    q_rows = [0]
+    k_rows = [0]
+    out_a = [999]
+    out_b = out_a.copy()
+
+    err_a = attention_q16_compute_scaled_qk_rows_checked_default_stride(
+        q_rows,
+        1,
+        2,
+        k_rows,
+        1,
+        2,
+        huge,
+        1 << 16,
+        out_a,
+        1,
+    )
+    err_b = explicit_default_stride_composition(
+        q_rows,
+        1,
+        2,
+        k_rows,
+        1,
+        2,
+        huge,
+        1 << 16,
+        out_b,
+        1,
+    )
+
+    assert err_a == err_b == ATTN_Q16_ERR_OVERFLOW
+    assert out_a == out_b == [999]
+
+
 if __name__ == "__main__":
     test_source_contains_default_stride_rows_wrapper()
     test_multilingual_row_batch_parity()
     test_error_parity()
     test_randomized_parity()
+    test_overflow_parity()
     print("ok")

@@ -181,6 +181,31 @@ I32 InferenceGenerateTokensCheckedTopKDefault(
     I64 workspace_topk_index_capacity,
     I64 *out_generated_tokens,
     I64 *out_generated_count);
+I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnly(
+    I64 *step_logits_q16,
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 *token_history,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 top_p_q16,
+    I64 *random_q16_values,
+    I64 random_q16_capacity,
+    I64 *workspace_stage_logits_q16,
+    I64 workspace_stage_logits_capacity,
+    I64 *workspace_topk_logits_q16,
+    I64 workspace_topk_logits_capacity,
+    I64 *workspace_topk_indices,
+    I64 workspace_topk_index_capacity,
+    I64 *out_generated_tokens,
+    I64 generated_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_history_capacity,
+    I64 *out_required_stage_logits_capacity,
+    I64 *out_required_topk_capacity,
+    I64 *out_required_random_capacity,
+    I64 *out_required_generated_capacity);
 
 I32 GenerationStepComposeStageError(I32 stage_base, I32 stage_status)
 {
@@ -1334,6 +1359,130 @@ I32 InferenceGenerateTokensCheckedTopKDefault(
                                           workspace_topk_index_capacity,
                                           out_generated_tokens,
                                           out_generated_count);
+}
+
+// WS7 diagnostics-only companion for top-k-default checked generation.
+//
+// Preflight invariants:
+// - pointer contract mirrors checked runtime wrapper inputs/workspaces;
+// - top-p domain must remain (0, 1.0_q16];
+// - capacity diagnostics are computed through canonical top-k-default
+//   preflight and staged locally before publish.
+//
+// No-partial diagnostics contract:
+// - required-capacity outputs are not modified unless all checks pass;
+// - generation/token-history buffers are never written.
+I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnly(
+    I64 *step_logits_q16,
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 *token_history,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 top_p_q16,
+    I64 *random_q16_values,
+    I64 random_q16_capacity,
+    I64 *workspace_stage_logits_q16,
+    I64 workspace_stage_logits_capacity,
+    I64 *workspace_topk_logits_q16,
+    I64 workspace_topk_logits_capacity,
+    I64 *workspace_topk_indices,
+    I64 workspace_topk_index_capacity,
+    I64 *out_generated_tokens,
+    I64 generated_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_history_capacity,
+    I64 *out_required_stage_logits_capacity,
+    I64 *out_required_topk_capacity,
+    I64 *out_required_random_capacity,
+    I64 *out_required_generated_capacity)
+{
+    I64 required_step_logits_cells;
+    I64 required_history_capacity;
+    I64 required_stage_logits_capacity;
+    I64 required_topk_capacity;
+    I64 required_random_capacity;
+    I64 required_generated_capacity;
+    I64 snapshot_step_logits_capacity;
+    I64 snapshot_vocab_size;
+    I64 snapshot_max_new_tokens;
+    I64 snapshot_token_history_capacity;
+    I64 snapshot_token_history_count;
+    I64 snapshot_random_q16_capacity;
+    I64 snapshot_workspace_stage_logits_capacity;
+    I64 snapshot_workspace_topk_logits_capacity;
+    I64 snapshot_workspace_topk_index_capacity;
+    I64 snapshot_generated_capacity;
+    I64 snapshot_top_p_q16;
+    I32 status;
+
+    if (!step_logits_q16 || !token_history || !random_q16_values ||
+        !workspace_stage_logits_q16 || !workspace_topk_logits_q16 ||
+        !workspace_topk_indices || !out_generated_tokens)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (!out_required_step_logits_cells || !out_required_history_capacity ||
+        !out_required_stage_logits_capacity || !out_required_topk_capacity ||
+        !out_required_random_capacity || !out_required_generated_capacity)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (top_p_q16 <= 0 || top_p_q16 > SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_step_logits_capacity = step_logits_capacity;
+    snapshot_vocab_size = vocab_size;
+    snapshot_max_new_tokens = max_new_tokens;
+    snapshot_token_history_capacity = token_history_capacity;
+    snapshot_token_history_count = token_history_count;
+    snapshot_random_q16_capacity = random_q16_capacity;
+    snapshot_workspace_stage_logits_capacity = workspace_stage_logits_capacity;
+    snapshot_workspace_topk_logits_capacity = workspace_topk_logits_capacity;
+    snapshot_workspace_topk_index_capacity = workspace_topk_index_capacity;
+    snapshot_generated_capacity = generated_capacity;
+    snapshot_top_p_q16 = top_p_q16;
+
+    status = InferenceGenerateTokensPreflightCheckedTopKDefault(
+        step_logits_capacity,
+        vocab_size,
+        max_new_tokens,
+        token_history_capacity,
+        token_history_count,
+        workspace_stage_logits_capacity,
+        workspace_topk_logits_capacity,
+        workspace_topk_index_capacity,
+        random_q16_capacity,
+        generated_capacity,
+        &required_step_logits_cells,
+        &required_history_capacity,
+        &required_stage_logits_capacity,
+        &required_topk_capacity,
+        &required_random_capacity,
+        &required_generated_capacity);
+    if (status)
+        return status;
+
+    // Immutable snapshot revalidation before diagnostics publish.
+    if (snapshot_step_logits_capacity != step_logits_capacity ||
+        snapshot_vocab_size != vocab_size ||
+        snapshot_max_new_tokens != max_new_tokens ||
+        snapshot_token_history_capacity != token_history_capacity ||
+        snapshot_token_history_count != token_history_count ||
+        snapshot_random_q16_capacity != random_q16_capacity ||
+        snapshot_workspace_stage_logits_capacity != workspace_stage_logits_capacity ||
+        snapshot_workspace_topk_logits_capacity != workspace_topk_logits_capacity ||
+        snapshot_workspace_topk_index_capacity != workspace_topk_index_capacity ||
+        snapshot_generated_capacity != generated_capacity ||
+        snapshot_top_p_q16 != top_p_q16)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    *out_required_step_logits_cells = required_step_logits_cells;
+    *out_required_history_capacity = required_history_capacity;
+    *out_required_stage_logits_capacity = required_stage_logits_capacity;
+    *out_required_topk_capacity = required_topk_capacity;
+    *out_required_random_capacity = required_random_capacity;
+    *out_required_generated_capacity = required_generated_capacity;
+    return SAMPLING_Q16_OK;
 }
 
 // WS7 execution wrapper: top-k-default generation with derived capacities.

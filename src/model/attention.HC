@@ -10807,7 +10807,7 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStride(
     if (query_row_count < 0 || token_count < 0 || head_dim < 0)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    // IQ-560 default-stride batch contract:
+    // IQ-570 default-stride batch contract:
     // - query rows are tightly packed head vectors.
     // - key rows are tightly packed head vectors.
     // - output rows are token-major with token_count row stride.
