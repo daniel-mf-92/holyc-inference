@@ -5630,6 +5630,102 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytes(
         out_required_merge_workspace_bytes);
 }
 
+I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesCommitOnly(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 vocab_piece_capacity,
+    I32 *out_token_ids,
+    U64 out_token_capacity,
+    U64 required_token_capacity,
+    U64 required_max_piece_len,
+    U64 required_merge_workspace_bytes,
+    U64 *out_token_count,
+    U64 *out_required_token_capacity,
+    U64 *out_max_piece_len)
+{
+    U64 canonical_required_token_capacity;
+    U64 canonical_max_piece_len;
+    U64 canonical_required_merge_workspace_bytes;
+    I32 err;
+
+    if (!bytes || !io_cursor || !vocab_piece_lens || !out_token_ids ||
+        !out_token_count || !out_required_token_capacity || !out_max_piece_len)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_capacity > 0x7FFFFFFFFFFFFFFF ||
+        out_token_capacity > 0x7FFFFFFFFFFFFFFF ||
+        required_token_capacity > 0x7FFFFFFFFFFFFFFF ||
+        required_max_piece_len > 0x7FFFFFFFFFFFFFFF ||
+        required_merge_workspace_bytes > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // IQ-701 strict commit-only contract: derive canonical diagnostics via the
+    // no-write required-bytes preflight and require exact caller parity before
+    // dispatching commit path that can mutate cursor/token outputs.
+    err = TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesPreflightOnly(
+        bytes,
+        byte_len,
+        io_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        vocab_piece_lens,
+        vocab_piece_count,
+        vocab_piece_capacity,
+        out_token_capacity,
+        &canonical_required_token_capacity,
+        &canonical_max_piece_len,
+        &canonical_required_merge_workspace_bytes);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    if (required_token_capacity != canonical_required_token_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (required_max_piece_len != canonical_max_piece_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (required_merge_workspace_bytes != canonical_required_merge_workspace_bytes)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    return TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnly(
+        bytes,
+        byte_len,
+        io_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        vocab_piece_lens,
+        vocab_piece_count,
+        vocab_piece_capacity,
+        out_token_ids,
+        out_token_capacity,
+        out_token_count,
+        out_required_token_capacity,
+        out_max_piece_len);
+}
+
 I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesDefaultCapacity(
     U8 *bytes,
     U64 byte_len,
@@ -5685,6 +5781,98 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesDefault
         out_required_token_capacity,
         out_max_piece_len,
         out_required_merge_workspace_bytes);
+}
+
+I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesCommitOnlyDefaultCapacity(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 vocab_piece_capacity,
+    I32 *out_token_ids,
+    U64 required_token_capacity,
+    U64 required_max_piece_len,
+    U64 required_merge_workspace_bytes,
+    U64 *out_token_count,
+    U64 *out_required_token_capacity,
+    U64 *out_max_piece_len)
+{
+    U64 canonical_required_token_capacity;
+    U64 canonical_max_piece_len;
+    U64 canonical_required_merge_workspace_bytes;
+    I32 err;
+
+    if (!bytes || !io_cursor || !vocab_piece_lens || !out_token_ids ||
+        !out_token_count || !out_required_token_capacity || !out_max_piece_len)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_capacity > 0x7FFFFFFFFFFFFFFF ||
+        required_token_capacity > 0x7FFFFFFFFFFFFFFF ||
+        required_max_piece_len > 0x7FFFFFFFFFFFFFFF ||
+        required_merge_workspace_bytes > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // IQ-702 strict default-capacity commit-only contract: derive canonical
+    // required-bytes diagnostics first, then require exact caller parity
+    // before dispatching default-capacity token commit path.
+    err = TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesDefaultCapacity(
+        bytes,
+        byte_len,
+        io_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        vocab_piece_lens,
+        vocab_piece_count,
+        vocab_piece_capacity,
+        &canonical_required_token_capacity,
+        &canonical_max_piece_len,
+        &canonical_required_merge_workspace_bytes);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    if (required_token_capacity != canonical_required_token_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (required_max_piece_len != canonical_max_piece_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (required_merge_workspace_bytes != canonical_required_merge_workspace_bytes)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    return TokenizerBPEEncodePromptCheckedNoAllocFromLensDefaultCapacityCommitOnly(
+        bytes,
+        byte_len,
+        io_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        vocab_piece_lens,
+        vocab_piece_count,
+        vocab_piece_capacity,
+        out_token_ids,
+        out_token_count,
+        out_required_token_capacity,
+        out_max_piece_len);
 }
 
 I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnly(
