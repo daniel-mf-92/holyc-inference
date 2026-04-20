@@ -1591,6 +1591,22 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredB
     I64 *out_required_stage_cells,
     I64 *out_required_stage_bytes);
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyHardened(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_q_cells,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes);
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesDefaultCapacity(
     I64 *q_rows_q16,
     I64 q_rows_capacity,
@@ -5833,6 +5849,204 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredB
     if (parity_required_stage_cells != canonical_required_stage_cells)
         return ATTN_Q16_ERR_BAD_PARAM;
     if (parity_required_stage_bytes != canonical_required_stage_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    *out_required_q_cells = canonical_required_q_cells;
+    *out_required_k_cells = canonical_required_k_cells;
+    *out_required_out_cells = canonical_required_out_cells;
+    *out_required_stage_cells = canonical_required_stage_cells;
+    *out_required_stage_bytes = canonical_required_stage_bytes;
+    return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyHardened(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_q_cells,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes)
+{
+    I64 staged_required_q_cells;
+    I64 staged_required_k_cells;
+    I64 staged_required_out_cells;
+    I64 staged_required_stage_cells;
+    I64 staged_required_stage_bytes;
+    I32 status;
+
+    if (!out_required_q_cells || !out_required_k_cells ||
+        !out_required_out_cells || !out_required_stage_cells ||
+        !out_required_stage_bytes)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_rows_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_row_count < 0 || token_count < 0 || head_dim < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-727 hardened commit-only diagnostics contract:
+    // route through canonical commit-only helper with local staging so caller
+    // outputs are never mutated on any failure path.
+    status =
+        AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesPreflightOnlyDefaultCapacityCommitOnly(
+            q_rows_q16,
+            q_rows_capacity,
+            query_row_count,
+            k_rows_q16,
+            k_rows_capacity,
+            token_count,
+            head_dim,
+            out_scores_q32,
+            out_scores_capacity,
+            &staged_required_q_cells,
+            &staged_required_k_cells,
+            &staged_required_out_cells,
+            &staged_required_stage_cells,
+            &staged_required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    *out_required_q_cells = staged_required_q_cells;
+    *out_required_k_cells = staged_required_k_cells;
+    *out_required_out_cells = staged_required_out_cells;
+    *out_required_stage_cells = staged_required_stage_cells;
+    *out_required_stage_bytes = staged_required_stage_bytes;
+    return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyHardenedPreflightOnly(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_q_cells,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes)
+{
+    I64 canonical_required_q_cells;
+    I64 canonical_required_k_cells;
+    I64 canonical_required_out_cells;
+    I64 canonical_required_stage_cells;
+    I64 canonical_required_stage_bytes;
+
+    I64 parity_required_q_cells;
+    I64 parity_required_k_cells;
+    I64 parity_required_out_cells;
+    I64 parity_required_stage_cells;
+    I64 parity_required_stage_bytes;
+
+    I64 snapshot_q_rows_capacity;
+    I64 snapshot_k_rows_capacity;
+    I64 snapshot_out_scores_capacity;
+    I64 snapshot_query_row_count;
+    I64 snapshot_token_count;
+    I64 snapshot_head_dim;
+    I32 status;
+
+    if (!out_required_q_cells || !out_required_k_cells ||
+        !out_required_out_cells || !out_required_stage_cells ||
+        !out_required_stage_bytes)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_rows_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_row_count < 0 || token_count < 0 || head_dim < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    snapshot_q_rows_capacity = q_rows_capacity;
+    snapshot_k_rows_capacity = k_rows_capacity;
+    snapshot_out_scores_capacity = out_scores_capacity;
+    snapshot_query_row_count = query_row_count;
+    snapshot_token_count = token_count;
+    snapshot_head_dim = head_dim;
+
+    // IQ-728 diagnostics-only mirror contract:
+    // 1) Stage canonical diagnostics through the IQ-727 hardened commit-only
+    //    helper so caller outputs are never touched on failure.
+    // 2) Recompute diagnostics through the non-hardened commit-only helper
+    //    to enforce parity and detect wrapper drift.
+    // 3) Publish diagnostics atomically after full parity checks succeed.
+    status =
+        AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyHardened(
+            q_rows_q16,
+            q_rows_capacity,
+            query_row_count,
+            k_rows_q16,
+            k_rows_capacity,
+            token_count,
+            head_dim,
+            out_scores_q32,
+            out_scores_capacity,
+            &canonical_required_q_cells,
+            &canonical_required_k_cells,
+            &canonical_required_out_cells,
+            &canonical_required_stage_cells,
+            &canonical_required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status =
+        AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesPreflightOnlyDefaultCapacityCommitOnly(
+            q_rows_q16,
+            q_rows_capacity,
+            query_row_count,
+            k_rows_q16,
+            k_rows_capacity,
+            token_count,
+            head_dim,
+            out_scores_q32,
+            out_scores_capacity,
+            &parity_required_q_cells,
+            &parity_required_k_cells,
+            &parity_required_out_cells,
+            &parity_required_stage_cells,
+            &parity_required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (snapshot_q_rows_capacity != q_rows_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_k_rows_capacity != k_rows_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_scores_capacity != out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_query_row_count != query_row_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_token_count != token_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_head_dim != head_dim)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (canonical_required_q_cells != parity_required_q_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (canonical_required_k_cells != parity_required_k_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (canonical_required_out_cells != parity_required_out_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (canonical_required_stage_cells != parity_required_stage_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (canonical_required_stage_bytes != parity_required_stage_bytes)
         return ATTN_Q16_ERR_BAD_PARAM;
 
     *out_required_q_cells = canonical_required_q_cells;
