@@ -290,11 +290,13 @@ def test_success_error_no_write_parity_and_sentinel_preservation() -> None:
     cur_a = [3]
     cur_b = [3]
 
+    good_prompt_nbytes = len(payload) - cur_a[0]
+
     err_a = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_required_bytes_commit_only_default_capacity_preflight_only_hardened(
         payload,
         len(payload),
         cur_a,
-        len(payload),
+        good_prompt_nbytes,
         left,
         right,
         ranks,
@@ -312,7 +314,7 @@ def test_success_error_no_write_parity_and_sentinel_preservation() -> None:
         payload,
         len(payload),
         cur_b,
-        len(payload),
+        good_prompt_nbytes,
         left,
         right,
         ranks,
@@ -347,7 +349,7 @@ def test_success_error_no_write_parity_and_sentinel_preservation() -> None:
         payload,
         len(payload),
         bad_cur_a,
-        len(payload) + 1,
+        good_prompt_nbytes + 1,
         left,
         right,
         ranks,
@@ -365,7 +367,7 @@ def test_success_error_no_write_parity_and_sentinel_preservation() -> None:
         payload,
         len(payload),
         bad_cur_b,
-        len(payload) + 1,
+        good_prompt_nbytes + 1,
         left,
         right,
         ranks,
