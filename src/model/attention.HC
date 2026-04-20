@@ -197,6 +197,50 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCo
     I64 *out_commit_required_stage_bytes,
     I64 *out_required_out_cells);
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafeCommitOnly(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 query_row_stride_q16,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 k_row_stride_q16,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 out_row_stride,
+    I64 commit_stage_cell_capacity,
+    I64 commit_stage_byte_capacity,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 required_q_cells,
+    I64 required_k_cells,
+    I64 required_out_cells,
+    I64 required_stage_cells,
+    I64 required_stage_bytes);
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafeDefaultCapacityCommitOnly(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 query_row_stride_q16,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 k_row_stride_q16,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 out_row_stride,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 required_q_cells,
+    I64 required_k_cells,
+    I64 required_out_cells,
+    I64 required_stage_cells,
+    I64 required_stage_bytes);
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafeDefaultCapacityPreflightOnly(
     I64 *q_rows_q16,
     I64 q_rows_capacity,
@@ -5682,6 +5726,216 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCo
         out_commit_required_stage_cells,
         out_commit_required_stage_bytes,
         out_required_out_cells);
+}
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafeCommitOnly(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 query_row_stride_q16,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 k_row_stride_q16,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 out_row_stride,
+    I64 commit_stage_cell_capacity,
+    I64 commit_stage_byte_capacity,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 required_q_cells,
+    I64 required_k_cells,
+    I64 required_out_cells,
+    I64 required_stage_cells,
+    I64 required_stage_bytes)
+{
+    I64 canonical_required_q_cells;
+    I64 canonical_required_k_cells;
+    I64 canonical_required_out_cells;
+    I64 canonical_required_stage_cells;
+    I64 canonical_required_stage_bytes;
+    I64 commit_required_stage_cells;
+    I64 commit_required_stage_bytes;
+    I64 commit_required_out_cells;
+    I32 status;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_rows_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0 ||
+        staged_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_row_count < 0 || query_row_stride_q16 < 0 || token_count < 0 ||
+        k_row_stride_q16 < 0 || head_dim < 0 || out_row_stride < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (commit_stage_cell_capacity < 0 || commit_stage_byte_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_q_cells < 0 || required_k_cells < 0 || required_out_cells < 0 ||
+        required_stage_cells < 0 || required_stage_bytes < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-677 commit-only contract:
+    // 1) re-run canonical alias-safe required-bytes diagnostics so commit-stage
+    //    capacities + live alias windows are validated at commit time;
+    // 2) re-derive canonical q/k/out/stage requirements and require exact
+    //    equality with caller-provided prevalidated diagnostics;
+    // 3) only after full validation succeeds, atomically commit staged scores
+    //    into caller strided output (strict no-partial writes).
+    status = AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafe(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        query_row_stride_q16,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        k_row_stride_q16,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        out_row_stride,
+        commit_stage_cell_capacity,
+        commit_stage_byte_capacity,
+        staged_scores_q32,
+        staged_scores_capacity,
+        &commit_required_stage_cells,
+        &commit_required_stage_bytes,
+        &commit_required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocPreflightOnly(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        query_row_stride_q16,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        k_row_stride_q16,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        out_row_stride,
+        &canonical_required_q_cells,
+        &canonical_required_k_cells,
+        &canonical_required_out_cells,
+        &canonical_required_stage_cells,
+        &canonical_required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (required_q_cells != canonical_required_q_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_k_cells != canonical_required_k_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_out_cells != canonical_required_out_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_stage_cells != canonical_required_stage_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_stage_bytes != canonical_required_stage_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (commit_required_stage_cells != canonical_required_stage_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (commit_required_stage_bytes != canonical_required_stage_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (commit_required_out_cells != canonical_required_out_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (!query_row_count || !token_count)
+        return ATTN_Q16_OK;
+
+    return AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocCommitOnly(
+        query_row_count,
+        token_count,
+        out_row_stride,
+        staged_scores_q32,
+        staged_scores_capacity,
+        out_scores_q32,
+        out_scores_capacity);
+}
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafeDefaultCapacityCommitOnly(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 query_row_stride_q16,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 k_row_stride_q16,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 out_row_stride,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 required_q_cells,
+    I64 required_k_cells,
+    I64 required_out_cells,
+    I64 required_stage_cells,
+    I64 required_stage_bytes)
+{
+    I64 commit_stage_cell_capacity;
+    I64 commit_stage_byte_capacity;
+    I32 status;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_rows_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0 ||
+        staged_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_row_count < 0 || query_row_stride_q16 < 0 || token_count < 0 ||
+        k_row_stride_q16 < 0 || head_dim < 0 || out_row_stride < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_q_cells < 0 || required_k_cells < 0 || required_out_cells < 0 ||
+        required_stage_cells < 0 || required_stage_bytes < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-680 default-capacity alias-safe commit-only contract:
+    // 1) derive default commit capacities from packed stage geometry and
+    //    caller staging bytes;
+    // 2) revalidate diagnostics + alias windows through canonical required-
+    //    bytes alias-safe commit-only helper;
+    // 3) if and only if all checks pass, atomically commit staged scores.
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       token_count,
+                                       &commit_stage_cell_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(staged_scores_capacity,
+                                       sizeof(I64),
+                                       &commit_stage_byte_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    return AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafeCommitOnly(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        query_row_stride_q16,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        k_row_stride_q16,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        out_row_stride,
+        commit_stage_cell_capacity,
+        commit_stage_byte_capacity,
+        staged_scores_q32,
+        staged_scores_capacity,
+        required_q_cells,
+        required_k_cells,
+        required_out_cells,
+        required_stage_cells,
+        required_stage_bytes);
 }
 
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafeDefaultCapacityPreflightOnly(
