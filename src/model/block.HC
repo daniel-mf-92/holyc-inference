@@ -67,11 +67,6 @@ I32 BlockTryMulI64Checked(I64 lhs, I64 rhs, I64 *out_prod)
     return BLOCK_Q16_OK;
 }
 
-I32 TransformerBlockQ16ResidualAddRowsComputeOutRowBaseChecked(
-    I64 row_index,
-    I64 out_row_stride_q16,
-    I64 *out_row_base);
-
 // Residual add kernel (Q16 lanes): out[i] = base[i] + residual[i]
 //
 // Contracts:
@@ -416,9 +411,9 @@ I32 TransformerBlockQ16ResidualAddRowsCheckedNoPartial(
                                        &residual_row_base);
         if (status)
             return status;
-        status = TransformerBlockQ16ResidualAddRowsComputeOutRowBaseChecked(row_index,
-                                                                             out_row_stride_q16,
-                                                                             &out_row_base);
+        status = BlockTryMulI64Checked(row_index,
+                                       out_row_stride_q16,
+                                       &out_row_base);
         if (status)
             return status;
 
@@ -465,32 +460,6 @@ I32 TransformerBlockQ16ResidualAddRowsCheckedNoPartial(
             out_q16[out_index] = lane_sum_q16;
         }
     }
-
-    return BLOCK_Q16_OK;
-}
-
-// Shared checked out-row base derivation for batched residual add kernels:
-//   out_row_base = row_index * out_row_stride_q16
-// Centralizing this keeps BAD_PARAM vs OVERFLOW behavior deterministic
-// wherever row-major block residual writers derive destination row bases.
-I32 TransformerBlockQ16ResidualAddRowsComputeOutRowBaseChecked(
-    I64 row_index,
-    I64 out_row_stride_q16,
-    I64 *out_row_base)
-{
-    I32 status;
-
-    if (!out_row_base)
-        return BLOCK_Q16_ERR_NULL_PTR;
-
-    if (row_index < 0 || out_row_stride_q16 < 0)
-        return BLOCK_Q16_ERR_BAD_PARAM;
-
-    status = BlockTryMulI64Checked(row_index,
-                                   out_row_stride_q16,
-                                   out_row_base);
-    if (status)
-        return status;
 
     return BLOCK_Q16_OK;
 }
