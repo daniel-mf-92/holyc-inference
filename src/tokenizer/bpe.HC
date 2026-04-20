@@ -5071,6 +5071,137 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPiece(
                                                     out_token_count);
 }
 
+I32 TokenizerBPEEncodePromptCheckedNoAllocFromLens(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 vocab_piece_capacity,
+    I32 *out_token_ids,
+    U64 out_token_capacity,
+    U64 *out_token_count,
+    U64 *out_required_token_capacity,
+    U64 *out_max_piece_len)
+{
+    U64 piece_index;
+    U64 max_piece_len;
+
+    if (!bytes || !io_cursor || !vocab_piece_lens || !out_token_ids ||
+        !out_token_count || !out_required_token_capacity || !out_max_piece_len)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_capacity > 0x7FFFFFFFFFFFFFFF ||
+        out_token_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (vocab_piece_count > vocab_piece_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    max_piece_len = 0;
+    piece_index = 0;
+    while (piece_index < vocab_piece_count) {
+        if (vocab_piece_lens[piece_index] > 0x7FFFFFFFFFFFFFFF)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+        if (vocab_piece_lens[piece_index] > max_piece_len)
+            max_piece_len = vocab_piece_lens[piece_index];
+
+        piece_index++;
+        if (!piece_index)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    *out_max_piece_len = max_piece_len;
+
+    return TokenizerBPEEncodePromptCheckedNoAllocFromMaxPiece(
+        bytes,
+        byte_len,
+        io_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        max_piece_len,
+        out_token_ids,
+        out_token_capacity,
+        out_token_count,
+        out_required_token_capacity);
+}
+
+I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensDefaultCapacity(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 vocab_piece_capacity,
+    I32 *out_token_ids,
+    U64 *out_token_count,
+    U64 *out_required_token_capacity,
+    U64 *out_max_piece_len)
+{
+    U64 derived_out_token_capacity;
+
+    if (!bytes || !io_cursor || !vocab_piece_lens || !out_token_ids ||
+        !out_token_count || !out_required_token_capacity || !out_max_piece_len)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // IQ-691 default-capacity contract: one-byte pretokenization upper-bounds
+    // output token count before merges, so prompt_nbytes is the canonical
+    // no-alloc destination capacity.
+    derived_out_token_capacity = prompt_nbytes;
+
+    return TokenizerBPEEncodePromptCheckedNoAllocFromLens(
+        bytes,
+        byte_len,
+        io_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        vocab_piece_lens,
+        vocab_piece_count,
+        vocab_piece_capacity,
+        out_token_ids,
+        derived_out_token_capacity,
+        out_token_count,
+        out_required_token_capacity,
+        out_max_piece_len);
+}
+
 I32 TokenizerBPEDecodeTokenSpanChecked(I32 *token_ids,
                                        U64 token_count,
                                        U64 *io_token_cursor,
