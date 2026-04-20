@@ -67,6 +67,11 @@ I32 BlockTryMulI64Checked(I64 lhs, I64 rhs, I64 *out_prod)
     return BLOCK_Q16_OK;
 }
 
+I32 TransformerBlockQ16ResidualAddRowsComputeOutRowBaseChecked(
+    I64 row_index,
+    I64 out_row_stride_q16,
+    I64 *out_row_base);
+
 // Residual add kernel (Q16 lanes): out[i] = base[i] + residual[i]
 //
 // Contracts:
@@ -203,6 +208,289 @@ I32 TransformerBlockQ16ResidualAddChecked(
 
         out_q16[out_index] = lane_sum_q16;
     }
+
+    return BLOCK_Q16_OK;
+}
+
+// Batched residual add (Q16 lanes):
+// out[row,lane] = base[row,lane] + residual[row,lane]
+//
+// Contracts:
+// - capacities are in I64 lanes
+// - row/lane strides are in lanes
+// - no-partial writes: full index + overflow preflight before commit
+I32 TransformerBlockQ16ResidualAddRowsCheckedNoPartial(
+    I64 *base_q16,
+    I64 base_capacity,
+    I64 base_row_stride_q16,
+    I64 base_lane_stride_q16,
+    I64 *residual_q16,
+    I64 residual_capacity,
+    I64 residual_row_stride_q16,
+    I64 residual_lane_stride_q16,
+    I64 *out_q16,
+    I64 out_capacity,
+    I64 out_row_stride_q16,
+    I64 out_lane_stride_q16,
+    I64 row_count,
+    I64 lane_count)
+{
+    I64 last_row;
+    I64 last_lane;
+    I64 base_row_max;
+    I64 residual_row_max;
+    I64 out_row_max;
+    I64 base_lane_max;
+    I64 residual_lane_max;
+    I64 out_lane_max;
+    I64 required_base_cells;
+    I64 required_residual_cells;
+    I64 required_out_cells;
+    I64 row_index;
+    I64 lane_index;
+    I64 base_row_base;
+    I64 residual_row_base;
+    I64 out_row_base;
+    I64 base_lane_offset;
+    I64 residual_lane_offset;
+    I64 out_lane_offset;
+    I64 base_index;
+    I64 residual_index;
+    I64 out_index;
+    I64 lane_sum_q16;
+    I32 status;
+
+    if (!base_q16 || !residual_q16 || !out_q16)
+        return BLOCK_Q16_ERR_NULL_PTR;
+
+    if (base_capacity < 0 || residual_capacity < 0 || out_capacity < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (base_row_stride_q16 < 0 || base_lane_stride_q16 < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (residual_row_stride_q16 < 0 || residual_lane_stride_q16 < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (out_row_stride_q16 < 0 || out_lane_stride_q16 < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || lane_count < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    if (!row_count || !lane_count)
+        return BLOCK_Q16_OK;
+
+    if (base_lane_stride_q16 < 1 || residual_lane_stride_q16 < 1 || out_lane_stride_q16 < 1)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (row_count > 1 && (base_row_stride_q16 < 1 ||
+                          residual_row_stride_q16 < 1 ||
+                          out_row_stride_q16 < 1))
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    last_row = row_count - 1;
+    last_lane = lane_count - 1;
+
+    status = BlockTryMulI64Checked(last_row,
+                                   base_row_stride_q16,
+                                   &base_row_max);
+    if (status)
+        return status;
+    status = BlockTryMulI64Checked(last_lane,
+                                   base_lane_stride_q16,
+                                   &base_lane_max);
+    if (status)
+        return status;
+    status = BlockTryAddI64Checked(base_row_max,
+                                   base_lane_max,
+                                   &required_base_cells);
+    if (status)
+        return status;
+    status = BlockTryAddI64Checked(required_base_cells,
+                                   1,
+                                   &required_base_cells);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(last_row,
+                                   residual_row_stride_q16,
+                                   &residual_row_max);
+    if (status)
+        return status;
+    status = BlockTryMulI64Checked(last_lane,
+                                   residual_lane_stride_q16,
+                                   &residual_lane_max);
+    if (status)
+        return status;
+    status = BlockTryAddI64Checked(residual_row_max,
+                                   residual_lane_max,
+                                   &required_residual_cells);
+    if (status)
+        return status;
+    status = BlockTryAddI64Checked(required_residual_cells,
+                                   1,
+                                   &required_residual_cells);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(last_row,
+                                   out_row_stride_q16,
+                                   &out_row_max);
+    if (status)
+        return status;
+    status = BlockTryMulI64Checked(last_lane,
+                                   out_lane_stride_q16,
+                                   &out_lane_max);
+    if (status)
+        return status;
+    status = BlockTryAddI64Checked(out_row_max,
+                                   out_lane_max,
+                                   &required_out_cells);
+    if (status)
+        return status;
+    status = BlockTryAddI64Checked(required_out_cells,
+                                   1,
+                                   &required_out_cells);
+    if (status)
+        return status;
+
+    if (required_base_cells > base_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (required_residual_cells > residual_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (required_out_cells > out_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    // Full preflight over all rows/lanes before touching out.
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        status = BlockTryMulI64Checked(row_index,
+                                       base_row_stride_q16,
+                                       &base_row_base);
+        if (status)
+            return status;
+        status = BlockTryMulI64Checked(row_index,
+                                       residual_row_stride_q16,
+                                       &residual_row_base);
+        if (status)
+            return status;
+
+        for (lane_index = 0; lane_index < lane_count; lane_index++)
+        {
+            status = BlockTryMulI64Checked(lane_index,
+                                           base_lane_stride_q16,
+                                           &base_lane_offset);
+            if (status)
+                return status;
+            status = BlockTryMulI64Checked(lane_index,
+                                           residual_lane_stride_q16,
+                                           &residual_lane_offset);
+            if (status)
+                return status;
+
+            status = BlockTryAddI64Checked(base_row_base,
+                                           base_lane_offset,
+                                           &base_index);
+            if (status)
+                return status;
+            status = BlockTryAddI64Checked(residual_row_base,
+                                           residual_lane_offset,
+                                           &residual_index);
+            if (status)
+                return status;
+
+            status = BlockTryAddI64Checked(base_q16[base_index],
+                                           residual_q16[residual_index],
+                                           &lane_sum_q16);
+            if (status)
+                return status;
+        }
+    }
+
+    // Commit pass runs only after full preflight succeeds.
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        status = BlockTryMulI64Checked(row_index,
+                                       base_row_stride_q16,
+                                       &base_row_base);
+        if (status)
+            return status;
+        status = BlockTryMulI64Checked(row_index,
+                                       residual_row_stride_q16,
+                                       &residual_row_base);
+        if (status)
+            return status;
+        status = TransformerBlockQ16ResidualAddRowsComputeOutRowBaseChecked(row_index,
+                                                                             out_row_stride_q16,
+                                                                             &out_row_base);
+        if (status)
+            return status;
+
+        for (lane_index = 0; lane_index < lane_count; lane_index++)
+        {
+            status = BlockTryMulI64Checked(lane_index,
+                                           base_lane_stride_q16,
+                                           &base_lane_offset);
+            if (status)
+                return status;
+            status = BlockTryMulI64Checked(lane_index,
+                                           residual_lane_stride_q16,
+                                           &residual_lane_offset);
+            if (status)
+                return status;
+            status = BlockTryMulI64Checked(lane_index,
+                                           out_lane_stride_q16,
+                                           &out_lane_offset);
+            if (status)
+                return status;
+
+            status = BlockTryAddI64Checked(base_row_base,
+                                           base_lane_offset,
+                                           &base_index);
+            if (status)
+                return status;
+            status = BlockTryAddI64Checked(residual_row_base,
+                                           residual_lane_offset,
+                                           &residual_index);
+            if (status)
+                return status;
+            status = BlockTryAddI64Checked(out_row_base,
+                                           out_lane_offset,
+                                           &out_index);
+            if (status)
+                return status;
+
+            status = BlockTryAddI64Checked(base_q16[base_index],
+                                           residual_q16[residual_index],
+                                           &lane_sum_q16);
+            if (status)
+                return status;
+
+            out_q16[out_index] = lane_sum_q16;
+        }
+    }
+
+    return BLOCK_Q16_OK;
+}
+
+// Shared checked out-row base derivation for batched residual add kernels:
+//   out_row_base = row_index * out_row_stride_q16
+// Centralizing this keeps BAD_PARAM vs OVERFLOW behavior deterministic
+// wherever row-major block residual writers derive destination row bases.
+I32 TransformerBlockQ16ResidualAddRowsComputeOutRowBaseChecked(
+    I64 row_index,
+    I64 out_row_stride_q16,
+    I64 *out_row_base)
+{
+    I32 status;
+
+    if (!out_row_base)
+        return BLOCK_Q16_ERR_NULL_PTR;
+
+    if (row_index < 0 || out_row_stride_q16 < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    status = BlockTryMulI64Checked(row_index,
+                                   out_row_stride_q16,
+                                   out_row_base);
+    if (status)
+        return status;
 
     return BLOCK_Q16_OK;
 }
