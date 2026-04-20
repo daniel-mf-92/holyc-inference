@@ -5530,6 +5530,168 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnly(
     return TOKENIZER_BPE_OK;
 }
 
+
+I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyRequiredBytes(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    U64 max_piece_len,
+    I32 *out_token_ids,
+    U64 *out_token_count,
+    U64 *out_required_token_capacity,
+    U64 *out_required_merge_workspace_bytes)
+{
+    U64 snapshot_byte_len;
+    U64 snapshot_cursor;
+    U64 snapshot_prompt_nbytes;
+    U64 snapshot_rank_table_count;
+    U64 snapshot_rank_table_capacity;
+    U64 snapshot_max_piece_len;
+
+    U64 staged_required_token_capacity;
+    U64 staged_required_merge_workspace_bytes;
+    U64 staged_cursor;
+    U64 staged_token_count;
+    U64 staged_commit_required_token_capacity;
+    U64 staged_token_capacity;
+    U64 staged_alloc_bytes;
+    I32 *staged_tokens;
+    U64 i;
+    I32 err;
+
+    if (!bytes || !io_cursor || !out_token_ids || !out_token_count ||
+        !out_required_token_capacity || !out_required_merge_workspace_bytes)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        max_piece_len > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    snapshot_byte_len = byte_len;
+    snapshot_cursor = *io_cursor;
+    snapshot_prompt_nbytes = prompt_nbytes;
+    snapshot_rank_table_count = rank_table_count;
+    snapshot_rank_table_capacity = rank_table_capacity;
+    snapshot_max_piece_len = max_piece_len;
+
+    if (snapshot_cursor > byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // IQ-824 commit-only required-bytes contract:
+    // 1) stage canonical diagnostics (token capacity + workspace bytes);
+    // 2) run canonical commit-only encode into isolated token staging;
+    // 3) atomically publish tokens/count/capacity/workspace bytes.
+    staged_required_token_capacity = *out_required_token_capacity;
+    err =
+        TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyPreflightOnlyRequiredBytes(
+            bytes,
+            byte_len,
+            &snapshot_cursor,
+            prompt_nbytes,
+            rank_left_tokens,
+            rank_right_tokens,
+            rank_values,
+            rank_merged_tokens,
+            rank_table_count,
+            rank_table_capacity,
+            max_piece_len,
+            &staged_required_token_capacity,
+            &staged_required_merge_workspace_bytes);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    if (snapshot_byte_len != byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_cursor != *io_cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_prompt_nbytes != prompt_nbytes)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_rank_table_count != rank_table_count)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_rank_table_capacity != rank_table_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_max_piece_len != max_piece_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (staged_required_token_capacity != prompt_nbytes)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (prompt_nbytes && max_piece_len > 0x7FFFFFFFFFFFFFFF / prompt_nbytes)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (staged_required_merge_workspace_bytes != prompt_nbytes * max_piece_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    staged_cursor = *io_cursor;
+    staged_token_count = *out_token_count;
+    staged_commit_required_token_capacity = *out_required_token_capacity;
+
+    staged_token_capacity = prompt_nbytes;
+    if (!staged_token_capacity)
+        staged_token_capacity = 1;
+
+    if (staged_token_capacity > (0x7FFFFFFFFFFFFFFF / sizeof(I32)))
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    staged_alloc_bytes = sizeof(I32) * staged_token_capacity;
+    if (!staged_alloc_bytes)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    staged_tokens = MAlloc(staged_alloc_bytes);
+    if (!staged_tokens)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    err = TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnly(
+        bytes,
+        byte_len,
+        &staged_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        max_piece_len,
+        staged_tokens,
+        &staged_token_count,
+        &staged_commit_required_token_capacity);
+    if (err != TOKENIZER_BPE_OK) {
+        Free(staged_tokens);
+        return err;
+    }
+
+    if (staged_commit_required_token_capacity != staged_required_token_capacity) {
+        Free(staged_tokens);
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    }
+
+    if (staged_token_count > staged_required_token_capacity) {
+        Free(staged_tokens);
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    }
+
+    for (i = 0; i < staged_token_count; i++)
+        out_token_ids[i] = staged_tokens[i];
+
+    *out_token_count = staged_token_count;
+    *out_required_token_capacity = staged_commit_required_token_capacity;
+    *out_required_merge_workspace_bytes = staged_required_merge_workspace_bytes;
+    *io_cursor = staged_cursor;
+    Free(staged_tokens);
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEEncodePromptCheckedNoAllocFromLens(
     U8 *bytes,
     U64 byte_len,
