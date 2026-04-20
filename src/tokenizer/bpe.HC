@@ -6509,6 +6509,79 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesCommitO
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyParityNoAllocHardenedDefault(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 vocab_piece_capacity,
+    U64 *out_required_token_capacity,
+    U64 *out_max_piece_len,
+    U64 *out_required_merge_workspace_bytes)
+{
+    U64 initial_cursor;
+    U64 staged_cursor;
+    U64 staged_required_token_capacity;
+    U64 staged_max_piece_len;
+    U64 staged_required_merge_workspace_bytes;
+    I32 err;
+
+    if (!bytes || !io_cursor || !vocab_piece_lens ||
+        !out_required_token_capacity || !out_max_piece_len ||
+        !out_required_merge_workspace_bytes)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    initial_cursor = *io_cursor;
+    staged_cursor = initial_cursor;
+
+    // Default-entry wrapper: stage diagnostics through canonical hardened
+    // no-alloc parity helper and enforce strict cursor immutability before
+    // atomically publishing caller-visible outputs.
+    err = TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyParityNoAllocHardened(
+        bytes,
+        byte_len,
+        &staged_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        vocab_piece_lens,
+        vocab_piece_count,
+        vocab_piece_capacity,
+        &staged_required_token_capacity,
+        &staged_max_piece_len,
+        &staged_required_merge_workspace_bytes);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+    if (staged_cursor != initial_cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Atomic diagnostics publish only after hardened default-entry checks pass.
+    *out_required_token_capacity = staged_required_token_capacity;
+    *out_max_piece_len = staged_max_piece_len;
+    *out_required_merge_workspace_bytes = staged_required_merge_workspace_bytes;
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesCommitOnlyDefaultCapacityPreflightOnlyHardened(
     U8 *bytes,
     U64 byte_len,
