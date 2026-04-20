@@ -4990,6 +4990,87 @@ I32 TokenizerBPEEncodePromptCheckedDefaultNoPartial(U8 *bytes,
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPiece(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    U64 max_piece_len,
+    I32 *out_token_ids,
+    U64 out_token_capacity,
+    U64 *out_token_count,
+    U64 *out_required_token_capacity)
+{
+    U64 cursor;
+    U64 required_token_capacity;
+    U64 required_merge_workspace_bytes;
+
+    if (!bytes || !io_cursor || !out_token_ids || !out_token_count ||
+        !out_required_token_capacity)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF ||
+        out_token_capacity > 0x7FFFFFFFFFFFFFFF ||
+        max_piece_len > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (rank_table_count > rank_table_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (prompt_nbytes > byte_len - cursor)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    if (prompt_nbytes && !max_piece_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Canonical no-alloc output-capacity diagnostic: prompt pretokenization
+    // emits one token per byte before merge passes can only reduce count.
+    required_token_capacity = prompt_nbytes;
+
+    // Derive the caller-side worst-case merge workspace budget from
+    // max_piece_len with explicit integer overflow checks.
+    if (prompt_nbytes && max_piece_len > 0x7FFFFFFFFFFFFFFF / prompt_nbytes)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    required_merge_workspace_bytes = prompt_nbytes * max_piece_len;
+    if (required_merge_workspace_bytes > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    *out_required_token_capacity = required_token_capacity;
+
+    if (required_token_capacity > out_token_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Delegate full UTF-8 validation + merge-loop semantics to the canonical
+    // checked no-partial encoder while preserving the caller no-alloc
+    // contract (all required workspace already pre-sized by caller).
+    return TokenizerBPEEncodePromptCheckedNoPartial(bytes,
+                                                    byte_len,
+                                                    io_cursor,
+                                                    prompt_nbytes,
+                                                    rank_left_tokens,
+                                                    rank_right_tokens,
+                                                    rank_values,
+                                                    rank_merged_tokens,
+                                                    rank_table_count,
+                                                    rank_table_capacity,
+                                                    out_token_ids,
+                                                    out_token_capacity,
+                                                    out_token_count);
+}
+
 I32 TokenizerBPEDecodeTokenSpanChecked(I32 *token_ids,
                                        U64 token_count,
                                        U64 *io_token_cursor,
