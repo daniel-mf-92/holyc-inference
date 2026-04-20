@@ -230,6 +230,50 @@ def test_error_paths_and_overflow() -> None:
     )
     assert err == FFN_Q16_ERR_OVERFLOW
 
+    # Default byte-capacity derivation must overflow-check
+    # `staging_out_capacity * sizeof(I64)` independently of row/lane geometry.
+    err = ffn_q16_swiglu_apply_rows_checked_nopartial_default_stride_noalloc_commit_capacity_default_capacity(
+        gate,
+        4,
+        up,
+        4,
+        out,
+        4,
+        1,
+        1,
+        stage,
+        (I64_MAX // 8) + 1,
+    )
+    assert err == FFN_Q16_ERR_OVERFLOW
+
+
+def test_alias_rejection_is_no_partial() -> None:
+    row_count = 3
+    lane_count = 4
+    required = row_count * lane_count
+
+    gate = [i << 10 for i in range(required)]
+    up = [((i * 3) - 5) << 11 for i in range(required)]
+    out = [0x4F4F] * required
+    out_before = out.copy()
+
+    # staging aliases out: must be rejected and preserve destination.
+    err = ffn_q16_swiglu_apply_rows_checked_nopartial_default_stride_noalloc_commit_capacity_default_capacity(
+        gate,
+        required,
+        up,
+        required,
+        out,
+        required,
+        row_count,
+        lane_count,
+        out,
+        len(out),
+    )
+
+    assert err == FFN_Q16_ERR_BAD_PARAM
+    assert out == out_before
+
 
 def test_randomized_parity_vs_explicit_composition() -> None:
     rng = random.Random(20260420_620)
@@ -287,5 +331,6 @@ if __name__ == "__main__":
     test_known_vectors_match_explicit_checked_composition()
     test_staging_capacity_shortfall_is_no_partial()
     test_error_paths_and_overflow()
+    test_alias_rejection_is_no_partial()
     test_randomized_parity_vs_explicit_composition()
     print("ok")
