@@ -44,7 +44,8 @@ def attention_q16_apply_score_scale_rows_checked_nopartial_default_stride_noallo
     default_score_stride = token_count
     default_row_stride = token_count
 
-    last_row_base_index = [0]
+    last_in_index = [0]
+    last_out_index = [0]
     required_in_cells = [0]
     required_out_cells = [0]
     required_stage_cells = [0]
@@ -56,13 +57,18 @@ def attention_q16_apply_score_scale_rows_checked_nopartial_default_stride_noallo
         default_score_stride,
         default_score_stride,
         default_row_stride,
+        default_row_stride,
         out_scores_q32,
         out_scores_capacity,
-        last_row_base_index,
+        last_in_index,
+        last_out_index,
         required_in_cells,
         required_out_cells,
-        required_stage_cells,
     )
+    if err != ATTN_Q16_OK:
+        return err, 0, 0, 0
+
+    err, required_stage_cells[0] = try_mul_i64_checked(row_count, token_count)
     if err != ATTN_Q16_OK:
         return err, 0, 0, 0
 
