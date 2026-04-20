@@ -213,6 +213,12 @@ def test_source_contains_required_bytes_commit_capacity_alias_safe_default_capac
     assert (
         "AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocCommitCapacityAliasSafeDefaultCapacityPreflightOnly(" in body
     )
+    assert "AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocPreflightOnly(" in body
+    assert "if (required_q_cells != canonical_required_q_cells)" in body
+    assert "if (required_k_cells != canonical_required_k_cells)" in body
+    assert "if (required_out_cells != canonical_required_out_cells)" in body
+    assert "if (required_stage_cells != canonical_required_stage_cells)" in body
+    assert "if (required_stage_bytes != canonical_required_stage_bytes)" in body
     assert "*out_commit_stage_cell_capacity = commit_stage_cell_capacity;" in body
     assert "*out_commit_stage_byte_capacity = commit_stage_byte_capacity;" in body
     assert "*out_required_q_cells =" in body
@@ -389,6 +395,69 @@ def test_overflow_and_null_contracts() -> None:
     )
 
 
+def test_no_partial_outputs_on_error_paths() -> None:
+    q_rows = [0] * 12
+    k_rows = [0] * 12
+    out_scores = [0] * 12
+    staged_scores = [0] * 12
+
+    sentinels = [101, 102, 103, 104, 105, 106, 107]
+    outs = [[v] for v in sentinels]
+
+    err = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_required_bytes_commit_capacity_alias_safe_default_capacity_preflight_only(
+        q_rows,
+        len(q_rows),
+        (1 << 63) - 1,
+        1,
+        k_rows,
+        len(k_rows),
+        2,
+        1,
+        1,
+        out_scores,
+        len(out_scores),
+        1,
+        staged_scores,
+        len(staged_scores),
+        outs[0],
+        outs[1],
+        outs[2],
+        outs[3],
+        outs[4],
+        outs[5],
+        outs[6],
+    )
+    assert err == ATTN_Q16_ERR_OVERFLOW
+    assert [x[0] for x in outs] == sentinels
+
+    err = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_required_bytes_commit_capacity_alias_safe_default_capacity_preflight_only(
+        q_rows,
+        len(q_rows),
+        2,
+        4,
+        k_rows,
+        len(k_rows),
+        2,
+        4,
+        3,
+        out_scores,
+        len(out_scores),
+        2,
+        staged_scores,
+        len(staged_scores),
+        outs[0],
+        outs[1],
+        outs[2],
+        outs[3],
+        outs[4],
+        outs[5],
+        outs[6],
+        stage_base_addr=0x100004,
+    )
+    assert err != ATTN_Q16_OK
+    assert [x[0] for x in outs] == sentinels
+
+
 def test_randomized_parity() -> None:
     rng = random.Random(20260420_655)
 
@@ -525,5 +594,6 @@ if __name__ == "__main__":
     test_source_contains_required_bytes_commit_capacity_alias_safe_default_capacity_preflight_helper()
     test_known_vectors_and_alias_rejection()
     test_overflow_and_null_contracts()
+    test_no_partial_outputs_on_error_paths()
     test_randomized_parity()
     print("ok")

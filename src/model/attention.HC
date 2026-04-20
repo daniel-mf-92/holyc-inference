@@ -5520,7 +5520,7 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCo
         !out_required_stage_bytes)
         return ATTN_Q16_ERR_NULL_PTR;
 
-    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32 || !staged_scores_q32)
         return ATTN_Q16_ERR_NULL_PTR;
 
     if (q_rows_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0 ||
