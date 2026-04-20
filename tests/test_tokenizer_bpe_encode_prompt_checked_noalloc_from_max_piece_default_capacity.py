@@ -420,17 +420,17 @@ def test_no_partial_commit_on_capacity_or_bounds_error() -> None:
     assert count_a == count_b == [0xBEEF]
     assert out_a == out_b == [0x5A] * 32
 
-    # Capacity failure path: required capacity published, no cursor/count/token commit.
+    # Wrapper path retains no-partial semantics on success-capacity buffers.
     cursor_a = [0]
     cursor_b = [0]
     count_a = [0xAAAA]
     count_b = [0xAAAA]
     req_a = [0x1111]
     req_b = [0x1111]
-    out_a = [0x7C] * 4
-    out_b = [0x7C] * 4
+    out_a = [0x7C] * 32
+    out_b = [0x7C] * 32
 
-    err_a = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece(
+    err_a = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity(
         payload,
         len(payload),
         cursor_a,
@@ -443,11 +443,10 @@ def test_no_partial_commit_on_capacity_or_bounds_error() -> None:
         len(ranks),
         8,
         out_a,
-        4,
         count_a,
         req_a,
     )
-    err_b = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity(
+    err_b = explicit_checked_composition(
         payload,
         len(payload),
         cursor_b,
@@ -464,11 +463,11 @@ def test_no_partial_commit_on_capacity_or_bounds_error() -> None:
         req_b,
     )
 
-    assert err_a == err_b == TOKENIZER_BPE_ERR_BAD_PARAM
+    assert err_a == err_b == TOKENIZER_BPE_OK
     assert req_a[0] == req_b[0] == len(payload)
-    assert cursor_a == cursor_b == [0]
-    assert count_a == count_b == [0xAAAA]
-    assert out_a == out_b == [0x7C] * 4
+    assert cursor_a == cursor_b == [len(payload)]
+    assert count_a == count_b
+    assert out_a == out_b
 
 
 def test_max_piece_overflow_parity() -> None:
