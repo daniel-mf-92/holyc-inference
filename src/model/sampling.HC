@@ -72,6 +72,23 @@ I32 InferenceGenerateTokensPreflightCheckedDefaultTopK(
     I64 *out_required_topk_capacity,
     I64 *out_required_random_capacity,
     I64 *out_required_generated_capacity);
+I32 InferenceGenerateTokensPreflightCheckedDefaultTopP(
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 workspace_stage_logits_capacity,
+    I64 workspace_topk_logits_capacity,
+    I64 workspace_topk_index_capacity,
+    I64 random_q16_capacity,
+    I64 generated_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_history_capacity,
+    I64 *out_required_stage_logits_capacity,
+    I64 *out_required_topk_capacity,
+    I64 *out_required_random_capacity,
+    I64 *out_required_generated_capacity);
 I32 InferenceGenerateTokensPreflightCheckedGreedyDefault(
     I64 step_logits_capacity,
     I64 vocab_size,
@@ -1271,6 +1288,11 @@ I32 InferenceGenerateTokensPreflightCheckedGreedyDefault(
     I64 *out_required_random_capacity,
     I64 *out_required_generated_capacity)
 {
+    // Greedy defaults are fixed by the generation wrapper:
+    // temperature_q16 = SAMPLING_Q16_ONE, top_k = 1, top_p_q16 = SAMPLING_Q16_ONE.
+    // Preflight capacity math is sampling-parameter invariant, so this helper
+    // delegates to the canonical checked preflight to preserve exact error
+    // classification and strict no-partial diagnostic writes.
     return InferenceGenerateTokensPreflightChecked(
         step_logits_capacity,
         vocab_size,
@@ -1298,6 +1320,49 @@ I32 InferenceGenerateTokensPreflightCheckedGreedyDefault(
 // to `InferenceGenerateTokensPreflightChecked` to preserve exact status
 // classification and no-partial output semantics.
 I32 InferenceGenerateTokensPreflightCheckedDefaultTopK(
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 workspace_stage_logits_capacity,
+    I64 workspace_topk_logits_capacity,
+    I64 workspace_topk_index_capacity,
+    I64 random_q16_capacity,
+    I64 generated_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_history_capacity,
+    I64 *out_required_stage_logits_capacity,
+    I64 *out_required_topk_capacity,
+    I64 *out_required_random_capacity,
+    I64 *out_required_generated_capacity)
+{
+    return InferenceGenerateTokensPreflightChecked(
+        step_logits_capacity,
+        vocab_size,
+        max_new_tokens,
+        token_history_capacity,
+        token_history_count,
+        workspace_stage_logits_capacity,
+        workspace_topk_logits_capacity,
+        workspace_topk_index_capacity,
+        random_q16_capacity,
+        generated_capacity,
+        out_required_step_logits_cells,
+        out_required_history_capacity,
+        out_required_stage_logits_capacity,
+        out_required_topk_capacity,
+        out_required_random_capacity,
+        out_required_generated_capacity);
+}
+
+// WS7 preflight wrapper for the default-top-p generation API.
+//
+// `InferenceGenerateTokensCheckedDefaultTopP` fixes sampling top-p to
+// `SAMPLING_Q16_ONE`. Capacity diagnostics are sampling-parameter invariant,
+// so this helper forwards to canonical preflight and preserves exact
+// BAD_PARAM/OVERFLOW classification with strict no-partial output writes.
+I32 InferenceGenerateTokensPreflightCheckedDefaultTopP(
     I64 step_logits_capacity,
     I64 vocab_size,
     I64 max_new_tokens,
