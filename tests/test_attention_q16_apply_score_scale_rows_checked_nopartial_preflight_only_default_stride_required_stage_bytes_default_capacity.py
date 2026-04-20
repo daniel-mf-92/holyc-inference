@@ -18,8 +18,8 @@ from test_attention_q16_apply_score_scale_checked import (
 from test_attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only import (
     try_mul_i64,
 )
-from test_attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_noalloc_hardened import (
-    attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_noalloc_hardened,
+from test_attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes import (
+    attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes,
 )
 
 I64_SIZE = 8
@@ -75,7 +75,7 @@ def attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_defaul
     last_in = [0]
     last_out = [0]
 
-    err = attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_noalloc_hardened(
+    err = attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes(
         in_scores_q32,
         in_scores_capacity,
         row_count,
@@ -180,7 +180,7 @@ def explicit_checked_composition(
     last_in = [0]
     last_out = [0]
 
-    err = attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_noalloc_hardened(
+    err = attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes(
         in_scores_q32,
         in_scores_capacity,
         row_count,
@@ -243,7 +243,7 @@ def test_source_contains_default_capacity_required_stage_bytes_helper() -> None:
 
     assert "status = AttentionTryMulI64Checked(row_count," in body
     assert "status = AttentionTryMulI64Checked(default_stage_cell_capacity," in body
-    assert "AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideRequiredStageBytesNoAllocHardened(" in body
+    assert "AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideRequiredStageBytes(" in body
     assert "canonical_required_stage_cells != default_stage_cell_capacity" in body
     assert "snapshot_in_scores_capacity != in_scores_capacity" in body
     assert "snapshot_out_scores_capacity != out_scores_capacity" in body
