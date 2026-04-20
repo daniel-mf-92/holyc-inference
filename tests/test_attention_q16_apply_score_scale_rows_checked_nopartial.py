@@ -33,7 +33,8 @@ def attention_q16_apply_score_scale_rows_checked_nopartial(
     token_count: int,
     in_score_stride: int,
     out_score_stride: int,
-    row_stride: int,
+    in_row_stride: int,
+    out_row_stride: int,
     score_scale_q16: int,
     out_scores_q32,
     out_scores_capacity: int,
@@ -45,7 +46,7 @@ def attention_q16_apply_score_scale_rows_checked_nopartial(
         return ATTN_Q16_ERR_BAD_PARAM
     if row_count < 0 or token_count < 0:
         return ATTN_Q16_ERR_BAD_PARAM
-    if in_score_stride < 0 or out_score_stride < 0 or row_stride < 0:
+    if in_score_stride < 0 or out_score_stride < 0 or in_row_stride < 0 or out_row_stride < 0:
         return ATTN_Q16_ERR_BAD_PARAM
 
     last_in_index = [0]
@@ -59,8 +60,8 @@ def attention_q16_apply_score_scale_rows_checked_nopartial(
         token_count,
         in_score_stride,
         out_score_stride,
-        row_stride,
-        row_stride,
+        in_row_stride,
+        out_row_stride,
         out_scores_q32,
         out_scores_capacity,
         last_in_index,
@@ -106,7 +107,7 @@ def attention_q16_apply_score_scale_rows_checked_nopartial(
         if err != ATTN_Q16_OK:
             return err
 
-        err, row_base = try_add_i64_checked(row_base, row_stride)
+        err, row_base = try_add_i64_checked(row_base, out_row_stride)
         if err != ATTN_Q16_OK:
             return err
 
@@ -117,7 +118,10 @@ def attention_q16_apply_score_scale_rows_checked_nopartial(
             return err
 
         for token_index in range(token_count):
-            err, out_index = try_add_i64_checked(row_base, token_index)
+            err, out_index = try_mul_i64_checked(token_index, out_score_stride)
+            if err != ATTN_Q16_OK:
+                return err
+            err, out_index = try_add_i64_checked(row_base, out_index)
             if err != ATTN_Q16_OK:
                 return err
             err, stage_index = try_add_i64_checked(stage_row_base, token_index)
@@ -125,7 +129,7 @@ def attention_q16_apply_score_scale_rows_checked_nopartial(
                 return err
             out_scores_q32[out_index] = stage[stage_index]
 
-        err, row_base = try_add_i64_checked(row_base, row_stride)
+        err, row_base = try_add_i64_checked(row_base, in_row_stride)
         if err != ATTN_Q16_OK:
             return err
 
@@ -139,7 +143,8 @@ def explicit_staged_row_composition(
     token_count: int,
     in_score_stride: int,
     out_score_stride: int,
-    row_stride: int,
+    in_row_stride: int,
+    out_row_stride: int,
     score_scale_q16: int,
     out_scores_q32,
     out_scores_capacity: int,
@@ -151,7 +156,7 @@ def explicit_staged_row_composition(
         return ATTN_Q16_ERR_BAD_PARAM
     if row_count < 0 or token_count < 0:
         return ATTN_Q16_ERR_BAD_PARAM
-    if in_score_stride < 0 or out_score_stride < 0 or row_stride < 0:
+    if in_score_stride < 0 or out_score_stride < 0 or in_row_stride < 0 or out_row_stride < 0:
         return ATTN_Q16_ERR_BAD_PARAM
 
     last_in_index = [0]
@@ -165,8 +170,8 @@ def explicit_staged_row_composition(
         token_count,
         in_score_stride,
         out_score_stride,
-        row_stride,
-        row_stride,
+        in_row_stride,
+        out_row_stride,
         out_scores_q32,
         out_scores_capacity,
         last_in_index,
@@ -194,7 +199,7 @@ def explicit_staged_row_composition(
     stage = [0] * required_stage_cells
 
     for row_index in range(row_count):
-        row_base = row_index * row_stride
+        row_base = row_index * in_row_stride
         stage_row_base = row_index * token_count
 
         err = attention_q16_apply_score_scale_checked_nopartial(
@@ -211,10 +216,11 @@ def explicit_staged_row_composition(
             return err
 
     for row_index in range(row_count):
-        row_base = row_index * row_stride
+        row_base = row_index * out_row_stride
         stage_row_base = row_index * token_count
         for token_index in range(token_count):
-            out_scores_q32[row_base + token_index] = stage[stage_row_base + token_index]
+            out_index = row_base + token_index * out_score_stride
+            out_scores_q32[out_index] = stage[stage_row_base + token_index]
 
     return ATTN_Q16_OK
 
@@ -235,11 +241,12 @@ def test_known_vector_matches_explicit_staged_row_composition() -> None:
     token_count = 4
     in_score_stride = 2
     out_score_stride = 3
-    row_stride = 11
+    in_row_stride = 11
+    out_row_stride = 13
     score_scale_q16 = 23170
 
-    in_capacity = (row_count - 1) * row_stride + (token_count - 1) * in_score_stride + 1
-    out_capacity = (row_count - 1) * row_stride + (token_count - 1) * out_score_stride + 1
+    in_capacity = (row_count - 1) * in_row_stride + (token_count - 1) * in_score_stride + 1
+    out_capacity = (row_count - 1) * out_row_stride + (token_count - 1) * out_score_stride + 1
 
     in_scores = [0] * in_capacity
     out_new = [0x4141] * out_capacity
@@ -252,7 +259,7 @@ def test_known_vector_matches_explicit_staged_row_composition() -> None:
     ]
     for row in range(row_count):
         for token in range(token_count):
-            in_scores[row * row_stride + token * in_score_stride] = values[row][token]
+            in_scores[row * in_row_stride + token * in_score_stride] = values[row][token]
 
     err_new = attention_q16_apply_score_scale_rows_checked_nopartial(
         in_scores,
@@ -261,7 +268,8 @@ def test_known_vector_matches_explicit_staged_row_composition() -> None:
         token_count,
         in_score_stride,
         out_score_stride,
-        row_stride,
+        in_row_stride,
+        out_row_stride,
         score_scale_q16,
         out_new,
         len(out_new),
@@ -273,7 +281,8 @@ def test_known_vector_matches_explicit_staged_row_composition() -> None:
         token_count,
         in_score_stride,
         out_score_stride,
-        row_stride,
+        in_row_stride,
+        out_row_stride,
         score_scale_q16,
         out_ref,
         len(out_ref),
@@ -288,7 +297,8 @@ def test_no_partial_output_preserved_on_scaling_error() -> None:
     token_count = 1
     in_score_stride = 1
     out_score_stride = 1
-    row_stride = 2
+    in_row_stride = 2
+    out_row_stride = 2
     score_scale_q16 = I64_MAX
 
     in_scores = [I64_MAX, 11, I64_MAX, 22]
@@ -302,7 +312,8 @@ def test_no_partial_output_preserved_on_scaling_error() -> None:
         token_count,
         in_score_stride,
         out_score_stride,
-        row_stride,
+        in_row_stride,
+        out_row_stride,
         score_scale_q16,
         out_scores,
         len(out_scores),
@@ -320,7 +331,8 @@ def test_randomized_parity_and_no_partial_contract() -> None:
         token_count = rng.randint(0, 24)
         in_score_stride = rng.randint(0, 8)
         out_score_stride = rng.randint(0, 8)
-        row_stride = rng.randint(0, 64)
+        in_row_stride = rng.randint(0, 64)
+        out_row_stride = rng.randint(0, 64)
         score_scale_q16 = rng.randint(-(1 << 16), (1 << 16))
 
         in_row_cells = 0
@@ -333,8 +345,8 @@ def test_randomized_parity_and_no_partial_contract() -> None:
         in_capacity = 0
         out_capacity = 0
         if row_count > 0:
-            in_capacity = (row_count - 1) * max(row_stride, 0) + in_row_cells
-            out_capacity = (row_count - 1) * max(row_stride, 0) + out_row_cells
+            in_capacity = (row_count - 1) * max(in_row_stride, 0) + in_row_cells
+            out_capacity = (row_count - 1) * max(out_row_stride, 0) + out_row_cells
 
         in_capacity = max(in_capacity, 0)
         out_capacity = max(out_capacity, 0)
@@ -347,13 +359,14 @@ def test_randomized_parity_and_no_partial_contract() -> None:
             row_count > 0
             and token_count > 0
             and in_score_stride > 0
-            and row_stride > 0
-            and row_stride >= in_row_cells
-            and row_stride >= out_row_cells
+            and in_row_stride > 0
+            and out_row_stride > 0
+            and in_row_stride >= in_row_cells
+            and out_row_stride >= out_row_cells
             and in_capacity > 0
         ):
             for row in range(row_count):
-                row_base = row * row_stride
+                row_base = row * in_row_stride
                 for token in range(token_count):
                     in_scores[row_base + token * in_score_stride] = rng.randint(
                         -(1 << 30), (1 << 30)
@@ -366,7 +379,8 @@ def test_randomized_parity_and_no_partial_contract() -> None:
             token_count,
             in_score_stride,
             out_score_stride,
-            row_stride,
+            in_row_stride,
+        out_row_stride,
             score_scale_q16,
             out_new,
             out_capacity,
@@ -378,7 +392,8 @@ def test_randomized_parity_and_no_partial_contract() -> None:
             token_count,
             in_score_stride,
             out_score_stride,
-            row_stride,
+            in_row_stride,
+        out_row_stride,
             score_scale_q16,
             out_ref,
             out_capacity,
@@ -404,6 +419,7 @@ def test_error_surfaces_match_reference() -> None:
         1,
         1,
         1,
+        1,
         1 << 16,
         out_a,
         len(out_a),
@@ -411,6 +427,7 @@ def test_error_surfaces_match_reference() -> None:
     err_b = explicit_staged_row_composition(
         None,
         0,
+        1,
         1,
         1,
         1,
@@ -433,6 +450,7 @@ def test_error_surfaces_match_reference() -> None:
         1,
         1,
         1,
+        1,
         1 << 16,
         out_a,
         len(out_a),
@@ -442,6 +460,7 @@ def test_error_surfaces_match_reference() -> None:
         1,
         1,
         2,
+        1,
         1,
         1,
         1,
