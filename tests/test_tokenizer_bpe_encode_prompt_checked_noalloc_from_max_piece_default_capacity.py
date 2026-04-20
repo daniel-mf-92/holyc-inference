@@ -11,8 +11,11 @@ sys.path.append(str(Path(__file__).resolve().parent))
 
 from test_tokenizer_bpe_encode_prompt_checked import (
     I64_MAX,
+    TOKENIZER_BPE_ERR_BAD_PARAM,
     TOKENIZER_BPE_ERR_NULL_PTR,
     TOKENIZER_BPE_ERR_OVERFLOW,
+    TOKENIZER_BPE_OK,
+    TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS,
 )
 from test_tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece import (
     tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece,
@@ -294,8 +297,291 @@ def test_randomized_parity() -> None:
         assert out_a == out_b
 
 
+def test_adversarial_utf8_cursor_max_piece_vectors() -> None:
+    left, right, ranks, merged = _build_rank_tables()
+
+    vectors = [
+        # Valid UTF-8 prompt with mixed-width scalars.
+        ("ASCII Καλημέρα 世界 😊".encode("utf-8"), 0, 8),
+        # Cursor lands on continuation byte.
+        ("Ωmega".encode("utf-8"), 1, 4),
+        # Prompt length exactly to end from non-zero cursor.
+        ("hello世界".encode("utf-8"), 5, 6),
+        # Zero-length prompt from middle cursor.
+        ("abcdef".encode("utf-8"), 3, 1),
+        # Invalid UTF-8 byte payload still must parity-match error behavior.
+        (bytes([0xF0, 0x28, 0x8C, 0x28, 0x61, 0x62]), 0, 5),
+    ]
+
+    for payload_bytes, cursor_seed, max_piece_len in vectors:
+        payload = list(payload_bytes)
+        byte_len = len(payload)
+        prompt_nbytes = byte_len - cursor_seed
+
+        out_a = [0x88] * 256
+        out_b = [0x88] * 256
+        count_a = [0x4444]
+        count_b = [0x4444]
+        req_a = [0x9999]
+        req_b = [0x9999]
+        cursor_a = [cursor_seed]
+        cursor_b = [cursor_seed]
+
+        err_a = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity(
+            payload,
+            byte_len,
+            cursor_a,
+            prompt_nbytes,
+            left,
+            right,
+            ranks,
+            merged,
+            len(ranks),
+            len(ranks),
+            max_piece_len,
+            out_a,
+            count_a,
+            req_a,
+        )
+        err_b = explicit_checked_composition(
+            payload,
+            byte_len,
+            cursor_b,
+            prompt_nbytes,
+            left,
+            right,
+            ranks,
+            merged,
+            len(ranks),
+            len(ranks),
+            max_piece_len,
+            out_b,
+            count_b,
+            req_b,
+        )
+
+        assert err_a == err_b
+        assert cursor_a == cursor_b
+        assert count_a == count_b
+        assert req_a == req_b
+        assert out_a == out_b
+
+
+def test_no_partial_commit_on_capacity_or_bounds_error() -> None:
+    left, right, ranks, merged = _build_rank_tables()
+    payload = list("token stream".encode("utf-8"))
+
+    cursor_a = [2]
+    cursor_b = [2]
+    count_a = [0xBEEF]
+    count_b = [0xBEEF]
+    req_a = [0xCAFE]
+    req_b = [0xCAFE]
+    out_a = [0x5A] * 32
+    out_b = [0x5A] * 32
+
+    # Force deterministic out-of-bounds prompt slice.
+    prompt_nbytes = len(payload) - 1
+    err_a = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity(
+        payload,
+        len(payload),
+        cursor_a,
+        prompt_nbytes,
+        left,
+        right,
+        ranks,
+        merged,
+        len(ranks),
+        len(ranks),
+        8,
+        out_a,
+        count_a,
+        req_a,
+    )
+    err_b = explicit_checked_composition(
+        payload,
+        len(payload),
+        cursor_b,
+        prompt_nbytes,
+        left,
+        right,
+        ranks,
+        merged,
+        len(ranks),
+        len(ranks),
+        8,
+        out_b,
+        count_b,
+        req_b,
+    )
+
+    assert err_a == err_b == TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS
+    assert cursor_a == cursor_b == [2]
+    assert count_a == count_b == [0xBEEF]
+    assert out_a == out_b == [0x5A] * 32
+
+    # Capacity failure path: required capacity published, no cursor/count/token commit.
+    cursor_a = [0]
+    cursor_b = [0]
+    count_a = [0xAAAA]
+    count_b = [0xAAAA]
+    req_a = [0x1111]
+    req_b = [0x1111]
+    out_a = [0x7C] * 4
+    out_b = [0x7C] * 4
+
+    err_a = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece(
+        payload,
+        len(payload),
+        cursor_a,
+        len(payload),
+        left,
+        right,
+        ranks,
+        merged,
+        len(ranks),
+        len(ranks),
+        8,
+        out_a,
+        4,
+        count_a,
+        req_a,
+    )
+    err_b = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity(
+        payload,
+        len(payload),
+        cursor_b,
+        len(payload),
+        left,
+        right,
+        ranks,
+        merged,
+        len(ranks),
+        len(ranks),
+        8,
+        out_b,
+        count_b,
+        req_b,
+    )
+
+    assert err_a == err_b == TOKENIZER_BPE_ERR_BAD_PARAM
+    assert req_a[0] == req_b[0] == len(payload)
+    assert cursor_a == cursor_b == [0]
+    assert count_a == count_b == [0xAAAA]
+    assert out_a == out_b == [0x7C] * 4
+
+
+def test_max_piece_overflow_parity() -> None:
+    left, right, ranks, merged = _build_rank_tables()
+    payload = [ord("x")] * 4
+    cursor_a = [0]
+    cursor_b = [0]
+    out_a = [0x20] * 16
+    out_b = [0x20] * 16
+    count_a = [0x22]
+    count_b = [0x22]
+    req_a = [0x33]
+    req_b = [0x33]
+
+    huge = I64_MAX
+
+    err_a = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity(
+        payload,
+        len(payload),
+        cursor_a,
+        len(payload),
+        left,
+        right,
+        ranks,
+        merged,
+        len(ranks),
+        len(ranks),
+        huge,
+        out_a,
+        count_a,
+        req_a,
+    )
+    err_b = explicit_checked_composition(
+        payload,
+        len(payload),
+        cursor_b,
+        len(payload),
+        left,
+        right,
+        ranks,
+        merged,
+        len(ranks),
+        len(ranks),
+        huge,
+        out_b,
+        count_b,
+        req_b,
+    )
+
+    assert err_a == err_b == TOKENIZER_BPE_ERR_OVERFLOW
+    assert cursor_a == cursor_b == [0]
+    assert count_a == count_b == [0x22]
+    assert out_a == out_b == [0x20] * 16
+
+
+def test_empty_prompt_success_parity() -> None:
+    left, right, ranks, merged = _build_rank_tables()
+    payload = list("abc".encode("utf-8"))
+    cursor_a = [2]
+    cursor_b = [2]
+    out_a = [0x44] * 8
+    out_b = [0x44] * 8
+    count_a = [0x2A2A]
+    count_b = [0x2A2A]
+    req_a = [0x1717]
+    req_b = [0x1717]
+
+    err_a = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity(
+        payload,
+        len(payload),
+        cursor_a,
+        0,
+        left,
+        right,
+        ranks,
+        merged,
+        len(ranks),
+        len(ranks),
+        0,
+        out_a,
+        count_a,
+        req_a,
+    )
+    err_b = explicit_checked_composition(
+        payload,
+        len(payload),
+        cursor_b,
+        0,
+        left,
+        right,
+        ranks,
+        merged,
+        len(ranks),
+        len(ranks),
+        0,
+        out_b,
+        count_b,
+        req_b,
+    )
+
+    assert err_a == err_b == TOKENIZER_BPE_OK
+    assert cursor_a == cursor_b == [2]
+    assert count_a == count_b == [0]
+    assert req_a == req_b == [0]
+    assert out_a == out_b == [0x44] * 8
+
+
 if __name__ == "__main__":
     test_source_contains_max_piece_default_capacity_wrapper()
     test_success_fixture_parity()
     test_randomized_parity()
+    test_adversarial_utf8_cursor_max_piece_vectors()
+    test_no_partial_commit_on_capacity_or_bounds_error()
+    test_max_piece_overflow_parity()
+    test_empty_prompt_success_parity()
     print("tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity=ok")
