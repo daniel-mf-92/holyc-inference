@@ -5217,6 +5217,89 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensDefaultCapacityPreflightOnly(
     U64 vocab_piece_count,
     U64 vocab_piece_capacity,
     U64 *out_required_token_capacity,
+    U64 *out_max_piece_len);
+
+I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensPreflightOnly(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 vocab_piece_capacity,
+    U64 out_token_capacity,
+    U64 *out_required_token_capacity,
+    U64 *out_max_piece_len)
+{
+    U64 staged_required_token_capacity;
+    U64 staged_max_piece_len;
+    I32 err;
+
+    // Keep rank tables in the signature for call-site parity with encode
+    // wrappers; canonical preflight performs only structural validation.
+    (void)rank_left_tokens;
+    (void)rank_right_tokens;
+    (void)rank_values;
+    (void)rank_merged_tokens;
+
+    if (!bytes || !io_cursor || !vocab_piece_lens ||
+        !out_required_token_capacity || !out_max_piece_len)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (out_token_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Reuse canonical lens preflight checks and max-piece scan, but stage
+    // diagnostics locally so failure never partially mutates caller outputs.
+    err = TokenizerBPEEncodePromptCheckedNoAllocFromLensDefaultCapacityPreflightOnly(
+        bytes,
+        byte_len,
+        io_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        vocab_piece_lens,
+        vocab_piece_count,
+        vocab_piece_capacity,
+        &staged_required_token_capacity,
+        &staged_max_piece_len);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    if (staged_required_token_capacity > out_token_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Atomic publish of explicit-capacity diagnostics.
+    *out_required_token_capacity = staged_required_token_capacity;
+    *out_max_piece_len = staged_max_piece_len;
+    return TOKENIZER_BPE_OK;
+}
+
+I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensDefaultCapacityPreflightOnly(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 vocab_piece_capacity,
+    U64 *out_required_token_capacity,
     U64 *out_max_piece_len)
 {
     U64 piece_index;
@@ -5279,6 +5362,95 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensDefaultCapacityPreflightOnly(
         return TOKENIZER_BPE_ERR_BAD_PARAM;
 
     // Strict no-partial output contract for preflight diagnostics.
+    *out_required_token_capacity = staged_required_token_capacity;
+    *out_max_piece_len = staged_max_piece_len;
+    return TOKENIZER_BPE_OK;
+}
+
+I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensPreflightOnly(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 vocab_piece_capacity,
+    U64 out_token_capacity,
+    U64 *out_required_token_capacity,
+    U64 *out_max_piece_len)
+{
+    U64 piece_index;
+    U64 staged_max_piece_len;
+    U64 staged_required_token_capacity;
+    U64 cursor;
+
+    // Keep parameters explicit for signature parity with no-alloc encode
+    // wrappers even though preflight diagnostics do not consume rank tables.
+    (void)rank_left_tokens;
+    (void)rank_right_tokens;
+    (void)rank_values;
+    (void)rank_merged_tokens;
+
+    if (!bytes || !io_cursor || !vocab_piece_lens ||
+        !out_required_token_capacity || !out_max_piece_len)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_capacity > 0x7FFFFFFFFFFFFFFF ||
+        out_token_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (rank_table_count > rank_table_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (vocab_piece_count > vocab_piece_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (prompt_nbytes > byte_len - cursor)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    staged_max_piece_len = 0;
+    piece_index = 0;
+    while (piece_index < vocab_piece_count)
+    {
+        if (vocab_piece_lens[piece_index] > 0x7FFFFFFFFFFFFFFF)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+
+        if (vocab_piece_lens[piece_index] > staged_max_piece_len)
+            staged_max_piece_len = vocab_piece_lens[piece_index];
+
+        piece_index++;
+        if (!piece_index)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    // No-alloc pretokenization bound: one emitted token per prompt byte
+    // before merges, so required token capacity is prompt_nbytes.
+    staged_required_token_capacity = prompt_nbytes;
+
+    // Non-empty prompt windows require at least one legal piece length.
+    if (prompt_nbytes && !staged_max_piece_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Explicit-capacity preflight guard for no-alloc callers.
+    if (staged_required_token_capacity > out_token_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Strict no-partial diagnostics commit.
     *out_required_token_capacity = staged_required_token_capacity;
     *out_max_piece_len = staged_max_piece_len;
     return TOKENIZER_BPE_OK;

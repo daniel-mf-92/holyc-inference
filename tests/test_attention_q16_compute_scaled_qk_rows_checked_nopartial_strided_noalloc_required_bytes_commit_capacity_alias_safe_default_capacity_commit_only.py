@@ -124,8 +124,9 @@ def test_source_contains_required_bytes_commit_capacity_alias_safe_default_capac
     assert signature in source
     body = source.split(signature, 1)[1]
 
-    assert "AttentionTryMulI64Checked(query_row_count" in body
-    assert "AttentionTryMulI64Checked(staged_scores_capacity" in body
+    assert "AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafeDefaultCapacityPreflightOnly(" in body
+    assert "if (preflight_required_q_cells != required_q_cells)" in body
+    assert "if (preflight_required_stage_bytes != required_stage_bytes)" in body
     assert "return AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafeCommitOnly(" in body
 
 
