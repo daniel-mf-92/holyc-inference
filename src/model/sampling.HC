@@ -55,6 +55,23 @@ I32 InferenceGenerateTokensPreflightChecked(
     I64 *out_required_topk_capacity,
     I64 *out_required_random_capacity,
     I64 *out_required_generated_capacity);
+I32 InferenceGenerateTokensPreflightCheckedDefaultTopK(
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 workspace_stage_logits_capacity,
+    I64 workspace_topk_logits_capacity,
+    I64 workspace_topk_index_capacity,
+    I64 random_q16_capacity,
+    I64 generated_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_history_capacity,
+    I64 *out_required_stage_logits_capacity,
+    I64 *out_required_topk_capacity,
+    I64 *out_required_random_capacity,
+    I64 *out_required_generated_capacity);
 
 I32 GenerationStepComposeStageError(I32 stage_base, I32 stage_status)
 {
@@ -1156,6 +1173,50 @@ I32 InferenceGenerateTokensCheckedDefaultTopP(I64 *step_logits_q16,
                                           workspace_topk_index_capacity,
                                           out_generated_tokens,
                                           out_generated_count);
+}
+
+// WS7 preflight wrapper for the default-top-k generation API.
+//
+// `InferenceGenerateTokensCheckedDefaultTopK` fixes sampling top-k to
+// `vocab_size`. Capacity diagnostics are otherwise identical to the base
+// checked preflight contract, so this helper forwards inputs/outputs directly
+// to `InferenceGenerateTokensPreflightChecked` to preserve exact status
+// classification and no-partial output semantics.
+I32 InferenceGenerateTokensPreflightCheckedDefaultTopK(
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 workspace_stage_logits_capacity,
+    I64 workspace_topk_logits_capacity,
+    I64 workspace_topk_index_capacity,
+    I64 random_q16_capacity,
+    I64 generated_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_history_capacity,
+    I64 *out_required_stage_logits_capacity,
+    I64 *out_required_topk_capacity,
+    I64 *out_required_random_capacity,
+    I64 *out_required_generated_capacity)
+{
+    return InferenceGenerateTokensPreflightChecked(
+        step_logits_capacity,
+        vocab_size,
+        max_new_tokens,
+        token_history_capacity,
+        token_history_count,
+        workspace_stage_logits_capacity,
+        workspace_topk_logits_capacity,
+        workspace_topk_index_capacity,
+        random_q16_capacity,
+        generated_capacity,
+        out_required_step_logits_cells,
+        out_required_history_capacity,
+        out_required_stage_logits_capacity,
+        out_required_topk_capacity,
+        out_required_random_capacity,
+        out_required_generated_capacity);
 }
 
 // WS7 generation preflight diagnostics for default-capacity API wrappers.
