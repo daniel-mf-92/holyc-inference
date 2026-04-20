@@ -206,6 +206,24 @@ I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnly(
     I64 *out_required_topk_capacity,
     I64 *out_required_random_capacity,
     I64 *out_required_generated_capacity);
+I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyDefaultCapacity(
+    I64 *step_logits_q16,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 *token_history,
+    I64 token_history_count,
+    I64 top_p_q16,
+    I64 *random_q16_values,
+    I64 *workspace_stage_logits_q16,
+    I64 *workspace_topk_logits_q16,
+    I64 *workspace_topk_indices,
+    I64 *out_generated_tokens,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_history_capacity,
+    I64 *out_required_stage_logits_capacity,
+    I64 *out_required_topk_capacity,
+    I64 *out_required_random_capacity,
+    I64 *out_required_generated_capacity);
 
 I32 GenerationStepComposeStageError(I32 stage_base, I32 stage_status)
 {
@@ -1483,6 +1501,83 @@ I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnly(
     *out_required_random_capacity = required_random_capacity;
     *out_required_generated_capacity = required_generated_capacity;
     return SAMPLING_Q16_OK;
+}
+
+// WS7 diagnostics-only default-capacity wrapper for top-k-default preflight.
+//
+// Derived capacities (integer-only, overflow-checked):
+// - step_logits_capacity = vocab_size * max_new_tokens
+// - token_history_capacity = token_history_count + max_new_tokens
+// - workspace stage/top-k capacities = vocab_size
+// - random/generated capacities = max_new_tokens
+//
+// No-partial diagnostics contract: delegate publishes required-capacity tuple
+// only on full success; no generation/history buffers are modified.
+I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyDefaultCapacity(
+    I64 *step_logits_q16,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 *token_history,
+    I64 token_history_count,
+    I64 top_p_q16,
+    I64 *random_q16_values,
+    I64 *workspace_stage_logits_q16,
+    I64 *workspace_topk_logits_q16,
+    I64 *workspace_topk_indices,
+    I64 *out_generated_tokens,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_history_capacity,
+    I64 *out_required_stage_logits_capacity,
+    I64 *out_required_topk_capacity,
+    I64 *out_required_random_capacity,
+    I64 *out_required_generated_capacity)
+{
+    I64 step_logits_capacity;
+    I64 token_history_capacity;
+
+    if (vocab_size < 0 || max_new_tokens < 0 || token_history_count < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    token_history_capacity = token_history_count + max_new_tokens;
+    if (token_history_capacity < token_history_count)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    if (max_new_tokens)
+    {
+        if (vocab_size > 0x7FFFFFFFFFFFFFFF / max_new_tokens)
+            return SAMPLING_Q16_ERR_OVERFLOW;
+        step_logits_capacity = vocab_size * max_new_tokens;
+    }
+    else
+    {
+        step_logits_capacity = 0;
+    }
+
+    return InferenceGenerateTokensCheckedTopKDefaultPreflightOnly(
+        step_logits_q16,
+        step_logits_capacity,
+        vocab_size,
+        max_new_tokens,
+        token_history,
+        token_history_capacity,
+        token_history_count,
+        top_p_q16,
+        random_q16_values,
+        max_new_tokens,
+        workspace_stage_logits_q16,
+        vocab_size,
+        workspace_topk_logits_q16,
+        vocab_size,
+        workspace_topk_indices,
+        vocab_size,
+        out_generated_tokens,
+        max_new_tokens,
+        out_required_step_logits_cells,
+        out_required_history_capacity,
+        out_required_stage_logits_capacity,
+        out_required_topk_capacity,
+        out_required_random_capacity,
+        out_required_generated_capacity);
 }
 
 // WS7 execution wrapper: top-k-default generation with derived capacities.
