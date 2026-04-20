@@ -1623,6 +1623,22 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredB
     I64 *out_required_stage_cells,
     I64 *out_required_stage_bytes);
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyHardenedPreflightOnlyNoAllocCommitOnly(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_q_cells,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes);
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesDefaultCapacity(
     I64 *q_rows_q16,
     I64 q_rows_capacity,
@@ -6126,6 +6142,72 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredB
     // helper, then publish atomically only on success.
     status =
         AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyHardenedPreflightOnly(
+            q_rows_q16,
+            q_rows_capacity,
+            query_row_count,
+            k_rows_q16,
+            k_rows_capacity,
+            token_count,
+            head_dim,
+            out_scores_q32,
+            out_scores_capacity,
+            &staged_required_q_cells,
+            &staged_required_k_cells,
+            &staged_required_out_cells,
+            &staged_required_stage_cells,
+            &staged_required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    *out_required_q_cells = staged_required_q_cells;
+    *out_required_k_cells = staged_required_k_cells;
+    *out_required_out_cells = staged_required_out_cells;
+    *out_required_stage_cells = staged_required_stage_cells;
+    *out_required_stage_bytes = staged_required_stage_bytes;
+    return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyHardenedPreflightOnlyNoAllocCommitOnly(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_q_cells,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes)
+{
+    I64 staged_required_q_cells;
+    I64 staged_required_k_cells;
+    I64 staged_required_out_cells;
+    I64 staged_required_stage_cells;
+    I64 staged_required_stage_bytes;
+    I32 status;
+
+    if (!out_required_q_cells || !out_required_k_cells ||
+        !out_required_out_cells || !out_required_stage_cells ||
+        !out_required_stage_bytes)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_rows_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_row_count < 0 || token_count < 0 || head_dim < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-730 commit-only diagnostics wrapper contract:
+    // run IQ-729 hardened preflight-only noalloc helper into staged locals,
+    // then atomically publish required cells/bytes only after success.
+    status =
+        AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyHardenedPreflightOnlyNoAlloc(
             q_rows_q16,
             q_rows_capacity,
             query_row_count,
