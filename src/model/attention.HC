@@ -10620,11 +10620,49 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideCommitOnly(
     if (!query_row_count || !token_count)
         return ATTN_Q16_OK;
 
-    // IQ-591 commit-only contract:
-    // staged rows are tightly packed by `token_count`, and destination rows
-    // use the same default stride. Commit only live token lanes with checked
-    // `{row_base + token_index}` math so no-partial callers keep deterministic
-    // all-or-nothing semantics.
+    return AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnly(
+        query_row_count,
+        token_count,
+        staged_scores_q32,
+        staged_scores_capacity,
+        out_scores_q32,
+        out_scores_capacity);
+}
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnly(
+    I64 query_row_count,
+    I64 token_count,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity)
+{
+    I64 default_out_row_stride;
+    I64 required_stage_cells;
+    I64 required_out_cells;
+    I64 row_index;
+    I64 token_index;
+    I64 row_base;
+    I64 stage_row_base;
+    I64 out_index;
+    I64 stage_index;
+    I32 status;
+
+    if (!staged_scores_q32 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (query_row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_scores_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (!query_row_count || !token_count)
+        return ATTN_Q16_OK;
+
+    // IQ-626 canonical commit-only contract:
+    // staged rows are tightly packed by `token_count`, destination rows use
+    // default stride, and all indexing is validated with checked
+    // `{row_base + token_index}` arithmetic before any output write.
     default_out_row_stride = token_count;
 
     status = AttentionTryMulI64Checked(query_row_count,
@@ -10649,8 +10687,8 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideCommitOnly(
     if (required_out_cells > out_scores_capacity)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    // First pass validates every source/destination index. If any checked
-    // index operation fails, return without touching caller output.
+    // First pass validates every packed source and default-stride destination
+    // index. Any checked arithmetic failure keeps caller outputs untouched.
     for (row_index = 0; row_index < query_row_count; row_index++)
     {
         status = AttentionTryMulI64Checked(row_index,
@@ -10681,8 +10719,8 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideCommitOnly(
         }
     }
 
-    // Commit pass copies only live token lanes; destination padding remains
-    // untouched by construction because writes are limited to `token_count`.
+    // Commit pass publishes only live token lanes, preserving strict
+    // all-or-nothing no-partial semantics.
     for (row_index = 0; row_index < query_row_count; row_index++)
     {
         status = AttentionTryMulI64Checked(row_index,
@@ -10716,26 +10754,6 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideCommitOnly(
     }
 
     return ATTN_Q16_OK;
-}
-
-I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnly(
-    I64 query_row_count,
-    I64 token_count,
-    I64 *staged_scores_q32,
-    I64 staged_scores_capacity,
-    I64 *out_scores_q32,
-    I64 out_scores_capacity)
-{
-    // IQ-576 default-stride no-partial commit-order wrapper:
-    // keep a canonical API name aligned with the WS5 queue while delegating
-    // exact checked row-major commit semantics to the established helper.
-    return AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideCommitOnly(
-        query_row_count,
-        token_count,
-        staged_scores_q32,
-        staged_scores_capacity,
-        out_scores_q32,
-        out_scores_capacity);
 }
 
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(

@@ -5198,6 +5198,59 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityPreflightOn
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyPreflightOnly(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    U64 max_piece_len,
+    U64 *out_required_token_capacity)
+{
+    U64 staged_required_token_capacity;
+    I32 err;
+
+    if (!bytes || !io_cursor || !out_required_token_capacity)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        max_piece_len > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // IQ-800 diagnostics-only commit-only preflight wrapper:
+    // compose canonical default-capacity max-piece checks while staging
+    // required-token diagnostics so caller outputs never partially mutate.
+    err = TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityPreflightOnly(
+        bytes,
+        byte_len,
+        io_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        max_piece_len,
+        &staged_required_token_capacity);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    if (staged_required_token_capacity != prompt_nbytes)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    *out_required_token_capacity = staged_required_token_capacity;
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnly(
     U8 *bytes,
     U64 byte_len,
@@ -5259,7 +5312,7 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnly(
     // 4) commit token ids/cursor/count atomically only after parity checks.
     preflight_required_token_capacity = *out_required_token_capacity;
     err =
-        TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityPreflightOnly(
+        TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyPreflightOnly(
             bytes,
             byte_len,
             &snapshot_cursor,

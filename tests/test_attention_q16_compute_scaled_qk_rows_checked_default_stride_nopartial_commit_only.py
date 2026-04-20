@@ -14,9 +14,9 @@ from test_attention_q16_apply_score_scale_checked import (
     ATTN_Q16_ERR_NULL_PTR,
     ATTN_Q16_OK,
 )
-from test_attention_q16_compute_scaled_qk_rows_checked_nopartial_default_stride_commit_only import (
-    attention_q16_compute_scaled_qk_rows_checked_nopartial_default_stride_commit_only,
-    explicit_checked_copy_loops,
+from test_attention_q16_apply_score_scale_checked import (
+    try_add_i64_checked,
+    try_mul_i64_checked,
 )
 
 
@@ -36,14 +36,62 @@ def attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit
     if staged_scores_capacity < 0 or out_scores_capacity < 0:
         return ATTN_Q16_ERR_BAD_PARAM
 
-    return attention_q16_compute_scaled_qk_rows_checked_nopartial_default_stride_commit_only(
-        query_row_count,
-        token_count,
-        staged_scores_q32,
-        staged_scores_capacity,
-        out_scores_q32,
-        out_scores_capacity,
+    if query_row_count == 0 or token_count == 0:
+        return ATTN_Q16_OK
+
+    default_out_row_stride = token_count
+
+    err, required_stage_cells = try_mul_i64_checked(query_row_count, token_count)
+    if err != ATTN_Q16_OK:
+        return err
+    err, required_out_cells = try_mul_i64_checked(
+        query_row_count - 1, default_out_row_stride
     )
+    if err != ATTN_Q16_OK:
+        return err
+    err, required_out_cells = try_add_i64_checked(required_out_cells, token_count)
+    if err != ATTN_Q16_OK:
+        return err
+
+    if required_stage_cells > staged_scores_capacity:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if required_out_cells > out_scores_capacity:
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    for row_index in range(query_row_count):
+        err, row_base = try_mul_i64_checked(row_index, default_out_row_stride)
+        if err != ATTN_Q16_OK:
+            return err
+        err, stage_row_base = try_mul_i64_checked(row_index, token_count)
+        if err != ATTN_Q16_OK:
+            return err
+
+        for token_index in range(token_count):
+            err, _ = try_add_i64_checked(row_base, token_index)
+            if err != ATTN_Q16_OK:
+                return err
+            err, _ = try_add_i64_checked(stage_row_base, token_index)
+            if err != ATTN_Q16_OK:
+                return err
+
+    for row_index in range(query_row_count):
+        err, row_base = try_mul_i64_checked(row_index, default_out_row_stride)
+        if err != ATTN_Q16_OK:
+            return err
+        err, stage_row_base = try_mul_i64_checked(row_index, token_count)
+        if err != ATTN_Q16_OK:
+            return err
+
+        for token_index in range(token_count):
+            err, out_index = try_add_i64_checked(row_base, token_index)
+            if err != ATTN_Q16_OK:
+                return err
+            err, stage_index = try_add_i64_checked(stage_row_base, token_index)
+            if err != ATTN_Q16_OK:
+                return err
+            out_scores_q32[out_index] = staged_scores_q32[stage_index]
+
+    return ATTN_Q16_OK
 
 
 def explicit_wrapper_composition(
@@ -62,26 +110,53 @@ def explicit_wrapper_composition(
     if staged_scores_capacity < 0 or out_scores_capacity < 0:
         return ATTN_Q16_ERR_BAD_PARAM
 
-    return explicit_checked_copy_loops(
-        query_row_count,
-        token_count,
-        staged_scores_q32,
-        staged_scores_capacity,
-        out_scores_q32,
-        out_scores_capacity,
-    )
+    if query_row_count == 0 or token_count == 0:
+        return ATTN_Q16_OK
+
+    err, required_stage_cells = try_mul_i64_checked(query_row_count, token_count)
+    if err != ATTN_Q16_OK:
+        return err
+    err, required_out_cells = try_mul_i64_checked(query_row_count - 1, token_count)
+    if err != ATTN_Q16_OK:
+        return err
+    err, required_out_cells = try_add_i64_checked(required_out_cells, token_count)
+    if err != ATTN_Q16_OK:
+        return err
+
+    if required_stage_cells > staged_scores_capacity:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if required_out_cells > out_scores_capacity:
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    for row_index in range(query_row_count):
+        err, row_base = try_mul_i64_checked(row_index, token_count)
+        if err != ATTN_Q16_OK:
+            return err
+
+        for token_index in range(token_count):
+            err, out_index = try_add_i64_checked(row_base, token_index)
+            if err != ATTN_Q16_OK:
+                return err
+            err, stage_index = try_add_i64_checked(row_base, token_index)
+            if err != ATTN_Q16_OK:
+                return err
+            out_scores_q32[out_index] = staged_scores_q32[stage_index]
+
+    return ATTN_Q16_OK
 
 
-def test_source_contains_default_stride_nopartial_commit_only_wrapper() -> None:
+def test_source_contains_default_stride_nopartial_commit_only_implementation() -> None:
     source = Path("src/model/attention.HC").read_text(encoding="utf-8")
     signature = "I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnly("
     assert signature in source
     body = source.split(signature, 1)[1]
 
-    assert (
-        "return AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideCommitOnly("
-        in body
-    )
+    assert "default_out_row_stride = token_count;" in body
+    assert "required_stage_cells" in body
+    assert "required_out_cells" in body
+    assert "for (row_index = 0; row_index < query_row_count; row_index++)" in body
+    assert "for (token_index = 0; token_index < token_count; token_index++)" in body
+    assert "out_scores_q32[out_index] = staged_scores_q32[stage_index];" in body
 
 
 def test_known_vector_matches_explicit_wrapper_composition() -> None:
@@ -210,7 +285,7 @@ def test_randomized_parity_vs_explicit_wrapper() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_default_stride_nopartial_commit_only_wrapper()
+    test_source_contains_default_stride_nopartial_commit_only_implementation()
     test_known_vector_matches_explicit_wrapper_composition()
     test_error_paths_preserve_output()
     test_randomized_parity_vs_explicit_wrapper()

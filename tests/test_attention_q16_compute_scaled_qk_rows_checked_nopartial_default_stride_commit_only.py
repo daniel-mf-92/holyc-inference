@@ -154,12 +154,7 @@ def test_source_contains_commit_only_helper() -> None:
     assert signature in source
     body = source.split(signature, 1)[1]
 
-    assert "default_out_row_stride = token_count;" in body
-    assert "required_stage_cells" in body
-    assert "required_out_cells" in body
-    assert "for (row_index = 0; row_index < query_row_count; row_index++)" in body
-    assert "for (token_index = 0; token_index < token_count; token_index++)" in body
-    assert "out_scores_q32[out_index] = staged_scores_q32[stage_index];" in body
+    assert "return AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnly(" in body
 
 
 def test_known_vector_matches_explicit_checked_copy() -> None:

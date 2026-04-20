@@ -264,7 +264,7 @@ def test_source_contains_max_piece_default_capacity_commit_only_wrapper() -> Non
         "I32 TokenizerBPEEncodePromptCheckedNoAllocFromLens(",
         1,
     )[0]
-    assert "TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityPreflightOnly(" in body
+    assert "TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyPreflightOnly(" in body
     assert "TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacity(" in body
     assert "if (snapshot_cursor != *io_cursor)" in body
     assert "for (i = 0; i < staged_token_count; i++)" in body
