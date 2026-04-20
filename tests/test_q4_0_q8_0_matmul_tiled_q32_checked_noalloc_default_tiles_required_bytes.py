@@ -109,7 +109,24 @@ def explicit_checked_composition(
     out_tile_n: list[int] | None,
     out_tile_k_blocks: list[int] | None,
 ) -> int:
-    return q4_0_q8_0_matmul_tiled_q32_checked_noalloc_default_tiles_required_bytes(
+    if (
+        out_required_lhs_blocks is None
+        or out_required_rhs_blocks is None
+        or out_required_out_cells is None
+        or out_tile_m is None
+        or out_tile_n is None
+        or out_tile_k_blocks is None
+    ):
+        return Q4_0_Q8_0_AVX2_ERR_NULL_PTR
+
+    req_lhs = [0]
+    req_rhs = [0]
+    req_out = [0]
+    tile_m = [0]
+    tile_n = [0]
+    tile_k = [0]
+
+    status = q4_0_q8_0_matmul_tiled_q32_checked_noalloc_default_tiles_preflight_only(
         lhs_q4_blocks,
         lhs_q4_block_capacity,
         row_count,
@@ -122,13 +139,23 @@ def explicit_checked_composition(
         out_cells_q32,
         out_cell_capacity,
         out_row_stride_cells,
-        out_required_lhs_blocks,
-        out_required_rhs_blocks,
-        out_required_out_cells,
-        out_tile_m,
-        out_tile_n,
-        out_tile_k_blocks,
+        req_lhs,
+        req_rhs,
+        req_out,
+        tile_m,
+        tile_n,
+        tile_k,
     )
+    if status != Q4_0_Q8_0_AVX2_OK:
+        return status
+
+    out_required_lhs_blocks[0] = req_lhs[0]
+    out_required_rhs_blocks[0] = req_rhs[0]
+    out_required_out_cells[0] = req_out[0]
+    out_tile_m[0] = tile_m[0]
+    out_tile_n[0] = tile_n[0]
+    out_tile_k_blocks[0] = tile_k[0]
+    return Q4_0_Q8_0_AVX2_OK
 
 
 def test_source_contains_required_bytes_wrapper() -> None:

@@ -516,6 +516,58 @@ I32 Q4_0Q8_0MatMulTiledQ32CheckedNoAllocDefaultTilesPreflightOnly(
     // Preflight-only no-partial policy: validate every dot path and publish
     // deterministic required capacities + fixed default tiles with zero output
     // writes. Compute/commit remains in the canonical AVX2 kernel wrapper.
+    row_tile_start = 0;
+    while (row_tile_start < row_count)
+    {
+        if (!Q4_0Q8_0MatMulTryAddI64NonNeg(row_tile_start,
+                                           Q4_0_Q8_0_MATMUL_DEFAULT_TILE_M,
+                                           &row_tile_end))
+            return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+        row_tile_end = Q4_0Q8_0MatMulMinI64(row_tile_end, row_count);
+
+        col_tile_start = 0;
+        while (col_tile_start < col_count)
+        {
+            if (!Q4_0Q8_0MatMulTryAddI64NonNeg(col_tile_start,
+                                               Q4_0_Q8_0_MATMUL_DEFAULT_TILE_N,
+                                               &col_tile_end))
+                return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+            col_tile_end = Q4_0Q8_0MatMulMinI64(col_tile_end, col_count);
+
+            for (row_index = row_tile_start; row_index < row_tile_end; ++row_index)
+            {
+                if (!Q4_0Q8_0MatMulTryMulI64NonNeg(row_index,
+                                                   lhs_row_stride_blocks,
+                                                   &lhs_row_base))
+                    return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+                lhs_row_ptr = &lhs_q4_blocks[lhs_row_base];
+
+                for (col_index = col_tile_start; col_index < col_tile_end; ++col_index)
+                {
+                    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(col_index,
+                                                       rhs_col_stride_blocks,
+                                                       &rhs_col_base))
+                        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+                    rhs_col_ptr = &rhs_q8_col_blocks[rhs_col_base];
+
+                    cell_dot_q32 = 0;
+                    status = Q4_0_Q8_0DotBlocksAVX2Q32Checked(lhs_row_ptr,
+                                                              rhs_col_ptr,
+                                                              k_block_count,
+                                                              &cell_dot_q32);
+                    if (status != Q4_0_Q8_0_MATMUL_OK)
+                        return status;
+                }
+            }
+
+            col_tile_start = col_tile_end;
+        }
+
+        row_tile_start = row_tile_end;
+    }
+
+    return Q4_0_Q8_0_MATMUL_OK;
+}
 
 I32 Q4_0Q8_0MatMulTiledQ32CheckedNoAllocDefaultTilesRequiredBytes(
     Q4_0Block *lhs_q4_blocks,
