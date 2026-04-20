@@ -5807,6 +5807,8 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyR
     if (staged_required_token_capacity_after_commit !=
         staged_required_token_capacity)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (staged_token_count > staged_required_token_capacity_after_commit)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
 
     if (prompt_nbytes && max_piece_len > 0x7FFFFFFFFFFFFFFF / prompt_nbytes)
         return TOKENIZER_BPE_ERR_OVERFLOW;
