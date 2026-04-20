@@ -4885,6 +4885,12 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedPreflightOnly(
     I64 required_q_cells;
     I64 required_k_cells;
     I64 required_out_cells;
+    I64 recomputed_last_q_base_index;
+    I64 recomputed_last_k_base_index;
+    I64 recomputed_last_out_base_index;
+    I64 recomputed_required_q_cells;
+    I64 recomputed_required_k_cells;
+    I64 recomputed_required_out_cells;
     I32 status;
 
     if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32 ||
@@ -5032,6 +5038,80 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialPreflightOnly(
         &required_out_cells);
     if (status != ATTN_Q16_OK)
         return status;
+
+    // IQ-568: derive all diagnostics from checked index math and verify they
+    // match the shared preflight helper before exposing outputs. This keeps
+    // no-partial wrappers deterministic and catches any future drift between
+    // staged diagnostics and explicit guard composition.
+    if (!query_row_count)
+    {
+        recomputed_last_q_base_index = 0;
+        recomputed_last_k_base_index = 0;
+        recomputed_last_out_base_index = 0;
+        recomputed_required_q_cells = 0;
+        recomputed_required_k_cells = 0;
+        recomputed_required_out_cells = 0;
+    }
+    else
+    {
+        status = AttentionTryMulI64Checked(query_row_count - 1,
+                                           query_row_stride_q16,
+                                           &recomputed_last_q_base_index);
+        if (status != ATTN_Q16_OK)
+            return status;
+
+        status = AttentionTryAddI64Checked(recomputed_last_q_base_index,
+                                           head_dim,
+                                           &recomputed_required_q_cells);
+        if (status != ATTN_Q16_OK)
+            return status;
+
+        status = AttentionTryMulI64Checked(token_count,
+                                           k_row_stride_q16,
+                                           &recomputed_required_k_cells);
+        if (status != ATTN_Q16_OK)
+            return status;
+
+        if (!token_count)
+        {
+            recomputed_last_k_base_index = 0;
+            recomputed_last_out_base_index = 0;
+            recomputed_required_out_cells = 0;
+        }
+        else
+        {
+            status = AttentionTryMulI64Checked(token_count - 1,
+                                               k_row_stride_q16,
+                                               &recomputed_last_k_base_index);
+            if (status != ATTN_Q16_OK)
+                return status;
+
+            status = AttentionTryMulI64Checked(query_row_count - 1,
+                                               out_row_stride,
+                                               &recomputed_last_out_base_index);
+            if (status != ATTN_Q16_OK)
+                return status;
+
+            status = AttentionTryAddI64Checked(recomputed_last_out_base_index,
+                                               token_count,
+                                               &recomputed_required_out_cells);
+            if (status != ATTN_Q16_OK)
+                return status;
+        }
+    }
+
+    if (last_q_base_index != recomputed_last_q_base_index)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (last_k_base_index != recomputed_last_k_base_index)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (last_out_base_index != recomputed_last_out_base_index)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_q_cells != recomputed_required_q_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_k_cells != recomputed_required_k_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_out_cells != recomputed_required_out_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
 
     *out_last_q_base_index = last_q_base_index;
     *out_last_k_base_index = last_k_base_index;

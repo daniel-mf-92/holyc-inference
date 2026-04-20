@@ -109,7 +109,11 @@ def test_source_contains_nopartial_rows_preflight_signature_and_delegate_shape()
     assert signature in source
 
     body = source.split(signature, 1)[1]
-    assert "return AttentionQ16ComputeScaledQKRowsCheckedPreflightOnly(" in body
+    assert "status = AttentionQ16ComputeScaledQKRowsCheckedPreflightOnly(" in body
+    assert "recomputed_last_q_base_index" in body
+    assert "recomputed_required_out_cells" in body
+    assert "if (last_q_base_index != recomputed_last_q_base_index)" in body
+    assert "if (required_out_cells != recomputed_required_out_cells)" in body
     assert "out_required_q_cells" in body
     assert "out_required_k_cells" in body
     assert "out_required_out_cells" in body
