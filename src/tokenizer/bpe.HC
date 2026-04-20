@@ -5212,6 +5212,7 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyP
     U64 max_piece_len,
     U64 *out_required_token_capacity)
 {
+    U64 snapshot_cursor;
     U64 staged_required_token_capacity;
     I32 err;
 
@@ -5225,13 +5226,17 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyP
         max_piece_len > 0x7FFFFFFFFFFFFFFF)
         return TOKENIZER_BPE_ERR_OVERFLOW;
 
+    snapshot_cursor = *io_cursor;
+    if (snapshot_cursor > byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
     // IQ-800 diagnostics-only commit-only preflight wrapper:
     // compose canonical default-capacity max-piece checks while staging
     // required-token diagnostics so caller outputs never partially mutate.
     err = TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityPreflightOnly(
         bytes,
         byte_len,
-        io_cursor,
+        &snapshot_cursor,
         prompt_nbytes,
         rank_left_tokens,
         rank_right_tokens,
@@ -5243,6 +5248,11 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyP
         &staged_required_token_capacity);
     if (err != TOKENIZER_BPE_OK)
         return err;
+
+    // Immutable-cursor diagnostics contract: preflight-only wrappers must not
+    // advance caller cursor, so commit-only geometry checks reject drift.
+    if (snapshot_cursor != *io_cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
 
     if (staged_required_token_capacity != prompt_nbytes)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
