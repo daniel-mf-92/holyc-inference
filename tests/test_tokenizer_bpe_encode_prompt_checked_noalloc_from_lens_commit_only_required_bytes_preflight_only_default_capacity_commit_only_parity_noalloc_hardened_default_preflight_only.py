@@ -87,6 +87,9 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_required_b
     if io_cursor[0] != initial_cursor:
         return TOKENIZER_BPE_ERR_BAD_PARAM
 
+    if staged_required[0] > I64_MAX or staged_max_piece[0] > I64_MAX or staged_required_bytes[0] > I64_MAX:
+        return TOKENIZER_BPE_ERR_OVERFLOW
+
     out_required_token_capacity[0] = staged_required[0]
     out_max_piece_len[0] = staged_max_piece[0]
     out_required_merge_workspace_bytes[0] = staged_required_bytes[0]
@@ -158,6 +161,9 @@ def explicit_checked_composition(*args):
     if err != TOKENIZER_BPE_OK:
         return err
 
+    if staged_required[0] > I64_MAX or staged_max_piece[0] > I64_MAX or staged_required_bytes[0] > I64_MAX:
+        return TOKENIZER_BPE_ERR_OVERFLOW
+
     out_required_token_capacity[0] = staged_required[0]
     out_max_piece_len[0] = staged_max_piece[0]
     out_required_merge_workspace_bytes[0] = staged_required_bytes[0]
@@ -201,6 +207,8 @@ def test_source_contains_signature_and_default_preflight_wrapper() -> None:
     assert "staged_cursor = initial_cursor;" in body
     assert "if (staged_cursor != initial_cursor)" in body
     assert "if (*io_cursor != initial_cursor)" in body
+    assert "staged_required_token_capacity > 0x7FFFFFFFFFFFFFFF" in body
+    assert "staged_required_merge_workspace_bytes > 0x7FFFFFFFFFFFFFFF" in body
     assert "*out_required_merge_workspace_bytes = staged_required_merge_workspace_bytes;" in body
 
 
@@ -318,6 +326,61 @@ def test_success_error_no_write_parity_and_sentinel_preservation() -> None:
     assert bad_bytes_a == bad_bytes_b == [0xCCCC]
 
 
+def test_staged_output_overflow_returns_error_and_preserves_sentinels() -> None:
+    left, right, ranks, merged = _build_rank_tables()
+
+    original = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_required_bytes_preflight_only_default_capacity_commit_only_parity_noalloc_hardened_default
+
+    def fake_overflow(*args):
+        out_required = args[13]
+        out_max_piece = args[14]
+        out_required_bytes = args[15]
+        out_required[0] = I64_MAX + 1
+        out_max_piece[0] = 1
+        out_required_bytes[0] = 1
+        return TOKENIZER_BPE_OK
+
+    globals()[
+        "tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_required_bytes_preflight_only_default_capacity_commit_only_parity_noalloc_hardened_default"
+    ] = fake_overflow
+    try:
+        req = [0xAAAA]
+        max_piece = [0xBBBB]
+        req_bytes = [0xCCCC]
+        cursor = [0]
+        payload = list(b"abc")
+        vocab_lens = [1, 2, 3]
+
+        err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_required_bytes_preflight_only_default_capacity_commit_only_parity_noalloc_hardened_default_preflight_only(
+            payload,
+            len(payload),
+            cursor,
+            len(payload),
+            left,
+            right,
+            ranks,
+            merged,
+            len(ranks),
+            len(ranks),
+            vocab_lens,
+            len(vocab_lens),
+            len(vocab_lens),
+            req,
+            max_piece,
+            req_bytes,
+        )
+
+        assert err == TOKENIZER_BPE_ERR_OVERFLOW
+        assert cursor == [0]
+        assert req == [0xAAAA]
+        assert max_piece == [0xBBBB]
+        assert req_bytes == [0xCCCC]
+    finally:
+        globals()[
+            "tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_required_bytes_preflight_only_default_capacity_commit_only_parity_noalloc_hardened_default"
+        ] = original
+
+
 def test_null_overflow_and_fuzz_parity() -> None:
     left, right, ranks, merged = _build_rank_tables()
 
@@ -430,5 +493,6 @@ def test_null_overflow_and_fuzz_parity() -> None:
 if __name__ == "__main__":
     test_source_contains_signature_and_default_preflight_wrapper()
     test_success_error_no_write_parity_and_sentinel_preservation()
+    test_staged_output_overflow_returns_error_and_preserves_sentinels()
     test_null_overflow_and_fuzz_parity()
     print("ok")

@@ -6652,6 +6652,11 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesPreflig
     if (*io_cursor != initial_cursor)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
 
+    if (staged_required_token_capacity > 0x7FFFFFFFFFFFFFFF ||
+        staged_max_piece_len > 0x7FFFFFFFFFFFFFFF ||
+        staged_required_merge_workspace_bytes > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
     // Atomic diagnostics publish only after all preflight checks pass.
     *out_required_token_capacity = staged_required_token_capacity;
     *out_max_piece_len = staged_max_piece_len;
