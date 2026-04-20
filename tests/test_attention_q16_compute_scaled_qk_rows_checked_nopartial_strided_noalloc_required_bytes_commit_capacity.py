@@ -217,7 +217,7 @@ def test_source_contains_strided_noalloc_required_bytes_commit_capacity_helper()
     assert signature in source
     body = source.split(signature, 1)[1]
 
-    assert "AttentionQ16ComputeScaledQKRowsCheckedNoPartialPreflightOnly(" in body
+    assert "AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocPreflightOnly(" in body
     assert "if (commit_required_stage_bytes > commit_stage_byte_capacity)" in body
 
 

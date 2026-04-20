@@ -342,6 +342,23 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCo
     I64 *out_commit_required_stage_bytes,
     I64 *out_required_out_cells);
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesDefaultCapacity(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 query_row_stride_q16,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 k_row_stride_q16,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 out_row_stride,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_required_out_cells);
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityDefault(
     I64 *q_rows_q16,
     I64 q_rows_capacity,
@@ -4730,6 +4747,76 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCo
     *out_commit_required_stage_bytes = commit_required_stage_bytes;
     *out_required_out_cells = required_out_cells;
     return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesDefaultCapacity(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 query_row_stride_q16,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 k_row_stride_q16,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 out_row_stride,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_required_out_cells)
+{
+    I64 default_stage_cell_capacity;
+    I64 default_stage_byte_capacity;
+    I32 status;
+
+    if (!out_required_stage_cells || !out_required_stage_bytes ||
+        !out_required_out_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_rows_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_row_count < 0 || query_row_stride_q16 < 0 || token_count < 0 ||
+        k_row_stride_q16 < 0 || head_dim < 0 || out_row_stride < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-635 default-capacity diagnostics contract:
+    // derive default stage capacities directly from live packed stage shape,
+    // then route all diagnostics through the canonical explicit commit-capacity
+    // required-bytes helper so guard/overflow semantics remain identical.
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       token_count,
+                                       &default_stage_cell_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(default_stage_cell_capacity,
+                                       sizeof(I64),
+                                       &default_stage_byte_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    return AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacity(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        query_row_stride_q16,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        k_row_stride_q16,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        out_row_stride,
+        default_stage_cell_capacity,
+        default_stage_byte_capacity,
+        out_required_stage_cells,
+        out_required_stage_bytes,
+        out_required_out_cells);
 }
 
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocCommitCapacity(
