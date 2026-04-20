@@ -5502,6 +5502,11 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCo
 {
     I64 commit_stage_cell_capacity;
     I64 commit_stage_byte_capacity;
+    I64 required_q_cells;
+    I64 required_k_cells;
+    I64 required_out_cells;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
     I32 status;
 
     if (!out_commit_stage_cell_capacity || !out_commit_stage_byte_capacity ||
