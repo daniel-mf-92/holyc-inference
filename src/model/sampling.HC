@@ -163,6 +163,24 @@ I32 InferenceGenerateTokensCheckedGreedyDefaultTopKDefaultCapacity(
     I64 *workspace_topk_indices,
     I64 *out_generated_tokens,
     I64 *out_generated_count);
+I32 InferenceGenerateTokensCheckedTopKDefault(
+    I64 *step_logits_q16,
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 *token_history,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 top_p_q16,
+    I64 *random_q16_values,
+    I64 *workspace_stage_logits_q16,
+    I64 workspace_stage_logits_capacity,
+    I64 *workspace_topk_logits_q16,
+    I64 workspace_topk_logits_capacity,
+    I64 *workspace_topk_indices,
+    I64 workspace_topk_index_capacity,
+    I64 *out_generated_tokens,
+    I64 *out_generated_count);
 
 I32 GenerationStepComposeStageError(I32 stage_base, I32 stage_status)
 {
@@ -1264,6 +1282,130 @@ I32 InferenceGenerateTokensCheckedDefaultTopP(I64 *step_logits_q16,
                                           workspace_topk_index_capacity,
                                           out_generated_tokens,
                                           out_generated_count);
+}
+
+// WS7 API sugar wrapper: deterministic top-k-default generation.
+//
+// Fixed sampling controls for this entry point:
+// - temperature_q16 = SAMPLING_Q16_ONE
+// - top_k = vocab_size (full-vocabulary eligibility)
+// - repetition_penalty_q16 = SAMPLING_Q16_ONE
+//
+// Caller still provides `top_p_q16` and all workspace/history capacities.
+// The wrapper preserves exact checked/no-partial semantics by delegating to
+// canonical `InferenceGenerateTokensChecked` with only sampling constants
+// substituted.
+I32 InferenceGenerateTokensCheckedTopKDefault(
+    I64 *step_logits_q16,
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 *token_history,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 top_p_q16,
+    I64 *random_q16_values,
+    I64 *workspace_stage_logits_q16,
+    I64 workspace_stage_logits_capacity,
+    I64 *workspace_topk_logits_q16,
+    I64 workspace_topk_logits_capacity,
+    I64 *workspace_topk_indices,
+    I64 workspace_topk_index_capacity,
+    I64 *out_generated_tokens,
+    I64 *out_generated_count)
+{
+    return InferenceGenerateTokensChecked(step_logits_q16,
+                                          step_logits_capacity,
+                                          vocab_size,
+                                          max_new_tokens,
+                                          token_history,
+                                          token_history_capacity,
+                                          token_history_count,
+                                          SAMPLING_Q16_ONE,
+                                          vocab_size,
+                                          top_p_q16,
+                                          SAMPLING_Q16_ONE,
+                                          random_q16_values,
+                                          workspace_stage_logits_q16,
+                                          workspace_stage_logits_capacity,
+                                          workspace_topk_logits_q16,
+                                          workspace_topk_logits_capacity,
+                                          workspace_topk_indices,
+                                          workspace_topk_index_capacity,
+                                          out_generated_tokens,
+                                          out_generated_count);
+}
+
+// WS7 execution wrapper: top-k-default generation with derived capacities.
+//
+// Fixed sampling controls are provided by
+// `InferenceGenerateTokensCheckedTopKDefault`:
+// - temperature_q16 = SAMPLING_Q16_ONE
+// - top_k = vocab_size
+// - repetition_penalty_q16 = SAMPLING_Q16_ONE
+//
+// Derived capacity contract (checked integer math only):
+// - step_logits_capacity = vocab_size * max_new_tokens
+// - token_history_capacity = token_history_count + max_new_tokens
+// - workspace stage/top-k capacities = vocab_size
+// - random/generated capacities = max_new_tokens
+//
+// The wrapper preserves exact checked/no-partial semantics by guarding all
+// additive/multiplicative derivations against overflow, then delegating to
+// canonical top-k-default checked generation.
+I32 InferenceGenerateTokensCheckedTopKDefaultDefaultCapacity(
+    I64 *step_logits_q16,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 *token_history,
+    I64 token_history_count,
+    I64 top_p_q16,
+    I64 *random_q16_values,
+    I64 *workspace_stage_logits_q16,
+    I64 *workspace_topk_logits_q16,
+    I64 *workspace_topk_indices,
+    I64 *out_generated_tokens,
+    I64 *out_generated_count)
+{
+    I64 step_logits_capacity;
+    I64 token_history_capacity;
+
+    if (vocab_size < 0 || max_new_tokens < 0 || token_history_count < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    token_history_capacity = token_history_count + max_new_tokens;
+    if (token_history_capacity < token_history_count)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    if (max_new_tokens)
+    {
+        if (vocab_size > 0x7FFFFFFFFFFFFFFF / max_new_tokens)
+            return SAMPLING_Q16_ERR_OVERFLOW;
+        step_logits_capacity = vocab_size * max_new_tokens;
+    }
+    else
+    {
+        step_logits_capacity = 0;
+    }
+
+    return InferenceGenerateTokensCheckedTopKDefault(
+        step_logits_q16,
+        step_logits_capacity,
+        vocab_size,
+        max_new_tokens,
+        token_history,
+        token_history_capacity,
+        token_history_count,
+        top_p_q16,
+        random_q16_values,
+        workspace_stage_logits_q16,
+        vocab_size,
+        workspace_topk_logits_q16,
+        vocab_size,
+        workspace_topk_indices,
+        vocab_size,
+        out_generated_tokens,
+        out_generated_count);
 }
 
 // WS7 API sugar wrapper: deterministic greedy generation defaults.
