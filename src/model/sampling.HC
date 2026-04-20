@@ -1175,6 +1175,57 @@ I32 InferenceGenerateTokensCheckedDefaultTopP(I64 *step_logits_q16,
                                           out_generated_count);
 }
 
+// WS7 API sugar wrapper: deterministic greedy generation defaults.
+//
+// Enforces the canonical greedy sampling configuration:
+// - temperature_q16 = 1.0 (no temperature scaling)
+// - top_k = 1 (single most likely token)
+// - top_p_q16 = 1.0 (no nucleus truncation)
+//
+// Random lanes remain required by the shared checked contract, but with
+// `top_k=1` they do not affect token choice. The wrapper preserves exact
+// status/no-partial semantics of `InferenceGenerateTokensChecked`.
+I32 InferenceGenerateTokensCheckedGreedyDefault(
+    I64 *step_logits_q16,
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 *token_history,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 repetition_penalty_q16,
+    I64 *random_q16_values,
+    I64 *workspace_stage_logits_q16,
+    I64 workspace_stage_logits_capacity,
+    I64 *workspace_topk_logits_q16,
+    I64 workspace_topk_logits_capacity,
+    I64 *workspace_topk_indices,
+    I64 workspace_topk_index_capacity,
+    I64 *out_generated_tokens,
+    I64 *out_generated_count)
+{
+    return InferenceGenerateTokensChecked(step_logits_q16,
+                                          step_logits_capacity,
+                                          vocab_size,
+                                          max_new_tokens,
+                                          token_history,
+                                          token_history_capacity,
+                                          token_history_count,
+                                          SAMPLING_Q16_ONE,
+                                          1,
+                                          SAMPLING_Q16_ONE,
+                                          repetition_penalty_q16,
+                                          random_q16_values,
+                                          workspace_stage_logits_q16,
+                                          workspace_stage_logits_capacity,
+                                          workspace_topk_logits_q16,
+                                          workspace_topk_logits_capacity,
+                                          workspace_topk_indices,
+                                          workspace_topk_index_capacity,
+                                          out_generated_tokens,
+                                          out_generated_count);
+}
+
 // WS7 preflight wrapper for the default-top-k generation API.
 //
 // `InferenceGenerateTokensCheckedDefaultTopK` fixes sampling top-k to
