@@ -422,6 +422,82 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialPreflightOnly(
     I64 *out_required_k_cells,
     I64 *out_required_out_cells);
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStridePreflightOnly(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_q_cells,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells);
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStridePreflightOnly(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_q_cells,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells)
+{
+    I64 default_query_row_stride_q16;
+    I64 default_k_row_stride_q16;
+    I64 default_out_row_stride;
+    I64 last_q_base_index;
+    I64 last_k_base_index;
+    I64 last_out_base_index;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32 ||
+        !out_required_q_cells || !out_required_k_cells ||
+        !out_required_out_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_rows_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_row_count < 0 || token_count < 0 || head_dim < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-575 default-stride batched diagnostics contract:
+    // - query rows are tightly packed by `head_dim` lanes;
+    // - key rows are tightly packed by `head_dim` lanes;
+    // - output rows are token-major with stride `token_count`.
+    // Route to the shared checked preflight helper so required-cell
+    // diagnostics stay composition-identical with explicit stride expansion.
+    default_query_row_stride_q16 = head_dim;
+    default_k_row_stride_q16 = head_dim;
+    default_out_row_stride = token_count;
+
+    return AttentionQ16ComputeScaledQKRowsCheckedPreflightOnly(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        default_query_row_stride_q16,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        default_k_row_stride_q16,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        default_out_row_stride,
+        &last_q_base_index,
+        &last_k_base_index,
+        &last_out_base_index,
+        out_required_q_cells,
+        out_required_k_cells,
+        out_required_out_cells);
+}
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialPreflightOnly(
     I64 *q_rows_q16,
     I64 q_rows_capacity,
@@ -2173,6 +2249,61 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
         required_stage_cells,
         out_scores_q32,
         out_scores_capacity);
+}
+
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacityDefaultCapacity(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity)
+{
+    I64 default_commit_stage_cell_capacity;
+    I64 default_commit_stage_byte_capacity;
+    I32 status;
+
+    if (!in_scores_q32 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (in_scores_capacity < 0 || out_scores_capacity < 0 ||
+        staged_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-625 default-capacity commit contract:
+    // derive commit scratch limits from live row/token geometry
+    // (`row_count * token_count`) and caller staging bytes
+    // (`staged_scores_capacity * sizeof(I64)`), then route all
+    // no-partial semantics through the canonical commit-capacity wrapper.
+    status = AttentionTryMulI64Checked(row_count,
+                                       token_count,
+                                       &default_commit_stage_cell_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(staged_scores_capacity,
+                                       sizeof(I64),
+                                       &default_commit_stage_byte_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    return AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacity(
+        in_scores_q32,
+        in_scores_capacity,
+        row_count,
+        token_count,
+        score_scale_q16,
+        out_scores_q32,
+        out_scores_capacity,
+        default_commit_stage_cell_capacity,
+        default_commit_stage_byte_capacity,
+        staged_scores_q32,
+        staged_scores_capacity);
 }
 
 I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(
