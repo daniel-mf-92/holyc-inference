@@ -72,6 +72,23 @@ I32 InferenceGenerateTokensPreflightCheckedDefaultTopK(
     I64 *out_required_topk_capacity,
     I64 *out_required_random_capacity,
     I64 *out_required_generated_capacity);
+I32 InferenceGenerateTokensPreflightCheckedGreedyDefault(
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 workspace_stage_logits_capacity,
+    I64 workspace_topk_logits_capacity,
+    I64 workspace_topk_index_capacity,
+    I64 random_q16_capacity,
+    I64 generated_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_history_capacity,
+    I64 *out_required_stage_logits_capacity,
+    I64 *out_required_topk_capacity,
+    I64 *out_required_random_capacity,
+    I64 *out_required_generated_capacity);
 
 I32 GenerationStepComposeStageError(I32 stage_base, I32 stage_status)
 {
@@ -1224,6 +1241,53 @@ I32 InferenceGenerateTokensCheckedGreedyDefault(
                                           workspace_topk_index_capacity,
                                           out_generated_tokens,
                                           out_generated_count);
+}
+
+// WS7 preflight wrapper for deterministic greedy-default generation.
+//
+// Mirrors `InferenceGenerateTokensCheckedGreedyDefault` fixed sampling knobs:
+// - temperature_q16 = SAMPLING_Q16_ONE
+// - top_k = 1
+// - top_p_q16 = SAMPLING_Q16_ONE
+//
+// Capacity diagnostics are identical to the base checked preflight contract.
+// This wrapper keeps exact BAD_PARAM/OVERFLOW classification and strict
+// no-partial diagnostic writes by forwarding to canonical preflight.
+I32 InferenceGenerateTokensPreflightCheckedGreedyDefault(
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 workspace_stage_logits_capacity,
+    I64 workspace_topk_logits_capacity,
+    I64 workspace_topk_index_capacity,
+    I64 random_q16_capacity,
+    I64 generated_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_history_capacity,
+    I64 *out_required_stage_logits_capacity,
+    I64 *out_required_topk_capacity,
+    I64 *out_required_random_capacity,
+    I64 *out_required_generated_capacity)
+{
+    return InferenceGenerateTokensPreflightChecked(
+        step_logits_capacity,
+        vocab_size,
+        max_new_tokens,
+        token_history_capacity,
+        token_history_count,
+        workspace_stage_logits_capacity,
+        workspace_topk_logits_capacity,
+        workspace_topk_index_capacity,
+        random_q16_capacity,
+        generated_capacity,
+        out_required_step_logits_cells,
+        out_required_history_capacity,
+        out_required_stage_logits_capacity,
+        out_required_topk_capacity,
+        out_required_random_capacity,
+        out_required_generated_capacity);
 }
 
 // WS7 preflight wrapper for the default-top-k generation API.
