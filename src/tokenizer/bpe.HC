@@ -5475,6 +5475,7 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensDefaultCapacityCommitOnly(
     U64 *out_required_token_capacity,
     U64 *out_max_piece_len)
 {
+    U64 cursor;
     U64 derived_out_token_capacity;
     U64 staged_cursor;
     U64 staged_token_count;
@@ -5498,14 +5499,29 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensDefaultCapacityCommitOnly(
         vocab_piece_capacity > 0x7FFFFFFFFFFFFFFF)
         return TOKENIZER_BPE_ERR_OVERFLOW;
 
+    if (rank_table_count > rank_table_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (vocab_piece_count > vocab_piece_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (prompt_nbytes > byte_len - cursor)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
     // IQ-695 default-capacity no-alloc contract: byte pretokenization emits
     // at most one token per prompt byte before merge passes shrink count.
     derived_out_token_capacity = prompt_nbytes;
 
     // Stage caller-visible cursor/count and token ids so every failure path
     // leaves caller outputs unchanged.
-    staged_cursor = *io_cursor;
+    staged_cursor = cursor;
     staged_token_count = *out_token_count;
+    staged_required_token_capacity = *out_required_token_capacity;
+    staged_max_piece_len = *out_max_piece_len;
 
     staged_token_capacity = derived_out_token_capacity;
     if (!staged_token_capacity)
