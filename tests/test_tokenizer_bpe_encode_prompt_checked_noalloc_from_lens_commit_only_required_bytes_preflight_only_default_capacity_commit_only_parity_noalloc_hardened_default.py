@@ -200,6 +200,7 @@ def test_source_contains_signature_and_default_hardening_wrapper() -> None:
     assert "initial_cursor = *io_cursor;" in body
     assert "staged_cursor = initial_cursor;" in body
     assert "if (staged_cursor != initial_cursor)" in body
+    assert "if (*io_cursor != initial_cursor)" in body
     assert "*out_required_merge_workspace_bytes = staged_required_merge_workspace_bytes;" in body
 
 

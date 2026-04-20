@@ -6574,6 +6574,8 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesPreflig
         return err;
     if (staged_cursor != initial_cursor)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (*io_cursor != initial_cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
 
     // Atomic diagnostics publish only after hardened default-entry checks pass.
     *out_required_token_capacity = staged_required_token_capacity;
