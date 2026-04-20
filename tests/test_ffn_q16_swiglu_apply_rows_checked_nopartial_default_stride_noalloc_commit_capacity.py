@@ -73,6 +73,9 @@ def ffn_q16_swiglu_apply_rows_checked_nopartial_default_stride_noalloc_commit_ca
     if row_count == 0 or lane_count == 0:
         return FFN_Q16_OK
 
+    if required_out_cells[0] > out_capacity:
+        return FFN_Q16_ERR_BAD_PARAM
+
     if staging_out_q16 is None:
         return FFN_Q16_ERR_NULL_PTR
     if required_stage_cells[0] > staging_out_capacity:
@@ -99,9 +102,6 @@ def ffn_q16_swiglu_apply_rows_checked_nopartial_default_stride_noalloc_commit_ca
     )
     if err != FFN_Q16_OK:
         return err
-
-    if required_out_cells[0] > out_capacity:
-        return FFN_Q16_ERR_BAD_PARAM
 
     return commit_only.ffn_q16_swiglu_apply_rows_checked_nopartial_default_stride_noalloc_commit_only(
         row_count,
@@ -166,6 +166,9 @@ def explicit_checked_commit_capacity_composition(
     if row_count == 0 or lane_count == 0:
         return FFN_Q16_OK
 
+    if required_out_cells[0] > out_capacity:
+        return FFN_Q16_ERR_BAD_PARAM
+
     if staging_out_q16 is None:
         return FFN_Q16_ERR_NULL_PTR
     if required_stage_cells[0] > staging_out_capacity:
@@ -193,9 +196,6 @@ def explicit_checked_commit_capacity_composition(
     if err != FFN_Q16_OK:
         return err
 
-    if required_out_cells[0] > out_capacity:
-        return FFN_Q16_ERR_BAD_PARAM
-
     return commit_only.ffn_q16_swiglu_apply_rows_checked_nopartial_default_stride_noalloc_commit_only(
         row_count,
         lane_count,
@@ -219,6 +219,7 @@ def test_source_contains_noalloc_commit_capacity_wrapper() -> None:
     )
     assert "FFNQ16SwiGLUApplyRowsCheckedDefaultStride(" in body
     assert "FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(" in body
+    assert "if (required_out_cells > out_capacity)" in body
     assert "if (required_stage_cells > staging_out_capacity)" in body
     assert "if (required_stage_bytes > staging_capacity_bytes)" in body
 
@@ -298,6 +299,39 @@ def test_commit_capacity_rejection_is_no_partial() -> None:
         stage,
         required,
     )
+    assert err == FFN_Q16_ERR_BAD_PARAM
+    assert out == out_before
+    assert stage == stage_before
+
+
+def test_out_capacity_rejection_is_no_partial_and_leaves_stage_untouched() -> None:
+    row_count = 3
+    lane_count = 5
+    required = row_count * lane_count
+    required_bytes = required * 8
+
+    gate = [((i * 9) - 13) << 12 for i in range(required)]
+    up = [((17 - i) << 11) for i in range(required)]
+    out = [0x7B7B] * (required - 1)
+    out_before = out.copy()
+    stage = [0x2C2C] * required
+    stage_before = stage.copy()
+
+    err = ffn_q16_swiglu_apply_rows_checked_nopartial_default_stride_noalloc_commit_capacity(
+        gate,
+        required,
+        up,
+        required,
+        out,
+        required - 1,
+        row_count,
+        lane_count,
+        required,
+        required_bytes,
+        stage,
+        required,
+    )
+
     assert err == FFN_Q16_ERR_BAD_PARAM
     assert out == out_before
     assert stage == stage_before
@@ -425,6 +459,7 @@ if __name__ == "__main__":
     test_source_contains_noalloc_commit_capacity_wrapper()
     test_known_vectors_match_explicit_checked_composition()
     test_commit_capacity_rejection_is_no_partial()
+    test_out_capacity_rejection_is_no_partial_and_leaves_stage_untouched()
     test_randomized_parity_against_explicit_composition()
     test_overflow_passthrough()
     print("ok")

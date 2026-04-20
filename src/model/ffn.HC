@@ -1431,6 +1431,12 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacity(I64 
     if (!row_count || !lane_count)
         return FFN_Q16_OK;
 
+    // Commit-capacity diagnostics already derive exact live output cells.
+    // Reject undersized destination before staged compute so no staging
+    // lanes are modified on guaranteed commit failure.
+    if (required_out_cells > out_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+
     if (!staging_out_q16)
         return FFN_Q16_ERR_NULL_PTR;
     if (required_stage_cells > staging_out_capacity)
