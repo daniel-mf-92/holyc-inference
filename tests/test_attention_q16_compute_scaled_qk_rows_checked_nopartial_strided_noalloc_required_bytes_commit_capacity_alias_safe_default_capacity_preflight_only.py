@@ -59,6 +59,12 @@ def attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_requi
     ):
         return ATTN_Q16_ERR_NULL_PTR
 
+    if q_rows_q16 is None or k_rows_q16 is None or out_scores_q32 is None or staged_scores_q32 is None:
+        return ATTN_Q16_ERR_NULL_PTR
+
+    if q_rows_q16 is None or k_rows_q16 is None or out_scores_q32 is None or staged_scores_q32 is None:
+        return ATTN_Q16_ERR_NULL_PTR
+
     err, commit_stage_cell_capacity = try_mul_i64_checked(query_row_count, token_count)
     if err != ATTN_Q16_OK:
         return err
@@ -356,6 +362,34 @@ def test_overflow_and_null_contracts() -> None:
             [0] * 8,
             8,
             None,
+            [0],
+            [0],
+            [0],
+            [0],
+            [0],
+            [0],
+        )
+        == ATTN_Q16_ERR_NULL_PTR
+    )
+
+
+    assert (
+        attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_required_bytes_commit_capacity_alias_safe_default_capacity_preflight_only(
+            q_rows,
+            len(q_rows),
+            1,
+            1,
+            k_rows,
+            len(k_rows),
+            1,
+            1,
+            1,
+            out_scores,
+            len(out_scores),
+            1,
+            None,
+            8,
+            [0],
             [0],
             [0],
             [0],
