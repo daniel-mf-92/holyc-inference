@@ -1070,3 +1070,109 @@ I32 InferenceGenerateTokensChecked(I64 *step_logits_q16,
                                 default_generated_capacity,
                                 out_generated_count);
 }
+
+// WS7 generation preflight diagnostics for default-capacity API wrappers.
+//
+// Exposes required capacities for `InferenceGenerateTokensChecked` contracts
+// without touching caller generation/history buffers:
+// - required_step_logits_cells: vocab_size * max_new_tokens
+// - required_history_capacity: token_history_count + max_new_tokens
+// - required_stage_logits_capacity: vocab_size
+// - required_topk_capacity: vocab_size (logits + indices)
+// - required_random_capacity: max_new_tokens
+// - required_generated_capacity: max_new_tokens
+//
+// Failure classification is deterministic:
+// - arithmetic overflow/underflow in checked size math => OVERFLOW
+// - shape/capacity contract violations => BAD_PARAM
+//
+// No-partial diagnostics: outputs are written only after all checks pass.
+I32 InferenceGenerateTokensPreflightChecked(
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 workspace_stage_logits_capacity,
+    I64 workspace_topk_logits_capacity,
+    I64 workspace_topk_index_capacity,
+    I64 random_q16_capacity,
+    I64 generated_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_history_capacity,
+    I64 *out_required_stage_logits_capacity,
+    I64 *out_required_topk_capacity,
+    I64 *out_required_random_capacity,
+    I64 *out_required_generated_capacity)
+{
+    I64 required_step_logits_cells;
+    I64 required_history_capacity;
+    I64 required_stage_logits_capacity;
+    I64 required_topk_capacity;
+    I64 required_random_capacity;
+    I64 required_generated_capacity;
+
+    if (!out_required_step_logits_cells || !out_required_history_capacity ||
+        !out_required_stage_logits_capacity || !out_required_topk_capacity ||
+        !out_required_random_capacity || !out_required_generated_capacity)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (step_logits_capacity < 0 || vocab_size < 0 || max_new_tokens < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (token_history_capacity < 0 || token_history_count < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (workspace_stage_logits_capacity < 0 || workspace_topk_logits_capacity < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (workspace_topk_index_capacity < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (random_q16_capacity < 0 || generated_capacity < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (vocab_size <= 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (token_history_count > token_history_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    required_history_capacity = token_history_count + max_new_tokens;
+    if (required_history_capacity < token_history_count)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    required_stage_logits_capacity = vocab_size;
+    required_topk_capacity = vocab_size;
+    required_random_capacity = max_new_tokens;
+    required_generated_capacity = max_new_tokens;
+
+    if (max_new_tokens)
+    {
+        if (vocab_size > 0x7FFFFFFFFFFFFFFF / max_new_tokens)
+            return SAMPLING_Q16_ERR_OVERFLOW;
+        required_step_logits_cells = vocab_size * max_new_tokens;
+    }
+    else
+    {
+        required_step_logits_cells = 0;
+    }
+
+    if (required_history_capacity > token_history_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (required_stage_logits_capacity > workspace_stage_logits_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (required_topk_capacity > workspace_topk_logits_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (required_topk_capacity > workspace_topk_index_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (required_random_capacity > random_q16_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (required_generated_capacity > generated_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (required_step_logits_cells > step_logits_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    *out_required_step_logits_cells = required_step_logits_cells;
+    *out_required_history_capacity = required_history_capacity;
+    *out_required_stage_logits_capacity = required_stage_logits_capacity;
+    *out_required_topk_capacity = required_topk_capacity;
+    *out_required_random_capacity = required_random_capacity;
+    *out_required_generated_capacity = required_generated_capacity;
+    return SAMPLING_Q16_OK;
+}
