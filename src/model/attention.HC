@@ -4038,7 +4038,7 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
     if (status != ATTN_Q16_OK)
         return status;
 
-    // IQ-611 commit-capacity no-alloc contract:
+    // IQ-616 commit-capacity no-alloc contract:
     // 1) enforce caller commit scratch contracts through the shared
     //    required-bytes helper (`commit_stage_cell_capacity`,
     //    `commit_stage_byte_capacity`);
@@ -4133,7 +4133,7 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
     if (query_row_count < 0 || token_count < 0 || head_dim < 0)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    // IQ-613 default-capacity commit contract:
+    // IQ-617 default-capacity commit contract:
     // derive commit scratch limits from the live default-stride batch shape
     // (`query_row_count * token_count`) and caller stage buffer cells
     // (`staged_scores_capacity * sizeof(I64)`), then route all no-partial
