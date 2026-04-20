@@ -2243,6 +2243,193 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocCommitCapacityDefaultCapa
     return FFN_Q16_OK;
 }
 
+I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocCommitCapacityAliasSafeDefaultCapacityPreflightOnly(I64 *gate_q16,
+                                                                                                             I64 gate_capacity,
+                                                                                                             I64 *up_q16,
+                                                                                                             I64 up_capacity,
+                                                                                                             I64 *out_q16,
+                                                                                                             I64 out_capacity,
+                                                                                                             I64 row_count,
+                                                                                                             I64 lane_count,
+                                                                                                             I64 in_row_stride_q16,
+                                                                                                             I64 out_row_stride_q16,
+                                                                                                             I64 *staging_out_q16,
+                                                                                                             I64 staging_out_capacity,
+                                                                                                             I64 *out_required_in_cells,
+                                                                                                             I64 *out_commit_required_stage_cells,
+                                                                                                             I64 *out_commit_required_stage_bytes,
+                                                                                                             I64 *out_required_out_cells)
+{
+    I64 commit_stage_cell_capacity;
+    I64 commit_stage_byte_capacity;
+    I64 required_in_cells;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
+    I64 required_out_cells;
+    I64 in_span_bytes;
+    I64 out_span_bytes;
+    I64 stage_capacity_bytes;
+    I64 stage_span_bytes;
+    I64 gate_base_addr;
+    I64 gate_end_addr;
+    I64 up_base_addr;
+    I64 up_end_addr;
+    I64 out_base_addr;
+    I64 out_end_addr;
+    I64 stage_base_addr;
+    I64 stage_end_addr;
+    I32 status;
+
+    if (!out_required_in_cells || !out_commit_required_stage_cells ||
+        !out_commit_required_stage_bytes || !out_required_out_cells)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (!gate_q16 || !up_q16 || !out_q16 || !staging_out_q16)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (gate_capacity < 0 || up_capacity < 0 || out_capacity < 0 ||
+        staging_out_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || lane_count < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (in_row_stride_q16 < 0 || out_row_stride_q16 < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    // IQ-663 default-capacity alias-safe preflight contract:
+    // derive commit capacities via checked integer math, run canonical
+    // no-partial preflight, then reject staging/input/output alias overlap
+    // before committing diagnostics (no partial output writes).
+    if (!row_count || !lane_count)
+    {
+        commit_stage_cell_capacity = 0;
+    }
+    else
+    {
+        status = FFNTryMulI64Checked(row_count - 1,
+                                     out_row_stride_q16,
+                                     &commit_stage_cell_capacity);
+        if (status)
+            return status;
+
+        status = FFNTryAddI64Checked(commit_stage_cell_capacity,
+                                     lane_count,
+                                     &commit_stage_cell_capacity);
+        if (status)
+            return status;
+    }
+
+    status = FFNTryMulI64Checked(staging_out_capacity,
+                                 sizeof(I64),
+                                 &commit_stage_byte_capacity);
+    if (status)
+        return status;
+
+    status = FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocCommitCapacityPreflightOnly(
+        gate_capacity,
+        up_capacity,
+        out_capacity,
+        row_count,
+        lane_count,
+        in_row_stride_q16,
+        out_row_stride_q16,
+        commit_stage_cell_capacity,
+        commit_stage_byte_capacity,
+        &required_in_cells,
+        &required_stage_cells,
+        &required_stage_bytes,
+        &required_out_cells);
+    if (status)
+        return status;
+
+    if (!row_count || !lane_count)
+    {
+        *out_required_in_cells = required_in_cells;
+        *out_commit_required_stage_cells = required_stage_cells;
+        *out_commit_required_stage_bytes = required_stage_bytes;
+        *out_required_out_cells = required_out_cells;
+        return FFN_Q16_OK;
+    }
+
+    if (required_stage_cells > staging_out_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    status = FFNTryMulI64Checked(required_in_cells,
+                                 sizeof(I64),
+                                 &in_span_bytes);
+    if (status)
+        return status;
+
+    status = FFNTryMulI64Checked(required_out_cells,
+                                 sizeof(I64),
+                                 &out_span_bytes);
+    if (status)
+        return status;
+
+    status = FFNTryMulI64Checked(staging_out_capacity,
+                                 sizeof(I64),
+                                 &stage_capacity_bytes);
+    if (status)
+        return status;
+
+    if (required_stage_bytes > stage_capacity_bytes)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    stage_span_bytes = required_stage_bytes;
+
+    gate_base_addr = (I64)gate_q16;
+    up_base_addr = (I64)up_q16;
+    out_base_addr = (I64)out_q16;
+    stage_base_addr = (I64)staging_out_q16;
+
+    status = FFNByteRangeEndChecked(gate_base_addr,
+                                    in_span_bytes,
+                                    &gate_end_addr);
+    if (status)
+        return status;
+
+    status = FFNByteRangeEndChecked(up_base_addr,
+                                    in_span_bytes,
+                                    &up_end_addr);
+    if (status)
+        return status;
+
+    status = FFNByteRangeEndChecked(out_base_addr,
+                                    out_span_bytes,
+                                    &out_end_addr);
+    if (status)
+        return status;
+
+    status = FFNByteRangeEndChecked(stage_base_addr,
+                                    stage_span_bytes,
+                                    &stage_end_addr);
+    if (status)
+        return status;
+
+    if (FFNByteRangesOverlap(stage_base_addr,
+                             stage_end_addr,
+                             gate_base_addr,
+                             gate_end_addr))
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    if (FFNByteRangesOverlap(stage_base_addr,
+                             stage_end_addr,
+                             up_base_addr,
+                             up_end_addr))
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    if (FFNByteRangesOverlap(stage_base_addr,
+                             stage_end_addr,
+                             out_base_addr,
+                             out_end_addr))
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    *out_required_in_cells = required_in_cells;
+    *out_commit_required_stage_cells = required_stage_cells;
+    *out_commit_required_stage_bytes = required_stage_bytes;
+    *out_required_out_cells = required_out_cells;
+    return FFN_Q16_OK;
+}
+
 // Caller-staged no-allocation strided no-partial SwiGLU wrapper with explicit
 // commit-capacity diagnostics.
 //
