@@ -157,6 +157,27 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCo
     I64 *out_commit_required_stage_bytes,
     I64 *out_required_out_cells);
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafe(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 query_row_stride_q16,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 k_row_stride_q16,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 out_row_stride,
+    I64 commit_stage_cell_capacity,
+    I64 commit_stage_byte_capacity,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 *out_commit_required_stage_cells,
+    I64 *out_commit_required_stage_bytes,
+    I64 *out_required_out_cells);
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityDefault(
     I64 *q_rows_q16,
     I64 q_rows_capacity,
@@ -5044,6 +5065,174 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCo
     return ATTN_Q16_OK;
 }
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafe(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 query_row_stride_q16,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 k_row_stride_q16,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 out_row_stride,
+    I64 commit_stage_cell_capacity,
+    I64 commit_stage_byte_capacity,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 *out_commit_required_stage_cells,
+    I64 *out_commit_required_stage_bytes,
+    I64 *out_required_out_cells)
+{
+    I64 required_q_cells;
+    I64 required_k_cells;
+    I64 required_out_cells;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
+    I64 q_span_bytes;
+    I64 k_span_bytes;
+    I64 out_span_bytes;
+    I64 stage_capacity_bytes;
+    I64 q_base_addr;
+    I64 q_end_addr;
+    I64 k_base_addr;
+    I64 k_end_addr;
+    I64 out_base_addr;
+    I64 out_end_addr;
+    I64 stage_base_addr;
+    I64 stage_end_addr;
+    I32 status;
+
+    if (!out_commit_required_stage_cells || !out_commit_required_stage_bytes ||
+        !out_required_out_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_rows_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0 ||
+        staged_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_row_count < 0 || query_row_stride_q16 < 0 || token_count < 0 ||
+        k_row_stride_q16 < 0 || head_dim < 0 || out_row_stride < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (commit_stage_cell_capacity < 0 || commit_stage_byte_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-648 alias-safe required-bytes contract:
+    // 1) run canonical explicit-stride preflight to get required q/k/out/stage;
+    // 2) enforce commit capacity bounds for staging cell+byte diagnostics;
+    // 3) for active rows/tokens, reject staged-vs-q/k/out live-span overlap
+    //    under interior-pointer layouts;
+    // 4) publish diagnostics only after all checks pass.
+    status = AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocPreflightOnly(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        query_row_stride_q16,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        k_row_stride_q16,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        out_row_stride,
+        &required_q_cells,
+        &required_k_cells,
+        &required_out_cells,
+        &required_stage_cells,
+        &required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (required_stage_cells > commit_stage_cell_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_stage_bytes > commit_stage_byte_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (query_row_count && token_count)
+    {
+        if (!staged_scores_q32)
+            return ATTN_Q16_ERR_NULL_PTR;
+        if (required_stage_cells > staged_scores_capacity)
+            return ATTN_Q16_ERR_BAD_PARAM;
+
+        status = AttentionTryMulI64Checked(staged_scores_capacity,
+                                           sizeof(I64),
+                                           &stage_capacity_bytes);
+        if (status != ATTN_Q16_OK)
+            return status;
+        if (required_stage_bytes > stage_capacity_bytes)
+            return ATTN_Q16_ERR_BAD_PARAM;
+
+        status = AttentionTryMulI64Checked(required_q_cells,
+                                           sizeof(I64),
+                                           &q_span_bytes);
+        if (status != ATTN_Q16_OK)
+            return status;
+        status = AttentionTryMulI64Checked(required_k_cells,
+                                           sizeof(I64),
+                                           &k_span_bytes);
+        if (status != ATTN_Q16_OK)
+            return status;
+        status = AttentionTryMulI64Checked(required_out_cells,
+                                           sizeof(I64),
+                                           &out_span_bytes);
+        if (status != ATTN_Q16_OK)
+            return status;
+
+        q_base_addr = (I64)q_rows_q16;
+        k_base_addr = (I64)k_rows_q16;
+        out_base_addr = (I64)out_scores_q32;
+        stage_base_addr = (I64)staged_scores_q32;
+
+        status = AttentionByteRangeEndChecked(q_base_addr,
+                                              q_span_bytes,
+                                              &q_end_addr);
+        if (status != ATTN_Q16_OK)
+            return status;
+        status = AttentionByteRangeEndChecked(k_base_addr,
+                                              k_span_bytes,
+                                              &k_end_addr);
+        if (status != ATTN_Q16_OK)
+            return status;
+        status = AttentionByteRangeEndChecked(out_base_addr,
+                                              out_span_bytes,
+                                              &out_end_addr);
+        if (status != ATTN_Q16_OK)
+            return status;
+        status = AttentionByteRangeEndChecked(stage_base_addr,
+                                              stage_capacity_bytes,
+                                              &stage_end_addr);
+        if (status != ATTN_Q16_OK)
+            return status;
+
+        if (AttentionByteRangesOverlap(stage_base_addr,
+                                       stage_end_addr,
+                                       q_base_addr,
+                                       q_end_addr))
+            return ATTN_Q16_ERR_BAD_PARAM;
+        if (AttentionByteRangesOverlap(stage_base_addr,
+                                       stage_end_addr,
+                                       k_base_addr,
+                                       k_end_addr))
+            return ATTN_Q16_ERR_BAD_PARAM;
+        if (AttentionByteRangesOverlap(stage_base_addr,
+                                       stage_end_addr,
+                                       out_base_addr,
+                                       out_end_addr))
+            return ATTN_Q16_ERR_BAD_PARAM;
+    }
+
+    *out_commit_required_stage_cells = required_stage_cells;
+    *out_commit_required_stage_bytes = required_stage_bytes;
+    *out_required_out_cells = required_out_cells;
+    return ATTN_Q16_OK;
+}
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesDefaultCapacity(
     I64 *q_rows_q16,
     I64 q_rows_capacity,
@@ -5688,12 +5877,16 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocCommitOnly(
                                                &out_index);
             if (status != ATTN_Q16_OK)
                 return status;
+            if (out_index < 0 || out_index >= out_scores_capacity)
+                return ATTN_Q16_ERR_BAD_PARAM;
 
             status = AttentionTryAddI64Checked(stage_row_base,
                                                token_index,
                                                &stage_index);
             if (status != ATTN_Q16_OK)
                 return status;
+            if (stage_index < 0 || stage_index >= staged_scores_capacity)
+                return ATTN_Q16_ERR_BAD_PARAM;
         }
     }
 

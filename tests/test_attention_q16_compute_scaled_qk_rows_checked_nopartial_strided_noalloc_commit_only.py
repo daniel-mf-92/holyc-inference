@@ -37,6 +37,9 @@ def attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commi
     if staged_scores_capacity < 0 or out_scores_capacity < 0:
         return ATTN_Q16_ERR_BAD_PARAM
 
+    if query_row_count > 0 and token_count > 0 and out_row_stride < token_count:
+        return ATTN_Q16_ERR_BAD_PARAM
+
     if query_row_count == 0 or token_count == 0:
         return ATTN_Q16_OK
 
@@ -66,13 +69,17 @@ def attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commi
             return err
 
         for token_index in range(token_count):
-            err, _ = try_add_i64_checked(out_row_base, token_index)
+            err, out_index = try_add_i64_checked(out_row_base, token_index)
             if err != ATTN_Q16_OK:
                 return err
+            if out_index < 0 or out_index >= out_scores_capacity:
+                return ATTN_Q16_ERR_BAD_PARAM
 
-            err, _ = try_add_i64_checked(stage_row_base, token_index)
+            err, stage_index = try_add_i64_checked(stage_row_base, token_index)
             if err != ATTN_Q16_OK:
                 return err
+            if stage_index < 0 or stage_index >= staged_scores_capacity:
+                return ATTN_Q16_ERR_BAD_PARAM
 
     for row_index in range(query_row_count):
         out_row_base = row_index * out_row_stride
@@ -185,6 +192,25 @@ def test_error_surfaces_and_no_partial_guarantee() -> None:
     assert out == out_before
 
 
+def test_rejects_out_stride_smaller_than_token_count() -> None:
+    staged = [5, 6, 7, 8]
+    out = [303, 303, 303, 303]
+    out_before = out.copy()
+
+    err = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commit_only(
+        1,
+        4,
+        3,
+        staged,
+        len(staged),
+        out,
+        len(out),
+    )
+
+    assert err == ATTN_Q16_ERR_BAD_PARAM
+    assert out == out_before
+
+
 def test_randomized_parity() -> None:
     rng = random.Random(20260420_641)
 
@@ -261,6 +287,7 @@ if __name__ == "__main__":
     test_source_contains_strided_noalloc_commit_only_helper()
     test_known_vector_commit_only_parity()
     test_error_surfaces_and_no_partial_guarantee()
+    test_rejects_out_stride_smaller_than_token_count()
     test_randomized_parity()
     test_commit_preserves_row_padding_cells()
     print("ok")
