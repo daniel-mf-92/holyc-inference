@@ -888,6 +888,14 @@ I32 GGUFMetadataReadArrayHeaderChecked(U8 *buf,
                                        U32 *out_elem_type,
                                        U64 *out_elem_count);
 
+I32 GGUFMetadataArrayReadF32BitsChecked(U8 *buf,
+                                        U64 buf_nbytes,
+                                        U64 *cursor,
+                                        U64 table_end,
+                                        U64 elem_count,
+                                        U32 *out_bits,
+                                        U64 out_bits_capacity);
+
 I32 GGUFMetadataArrayPayloadSpanValidateChecked(U64 payload_start,
                                                 U64 payload_bytes,
                                                 U64 table_end,
@@ -5410,6 +5418,86 @@ I32 GGUFMetadataReadArrayHeaderChecked(U8 *buf,
     *out_elem_type = elem_type;
     *out_elem_count = elem_count;
     *cursor = cur;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked GGUF FLOAT32 array payload reader (raw-bit decode, integer-only).
+// Reads `elem_count` little-endian FLOAT32 payload elements from `*cursor`
+// into `out_bits[]` as exact IEEE754 bit patterns (no float conversion).
+// Contract: strict no-partial semantics — `*cursor` and `out_bits[]` are
+// committed only after full range/capacity validation succeeds.
+I32 GGUFMetadataArrayReadF32BitsChecked(U8 *buf,
+                                        U64 buf_nbytes,
+                                        U64 *cursor,
+                                        U64 table_end,
+                                        U64 elem_count,
+                                        U32 *out_bits,
+                                        U64 out_bits_capacity)
+{
+    U64 cur;
+    U64 payload_bytes;
+    U64 payload_end;
+    U64 lane;
+    U64 lane_off;
+    U64 lane_base;
+    I32 err;
+
+    if (!buf || !cursor || !out_bits)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    // Keep all parser/index arithmetic inside positive I64-space contracts.
+    if (buf_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (table_end > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (elem_count > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (out_bits_capacity > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    if (elem_count > GGUF_MAX_ARRAY_ELEMS)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (out_bits_capacity < elem_count)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    cur = *cursor;
+    if (cur > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    // Alignment math: FLOAT32 payload starts/ends on 4-byte boundaries.
+    if (elem_count && (cur & 3))
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    // Canonical fixed-width ARRAY payload-span validation for FLOAT32 payload.
+    err = GGUFMetadataArrayPayloadSpanFromFixedTypeChecked(GGUF_TYPE_FLOAT32,
+                                                           elem_count,
+                                                           cur,
+                                                           table_end,
+                                                           buf_nbytes,
+                                                           &payload_bytes,
+                                                           &payload_end);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    if (payload_bytes != (elem_count << 2))
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    if (elem_count && (payload_end & 3))
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    // Decode exactly `elem_count` lanes using explicit little-endian byte
+    // assembly so every bit written to out_bits[] is auditable.
+    for (lane = 0; lane < elem_count; ++lane)
+    {
+        lane_off = lane << 2;
+        lane_base = cur + lane_off;
+        out_bits[lane] = (U32)buf[lane_base]
+                       | ((U32)buf[lane_base + 1] << 8)
+                       | ((U32)buf[lane_base + 2] << 16)
+                       | ((U32)buf[lane_base + 3] << 24);
+    }
+
+    *cursor = payload_end;
     return GGUF_META_TABLE_OK;
 }
 
