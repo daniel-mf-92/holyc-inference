@@ -5212,7 +5212,12 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyP
     U64 max_piece_len,
     U64 *out_required_token_capacity)
 {
+    U64 snapshot_byte_len;
     U64 snapshot_cursor;
+    U64 snapshot_prompt_nbytes;
+    U64 snapshot_rank_table_count;
+    U64 snapshot_rank_table_capacity;
+    U64 snapshot_max_piece_len;
     U64 staged_required_token_capacity;
     I32 err;
 
@@ -5226,7 +5231,13 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyP
         max_piece_len > 0x7FFFFFFFFFFFFFFF)
         return TOKENIZER_BPE_ERR_OVERFLOW;
 
+    snapshot_byte_len = byte_len;
     snapshot_cursor = *io_cursor;
+    snapshot_prompt_nbytes = prompt_nbytes;
+    snapshot_rank_table_count = rank_table_count;
+    snapshot_rank_table_capacity = rank_table_capacity;
+    snapshot_max_piece_len = max_piece_len;
+
     if (snapshot_cursor > byte_len)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
 
@@ -5249,9 +5260,20 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyP
     if (err != TOKENIZER_BPE_OK)
         return err;
 
-    // Immutable-cursor diagnostics contract: preflight-only wrappers must not
-    // advance caller cursor, so commit-only geometry checks reject drift.
+    // Immutable diagnostics contract: commit-only preflight wrappers publish
+    // no caller writes besides required outputs and must preserve all
+    // geometry inputs exactly.
+    if (snapshot_byte_len != byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
     if (snapshot_cursor != *io_cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_prompt_nbytes != prompt_nbytes)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_rank_table_count != rank_table_count)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_rank_table_capacity != rank_table_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_max_piece_len != max_piece_len)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
 
     if (staged_required_token_capacity != prompt_nbytes)

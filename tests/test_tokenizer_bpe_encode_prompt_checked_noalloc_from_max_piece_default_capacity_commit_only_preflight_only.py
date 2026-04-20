@@ -35,6 +35,13 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity_
     max_piece_len: int,
     out_required_token_capacity: list[int] | None,
 ) -> int:
+    snapshot_byte_len = byte_len
+    snapshot_cursor = io_cursor[0] if io_cursor is not None else 0
+    snapshot_prompt_nbytes = prompt_nbytes
+    snapshot_rank_table_count = rank_table_count
+    snapshot_rank_table_capacity = rank_table_capacity
+    snapshot_max_piece_len = max_piece_len
+
     if data is None or io_cursor is None or out_required_token_capacity is None:
         return TOKENIZER_BPE_ERR_NULL_PTR
 
@@ -65,6 +72,19 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity_
     if err != TOKENIZER_BPE_OK:
         return err
 
+    if snapshot_byte_len != byte_len:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+    if snapshot_cursor != io_cursor[0]:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+    if snapshot_prompt_nbytes != prompt_nbytes:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+    if snapshot_rank_table_count != rank_table_count:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+    if snapshot_rank_table_capacity != rank_table_capacity:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+    if snapshot_max_piece_len != max_piece_len:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+
     if staged_required[0] != prompt_nbytes:
         return TOKENIZER_BPE_ERR_BAD_PARAM
 
@@ -87,6 +107,7 @@ def test_source_contains_commit_only_preflight_only_signature_and_atomic_publish
         1,
     )[0]
     assert "TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityPreflightOnly(" in body
+    assert "if (snapshot_byte_len != byte_len)" in body
     assert "if (staged_required_token_capacity != prompt_nbytes)" in body
     assert "*out_required_token_capacity = staged_required_token_capacity;" in body
 
