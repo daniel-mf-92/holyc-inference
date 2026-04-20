@@ -87,6 +87,23 @@ I32 Q4_0Q8_0MatMulTiledQ32CheckedNoAllocDefaultTilesCommitOnly(
     I64 *out_cells_q32,
     I64 out_cell_capacity,
     I64 out_row_stride_cells);
+I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRows(
+    Q4_0Block *lhs_q4_blocks,
+    I64 lhs_q4_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_q8_col_blocks,
+    I64 rhs_q8_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_cells_q32,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells,
+    I64 iter_count,
+    I64 *out_total_cells,
+    I64 *out_total_block_dots,
+    I64 *out_last_status);
 
 Bool Q4_0Q8_0MatMulTryMulI64NonNeg(I64 lhs, I64 rhs, I64 *out_prod)
 {
@@ -633,5 +650,88 @@ I32 Q4_0Q8_0MatMulTiledQ32CheckedNoAllocDefaultTilesRequiredBytes(
     *out_tile_m = tile_m;
     *out_tile_n = tile_n;
     *out_tile_k_blocks = tile_k_blocks;
+    return Q4_0_Q8_0_MATMUL_OK;
+}
+
+I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRows(
+    Q4_0Block *lhs_q4_blocks,
+    I64 lhs_q4_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_q8_col_blocks,
+    I64 rhs_q8_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_cells_q32,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells,
+    I64 iter_count,
+    I64 *out_total_cells,
+    I64 *out_total_block_dots,
+    I64 *out_last_status)
+{
+    I64 staged_cells_per_iter;
+    I64 staged_block_dots_per_iter;
+    I64 staged_total_cells;
+    I64 staged_total_block_dots;
+    I64 staged_last_status;
+    I64 iter_index;
+    I32 status;
+
+    if (!out_total_cells || !out_total_block_dots || !out_last_status)
+        return Q4_0_Q8_0_MATMUL_ERR_NULL_PTR;
+
+    if (iter_count < 0)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    // IQ-822: derive deterministic benchmark diagnostics with checked integer
+    // math so the benchmark wrapper stays integer-only and overflow-safe.
+    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(row_count, col_count, &staged_cells_per_iter))
+        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(staged_cells_per_iter,
+                                       k_block_count,
+                                       &staged_block_dots_per_iter))
+        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(staged_cells_per_iter,
+                                       iter_count,
+                                       &staged_total_cells))
+        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(staged_block_dots_per_iter,
+                                       iter_count,
+                                       &staged_total_block_dots))
+        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+
+    staged_last_status = Q4_0_Q8_0_MATMUL_OK;
+
+    // Execute full checked AVX2 matmul each loop and preserve strict no-
+    // partial diagnostics publish semantics: required outputs commit only
+    // after every iteration succeeds.
+    for (iter_index = 0; iter_index < iter_count; ++iter_index)
+    {
+        status = Q4_0Q8_0MatMulQ32TiledAVX2Checked(
+            lhs_q4_blocks,
+            lhs_q4_block_capacity,
+            row_count,
+            lhs_row_stride_blocks,
+            rhs_q8_col_blocks,
+            rhs_q8_block_capacity,
+            col_count,
+            rhs_col_stride_blocks,
+            k_block_count,
+            Q4_0_Q8_0_MATMUL_DEFAULT_TILE_M,
+            Q4_0_Q8_0_MATMUL_DEFAULT_TILE_N,
+            out_cells_q32,
+            out_cell_capacity,
+            out_row_stride_cells);
+        if (status != Q4_0_Q8_0_MATMUL_OK)
+            return status;
+
+        staged_last_status = status;
+    }
+
+    *out_total_cells = staged_total_cells;
+    *out_total_block_dots = staged_total_block_dots;
+    *out_last_status = staged_last_status;
     return Q4_0_Q8_0_MATMUL_OK;
 }
