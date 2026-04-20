@@ -93,6 +93,7 @@ def test_source_contains_commit_only_preflight_only_signature_and_atomic_publish
         1,
     )[0]
     assert "TokenizerBPEEncodePromptCheckedNoAllocFromLensPreflightOnly(" in body
+    assert "if (staged_required_token_capacity > out_token_capacity)" in body
     assert "*out_required_token_capacity = staged_required_token_capacity;" in body
     assert "*out_max_piece_len = staged_max_piece_len;" in body
 

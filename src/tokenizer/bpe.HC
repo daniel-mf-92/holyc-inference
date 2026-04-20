@@ -5508,6 +5508,13 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnly(
     if (err != TOKENIZER_BPE_OK)
         return err;
 
+    if (staged_required_token_capacity > 0x7FFFFFFFFFFFFFFF ||
+        staged_max_piece_len > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (staged_required_token_capacity > out_token_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
     *out_required_token_capacity = staged_required_token_capacity;
     *out_max_piece_len = staged_max_piece_len;
     return TOKENIZER_BPE_OK;
