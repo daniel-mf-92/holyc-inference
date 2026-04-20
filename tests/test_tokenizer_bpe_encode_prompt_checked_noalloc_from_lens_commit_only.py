@@ -261,8 +261,9 @@ def test_source_contains_lens_commit_only_signature_and_staged_delegate() -> Non
         "I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensDefaultCapacityCommitOnly(",
         1,
     )[0]
-    assert "canonical_max_piece_len = 0;" in body
-    assert "canonical_required_token_capacity = prompt_nbytes;" in body
+    assert "TokenizerBPEEncodePromptCheckedNoAllocFromLensPreflightOnly(" in body
+    assert "&canonical_required_token_capacity" in body
+    assert "&canonical_max_piece_len" in body
     assert "staged_cursor = cursor;" in body
     assert "staged_token_count = *out_token_count;" in body
     assert "staged_required_token_capacity = *out_required_token_capacity;" in body
@@ -271,7 +272,8 @@ def test_source_contains_lens_commit_only_signature_and_staged_delegate() -> Non
     assert "for (i = 0; i < staged_token_count; i++)" in body
     assert "*out_token_count = staged_token_count;" in body
     assert "*out_required_token_capacity = staged_required_token_capacity;" in body
-    assert "*out_max_piece_len = canonical_max_piece_len;" in body
+    assert "staged_max_piece_len = canonical_max_piece_len;" in body
+    assert "*out_max_piece_len = staged_max_piece_len;" in body
     assert "*io_cursor = staged_cursor;" in body
 
 

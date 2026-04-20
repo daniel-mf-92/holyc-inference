@@ -5456,6 +5456,63 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensPreflightOnly(
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnly(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 vocab_piece_capacity,
+    U64 out_token_capacity,
+    U64 *out_required_token_capacity,
+    U64 *out_max_piece_len)
+{
+    U64 staged_required_token_capacity;
+    U64 staged_max_piece_len;
+    I32 err;
+
+    if (!bytes || !io_cursor || !vocab_piece_lens ||
+        !out_required_token_capacity || !out_max_piece_len)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (out_token_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Commit-only diagnostics wrapper: reuse canonical explicit-capacity
+    // lens preflight while staging diagnostics so failure never mutates
+    // caller-visible outputs.
+    err = TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnly(
+        bytes,
+        byte_len,
+        io_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        vocab_piece_lens,
+        vocab_piece_count,
+        vocab_piece_capacity,
+        out_token_capacity,
+        &staged_required_token_capacity,
+        &staged_max_piece_len);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    *out_required_token_capacity = staged_required_token_capacity;
+    *out_max_piece_len = staged_max_piece_len;
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnly(
     U8 *bytes,
     U64 byte_len,
@@ -5480,11 +5537,11 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnly(
     U64 staged_cursor;
     U64 staged_token_count;
     U64 staged_required_token_capacity;
+    U64 staged_max_piece_len;
     U64 staged_token_capacity;
     U64 staged_alloc_bytes;
     U64 canonical_required_token_capacity;
     U64 canonical_max_piece_len;
-    U64 piece_index;
     I32 *staged_tokens;
     I32 err;
     U64 i;
@@ -5515,37 +5572,33 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnly(
     if (prompt_nbytes > byte_len - cursor)
         return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
 
-    // Canonical lens scan: compute the exact max piece byte length with
-    // checked integer bounds before any encode-side state mutation.
-    canonical_max_piece_len = 0;
-    piece_index = 0;
-    while (piece_index < vocab_piece_count)
-    {
-        if (vocab_piece_lens[piece_index] > 0x7FFFFFFFFFFFFFFF)
-            return TOKENIZER_BPE_ERR_OVERFLOW;
-
-        if (vocab_piece_lens[piece_index] > canonical_max_piece_len)
-            canonical_max_piece_len = vocab_piece_lens[piece_index];
-
-        piece_index++;
-        if (!piece_index)
-            return TOKENIZER_BPE_ERR_OVERFLOW;
-    }
-
-    // Canonical no-alloc required-token diagnostic is one token per byte
-    // before merges can only reduce token count.
-    canonical_required_token_capacity = prompt_nbytes;
-
-    if (prompt_nbytes && !canonical_max_piece_len)
-        return TOKENIZER_BPE_ERR_BAD_PARAM;
-
-    if (canonical_required_token_capacity > out_token_capacity)
-        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    // Reuse explicit-capacity lens preflight to derive canonical diagnostics
+    // before any staged encode/commit work.
+    err = TokenizerBPEEncodePromptCheckedNoAllocFromLensPreflightOnly(
+        bytes,
+        byte_len,
+        io_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        vocab_piece_lens,
+        vocab_piece_count,
+        vocab_piece_capacity,
+        out_token_capacity,
+        &canonical_required_token_capacity,
+        &canonical_max_piece_len);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
 
     // Stage caller-observable state so all failures remain no-partial.
     staged_cursor = cursor;
     staged_token_count = *out_token_count;
     staged_required_token_capacity = *out_required_token_capacity;
+    staged_max_piece_len = *out_max_piece_len;
 
     staged_token_capacity = out_token_capacity;
     if (!staged_token_capacity)
@@ -5592,6 +5645,13 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnly(
         return TOKENIZER_BPE_ERR_BAD_PARAM;
     }
 
+    // Delegate max-piece output is reconstructed locally; enforce canonical
+    // parity before publishing to caller state.
+    if (canonical_max_piece_len > 0x7FFFFFFFFFFFFFFF) {
+        Free(staged_tokens);
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
     if (staged_token_count > out_token_capacity) {
         Free(staged_tokens);
         return TOKENIZER_BPE_ERR_BAD_PARAM;
@@ -5602,7 +5662,8 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnly(
 
     *out_token_count = staged_token_count;
     *out_required_token_capacity = staged_required_token_capacity;
-    *out_max_piece_len = canonical_max_piece_len;
+    staged_max_piece_len = canonical_max_piece_len;
+    *out_max_piece_len = staged_max_piece_len;
     *io_cursor = staged_cursor;
     Free(staged_tokens);
     return TOKENIZER_BPE_OK;
