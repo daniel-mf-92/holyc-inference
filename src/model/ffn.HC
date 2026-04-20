@@ -1761,6 +1761,7 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapaci
     I64 in_span_bytes;
     I64 out_span_bytes;
     I64 stage_capacity_bytes;
+    I64 stage_span_bytes;
     I64 gate_base_addr;
     I64 gate_end_addr;
     I64 up_base_addr;
@@ -1822,6 +1823,15 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapaci
     if (status)
         return status;
 
+    if (required_stage_bytes > stage_capacity_bytes)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    // Alias checks are against the live staged write span, not the full
+    // caller-provided staging allocation. This keeps interior-pointer layouts
+    // precise: only bytes touched by this operation participate in overlap
+    // rejection.
+    stage_span_bytes = required_stage_bytes;
+
     gate_base_addr = (I64)gate_q16;
     up_base_addr = (I64)up_q16;
     out_base_addr = (I64)out_q16;
@@ -1846,7 +1856,7 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapaci
         return status;
 
     status = FFNByteRangeEndChecked(stage_base_addr,
-                                    stage_capacity_bytes,
+                                    stage_span_bytes,
                                     &stage_end_addr);
     if (status)
         return status;
