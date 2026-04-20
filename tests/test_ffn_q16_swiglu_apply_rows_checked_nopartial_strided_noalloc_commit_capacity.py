@@ -192,6 +192,7 @@ def test_source_contains_strided_noalloc_commit_capacity_wrapper() -> None:
     body = source.split(signature, 1)[1]
 
     assert "FFNQ16SwiGLUApplyRowsChecked(gate_q16," in body
+    assert "if (required_stage_cells != required_out_cells)" in body
     assert "if (required_stage_cells > commit_stage_cell_capacity)" in body
     assert "if (required_stage_bytes > commit_stage_byte_capacity)" in body
     assert "if (staging_out_q16 == gate_q16)" in body

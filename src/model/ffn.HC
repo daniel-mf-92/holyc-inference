@@ -1753,6 +1753,10 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocCommitCapacityDefaultCapa
 {
     I64 commit_stage_cell_capacity;
     I64 commit_stage_byte_capacity;
+    I64 required_in_cells;
+    I64 commit_required_stage_cells;
+    I64 commit_required_stage_bytes;
+    I64 required_out_cells;
     I32 status;
 
     if (!out_required_in_cells || !out_commit_required_stage_cells ||
@@ -1792,7 +1796,7 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocCommitCapacityDefaultCapa
     if (status)
         return status;
 
-    return FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocCommitCapacityPreflightOnly(
+    status = FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocCommitCapacityPreflightOnly(
         gate_capacity,
         up_capacity,
         out_capacity,
@@ -1802,10 +1806,24 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocCommitCapacityDefaultCapa
         out_row_stride_q16,
         commit_stage_cell_capacity,
         commit_stage_byte_capacity,
-        out_required_in_cells,
-        out_commit_required_stage_cells,
-        out_commit_required_stage_bytes,
-        out_required_out_cells);
+        &required_in_cells,
+        &commit_required_stage_cells,
+        &commit_required_stage_bytes,
+        &required_out_cells);
+    if (status)
+        return status;
+
+    // Default-capacity path derives commit-stage cells from the same strided
+    // output geometry used for destination span math, so both diagnostics must
+    // match exactly.
+    if (commit_required_stage_cells != required_out_cells)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    *out_required_in_cells = required_in_cells;
+    *out_commit_required_stage_cells = commit_required_stage_cells;
+    *out_commit_required_stage_bytes = commit_required_stage_bytes;
+    *out_required_out_cells = required_out_cells;
+    return FFN_Q16_OK;
 }
 
 // Caller-staged no-allocation strided no-partial SwiGLU wrapper with explicit
@@ -1880,6 +1898,8 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocCommitCapacity(I64 *gate_
     if (!row_count || !lane_count)
         return FFN_Q16_OK;
 
+    if (required_stage_cells != required_out_cells)
+        return FFN_Q16_ERR_BAD_PARAM;
     if (required_stage_cells > commit_stage_cell_capacity)
         return FFN_Q16_ERR_BAD_PARAM;
     if (required_stage_bytes > commit_stage_byte_capacity)

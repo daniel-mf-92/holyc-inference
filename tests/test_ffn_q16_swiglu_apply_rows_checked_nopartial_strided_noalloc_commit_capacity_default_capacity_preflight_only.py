@@ -205,6 +205,7 @@ def test_source_contains_default_capacity_strided_preflight_only_wrapper() -> No
     assert "FFNTryMulI64Checked(row_count - 1," in body
     assert "FFNTryMulI64Checked(staging_out_capacity," in body
     assert "FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocCommitCapacityPreflightOnly(" in body
+    assert "if (commit_required_stage_cells != required_out_cells)" in body
 
 
 def test_source_routes_commit_capacity_wrapper_through_preflight() -> None:
