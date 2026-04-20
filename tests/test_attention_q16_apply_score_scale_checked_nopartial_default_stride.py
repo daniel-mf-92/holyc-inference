@@ -13,6 +13,7 @@ from test_attention_q16_apply_score_scale_checked_nopartial import (
     ATTN_Q16_ERR_BAD_PARAM,
     ATTN_Q16_ERR_NULL_PTR,
     ATTN_Q16_OK,
+    attention_q16_apply_score_scale_checked,
     attention_q16_apply_score_scale_checked_nopartial,
 )
 
@@ -33,17 +34,29 @@ def attention_q16_apply_score_scale_checked_nopartial_default_stride(
     if token_count < 0:
         return ATTN_Q16_ERR_BAD_PARAM
 
+    if token_count == 0:
+        return ATTN_Q16_OK
+
     default_score_stride = token_count
-    return attention_q16_apply_score_scale_checked_nopartial(
+
+    staged_scores = [0] * token_count
+    err = attention_q16_apply_score_scale_checked(
         in_scores_q32,
         in_scores_capacity,
         token_count,
         default_score_stride,
         score_scale_q16,
-        out_scores_q32,
-        out_scores_capacity,
-        default_score_stride,
+        staged_scores,
+        token_count,
+        1,
     )
+    if err != ATTN_Q16_OK:
+        return err
+
+    for token_index in range(token_count):
+        out_scores_q32[token_index * default_score_stride] = staged_scores[token_index]
+
+    return ATTN_Q16_OK
 
 
 def explicit_staged_default_stride_composition(
@@ -54,16 +67,15 @@ def explicit_staged_default_stride_composition(
     out_scores_q32,
     out_scores_capacity: int,
 ) -> int:
-    stride = token_count
     return attention_q16_apply_score_scale_checked_nopartial(
         in_scores_q32,
         in_scores_capacity,
         token_count,
-        stride,
+        token_count,
         score_scale_q16,
         out_scores_q32,
         out_scores_capacity,
-        stride,
+        token_count,
     )
 
 
@@ -73,7 +85,9 @@ def test_source_contains_default_stride_nopartial_wrapper() -> None:
     assert signature in source
     body = source.split(signature, 1)[1]
     assert "default_score_stride = token_count;" in body
-    assert "return AttentionQ16ApplyScoreScaleCheckedNoPartial(" in body
+    assert "status = AttentionQ16ApplyScoreScaleChecked(" in body
+    assert "staged_scores_q32 = MAlloc(stage_bytes);" in body
+    assert "out_scores_q32[out_base] = staged_scores_q32[token_index];" in body
 
 
 def test_known_vector_matches_explicit_composition() -> None:
