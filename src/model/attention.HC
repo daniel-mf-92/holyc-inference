@@ -2685,10 +2685,23 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
     I64 *staged_scores_q32,
     I64 staged_scores_capacity)
 {
+    I64 required_q_cells;
+    I64 required_k_cells;
     I64 required_stage_cells;
     I64 required_stage_bytes;
     I64 required_out_cells;
+    I64 required_q_bytes;
+    I64 required_k_bytes;
+    I64 required_out_bytes;
     I64 staging_capacity_bytes;
+    U64 staged_begin;
+    U64 staged_end;
+    U64 q_begin;
+    U64 q_end;
+    U64 k_begin;
+    U64 k_end;
+    U64 out_begin;
+    U64 out_end;
     I32 status;
 
     if (!in_scores_q32 || !out_scores_q32)
@@ -4404,6 +4417,28 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAlloc(
     if (status != ATTN_Q16_OK)
         return status;
 
+    if (query_row_count)
+    {
+        status = AttentionTryMulI64Checked(query_row_count - 1,
+                                           query_row_stride_q16,
+                                           &required_q_cells);
+        if (status != ATTN_Q16_OK)
+            return status;
+        status = AttentionTryAddI64Checked(required_q_cells,
+                                           head_dim,
+                                           &required_q_cells);
+        if (status != ATTN_Q16_OK)
+            return status;
+    }
+    else
+        required_q_cells = 0;
+
+    status = AttentionTryMulI64Checked(token_count,
+                                       k_row_stride_q16,
+                                       &required_k_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
     if (!query_row_count || !token_count)
         return ATTN_Q16_OK;
 
@@ -4641,11 +4676,59 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
     if (required_stage_bytes > staging_capacity_bytes)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    if (staged_scores_q32 == q_rows_q16)
+    status = AttentionTryMulI64Checked(required_q_cells,
+                                       sizeof(I64),
+                                       &required_q_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryMulI64Checked(required_k_cells,
+                                       sizeof(I64),
+                                       &required_k_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryMulI64Checked(required_out_cells,
+                                       sizeof(I64),
+                                       &required_out_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (required_stage_bytes <= 0 || required_q_bytes <= 0 ||
+        required_k_bytes <= 0 || required_out_bytes <= 0)
         return ATTN_Q16_ERR_BAD_PARAM;
-    if (staged_scores_q32 == k_rows_q16)
+
+    // No-partial contract: staging must not overlap live Q/K/output spans.
+    // This guards interior-pointer aliasing, not just exact pointer equality.
+    staged_begin = (U64)staged_scores_q32;
+    q_begin = (U64)q_rows_q16;
+    k_begin = (U64)k_rows_q16;
+    out_begin = (U64)out_scores_q32;
+
+    status = AttentionTryAddU64Checked(staged_begin,
+                                       (U64)required_stage_bytes,
+                                       &staged_end);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddU64Checked(q_begin,
+                                       (U64)required_q_bytes,
+                                       &q_end);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddU64Checked(k_begin,
+                                       (U64)required_k_bytes,
+                                       &k_end);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddU64Checked(out_begin,
+                                       (U64)required_out_bytes,
+                                       &out_end);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (staged_begin < q_end && q_begin < staged_end)
         return ATTN_Q16_ERR_BAD_PARAM;
-    if (staged_scores_q32 == out_scores_q32)
+    if (staged_begin < k_end && k_begin < staged_end)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_begin < out_end && out_begin < staged_end)
         return ATTN_Q16_ERR_BAD_PARAM;
 
     status = AttentionQ16ComputeScaledQKRowsCheckedDefaultStride(

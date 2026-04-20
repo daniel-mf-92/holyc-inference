@@ -125,6 +125,8 @@ def attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commi
     if required_stage_bytes > staging_capacity_bytes:
         return ATTN_Q16_ERR_BAD_PARAM
 
+    # Python lists have no interior-pointer views. Object identity is the
+    # closest alias model to HolyC pointer-window overlap checks.
     if staged_scores_q32 is q_rows_q16:
         return ATTN_Q16_ERR_BAD_PARAM
     if staged_scores_q32 is k_rows_q16:
@@ -345,7 +347,7 @@ def test_source_contains_strided_noalloc_commit_capacity_wrapper() -> None:
     assert "AttentionQ16ComputeScaledQKRowsCheckedNoPartialPreflightOnly(" in body
     assert "AttentionQ16ComputeScaledQKRowsChecked(" in body
     assert "AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacity(" in body
-    assert "if (staged_scores_q32 == out_scores_q32)" in body
+    assert "if (staged_begin < out_end && out_begin < staged_end)" in body
 
 
 def test_known_vector_matches_explicit_checked_composition() -> None:
@@ -458,6 +460,36 @@ def test_error_surfaces_and_no_partial_guarantee() -> None:
         0,
         [0],
         1,
+    )
+    assert err == ATTN_Q16_ERR_BAD_PARAM
+    assert out == out_before
+
+
+def test_alias_window_rejected_by_overlap_guard() -> None:
+    q_rows = [1, 2, 3, 4]
+    k_rows = [5, 6, 7, 8]
+    out = [999, 999, 999, 999]
+    out_before = out.copy()
+
+    # Identity alias maps to overlap in Python model and should reject.
+    err = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commit_capacity(
+        q_rows,
+        4,
+        1,
+        4,
+        k_rows,
+        4,
+        1,
+        4,
+        4,
+        65536,
+        out,
+        4,
+        1,
+        1,
+        8,
+        out,
+        4,
     )
     assert err == ATTN_Q16_ERR_BAD_PARAM
     assert out == out_before
@@ -600,5 +632,6 @@ if __name__ == "__main__":
     test_source_contains_strided_noalloc_commit_capacity_wrapper()
     test_known_vector_matches_explicit_checked_composition()
     test_error_surfaces_and_no_partial_guarantee()
+    test_alias_window_rejected_by_overlap_guard()
     test_randomized_parity_vs_explicit_checked_composition()
     print("ok")
