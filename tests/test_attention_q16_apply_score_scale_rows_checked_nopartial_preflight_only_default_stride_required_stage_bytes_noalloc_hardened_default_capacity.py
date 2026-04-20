@@ -332,12 +332,12 @@ def test_default_capacity_wrapper_error_and_no_partial_contracts() -> None:
     assert sentinel_last_out == [46]
 
     status = attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_noalloc_hardened_default_capacity(
-        [0],
+        [],
+        (1 << 63) - 1,
         1,
-        1 << 62,
-        8,
-        [0],
-        1,
+        1 << 50,
+        [],
+        (1 << 63) - 1,
         sentinel_in,
         sentinel_out,
         sentinel_stage,
