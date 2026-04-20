@@ -2170,6 +2170,141 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacityAlias
         out_required_out_cells);
 }
 
+I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacityAliasSafeDefaultCapacity(I64 *gate_q16,
+                                                                                                       I64 gate_capacity,
+                                                                                                       I64 *up_q16,
+                                                                                                       I64 up_capacity,
+                                                                                                       I64 *out_q16,
+                                                                                                       I64 out_capacity,
+                                                                                                       I64 row_count,
+                                                                                                       I64 lane_count,
+                                                                                                       I64 *staging_out_q16,
+                                                                                                       I64 staging_out_capacity)
+{
+    I64 default_in_row_stride_q16;
+    I64 default_out_row_stride_q16;
+    I64 required_in_cells;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
+    I64 required_out_cells;
+    I32 status;
+
+    if (!gate_q16 || !up_q16 || !out_q16 || !staging_out_q16)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (gate_capacity < 0 || up_capacity < 0 || out_capacity < 0 ||
+        staging_out_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || lane_count < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    // IQ-673 default-stride alias-safe commit contract:
+    // 1) derive canonical default row strides (gate/up/out == lane_count);
+    // 2) run canonical alias-safe preflight with default commit capacities to
+    //    enforce overlap + bounds before any staged compute/commit writes;
+    // 3) delegate actual staged no-partial compute+commit through canonical
+    //    strided default-capacity commit helper.
+    default_in_row_stride_q16 = lane_count;
+    default_out_row_stride_q16 = lane_count;
+
+    status = FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocCommitCapacityAliasSafeDefaultCapacityPreflightOnly(
+        gate_q16,
+        gate_capacity,
+        up_q16,
+        up_capacity,
+        out_q16,
+        out_capacity,
+        row_count,
+        lane_count,
+        default_in_row_stride_q16,
+        default_out_row_stride_q16,
+        staging_out_q16,
+        staging_out_capacity,
+        &required_in_cells,
+        &required_stage_cells,
+        &required_stage_bytes,
+        &required_out_cells);
+    if (status)
+        return status;
+
+    return FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocCommitCapacityDefaultCapacity(
+        gate_q16,
+        gate_capacity,
+        up_q16,
+        up_capacity,
+        out_q16,
+        out_capacity,
+        row_count,
+        lane_count,
+        default_in_row_stride_q16,
+        default_out_row_stride_q16,
+        staging_out_q16,
+        staging_out_capacity);
+}
+
+I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitCapacityAliasSafeDefaultCapacityPreflightOnly(
+    I64 *gate_q16,
+    I64 gate_capacity,
+    I64 *up_q16,
+    I64 up_capacity,
+    I64 *out_q16,
+    I64 out_capacity,
+    I64 row_count,
+    I64 lane_count,
+    I64 *staging_out_q16,
+    I64 staging_out_capacity,
+    I64 *out_required_in_cells,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_required_out_cells,
+    I64 *out_commit_stage_cell_capacity,
+    I64 *out_commit_stage_byte_capacity)
+{
+    I64 default_in_row_stride_q16;
+    I64 default_out_row_stride_q16;
+
+    if (!out_required_in_cells || !out_required_stage_cells ||
+        !out_required_stage_bytes || !out_required_out_cells ||
+        !out_commit_stage_cell_capacity || !out_commit_stage_byte_capacity)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (!gate_q16 || !up_q16 || !out_q16 || !staging_out_q16)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (gate_capacity < 0 || up_capacity < 0 || out_capacity < 0 ||
+        staging_out_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || lane_count < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    // IQ-671 default-stride alias-safe required-bytes preflight contract:
+    // derive canonical default strides (gate/up/out row stride == lane_count)
+    // and route required-bytes + derived commit-capacity diagnostics through
+    // the canonical explicit-stride helper with no compute/commit side effects.
+    default_in_row_stride_q16 = lane_count;
+    default_out_row_stride_q16 = lane_count;
+
+    return FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafeDefaultCapacityPreflightOnly(
+        gate_q16,
+        gate_capacity,
+        up_q16,
+        up_capacity,
+        out_q16,
+        out_capacity,
+        row_count,
+        lane_count,
+        default_in_row_stride_q16,
+        default_out_row_stride_q16,
+        staging_out_q16,
+        staging_out_capacity,
+        out_required_in_cells,
+        out_required_stage_cells,
+        out_required_stage_bytes,
+        out_required_out_cells,
+        out_commit_stage_cell_capacity,
+        out_commit_stage_byte_capacity);
+}
+
 I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafeDefaultCapacityPreflightOnly(
     I64 *gate_q16,
     I64 gate_capacity,
