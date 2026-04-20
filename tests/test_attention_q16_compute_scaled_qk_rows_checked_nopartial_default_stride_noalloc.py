@@ -14,8 +14,8 @@ from test_attention_q16_apply_score_scale_checked import (
     ATTN_Q16_ERR_NULL_PTR,
     ATTN_Q16_OK,
 )
-from test_attention_q16_compute_scaled_qk_rows_checked_default_stride import (
-    attention_q16_compute_scaled_qk_rows_checked_default_stride,
+from test_attention_q16_compute_scaled_qk_rows_checked_nopartial_default_stride import (
+    attention_q16_compute_scaled_qk_rows_checked_nopartial_default_stride,
 )
 from test_attention_q16_compute_scaled_qk_rows_checked_nopartial_default_stride_noalloc_commit_only import (
     attention_q16_compute_scaled_qk_rows_checked_nopartial_default_stride_noalloc_commit_only,
@@ -84,7 +84,7 @@ def attention_q16_compute_scaled_qk_rows_checked_nopartial_default_stride_noallo
     if staged_scores_q32 is out_scores_q32:
         return ATTN_Q16_ERR_BAD_PARAM
 
-    err = attention_q16_compute_scaled_qk_rows_checked_default_stride(
+    err = attention_q16_compute_scaled_qk_rows_checked_nopartial_default_stride(
         q_rows_q16,
         q_rows_capacity,
         query_row_count,
@@ -163,7 +163,7 @@ def explicit_staged_noalloc_composition(
     if staged_scores_q32 is out_scores_q32:
         return ATTN_Q16_ERR_BAD_PARAM
 
-    err = attention_q16_compute_scaled_qk_rows_checked_default_stride(
+    err = attention_q16_compute_scaled_qk_rows_checked_nopartial_default_stride(
         q_rows_q16,
         q_rows_capacity,
         query_row_count,
@@ -211,7 +211,7 @@ def test_source_contains_noalloc_wrapper() -> None:
         "AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly("
         in body
     )
-    assert "AttentionQ16ComputeScaledQKRowsCheckedDefaultStride(" in body
+    assert "AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStride(" in body
     assert (
         "AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly("
         in body

@@ -18,9 +18,25 @@ from test_attention_q16_apply_score_scale_checked import (
 from test_attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_default_capacity_noalloc_hardened_commit_only_preflight_only_required_bytes import (
     attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_default_capacity_noalloc_hardened_commit_only_preflight_only_required_bytes,
 )
+from test_attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_default_capacity_noalloc_hardened_commit_only import (
+    attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_default_capacity_noalloc_hardened_commit_only,
+)
 from test_attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_default_capacity_noalloc_hardened_preflight_only_commit_only_required_bytes import (
     attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_default_capacity_noalloc_hardened_preflight_only_commit_only_required_bytes,
 )
+
+
+def _derive_expected_geometry(row_count: int, token_count: int) -> tuple[int, int, int]:
+    required_cells = row_count * token_count
+    if required_cells > ((1 << 63) - 1):
+        raise OverflowError
+
+    required_stage_bytes = required_cells * 8
+    if required_stage_bytes > ((1 << 63) - 1):
+        raise OverflowError
+
+    last_index = 0 if required_cells == 0 else required_cells - 1
+    return required_cells, required_stage_bytes, last_index
 
 
 def attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_default_capacity_noalloc_hardened_commit_only_preflight_only_parity(
@@ -299,7 +315,7 @@ def test_source_contains_commit_only_preflight_only_parity() -> None:
     source = Path("src/model/attention.HC").read_text(encoding="utf-8")
     assert (
         "I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStride"
-        "RequiredStageBytesDefaultCapacityNoAllocHardenedCommitOnlyPreflightOnly("
+        "RequiredStageBytesDefaultCapacityNoAllocHardenedCommitOnlyPreflightOnlyParity("
     ) in source
     assert (
         "AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStride"

@@ -808,6 +808,9 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideReq
     I64 snapshot_out_scores_capacity;
     I64 snapshot_row_count;
     I64 snapshot_token_count;
+    I64 expected_required_cells;
+    I64 expected_required_stage_bytes;
+    I64 expected_last_index;
     I32 status;
 
     if (!out_required_in_cells || !out_required_out_cells ||
@@ -904,6 +907,47 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideReq
     if (commit_preflight_last_in_index != preflight_commit_last_in_index)
         return ATTN_Q16_ERR_BAD_PARAM;
     if (commit_preflight_last_out_index != preflight_commit_last_out_index)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // Harden parity gate with geometry-derived invariants so two broken
+    // subordinate helpers cannot agree on the same wrong tuple and slip through.
+    status = AttentionTryMulI64Checked(snapshot_row_count,
+                                       snapshot_token_count,
+                                       &expected_required_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (preflight_commit_required_in_cells != expected_required_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (preflight_commit_required_out_cells != expected_required_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (preflight_commit_required_stage_cells != expected_required_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionTryMulI64Checked(expected_required_cells,
+                                       sizeof(I64),
+                                       &expected_required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (preflight_commit_required_stage_bytes != expected_required_stage_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (expected_required_cells == 0)
+    {
+        expected_last_index = 0;
+    }
+    else
+    {
+        status = AttentionTryAddI64Checked(expected_required_cells,
+                                           -1,
+                                           &expected_last_index);
+        if (status != ATTN_Q16_OK)
+            return status;
+    }
+
+    if (preflight_commit_last_in_index != expected_last_index)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (preflight_commit_last_out_index != expected_last_index)
         return ATTN_Q16_ERR_BAD_PARAM;
 
     *out_required_in_cells = preflight_commit_required_in_cells;
@@ -7920,28 +7964,6 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAlloc(
     if (status != ATTN_Q16_OK)
         return status;
 
-    if (query_row_count)
-    {
-        status = AttentionTryMulI64Checked(query_row_count - 1,
-                                           query_row_stride_q16,
-                                           &required_q_cells);
-        if (status != ATTN_Q16_OK)
-            return status;
-        status = AttentionTryAddI64Checked(required_q_cells,
-                                           head_dim,
-                                           &required_q_cells);
-        if (status != ATTN_Q16_OK)
-            return status;
-    }
-    else
-        required_q_cells = 0;
-
-    status = AttentionTryMulI64Checked(token_count,
-                                       k_row_stride_q16,
-                                       &required_k_cells);
-    if (status != ATTN_Q16_OK)
-        return status;
-
     if (!query_row_count || !token_count)
         return ATTN_Q16_OK;
 
@@ -7971,7 +7993,7 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAlloc(
     if (staged_scores_q32 == out_scores_q32)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    status = AttentionQ16ComputeScaledQKRowsCheckedDefaultStride(
+    status = AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStride(
         q_rows_q16,
         q_rows_capacity,
         query_row_count,
@@ -10675,6 +10697,26 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideCommitOnly(
     }
 
     return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnly(
+    I64 query_row_count,
+    I64 token_count,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity)
+{
+    // IQ-576 default-stride no-partial commit-order wrapper:
+    // keep a canonical API name aligned with the WS5 queue while delegating
+    // exact checked row-major commit semantics to the established helper.
+    return AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideCommitOnly(
+        query_row_count,
+        token_count,
+        staged_scores_q32,
+        staged_scores_capacity,
+        out_scores_q32,
+        out_scores_capacity);
 }
 
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(
