@@ -48,10 +48,10 @@ def attention_q16_apply_score_scale_rows_checked_nopartial(
     if in_score_stride < 0 or out_score_stride < 0 or row_stride < 0:
         return ATTN_Q16_ERR_BAD_PARAM
 
-    last_row_base_index = [0]
+    last_in_index = [0]
+    last_out_index = [0]
     required_in_cells = [0]
     required_out_cells = [0]
-    required_stage_cells = [0]
     err = attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only(
         in_scores_q32,
         in_scores_capacity,
@@ -60,12 +60,13 @@ def attention_q16_apply_score_scale_rows_checked_nopartial(
         in_score_stride,
         out_score_stride,
         row_stride,
+        row_stride,
         out_scores_q32,
         out_scores_capacity,
-        last_row_base_index,
+        last_in_index,
+        last_out_index,
         required_in_cells,
         required_out_cells,
-        required_stage_cells,
     )
     if err != ATTN_Q16_OK:
         return err
@@ -80,7 +81,11 @@ def attention_q16_apply_score_scale_rows_checked_nopartial(
     if err != ATTN_Q16_OK:
         return err
 
-    stage = [0] * required_stage_cells[0]
+    err, required_stage_cells = try_mul_i64_checked(row_count, token_count)
+    if err != ATTN_Q16_OK:
+        return err
+
+    stage = [0] * required_stage_cells
 
     row_base = 0
     for row_index in range(row_count):
@@ -149,10 +154,10 @@ def explicit_staged_row_composition(
     if in_score_stride < 0 or out_score_stride < 0 or row_stride < 0:
         return ATTN_Q16_ERR_BAD_PARAM
 
-    last_row_base_index = [0]
+    last_in_index = [0]
+    last_out_index = [0]
     required_in_cells = [0]
     required_out_cells = [0]
-    required_stage_cells = [0]
     err = attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only(
         in_scores_q32,
         in_scores_capacity,
@@ -161,12 +166,13 @@ def explicit_staged_row_composition(
         in_score_stride,
         out_score_stride,
         row_stride,
+        row_stride,
         out_scores_q32,
         out_scores_capacity,
-        last_row_base_index,
+        last_in_index,
+        last_out_index,
         required_in_cells,
         required_out_cells,
-        required_stage_cells,
     )
     if err != ATTN_Q16_OK:
         return err
@@ -181,7 +187,11 @@ def explicit_staged_row_composition(
     if err != ATTN_Q16_OK:
         return err
 
-    stage = [0] * required_stage_cells[0]
+    err, required_stage_cells = try_mul_i64_checked(row_count, token_count)
+    if err != ATTN_Q16_OK:
+        return err
+
+    stage = [0] * required_stage_cells
 
     for row_index in range(row_count):
         row_base = row_index * row_stride

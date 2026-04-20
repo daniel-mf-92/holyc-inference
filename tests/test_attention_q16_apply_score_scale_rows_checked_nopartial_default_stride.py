@@ -165,6 +165,86 @@ def test_error_parity_and_no_partial_contract() -> None:
     )
 
 
+def test_overflow_geometry_and_output_preservation_parity() -> None:
+    row_count = (1 << 62)
+    token_count = 4
+    score_scale_q16 = 1 << 16
+
+    in_scores = [123]
+    out_seed = [777]
+    out_new = out_seed.copy()
+    out_ref = out_seed.copy()
+
+    err_new = attention_q16_apply_score_scale_rows_checked_nopartial_default_stride(
+        in_scores,
+        len(in_scores),
+        row_count,
+        token_count,
+        score_scale_q16,
+        out_new,
+        len(out_new),
+    )
+    err_ref = explicit_default_stride_nopartial_composition(
+        in_scores,
+        len(in_scores),
+        row_count,
+        token_count,
+        score_scale_q16,
+        out_ref,
+        len(out_ref),
+    )
+
+    assert err_new == err_ref
+    assert err_new != ATTN_Q16_OK
+    assert out_new == out_ref == out_seed
+
+
+def test_default_stride_no_partial_parity_with_surplus_capacity() -> None:
+    row_count = 3
+    token_count = 3
+    score_scale_q16 = 1 << 16
+
+    capacity = row_count * token_count
+    in_scores = [
+        10,
+        20,
+        30,
+        40,
+        50,
+        60,
+        70,
+        80,
+        90,
+    ]
+
+    out_seed = [0x5151] * (capacity + 7)
+    out_new = out_seed.copy()
+    out_ref = out_seed.copy()
+
+    err_new = attention_q16_apply_score_scale_rows_checked_nopartial_default_stride(
+        in_scores,
+        len(in_scores),
+        row_count,
+        token_count,
+        score_scale_q16,
+        out_new,
+        len(out_new),
+    )
+    err_ref = explicit_default_stride_nopartial_composition(
+        in_scores,
+        len(in_scores),
+        row_count,
+        token_count,
+        score_scale_q16,
+        out_ref,
+        len(out_ref),
+    )
+
+    assert err_new == err_ref
+    assert out_new == out_ref
+    assert out_new[capacity:] == out_seed[capacity:]
+
+
 def test_randomized_parity_against_explicit_composition() -> None:
     rng = random.Random(20260420_593)
 
@@ -220,5 +300,7 @@ if __name__ == "__main__":
     test_source_contains_default_stride_nopartial_rows_wrapper()
     test_known_vector_matches_explicit_composition()
     test_error_parity_and_no_partial_contract()
+    test_overflow_geometry_and_output_preservation_parity()
+    test_default_stride_no_partial_parity_with_surplus_capacity()
     test_randomized_parity_against_explicit_composition()
     print("ok")
