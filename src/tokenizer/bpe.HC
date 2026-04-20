@@ -5015,6 +5015,9 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPiece(
         !out_required_token_capacity)
         return TOKENIZER_BPE_ERR_NULL_PTR;
 
+    if (out_token_count == out_required_token_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
     if (byte_len > 0x7FFFFFFFFFFFFFFF ||
         prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
         rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
