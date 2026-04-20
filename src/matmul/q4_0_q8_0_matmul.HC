@@ -55,6 +55,25 @@ I32 Q4_0Q8_0MatMulTiledQ32CheckedNoAllocDefaultTilesPreflightOnly(
     I64 *out_tile_m,
     I64 *out_tile_n,
     I64 *out_tile_k_blocks);
+I32 Q4_0Q8_0MatMulTiledQ32CheckedNoAllocDefaultTilesRequiredBytes(
+    Q4_0Block *lhs_q4_blocks,
+    I64 lhs_q4_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_q8_col_blocks,
+    I64 rhs_q8_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_cells_q32,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells,
+    I64 *out_required_lhs_blocks,
+    I64 *out_required_rhs_blocks,
+    I64 *out_required_out_cells,
+    I64 *out_tile_m,
+    I64 *out_tile_n,
+    I64 *out_tile_k_blocks);
 I32 Q4_0Q8_0MatMulTiledQ32CheckedNoAllocDefaultTilesCommitOnly(
     Q4_0Block *lhs_q4_blocks,
     I64 lhs_q4_block_capacity,
@@ -616,4 +635,71 @@ I32 Q4_0Q8_0MatMulTiledQ32CheckedNoAllocDefaultTilesCommitOnly(
         out_cells_q32,
         out_cell_capacity,
         out_row_stride_cells);
+}
+
+I32 Q4_0Q8_0MatMulTiledQ32CheckedNoAllocDefaultTilesRequiredBytes(
+    Q4_0Block *lhs_q4_blocks,
+    I64 lhs_q4_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_q8_col_blocks,
+    I64 rhs_q8_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_cells_q32,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells,
+    I64 *out_required_lhs_blocks,
+    I64 *out_required_rhs_blocks,
+    I64 *out_required_out_cells,
+    I64 *out_tile_m,
+    I64 *out_tile_n,
+    I64 *out_tile_k_blocks)
+{
+    I64 required_lhs_blocks;
+    I64 required_rhs_blocks;
+    I64 required_out_cells;
+    I64 tile_m;
+    I64 tile_n;
+    I64 tile_k_blocks;
+    I32 status;
+
+    if (!out_required_lhs_blocks || !out_required_rhs_blocks ||
+        !out_required_out_cells || !out_tile_m || !out_tile_n ||
+        !out_tile_k_blocks)
+        return Q4_0_Q8_0_MATMUL_ERR_NULL_PTR;
+
+    // IQ-690 required-bytes contract: route through canonical default-tiles
+    // preflight with local diagnostics first, then publish atomically so error
+    // paths cannot leak partially-updated required/tile outputs.
+    status = Q4_0Q8_0MatMulTiledQ32CheckedNoAllocDefaultTilesPreflightOnly(
+        lhs_q4_blocks,
+        lhs_q4_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_q8_col_blocks,
+        rhs_q8_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q32,
+        out_cell_capacity,
+        out_row_stride_cells,
+        &required_lhs_blocks,
+        &required_rhs_blocks,
+        &required_out_cells,
+        &tile_m,
+        &tile_n,
+        &tile_k_blocks);
+    if (status != Q4_0_Q8_0_MATMUL_OK)
+        return status;
+
+    *out_required_lhs_blocks = required_lhs_blocks;
+    *out_required_rhs_blocks = required_rhs_blocks;
+    *out_required_out_cells = required_out_cells;
+    *out_tile_m = tile_m;
+    *out_tile_n = tile_n;
+    *out_tile_k_blocks = tile_k_blocks;
+    return Q4_0_Q8_0_MATMUL_OK;
 }
