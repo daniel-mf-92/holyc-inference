@@ -769,6 +769,11 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocCommitCapacityD
 {
     I64 commit_stage_cell_capacity;
     I64 commit_stage_byte_capacity;
+    I64 required_q_cells;
+    I64 required_k_cells;
+    I64 required_out_cells;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
     I32 status;
 
     if (!out_commit_stage_cell_capacity || !out_commit_stage_byte_capacity ||
@@ -4514,6 +4519,11 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
 {
     I64 commit_stage_cell_capacity;
     I64 commit_stage_byte_capacity;
+    I64 required_q_cells;
+    I64 required_k_cells;
+    I64 required_out_cells;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
     I32 status;
 
     if (!out_commit_required_stage_cells || !out_commit_required_stage_bytes ||
@@ -5510,7 +5520,7 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCo
         k_row_stride_q16 < 0 || head_dim < 0 || out_row_stride < 0)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    // IQ-655 default-capacity alias-safe required-bytes preflight contract:
+    // IQ-656 default-capacity alias-safe required-bytes preflight contract:
     // derive commit capacities from packed stage geometry and caller stage
     // capacity, then reuse the canonical alias-safe default-capacity preflight
     // helper so q/k/out/stage diagnostics and overlap gates remain identical.

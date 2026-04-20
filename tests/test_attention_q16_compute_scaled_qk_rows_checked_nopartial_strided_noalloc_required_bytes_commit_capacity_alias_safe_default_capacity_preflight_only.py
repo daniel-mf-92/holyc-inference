@@ -139,7 +139,32 @@ def explicit_checked_composition(
     out_base_addr: int = 0x300000,
     stage_base_addr: int = 0x400000,
 ) -> int:
-    return attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_required_bytes_commit_capacity_alias_safe_default_capacity_preflight_only(
+    if (
+        out_commit_stage_cell_capacity is None
+        or out_commit_stage_byte_capacity is None
+        or out_required_q_cells is None
+        or out_required_k_cells is None
+        or out_required_out_cells is None
+        or out_required_stage_cells is None
+        or out_required_stage_bytes is None
+    ):
+        return ATTN_Q16_ERR_NULL_PTR
+
+    err, commit_stage_cell_capacity = try_mul_i64_checked(query_row_count, token_count)
+    if err != ATTN_Q16_OK:
+        return err
+
+    err, commit_stage_byte_capacity = try_mul_i64_checked(staged_scores_capacity, 8)
+    if err != ATTN_Q16_OK:
+        return err
+
+    req_q = [0]
+    req_k = [0]
+    req_out = [0]
+    req_stage_cells = [0]
+    req_stage_bytes = [0]
+
+    err = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commit_capacity_alias_safe_default_capacity_preflight_only(
         q_rows_q16,
         q_rows_capacity,
         query_row_count,
@@ -154,18 +179,27 @@ def explicit_checked_composition(
         out_row_stride,
         staged_scores_q32,
         staged_scores_capacity,
-        out_commit_stage_cell_capacity,
-        out_commit_stage_byte_capacity,
-        out_required_q_cells,
-        out_required_k_cells,
-        out_required_out_cells,
-        out_required_stage_cells,
-        out_required_stage_bytes,
+        req_q,
+        req_k,
+        req_out,
+        req_stage_cells,
+        req_stage_bytes,
         q_base_addr=q_base_addr,
         k_base_addr=k_base_addr,
         out_base_addr=out_base_addr,
         stage_base_addr=stage_base_addr,
     )
+    if err != ATTN_Q16_OK:
+        return err
+
+    out_commit_stage_cell_capacity[0] = commit_stage_cell_capacity
+    out_commit_stage_byte_capacity[0] = commit_stage_byte_capacity
+    out_required_q_cells[0] = req_q[0]
+    out_required_k_cells[0] = req_k[0]
+    out_required_out_cells[0] = req_out[0]
+    out_required_stage_cells[0] = req_stage_cells[0]
+    out_required_stage_bytes[0] = req_stage_bytes[0]
+    return ATTN_Q16_OK
 
 
 def test_source_contains_required_bytes_commit_capacity_alias_safe_default_capacity_preflight_helper() -> None:
