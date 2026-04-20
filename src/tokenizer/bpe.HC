@@ -6146,10 +6146,11 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesPreflig
     if (canonical_cursor != initial_cursor)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
 
-    // Independently stage commit-only default-capacity parity diagnostics and
-    // require exact equality before atomically publishing outputs.
+    // Independently stage commit-only default-capacity preflight-only no-alloc
+    // parity diagnostics and require exact equality before atomically
+    // publishing outputs.
     parity_cursor = initial_cursor;
-    err = TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesCommitOnlyDefaultCapacityPreflightOnly(
+    err = TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesCommitOnlyDefaultCapacityPreflightOnlyNoAlloc(
         bytes,
         byte_len,
         &parity_cursor,
