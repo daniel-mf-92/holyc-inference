@@ -494,3 +494,81 @@ I32 TransformerBlockQ16ResidualAddRowsComputeOutRowBaseChecked(
 
     return BLOCK_Q16_OK;
 }
+
+// Block-level staging footprint helper for one transformer pass.
+//
+// The block pipeline stages three dense Q16 slabs of live cells:
+// - attention staging
+// - FFN staging
+// - residual staging
+//
+// Outputs are deterministic checked diagnostics for caller-managed
+// workspace contracts.
+I32 TransformerBlockQ16ComputeRequiredBytesChecked(
+    I64 row_count,
+    I64 lane_count,
+    I64 *out_attn_stage_cells,
+    I64 *out_ffn_stage_cells,
+    I64 *out_residual_cells,
+    I64 *out_total_stage_bytes)
+{
+    I64 attn_stage_cells;
+    I64 ffn_stage_cells;
+    I64 residual_cells;
+    I64 dense_cells;
+    I64 total_stage_cells;
+    I64 total_stage_bytes;
+    I32 status;
+
+    if (!out_attn_stage_cells || !out_ffn_stage_cells ||
+        !out_residual_cells || !out_total_stage_bytes)
+        return BLOCK_Q16_ERR_NULL_PTR;
+
+    if (row_count < 0 || lane_count < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    if (!row_count || !lane_count)
+    {
+        *out_attn_stage_cells = 0;
+        *out_ffn_stage_cells = 0;
+        *out_residual_cells = 0;
+        *out_total_stage_bytes = 0;
+        return BLOCK_Q16_OK;
+    }
+
+    status = BlockTryMulI64Checked(row_count,
+                                   lane_count,
+                                   &dense_cells);
+    if (status)
+        return status;
+
+    // Stage diagnostics locally first so overflow exits never publish
+    // partially-updated outputs.
+    attn_stage_cells = dense_cells;
+    ffn_stage_cells = dense_cells;
+    residual_cells = dense_cells;
+
+    status = BlockTryAddI64Checked(dense_cells,
+                                   dense_cells,
+                                   &total_stage_cells);
+    if (status)
+        return status;
+    status = BlockTryAddI64Checked(total_stage_cells,
+                                   dense_cells,
+                                   &total_stage_cells);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(total_stage_cells,
+                                   sizeof(I64),
+                                   &total_stage_bytes);
+    if (status)
+        return status;
+
+    *out_attn_stage_cells = attn_stage_cells;
+    *out_ffn_stage_cells = ffn_stage_cells;
+    *out_residual_cells = residual_cells;
+    *out_total_stage_bytes = total_stage_bytes;
+
+    return BLOCK_Q16_OK;
+}
