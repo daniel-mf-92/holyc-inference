@@ -116,16 +116,6 @@ I32 InferenceGenerateTokensPreflightCheckedGreedyDefaultTopKDefaultCapacity(
     I64 *out_required_topk_capacity,
     I64 *out_required_random_capacity,
     I64 *out_required_generated_capacity);
-I32 InferenceGenerateTokensPreflightCheckedGreedyDefaultTopKDefaultCapacity(
-    I64 vocab_size,
-    I64 max_new_tokens,
-    I64 token_history_count,
-    I64 *out_required_step_logits_cells,
-    I64 *out_required_history_capacity,
-    I64 *out_required_stage_logits_capacity,
-    I64 *out_required_topk_capacity,
-    I64 *out_required_random_capacity,
-    I64 *out_required_generated_capacity);
 I32 InferenceGenerateTokensPreflightCheckedGreedyDefault(
     I64 step_logits_capacity,
     I64 vocab_size,
@@ -1463,79 +1453,6 @@ I32 InferenceGenerateTokensPreflightCheckedGreedyDefaultTopK(
         workspace_topk_index_capacity,
         random_q16_capacity,
         generated_capacity,
-        out_required_step_logits_cells,
-        out_required_history_capacity,
-        out_required_stage_logits_capacity,
-        out_required_topk_capacity,
-        out_required_random_capacity,
-        out_required_generated_capacity);
-}
-
-// WS7 preflight diagnostics wrapper: derive canonical default capacities for
-// greedy default-top-k inference, then delegate to canonical checked wrapper.
-//
-// Derived capacities (all checked integer math):
-// - step_logits_capacity = vocab_size * max_new_tokens
-// - token_history_capacity = token_history_count + max_new_tokens
-// - workspace_stage_logits_capacity = vocab_size
-// - workspace_topk_logits_capacity = vocab_size
-// - workspace_topk_index_capacity = vocab_size
-// - random_q16_capacity = max_new_tokens
-// - generated_capacity = max_new_tokens
-//
-// No-partial diagnostics are preserved by forwarding to
-// `InferenceGenerateTokensPreflightCheckedGreedyDefaultTopK` only after all
-// local overflow/domain guards pass.
-I32 InferenceGenerateTokensPreflightCheckedGreedyDefaultTopKDefaultCapacity(
-    I64 vocab_size,
-    I64 max_new_tokens,
-    I64 token_history_count,
-    I64 *out_required_step_logits_cells,
-    I64 *out_required_history_capacity,
-    I64 *out_required_stage_logits_capacity,
-    I64 *out_required_topk_capacity,
-    I64 *out_required_random_capacity,
-    I64 *out_required_generated_capacity)
-{
-    I64 step_logits_capacity;
-    I64 token_history_capacity;
-
-    if (!out_required_step_logits_cells || !out_required_history_capacity ||
-        !out_required_stage_logits_capacity || !out_required_topk_capacity ||
-        !out_required_random_capacity || !out_required_generated_capacity)
-        return SAMPLING_Q16_ERR_NULL_PTR;
-
-    if (vocab_size <= 0)
-        return SAMPLING_Q16_ERR_BAD_PARAM;
-    if (max_new_tokens < 0 || token_history_count < 0)
-        return SAMPLING_Q16_ERR_BAD_PARAM;
-
-    if (max_new_tokens)
-    {
-        if (vocab_size > 0x7FFFFFFFFFFFFFFF / max_new_tokens)
-            return SAMPLING_Q16_ERR_OVERFLOW;
-        step_logits_capacity = vocab_size * max_new_tokens;
-    }
-    else
-    {
-        step_logits_capacity = 0;
-    }
-
-    token_history_capacity = token_history_count + max_new_tokens;
-    if (token_history_capacity < token_history_count)
-        return SAMPLING_Q16_ERR_OVERFLOW;
-
-    return InferenceGenerateTokensPreflightCheckedGreedyDefaultTopK(
-        step_logits_capacity,
-        vocab_size,
-        max_new_tokens,
-        token_history_capacity,
-        token_history_count,
-        vocab_size,
-        vocab_size,
-        vocab_size,
-        max_new_tokens,
-        max_new_tokens,
         out_required_step_logits_cells,
         out_required_history_capacity,
         out_required_stage_logits_capacity,
