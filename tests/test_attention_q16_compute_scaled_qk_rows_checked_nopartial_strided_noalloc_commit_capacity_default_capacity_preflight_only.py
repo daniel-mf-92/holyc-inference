@@ -37,11 +37,16 @@ def attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commi
     out_scores_capacity: int,
     out_row_stride: int,
     staged_scores_capacity: int,
+    out_commit_stage_cell_capacity: list[int] | None,
+    out_commit_stage_byte_capacity: list[int] | None,
     out_commit_required_stage_cells: list[int] | None,
     out_commit_required_stage_bytes: list[int] | None,
     out_required_out_cells: list[int] | None,
 ) -> int:
     if (
+        out_commit_stage_cell_capacity is None
+        or out_commit_stage_byte_capacity is None
+        or
         out_commit_required_stage_cells is None
         or out_commit_required_stage_bytes is None
         or out_required_out_cells is None
@@ -76,7 +81,7 @@ def attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commi
     if err != ATTN_Q16_OK:
         return err
 
-    return attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_required_bytes_commit_capacity(
+    status = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_required_bytes_commit_capacity(
         q_rows_q16,
         q_rows_capacity,
         query_row_count,
@@ -95,6 +100,12 @@ def attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commi
         out_commit_required_stage_bytes,
         out_required_out_cells,
     )
+    if status != ATTN_Q16_OK:
+        return status
+
+    out_commit_stage_cell_capacity[0] = commit_stage_cell_capacity
+    out_commit_stage_byte_capacity[0] = commit_stage_byte_capacity
+    return ATTN_Q16_OK
 
 
 def explicit_checked_preflight_composition(
@@ -111,11 +122,16 @@ def explicit_checked_preflight_composition(
     out_scores_capacity: int,
     out_row_stride: int,
     staged_scores_capacity: int,
+    out_commit_stage_cell_capacity: list[int] | None,
+    out_commit_stage_byte_capacity: list[int] | None,
     out_commit_required_stage_cells: list[int] | None,
     out_commit_required_stage_bytes: list[int] | None,
     out_required_out_cells: list[int] | None,
 ) -> int:
     if (
+        out_commit_stage_cell_capacity is None
+        or out_commit_stage_byte_capacity is None
+        or
         out_commit_required_stage_cells is None
         or out_commit_required_stage_bytes is None
         or out_required_out_cells is None
@@ -150,7 +166,7 @@ def explicit_checked_preflight_composition(
     if err != ATTN_Q16_OK:
         return err
 
-    return attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_required_bytes_commit_capacity(
+    status = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_required_bytes_commit_capacity(
         q_rows_q16,
         q_rows_capacity,
         query_row_count,
@@ -169,6 +185,12 @@ def explicit_checked_preflight_composition(
         out_commit_required_stage_bytes,
         out_required_out_cells,
     )
+    if status != ATTN_Q16_OK:
+        return status
+
+    out_commit_stage_cell_capacity[0] = commit_stage_cell_capacity
+    out_commit_stage_byte_capacity[0] = commit_stage_byte_capacity
+    return ATTN_Q16_OK
 
 
 def test_source_contains_strided_default_capacity_preflight_only_wrapper() -> None:
@@ -179,8 +201,10 @@ def test_source_contains_strided_default_capacity_preflight_only_wrapper() -> No
 
     assert "AttentionTryMulI64Checked(query_row_count," in body
     assert "AttentionTryMulI64Checked(staged_scores_capacity," in body
+    assert "*out_commit_stage_cell_capacity = commit_stage_cell_capacity;" in body
+    assert "*out_commit_stage_byte_capacity = commit_stage_byte_capacity;" in body
     assert (
-        "return AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacity("
+        "status = AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacity("
         in body
     )
 
@@ -204,9 +228,13 @@ def test_known_vectors_and_zero_case() -> None:
     got_stage_cells = [111]
     got_stage_bytes = [222]
     got_out_cells = [333]
+    got_commit_stage_cells = [777]
+    got_commit_stage_bytes = [888]
     exp_stage_cells = [444]
     exp_stage_bytes = [555]
     exp_out_cells = [666]
+    exp_commit_stage_cells = [999]
+    exp_commit_stage_bytes = [1111]
 
     err_got = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commit_capacity_default_capacity_preflight_only(
         q_rows,
@@ -222,6 +250,8 @@ def test_known_vectors_and_zero_case() -> None:
         out_capacity,
         out_row_stride,
         query_row_count * token_count,
+        got_commit_stage_cells,
+        got_commit_stage_bytes,
         got_stage_cells,
         got_stage_bytes,
         got_out_cells,
@@ -240,12 +270,16 @@ def test_known_vectors_and_zero_case() -> None:
         out_capacity,
         out_row_stride,
         query_row_count * token_count,
+        exp_commit_stage_cells,
+        exp_commit_stage_bytes,
         exp_stage_cells,
         exp_stage_bytes,
         exp_out_cells,
     )
 
     assert err_got == err_exp == ATTN_Q16_OK
+    assert got_commit_stage_cells == exp_commit_stage_cells == [query_row_count * token_count]
+    assert got_commit_stage_bytes == exp_commit_stage_bytes == [query_row_count * token_count * 8]
     assert got_stage_cells == exp_stage_cells == [query_row_count * token_count]
     assert got_stage_bytes == exp_stage_bytes == [query_row_count * token_count * 8]
 
@@ -256,6 +290,8 @@ def test_known_vectors_and_zero_case() -> None:
     z_stage_cells = [9]
     z_stage_bytes = [9]
     z_out_cells = [9]
+    z_commit_stage_cells = [9]
+    z_commit_stage_bytes = [9]
     err = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commit_capacity_default_capacity_preflight_only(
         [0],
         1,
@@ -270,11 +306,15 @@ def test_known_vectors_and_zero_case() -> None:
         1,
         5,
         2,
+        z_commit_stage_cells,
+        z_commit_stage_bytes,
         z_stage_cells,
         z_stage_bytes,
         z_out_cells,
     )
     assert err == ATTN_Q16_OK
+    assert z_commit_stage_cells == [0]
+    assert z_commit_stage_bytes == [16]
     assert z_stage_cells == [0]
     assert z_stage_bytes == [0]
     assert z_out_cells == [0]
@@ -305,9 +345,13 @@ def test_randomized_parity_and_overflow_behavior() -> None:
         got_stage_cells = [101]
         got_stage_bytes = [202]
         got_out_cells = [303]
+        got_commit_stage_cells = [707]
+        got_commit_stage_bytes = [808]
         exp_stage_cells = [404]
         exp_stage_bytes = [505]
         exp_out_cells = [606]
+        exp_commit_stage_cells = [909]
+        exp_commit_stage_bytes = [1001]
 
         err_got = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commit_capacity_default_capacity_preflight_only(
             q_rows,
@@ -323,6 +367,8 @@ def test_randomized_parity_and_overflow_behavior() -> None:
             out_capacity,
             out_row_stride,
             staged_capacity,
+            got_commit_stage_cells,
+            got_commit_stage_bytes,
             got_stage_cells,
             got_stage_bytes,
             got_out_cells,
@@ -341,6 +387,8 @@ def test_randomized_parity_and_overflow_behavior() -> None:
             out_capacity,
             out_row_stride,
             staged_capacity,
+            exp_commit_stage_cells,
+            exp_commit_stage_bytes,
             exp_stage_cells,
             exp_stage_bytes,
             exp_out_cells,
@@ -348,13 +396,19 @@ def test_randomized_parity_and_overflow_behavior() -> None:
 
         assert err_got == err_exp
         if err_got == ATTN_Q16_OK:
+            assert got_commit_stage_cells == exp_commit_stage_cells
+            assert got_commit_stage_bytes == exp_commit_stage_bytes
             assert got_stage_cells == exp_stage_cells
             assert got_stage_bytes == exp_stage_bytes
             assert got_out_cells == exp_out_cells
         else:
+            assert got_commit_stage_cells == [707]
+            assert got_commit_stage_bytes == [808]
             assert got_stage_cells == [101]
             assert got_stage_bytes == [202]
             assert got_out_cells == [303]
+            assert exp_commit_stage_cells == [909]
+            assert exp_commit_stage_bytes == [1001]
             assert exp_stage_cells == [404]
             assert exp_stage_bytes == [505]
             assert exp_out_cells == [606]
@@ -362,6 +416,8 @@ def test_randomized_parity_and_overflow_behavior() -> None:
     out1 = [1]
     out2 = [1]
     out3 = [1]
+    out4 = [1]
+    out5 = [1]
     err = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commit_capacity_default_capacity_preflight_only(
         [0],
         1,
@@ -379,6 +435,8 @@ def test_randomized_parity_and_overflow_behavior() -> None:
         out1,
         out2,
         out3,
+        out4,
+        out5,
     )
     assert err == ATTN_Q16_ERR_OVERFLOW
 
