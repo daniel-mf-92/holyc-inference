@@ -93,6 +93,20 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideReq
     I64 *out_last_in_index,
     I64 *out_last_out_index);
 
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideRequiredStageBytesNoAllocHardened(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_in_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_last_in_index,
+    I64 *out_last_out_index);
+
 I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
     I64 *in_scores_q32,
     I64 in_scores_capacity,
@@ -3001,6 +3015,129 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideReq
     *out_required_stage_bytes = required_stage_bytes;
     *out_last_in_index = last_in_index;
     *out_last_out_index = last_out_index;
+    return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideRequiredStageBytesNoAllocHardened(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_in_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_last_in_index,
+    I64 *out_last_out_index)
+{
+    I64 canonical_required_in_cells;
+    I64 canonical_required_out_cells;
+    I64 canonical_required_stage_cells;
+    I64 canonical_required_stage_bytes;
+    I64 canonical_last_in_index;
+    I64 canonical_last_out_index;
+
+    I64 recomputed_required_stage_cells;
+    I64 recomputed_required_stage_bytes;
+    I64 expected_last_index;
+    I64 snapshot_in_scores_capacity;
+    I64 snapshot_out_scores_capacity;
+    I64 snapshot_row_count;
+    I64 snapshot_token_count;
+    I32 status;
+
+    if (!in_scores_q32 || !out_scores_q32 || !out_required_in_cells ||
+        !out_required_out_cells || !out_required_stage_cells ||
+        !out_required_stage_bytes || !out_last_in_index || !out_last_out_index)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (in_scores_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    snapshot_in_scores_capacity = in_scores_capacity;
+    snapshot_out_scores_capacity = out_scores_capacity;
+    snapshot_row_count = row_count;
+    snapshot_token_count = token_count;
+
+    // IQ-717 hardened diagnostics-only required-stage-bytes contract:
+    // 1) run canonical default-stride required-stage-bytes diagnostics;
+    // 2) independently recompute required stage cells/bytes from row/token
+    //    geometry and require exact parity with canonical diagnostics;
+    // 3) enforce shape immutability by requiring canonical in/out required-cell
+    //    diagnostics to match the same recomputed geometry;
+    // 4) commit caller-visible diagnostics atomically only after all checks.
+    status =
+        AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideRequiredStageBytes(
+            in_scores_q32,
+            in_scores_capacity,
+            row_count,
+            token_count,
+            out_scores_q32,
+            out_scores_capacity,
+            &canonical_required_in_cells,
+            &canonical_required_out_cells,
+            &canonical_required_stage_cells,
+            &canonical_required_stage_bytes,
+            &canonical_last_in_index,
+            &canonical_last_out_index);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(row_count,
+                                       token_count,
+                                       &recomputed_required_stage_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(recomputed_required_stage_cells,
+                                       sizeof(I64),
+                                       &recomputed_required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (recomputed_required_stage_cells == 0)
+        expected_last_index = 0;
+    else
+    {
+        status = AttentionTryAddI64Checked(recomputed_required_stage_cells,
+                                           -1,
+                                           &expected_last_index);
+        if (status != ATTN_Q16_OK)
+            return status;
+    }
+
+    if (snapshot_in_scores_capacity != in_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_scores_capacity != out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_row_count != row_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_token_count != token_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (canonical_required_stage_cells != recomputed_required_stage_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (canonical_required_stage_bytes != recomputed_required_stage_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (canonical_required_in_cells != recomputed_required_stage_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (canonical_required_out_cells != recomputed_required_stage_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (canonical_last_in_index != expected_last_index)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (canonical_last_out_index != expected_last_index)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    *out_required_in_cells = canonical_required_in_cells;
+    *out_required_out_cells = canonical_required_out_cells;
+    *out_required_stage_cells = canonical_required_stage_cells;
+    *out_required_stage_bytes = canonical_required_stage_bytes;
+    *out_last_in_index = canonical_last_in_index;
+    *out_last_out_index = canonical_last_out_index;
     return ATTN_Q16_OK;
 }
 
