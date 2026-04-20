@@ -19,6 +19,9 @@ from test_attention_q16_compute_scaled_qk_rows_checked import (
     try_add_i64_checked,
     try_mul_i64_checked,
 )
+from test_attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commit_capacity_alias_safe_preflight_only import (
+    attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commit_capacity_alias_safe_preflight_only,
+)
 from test_attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_preflight_only import (
     attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_preflight_only,
 )
@@ -210,7 +213,24 @@ def explicit_checked_composition(
     out_base_addr: int = 0x300000,
     stage_base_addr: int = 0x400000,
 ) -> int:
-    return attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commit_capacity_alias_safe_default_capacity_preflight_only(
+    commit_required_stage_cells = [0]
+    commit_required_stage_bytes = [0]
+    commit_required_out_cells = [0]
+
+    required_q_cells = [0]
+    required_k_cells = [0]
+    required_out_cells = [0]
+    required_stage_cells = [0]
+    required_stage_bytes = [0]
+
+    err, commit_stage_cell_capacity = try_mul_i64_checked(query_row_count, token_count)
+    if err != ATTN_Q16_OK:
+        return err
+    err, commit_stage_byte_capacity = try_mul_i64_checked(staged_scores_capacity, 8)
+    if err != ATTN_Q16_OK:
+        return err
+
+    err = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_preflight_only(
         q_rows_q16,
         q_rows_capacity,
         query_row_count,
@@ -223,18 +243,56 @@ def explicit_checked_composition(
         out_scores_q32,
         out_scores_capacity,
         out_row_stride,
+        required_q_cells,
+        required_k_cells,
+        required_out_cells,
+        required_stage_cells,
+        required_stage_bytes,
+    )
+    if err != ATTN_Q16_OK:
+        return err
+
+    err = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commit_capacity_alias_safe_preflight_only(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        query_row_stride_q16,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        k_row_stride_q16,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        out_row_stride,
+        commit_stage_cell_capacity,
+        commit_stage_byte_capacity,
         staged_scores_q32,
         staged_scores_capacity,
-        out_required_q_cells,
-        out_required_k_cells,
-        out_required_out_cells,
-        out_required_stage_cells,
-        out_required_stage_bytes,
+        commit_required_stage_cells,
+        commit_required_stage_bytes,
+        commit_required_out_cells,
         q_base_addr=q_base_addr,
         k_base_addr=k_base_addr,
         out_base_addr=out_base_addr,
         stage_base_addr=stage_base_addr,
     )
+    if err != ATTN_Q16_OK:
+        return err
+
+    if commit_required_stage_cells[0] != required_stage_cells[0]:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if commit_required_stage_bytes[0] != required_stage_bytes[0]:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if commit_required_out_cells[0] != required_out_cells[0]:
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    out_required_q_cells[0] = required_q_cells[0]
+    out_required_k_cells[0] = required_k_cells[0]
+    out_required_out_cells[0] = commit_required_out_cells[0]
+    out_required_stage_cells[0] = commit_required_stage_cells[0]
+    out_required_stage_bytes[0] = commit_required_stage_bytes[0]
+    return ATTN_Q16_OK
 
 
 def test_source_contains_alias_safe_default_capacity_preflight_helper() -> None:
@@ -246,9 +304,11 @@ def test_source_contains_alias_safe_default_capacity_preflight_helper() -> None:
     assert "AttentionTryMulI64Checked(query_row_count," in body
     assert "AttentionTryMulI64Checked(staged_scores_capacity," in body
     assert "AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocPreflightOnly(" in body
+    assert "AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocCommitCapacityAliasSafePreflightOnly(" in body
+    assert "if (commit_required_stage_cells != required_stage_cells)" in body
     assert "*out_required_q_cells = required_q_cells;" in body
     assert "*out_required_k_cells = required_k_cells;" in body
-    assert "*out_required_out_cells = required_out_cells;" in body
+    assert "*out_required_out_cells = commit_required_out_cells;" in body
     assert "*out_required_stage_cells = required_stage_cells;" in body
     assert "*out_required_stage_bytes = required_stage_bytes;" in body
 
