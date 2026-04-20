@@ -2187,6 +2187,7 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacityAlias
     I64 required_stage_cells;
     I64 required_stage_bytes;
     I64 required_out_cells;
+    I64 expected_stage_bytes;
     I32 status;
 
     if (!gate_q16 || !up_q16 || !out_q16 || !staging_out_q16)
@@ -2226,6 +2227,20 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacityAlias
         &required_out_cells);
     if (status)
         return status;
+
+    // Guard canonical diagnostics parity before compute/commit: staged cell
+    // geometry must match live output geometry and stage bytes must equal
+    // `required_stage_cells * sizeof(I64)`.
+    if (required_stage_cells != required_out_cells)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    status = FFNTryMulI64Checked(required_stage_cells,
+                                 sizeof(I64),
+                                 &expected_stage_bytes);
+    if (status)
+        return status;
+    if (expected_stage_bytes != required_stage_bytes)
+        return FFN_Q16_ERR_BAD_PARAM;
 
     return FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocCommitCapacityDefaultCapacity(
         gate_q16,
