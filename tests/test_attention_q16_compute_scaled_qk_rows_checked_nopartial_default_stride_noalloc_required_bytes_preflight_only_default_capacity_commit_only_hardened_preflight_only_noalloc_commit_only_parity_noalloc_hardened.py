@@ -22,6 +22,17 @@ from test_attention_q16_compute_scaled_qk_rows_checked_nopartial_default_stride_
 )
 
 
+I64_MIN = -(1 << 63)
+I64_MAX = (1 << 63) - 1
+
+
+def _mul_i64_checked(a: int, b: int) -> tuple[int, int]:
+    value = a * b
+    if value < I64_MIN or value > I64_MAX:
+        return ATTN_Q16_ERR_BAD_PARAM, 0
+    return ATTN_Q16_OK, value
+
+
 def attention_q16_compute_scaled_qk_rows_checked_nopartial_default_stride_noalloc_required_bytes_preflight_only_default_capacity_commit_only_hardened_preflight_only_noalloc_commit_only_parity_noalloc_hardened(
     q_rows_q16,
     q_rows_capacity: int,
@@ -144,6 +155,28 @@ def attention_q16_compute_scaled_qk_rows_checked_nopartial_default_stride_noallo
         or canonical_out[0] != hardened_out[0]
         or canonical_stage_cells[0] != hardened_stage_cells[0]
         or canonical_stage_bytes[0] != hardened_stage_bytes[0]
+    ):
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    err, recomputed_q = _mul_i64_checked(query_row_count, head_dim)
+    if err != ATTN_Q16_OK:
+        return err
+    err, recomputed_k = _mul_i64_checked(token_count, head_dim)
+    if err != ATTN_Q16_OK:
+        return err
+    err, recomputed_out = _mul_i64_checked(query_row_count, token_count)
+    if err != ATTN_Q16_OK:
+        return err
+    err, recomputed_stage_bytes = _mul_i64_checked(recomputed_out, 8)
+    if err != ATTN_Q16_OK:
+        return err
+
+    if (
+        canonical_q[0] != recomputed_q
+        or canonical_k[0] != recomputed_k
+        or canonical_out[0] != recomputed_out
+        or canonical_stage_cells[0] != recomputed_out
+        or canonical_stage_bytes[0] != recomputed_stage_bytes
     ):
         return ATTN_Q16_ERR_BAD_PARAM
 
@@ -282,6 +315,28 @@ def explicit_checked_composition(*args) -> int:
     ):
         return ATTN_Q16_ERR_BAD_PARAM
 
+    err, recomputed_q = _mul_i64_checked(query_row_count, head_dim)
+    if err != ATTN_Q16_OK:
+        return err
+    err, recomputed_k = _mul_i64_checked(token_count, head_dim)
+    if err != ATTN_Q16_OK:
+        return err
+    err, recomputed_out = _mul_i64_checked(query_row_count, token_count)
+    if err != ATTN_Q16_OK:
+        return err
+    err, recomputed_stage_bytes = _mul_i64_checked(recomputed_out, 8)
+    if err != ATTN_Q16_OK:
+        return err
+
+    if (
+        canonical_q[0] != recomputed_q
+        or canonical_k[0] != recomputed_k
+        or canonical_out[0] != recomputed_out
+        or canonical_stage_cells[0] != recomputed_out
+        or canonical_stage_bytes[0] != recomputed_stage_bytes
+    ):
+        return ATTN_Q16_ERR_BAD_PARAM
+
     out_required_q_cells[0] = hardened_q[0]
     out_required_k_cells[0] = hardened_k[0]
     out_required_out_cells[0] = hardened_out[0]
@@ -301,6 +356,8 @@ def test_source_contains_parity_noalloc_hardened_wrapper() -> None:
     assert "snapshot_q_rows_capacity" in body
     assert "canonical_required_q_cells" in body
     assert "hardened_required_q_cells" in body
+    assert "recomputed_required_q_cells" in body
+    assert "AttentionTryMulI64Checked(query_row_count" in body
 
 
 def test_known_vector_and_failure_sentinel_immutability() -> None:
