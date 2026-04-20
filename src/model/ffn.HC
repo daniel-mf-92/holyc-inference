@@ -1030,6 +1030,48 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommit
     return FFN_Q16_OK;
 }
 
+// Default commit-cell-capacity wrapper for no-alloc required-bytes commit
+// diagnostics.
+//
+// IQ-614 contract:
+// - derive commit_stage_cell_capacity = row_count * lane_count using checked
+//   overflow math;
+// - route all diagnostics through the canonical commit-capacity helper so
+//   null/shape/capacity/error behavior stays identical to explicit composition.
+I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitCapacityDefault(
+    I64 row_count,
+    I64 lane_count,
+    I64 commit_stage_byte_capacity,
+    I64 *out_commit_required_stage_cells,
+    I64 *out_commit_required_stage_bytes,
+    I64 *out_required_out_cells)
+{
+    I64 commit_stage_cell_capacity;
+    I32 status;
+
+    if (!out_commit_required_stage_cells || !out_commit_required_stage_bytes ||
+        !out_required_out_cells)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (row_count < 0 || lane_count < 0 || commit_stage_byte_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    status = FFNTryMulI64Checked(row_count,
+                                 lane_count,
+                                 &commit_stage_cell_capacity);
+    if (status)
+        return status;
+
+    return FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitCapacity(
+        row_count,
+        lane_count,
+        commit_stage_cell_capacity,
+        commit_stage_byte_capacity,
+        out_commit_required_stage_cells,
+        out_commit_required_stage_bytes,
+        out_required_out_cells);
+}
+
 // Caller-staged no-alloc preflight diagnostics for default-stride
 // no-partial SwiGLU rows.
 //

@@ -16,6 +16,9 @@ from test_attention_q16_apply_score_scale_checked_nopartial import (
     attention_q16_apply_score_scale_checked,
     attention_q16_apply_score_scale_checked_nopartial,
 )
+from test_attention_q16_apply_score_scale_checked_default_stride_nopartial_preflight_only import (
+    attention_q16_apply_score_scale_checked_default_stride_nopartial_preflight_only,
+)
 
 
 def attention_q16_apply_score_scale_checked_nopartial_default_stride(
@@ -38,6 +41,24 @@ def attention_q16_apply_score_scale_checked_nopartial_default_stride(
         return ATTN_Q16_OK
 
     default_score_stride = token_count
+
+    preflight_last_in = [0]
+    preflight_last_out = [0]
+    preflight_required_in = [0]
+    preflight_required_out = [0]
+    err = attention_q16_apply_score_scale_checked_default_stride_nopartial_preflight_only(
+        in_scores_q32,
+        in_scores_capacity,
+        token_count,
+        out_scores_q32,
+        out_scores_capacity,
+        preflight_last_in,
+        preflight_last_out,
+        preflight_required_in,
+        preflight_required_out,
+    )
+    if err != ATTN_Q16_OK:
+        return err
 
     staged_scores = [0] * token_count
     err = attention_q16_apply_score_scale_checked(

@@ -821,6 +821,12 @@ I32 AttentionQ16ApplyScoreScaleCheckedNoPartial(I64 *in_scores_q32,
     if (status != ATTN_Q16_OK)
         return status;
 
+    // Preflight guarantees span fit, but keep explicit contract checks here
+    // so staged wrapper behavior stays self-contained and auditable.
+    if (required_in_cells > in_scores_capacity ||
+        required_out_cells > out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
     if (!token_count)
         return ATTN_Q16_OK;
 
