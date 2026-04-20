@@ -143,6 +143,19 @@ I32 InferenceGenerateTokensPreflightCheckedGreedyDefault(
     I64 *out_required_topk_capacity,
     I64 *out_required_random_capacity,
     I64 *out_required_generated_capacity);
+I32 InferenceGenerateTokensCheckedGreedyDefaultTopKDefaultCapacity(
+    I64 *step_logits_q16,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 *token_history,
+    I64 token_history_count,
+    I64 repetition_penalty_q16,
+    I64 *random_q16_values,
+    I64 *workspace_stage_logits_q16,
+    I64 *workspace_topk_logits_q16,
+    I64 *workspace_topk_indices,
+    I64 *out_generated_tokens,
+    I64 *out_generated_count);
 
 I32 GenerationStepComposeStageError(I32 stage_base, I32 stage_status)
 {
@@ -1295,6 +1308,72 @@ I32 InferenceGenerateTokensCheckedGreedyDefault(
                                           workspace_topk_index_capacity,
                                           out_generated_tokens,
                                           out_generated_count);
+}
+
+// WS7 execution wrapper: greedy default-top-k with fully derived capacities.
+//
+// Derived capacity contract (checked integer math only):
+// - step_logits_capacity = vocab_size * max_new_tokens
+// - token_history_capacity = token_history_count + max_new_tokens
+// - workspace stage/top-k capacities = vocab_size
+// - random/generated capacities = max_new_tokens
+//
+// The wrapper preserves explicit composition behavior by computing all derived
+// capacities locally with overflow guards, then delegating to canonical greedy
+// checked generation.
+I32 InferenceGenerateTokensCheckedGreedyDefaultTopKDefaultCapacity(
+    I64 *step_logits_q16,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 *token_history,
+    I64 token_history_count,
+    I64 repetition_penalty_q16,
+    I64 *random_q16_values,
+    I64 *workspace_stage_logits_q16,
+    I64 *workspace_topk_logits_q16,
+    I64 *workspace_topk_indices,
+    I64 *out_generated_tokens,
+    I64 *out_generated_count)
+{
+    I64 step_logits_capacity;
+    I64 token_history_capacity;
+
+    if (vocab_size < 0 || max_new_tokens < 0 || token_history_count < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    token_history_capacity = token_history_count + max_new_tokens;
+    if (token_history_capacity < token_history_count)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    if (max_new_tokens)
+    {
+        if (vocab_size > 0x7FFFFFFFFFFFFFFF / max_new_tokens)
+            return SAMPLING_Q16_ERR_OVERFLOW;
+        step_logits_capacity = vocab_size * max_new_tokens;
+    }
+    else
+    {
+        step_logits_capacity = 0;
+    }
+
+    return InferenceGenerateTokensCheckedGreedyDefault(
+        step_logits_q16,
+        step_logits_capacity,
+        vocab_size,
+        max_new_tokens,
+        token_history,
+        token_history_capacity,
+        token_history_count,
+        repetition_penalty_q16,
+        random_q16_values,
+        workspace_stage_logits_q16,
+        vocab_size,
+        workspace_topk_logits_q16,
+        vocab_size,
+        workspace_topk_indices,
+        vocab_size,
+        out_generated_tokens,
+        out_generated_count);
 }
 
 // WS7 preflight wrapper for deterministic greedy-default generation.
