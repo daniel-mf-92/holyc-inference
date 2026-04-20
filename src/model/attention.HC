@@ -67,6 +67,42 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredB
     I64 *out_required_stage_bytes,
     I64 *out_required_out_cells);
 
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesDefaultCapacity(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_required_out_cells);
+
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitCapacity(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 commit_stage_cell_capacity,
+    I64 commit_stage_byte_capacity,
+    I64 *out_commit_required_stage_cells,
+    I64 *out_commit_required_stage_bytes,
+    I64 *out_required_out_cells);
+
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitCapacityDefault(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 commit_stage_byte_capacity,
+    I64 *out_commit_required_stage_cells,
+    I64 *out_commit_required_stage_bytes,
+    I64 *out_required_out_cells);
+
 I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnly(
     I64 *in_scores_q32,
     I64 in_scores_capacity,
@@ -1863,6 +1899,158 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredB
 
     *out_required_stage_cells = required_stage_cells;
     *out_required_stage_bytes = required_stage_bytes;
+    *out_required_out_cells = required_out_cells;
+    return ATTN_Q16_OK;
+}
+
+// Default-capacity wrapper for no-alloc required-bytes diagnostics.
+//
+// IQ-622 contract:
+// - derive `stage_cell_capacity = row_count * token_count` using checked
+//   overflow-safe integer math;
+// - route all diagnostics/null/shape contracts through the canonical
+//   ...NoAllocRequiredBytes helper so behavior stays composition-identical.
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesDefaultCapacity(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_required_out_cells)
+{
+    I64 default_stage_cell_capacity;
+    I32 status;
+
+    if (!out_required_stage_cells || !out_required_stage_bytes ||
+        !out_required_out_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (!in_scores_q32 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (in_scores_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionTryMulI64Checked(row_count,
+                                       token_count,
+                                       &default_stage_cell_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    return AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
+        in_scores_q32,
+        in_scores_capacity,
+        row_count,
+        token_count,
+        out_scores_q32,
+        out_scores_capacity,
+        default_stage_cell_capacity,
+        out_required_stage_cells,
+        out_required_stage_bytes,
+        out_required_out_cells);
+}
+
+// Default commit-cell-capacity wrapper for no-alloc required-bytes commit
+// diagnostics.
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitCapacityDefault(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 commit_stage_byte_capacity,
+    I64 *out_commit_required_stage_cells,
+    I64 *out_commit_required_stage_bytes,
+    I64 *out_required_out_cells)
+{
+    I64 commit_stage_cell_capacity;
+    I32 status;
+
+    if (!out_commit_required_stage_cells || !out_commit_required_stage_bytes ||
+        !out_required_out_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (in_scores_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (commit_stage_byte_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionTryMulI64Checked(row_count,
+                                       token_count,
+                                       &commit_stage_cell_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    return AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitCapacity(
+        in_scores_q32,
+        in_scores_capacity,
+        row_count,
+        token_count,
+        out_scores_q32,
+        out_scores_capacity,
+        commit_stage_cell_capacity,
+        commit_stage_byte_capacity,
+        out_commit_required_stage_cells,
+        out_commit_required_stage_bytes,
+        out_required_out_cells);
+}
+
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitCapacity(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 commit_stage_cell_capacity,
+    I64 commit_stage_byte_capacity,
+    I64 *out_commit_required_stage_cells,
+    I64 *out_commit_required_stage_bytes,
+    I64 *out_required_out_cells)
+{
+    I64 commit_required_stage_cells;
+    I64 commit_required_stage_bytes;
+    I64 required_out_cells;
+    I32 status;
+
+    if (!out_commit_required_stage_cells || !out_commit_required_stage_bytes ||
+        !out_required_out_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (commit_stage_cell_capacity < 0 || commit_stage_byte_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-623 commit-capacity diagnostics contract:
+    // derive strict required stage cells/bytes through the canonical no-alloc
+    // required-bytes helper, then validate those diagnostics against caller
+    // commit scratch limits before commit-only dispatch.
+    status = AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
+        in_scores_q32,
+        in_scores_capacity,
+        row_count,
+        token_count,
+        out_scores_q32,
+        out_scores_capacity,
+        commit_stage_cell_capacity,
+        &commit_required_stage_cells,
+        &commit_required_stage_bytes,
+        &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (commit_required_stage_bytes > commit_stage_byte_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    *out_commit_required_stage_cells = commit_required_stage_cells;
+    *out_commit_required_stage_bytes = commit_required_stage_bytes;
     *out_required_out_cells = required_out_cells;
     return ATTN_Q16_OK;
 }
