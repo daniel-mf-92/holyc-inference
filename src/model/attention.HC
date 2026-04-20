@@ -998,6 +998,20 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStridePreflightOnly(
     I64 default_query_row_stride_q16;
     I64 default_k_row_stride_q16;
     I64 default_out_row_stride;
+    I64 commit_stage_cell_capacity;
+    I64 commit_stage_byte_capacity;
+    I64 required_q_cells;
+    I64 required_k_cells;
+    I64 required_out_cells;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
+    I32 status;
+    I64 required_q_cells;
+    I64 required_k_cells;
+    I64 required_out_cells;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
+    I32 status;
     I64 last_q_base_index;
     I64 last_k_base_index;
     I64 last_out_base_index;
@@ -5691,15 +5705,17 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredB
     if (query_row_count < 0 || token_count < 0 || head_dim < 0)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    // IQ-662 default-stride alias-safe default-capacity preflight contract:
+    // IQ-670 default-stride alias-safe default-capacity preflight contract:
     // derive canonical packed strides from head/token geometry, then route
     // diagnostics through the explicit-stride alias-safe preflight helper so
     // overflow, overlap, and required-span semantics stay centralized.
+    // Publish all diagnostics atomically only after the canonical helper
+    // succeeds so caller output cells cannot observe partial writes.
     default_query_row_stride_q16 = head_dim;
     default_k_row_stride_q16 = head_dim;
     default_out_row_stride = token_count;
 
-    return AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafeDefaultCapacityPreflightOnly(
+    status = AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafeDefaultCapacityPreflightOnly(
         q_rows_q16,
         q_rows_capacity,
         query_row_count,
@@ -5714,13 +5730,24 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredB
         default_out_row_stride,
         staged_scores_q32,
         staged_scores_capacity,
-        out_commit_stage_cell_capacity,
-        out_commit_stage_byte_capacity,
-        out_required_q_cells,
-        out_required_k_cells,
-        out_required_out_cells,
-        out_required_stage_cells,
-        out_required_stage_bytes);
+        &commit_stage_cell_capacity,
+        &commit_stage_byte_capacity,
+        &required_q_cells,
+        &required_k_cells,
+        &required_out_cells,
+        &required_stage_cells,
+        &required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    *out_commit_stage_cell_capacity = commit_stage_cell_capacity;
+    *out_commit_stage_byte_capacity = commit_stage_byte_capacity;
+    *out_required_q_cells = required_q_cells;
+    *out_required_k_cells = required_k_cells;
+    *out_required_out_cells = required_out_cells;
+    *out_required_stage_cells = required_stage_cells;
+    *out_required_stage_bytes = required_stage_bytes;
+    return ATTN_Q16_OK;
 }
 
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacityAliasSafeDefaultCapacityPreflightOnly(
@@ -5763,11 +5790,13 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
     // derive canonical packed strides from model geometry, then route through
     // the explicit-stride default-capacity alias-safe preflight helper so
     // overlap semantics and q/k/out/stage diagnostics stay fully centralized.
+    // Publish diagnostics atomically only after the canonical helper succeeds
+    // so caller-provided output cells never observe partial writes.
     default_query_row_stride_q16 = head_dim;
     default_k_row_stride_q16 = head_dim;
     default_out_row_stride = token_count;
 
-    return AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocCommitCapacityAliasSafeDefaultCapacityPreflightOnly(
+    status = AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocCommitCapacityAliasSafeDefaultCapacityPreflightOnly(
         q_rows_q16,
         q_rows_capacity,
         query_row_count,
@@ -5782,11 +5811,20 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
         default_out_row_stride,
         staged_scores_q32,
         staged_scores_capacity,
-        out_required_q_cells,
-        out_required_k_cells,
-        out_required_out_cells,
-        out_required_stage_cells,
-        out_required_stage_bytes);
+        &required_q_cells,
+        &required_k_cells,
+        &required_out_cells,
+        &required_stage_cells,
+        &required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    *out_required_q_cells = required_q_cells;
+    *out_required_k_cells = required_k_cells;
+    *out_required_out_cells = required_out_cells;
+    *out_required_stage_cells = required_stage_cells;
+    *out_required_stage_bytes = required_stage_bytes;
+    return ATTN_Q16_OK;
 }
 
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesDefaultCapacity(
@@ -6399,7 +6437,7 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocCommitCapacityA
         k_row_stride_q16 < 0 || head_dim < 0 || out_row_stride < 0)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    // IQ-653 alias-safe default-capacity preflight contract:
+    // IQ-660 alias-safe default-capacity preflight contract:
     // 1) derive default commit capacities from packed stage shape and caller
     //    staging bytes;
     // 2) compute q/k/out/stage diagnostics through canonical explicit-stride

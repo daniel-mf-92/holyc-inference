@@ -75,7 +75,15 @@ def attention_q16_compute_scaled_qk_rows_checked_nopartial_default_stride_noallo
     default_k_row_stride_q16 = head_dim
     default_out_row_stride = token_count
 
-    return attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_required_bytes_commit_capacity_alias_safe_default_capacity_preflight_only(
+    tmp_commit_cells = [0]
+    tmp_commit_bytes = [0]
+    tmp_q_cells = [0]
+    tmp_k_cells = [0]
+    tmp_out_cells = [0]
+    tmp_stage_cells = [0]
+    tmp_stage_bytes = [0]
+
+    err = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_required_bytes_commit_capacity_alias_safe_default_capacity_preflight_only(
         q_rows_q16,
         q_rows_capacity,
         query_row_count,
@@ -90,18 +98,29 @@ def attention_q16_compute_scaled_qk_rows_checked_nopartial_default_stride_noallo
         default_out_row_stride,
         staged_scores_q32,
         staged_scores_capacity,
-        out_commit_stage_cell_capacity,
-        out_commit_stage_byte_capacity,
-        out_required_q_cells,
-        out_required_k_cells,
-        out_required_out_cells,
-        out_required_stage_cells,
-        out_required_stage_bytes,
+        tmp_commit_cells,
+        tmp_commit_bytes,
+        tmp_q_cells,
+        tmp_k_cells,
+        tmp_out_cells,
+        tmp_stage_cells,
+        tmp_stage_bytes,
         q_base_addr=q_base_addr,
         k_base_addr=k_base_addr,
         out_base_addr=out_base_addr,
         stage_base_addr=stage_base_addr,
     )
+    if err != ATTN_Q16_OK:
+        return err
+
+    out_commit_stage_cell_capacity[0] = tmp_commit_cells[0]
+    out_commit_stage_byte_capacity[0] = tmp_commit_bytes[0]
+    out_required_q_cells[0] = tmp_q_cells[0]
+    out_required_k_cells[0] = tmp_k_cells[0]
+    out_required_out_cells[0] = tmp_out_cells[0]
+    out_required_stage_cells[0] = tmp_stage_cells[0]
+    out_required_stage_bytes[0] = tmp_stage_bytes[0]
+    return ATTN_Q16_OK
 
 
 def explicit_checked_composition(
@@ -171,6 +190,8 @@ def test_source_contains_default_stride_alias_safe_required_bytes_default_capaci
     assert "default_query_row_stride_q16 = head_dim;" in body
     assert "default_k_row_stride_q16 = head_dim;" in body
     assert "default_out_row_stride = token_count;" in body
+    assert "*out_commit_stage_cell_capacity = commit_stage_cell_capacity;" in body
+    assert "*out_required_stage_bytes = required_stage_bytes;" in body
     assert (
         "AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafeDefaultCapacityPreflightOnly("
         in body
