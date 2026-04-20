@@ -5202,6 +5202,88 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensDefaultCapacity(
         out_max_piece_len);
 }
 
+I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensDefaultCapacityPreflightOnly(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 vocab_piece_capacity,
+    U64 *out_required_token_capacity,
+    U64 *out_max_piece_len)
+{
+    U64 piece_index;
+    U64 staged_max_piece_len;
+    U64 staged_required_token_capacity;
+    U64 cursor;
+
+    // Keep parameters explicit for signature parity with no-alloc encode
+    // wrappers even though preflight diagnostics do not consume rank tables.
+    (void)rank_left_tokens;
+    (void)rank_right_tokens;
+    (void)rank_values;
+    (void)rank_merged_tokens;
+
+    if (!bytes || !io_cursor || !vocab_piece_lens ||
+        !out_required_token_capacity || !out_max_piece_len)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (rank_table_count > rank_table_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (vocab_piece_count > vocab_piece_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (prompt_nbytes > byte_len - cursor)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    staged_max_piece_len = 0;
+    piece_index = 0;
+    while (piece_index < vocab_piece_count)
+    {
+        if (vocab_piece_lens[piece_index] > 0x7FFFFFFFFFFFFFFF)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+
+        if (vocab_piece_lens[piece_index] > staged_max_piece_len)
+            staged_max_piece_len = vocab_piece_lens[piece_index];
+
+        piece_index++;
+        if (!piece_index)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+
+    // IQ-693 diagnostics-only contract: default no-alloc token capacity is
+    // bounded by pretokenized byte count, and max-piece scan gates whether
+    // non-empty prompts are legal before any encode writes occur.
+    staged_required_token_capacity = prompt_nbytes;
+    if (prompt_nbytes && !staged_max_piece_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Strict no-partial output contract for preflight diagnostics.
+    *out_required_token_capacity = staged_required_token_capacity;
+    *out_max_piece_len = staged_max_piece_len;
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEDecodeTokenSpanChecked(I32 *token_ids,
                                        U64 token_count,
                                        U64 *io_token_cursor,

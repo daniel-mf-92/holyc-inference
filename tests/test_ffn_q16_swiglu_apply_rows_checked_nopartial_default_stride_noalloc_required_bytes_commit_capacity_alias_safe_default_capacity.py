@@ -136,7 +136,10 @@ def test_source_contains_default_stride_alias_safe_required_bytes_helper() -> No
 
     assert "default_in_row_stride_q16 = lane_count;" in body
     assert "default_out_row_stride_q16 = lane_count;" in body
-    assert "FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafeDefaultCapacity(" in body
+    assert "FFNTryMulI64Checked(row_count - 1," in body
+    assert "FFNTryAddI64Checked(commit_stage_cell_capacity," in body
+    assert "FFNTryMulI64Checked(staging_out_capacity," in body
+    assert "FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafe(" in body
 
 
 def test_known_vectors_and_alias_rejection() -> None:

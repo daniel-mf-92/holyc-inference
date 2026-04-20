@@ -2073,6 +2073,9 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommit
 {
     I64 default_in_row_stride_q16;
     I64 default_out_row_stride_q16;
+    I64 commit_stage_cell_capacity;
+    I64 commit_stage_byte_capacity;
+    I32 status;
 
     if (!out_required_in_cells || !out_commit_required_stage_cells ||
         !out_commit_required_stage_bytes || !out_required_out_cells)
@@ -2088,13 +2091,39 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommit
         return FFN_Q16_ERR_BAD_PARAM;
 
     // IQ-664 default-stride alias-safe required-bytes contract:
-    // derive canonical default strides (gate/up/out row stride == lane_count)
-    // and delegate commit-capacity + alias diagnostics to the canonical
-    // explicit-stride alias-safe default-capacity helper.
+    // 1) derive canonical default strides (gate/up/out row stride == lane_count);
+    // 2) derive default commit capacities from live output span + caller staging
+    //    buffer capacity;
+    // 3) dispatch canonical explicit-stride alias-safe required-bytes helper.
     default_in_row_stride_q16 = lane_count;
     default_out_row_stride_q16 = lane_count;
 
-    return FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafeDefaultCapacity(
+    if (!row_count || !lane_count)
+    {
+        commit_stage_cell_capacity = 0;
+    }
+    else
+    {
+        status = FFNTryMulI64Checked(row_count - 1,
+                                     default_out_row_stride_q16,
+                                     &commit_stage_cell_capacity);
+        if (status)
+            return status;
+
+        status = FFNTryAddI64Checked(commit_stage_cell_capacity,
+                                     lane_count,
+                                     &commit_stage_cell_capacity);
+        if (status)
+            return status;
+    }
+
+    status = FFNTryMulI64Checked(staging_out_capacity,
+                                 sizeof(I64),
+                                 &commit_stage_byte_capacity);
+    if (status)
+        return status;
+
+    return FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafe(
         gate_q16,
         gate_capacity,
         up_q16,
@@ -2105,6 +2134,8 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommit
         lane_count,
         default_in_row_stride_q16,
         default_out_row_stride_q16,
+        commit_stage_cell_capacity,
+        commit_stage_byte_capacity,
         staging_out_q16,
         staging_out_capacity,
         out_required_in_cells,
