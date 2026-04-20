@@ -937,6 +937,52 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocPreflight
     I64 *out_required_stage_cells,
     I64 *out_required_out_cells);
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialPreflightOnlyDefaultStrideNoAlloc(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 stage_cell_capacity,
+    I64 *out_required_stage_cells,
+    I64 *out_required_out_cells);
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialPreflightOnlyDefaultStrideNoAlloc(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 stage_cell_capacity,
+    I64 *out_required_stage_cells,
+    I64 *out_required_out_cells)
+{
+    // IQ-577 wrapper: keep the legacy queue/API name while routing all
+    // diagnostics through the canonical default-stride no-alloc preflight
+    // implementation.
+    return AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        stage_cell_capacity,
+        out_required_stage_cells,
+        out_required_out_cells);
+}
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialPreflightOnlyDefaultStrideNoAllocDefaultCapacity(
     I64 *q_rows_q16,
     I64 q_rows_capacity,
