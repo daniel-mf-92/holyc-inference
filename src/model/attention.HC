@@ -79,6 +79,20 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideReq
     I64 *out_last_in_index,
     I64 *out_last_out_index);
 
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideRequiredStageBytes(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_in_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_last_in_index,
+    I64 *out_last_out_index);
+
 I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
     I64 *in_scores_q32,
     I64 in_scores_capacity,
@@ -2917,6 +2931,75 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideReq
     *out_required_in_cells = required_in_cells;
     *out_required_out_cells = required_out_cells;
     *out_required_stage_cells = required_stage_cells;
+    *out_last_in_index = last_in_index;
+    *out_last_out_index = last_out_index;
+    return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideRequiredStageBytes(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_in_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_last_in_index,
+    I64 *out_last_out_index)
+{
+    I64 required_in_cells;
+    I64 required_out_cells;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
+    I64 last_in_index;
+    I64 last_out_index;
+    I32 status;
+
+    if (!in_scores_q32 || !out_scores_q32 || !out_required_in_cells ||
+        !out_required_out_cells || !out_required_stage_cells ||
+        !out_required_stage_bytes || !out_last_in_index ||
+        !out_last_out_index)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (in_scores_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-716 diagnostics-only default-stride required-stage-bytes contract:
+    // 1) derive canonical in/out/stage-cell diagnostics + last indices through
+    //    the required-stage-cells helper;
+    // 2) convert stage cells to bytes with checked I64 multiply;
+    // 3) publish all diagnostics atomically on success and never on failures.
+    status =
+        AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideRequiredStageCells(
+            in_scores_q32,
+            in_scores_capacity,
+            row_count,
+            token_count,
+            out_scores_q32,
+            out_scores_capacity,
+            &required_in_cells,
+            &required_out_cells,
+            &required_stage_cells,
+            &last_in_index,
+            &last_out_index);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(required_stage_cells,
+                                       sizeof(I64),
+                                       &required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    *out_required_in_cells = required_in_cells;
+    *out_required_out_cells = required_out_cells;
+    *out_required_stage_cells = required_stage_cells;
+    *out_required_stage_bytes = required_stage_bytes;
     *out_last_in_index = last_in_index;
     *out_last_out_index = last_out_index;
     return ATTN_Q16_OK;
