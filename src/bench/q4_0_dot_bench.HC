@@ -351,11 +351,31 @@ I32 Q4_0DotBenchRunDefaultSuite(I64 cpu_hz)
     Q4_0Block rhs[Q4_0_DOT_BENCH_MAX_BLOCKS];
     Q4_0Block row_matrix[Q4_0_DOT_BENCH_MAX_BLOCKS * Q4_0_DOT_BENCH_MAX_ROWS];
     I64 row_out_q16[Q4_0_DOT_BENCH_MAX_ROWS];
+    I64 preflight_shape_count;
+    I64 preflight_required_max_blocks;
+    I64 preflight_required_max_rows;
+    I64 preflight_required_row_matrix_blocks;
     I64 shape_index;
     I64 row_matrix_blocks;
     I32 status;
 
-    if (cpu_hz <= 0)
+    status = Q4_0DotBenchRunDefaultSuiteNoPartialPreflightOnly(
+        cpu_hz,
+        &preflight_shape_count,
+        &preflight_required_max_blocks,
+        &preflight_required_max_rows,
+        &preflight_required_row_matrix_blocks);
+    if (status != Q4_0_DOT_BENCH_OK)
+        return status;
+
+    if (preflight_shape_count != 4)
+        return Q4_0_DOT_BENCH_ERR_BAD_PARAM;
+    if (preflight_required_max_blocks > Q4_0_DOT_BENCH_MAX_BLOCKS)
+        return Q4_0_DOT_BENCH_ERR_BAD_PARAM;
+    if (preflight_required_max_rows > Q4_0_DOT_BENCH_MAX_ROWS)
+        return Q4_0_DOT_BENCH_ERR_BAD_PARAM;
+    if (preflight_required_row_matrix_blocks >
+        (Q4_0_DOT_BENCH_MAX_BLOCKS * Q4_0_DOT_BENCH_MAX_ROWS))
         return Q4_0_DOT_BENCH_ERR_BAD_PARAM;
 
     // Fixed deterministic coverage:
