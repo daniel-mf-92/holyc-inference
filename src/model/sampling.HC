@@ -1111,6 +1111,53 @@ I32 InferenceGenerateTokensCheckedDefaultTopK(I64 *step_logits_q16,
                                           out_generated_count);
 }
 
+// WS7 API sugar wrapper: force top-p to full probability mass.
+//
+// Caller still controls `top_k` and temperature; setting `top_p_q16=1.0`
+// disables nucleus truncation while preserving the exact checked and
+// no-partial semantics of `InferenceGenerateTokensChecked`.
+I32 InferenceGenerateTokensCheckedDefaultTopP(I64 *step_logits_q16,
+                                              I64 step_logits_capacity,
+                                              I64 vocab_size,
+                                              I64 max_new_tokens,
+                                              I64 *token_history,
+                                              I64 token_history_capacity,
+                                              I64 token_history_count,
+                                              I64 temperature_q16,
+                                              I64 top_k,
+                                              I64 repetition_penalty_q16,
+                                              I64 *random_q16_values,
+                                              I64 *workspace_stage_logits_q16,
+                                              I64 workspace_stage_logits_capacity,
+                                              I64 *workspace_topk_logits_q16,
+                                              I64 workspace_topk_logits_capacity,
+                                              I64 *workspace_topk_indices,
+                                              I64 workspace_topk_index_capacity,
+                                              I64 *out_generated_tokens,
+                                              I64 *out_generated_count)
+{
+    return InferenceGenerateTokensChecked(step_logits_q16,
+                                          step_logits_capacity,
+                                          vocab_size,
+                                          max_new_tokens,
+                                          token_history,
+                                          token_history_capacity,
+                                          token_history_count,
+                                          temperature_q16,
+                                          top_k,
+                                          SAMPLING_Q16_ONE,
+                                          repetition_penalty_q16,
+                                          random_q16_values,
+                                          workspace_stage_logits_q16,
+                                          workspace_stage_logits_capacity,
+                                          workspace_topk_logits_q16,
+                                          workspace_topk_logits_capacity,
+                                          workspace_topk_indices,
+                                          workspace_topk_index_capacity,
+                                          out_generated_tokens,
+                                          out_generated_count);
+}
+
 // WS7 generation preflight diagnostics for default-capacity API wrappers.
 //
 // Exposes required capacities for `InferenceGenerateTokensChecked` contracts
