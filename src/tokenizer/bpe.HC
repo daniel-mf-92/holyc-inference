@@ -5123,6 +5123,78 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacity(
         out_required_token_capacity);
 }
 
+I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityPreflightOnly(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    U64 max_piece_len,
+    U64 *out_required_token_capacity)
+{
+    U64 cursor;
+    U64 required_token_capacity;
+    U64 required_merge_workspace_bytes;
+    U64 derived_out_token_capacity;
+
+    if (!bytes || !io_cursor || !out_required_token_capacity)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        max_piece_len > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // IQ-797 diagnostics-only default-capacity preflight contract:
+    // mirror canonical max-piece checked guards without token or cursor
+    // commits, then atomically publish required token capacity.
+    if (rank_table_count > rank_table_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    cursor = *io_cursor;
+    if (cursor > byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (prompt_nbytes > byte_len - cursor)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    if (prompt_nbytes && !max_piece_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    required_token_capacity = prompt_nbytes;
+    derived_out_token_capacity = prompt_nbytes;
+
+    if (required_token_capacity != derived_out_token_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (prompt_nbytes && max_piece_len > 0x7FFFFFFFFFFFFFFF / prompt_nbytes)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    required_merge_workspace_bytes = prompt_nbytes * max_piece_len;
+    if (required_merge_workspace_bytes > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    // Keep parameter-surface parity with execution helper signatures while
+    // remaining diagnostics-only in this preflight wrapper.
+    if (!rank_left_tokens && rank_table_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+    if (!rank_right_tokens && rank_table_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+    if (!rank_values && rank_table_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+    if (!rank_merged_tokens && rank_table_count)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    *out_required_token_capacity = required_token_capacity;
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEEncodePromptCheckedNoAllocFromLens(
     U8 *bytes,
     U64 byte_len,
