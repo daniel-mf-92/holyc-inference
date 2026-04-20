@@ -794,3 +794,165 @@ I32 GenerationStepChecked(I64 *logits_q16,
     *out_token_id = sampled_token_id;
     return SAMPLING_Q16_OK;
 }
+
+// Run an autoregressive generation loop for a fixed number of steps.
+//
+// Inputs are precomputed per-step logits laid out row-major:
+//   step_logits_q16[step * vocab_size + token_id]
+//
+// Checked / no-partial contract:
+// - Stage generated token ids in token_history tail for step-to-step context.
+// - Do not write out_generated_tokens/out_generated_count until every
+//   GenerationStepChecked call succeeds.
+// - On any failure, return immediately with caller-visible generated outputs
+//   unchanged.
+I32 GenerationRunChecked(I64 *step_logits_q16,
+                         I64 step_logits_capacity,
+                         I64 vocab_size,
+                         I64 max_new_tokens,
+                         I64 *token_history,
+                         I64 token_history_capacity,
+                         I64 token_history_count,
+                         I64 temperature_q16,
+                         I64 top_k,
+                         I64 top_p_q16,
+                         I64 repetition_penalty_q16,
+                         I64 *random_q16_values,
+                         I64 random_values_capacity,
+                         I64 *workspace_stage_logits_q16,
+                         I64 workspace_stage_logits_capacity,
+                         I64 *workspace_topk_logits_q16,
+                         I64 workspace_topk_logits_capacity,
+                         I64 *workspace_topk_indices,
+                         I64 workspace_topk_index_capacity,
+                         I64 *out_generated_tokens,
+                         I64 out_generated_tokens_capacity,
+                         I64 *out_generated_count)
+{
+    I64 step_index;
+    I64 required_logits_cells;
+    I64 required_history_cells;
+    I64 required_generated_cells;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 sampled_token_id;
+    I32 status;
+
+    if (!step_logits_q16 || !token_history || !random_q16_values ||
+        !workspace_stage_logits_q16 || !workspace_topk_logits_q16 ||
+        !workspace_topk_indices || !out_generated_tokens || !out_generated_count)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (step_logits_capacity < 0 || vocab_size < 0 || max_new_tokens < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (token_history_capacity < 0 || token_history_count < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (random_values_capacity < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (workspace_stage_logits_capacity < 0 || workspace_topk_logits_capacity < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (workspace_topk_index_capacity < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (out_generated_tokens_capacity < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (vocab_size <= 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (token_history_count > token_history_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (max_new_tokens > out_generated_tokens_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (max_new_tokens > random_values_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (max_new_tokens)
+    {
+        if (vocab_size > 0x7FFFFFFFFFFFFFFF / max_new_tokens)
+            return SAMPLING_Q16_ERR_OVERFLOW;
+        required_logits_cells = vocab_size * max_new_tokens;
+    }
+    else
+    {
+        required_logits_cells = 0;
+    }
+
+    required_history_cells = token_history_count + max_new_tokens;
+    if (required_history_cells < token_history_count)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+    if (required_history_cells > token_history_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    required_generated_cells = max_new_tokens;
+    if (required_logits_cells > step_logits_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    // Guard indexed spans before stepping.
+    if (required_logits_cells)
+    {
+        last_index = required_logits_cells - 1;
+        if (last_index > 0x0FFFFFFFFFFFFFFF)
+            return SAMPLING_Q16_ERR_OVERFLOW;
+        last_byte_offset = last_index << 3;
+        if ((U64)step_logits_q16 > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+            return SAMPLING_Q16_ERR_OVERFLOW;
+    }
+
+    if (required_history_cells)
+    {
+        last_index = required_history_cells - 1;
+        if (last_index > 0x0FFFFFFFFFFFFFFF)
+            return SAMPLING_Q16_ERR_OVERFLOW;
+        last_byte_offset = last_index << 3;
+        if ((U64)token_history > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+            return SAMPLING_Q16_ERR_OVERFLOW;
+    }
+
+    if (required_generated_cells)
+    {
+        last_index = required_generated_cells - 1;
+        if (last_index > 0x0FFFFFFFFFFFFFFF)
+            return SAMPLING_Q16_ERR_OVERFLOW;
+        last_byte_offset = last_index << 3;
+        if ((U64)out_generated_tokens >
+            (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+            return SAMPLING_Q16_ERR_OVERFLOW;
+        if ((U64)random_q16_values >
+            (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+            return SAMPLING_Q16_ERR_OVERFLOW;
+    }
+
+    // Stage into token_history tail so repetition penalty sees generated tokens
+    // without touching caller-visible generated outputs until final commit.
+    for (step_index = 0; step_index < max_new_tokens; step_index++)
+    {
+        status = GenerationStepChecked(step_logits_q16 + (step_index * vocab_size),
+                                       vocab_size,
+                                       vocab_size,
+                                       token_history,
+                                       token_history_capacity,
+                                       token_history_count + step_index,
+                                       temperature_q16,
+                                       top_k,
+                                       top_p_q16,
+                                       repetition_penalty_q16,
+                                       random_q16_values[step_index],
+                                       workspace_stage_logits_q16,
+                                       workspace_stage_logits_capacity,
+                                       workspace_topk_logits_q16,
+                                       workspace_topk_logits_capacity,
+                                       workspace_topk_indices,
+                                       workspace_topk_index_capacity,
+                                       &sampled_token_id);
+        if (status)
+            return status;
+
+        token_history[token_history_count + step_index] = sampled_token_id;
+    }
+
+    // Atomic publish: generated outputs only become visible after full success.
+    for (step_index = 0; step_index < max_new_tokens; step_index++)
+        out_generated_tokens[step_index] = token_history[token_history_count + step_index];
+
+    *out_generated_count = max_new_tokens;
+    return SAMPLING_Q16_OK;
+}
