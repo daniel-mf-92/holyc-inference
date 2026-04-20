@@ -232,9 +232,35 @@ def test_randomized_parity() -> None:
         assert out_a == out_b
 
 
+def test_commit_preserves_row_padding_cells() -> None:
+    query_row_count = 2
+    token_count = 3
+    out_row_stride = 5
+
+    staged = [10, 11, 12, 20, 21, 22]
+    out = [777] * ((query_row_count - 1) * out_row_stride + out_row_stride)
+
+    err = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commit_only(
+        query_row_count,
+        token_count,
+        out_row_stride,
+        staged,
+        len(staged),
+        out,
+        len(out),
+    )
+
+    assert err == ATTN_Q16_OK
+    assert out[0:3] == [10, 11, 12]
+    assert out[5:8] == [20, 21, 22]
+    assert out[3] == 777 and out[4] == 777
+    assert out[8] == 777 and out[9] == 777
+
+
 if __name__ == "__main__":
     test_source_contains_strided_noalloc_commit_only_helper()
     test_known_vector_commit_only_parity()
     test_error_surfaces_and_no_partial_guarantee()
     test_randomized_parity()
+    test_commit_preserves_row_padding_cells()
     print("ok")

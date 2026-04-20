@@ -374,12 +374,19 @@ def test_randomized_parity() -> None:
         else:
             stage_base = 0x400000 + rng.randint(0, 256)
 
-        got_stage_cells = [777]
-        got_stage_bytes = [888]
-        got_out_cells = [999]
-        exp_stage_cells = [111]
-        exp_stage_bytes = [222]
-        exp_out_cells = [333]
+        got_stage_cells_init = 777
+        got_stage_bytes_init = 888
+        got_out_cells_init = 999
+        exp_stage_cells_init = got_stage_cells_init
+        exp_stage_bytes_init = got_stage_bytes_init
+        exp_out_cells_init = got_out_cells_init
+
+        got_stage_cells = [got_stage_cells_init]
+        got_stage_bytes = [got_stage_bytes_init]
+        got_out_cells = [got_out_cells_init]
+        exp_stage_cells = [exp_stage_cells_init]
+        exp_stage_bytes = [exp_stage_bytes_init]
+        exp_out_cells = [exp_out_cells_init]
 
         err_got = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_commit_capacity_alias_safe_preflight_only(
             q_rows,

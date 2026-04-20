@@ -5634,6 +5634,12 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocCommitOnly(
     if (staged_scores_capacity < 0 || out_scores_capacity < 0)
         return ATTN_Q16_ERR_BAD_PARAM;
 
+    // Strided row-major output must provide at least one full live-token slab
+    // per row. Smaller strides alias row payloads and violate no-partial
+    // commit semantics for this direct commit-only helper.
+    if (query_row_count > 0 && token_count > 0 && out_row_stride < token_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
     if (!query_row_count || !token_count)
         return ATTN_Q16_OK;
 
