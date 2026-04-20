@@ -6077,6 +6077,115 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesPreflig
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyParityHardened(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 vocab_piece_capacity,
+    U64 *out_required_token_capacity,
+    U64 *out_max_piece_len,
+    U64 *out_required_merge_workspace_bytes)
+{
+    U64 initial_cursor;
+    U64 canonical_cursor;
+    U64 canonical_required_token_capacity;
+    U64 canonical_max_piece_len;
+    U64 canonical_required_merge_workspace_bytes;
+    U64 parity_cursor;
+    U64 parity_required_token_capacity;
+    U64 parity_max_piece_len;
+    U64 parity_required_merge_workspace_bytes;
+    I32 err;
+
+    if (!bytes || !io_cursor || !vocab_piece_lens ||
+        !out_required_token_capacity || !out_max_piece_len ||
+        !out_required_merge_workspace_bytes)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    initial_cursor = *io_cursor;
+
+    // Stage canonical diagnostics through preflight-only default-capacity.
+    // This path must never mutate caller cursor or output diagnostics on error.
+    canonical_cursor = initial_cursor;
+    err = TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesPreflightOnlyDefaultCapacity(
+        bytes,
+        byte_len,
+        &canonical_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        vocab_piece_lens,
+        vocab_piece_count,
+        vocab_piece_capacity,
+        &canonical_required_token_capacity,
+        &canonical_max_piece_len,
+        &canonical_required_merge_workspace_bytes);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+    if (canonical_cursor != initial_cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Independently stage commit-only default-capacity parity diagnostics and
+    // require exact equality before atomically publishing outputs.
+    parity_cursor = initial_cursor;
+    err = TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesCommitOnlyDefaultCapacityPreflightOnly(
+        bytes,
+        byte_len,
+        &parity_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        vocab_piece_lens,
+        vocab_piece_count,
+        vocab_piece_capacity,
+        &parity_required_token_capacity,
+        &parity_max_piece_len,
+        &parity_required_merge_workspace_bytes);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+    if (parity_cursor != initial_cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (parity_required_token_capacity != canonical_required_token_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (parity_max_piece_len != canonical_max_piece_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (parity_required_merge_workspace_bytes != canonical_required_merge_workspace_bytes)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Atomic diagnostics publish only after both staged paths and parity
+    // constraints are fully satisfied.
+    *out_required_token_capacity = canonical_required_token_capacity;
+    *out_max_piece_len = canonical_max_piece_len;
+    *out_required_merge_workspace_bytes = canonical_required_merge_workspace_bytes;
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesCommitOnlyDefaultCapacityPreflightOnlyNoAlloc(
     U8 *bytes,
     U64 byte_len,
