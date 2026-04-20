@@ -262,11 +262,11 @@ def test_source_contains_signature_and_hardening_calls() -> None:
         "I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesPreflightOnlyDefaultCapacity(",
         1,
     )[0]
-    assert "TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesDefaultCapacity(" in body
-    assert "TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesCommitOnlyDefaultCapacityPreflightOnly(" in body
+    assert "TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesPreflightOnlyDefaultCapacity(" in body
+    assert "TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesCommitOnlyDefaultCapacityPreflightOnlyNoAlloc(" in body
     assert "initial_cursor = *io_cursor;" in body
-    assert "staged_cursor = initial_cursor;" in body
-    assert "if (staged_cursor != initial_cursor)" in body
+    assert "canonical_cursor = initial_cursor;" in body
+    assert "if (canonical_cursor != initial_cursor)" in body
     assert "if (parity_cursor != initial_cursor)" in body
     assert "if (parity_required_token_capacity != canonical_required_token_capacity)" in body
     assert "*out_required_merge_workspace_bytes = canonical_required_merge_workspace_bytes;" in body
