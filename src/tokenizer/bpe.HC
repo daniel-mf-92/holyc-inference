@@ -5434,7 +5434,9 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLens(
     U64 *out_max_piece_len)
 {
     U64 piece_index;
-    U64 max_piece_len;
+    U64 staged_max_piece_len;
+    U64 staged_required_token_capacity;
+    I32 err;
 
     if (!bytes || !io_cursor || !vocab_piece_lens || !out_token_ids ||
         !out_token_count || !out_required_token_capacity || !out_max_piece_len)
@@ -5452,22 +5454,24 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLens(
     if (vocab_piece_count > vocab_piece_capacity)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
 
-    max_piece_len = 0;
+    // Scan once across caller-provided piece lengths and derive the exact
+    // max merge-piece span used by the no-allocation max-piece encoder path.
+    staged_max_piece_len = 0;
     piece_index = 0;
     while (piece_index < vocab_piece_count) {
         if (vocab_piece_lens[piece_index] > 0x7FFFFFFFFFFFFFFF)
             return TOKENIZER_BPE_ERR_OVERFLOW;
-        if (vocab_piece_lens[piece_index] > max_piece_len)
-            max_piece_len = vocab_piece_lens[piece_index];
+        if (vocab_piece_lens[piece_index] > staged_max_piece_len)
+            staged_max_piece_len = vocab_piece_lens[piece_index];
 
         piece_index++;
         if (!piece_index)
             return TOKENIZER_BPE_ERR_OVERFLOW;
     }
 
-    *out_max_piece_len = max_piece_len;
-
-    return TokenizerBPEEncodePromptCheckedNoAllocFromMaxPiece(
+    // Stage diagnostics locally so all caller-visible outputs remain
+    // deterministic no-partial on any downstream encode failure path.
+    err = TokenizerBPEEncodePromptCheckedNoAllocFromMaxPiece(
         bytes,
         byte_len,
         io_cursor,
@@ -5478,11 +5482,17 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLens(
         rank_merged_tokens,
         rank_table_count,
         rank_table_capacity,
-        max_piece_len,
+        staged_max_piece_len,
         out_token_ids,
         out_token_capacity,
         out_token_count,
-        out_required_token_capacity);
+        &staged_required_token_capacity);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    *out_required_token_capacity = staged_required_token_capacity;
+    *out_max_piece_len = staged_max_piece_len;
+    return TOKENIZER_BPE_OK;
 }
 
 I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensDefaultCapacity(

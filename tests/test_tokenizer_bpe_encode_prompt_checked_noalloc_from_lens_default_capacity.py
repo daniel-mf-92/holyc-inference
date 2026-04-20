@@ -207,7 +207,9 @@ def test_source_contains_lens_default_capacity_helpers() -> None:
     body_lens = source.split(sig_lens, 1)[1]
     assert "if (vocab_piece_count > vocab_piece_capacity)" in body_lens
     assert "while (piece_index < vocab_piece_count)" in body_lens
-    assert "*out_max_piece_len = max_piece_len;" in body_lens
+    assert "if (err != TOKENIZER_BPE_OK)" in body_lens
+    assert "*out_required_token_capacity = staged_required_token_capacity;" in body_lens
+    assert "*out_max_piece_len = staged_max_piece_len;" in body_lens
     assert "TokenizerBPEEncodePromptCheckedNoAllocFromMaxPiece(" in body_lens
 
     sig_default = "I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensDefaultCapacity("

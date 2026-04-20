@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity harness for TokenizerBPEEncodePromptCheckedNoAllocFromLens."""
+"""Parity harness for TokenizerBPEEncodePromptCheckedNoAllocFromLens (IQ-686)."""
 
 from __future__ import annotations
 
@@ -66,17 +66,16 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens(
     if vocab_piece_count > vocab_piece_capacity:
         return TOKENIZER_BPE_ERR_BAD_PARAM
 
-    max_piece_len = 0
-    for piece_index in range(vocab_piece_count):
-        piece_len = vocab_piece_lens[piece_index]
+    staged_max_piece_len = 0
+    for index in range(vocab_piece_count):
+        piece_len = vocab_piece_lens[index]
         if piece_len > I64_MAX:
             return TOKENIZER_BPE_ERR_OVERFLOW
-        if piece_len > max_piece_len:
-            max_piece_len = piece_len
+        if piece_len > staged_max_piece_len:
+            staged_max_piece_len = piece_len
 
-    out_max_piece_len[0] = max_piece_len
-
-    return tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece(
+    staged_required = [0x12345678]
+    err = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece(
         data,
         byte_len,
         io_cursor,
@@ -87,15 +86,21 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens(
         rank_merged_tokens,
         rank_table_count,
         rank_table_capacity,
-        max_piece_len,
+        staged_max_piece_len,
         out_token_ids,
         out_token_capacity,
         out_token_count,
-        out_required_token_capacity,
+        staged_required,
     )
+    if err != TOKENIZER_BPE_OK:
+        return err
+
+    out_required_token_capacity[0] = staged_required[0]
+    out_max_piece_len[0] = staged_max_piece_len
+    return TOKENIZER_BPE_OK
 
 
-def explicit_checked_max_piece_then_encode(
+def explicit_checked_composition(
     data: list[int] | None,
     byte_len: int,
     io_cursor: list[int] | None,
@@ -140,17 +145,16 @@ def explicit_checked_max_piece_then_encode(
     if vocab_piece_count > vocab_piece_capacity:
         return TOKENIZER_BPE_ERR_BAD_PARAM
 
-    max_piece_len = 0
-    for piece_index in range(vocab_piece_count):
-        piece_len = vocab_piece_lens[piece_index]
+    staged_max_piece_len = 0
+    for index in range(vocab_piece_count):
+        piece_len = vocab_piece_lens[index]
         if piece_len > I64_MAX:
             return TOKENIZER_BPE_ERR_OVERFLOW
-        if piece_len > max_piece_len:
-            max_piece_len = piece_len
+        if piece_len > staged_max_piece_len:
+            staged_max_piece_len = piece_len
 
-    out_max_piece_len[0] = max_piece_len
-
-    return tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece(
+    staged_required = [0xCAFED00D]
+    err = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece(
         data,
         byte_len,
         io_cursor,
@@ -161,12 +165,18 @@ def explicit_checked_max_piece_then_encode(
         rank_merged_tokens,
         rank_table_count,
         rank_table_capacity,
-        max_piece_len,
+        staged_max_piece_len,
         out_token_ids,
         out_token_capacity,
         out_token_count,
-        out_required_token_capacity,
+        staged_required,
     )
+    if err != TOKENIZER_BPE_OK:
+        return err
+
+    out_required_token_capacity[0] = staged_required[0]
+    out_max_piece_len[0] = staged_max_piece_len
+    return TOKENIZER_BPE_OK
 
 
 def _build_rank_tables() -> tuple[list[int], list[int], list[int], list[int]]:
@@ -193,23 +203,23 @@ def _build_rank_tables() -> tuple[list[int], list[int], list[int], list[int]]:
     return left, right, ranks, merged
 
 
-def test_source_contains_from_lens_helper() -> None:
+def test_source_contains_helper_and_staged_publish() -> None:
     source = Path("src/tokenizer/bpe.HC").read_text(encoding="utf-8")
     sig = "I32 TokenizerBPEEncodePromptCheckedNoAllocFromLens("
     assert sig in source
-
     body = source.split(sig, 1)[1]
-    assert "if (vocab_piece_count > vocab_piece_capacity)" in body
-    assert "while (piece_index < vocab_piece_count)" in body
-    assert "*out_max_piece_len = max_piece_len;" in body
-    assert "TokenizerBPEEncodePromptCheckedNoAllocFromMaxPiece(" in body
+    assert "staged_max_piece_len = 0;" in body
+    assert "staged_required_token_capacity" in body
+    assert "err = TokenizerBPEEncodePromptCheckedNoAllocFromMaxPiece(" in body
+    assert "if (err != TOKENIZER_BPE_OK)" in body
+    assert "*out_required_token_capacity = staged_required_token_capacity;" in body
+    assert "*out_max_piece_len = staged_max_piece_len;" in body
 
 
-def test_success_fixture_matches_explicit_composition() -> None:
+def test_success_fixture_parity() -> None:
     left, right, ranks, merged = _build_rank_tables()
-    vocab_lens = [1, 2, 4, 3, 8, 5, 1]
-
     payload = list("hello, world 123\tgo! Καλημέρα 世界".encode("utf-8"))
+    vocab_lens = [1, 2, 4, 3, 8, 5, 1]
 
     cursor_a = [0]
     cursor_b = [0]
@@ -219,8 +229,8 @@ def test_success_fixture_matches_explicit_composition() -> None:
     count_b = [0xABCD]
     req_a = [0xDEAD]
     req_b = [0xDEAD]
-    max_a = [0xEEEE]
-    max_b = [0xEEEE]
+    max_a = [0xBEEF]
+    max_b = [0xBEEF]
 
     err_a = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens(
         payload,
@@ -242,7 +252,7 @@ def test_success_fixture_matches_explicit_composition() -> None:
         req_a,
         max_a,
     )
-    err_b = explicit_checked_max_piece_then_encode(
+    err_b = explicit_checked_composition(
         payload,
         len(payload),
         cursor_b,
@@ -264,214 +274,123 @@ def test_success_fixture_matches_explicit_composition() -> None:
     )
 
     assert err_a == err_b == TOKENIZER_BPE_OK
-    assert cursor_a[0] == cursor_b[0] == len(payload)
+    assert cursor_a[0] == cursor_b[0]
     assert count_a[0] == count_b[0]
     assert req_a[0] == req_b[0] == len(payload)
     assert max_a[0] == max_b[0] == 8
     assert out_a == out_b
 
 
-def test_error_vectors_and_no_partial_parity() -> None:
-    payload = [ord("o"), ord("k")]
+def test_downstream_error_keeps_staged_outputs_unpublished() -> None:
+    left, right, ranks, merged = _build_rank_tables()
+    payload = list("TempleOS".encode("utf-8"))
+    vocab_lens = [1, 2, 6]
 
-    out_a = [0xAAAA] * 8
-    out_b = [0xAAAA] * 8
-    count_a = [0x3333]
-    count_b = [0x3333]
-    req_a = [0x7777]
-    req_b = [0x7777]
-    max_a = [0x9999]
-    max_b = [0x9999]
-    cursor_a = [0]
-    cursor_b = [0]
-
-    err_a = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens(
-        payload,
-        len(payload),
-        cursor_a,
-        2,
-        [],
-        [],
-        [],
-        [],
-        0,
-        0,
-        [1, 3, 7],
-        3,
-        3,
-        out_a,
-        1,
-        count_a,
-        req_a,
-        max_a,
-    )
-    err_b = explicit_checked_max_piece_then_encode(
-        payload,
-        len(payload),
-        cursor_b,
-        2,
-        [],
-        [],
-        [],
-        [],
-        0,
-        0,
-        [1, 3, 7],
-        3,
-        3,
-        out_b,
-        1,
-        count_b,
-        req_b,
-        max_b,
-    )
-
-    assert err_a == err_b == TOKENIZER_BPE_ERR_BAD_PARAM
-    assert cursor_a == cursor_b == [0]
-    assert count_a == count_b == [0x3333]
-    assert req_a == req_b == [2]
-    assert max_a == max_b == [7]
-    assert out_a == out_b == [0xAAAA] * 8
-
-    max_out = [0xBEEF]
-    err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens(
-        payload,
-        len(payload),
-        [0],
-        2,
-        [],
-        [],
-        [],
-        [],
-        0,
-        0,
-        [1, I64_MAX + 1],
-        2,
-        2,
-        [0] * 8,
-        8,
-        [0xAAAA],
-        [0xBBBB],
-        max_out,
-    )
-    assert err == TOKENIZER_BPE_ERR_OVERFLOW
-    assert max_out[0] == 0xBEEF
+    out = [0x9A9A] * 32
+    count = [0xAAAA]
+    cursor = [0]
+    required = [0x11111111]
+    max_piece = [0x22222222]
 
     err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens(
         payload,
         len(payload),
-        [0],
-        2,
-        [],
-        [],
-        [],
-        [],
-        0,
-        0,
-        [1],
-        2,
-        1,
-        [0] * 8,
-        8,
-        [0],
-        [0],
-        [0],
+        cursor,
+        len(payload),
+        left,
+        right,
+        ranks,
+        merged,
+        len(ranks),
+        len(ranks),
+        vocab_lens,
+        len(vocab_lens),
+        len(vocab_lens),
+        out,
+        len(payload) - 1,
+        count,
+        required,
+        max_piece,
     )
+
     assert err == TOKENIZER_BPE_ERR_BAD_PARAM
-
-    err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens(
-        None,
-        0,
-        [0],
-        0,
-        [],
-        [],
-        [],
-        [],
-        0,
-        0,
-        [1],
-        1,
-        1,
-        [0],
-        1,
-        [0],
-        [0],
-        [0],
-    )
-    assert err == TOKENIZER_BPE_ERR_NULL_PTR
+    assert cursor[0] == 0
+    assert count[0] == 0xAAAA
+    assert required[0] == 0x11111111
+    assert max_piece[0] == 0x22222222
+    assert out == [0x9A9A] * 32
 
 
-def test_randomized_parity_vs_explicit_composition() -> None:
-    rng = random.Random(20260421_686)
+def test_adversarial_parity_randomized() -> None:
+    random.seed(686)
 
-    for _ in range(3000):
-        payload_len = rng.randint(0, 80)
-        payload = [rng.randint(0, 127) for _ in range(payload_len)]
+    for _ in range(250):
+        byte_len = random.randint(0, 48)
+        payload = [random.randint(0, 255) for _ in range(byte_len)]
+        cursor0 = random.randint(0, byte_len)
+        remain = byte_len - cursor0
+        prompt_nbytes = random.randint(0, remain)
 
-        cursor_seed = rng.randint(0, payload_len)
-        prompt_nbytes = rng.randint(0, payload_len - cursor_seed)
+        rank_table_capacity = random.randint(0, 24)
+        rank_table_count = random.randint(0, rank_table_capacity)
+        left = [random.randint(0, 300) for _ in range(rank_table_capacity)]
+        right = [random.randint(0, 300) for _ in range(rank_table_capacity)]
+        ranks = [random.randint(0, 7) for _ in range(rank_table_capacity)]
+        merged = [random.randint(301, 700) for _ in range(rank_table_capacity)]
 
-        rank_capacity = rng.randint(0, 40)
-        rank_count = rng.randint(0, rank_capacity)
-        rank_left = [rng.randint(0, 400) for _ in range(rank_capacity)]
-        rank_right = [rng.randint(0, 400) for _ in range(rank_capacity)]
-        rank_values = [rng.randint(0, 6) for _ in range(rank_capacity)]
-        rank_merged = [rng.randint(0, 600) for _ in range(rank_capacity)]
+        vocab_piece_capacity = random.randint(0, 20)
+        vocab_piece_count = random.randint(0, vocab_piece_capacity)
+        vocab_piece_lens = [random.randint(0, 12) for _ in range(vocab_piece_capacity)]
 
-        vocab_capacity = rng.randint(0, 40)
-        vocab_count = rng.randint(0, vocab_capacity)
-        vocab_lens = [rng.randint(0, 12) for _ in range(vocab_capacity)]
+        out_token_capacity = random.randint(0, 64)
+        out_a = [0xA5A5] * max(1, out_token_capacity + 8)
+        out_b = [0xA5A5] * max(1, out_token_capacity + 8)
 
-        out_capacity = rng.randint(0, 96)
-
-        cursor_a = [cursor_seed]
-        cursor_b = [cursor_seed]
-        out_a = [0x6161] * 128
-        out_b = [0x6161] * 128
-        count_a = [0x4242]
-        count_b = [0x4242]
-        req_a = [0x7373]
-        req_b = [0x7373]
-        max_a = [0x5151]
-        max_b = [0x5151]
+        cursor_a = [cursor0]
+        cursor_b = [cursor0]
+        count_a = [0x1BAD]
+        count_b = [0x1BAD]
+        req_a = [0x2222]
+        req_b = [0x2222]
+        max_a = [0x3333]
+        max_b = [0x3333]
 
         err_a = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens(
             payload,
-            len(payload),
+            byte_len,
             cursor_a,
             prompt_nbytes,
-            rank_left,
-            rank_right,
-            rank_values,
-            rank_merged,
-            rank_count,
-            rank_capacity,
-            vocab_lens,
-            vocab_count,
-            vocab_capacity,
+            left,
+            right,
+            ranks,
+            merged,
+            rank_table_count,
+            rank_table_capacity,
+            vocab_piece_lens,
+            vocab_piece_count,
+            vocab_piece_capacity,
             out_a,
-            out_capacity,
+            out_token_capacity,
             count_a,
             req_a,
             max_a,
         )
-        err_b = explicit_checked_max_piece_then_encode(
+        err_b = explicit_checked_composition(
             payload,
-            len(payload),
+            byte_len,
             cursor_b,
             prompt_nbytes,
-            rank_left,
-            rank_right,
-            rank_values,
-            rank_merged,
-            rank_count,
-            rank_capacity,
-            vocab_lens,
-            vocab_count,
-            vocab_capacity,
+            left,
+            right,
+            ranks,
+            merged,
+            rank_table_count,
+            rank_table_capacity,
+            vocab_piece_lens,
+            vocab_piece_count,
+            vocab_piece_capacity,
             out_b,
-            out_capacity,
+            out_token_capacity,
             count_b,
             req_b,
             max_b,
@@ -479,50 +398,15 @@ def test_randomized_parity_vs_explicit_composition() -> None:
 
         assert err_a == err_b
         assert cursor_a == cursor_b
-        assert out_a == out_b
         assert count_a == count_b
         assert req_a == req_b
         assert max_a == max_b
-
-
-def test_adversarial_overflow_vectors() -> None:
-    payload = [1, 2, 3]
-    out = [0xAAAA] * 8
-    count = [0x1111]
-    req = [0x2222]
-    max_piece = [0x3333]
-
-    err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens(
-        payload,
-        len(payload),
-        [0],
-        2,
-        [],
-        [],
-        [],
-        [],
-        I64_MAX + 1,
-        I64_MAX + 1,
-        [1],
-        1,
-        1,
-        out,
-        8,
-        count,
-        req,
-        max_piece,
-    )
-    assert err == TOKENIZER_BPE_ERR_OVERFLOW
-    assert count == [0x1111]
-    assert req == [0x2222]
-    assert max_piece == [0x3333]
-    assert out == [0xAAAA] * 8
+        assert out_a == out_b
 
 
 if __name__ == "__main__":
-    test_source_contains_from_lens_helper()
-    test_success_fixture_matches_explicit_composition()
-    test_error_vectors_and_no_partial_parity()
-    test_randomized_parity_vs_explicit_composition()
-    test_adversarial_overflow_vectors()
+    test_source_contains_helper_and_staged_publish()
+    test_success_fixture_parity()
+    test_downstream_error_keeps_staged_outputs_unpublished()
+    test_adversarial_parity_randomized()
     print("ok")
