@@ -319,10 +319,85 @@ def test_matches_scaled_row_checked_when_success_dense_output() -> None:
         assert out_no_partial == out_checked
 
 
+def test_overflow_stride_guard_parity_and_no_partial() -> None:
+    huge_token_count = 1 << 40
+    q = [1 << 16]
+    k = [1 << 16]
+
+    out_seed = [0x6EED, 0x6EED, 0x6EED]
+    out_a = out_seed.copy()
+    out_b = out_seed.copy()
+
+    err_a = attention_q16_compute_scaled_qk_row_checked_nopartial_default_stride(
+        q,
+        len(q),
+        k,
+        len(k),
+        huge_token_count,
+        1,
+        1 << 16,
+        out_a,
+        len(out_a),
+    )
+    err_b = explicit_default_stride_nopartial_composition(
+        q,
+        len(q),
+        k,
+        len(k),
+        huge_token_count,
+        1,
+        1 << 16,
+        out_b,
+        len(out_b),
+    )
+
+    assert err_a == err_b
+    assert out_a == out_b == out_seed
+
+
+def test_overflow_k_row_span_guard_parity_and_no_partial() -> None:
+    huge_token_count = 2
+    huge_head_dim = (1 << 62) + 9
+
+    q = [42]
+    k = [7]
+    out_seed = [0x44, 0x44, 0x44]
+    out_a = out_seed.copy()
+    out_b = out_seed.copy()
+
+    err_a = attention_q16_compute_scaled_qk_row_checked_nopartial_default_stride(
+        q,
+        len(q),
+        k,
+        len(k),
+        huge_token_count,
+        huge_head_dim,
+        1 << 16,
+        out_a,
+        len(out_a),
+    )
+    err_b = explicit_default_stride_nopartial_composition(
+        q,
+        len(q),
+        k,
+        len(k),
+        huge_token_count,
+        huge_head_dim,
+        1 << 16,
+        out_b,
+        len(out_b),
+    )
+
+    assert err_a == err_b
+    assert out_a == out_b == out_seed
+
+
 if __name__ == "__main__":
     test_source_contains_default_stride_nopartial_wrapper()
     test_multilingual_and_adversarial_vectors()
     test_error_parity_and_no_partial()
     test_randomized_parity_and_no_partial()
+    test_overflow_stride_guard_parity_and_no_partial()
+    test_overflow_k_row_span_guard_parity_and_no_partial()
     test_matches_scaled_row_checked_when_success_dense_output()
     print("ok")
