@@ -5743,6 +5743,18 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredB
         !out_required_stage_bytes)
         return ATTN_Q16_ERR_NULL_PTR;
 
+    if (out_required_q_cells == out_required_k_cells ||
+        out_required_q_cells == out_required_out_cells ||
+        out_required_q_cells == out_required_stage_cells ||
+        out_required_q_cells == out_required_stage_bytes ||
+        out_required_k_cells == out_required_out_cells ||
+        out_required_k_cells == out_required_stage_cells ||
+        out_required_k_cells == out_required_stage_bytes ||
+        out_required_out_cells == out_required_stage_cells ||
+        out_required_out_cells == out_required_stage_bytes ||
+        out_required_stage_cells == out_required_stage_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
     if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
         return ATTN_Q16_ERR_NULL_PTR;
 
