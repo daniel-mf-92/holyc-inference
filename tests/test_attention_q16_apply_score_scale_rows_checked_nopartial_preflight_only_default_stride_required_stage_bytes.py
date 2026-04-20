@@ -15,14 +15,15 @@ from test_attention_q16_apply_score_scale_checked import (
     ATTN_Q16_ERR_OVERFLOW,
     ATTN_Q16_OK,
 )
-from test_attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only import (
-    try_mul_i64,
-)
 from test_attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_cells import (
     attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_cells,
 )
+from test_attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only import (
+    try_mul_i64,
+)
 
 I64_MAX = (1 << 63) - 1
+I64_SIZE = 8
 
 
 def attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes(
@@ -78,7 +79,7 @@ def attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_defaul
     if err != ATTN_Q16_OK:
         return err
 
-    err, req_stage_bytes = try_mul_i64(req_stage_cells[0], 8)
+    err, req_stage_bytes = try_mul_i64(req_stage_cells[0], I64_SIZE)
     if err != ATTN_Q16_OK:
         return err
 
@@ -105,7 +106,24 @@ def explicit_checked_composition(
     out_last_in_index: list[int] | None,
     out_last_out_index: list[int] | None,
 ) -> int:
-    return attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes(
+    if (
+        in_scores_q32 is None
+        or out_scores_q32 is None
+        or out_required_in_cells is None
+        or out_required_out_cells is None
+        or out_required_stage_cells is None
+        or out_required_stage_bytes is None
+        or out_last_in_index is None
+        or out_last_out_index is None
+    ):
+        return ATTN_Q16_ERR_NULL_PTR
+
+    if in_scores_capacity < 0 or out_scores_capacity < 0:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if row_count < 0 or token_count < 0:
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    err = attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_cells(
         in_scores_q32,
         in_scores_capacity,
         row_count,
@@ -115,10 +133,14 @@ def explicit_checked_composition(
         out_required_in_cells,
         out_required_out_cells,
         out_required_stage_cells,
-        out_required_stage_bytes,
         out_last_in_index,
         out_last_out_index,
     )
+    if err != ATTN_Q16_OK:
+        return err
+
+    err, out_required_stage_bytes[0] = try_mul_i64(out_required_stage_cells[0], I64_SIZE)
+    return err
 
 
 def test_source_contains_required_stage_bytes_helper() -> None:
@@ -126,10 +148,7 @@ def test_source_contains_required_stage_bytes_helper() -> None:
     sig = "I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideRequiredStageBytes("
     assert sig in source
     body = source.split(sig, 1)[1]
-    assert (
-        "AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideRequiredStageCells("
-        in body
-    )
+    assert "AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideRequiredStageCells(" in body
     assert "status = AttentionTryMulI64Checked(required_stage_cells," in body
     assert "sizeof(I64)," in body
     assert "*out_required_stage_bytes = required_stage_bytes;" in body
@@ -138,13 +157,10 @@ def test_source_contains_required_stage_bytes_helper() -> None:
 def test_known_vector_outputs_expected_diagnostics() -> None:
     row_count = 3
     token_count = 1
-    default_stride = token_count
+    required_cells = row_count * token_count
 
-    last_index = (row_count - 1) * default_stride + (token_count - 1) * default_stride
-    required = last_index + 1
-
-    in_scores = [7] * required
-    out_scores = [9] * required
+    in_scores = [7] * required_cells
+    out_scores = [9] * required_cells
 
     req_in = [101]
     req_out = [102]
@@ -169,12 +185,12 @@ def test_known_vector_outputs_expected_diagnostics() -> None:
     )
 
     assert err == ATTN_Q16_OK
-    assert req_in == [required]
-    assert req_out == [required]
-    assert req_stage_cells == [row_count * token_count]
-    assert req_stage_bytes == [row_count * token_count * 8]
-    assert last_in == [last_index]
-    assert last_out == [last_index]
+    assert req_in == [required_cells]
+    assert req_out == [required_cells]
+    assert req_stage_cells == [required_cells]
+    assert req_stage_bytes == [required_cells * I64_SIZE]
+    assert last_in == [required_cells - 1]
+    assert last_out == [required_cells - 1]
 
 
 def test_error_paths_preserve_outputs() -> None:
@@ -223,12 +239,12 @@ def test_error_paths_preserve_outputs() -> None:
     )
     assert err == ATTN_Q16_ERR_BAD_PARAM
 
-    huge = 1 << 62
+    huge_cells = (I64_MAX // I64_SIZE) + 1
     err = attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes(
         [0],
         I64_MAX,
-        huge,
-        huge,
+        huge_cells,
+        1,
         [0],
         I64_MAX,
         req_in,
@@ -248,14 +264,14 @@ def test_randomized_parity_and_no_write_on_error() -> None:
         row_count = rng.randint(-2, 30)
         token_count = rng.randint(-2, 30)
 
-        required_stage = 0
+        required_cells = 0
         if row_count >= 0 and token_count >= 0:
-            required_stage = row_count * token_count
+            required_cells = row_count * token_count
 
         cap_pad_in = rng.randint(0, 4)
         cap_pad_out = rng.randint(0, 4)
-        in_capacity = required_stage + cap_pad_in
-        out_capacity = required_stage + cap_pad_out
+        in_capacity = required_cells + cap_pad_in
+        out_capacity = required_cells + cap_pad_out
 
         if rng.random() < 0.15:
             in_capacity = rng.randint(-3, 3)

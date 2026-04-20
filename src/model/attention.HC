@@ -2960,8 +2960,7 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideReq
 
     if (!in_scores_q32 || !out_scores_q32 || !out_required_in_cells ||
         !out_required_out_cells || !out_required_stage_cells ||
-        !out_required_stage_bytes || !out_last_in_index ||
-        !out_last_out_index)
+        !out_required_stage_bytes || !out_last_in_index || !out_last_out_index)
         return ATTN_Q16_ERR_NULL_PTR;
 
     if (in_scores_capacity < 0 || out_scores_capacity < 0)
@@ -2970,10 +2969,10 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideReq
         return ATTN_Q16_ERR_BAD_PARAM;
 
     // IQ-716 diagnostics-only default-stride required-stage-bytes contract:
-    // 1) derive canonical in/out/stage-cell diagnostics + last indices through
-    //    the required-stage-cells helper;
-    // 2) convert stage cells to bytes with checked I64 multiply;
-    // 3) publish all diagnostics atomically on success and never on failures.
+    // 1) compose canonical required-stage-cells diagnostics helper;
+    // 2) convert required stage cells to bytes via checked I64 multiply;
+    // 3) atomically publish cells/bytes + last-index diagnostics on success;
+    // 4) maintain strict zero-write semantics on any error return.
     status =
         AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideRequiredStageCells(
             in_scores_q32,
