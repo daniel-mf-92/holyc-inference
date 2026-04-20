@@ -55,6 +55,17 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocPreflight
     I64 *out_required_out_cells,
     I64 *out_required_stage_cells);
 
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideNoAllocDefaultCapacity(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_in_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_cells);
+
 I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
     I64 *in_scores_q32,
     I64 in_scores_capacity,
@@ -1954,6 +1965,53 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocPreflight
         return ATTN_Q16_ERR_BAD_PARAM;
 
     return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialPreflightOnlyDefaultStrideNoAllocDefaultCapacity(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_in_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_cells)
+{
+    I64 default_stage_cell_capacity;
+    I32 status;
+
+    if (!in_scores_q32 || !out_scores_q32 || !out_required_in_cells ||
+        !out_required_out_cells || !out_required_stage_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (in_scores_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-628 default-capacity preflight-only contract:
+    // derive staging capacity from the live row-major score slab
+    // (`row_count * token_count`) with checked overflow guards, then route all
+    // diagnostics through the canonical no-alloc default-stride preflight
+    // helper without compute/commit side effects.
+    status = AttentionTryMulI64Checked(row_count,
+                                       token_count,
+                                       &default_stage_cell_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    return AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(
+        in_scores_q32,
+        in_scores_capacity,
+        row_count,
+        token_count,
+        out_scores_q32,
+        out_scores_capacity,
+        default_stage_cell_capacity,
+        out_required_in_cells,
+        out_required_out_cells,
+        out_required_stage_cells);
 }
 
 I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
