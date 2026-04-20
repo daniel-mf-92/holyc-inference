@@ -240,6 +240,24 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredB
     I64 *out_required_stage_cells,
     I64 *out_required_stage_bytes);
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacityAliasSafeDefaultCapacityPreflightOnly(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 *out_required_q_cells,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes);
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityDefault(
     I64 *q_rows_q16,
     I64 q_rows_capacity,
@@ -5632,6 +5650,143 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCo
     *out_required_stage_cells = required_stage_cells;
     *out_required_stage_bytes = required_stage_bytes;
     return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitCapacityAliasSafeDefaultCapacityPreflightOnly(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 *out_commit_stage_cell_capacity,
+    I64 *out_commit_stage_byte_capacity,
+    I64 *out_required_q_cells,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes)
+{
+    I64 default_query_row_stride_q16;
+    I64 default_k_row_stride_q16;
+    I64 default_out_row_stride;
+
+    if (!out_commit_stage_cell_capacity || !out_commit_stage_byte_capacity ||
+        !out_required_q_cells || !out_required_k_cells ||
+        !out_required_out_cells || !out_required_stage_cells ||
+        !out_required_stage_bytes)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32 || !staged_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_rows_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0 ||
+        staged_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_row_count < 0 || token_count < 0 || head_dim < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-662 default-stride alias-safe default-capacity preflight contract:
+    // derive canonical packed strides from head/token geometry, then route
+    // diagnostics through the explicit-stride alias-safe preflight helper so
+    // overflow, overlap, and required-span semantics stay centralized.
+    default_query_row_stride_q16 = head_dim;
+    default_k_row_stride_q16 = head_dim;
+    default_out_row_stride = token_count;
+
+    return AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafeDefaultCapacityPreflightOnly(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        default_query_row_stride_q16,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        default_k_row_stride_q16,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        default_out_row_stride,
+        staged_scores_q32,
+        staged_scores_capacity,
+        out_commit_stage_cell_capacity,
+        out_commit_stage_byte_capacity,
+        out_required_q_cells,
+        out_required_k_cells,
+        out_required_out_cells,
+        out_required_stage_cells,
+        out_required_stage_bytes);
+}
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacityAliasSafeDefaultCapacityPreflightOnly(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 *out_required_q_cells,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes)
+{
+    I64 default_query_row_stride_q16;
+    I64 default_k_row_stride_q16;
+    I64 default_out_row_stride;
+
+    if (!out_required_q_cells || !out_required_k_cells ||
+        !out_required_out_cells || !out_required_stage_cells ||
+        !out_required_stage_bytes)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32 || !staged_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_rows_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0 ||
+        staged_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_row_count < 0 || token_count < 0 || head_dim < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-669 default-stride alias-safe preflight contract:
+    // derive canonical packed strides from model geometry, then route through
+    // the explicit-stride default-capacity alias-safe preflight helper so
+    // overlap semantics and q/k/out/stage diagnostics stay fully centralized.
+    default_query_row_stride_q16 = head_dim;
+    default_k_row_stride_q16 = head_dim;
+    default_out_row_stride = token_count;
+
+    return AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocCommitCapacityAliasSafeDefaultCapacityPreflightOnly(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        default_query_row_stride_q16,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        default_k_row_stride_q16,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        default_out_row_stride,
+        staged_scores_q32,
+        staged_scores_capacity,
+        out_required_q_cells,
+        out_required_k_cells,
+        out_required_out_cells,
+        out_required_stage_cells,
+        out_required_stage_bytes);
 }
 
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesDefaultCapacity(
