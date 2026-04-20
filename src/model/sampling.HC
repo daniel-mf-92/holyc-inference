@@ -38,6 +38,23 @@ I32 FPQ16TopPSampleIndexChecked(I64 *probs_q16,
                                 I64 prefix_len,
                                 I64 random_q16,
                                 I64 *out_index);
+I32 InferenceGenerateTokensPreflightChecked(
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 workspace_stage_logits_capacity,
+    I64 workspace_topk_logits_capacity,
+    I64 workspace_topk_index_capacity,
+    I64 random_q16_capacity,
+    I64 generated_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_history_capacity,
+    I64 *out_required_stage_logits_capacity,
+    I64 *out_required_topk_capacity,
+    I64 *out_required_random_capacity,
+    I64 *out_required_generated_capacity);
 
 I32 GenerationStepComposeStageError(I32 stage_base, I32 stage_status)
 {
@@ -989,86 +1006,109 @@ I32 InferenceGenerateTokensChecked(I64 *step_logits_q16,
                                    I64 *out_generated_tokens,
                                    I64 *out_generated_count)
 {
-    I64 default_history_capacity;
-    I64 default_stage_logits_capacity;
-    I64 default_topk_capacity;
-    I64 default_random_capacity;
-    I64 default_generated_capacity;
-    I64 required_logits_cells;
+    I64 required_step_logits_cells;
+    I64 required_history_capacity;
+    I64 required_stage_logits_capacity;
+    I64 required_topk_capacity;
+    I64 required_random_capacity;
+    I64 required_generated_capacity;
+    I32 status;
 
     if (!step_logits_q16 || !token_history || !random_q16_values ||
         !workspace_stage_logits_q16 || !workspace_topk_logits_q16 ||
         !workspace_topk_indices || !out_generated_tokens || !out_generated_count)
         return SAMPLING_Q16_ERR_NULL_PTR;
 
-    if (step_logits_capacity < 0 || vocab_size < 0 || max_new_tokens < 0)
-        return SAMPLING_Q16_ERR_BAD_PARAM;
-    if (token_history_capacity < 0 || token_history_count < 0)
-        return SAMPLING_Q16_ERR_BAD_PARAM;
-    if (workspace_stage_logits_capacity < 0 || workspace_topk_logits_capacity < 0)
-        return SAMPLING_Q16_ERR_BAD_PARAM;
-    if (workspace_topk_index_capacity < 0)
-        return SAMPLING_Q16_ERR_BAD_PARAM;
-
-    if (vocab_size <= 0)
-        return SAMPLING_Q16_ERR_BAD_PARAM;
-    if (token_history_count > token_history_capacity)
-        return SAMPLING_Q16_ERR_BAD_PARAM;
-
-    default_history_capacity = token_history_count + max_new_tokens;
-    if (default_history_capacity < token_history_count)
-        return SAMPLING_Q16_ERR_OVERFLOW;
-
-    default_stage_logits_capacity = vocab_size;
-    default_topk_capacity = vocab_size;
-    default_random_capacity = max_new_tokens;
-    default_generated_capacity = max_new_tokens;
-
-    if (default_history_capacity > token_history_capacity)
-        return SAMPLING_Q16_ERR_BAD_PARAM;
-    if (default_stage_logits_capacity > workspace_stage_logits_capacity)
-        return SAMPLING_Q16_ERR_BAD_PARAM;
-    if (default_topk_capacity > workspace_topk_logits_capacity)
-        return SAMPLING_Q16_ERR_BAD_PARAM;
-    if (default_topk_capacity > workspace_topk_index_capacity)
-        return SAMPLING_Q16_ERR_BAD_PARAM;
-
-    if (max_new_tokens)
-    {
-        if (vocab_size > 0x7FFFFFFFFFFFFFFF / max_new_tokens)
-            return SAMPLING_Q16_ERR_OVERFLOW;
-        required_logits_cells = vocab_size * max_new_tokens;
-    }
-    else
-    {
-        required_logits_cells = 0;
-    }
-
-    if (required_logits_cells > step_logits_capacity)
-        return SAMPLING_Q16_ERR_BAD_PARAM;
+    status = InferenceGenerateTokensPreflightChecked(
+        step_logits_capacity,
+        vocab_size,
+        max_new_tokens,
+        token_history_capacity,
+        token_history_count,
+        workspace_stage_logits_capacity,
+        workspace_topk_logits_capacity,
+        workspace_topk_index_capacity,
+        max_new_tokens,
+        max_new_tokens,
+        &required_step_logits_cells,
+        &required_history_capacity,
+        &required_stage_logits_capacity,
+        &required_topk_capacity,
+        &required_random_capacity,
+        &required_generated_capacity);
+    if (status)
+        return status;
 
     return GenerationRunChecked(step_logits_q16,
                                 step_logits_capacity,
                                 vocab_size,
                                 max_new_tokens,
                                 token_history,
-                                default_history_capacity,
+                                required_history_capacity,
                                 token_history_count,
                                 temperature_q16,
                                 top_k,
                                 top_p_q16,
                                 repetition_penalty_q16,
                                 random_q16_values,
-                                default_random_capacity,
+                                required_random_capacity,
                                 workspace_stage_logits_q16,
-                                default_stage_logits_capacity,
+                                required_stage_logits_capacity,
                                 workspace_topk_logits_q16,
-                                default_topk_capacity,
+                                required_topk_capacity,
                                 workspace_topk_indices,
-                                default_topk_capacity,
+                                required_topk_capacity,
                                 out_generated_tokens,
-                                default_generated_capacity,
+                                required_generated_capacity,
                                 out_generated_count);
+}
+
+// WS7 API sugar wrapper: force top-k to full vocab.
+//
+// This exposes a minimal public API where caller only provides top-p and
+// temperature controls. `top_k=vocab_size` keeps full-vocabulary eligibility
+// while preserving the exact checked/no-partial semantics of
+// `InferenceGenerateTokensChecked`.
+I32 InferenceGenerateTokensCheckedDefaultTopK(I64 *step_logits_q16,
+                                              I64 step_logits_capacity,
+                                              I64 vocab_size,
+                                              I64 max_new_tokens,
+                                              I64 *token_history,
+                                              I64 token_history_capacity,
+                                              I64 token_history_count,
+                                              I64 temperature_q16,
+                                              I64 top_p_q16,
+                                              I64 repetition_penalty_q16,
+                                              I64 *random_q16_values,
+                                              I64 *workspace_stage_logits_q16,
+                                              I64 workspace_stage_logits_capacity,
+                                              I64 *workspace_topk_logits_q16,
+                                              I64 workspace_topk_logits_capacity,
+                                              I64 *workspace_topk_indices,
+                                              I64 workspace_topk_index_capacity,
+                                              I64 *out_generated_tokens,
+                                              I64 *out_generated_count)
+{
+    return InferenceGenerateTokensChecked(step_logits_q16,
+                                          step_logits_capacity,
+                                          vocab_size,
+                                          max_new_tokens,
+                                          token_history,
+                                          token_history_capacity,
+                                          token_history_count,
+                                          temperature_q16,
+                                          vocab_size,
+                                          top_p_q16,
+                                          repetition_penalty_q16,
+                                          random_q16_values,
+                                          workspace_stage_logits_q16,
+                                          workspace_stage_logits_capacity,
+                                          workspace_topk_logits_q16,
+                                          workspace_topk_logits_capacity,
+                                          workspace_topk_indices,
+                                          workspace_topk_index_capacity,
+                                          out_generated_tokens,
+                                          out_generated_count);
 }
 
 // WS7 generation preflight diagnostics for default-capacity API wrappers.

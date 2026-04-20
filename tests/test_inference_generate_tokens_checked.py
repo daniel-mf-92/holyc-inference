@@ -107,12 +107,12 @@ def inference_generate_tokens_reference(
 def test_source_contains_inference_generate_tokens_checked_wrapper() -> None:
     source = Path("src/model/sampling.HC").read_text(encoding="utf-8")
     assert "I32 InferenceGenerateTokensChecked(" in source
-    assert "default_history_capacity = token_history_count + max_new_tokens;" in source
-    assert "if (default_history_capacity < token_history_count)" in source
-    assert "if (vocab_size > 0x7FFFFFFFFFFFFFFF / max_new_tokens)" in source
+    assert "InferenceGenerateTokensPreflightChecked(" in source
+    assert "&required_history_capacity" in source
+    assert "max_new_tokens,\n        max_new_tokens," in source
     assert "return GenerationRunChecked(step_logits_q16," in source
-    assert "default_stage_logits_capacity" in source
-    assert "default_topk_capacity" in source
+    assert "required_stage_logits_capacity" in source
+    assert "required_topk_capacity" in source
 
 
 def test_inference_generate_tokens_reference_success_default_capacities() -> None:
