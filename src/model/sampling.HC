@@ -240,3 +240,151 @@ I32 SamplingTopPSelectCutoffChecked(I64 *probs_q16,
     *out_cutoff_index = cutoff_index;
     return SAMPLING_Q16_OK;
 }
+
+// Checked in-place repetition-penalty pass over logits using token history.
+//
+// Integer penalty rule (Q16):
+//   - For positive logits: divide by penalty (reduces favored repeats).
+//   - For negative logits: multiply by penalty (pushes further negative).
+//
+// Determinism / no-partial semantics:
+//   - Each token id present in history is penalized at most once.
+//   - Duplicate history entries are skipped after first occurrence.
+//   - Full preflight pass validates pointers, bounds, history token ids, and
+//     per-token fixed-point arithmetic before any in-place commit writes.
+I32 SamplingApplyRepetitionPenaltyChecked(I64 *logits_q16,
+                                          I64 logits_capacity,
+                                          I64 vocab_size,
+                                          I64 *token_history,
+                                          I64 token_history_capacity,
+                                          I64 token_history_count,
+                                          I64 penalty_q16)
+{
+    I64 history_index;
+    I64 prior_index;
+    I64 token_id;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 adjusted_logit_q16;
+    I64 base_logit_q16;
+    I32 status;
+    Bool already_seen;
+
+    if (!logits_q16)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+    if (token_history_count > 0 && !token_history)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (logits_capacity < 0 || vocab_size < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (token_history_capacity < 0 || token_history_count < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (vocab_size > logits_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (token_history_count > token_history_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (penalty_q16 <= 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (!vocab_size || !token_history_count)
+        return SAMPLING_Q16_OK;
+
+    // Guard logits pointer span for vocab-sized indexed loads/stores.
+    last_index = vocab_size - 1;
+    if (last_index > 0x0FFFFFFFFFFFFFFF)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)logits_q16 > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    // Guard token-history pointer span for indexed reads.
+    last_index = token_history_count - 1;
+    if (last_index > 0x0FFFFFFFFFFFFFFF)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)token_history > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    // Preflight: validate token ids, dedup policy, and arithmetic viability.
+    for (history_index = 0; history_index < token_history_count; history_index++)
+    {
+        token_id = token_history[history_index];
+        if (token_id < 0 || token_id >= vocab_size)
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+
+        already_seen = FALSE;
+        for (prior_index = 0; prior_index < history_index; prior_index++)
+        {
+            if (token_history[prior_index] == token_id)
+            {
+                already_seen = TRUE;
+                break;
+            }
+        }
+
+        if (already_seen)
+            continue;
+
+        base_logit_q16 = logits_q16[token_id];
+        if (base_logit_q16 < 0)
+        {
+            status = FPQ16MulDivRoundedChecked(base_logit_q16,
+                                               penalty_q16,
+                                               SAMPLING_Q16_ONE,
+                                               &adjusted_logit_q16);
+        }
+        else
+        {
+            status = FPQ16MulDivRoundedChecked(base_logit_q16,
+                                               SAMPLING_Q16_ONE,
+                                               penalty_q16,
+                                               &adjusted_logit_q16);
+        }
+
+        if (status)
+            return status;
+    }
+
+    // Commit: same dedup/arith path, now writing in place.
+    for (history_index = 0; history_index < token_history_count; history_index++)
+    {
+        token_id = token_history[history_index];
+
+        already_seen = FALSE;
+        for (prior_index = 0; prior_index < history_index; prior_index++)
+        {
+            if (token_history[prior_index] == token_id)
+            {
+                already_seen = TRUE;
+                break;
+            }
+        }
+
+        if (already_seen)
+            continue;
+
+        base_logit_q16 = logits_q16[token_id];
+        if (base_logit_q16 < 0)
+        {
+            status = FPQ16MulDivRoundedChecked(base_logit_q16,
+                                               penalty_q16,
+                                               SAMPLING_Q16_ONE,
+                                               &adjusted_logit_q16);
+        }
+        else
+        {
+            status = FPQ16MulDivRoundedChecked(base_logit_q16,
+                                               SAMPLING_Q16_ONE,
+                                               penalty_q16,
+                                               &adjusted_logit_q16);
+        }
+
+        if (status)
+            return status;
+        logits_q16[token_id] = adjusted_logit_q16;
+    }
+
+    return SAMPLING_Q16_OK;
+}
