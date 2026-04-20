@@ -5638,6 +5638,85 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredB
     return ATTN_Q16_OK;
 }
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesPreflightOnlyDefaultCapacity(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_q_cells,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes)
+{
+    I64 default_stage_cell_capacity;
+    I64 required_q_cells;
+    I64 required_k_cells;
+    I64 required_out_cells;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
+    I32 status;
+
+    if (!out_required_q_cells || !out_required_k_cells ||
+        !out_required_out_cells || !out_required_stage_cells ||
+        !out_required_stage_bytes)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_rows_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_row_count < 0 || token_count < 0 || head_dim < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-725 default-capacity diagnostics contract:
+    // derive stage-cell capacity from the live score slab
+    // (`query_row_count * token_count`) with checked overflow math,
+    // then delegate diagnostics to the canonical required-bytes preflight
+    // helper and publish all outputs atomically on full success.
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       token_count,
+                                       &default_stage_cell_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesPreflightOnly(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        &required_q_cells,
+        &required_k_cells,
+        &required_out_cells,
+        &required_stage_cells,
+        &required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    // Explicitly verify default-capacity diagnostics stay composition-identical
+    // even when helper internals evolve.
+    if (required_stage_cells != default_stage_cell_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    *out_required_q_cells = required_q_cells;
+    *out_required_k_cells = required_k_cells;
+    *out_required_out_cells = required_out_cells;
+    *out_required_stage_cells = required_stage_cells;
+    *out_required_stage_bytes = required_stage_bytes;
+    return ATTN_Q16_OK;
+}
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesDefaultCapacity(
     I64 *q_rows_q16,
     I64 q_rows_capacity,
