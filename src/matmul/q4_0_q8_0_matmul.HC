@@ -36,6 +36,25 @@ class Q8_0Block
 // Declared in src/quant/q4_0_q8_0_dot.HC.
 I32 Q4_0_Q8_0DotProductBlocksQ16AccumulateChecked(Q4_0Block *lhs_q4, Q8_0Block *rhs_q8, I64 block_count, I64 *io_accum_q16);
 I32 Q4_0_Q8_0DotBlocksAVX2Q32Checked(Q4_0Block *lhs_q4, Q8_0Block *rhs_q8, I64 block_count, I64 *out_dot_q32);
+I32 Q4_0Q8_0MatMulTiledQ32CheckedNoAllocDefaultTilesPreflightOnly(
+    Q4_0Block *lhs_q4_blocks,
+    I64 lhs_q4_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_q8_col_blocks,
+    I64 rhs_q8_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_cells_q32,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells,
+    I64 *out_required_lhs_blocks,
+    I64 *out_required_rhs_blocks,
+    I64 *out_required_out_cells,
+    I64 *out_tile_m,
+    I64 *out_tile_n,
+    I64 *out_tile_k_blocks);
 
 Bool Q4_0Q8_0MatMulTryMulI64NonNeg(I64 lhs, I64 rhs, I64 *out_prod)
 {
@@ -334,6 +353,73 @@ I32 Q4_0Q8_0MatMulTiledQ32CheckedNoAllocDefaultTiles(
     I64 out_cell_capacity,
     I64 out_row_stride_cells)
 {
+    I64 required_lhs_blocks;
+    I64 required_rhs_blocks;
+    I64 required_out_cells;
+    I64 tile_m;
+    I64 tile_n;
+    I64 tile_k_blocks;
+    I32 status;
+
+    status = Q4_0Q8_0MatMulTiledQ32CheckedNoAllocDefaultTilesPreflightOnly(
+        lhs_q4_blocks,
+        lhs_q4_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_q8_col_blocks,
+        rhs_q8_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q32,
+        out_cell_capacity,
+        out_row_stride_cells,
+        &required_lhs_blocks,
+        &required_rhs_blocks,
+        &required_out_cells,
+        &tile_m,
+        &tile_n,
+        &tile_k_blocks);
+    if (status != Q4_0_Q8_0_MATMUL_OK)
+        return status;
+
+    return Q4_0Q8_0MatMulQ32TiledAVX2Checked(
+        lhs_q4_blocks,
+        lhs_q4_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_q8_col_blocks,
+        rhs_q8_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        Q4_0_Q8_0_MATMUL_DEFAULT_TILE_M,
+        Q4_0_Q8_0_MATMUL_DEFAULT_TILE_N,
+        out_cells_q32,
+        out_cell_capacity,
+        out_row_stride_cells);
+}
+
+I32 Q4_0Q8_0MatMulTiledQ32CheckedNoAllocDefaultTilesPreflightOnly(
+    Q4_0Block *lhs_q4_blocks,
+    I64 lhs_q4_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_q8_col_blocks,
+    I64 rhs_q8_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_cells_q32,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells,
+    I64 *out_required_lhs_blocks,
+    I64 *out_required_rhs_blocks,
+    I64 *out_required_out_cells,
+    I64 *out_tile_m,
+    I64 *out_tile_n,
+    I64 *out_tile_k_blocks)
+{
     I64 lhs_required_blocks;
     I64 rhs_required_blocks;
     I64 out_required_cells;
@@ -350,6 +436,11 @@ I32 Q4_0Q8_0MatMulTiledQ32CheckedNoAllocDefaultTiles(
     Q8_0Block *rhs_col_ptr;
     I32 status;
 
+    if (!out_required_lhs_blocks || !out_required_rhs_blocks ||
+        !out_required_out_cells || !out_tile_m || !out_tile_n ||
+        !out_tile_k_blocks)
+        return Q4_0_Q8_0_MATMUL_ERR_NULL_PTR;
+
     if (!lhs_q4_blocks || !rhs_q8_col_blocks || !out_cells_q32)
         return Q4_0_Q8_0_MATMUL_ERR_NULL_PTR;
 
@@ -360,7 +451,7 @@ I32 Q4_0Q8_0MatMulTiledQ32CheckedNoAllocDefaultTiles(
     if (lhs_row_stride_blocks < 0 || rhs_col_stride_blocks < 0 || out_row_stride_cells < 0)
         return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
 
-    // IQ-684: default kernel tile contract is fixed at (M,N,K)=(4,4,8).
+    // IQ-687: default kernel tile contract is fixed at (M,N,K)=(4,4,8).
     // K tile is a scheduling default for the compute kernel family; this
     // wrapper accepts any checked K-block count the canonical kernel accepts.
     if (k_block_count > lhs_row_stride_blocks || k_block_count > rhs_col_stride_blocks)
@@ -383,9 +474,16 @@ I32 Q4_0Q8_0MatMulTiledQ32CheckedNoAllocDefaultTiles(
     if (out_required_cells > out_cell_capacity)
         return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
 
-    // No-partial policy: run full checked dot preflight before first output
-    // write. This guarantees every possible dot/overflow fault is surfaced
-    // before the canonical kernel commits any cell into caller output memory.
+    *out_required_lhs_blocks = lhs_required_blocks;
+    *out_required_rhs_blocks = rhs_required_blocks;
+    *out_required_out_cells = out_required_cells;
+    *out_tile_m = Q4_0_Q8_0_MATMUL_DEFAULT_TILE_M;
+    *out_tile_n = Q4_0_Q8_0_MATMUL_DEFAULT_TILE_N;
+    *out_tile_k_blocks = Q4_0_Q8_0_MATMUL_DEFAULT_TILE_K;
+
+    // Preflight-only no-partial policy: validate every dot path and publish
+    // deterministic required capacities + fixed default tiles with zero output
+    // writes. Compute/commit remains in the canonical AVX2 kernel wrapper.
     row_tile_start = 0;
     while (row_tile_start < row_count)
     {
@@ -435,19 +533,5 @@ I32 Q4_0Q8_0MatMulTiledQ32CheckedNoAllocDefaultTiles(
         row_tile_start = row_tile_end;
     }
 
-    return Q4_0Q8_0MatMulQ32TiledAVX2Checked(
-        lhs_q4_blocks,
-        lhs_q4_block_capacity,
-        row_count,
-        lhs_row_stride_blocks,
-        rhs_q8_col_blocks,
-        rhs_q8_block_capacity,
-        col_count,
-        rhs_col_stride_blocks,
-        k_block_count,
-        Q4_0_Q8_0_MATMUL_DEFAULT_TILE_M,
-        Q4_0_Q8_0_MATMUL_DEFAULT_TILE_N,
-        out_cells_q32,
-        out_cell_capacity,
-        out_row_stride_cells);
+    return Q4_0_Q8_0_MATMUL_OK;
 }
