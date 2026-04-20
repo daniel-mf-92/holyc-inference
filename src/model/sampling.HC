@@ -19,6 +19,15 @@ I32 FPQ16TopKSelectIndicesChecked(I64 *logits_q16,
                                   I64 k,
                                   I64 *out_indices,
                                   I64 out_index_capacity);
+I32 FPQ16SoftmaxFromPreclampedChecked(I64 *preclamped_logits_q16,
+                                      I64 *exp_lanes_q16,
+                                      I64 lane_count,
+                                      I64 *probs_q16);
+I32 FPQ16TopPSampleIndexChecked(I64 *probs_q16,
+                                I64 lane_count,
+                                I64 prefix_len,
+                                I64 random_q16,
+                                I64 *out_index);
 
 // Temperature scaling for sampling logits (Q16 lanes):
 //   out_logits_q16[i] = round_half_up(logits_q16[i] / temperature_q16)
@@ -388,5 +397,188 @@ I32 SamplingApplyRepetitionPenaltyChecked(I64 *logits_q16,
         logits_q16[token_id] = adjusted_logit_q16;
     }
 
+    return SAMPLING_Q16_OK;
+}
+
+// Checked composed next-token selector from integer logits.
+//
+// Pipeline (all integer-only, no allocation):
+//   1) stage_logits <- logits (immutable caller logits preserved)
+//   2) optional repetition penalty in-place on stage_logits
+//   3) temperature scaling in-place on stage_logits
+//   4) deterministic stable top-k token index selection
+//   5) gather top-k logits -> topk_probs workspace
+//   6) softmax over top-k logits (Q16 probabilities)
+//   7) top-p cutoff over descending top-k probabilities
+//   8) deterministic sample inside top-p prefix using random_q16
+//
+// Determinism / safety:
+//   - Tie-break policy is inherited from SamplingTopKSelectIndicesChecked:
+//     larger logit first, lower token id on ties.
+//   - *out_token_id is written exactly once on success.
+//   - Failures return checked error code and do not partially publish output.
+I32 SamplingSelectNextTokenChecked(I64 *logits_q16,
+                                   I64 logits_capacity,
+                                   I64 vocab_size,
+                                   I64 *token_history,
+                                   I64 token_history_capacity,
+                                   I64 token_history_count,
+                                   I64 temperature_q16,
+                                   I64 top_k,
+                                   I64 top_p_q16,
+                                   I64 repetition_penalty_q16,
+                                   I64 random_q16,
+                                   I64 *stage_logits_q16,
+                                   I64 stage_logits_capacity,
+                                   I64 *topk_probs_q16,
+                                   I64 topk_probs_capacity,
+                                   I64 *topk_indices,
+                                   I64 topk_index_capacity,
+                                   I64 *out_token_id)
+{
+    I64 lane_index;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 top_p_cutoff_index;
+    I64 nucleus_prefix_len;
+    I64 sampled_rank;
+    I64 sampled_token_id;
+    I32 status;
+
+    if (!logits_q16 || !stage_logits_q16 || !topk_probs_q16 || !topk_indices ||
+        !out_token_id)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+    if (token_history_count > 0 && !token_history)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (logits_capacity < 0 || vocab_size < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (token_history_capacity < 0 || token_history_count < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (stage_logits_capacity < 0 || topk_probs_capacity < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (topk_index_capacity < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (!vocab_size)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (vocab_size > logits_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (vocab_size > stage_logits_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (token_history_count > token_history_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (temperature_q16 <= 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (repetition_penalty_q16 < SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (top_k <= 0 || top_k > vocab_size)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (top_k > topk_index_capacity || top_k > topk_probs_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (top_p_q16 <= 0 || top_p_q16 > SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (random_q16 < 0 || random_q16 >= SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    // Guard pointer-span math before copy/gather loops.
+    last_index = vocab_size - 1;
+    if (last_index > 0x0FFFFFFFFFFFFFFF)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)logits_q16 > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+        return SAMPLING_Q16_ERR_OVERFLOW;
+    if ((U64)stage_logits_q16 > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    last_index = top_k - 1;
+    if (last_index > 0x0FFFFFFFFFFFFFFF)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)topk_probs_q16 > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+        return SAMPLING_Q16_ERR_OVERFLOW;
+    if ((U64)topk_indices > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    // Stage immutable caller logits into scratch before in-place transforms.
+    for (lane_index = 0; lane_index < vocab_size; lane_index++)
+        stage_logits_q16[lane_index] = logits_q16[lane_index];
+
+    // Repetition penalty before temperature mirrors common LLM decoding order:
+    // punish seen tokens first, then smooth/sharpen with temperature.
+    status = SamplingApplyRepetitionPenaltyChecked(stage_logits_q16,
+                                                   stage_logits_capacity,
+                                                   vocab_size,
+                                                   token_history,
+                                                   token_history_capacity,
+                                                   token_history_count,
+                                                   repetition_penalty_q16);
+    if (status)
+        return status;
+
+    status = SamplingQ16ApplyTemperatureChecked(stage_logits_q16,
+                                                stage_logits_capacity,
+                                                vocab_size,
+                                                temperature_q16,
+                                                stage_logits_q16,
+                                                stage_logits_capacity);
+    if (status)
+        return status;
+
+    status = SamplingTopKSelectIndicesChecked(stage_logits_q16,
+                                              stage_logits_capacity,
+                                              vocab_size,
+                                              top_k,
+                                              topk_indices,
+                                              topk_index_capacity);
+    if (status)
+        return status;
+
+    // Gather top-k logits in stable rank order so probabilities stay descending.
+    for (lane_index = 0; lane_index < top_k; lane_index++)
+    {
+        sampled_token_id = topk_indices[lane_index];
+        if (sampled_token_id < 0 || sampled_token_id >= vocab_size)
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+
+        topk_probs_q16[lane_index] = stage_logits_q16[sampled_token_id];
+    }
+
+    // Alias-permitted call: same topk buffer is reused for preclamped logits,
+    // exp staging, and final probabilities to keep the runtime allocation-free.
+    status = FPQ16SoftmaxFromPreclampedChecked(topk_probs_q16,
+                                               topk_probs_q16,
+                                               top_k,
+                                               topk_probs_q16);
+    if (status)
+        return status;
+
+    status = SamplingTopPSelectCutoffChecked(topk_probs_q16,
+                                             topk_probs_capacity,
+                                             top_k,
+                                             top_p_q16,
+                                             &top_p_cutoff_index);
+    if (status)
+        return status;
+
+    nucleus_prefix_len = top_p_cutoff_index + 1;
+    status = FPQ16TopPSampleIndexChecked(topk_probs_q16,
+                                         top_k,
+                                         nucleus_prefix_len,
+                                         random_q16,
+                                         &sampled_rank);
+    if (status)
+        return status;
+
+    if (sampled_rank < 0 || sampled_rank >= top_k)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    sampled_token_id = topk_indices[sampled_rank];
+    if (sampled_token_id < 0 || sampled_token_id >= vocab_size)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    *out_token_id = sampled_token_id;
     return SAMPLING_Q16_OK;
 }
