@@ -1891,22 +1891,24 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocCommitCapacityDefaultCapa
     // and caller staging storage bytes (`staging_out_capacity * sizeof(I64)`),
     // then route strict no-partial behavior through canonical commit-capacity
     // wrapper.
-    status = FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocRequiredBytes(
-        gate_q16,
-        gate_capacity,
-        up_q16,
-        up_capacity,
-        out_q16,
-        out_capacity,
-        row_count,
-        lane_count,
-        in_row_stride_q16,
-        out_row_stride_q16,
-        &commit_stage_cell_capacity,
-        &commit_stage_byte_capacity,
-        &status);
-    if (status)
-        return status;
+    if (!row_count || !lane_count)
+    {
+        commit_stage_cell_capacity = 0;
+    }
+    else
+    {
+        status = FFNTryMulI64Checked(row_count - 1,
+                                     out_row_stride_q16,
+                                     &commit_stage_cell_capacity);
+        if (status)
+            return status;
+
+        status = FFNTryAddI64Checked(commit_stage_cell_capacity,
+                                     lane_count,
+                                     &commit_stage_cell_capacity);
+        if (status)
+            return status;
+    }
 
     status = FFNTryMulI64Checked(staging_out_capacity,
                                  sizeof(I64),
