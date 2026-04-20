@@ -5488,7 +5488,7 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnly(
     // Commit-only diagnostics wrapper: reuse canonical explicit-capacity
     // lens preflight while staging diagnostics so failure never mutates
     // caller-visible outputs.
-    err = TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnly(
+    err = TokenizerBPEEncodePromptCheckedNoAllocFromLensPreflightOnly(
         bytes,
         byte_len,
         io_cursor,
@@ -5574,7 +5574,7 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnly(
 
     // Reuse explicit-capacity lens preflight to derive canonical diagnostics
     // before any staged encode/commit work.
-    err = TokenizerBPEEncodePromptCheckedNoAllocFromLensPreflightOnly(
+    err = TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnly(
         bytes,
         byte_len,
         io_cursor,

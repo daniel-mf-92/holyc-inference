@@ -261,7 +261,7 @@ def test_source_contains_lens_commit_only_signature_and_staged_delegate() -> Non
         "I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensDefaultCapacityCommitOnly(",
         1,
     )[0]
-    assert "TokenizerBPEEncodePromptCheckedNoAllocFromLensPreflightOnly(" in body
+    assert "TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnly(" in body
     assert "&canonical_required_token_capacity" in body
     assert "&canonical_max_piece_len" in body
     assert "staged_cursor = cursor;" in body
