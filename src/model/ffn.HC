@@ -1622,3 +1622,237 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocDefaultCapacity(I64
         out_q16,
         out_capacity);
 }
+
+// Caller-staged no-allocation strided no-partial SwiGLU wrapper with explicit
+// commit-capacity diagnostics.
+//
+// Contracts:
+// - `in_row_stride_q16` is shared by gate/up rows.
+// - `out_row_stride_q16` controls both staged and committed row spacing.
+// - Commit scratch bounds (`commit_stage_cell_capacity`,
+//   `commit_stage_byte_capacity`) are enforced before staged compute.
+// - Two-pass commit keeps strict no-partial writes on `out_q16`.
+I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocCommitCapacity(I64 *gate_q16,
+                                                                       I64 gate_capacity,
+                                                                       I64 *up_q16,
+                                                                       I64 up_capacity,
+                                                                       I64 *out_q16,
+                                                                       I64 out_capacity,
+                                                                       I64 row_count,
+                                                                       I64 lane_count,
+                                                                       I64 in_row_stride_q16,
+                                                                       I64 out_row_stride_q16,
+                                                                       I64 commit_stage_cell_capacity,
+                                                                       I64 commit_stage_byte_capacity,
+                                                                       I64 *staging_out_q16,
+                                                                       I64 staging_out_capacity)
+{
+    I64 last_row;
+    I64 required_in_cells;
+    I64 required_out_cells;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
+    I64 staging_capacity_bytes;
+    I64 row_index;
+    I64 lane_index;
+    I64 out_row_base;
+    I64 stage_row_base;
+    I64 next_out_row_base;
+    I64 next_stage_row_base;
+    I64 out_index;
+    I64 stage_index;
+    I32 status;
+
+    if (!gate_q16 || !up_q16 || !out_q16)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (gate_capacity < 0 || up_capacity < 0 || out_capacity < 0 ||
+        staging_out_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || lane_count < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (in_row_stride_q16 < 0 || out_row_stride_q16 < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (commit_stage_cell_capacity < 0 || commit_stage_byte_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    status = FFNTryMulI64Checked(staging_out_capacity,
+                                 sizeof(I64),
+                                 &staging_capacity_bytes);
+    if (status)
+        return status;
+
+    if (!row_count || !lane_count)
+        return FFN_Q16_OK;
+
+    if (in_row_stride_q16 < lane_count)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (out_row_stride_q16 < lane_count)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    last_row = row_count - 1;
+
+    status = FFNTryMulI64Checked(last_row,
+                                 in_row_stride_q16,
+                                 &required_in_cells);
+    if (status)
+        return status;
+    status = FFNTryAddI64Checked(required_in_cells,
+                                 lane_count,
+                                 &required_in_cells);
+    if (status)
+        return status;
+
+    status = FFNTryMulI64Checked(last_row,
+                                 out_row_stride_q16,
+                                 &required_out_cells);
+    if (status)
+        return status;
+    status = FFNTryAddI64Checked(required_out_cells,
+                                 lane_count,
+                                 &required_out_cells);
+    if (status)
+        return status;
+
+    required_stage_cells = required_out_cells;
+
+    status = FFNTryMulI64Checked(required_stage_cells,
+                                 sizeof(I64),
+                                 &required_stage_bytes);
+    if (status)
+        return status;
+
+    if (required_in_cells > gate_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (required_in_cells > up_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (required_out_cells > out_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    if (required_stage_cells > commit_stage_cell_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (required_stage_bytes > commit_stage_byte_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    if (!staging_out_q16)
+        return FFN_Q16_ERR_NULL_PTR;
+    if (required_stage_cells > staging_out_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (required_stage_bytes > staging_capacity_bytes)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    // Staging must remain disjoint from all source and destination arrays so
+    // staged compute and commit-only copy cannot self-alias.
+    if (staging_out_q16 == gate_q16)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (staging_out_q16 == up_q16)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (staging_out_q16 == out_q16)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    status = FFNQ16SwiGLUApplyRowsChecked(gate_q16,
+                                          gate_capacity,
+                                          in_row_stride_q16,
+                                          up_q16,
+                                          up_capacity,
+                                          in_row_stride_q16,
+                                          staging_out_q16,
+                                          required_stage_cells,
+                                          out_row_stride_q16,
+                                          row_count,
+                                          lane_count);
+    if (status)
+        return status;
+
+    // Commit-only pass 1: validate every live out/stage index before writes.
+    out_row_base = 0;
+    stage_row_base = 0;
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        for (lane_index = 0; lane_index < lane_count; lane_index++)
+        {
+            status = FFNTryAddI64Checked(out_row_base,
+                                         lane_index,
+                                         &out_index);
+            if (status)
+                return status;
+            if (out_index < 0 || out_index >= required_out_cells)
+                return FFN_Q16_ERR_BAD_PARAM;
+            if (out_index >= out_capacity)
+                return FFN_Q16_ERR_BAD_PARAM;
+
+            status = FFNTryAddI64Checked(stage_row_base,
+                                         lane_index,
+                                         &stage_index);
+            if (status)
+                return status;
+            if (stage_index < 0 || stage_index >= required_stage_cells)
+                return FFN_Q16_ERR_BAD_PARAM;
+            if (stage_index >= staging_out_capacity)
+                return FFN_Q16_ERR_BAD_PARAM;
+        }
+
+        status = FFNTryAddI64Checked(out_row_base,
+                                     out_row_stride_q16,
+                                     &next_out_row_base);
+        if (status)
+            return status;
+
+        status = FFNTryAddI64Checked(stage_row_base,
+                                     out_row_stride_q16,
+                                     &next_stage_row_base);
+        if (status)
+            return status;
+
+        out_row_base = next_out_row_base;
+        stage_row_base = next_stage_row_base;
+    }
+
+    // Commit-only pass 2: copy exactly live lane_count cells per row.
+    out_row_base = 0;
+    stage_row_base = 0;
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        for (lane_index = 0; lane_index < lane_count; lane_index++)
+        {
+            status = FFNTryAddI64Checked(out_row_base,
+                                         lane_index,
+                                         &out_index);
+            if (status)
+                return status;
+            if (out_index < 0 || out_index >= required_out_cells)
+                return FFN_Q16_ERR_BAD_PARAM;
+            if (out_index >= out_capacity)
+                return FFN_Q16_ERR_BAD_PARAM;
+
+            status = FFNTryAddI64Checked(stage_row_base,
+                                         lane_index,
+                                         &stage_index);
+            if (status)
+                return status;
+            if (stage_index < 0 || stage_index >= required_stage_cells)
+                return FFN_Q16_ERR_BAD_PARAM;
+            if (stage_index >= staging_out_capacity)
+                return FFN_Q16_ERR_BAD_PARAM;
+
+            out_q16[out_index] = staging_out_q16[stage_index];
+        }
+
+        status = FFNTryAddI64Checked(out_row_base,
+                                     out_row_stride_q16,
+                                     &next_out_row_base);
+        if (status)
+            return status;
+
+        status = FFNTryAddI64Checked(stage_row_base,
+                                     out_row_stride_q16,
+                                     &next_stage_row_base);
+        if (status)
+            return status;
+
+        out_row_base = next_out_row_base;
+        stage_row_base = next_stage_row_base;
+    }
+
+    return FFN_Q16_OK;
+}
