@@ -166,6 +166,26 @@ def attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_defaul
     if commit_last_out_index[0] != preflight_last_out_index[0]:
         return ATTN_Q16_ERR_BAD_PARAM
 
+    try:
+        expected_required_cells, expected_required_stage_bytes, expected_last_index = (
+            _derive_expected_geometry(row_count, token_count)
+        )
+    except OverflowError:
+        return ATTN_Q16_ERR_OVERFLOW
+
+    if preflight_required_in_cells[0] != expected_required_cells:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if preflight_required_out_cells[0] != expected_required_cells:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if preflight_required_stage_cells[0] != expected_required_cells:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if preflight_required_stage_bytes[0] != expected_required_stage_bytes:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if preflight_last_in_index[0] != expected_last_index:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if preflight_last_out_index[0] != expected_last_index:
+        return ATTN_Q16_ERR_BAD_PARAM
+
     out_required_in_cells[0] = preflight_required_in_cells[0]
     out_required_out_cells[0] = preflight_required_out_cells[0]
     out_required_stage_cells[0] = preflight_required_stage_cells[0]
@@ -302,6 +322,26 @@ def explicit_staged_composition(
     if staged_last_out_index[0] != parity_last_out_index[0]:
         return ATTN_Q16_ERR_BAD_PARAM
 
+    try:
+        expected_required_cells, expected_required_stage_bytes, expected_last_index = (
+            _derive_expected_geometry(row_count, token_count)
+        )
+    except OverflowError:
+        return ATTN_Q16_ERR_OVERFLOW
+
+    if parity_required_in_cells[0] != expected_required_cells:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if parity_required_out_cells[0] != expected_required_cells:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if parity_required_stage_cells[0] != expected_required_cells:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if parity_required_stage_bytes[0] != expected_required_stage_bytes:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if parity_last_in_index[0] != expected_last_index:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if parity_last_out_index[0] != expected_last_index:
+        return ATTN_Q16_ERR_BAD_PARAM
+
     out_required_in_cells[0] = parity_required_in_cells[0]
     out_required_out_cells[0] = parity_required_out_cells[0]
     out_required_stage_cells[0] = parity_required_stage_cells[0]
@@ -328,6 +368,86 @@ def test_source_contains_commit_only_preflight_only_parity() -> None:
     assert "IQ-796 diagnostics-only parity gate:" in source
     assert "commit_preflight_required_stage_bytes" in source
     assert "preflight_commit_required_stage_bytes" in source
+    assert "expected_required_cells" in source
+    assert "expected_required_stage_bytes" in source
+    assert "expected_last_index" in source
+
+
+def test_commit_only_preflight_only_parity_rejects_tuple_that_matches_but_violates_geometry() -> None:
+    original_commit = (
+        attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_default_capacity_noalloc_hardened_commit_only_preflight_only_required_bytes
+    )
+    original_preflight = (
+        attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_default_capacity_noalloc_hardened_preflight_only_commit_only_required_bytes
+    )
+
+    def fake_commit(*args):
+        out_required_in_cells = args[6]
+        out_required_out_cells = args[7]
+        out_required_stage_cells = args[8]
+        out_required_stage_bytes = args[9]
+        out_last_in_index = args[10]
+        out_last_out_index = args[11]
+        out_required_in_cells[0] = 8
+        out_required_out_cells[0] = 8
+        out_required_stage_cells[0] = 8
+        out_required_stage_bytes[0] = 64
+        out_last_in_index[0] = 7
+        out_last_out_index[0] = 7
+        return ATTN_Q16_OK
+
+    def fake_preflight(*args):
+        out_required_in_cells = args[6]
+        out_required_out_cells = args[7]
+        out_required_stage_cells = args[8]
+        out_required_stage_bytes = args[9]
+        out_last_in_index = args[10]
+        out_last_out_index = args[11]
+        out_required_in_cells[0] = 8
+        out_required_out_cells[0] = 8
+        out_required_stage_cells[0] = 8
+        out_required_stage_bytes[0] = 64
+        out_last_in_index[0] = 7
+        out_last_out_index[0] = 7
+        return ATTN_Q16_OK
+
+    globals()[
+        "attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_default_capacity_noalloc_hardened_commit_only_preflight_only_required_bytes"
+    ] = fake_commit
+    globals()[
+        "attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_default_capacity_noalloc_hardened_preflight_only_commit_only_required_bytes"
+    ] = fake_preflight
+
+    try:
+        out_required_in_cells = [0]
+        out_required_out_cells = [0]
+        out_required_stage_cells = [0]
+        out_required_stage_bytes = [0]
+        out_last_in_index = [0]
+        out_last_out_index = [0]
+
+        err = attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_default_capacity_noalloc_hardened_commit_only_preflight_only_parity(
+            [0] * 6,
+            6,
+            2,
+            3,
+            [0] * 6,
+            6,
+            out_required_in_cells,
+            out_required_out_cells,
+            out_required_stage_cells,
+            out_required_stage_bytes,
+            out_last_in_index,
+            out_last_out_index,
+        )
+        assert err == ATTN_Q16_ERR_BAD_PARAM
+    finally:
+        globals()[
+            "attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_default_capacity_noalloc_hardened_commit_only_preflight_only_required_bytes"
+        ] = original_commit
+        globals()[
+            "attention_q16_apply_score_scale_rows_checked_nopartial_preflight_only_default_stride_required_stage_bytes_default_capacity_noalloc_hardened_preflight_only_commit_only_required_bytes"
+        ] = original_preflight
 
 
 def test_commit_only_preflight_only_parity_nullptr_and_alias_contracts() -> None:
@@ -475,6 +595,7 @@ def test_commit_only_preflight_only_parity_matches_explicit_staged_composition_r
 
 if __name__ == "__main__":
     test_source_contains_commit_only_preflight_only_parity()
+    test_commit_only_preflight_only_parity_rejects_tuple_that_matches_but_violates_geometry()
     test_commit_only_preflight_only_parity_nullptr_and_alias_contracts()
     test_commit_only_preflight_only_parity_overflow_propagation()
     test_commit_only_preflight_only_parity_matches_explicit_staged_composition_randomized()
