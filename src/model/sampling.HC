@@ -283,7 +283,9 @@ I32 SamplingApplyRepetitionPenaltyChecked(I64 *logits_q16,
         return SAMPLING_Q16_ERR_BAD_PARAM;
     if (token_history_count > token_history_capacity)
         return SAMPLING_Q16_ERR_BAD_PARAM;
-    if (penalty_q16 <= 0)
+    // Repetition penalty is a divisor/multiplier ratio and must be >= 1.0_q16.
+    // Values below one would reward repeats and violate intended semantics.
+    if (penalty_q16 < SAMPLING_Q16_ONE)
         return SAMPLING_Q16_ERR_BAD_PARAM;
 
     if (!vocab_size || !token_history_count)
