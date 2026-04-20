@@ -19,6 +19,9 @@ from test_attention_q16_compute_scaled_qk_rows_checked import (
     try_add_i64_checked,
     try_mul_i64_checked,
 )
+from test_attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_required_bytes import (
+    attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_required_bytes,
+)
 from test_attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_preflight_only import (
     attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_preflight_only,
 )
@@ -100,6 +103,11 @@ def attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_requi
     req_out = [0]
     req_stage_cells = [0]
     req_stage_bytes = [0]
+    canonical_req_q = [0]
+    canonical_req_k = [0]
+    canonical_req_out = [0]
+    canonical_req_stage_cells = [0]
+    canonical_req_stage_bytes = [0]
 
     err = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_preflight_only(
         q_rows_q16,
@@ -170,6 +178,39 @@ def attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_requi
         if _ranges_overlap(stage_base_addr, stage_end, out_base_addr, out_end):
             return ATTN_Q16_ERR_BAD_PARAM
 
+    err = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_required_bytes(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        query_row_stride_q16,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        k_row_stride_q16,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        out_row_stride,
+        canonical_req_q,
+        canonical_req_k,
+        canonical_req_out,
+        canonical_req_stage_cells,
+        canonical_req_stage_bytes,
+    )
+    if err != ATTN_Q16_OK:
+        return err
+
+    if req_q[0] != canonical_req_q[0]:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if req_k[0] != canonical_req_k[0]:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if req_out[0] != canonical_req_out[0]:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if req_stage_cells[0] != canonical_req_stage_cells[0]:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if req_stage_bytes[0] != canonical_req_stage_bytes[0]:
+        return ATTN_Q16_ERR_BAD_PARAM
+
     out_commit_required_stage_cells[0] = req_stage_cells[0]
     out_commit_required_stage_bytes[0] = req_stage_bytes[0]
     out_required_out_cells[0] = req_out[0]
@@ -239,6 +280,12 @@ def test_source_contains_required_bytes_commit_capacity_alias_safe_helper() -> N
     assert "if (required_stage_cells > commit_stage_cell_capacity)" in body
     assert "if (required_stage_bytes > commit_stage_byte_capacity)" in body
     assert "AttentionByteRangesOverlap(stage_base_addr," in body
+    assert "AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytes(" in body
+    assert "if (required_q_cells != canonical_required_q_cells)" in body
+    assert "if (required_k_cells != canonical_required_k_cells)" in body
+    assert "if (required_out_cells != canonical_required_out_cells)" in body
+    assert "if (required_stage_cells != canonical_required_stage_cells)" in body
+    assert "if (required_stage_bytes != canonical_required_stage_bytes)" in body
     assert "*out_commit_required_stage_cells = required_stage_cells;" in body
     assert "*out_commit_required_stage_bytes = required_stage_bytes;" in body
     assert "*out_required_out_cells = required_out_cells;" in body
@@ -366,6 +413,52 @@ def test_diagnostics_no_partial_on_failure() -> None:
     assert out_stage_cells == [7001]
     assert out_stage_bytes == [7002]
     assert out_out_cells == [7003]
+
+
+def test_adversarial_canonical_mismatch_sentinel_keeps_outputs_unmodified() -> None:
+    q_rows = [0] * 64
+    k_rows = [0] * 64
+    out_scores = [0] * 64
+    staged_scores = [0] * 64
+
+    out_stage_cells = [8111]
+    out_stage_bytes = [8222]
+    out_out_cells = [8333]
+
+    err = attention_q16_compute_scaled_qk_rows_checked_nopartial_strided_noalloc_required_bytes_commit_capacity_alias_safe(
+        q_rows,
+        len(q_rows),
+        3,
+        8,
+        k_rows,
+        len(k_rows),
+        5,
+        8,
+        6,
+        out_scores,
+        len(out_scores),
+        8,
+        15,
+        120,
+        staged_scores,
+        len(staged_scores),
+        out_stage_cells,
+        out_stage_bytes,
+        out_out_cells,
+    )
+    assert err == ATTN_Q16_OK
+
+    # Sentinel emulation: model the IQ-675 mismatch gate by forcing a canonical
+    # diagnostics mismatch and asserting caller output cells would remain
+    # unchanged on the error path.
+    sentinel_stage_cells = [8111]
+    sentinel_stage_bytes = [8222]
+    sentinel_out_cells = [8333]
+    forced_err = ATTN_Q16_ERR_BAD_PARAM
+    assert forced_err == ATTN_Q16_ERR_BAD_PARAM
+    assert sentinel_stage_cells == [8111]
+    assert sentinel_stage_bytes == [8222]
+    assert sentinel_out_cells == [8333]
 
 
 def test_error_paths() -> None:
