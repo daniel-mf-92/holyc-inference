@@ -145,3 +145,98 @@ I32 SamplingTopKSelectIndicesChecked(I64 *logits_q16,
                                          out_indices,
                                          out_index_capacity);
 }
+
+// Checked deterministic top-p cutoff selector over descending probability
+// lanes.
+//
+// Output contract:
+//   - Writes exactly one cutoff index to *out_cutoff_index on success.
+//   - Returned index is the first crossing i where
+//       sum(probs_q16[0..i]) >= top_p_q16.
+//   - If cumulative mass never crosses due finite-lane residue, result clamps
+//     deterministically to lane_count - 1.
+//   - No partial writes on all failure paths.
+//
+// Checked guards:
+//   - probs_q16 and out_cutoff_index are non-null.
+//   - probs_capacity/lane_count are non-negative.
+//   - lane_count > 0 and lane_count <= probs_capacity.
+//   - top_p_q16 in (0, 1.0_q16].
+//   - Pointer-span arithmetic for probs_q16[lane_count] cannot overflow U64.
+//   - Each probability lane is in [0, 1.0_q16].
+//   - Probabilities are monotone non-increasing.
+//   - Cumulative mass is monotone, cannot overflow I64, never exceeds 1.0_q16,
+//     and total mass must equal 1.0_q16.
+I32 SamplingTopPSelectCutoffChecked(I64 *probs_q16,
+                                    I64 probs_capacity,
+                                    I64 lane_count,
+                                    I64 top_p_q16,
+                                    I64 *out_cutoff_index)
+{
+    I64 lane_index;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 lane_prob_q16;
+    I64 prev_prob_q16;
+    I64 cumulative_q16;
+    I64 prev_cumulative_q16;
+    I64 cutoff_index;
+
+    if (!probs_q16 || !out_cutoff_index)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (probs_capacity < 0 || lane_count < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (!lane_count)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (lane_count > probs_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (top_p_q16 <= 0 || top_p_q16 > SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    // Guard span/index arithmetic before lane loads.
+    last_index = lane_count - 1;
+    if (last_index > 0x0FFFFFFFFFFFFFFF)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)probs_q16 > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    cumulative_q16 = 0;
+    prev_cumulative_q16 = 0;
+    prev_prob_q16 = SAMPLING_Q16_ONE;
+    cutoff_index = -1;
+
+    for (lane_index = 0; lane_index < lane_count; lane_index++)
+    {
+        lane_prob_q16 = probs_q16[lane_index];
+        if (lane_prob_q16 < 0 || lane_prob_q16 > SAMPLING_Q16_ONE)
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+        if (lane_prob_q16 > prev_prob_q16)
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+        if (lane_prob_q16 > (0x7FFFFFFFFFFFFFFF - cumulative_q16))
+            return SAMPLING_Q16_ERR_OVERFLOW;
+
+        cumulative_q16 += lane_prob_q16;
+        if (cumulative_q16 < prev_cumulative_q16)
+            return SAMPLING_Q16_ERR_OVERFLOW;
+        if (cumulative_q16 > SAMPLING_Q16_ONE)
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+
+        if (cutoff_index < 0 && cumulative_q16 >= top_p_q16)
+            cutoff_index = lane_index;
+
+        prev_prob_q16 = lane_prob_q16;
+        prev_cumulative_q16 = cumulative_q16;
+    }
+
+    if (cumulative_q16 != SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (cutoff_index < 0)
+        cutoff_index = lane_count - 1;
+
+    *out_cutoff_index = cutoff_index;
+    return SAMPLING_Q16_OK;
+}
