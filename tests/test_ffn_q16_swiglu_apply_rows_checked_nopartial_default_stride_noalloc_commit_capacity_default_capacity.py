@@ -275,6 +275,34 @@ def test_alias_rejection_is_no_partial() -> None:
     assert out == out_before
 
 
+
+
+def test_null_staging_pointer_requires_nonzero_geometry() -> None:
+    row_count = 2
+    lane_count = 3
+    required = row_count * lane_count
+
+    gate = [0] * required
+    up = [0] * required
+    out = [0x7A7A] * required
+    out_before = out.copy()
+
+    err = ffn_q16_swiglu_apply_rows_checked_nopartial_default_stride_noalloc_commit_capacity_default_capacity(
+        gate,
+        required,
+        up,
+        required,
+        out,
+        required,
+        row_count,
+        lane_count,
+        None,
+        required,
+    )
+    assert err == FFN_Q16_ERR_NULL_PTR
+    assert out == out_before
+
+
 def test_randomized_parity_vs_explicit_composition() -> None:
     rng = random.Random(20260420_620)
 
@@ -332,5 +360,6 @@ if __name__ == "__main__":
     test_staging_capacity_shortfall_is_no_partial()
     test_error_paths_and_overflow()
     test_alias_rejection_is_no_partial()
+    test_null_staging_pointer_requires_nonzero_geometry()
     test_randomized_parity_vs_explicit_composition()
     print("ok")
