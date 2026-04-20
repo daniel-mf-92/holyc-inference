@@ -5407,6 +5407,11 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCo
     I64 required_out_cells;
     I64 required_stage_cells;
     I64 required_stage_bytes;
+    I64 canonical_required_q_cells;
+    I64 canonical_required_k_cells;
+    I64 canonical_required_out_cells;
+    I64 canonical_required_stage_cells;
+    I64 canonical_required_stage_bytes;
     I64 q_span_bytes;
     I64 k_span_bytes;
     I64 out_span_bytes;
@@ -5542,6 +5547,41 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCo
                                        out_end_addr))
             return ATTN_Q16_ERR_BAD_PARAM;
     }
+
+    // IQ-675 hardening: publish diagnostics only after alias-safe preflight
+    // and canonical required-bytes diagnostics agree across every required
+    // q/k/out/stage span field so callers cannot observe mixed diagnostics.
+    status = AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytes(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        query_row_stride_q16,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        k_row_stride_q16,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        out_row_stride,
+        &canonical_required_q_cells,
+        &canonical_required_k_cells,
+        &canonical_required_out_cells,
+        &canonical_required_stage_cells,
+        &canonical_required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (required_q_cells != canonical_required_q_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_k_cells != canonical_required_k_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_out_cells != canonical_required_out_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_stage_cells != canonical_required_stage_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_stage_bytes != canonical_required_stage_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
 
     *out_commit_required_stage_cells = required_stage_cells;
     *out_commit_required_stage_bytes = required_stage_bytes;
