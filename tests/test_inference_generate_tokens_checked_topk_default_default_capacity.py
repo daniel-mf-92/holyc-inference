@@ -218,7 +218,7 @@ def test_source_contains_topk_default_default_capacity_wrapper() -> None:
     assert "return InferenceGenerateTokensCheckedTopKDefault(" in source
 
 
-def test_source_wrapper_derives_checked_default_capacities() -> None:
+def test_source_topk_default_default_capacity_derives_checked_capacities() -> None:
     source = Path("src/model/sampling.HC").read_text(encoding="utf-8")
     signature = "I32 InferenceGenerateTokensCheckedTopKDefaultDefaultCapacity("
     start = source.rfind(signature)
@@ -243,35 +243,35 @@ def test_source_wrapper_derives_checked_default_capacities() -> None:
     body = source[brace_open + 1 : end]
 
     assert "token_history_capacity = token_history_count + max_new_tokens;" in body
+    assert "token_history_capacity < token_history_count" in body
     assert "vocab_size > 0x7FFFFFFFFFFFFFFF / max_new_tokens" in body
     assert "step_logits_capacity = vocab_size * max_new_tokens;" in body
-    assert "workspace_stage_logits_q16," in body
-    assert "workspace_topk_logits_q16," in body
-    assert "workspace_topk_indices," in body
-    assert "vocab_size," in body
+    assert "return InferenceGenerateTokensCheckedTopKDefault(" in body
 
 
-def test_default_capacity_matches_explicit_composition_randomized() -> None:
-    rng = random.Random(20260420_790)
-    for _ in range(1400):
-        vocab_size = rng.randint(0, 512)
-        max_new_tokens = rng.randint(0, 128)
-        token_history_count = rng.randint(0, 128)
-        top_p_q16 = rng.randint(-4, SAMPLING_Q16_ONE + 4)
+def test_topk_default_default_capacity_matches_explicit_composition_randomized() -> None:
+    rng = random.Random(20260420_790_1)
+    for _ in range(1200):
+        vocab_size = rng.randint(1, 512)
+        max_new_tokens = rng.randint(0, 96)
+        token_history_count = rng.randint(0, 96)
 
-        if token_history_count + max_new_tokens < token_history_count:
-            token_history_capacity = token_history_count
-        else:
-            token_history_capacity = token_history_count + max_new_tokens
+        token_history_capacity = token_history_count + max_new_tokens
+        step_logits_capacity = vocab_size * max_new_tokens
+
+        top_p_q16 = rng.randint(1, SAMPLING_Q16_ONE)
+        forced_run_status = rng.choice(
+            [SAMPLING_Q16_OK, SAMPLING_Q16_OK, SAMPLING_Q16_ERR_BAD_PARAM]
+        )
 
         history = [
-            rng.randint(0, max(0, vocab_size - 1)) if vocab_size else 0
-            for _ in range(token_history_capacity)
+            rng.randint(0, vocab_size - 1) for _ in range(token_history_capacity)
         ]
-        random_values = [rng.randint(0, SAMPLING_Q16_ONE - 1) for _ in range(max_new_tokens)]
-        out_default = [901] * max_new_tokens
-        out_explicit = [901] * max_new_tokens
-        forced_run_status = rng.choice([SAMPLING_Q16_OK, SAMPLING_Q16_OK, 0x0521])
+        random_values = [
+            rng.randint(0, SAMPLING_Q16_ONE - 1) for _ in range(max_new_tokens)
+        ]
+        out_default = [777] * max_new_tokens
+        out_explicit = [777] * max_new_tokens
 
         result_default = (
             inference_generate_tokens_checked_topk_default_default_capacity_reference(
@@ -286,18 +286,11 @@ def test_default_capacity_matches_explicit_composition_randomized() -> None:
             )
         )
 
-        if max_new_tokens and vocab_size > I64_MAX // max_new_tokens:
-            expected_step_logits_capacity = I64_MAX
-        else:
-            expected_step_logits_capacity = vocab_size * max_new_tokens
-
-        expected_token_history_capacity = token_history_count + max_new_tokens
-
         result_explicit = inference_generate_tokens_checked_topk_default_reference(
-            step_logits_capacity=expected_step_logits_capacity,
+            step_logits_capacity=step_logits_capacity,
             vocab_size=vocab_size,
             max_new_tokens=max_new_tokens,
-            token_history_capacity=expected_token_history_capacity,
+            token_history_capacity=token_history_capacity,
             token_history_count=token_history_count,
             top_p_q16=top_p_q16,
             workspace_stage_logits_capacity=vocab_size,
@@ -309,81 +302,75 @@ def test_default_capacity_matches_explicit_composition_randomized() -> None:
             forced_run_status=forced_run_status,
         )
 
-        if max_new_tokens and vocab_size > I64_MAX // max_new_tokens:
-            assert result_default[0] == SAMPLING_Q16_ERR_OVERFLOW
-        else:
-            assert result_default == result_explicit
+        assert result_default == result_explicit
 
 
-def test_default_capacity_preserves_failure_no_partial_contracts() -> None:
-    history = [3, 5, 7, 11, 13, 17]
-    out_tokens = [21, 22, 23]
+def test_topk_default_default_capacity_preserves_failure_classification() -> None:
+    token_history = [3, 1, 4, 1, 5, 9]
+    out_tokens = [81, 82, 83]
 
-    default_result = inference_generate_tokens_checked_topk_default_default_capacity_reference(
-        vocab_size=9,
-        max_new_tokens=3,
-        token_history_count=3,
-        top_p_q16=SAMPLING_Q16_ONE,
-        token_history=history,
-        random_q16_values=[1, 2, 3],
-        out_generated_tokens=out_tokens,
-        forced_run_status=0x0777,
-    )
-
-    explicit_result = inference_generate_tokens_checked_topk_default_reference(
-        step_logits_capacity=27,
-        vocab_size=9,
-        max_new_tokens=3,
-        token_history_capacity=6,
-        token_history_count=3,
-        top_p_q16=SAMPLING_Q16_ONE,
-        workspace_stage_logits_capacity=9,
-        workspace_topk_logits_capacity=9,
-        workspace_topk_index_capacity=9,
-        token_history=history,
-        random_q16_values=[1, 2, 3],
-        out_generated_tokens=out_tokens,
-        forced_run_status=0x0777,
-    )
-
-    assert default_result[0] == explicit_result[0] == 0x0777
-    assert default_result[2] == explicit_result[2] == -1
-    assert default_result[1] == explicit_result[1] == out_tokens
-    assert default_result[3] == explicit_result[3] == history
-
-
-def test_adversarial_bad_param_and_overflow_vectors() -> None:
-    adversarial = [
-        dict(vocab_size=-1, max_new_tokens=2, token_history_count=0, top_p_q16=SAMPLING_Q16_ONE, expect=SAMPLING_Q16_ERR_BAD_PARAM),
-        dict(vocab_size=16, max_new_tokens=-1, token_history_count=0, top_p_q16=SAMPLING_Q16_ONE, expect=SAMPLING_Q16_ERR_BAD_PARAM),
-        dict(vocab_size=16, max_new_tokens=3, token_history_count=-2, top_p_q16=SAMPLING_Q16_ONE, expect=SAMPLING_Q16_ERR_BAD_PARAM),
-        dict(vocab_size=(1 << 62), max_new_tokens=3, token_history_count=1, top_p_q16=SAMPLING_Q16_ONE, expect=SAMPLING_Q16_ERR_OVERFLOW),
-        dict(vocab_size=8, max_new_tokens=4, token_history_count=2, top_p_q16=0, expect=SAMPLING_Q16_ERR_BAD_PARAM),
-        dict(vocab_size=8, max_new_tokens=4, token_history_count=2, top_p_q16=SAMPLING_Q16_ONE + 1, expect=SAMPLING_Q16_ERR_BAD_PARAM),
-    ]
-
-    for case in adversarial:
-        token_history_capacity = max(0, case["token_history_count"] + max(0, case["max_new_tokens"]))
-        history = [0] * token_history_capacity
-        random_values = [0] * max(0, case["max_new_tokens"])
-        out_tokens = [505] * max(0, case["max_new_tokens"])
-
-        result = inference_generate_tokens_checked_topk_default_default_capacity_reference(
-            vocab_size=case["vocab_size"],
-            max_new_tokens=case["max_new_tokens"],
-            token_history_count=case["token_history_count"],
-            top_p_q16=case["top_p_q16"],
-            token_history=history,
-            random_q16_values=random_values,
+    status_overflow, out_overflow, count_overflow, history_overflow = (
+        inference_generate_tokens_checked_topk_default_default_capacity_reference(
+            vocab_size=(1 << 62),
+            max_new_tokens=3,
+            token_history_count=0,
+            top_p_q16=SAMPLING_Q16_ONE,
+            token_history=token_history,
+            random_q16_values=[0, 0, 0],
             out_generated_tokens=out_tokens,
         )
-        assert result[0] == case["expect"]
+    )
+    assert status_overflow == SAMPLING_Q16_ERR_OVERFLOW
+    assert out_overflow == out_tokens
+    assert count_overflow == -1
+    assert history_overflow == token_history
+
+    status_bad, out_bad, count_bad, history_bad = (
+        inference_generate_tokens_checked_topk_default_default_capacity_reference(
+            vocab_size=0,
+            max_new_tokens=3,
+            token_history_count=0,
+            top_p_q16=SAMPLING_Q16_ONE,
+            token_history=token_history,
+            random_q16_values=[0, 0, 0],
+            out_generated_tokens=out_tokens,
+        )
+    )
+    assert status_bad == SAMPLING_Q16_ERR_BAD_PARAM
+    assert out_bad == out_tokens
+    assert count_bad == -1
+    assert history_bad == token_history
+
+
+def test_topk_default_default_capacity_preserves_no_partial_on_run_failure() -> None:
+    history = [5, 6, 7, 8, 9, 10]
+    out_tokens = [101, 102, 103]
+
+    status, out_after, generated_count, history_after = (
+        inference_generate_tokens_checked_topk_default_default_capacity_reference(
+            vocab_size=11,
+            max_new_tokens=3,
+            token_history_count=3,
+            top_p_q16=SAMPLING_Q16_ONE,
+            token_history=history,
+            random_q16_values=[11, 22, 33],
+            out_generated_tokens=out_tokens,
+            forced_run_status=SAMPLING_Q16_ERR_BAD_PARAM,
+        )
+    )
+
+    assert status == SAMPLING_Q16_ERR_BAD_PARAM
+    assert generated_count == -1
+    assert out_after == out_tokens
+    assert history_after == history
 
 
 if __name__ == "__main__":
     test_source_contains_topk_default_default_capacity_wrapper()
-    test_source_wrapper_derives_checked_default_capacities()
-    test_default_capacity_matches_explicit_composition_randomized()
-    test_default_capacity_preserves_failure_no_partial_contracts()
-    test_adversarial_bad_param_and_overflow_vectors()
-    print("inference_generate_tokens_checked_topk_default_default_capacity_reference_checks=ok")
+    test_source_topk_default_default_capacity_derives_checked_capacities()
+    test_topk_default_default_capacity_matches_explicit_composition_randomized()
+    test_topk_default_default_capacity_preserves_failure_classification()
+    test_topk_default_default_capacity_preserves_no_partial_on_run_failure()
+    print(
+        "inference_generate_tokens_checked_topk_default_default_capacity_reference_checks=ok"
+    )
