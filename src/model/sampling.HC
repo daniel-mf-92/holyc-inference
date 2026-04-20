@@ -10,6 +10,16 @@
 #define SAMPLING_Q16_SHIFT 16
 #define SAMPLING_Q16_ONE   (1 << SAMPLING_Q16_SHIFT)
 
+// IQ-750 explicit stage-coded generation-step errors.
+// Returned code = STAGE_BASE | underlying checked status.
+// Example: repetition stage bad-param => 0x0102.
+#define GENERATION_STEP_STAGE_REPETITION_BASE 0x0100
+#define GENERATION_STEP_STAGE_TEMPERATURE_BASE 0x0200
+#define GENERATION_STEP_STAGE_TOPK_BASE       0x0300
+#define GENERATION_STEP_STAGE_SOFTMAX_BASE    0x0400
+#define GENERATION_STEP_STAGE_TOPP_CUTOFF_BASE 0x0500
+#define GENERATION_STEP_STAGE_TOPP_SAMPLE_BASE 0x0600
+
 I32 FPQ16MulDivRoundedChecked(I64 a_q16,
                               I64 b_q16,
                               I64 d_q16,
@@ -28,6 +38,17 @@ I32 FPQ16TopPSampleIndexChecked(I64 *probs_q16,
                                 I64 prefix_len,
                                 I64 random_q16,
                                 I64 *out_index);
+
+I32 GenerationStepComposeStageError(I32 stage_base, I32 stage_status)
+{
+    if (!stage_status)
+        return SAMPLING_Q16_OK;
+
+    if (stage_status < 0 || stage_status > 0xFF)
+        return stage_base | SAMPLING_Q16_ERR_BAD_PARAM;
+
+    return stage_base | stage_status;
+}
 
 // Temperature scaling for sampling logits (Q16 lanes):
 //   out_logits_q16[i] = round_half_up(logits_q16[i] / temperature_q16)
@@ -576,6 +597,197 @@ I32 SamplingSelectNextTokenChecked(I64 *logits_q16,
         return SAMPLING_Q16_ERR_BAD_PARAM;
 
     sampled_token_id = topk_indices[sampled_rank];
+    if (sampled_token_id < 0 || sampled_token_id >= vocab_size)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    *out_token_id = sampled_token_id;
+    return SAMPLING_Q16_OK;
+}
+
+// Execute exactly one generation step from logits to one sampled token id.
+//
+// This is the canonical WS7 step-level entrypoint with explicit stage-coded
+// failures. It shares integer-only transforms with SamplingSelectNextTokenChecked
+// but exposes which transform stage rejected the input.
+//
+// Stage-coded failures (base | status):
+// - repetition penalty: 0x0100
+// - temperature scale:  0x0200
+// - top-k selection:    0x0300
+// - softmax:            0x0400
+// - top-p cutoff scan:  0x0500
+// - top-p sample:       0x0600
+I32 GenerationStepChecked(I64 *logits_q16,
+                          I64 logits_capacity,
+                          I64 vocab_size,
+                          I64 *token_history,
+                          I64 token_history_capacity,
+                          I64 token_history_count,
+                          I64 temperature_q16,
+                          I64 top_k,
+                          I64 top_p_q16,
+                          I64 repetition_penalty_q16,
+                          I64 random_q16,
+                          I64 *workspace_stage_logits_q16,
+                          I64 workspace_stage_logits_capacity,
+                          I64 *workspace_topk_logits_q16,
+                          I64 workspace_topk_logits_capacity,
+                          I64 *workspace_topk_indices,
+                          I64 workspace_topk_index_capacity,
+                          I64 *out_token_id)
+{
+    I64 lane_index;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 top_p_cutoff_index;
+    I64 nucleus_prefix_len;
+    I64 sampled_rank;
+    I64 sampled_token_id;
+    I32 status;
+
+    if (!logits_q16 || !workspace_stage_logits_q16 || !workspace_topk_logits_q16 ||
+        !workspace_topk_indices || !out_token_id)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+    if (token_history_count > 0 && !token_history)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (logits_capacity < 0 || vocab_size < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (token_history_capacity < 0 || token_history_count < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (workspace_stage_logits_capacity < 0 || workspace_topk_logits_capacity < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (workspace_topk_index_capacity < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (!vocab_size)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (vocab_size > logits_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (vocab_size > workspace_stage_logits_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (token_history_count > token_history_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (temperature_q16 <= 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (repetition_penalty_q16 < SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (top_k <= 0 || top_k > vocab_size)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (top_k > workspace_topk_index_capacity ||
+        top_k > workspace_topk_logits_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (top_p_q16 <= 0 || top_p_q16 > SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (random_q16 < 0 || random_q16 >= SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    // Checked pointer-span guards before any copy/gather writes.
+    last_index = vocab_size - 1;
+    if (last_index > 0x0FFFFFFFFFFFFFFF)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)logits_q16 > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+        return SAMPLING_Q16_ERR_OVERFLOW;
+    if ((U64)workspace_stage_logits_q16 >
+        (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    last_index = top_k - 1;
+    if (last_index > 0x0FFFFFFFFFFFFFFF)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)workspace_topk_logits_q16 >
+        (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+        return SAMPLING_Q16_ERR_OVERFLOW;
+    if ((U64)workspace_topk_indices >
+        (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    // Stage immutable caller logits into mutable workspace.
+    for (lane_index = 0; lane_index < vocab_size; lane_index++)
+        workspace_stage_logits_q16[lane_index] = logits_q16[lane_index];
+
+    status = SamplingApplyRepetitionPenaltyChecked(workspace_stage_logits_q16,
+                                                   workspace_stage_logits_capacity,
+                                                   vocab_size,
+                                                   token_history,
+                                                   token_history_capacity,
+                                                   token_history_count,
+                                                   repetition_penalty_q16);
+    if (status)
+        return GenerationStepComposeStageError(
+            GENERATION_STEP_STAGE_REPETITION_BASE,
+            status);
+
+    status = SamplingQ16ApplyTemperatureChecked(workspace_stage_logits_q16,
+                                                workspace_stage_logits_capacity,
+                                                vocab_size,
+                                                temperature_q16,
+                                                workspace_stage_logits_q16,
+                                                workspace_stage_logits_capacity);
+    if (status)
+        return GenerationStepComposeStageError(
+            GENERATION_STEP_STAGE_TEMPERATURE_BASE,
+            status);
+
+    status = SamplingTopKSelectIndicesChecked(workspace_stage_logits_q16,
+                                              workspace_stage_logits_capacity,
+                                              vocab_size,
+                                              top_k,
+                                              workspace_topk_indices,
+                                              workspace_topk_index_capacity);
+    if (status)
+        return GenerationStepComposeStageError(
+            GENERATION_STEP_STAGE_TOPK_BASE,
+            status);
+
+    for (lane_index = 0; lane_index < top_k; lane_index++)
+    {
+        sampled_token_id = workspace_topk_indices[lane_index];
+        if (sampled_token_id < 0 || sampled_token_id >= vocab_size)
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+
+        workspace_topk_logits_q16[lane_index] =
+            workspace_stage_logits_q16[sampled_token_id];
+    }
+
+    status = FPQ16SoftmaxFromPreclampedChecked(workspace_topk_logits_q16,
+                                               workspace_topk_logits_q16,
+                                               top_k,
+                                               workspace_topk_logits_q16);
+    if (status)
+        return GenerationStepComposeStageError(
+            GENERATION_STEP_STAGE_SOFTMAX_BASE,
+            status);
+
+    status = SamplingTopPSelectCutoffChecked(workspace_topk_logits_q16,
+                                             workspace_topk_logits_capacity,
+                                             top_k,
+                                             top_p_q16,
+                                             &top_p_cutoff_index);
+    if (status)
+        return GenerationStepComposeStageError(
+            GENERATION_STEP_STAGE_TOPP_CUTOFF_BASE,
+            status);
+
+    nucleus_prefix_len = top_p_cutoff_index + 1;
+    status = FPQ16TopPSampleIndexChecked(workspace_topk_logits_q16,
+                                         top_k,
+                                         nucleus_prefix_len,
+                                         random_q16,
+                                         &sampled_rank);
+    if (status)
+        return GenerationStepComposeStageError(
+            GENERATION_STEP_STAGE_TOPP_SAMPLE_BASE,
+            status);
+
+    if (sampled_rank < 0 || sampled_rank >= top_k)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    sampled_token_id = workspace_topk_indices[sampled_rank];
     if (sampled_token_id < 0 || sampled_token_id >= vocab_size)
         return SAMPLING_Q16_ERR_BAD_PARAM;
 
