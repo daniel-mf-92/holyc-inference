@@ -693,6 +693,11 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocCommitCapacityD
 {
     I64 commit_stage_cell_capacity;
     I64 commit_stage_byte_capacity;
+    I64 required_q_cells;
+    I64 required_k_cells;
+    I64 required_out_cells;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
     I32 status;
 
     if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
@@ -5537,16 +5542,21 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCo
             out_row_stride,
             staged_scores_q32,
             staged_scores_capacity,
-            out_required_q_cells,
-            out_required_k_cells,
-            out_required_out_cells,
-            out_required_stage_cells,
-            out_required_stage_bytes);
+            &required_q_cells,
+            &required_k_cells,
+            &required_out_cells,
+            &required_stage_cells,
+            &required_stage_bytes);
     if (status != ATTN_Q16_OK)
         return status;
 
     *out_commit_stage_cell_capacity = commit_stage_cell_capacity;
     *out_commit_stage_byte_capacity = commit_stage_byte_capacity;
+    *out_required_q_cells = required_q_cells;
+    *out_required_k_cells = required_k_cells;
+    *out_required_out_cells = required_out_cells;
+    *out_required_stage_cells = required_stage_cells;
+    *out_required_stage_bytes = required_stage_bytes;
     return ATTN_Q16_OK;
 }
 
