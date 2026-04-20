@@ -3785,6 +3785,71 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredB
         out_required_out_cells);
 }
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacityDefaultCapacityPreflightOnly(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 staged_scores_capacity,
+    I64 *out_commit_required_stage_cells,
+    I64 *out_commit_required_stage_bytes,
+    I64 *out_required_out_cells)
+{
+    I64 commit_stage_cell_capacity;
+    I64 commit_stage_byte_capacity;
+    I32 status;
+
+    if (!out_commit_required_stage_cells || !out_commit_required_stage_bytes ||
+        !out_required_out_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_rows_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0 ||
+        staged_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_row_count < 0 || token_count < 0 || head_dim < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-629 preflight-only default-capacity contract:
+    // derive default commit scratch capacities from the live query/token slab
+    // and caller staging capacity, then route diagnostics through the shared
+    // ...NoAllocRequiredBytesCommitCapacity helper with no compute/commit.
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       token_count,
+                                       &commit_stage_cell_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(staged_scores_capacity,
+                                       sizeof(I64),
+                                       &commit_stage_byte_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    return AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitCapacity(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        head_dim,
+        out_scores_q32,
+        out_scores_capacity,
+        commit_stage_cell_capacity,
+        commit_stage_byte_capacity,
+        out_commit_required_stage_cells,
+        out_commit_required_stage_bytes,
+        out_required_out_cells);
+}
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitCapacity(
     I64 *q_rows_q16,
     I64 q_rows_capacity,
