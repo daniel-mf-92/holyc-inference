@@ -541,3 +541,102 @@ I32 TransformerBlockQ16ComputeRequiredBytesChecked(
 
     return BLOCK_Q16_OK;
 }
+
+// Transformer block preflight-only diagnostics for checked no-partial apply.
+//
+// Exposes the exact workspace/output contract for one block pass:
+// - required_qkv_cells: Q/K/V projection slabs (3 * row_count * lane_count)
+// - required_attn_scores: attention score matrix (row_count * row_count)
+// - required_ffn_cells: FFN output slab (row_count * lane_count)
+// - required_out_cells: final block output slab (row_count * lane_count)
+// - required_stage_bytes: bytes required for staging all above diagnostics
+//
+// This helper never touches model tensors and stages diagnostics locally so
+// failures leave caller-owned outputs unchanged.
+I32 TransformerBlockQ16ApplyCheckedNoPartialPreflightOnly(
+    I64 row_count,
+    I64 lane_count,
+    I64 *out_required_qkv_cells,
+    I64 *out_required_attn_scores,
+    I64 *out_required_ffn_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_bytes)
+{
+    I64 dense_cells;
+    I64 required_qkv_cells;
+    I64 required_attn_scores;
+    I64 required_ffn_cells;
+    I64 required_out_cells;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
+    I32 status;
+
+    if (!out_required_qkv_cells || !out_required_attn_scores ||
+        !out_required_ffn_cells || !out_required_out_cells ||
+        !out_required_stage_bytes)
+        return BLOCK_Q16_ERR_NULL_PTR;
+
+    if (row_count < 0 || lane_count < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    if (!row_count || !lane_count)
+    {
+        *out_required_qkv_cells = 0;
+        *out_required_attn_scores = 0;
+        *out_required_ffn_cells = 0;
+        *out_required_out_cells = 0;
+        *out_required_stage_bytes = 0;
+        return BLOCK_Q16_OK;
+    }
+
+    status = BlockTryMulI64Checked(row_count,
+                                   lane_count,
+                                   &dense_cells);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(dense_cells,
+                                   3,
+                                   &required_qkv_cells);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(row_count,
+                                   row_count,
+                                   &required_attn_scores);
+    if (status)
+        return status;
+
+    required_ffn_cells = dense_cells;
+    required_out_cells = dense_cells;
+
+    status = BlockTryAddI64Checked(required_qkv_cells,
+                                   required_attn_scores,
+                                   &required_stage_cells);
+    if (status)
+        return status;
+    status = BlockTryAddI64Checked(required_stage_cells,
+                                   required_ffn_cells,
+                                   &required_stage_cells);
+    if (status)
+        return status;
+    status = BlockTryAddI64Checked(required_stage_cells,
+                                   required_out_cells,
+                                   &required_stage_cells);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(required_stage_cells,
+                                   sizeof(I64),
+                                   &required_stage_bytes);
+    if (status)
+        return status;
+
+    *out_required_qkv_cells = required_qkv_cells;
+    *out_required_attn_scores = required_attn_scores;
+    *out_required_ffn_cells = required_ffn_cells;
+    *out_required_out_cells = required_out_cells;
+    *out_required_stage_bytes = required_stage_bytes;
+
+    return BLOCK_Q16_OK;
+}
