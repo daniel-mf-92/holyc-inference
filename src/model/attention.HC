@@ -306,6 +306,23 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocCommitCapacity(
     I64 *staged_scores_q32,
     I64 staged_scores_capacity);
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocCommitCapacityDefaultCapacity(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 query_row_stride_q16,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 k_row_stride_q16,
+    I64 head_dim,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 out_row_stride,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity);
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacity(
     I64 *q_rows_q16,
     I64 q_rows_capacity,
@@ -543,6 +560,74 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideCommitOnlyPrefli
     I64 out_scores_capacity,
     I64 *out_required_stage_cells,
     I64 *out_required_out_cells);
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocCommitCapacityDefaultCapacity(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 query_row_count,
+    I64 query_row_stride_q16,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 token_count,
+    I64 k_row_stride_q16,
+    I64 head_dim,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 out_row_stride,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity)
+{
+    I64 commit_stage_cell_capacity;
+    I64 commit_stage_byte_capacity;
+    I32 status;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_rows_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0 ||
+        staged_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_row_count < 0 || query_row_stride_q16 < 0 || token_count < 0 ||
+        k_row_stride_q16 < 0 || head_dim < 0 || out_row_stride < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-634 default-capacity strided commit contract:
+    // derive commit scratch capacities from live packed stage slab
+    // (`query_row_count * token_count`) and caller stage storage bytes
+    // (`staged_scores_capacity * sizeof(I64)`), then route through the
+    // canonical strided no-alloc commit-capacity wrapper.
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       token_count,
+                                       &commit_stage_cell_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(staged_scores_capacity,
+                                       sizeof(I64),
+                                       &commit_stage_byte_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    return AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocCommitCapacity(
+        q_rows_q16,
+        q_rows_capacity,
+        query_row_count,
+        query_row_stride_q16,
+        k_rows_q16,
+        k_rows_capacity,
+        token_count,
+        k_row_stride_q16,
+        head_dim,
+        score_scale_q16,
+        out_scores_q32,
+        out_scores_capacity,
+        out_row_stride,
+        commit_stage_cell_capacity,
+        commit_stage_byte_capacity,
+        staged_scores_q32,
+        staged_scores_capacity);
+}
 
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideCommitOnly(
     I64 query_row_count,
