@@ -1880,6 +1880,11 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocCommitCapacity(I64 *gate_
     if (!row_count || !lane_count)
         return FFN_Q16_OK;
 
+    if (required_stage_cells > commit_stage_cell_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (required_stage_bytes > commit_stage_byte_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+
     if (!staging_out_q16)
         return FFN_Q16_ERR_NULL_PTR;
     if (required_stage_cells > staging_out_capacity)
