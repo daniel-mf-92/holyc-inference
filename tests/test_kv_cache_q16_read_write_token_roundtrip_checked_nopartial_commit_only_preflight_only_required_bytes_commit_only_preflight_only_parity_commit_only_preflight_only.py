@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity harness for ...RequiredBytesCommitOnlyPreflightOnlyParityCommitOnly (IQ-926)."""
+"""Parity harness for ...RequiredBytesCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly (IQ-927)."""
 
 from __future__ import annotations
 
@@ -13,16 +13,15 @@ from test_kv_cache_q16_indexing_checked import (
     KV_Q16_ERR_BAD_PARAM,
     KV_Q16_ERR_NULL_PTR,
     KV_Q16_OK,
+    kv_cache_q16_compute_layer_token_base_index_checked,
+    try_mul_i64_checked,
 )
-from test_kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only import (
-    kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only,
-)
-from test_kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity import (
-    kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity,
+from test_kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity_commit_only import (
+    kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity_commit_only,
 )
 
 
-def kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity_commit_only(
+def kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity_commit_only_preflight_only(
     k_cache_q16: list[int] | None,
     k_cache_capacity: int,
     v_cache_q16: list[int] | None,
@@ -45,7 +44,6 @@ def kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_prefli
     out_required_token_bytes: list[int] | None,
     out_k_base_index: list[int] | None,
     out_v_base_index: list[int] | None,
-    mutate_pointer_after_snapshot: bool = False,
 ) -> int:
     if (
         out_required_span_cells is None
@@ -107,23 +105,12 @@ def kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_prefli
         k_token_out_capacity,
         v_token_out_capacity,
     )
-    snapshot_ptrs = (
-        k_cache_q16,
-        v_cache_q16,
-        k_token_src_q16,
-        v_token_src_q16,
-        k_token_out_q16,
-        v_token_out_q16,
-    )
 
-    if mutate_pointer_after_snapshot:
-        k_token_out_q16 = []
-
-    staged_parity_span = [0]
-    staged_parity_bytes = [0]
-    staged_parity_k_base = [0]
-    staged_parity_v_base = [0]
-    err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity(
+    staged_required_span_cells = [0]
+    staged_required_token_bytes = [0]
+    staged_k_base_index = [0]
+    staged_v_base_index = [0]
+    err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity_commit_only(
         k_cache_q16,
         k_cache_capacity,
         v_cache_q16,
@@ -142,62 +129,68 @@ def kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_prefli
         k_token_out_capacity,
         v_token_out_q16,
         v_token_out_capacity,
-        staged_parity_span,
-        staged_parity_bytes,
-        staged_parity_k_base,
-        staged_parity_v_base,
+        staged_required_span_cells,
+        staged_required_token_bytes,
+        staged_k_base_index,
+        staged_v_base_index,
     )
     if err != KV_Q16_OK:
         return err
 
-    staged_commit_span = [0]
-    staged_commit_bytes = [0]
-    staged_commit_k_base = [0]
-    staged_commit_v_base = [0]
-    err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only(
-        k_cache_q16,
-        k_cache_capacity,
-        v_cache_q16,
-        v_cache_capacity,
+    recomputed_k_base = [0]
+    recomputed_k_span = [0]
+    err = kv_cache_q16_compute_layer_token_base_index_checked(
         layer_idx,
         token_idx,
         layer_count,
         token_capacity,
         kv_heads,
         head_dim,
-        k_token_src_q16,
-        k_token_src_capacity,
-        v_token_src_q16,
-        v_token_src_capacity,
-        k_token_out_q16,
-        k_token_out_capacity,
-        v_token_out_q16,
-        v_token_out_capacity,
-        staged_commit_span,
-        staged_commit_bytes,
-        staged_commit_k_base,
-        staged_commit_v_base,
+        recomputed_k_base,
+        recomputed_k_span,
     )
+    if err != KV_Q16_OK:
+        return err
+
+    recomputed_v_base = [0]
+    recomputed_v_span = [0]
+    err = kv_cache_q16_compute_layer_token_base_index_checked(
+        layer_idx,
+        token_idx,
+        layer_count,
+        token_capacity,
+        kv_heads,
+        head_dim,
+        recomputed_v_base,
+        recomputed_v_span,
+    )
+    if err != KV_Q16_OK:
+        return err
+
+    if recomputed_k_span[0] != recomputed_v_span[0]:
+        return KV_Q16_ERR_BAD_PARAM
+
+    err, recomputed_token_bytes = try_mul_i64_checked(recomputed_k_span[0], 8)
     if err != KV_Q16_OK:
         return err
 
     if (
-        staged_parity_span[0] < 0
-        or staged_parity_bytes[0] < 0
-        or staged_parity_k_base[0] < 0
-        or staged_parity_v_base[0] < 0
-        or staged_commit_span[0] < 0
-        or staged_commit_bytes[0] < 0
-        or staged_commit_k_base[0] < 0
-        or staged_commit_v_base[0] < 0
+        staged_required_span_cells[0] < 0
+        or staged_required_token_bytes[0] < 0
+        or staged_k_base_index[0] < 0
+        or staged_v_base_index[0] < 0
+        or recomputed_k_span[0] < 0
+        or recomputed_token_bytes < 0
+        or recomputed_k_base[0] < 0
+        or recomputed_v_base[0] < 0
     ):
         return KV_Q16_ERR_BAD_PARAM
 
     if (
-        staged_parity_span[0] != staged_commit_span[0]
-        or staged_parity_bytes[0] != staged_commit_bytes[0]
-        or staged_parity_k_base[0] != staged_commit_k_base[0]
-        or staged_parity_v_base[0] != staged_commit_v_base[0]
+        staged_required_span_cells[0] != recomputed_k_span[0]
+        or staged_required_token_bytes[0] != recomputed_token_bytes
+        or staged_k_base_index[0] != recomputed_k_base[0]
+        or staged_v_base_index[0] != recomputed_v_base[0]
     ):
         return KV_Q16_ERR_BAD_PARAM
 
@@ -217,79 +210,87 @@ def kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_prefli
     ):
         return KV_Q16_ERR_BAD_PARAM
 
-    if snapshot_ptrs != (
-        k_cache_q16,
-        v_cache_q16,
-        k_token_src_q16,
-        v_token_src_q16,
-        k_token_out_q16,
-        v_token_out_q16,
-    ):
-        return KV_Q16_ERR_BAD_PARAM
-
-    out_required_span_cells[0] = staged_parity_span[0]
-    out_required_token_bytes[0] = staged_parity_bytes[0]
-    out_k_base_index[0] = staged_parity_k_base[0]
-    out_v_base_index[0] = staged_parity_v_base[0]
+    out_required_span_cells[0] = staged_required_span_cells[0]
+    out_required_token_bytes[0] = staged_required_token_bytes[0]
+    out_k_base_index[0] = staged_k_base_index[0]
+    out_v_base_index[0] = staged_v_base_index[0]
     return KV_Q16_OK
 
 
-def explicit_parity_commit_only_composition(*args, **kwargs) -> tuple[int, tuple[int, int, int, int]]:
-    parity_span = [0]
-    parity_bytes = [0]
-    parity_k_base = [0]
-    parity_v_base = [0]
-    err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity(
+def explicit_preflight_only_composition(*args, **kwargs) -> tuple[int, tuple[int, int, int, int]]:
+    staged_span = [0]
+    staged_bytes = [0]
+    staged_k_base = [0]
+    staged_v_base = [0]
+    err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity_commit_only(
         *args,
-        out_required_span_cells=parity_span,
-        out_required_token_bytes=parity_bytes,
-        out_k_base_index=parity_k_base,
-        out_v_base_index=parity_v_base,
+        out_required_span_cells=staged_span,
+        out_required_token_bytes=staged_bytes,
+        out_k_base_index=staged_k_base,
+        out_v_base_index=staged_v_base,
         **kwargs,
     )
     if err != KV_Q16_OK:
         return err, (0, 0, 0, 0)
 
-    commit_span = [0]
-    commit_bytes = [0]
-    commit_k_base = [0]
-    commit_v_base = [0]
-    err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only(
-        *args,
-        out_required_span_cells=commit_span,
-        out_required_token_bytes=commit_bytes,
-        out_k_base_index=commit_k_base,
-        out_v_base_index=commit_v_base,
-        **kwargs,
+    recomputed_k_base = [0]
+    recomputed_k_span = [0]
+    err = kv_cache_q16_compute_layer_token_base_index_checked(
+        args[4],
+        args[5],
+        args[6],
+        args[7],
+        args[8],
+        args[9],
+        recomputed_k_base,
+        recomputed_k_span,
     )
+    if err != KV_Q16_OK:
+        return err, (0, 0, 0, 0)
+
+    recomputed_v_base = [0]
+    recomputed_v_span = [0]
+    err = kv_cache_q16_compute_layer_token_base_index_checked(
+        args[4],
+        args[5],
+        args[6],
+        args[7],
+        args[8],
+        args[9],
+        recomputed_v_base,
+        recomputed_v_span,
+    )
+    if err != KV_Q16_OK:
+        return err, (0, 0, 0, 0)
+
+    if recomputed_k_span[0] != recomputed_v_span[0]:
+        return KV_Q16_ERR_BAD_PARAM, (0, 0, 0, 0)
+
+    err, recomputed_token_bytes = try_mul_i64_checked(recomputed_k_span[0], 8)
     if err != KV_Q16_OK:
         return err, (0, 0, 0, 0)
 
     if (
-        parity_span[0] != commit_span[0]
-        or parity_bytes[0] != commit_bytes[0]
-        or parity_k_base[0] != commit_k_base[0]
-        or parity_v_base[0] != commit_v_base[0]
+        staged_span[0] != recomputed_k_span[0]
+        or staged_bytes[0] != recomputed_token_bytes
+        or staged_k_base[0] != recomputed_k_base[0]
+        or staged_v_base[0] != recomputed_v_base[0]
     ):
         return KV_Q16_ERR_BAD_PARAM, (0, 0, 0, 0)
 
-    return KV_Q16_OK, (parity_span[0], parity_bytes[0], parity_k_base[0], parity_v_base[0])
+    return KV_Q16_OK, (staged_span[0], staged_bytes[0], staged_k_base[0], staged_v_base[0])
 
 
-def test_source_contains_iq926_function() -> None:
+def test_source_contains_iq927_function() -> None:
     source = Path("src/model/kv_cache.HC").read_text(encoding="utf-8")
-    sig = "I32 KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesCommitOnlyPreflightOnlyParityCommitOnly("
+    sig = "I32 KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly("
     assert sig in source
     body = source.split(sig, 1)[1]
 
-    assert "KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesCommitOnlyPreflightOnlyParity(" in body
-    assert "KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesCommitOnly(" in body
+    assert "KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesCommitOnlyPreflightOnlyParityCommitOnly(" in body
+    assert "status = KVTryMulI64Checked(staged_span_cells_recomputed_k," in body
     assert "snapshot_k_cache_capacity = k_cache_capacity;" in body
-    assert "snapshot_v_cache_capacity = v_cache_capacity;" in body
-    assert "snapshot_k_cache_ptr = k_cache_q16;" in body
-    assert "snapshot_k_out_ptr = k_token_out_q16;" in body
-    assert "if (staged_required_span_cells != staged_required_span_cells_canonical ||" in body
-    assert "snapshot_k_out_ptr != k_token_out_q16 ||" in body
+    assert "if (staged_required_span_cells != staged_span_cells_recomputed_k ||" in body
     assert "*out_required_token_bytes = staged_required_token_bytes;" in body
 
 
@@ -332,7 +333,7 @@ def _make_valid_case(rng: random.Random) -> tuple:
 
 
 def test_null_and_alias_guards() -> None:
-    rng = random.Random(922001)
+    rng = random.Random(927001)
     args = _make_valid_case(rng)
     out_span = [0]
     out_bytes = [0]
@@ -340,7 +341,7 @@ def test_null_and_alias_guards() -> None:
     out_v = [0]
 
     assert (
-        kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity_commit_only(
+        kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity_commit_only_preflight_only(
             *args,
             None,
             out_bytes,
@@ -352,7 +353,7 @@ def test_null_and_alias_guards() -> None:
 
     shared = [0]
     assert (
-        kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity_commit_only(
+        kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity_commit_only_preflight_only(
             *args,
             shared,
             shared,
@@ -383,7 +384,7 @@ def test_known_vector_success_and_failure_no_partial() -> None:
     out_k = [333]
     out_v = [444]
 
-    err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity_commit_only(
+    err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity_commit_only_preflight_only(
         k_cache,
         len(k_cache),
         v_cache,
@@ -415,7 +416,7 @@ def test_known_vector_success_and_failure_no_partial() -> None:
     fail_bytes = [88]
     fail_k = [99]
     fail_v = [111]
-    err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity_commit_only(
+    err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity_commit_only_preflight_only(
         k_cache,
         len(k_cache),
         v_cache,
@@ -446,41 +447,17 @@ def test_known_vector_success_and_failure_no_partial() -> None:
     assert fail_v == [111]
 
 
-def test_snapshot_pointer_mismatch_is_rejected_no_partial() -> None:
-    rng = random.Random(926321)
-    args = _make_valid_case(rng)
-
-    out_span = [901]
-    out_bytes = [902]
-    out_k = [903]
-    out_v = [904]
-
-    err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity_commit_only(
-        *args,
-        out_span,
-        out_bytes,
-        out_k,
-        out_v,
-        mutate_pointer_after_snapshot=True,
-    )
-    assert err == KV_Q16_ERR_BAD_PARAM
-    assert out_span == [901]
-    assert out_bytes == [902]
-    assert out_k == [903]
-    assert out_v == [904]
-
-
 def test_randomized_parity() -> None:
-    rng = random.Random(20260421_922)
+    rng = random.Random(20260421_927)
 
-    for _ in range(2000):
+    for _ in range(2200):
         args = _make_valid_case(rng)
 
-        if rng.random() < 0.15:
+        if rng.random() < 0.16:
             li = list(args)
             li[5] = li[7] + rng.randint(0, 3)
             args = tuple(li)
-        if rng.random() < 0.15:
+        if rng.random() < 0.16:
             li = list(args)
             li[1] = rng.randint(0, max(0, li[1] - 1))
             args = tuple(li)
@@ -490,14 +467,14 @@ def test_randomized_parity() -> None:
         out_k = [rng.randint(-10000, 10000)]
         out_v = [rng.randint(-10000, 10000)]
 
-        err_impl = kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity_commit_only(
+        err_impl = kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity_commit_only_preflight_only(
             *args,
             out_span,
             out_bytes,
             out_k,
             out_v,
         )
-        err_ref, tup_ref = explicit_parity_commit_only_composition(*args)
+        err_ref, tup_ref = explicit_preflight_only_composition(*args)
 
         assert err_impl == err_ref
         if err_impl == KV_Q16_OK:
@@ -505,9 +482,9 @@ def test_randomized_parity() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_iq926_function()
+    test_source_contains_iq927_function()
     test_null_and_alias_guards()
     test_known_vector_success_and_failure_no_partial()
-    test_snapshot_pointer_mismatch_is_rejected_no_partial()
     test_randomized_parity()
     print("ok")
+
