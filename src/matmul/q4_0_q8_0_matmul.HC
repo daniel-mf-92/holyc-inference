@@ -938,6 +938,12 @@ I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnly(
     I64 snapshot_col_count;
     I64 snapshot_k_block_count;
     I64 snapshot_iter_count;
+    I64 snapshot_lhs_q4_block_capacity;
+    I64 snapshot_rhs_q8_block_capacity;
+    I64 snapshot_out_cell_capacity;
+    I64 snapshot_lhs_row_stride_blocks;
+    I64 snapshot_rhs_col_stride_blocks;
+    I64 snapshot_out_row_stride_cells;
     I64 staged_cells_per_iter;
     I64 staged_block_dots_per_iter;
     I64 staged_total_cells;
@@ -961,6 +967,12 @@ I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnly(
     snapshot_col_count = col_count;
     snapshot_k_block_count = k_block_count;
     snapshot_iter_count = iter_count;
+    snapshot_lhs_q4_block_capacity = lhs_q4_block_capacity;
+    snapshot_rhs_q8_block_capacity = rhs_q8_block_capacity;
+    snapshot_out_cell_capacity = out_cell_capacity;
+    snapshot_lhs_row_stride_blocks = lhs_row_stride_blocks;
+    snapshot_rhs_col_stride_blocks = rhs_col_stride_blocks;
+    snapshot_out_row_stride_cells = out_row_stride_cells;
 
     // IQ-825 diagnostics-only bench preflight: validate checked geometry and
     // dot-kernel addressability without writing output cells.
@@ -991,7 +1003,13 @@ I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnly(
     if (snapshot_row_count != row_count ||
         snapshot_col_count != col_count ||
         snapshot_k_block_count != k_block_count ||
-        snapshot_iter_count != iter_count)
+        snapshot_iter_count != iter_count ||
+        snapshot_lhs_q4_block_capacity != lhs_q4_block_capacity ||
+        snapshot_rhs_q8_block_capacity != rhs_q8_block_capacity ||
+        snapshot_out_cell_capacity != out_cell_capacity ||
+        snapshot_lhs_row_stride_blocks != lhs_row_stride_blocks ||
+        snapshot_rhs_col_stride_blocks != rhs_col_stride_blocks ||
+        snapshot_out_row_stride_cells != out_row_stride_cells)
         return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
 
     if (!Q4_0Q8_0MatMulTryMulI64NonNeg(row_count,

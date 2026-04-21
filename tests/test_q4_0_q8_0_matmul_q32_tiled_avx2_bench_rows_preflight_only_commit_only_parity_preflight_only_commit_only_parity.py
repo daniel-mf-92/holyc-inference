@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity harness for ...PreflightOnlyCommitOnlyParityPreflightOnlyCommitOnlyParity (IQ-855)."""
+"""Parity harness for ...PreflightOnlyCommitOnlyParityPreflightOnlyCommitOnlyParity (IQ-858)."""
 
 from __future__ import annotations
 
@@ -165,9 +165,102 @@ def q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity
 
 
 def explicit_checked_composition(*args):
-    return q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity_preflight_only_commit_only_parity(
-        *args
+    (
+        lhs_q4_blocks,
+        lhs_q4_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_q8_col_blocks,
+        rhs_q8_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q32,
+        out_cell_capacity,
+        out_row_stride_cells,
+        iter_count,
+        out_cells_per_iter,
+        out_block_dots_per_iter,
+        out_total_cells,
+        out_total_block_dots,
+    ) = args
+
+    if (
+        out_cells_per_iter is None
+        or out_block_dots_per_iter is None
+        or out_total_cells is None
+        or out_total_block_dots is None
+    ):
+        return Q4_0_Q8_0_AVX2_ERR_NULL_PTR
+
+    commit_cells_per_iter = [out_cells_per_iter[0]]
+    commit_block_dots_per_iter = [out_block_dots_per_iter[0]]
+    commit_total_cells = [out_total_cells[0]]
+    commit_total_block_dots = [out_total_block_dots[0]]
+
+    preflight_cells_per_iter = [out_cells_per_iter[0]]
+    preflight_block_dots_per_iter = [out_block_dots_per_iter[0]]
+    preflight_total_cells = [out_total_cells[0]]
+    preflight_total_block_dots = [out_total_block_dots[0]]
+
+    err = q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity_preflight_only_commit_only(
+        lhs_q4_blocks,
+        lhs_q4_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_q8_col_blocks,
+        rhs_q8_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q32,
+        out_cell_capacity,
+        out_row_stride_cells,
+        iter_count,
+        commit_cells_per_iter,
+        commit_block_dots_per_iter,
+        commit_total_cells,
+        commit_total_block_dots,
     )
+    if err != Q4_0_Q8_0_AVX2_OK:
+        return err
+
+    err = q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity_preflight_only(
+        lhs_q4_blocks,
+        lhs_q4_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_q8_col_blocks,
+        rhs_q8_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q32,
+        out_cell_capacity,
+        out_row_stride_cells,
+        iter_count,
+        preflight_cells_per_iter,
+        preflight_block_dots_per_iter,
+        preflight_total_cells,
+        preflight_total_block_dots,
+    )
+    if err != Q4_0_Q8_0_AVX2_OK:
+        return err
+
+    if commit_cells_per_iter[0] != preflight_cells_per_iter[0]:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    if commit_block_dots_per_iter[0] != preflight_block_dots_per_iter[0]:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    if commit_total_cells[0] != preflight_total_cells[0]:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    if commit_total_block_dots[0] != preflight_total_block_dots[0]:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+
+    out_cells_per_iter[0] = commit_cells_per_iter[0]
+    out_block_dots_per_iter[0] = commit_block_dots_per_iter[0]
+    out_total_cells[0] = commit_total_cells[0]
+    out_total_block_dots[0] = commit_total_block_dots[0]
+    return Q4_0_Q8_0_AVX2_OK
 
 
 def test_source_contains_signature_and_parity_gate() -> None:
