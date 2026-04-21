@@ -140,6 +140,24 @@ I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnly(
     I64 *out_block_dots_per_iter,
     I64 *out_total_cells,
     I64 *out_total_block_dots);
+I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParity(
+    Q4_0Block *lhs_q4_blocks,
+    I64 lhs_q4_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_q8_col_blocks,
+    I64 rhs_q8_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_cells_q32,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells,
+    I64 iter_count,
+    I64 *out_cells_per_iter,
+    I64 *out_block_dots_per_iter,
+    I64 *out_total_cells,
+    I64 *out_total_block_dots);
 
 Bool Q4_0Q8_0MatMulTryMulI64NonNeg(I64 lhs, I64 rhs, I64 *out_prod)
 {
@@ -952,5 +970,128 @@ I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnly(
     *out_block_dots_per_iter = staged_block_dots_per_iter;
     *out_total_cells = staged_total_cells;
     *out_total_block_dots = staged_total_block_dots;
+    return Q4_0_Q8_0_MATMUL_OK;
+}
+
+I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParity(
+    Q4_0Block *lhs_q4_blocks,
+    I64 lhs_q4_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_q8_col_blocks,
+    I64 rhs_q8_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_cells_q32,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells,
+    I64 iter_count,
+    I64 *out_cells_per_iter,
+    I64 *out_block_dots_per_iter,
+    I64 *out_total_cells,
+    I64 *out_total_block_dots)
+{
+    I64 commit_cells_per_iter;
+    I64 commit_block_dots_per_iter;
+    I64 commit_total_cells;
+    I64 commit_total_block_dots;
+
+    I64 canonical_cells_per_iter;
+    I64 canonical_block_dots_per_iter;
+    I64 canonical_total_cells;
+    I64 canonical_total_block_dots;
+
+    I64 snapshot_row_count;
+    I64 snapshot_col_count;
+    I64 snapshot_k_block_count;
+    I64 snapshot_iter_count;
+    I32 status;
+
+    if (!out_cells_per_iter || !out_block_dots_per_iter ||
+        !out_total_cells || !out_total_block_dots)
+        return Q4_0_Q8_0_MATMUL_ERR_NULL_PTR;
+
+    snapshot_row_count = row_count;
+    snapshot_col_count = col_count;
+    snapshot_k_block_count = k_block_count;
+    snapshot_iter_count = iter_count;
+
+    commit_cells_per_iter = *out_cells_per_iter;
+    commit_block_dots_per_iter = *out_block_dots_per_iter;
+    commit_total_cells = *out_total_cells;
+    commit_total_block_dots = *out_total_block_dots;
+
+    canonical_cells_per_iter = commit_cells_per_iter;
+    canonical_block_dots_per_iter = commit_block_dots_per_iter;
+    canonical_total_cells = commit_total_cells;
+    canonical_total_block_dots = commit_total_block_dots;
+
+    // IQ-828 diagnostics-only parity gate:
+    // 1) stage commit-only diagnostics from IQ-827 helper,
+    // 2) stage canonical preflight diagnostics independently,
+    // 3) enforce immutable geometry and exact tuple parity,
+    // 4) publish atomically only after full parity succeeds.
+    status = Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnly(
+        lhs_q4_blocks,
+        lhs_q4_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_q8_col_blocks,
+        rhs_q8_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q32,
+        out_cell_capacity,
+        out_row_stride_cells,
+        iter_count,
+        &commit_cells_per_iter,
+        &commit_block_dots_per_iter,
+        &commit_total_cells,
+        &commit_total_block_dots);
+    if (status != Q4_0_Q8_0_MATMUL_OK)
+        return status;
+
+    status = Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnly(
+        lhs_q4_blocks,
+        lhs_q4_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_q8_col_blocks,
+        rhs_q8_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q32,
+        out_cell_capacity,
+        out_row_stride_cells,
+        iter_count,
+        &canonical_cells_per_iter,
+        &canonical_block_dots_per_iter,
+        &canonical_total_cells,
+        &canonical_total_block_dots);
+    if (status != Q4_0_Q8_0_MATMUL_OK)
+        return status;
+
+    if (snapshot_row_count != row_count ||
+        snapshot_col_count != col_count ||
+        snapshot_k_block_count != k_block_count ||
+        snapshot_iter_count != iter_count)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (commit_cells_per_iter != canonical_cells_per_iter)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (commit_block_dots_per_iter != canonical_block_dots_per_iter)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (commit_total_cells != canonical_total_cells)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (commit_total_block_dots != canonical_total_block_dots)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    *out_cells_per_iter = commit_cells_per_iter;
+    *out_block_dots_per_iter = commit_block_dots_per_iter;
+    *out_total_cells = commit_total_cells;
+    *out_total_block_dots = commit_total_block_dots;
     return Q4_0_Q8_0_MATMUL_OK;
 }

@@ -13830,3 +13830,446 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnl
     *out_required_out_bytes = staged_required_out_bytes;
     return ATTN_Q16_OK;
 }
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyPreflightOnlyParity(
+    I64 *q_rows_q16,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 *out_last_q_base_index,
+    I64 *out_last_k_base_index,
+    I64 *out_last_out_base_index,
+    I64 *out_required_q_cells,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_q_bytes,
+    I64 *out_required_k_bytes,
+    I64 *out_required_out_bytes)
+{
+    I64 staged_last_q_base_index;
+    I64 staged_last_k_base_index;
+    I64 staged_last_out_base_index;
+    I64 staged_required_q_cells;
+    I64 staged_required_k_cells;
+    I64 staged_required_out_cells;
+    I64 staged_required_q_bytes;
+    I64 staged_required_k_bytes;
+    I64 staged_required_out_bytes;
+
+    I64 canonical_last_q_base_index;
+    I64 canonical_last_k_base_index;
+    I64 canonical_last_out_base_index;
+    I64 canonical_required_q_cells;
+    I64 canonical_required_k_cells;
+    I64 canonical_required_out_cells;
+    I64 canonical_required_q_bytes;
+    I64 canonical_required_k_bytes;
+    I64 canonical_required_out_bytes;
+
+    I64 snapshot_query_row_count;
+    I64 snapshot_token_count;
+    I64 snapshot_head_dim;
+    I64 snapshot_q_rows_capacity;
+    I64 snapshot_k_rows_capacity;
+    I64 snapshot_out_scores_capacity;
+    I64 q_rows_capacity;
+    I64 k_rows_capacity;
+    I64 out_scores_capacity;
+    I32 status;
+
+    if (!out_last_q_base_index || !out_last_k_base_index ||
+        !out_last_out_base_index || !out_required_q_cells ||
+        !out_required_k_cells || !out_required_out_cells ||
+        !out_required_q_bytes || !out_required_k_bytes ||
+        !out_required_out_bytes)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (out_last_q_base_index == out_last_k_base_index ||
+        out_last_q_base_index == out_last_out_base_index ||
+        out_last_q_base_index == out_required_q_cells ||
+        out_last_q_base_index == out_required_k_cells ||
+        out_last_q_base_index == out_required_out_cells ||
+        out_last_q_base_index == out_required_q_bytes ||
+        out_last_q_base_index == out_required_k_bytes ||
+        out_last_q_base_index == out_required_out_bytes ||
+        out_last_k_base_index == out_last_out_base_index ||
+        out_last_k_base_index == out_required_q_cells ||
+        out_last_k_base_index == out_required_k_cells ||
+        out_last_k_base_index == out_required_out_cells ||
+        out_last_k_base_index == out_required_q_bytes ||
+        out_last_k_base_index == out_required_k_bytes ||
+        out_last_k_base_index == out_required_out_bytes ||
+        out_last_out_base_index == out_required_q_cells ||
+        out_last_out_base_index == out_required_k_cells ||
+        out_last_out_base_index == out_required_out_cells ||
+        out_last_out_base_index == out_required_q_bytes ||
+        out_last_out_base_index == out_required_k_bytes ||
+        out_last_out_base_index == out_required_out_bytes ||
+        out_required_q_cells == out_required_k_cells ||
+        out_required_q_cells == out_required_out_cells ||
+        out_required_q_cells == out_required_q_bytes ||
+        out_required_q_cells == out_required_k_bytes ||
+        out_required_q_cells == out_required_out_bytes ||
+        out_required_k_cells == out_required_out_cells ||
+        out_required_k_cells == out_required_q_bytes ||
+        out_required_k_cells == out_required_k_bytes ||
+        out_required_k_cells == out_required_out_bytes ||
+        out_required_out_cells == out_required_q_bytes ||
+        out_required_out_cells == out_required_k_bytes ||
+        out_required_out_cells == out_required_out_bytes ||
+        out_required_q_bytes == out_required_k_bytes ||
+        out_required_q_bytes == out_required_out_bytes ||
+        out_required_k_bytes == out_required_out_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (query_row_count < 0 || token_count < 0 || head_dim < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    snapshot_query_row_count = query_row_count;
+    snapshot_token_count = token_count;
+    snapshot_head_dim = head_dim;
+
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       head_dim,
+                                       &q_rows_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(token_count,
+                                       head_dim,
+                                       &k_rows_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       token_count,
+                                       &out_scores_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    snapshot_q_rows_capacity = q_rows_capacity;
+    snapshot_k_rows_capacity = k_rows_capacity;
+    snapshot_out_scores_capacity = out_scores_capacity;
+
+    status =
+        AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyPreflightOnly(
+            q_rows_q16,
+            query_row_count,
+            k_rows_q16,
+            token_count,
+            head_dim,
+            out_scores_q32,
+            &staged_last_q_base_index,
+            &staged_last_k_base_index,
+            &staged_last_out_base_index,
+            &staged_required_q_cells,
+            &staged_required_k_cells,
+            &staged_required_out_cells,
+            &staged_required_q_bytes,
+            &staged_required_k_bytes,
+            &staged_required_out_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status =
+        AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnlyDefaultCapacity(
+            q_rows_q16,
+            query_row_count,
+            k_rows_q16,
+            token_count,
+            head_dim,
+            out_scores_q32,
+            &canonical_last_q_base_index,
+            &canonical_last_k_base_index,
+            &canonical_last_out_base_index,
+            &canonical_required_q_cells,
+            &canonical_required_k_cells,
+            &canonical_required_out_cells,
+            &canonical_required_q_bytes,
+            &canonical_required_k_bytes,
+            &canonical_required_out_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (snapshot_query_row_count != query_row_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_token_count != token_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_head_dim != head_dim)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_q_rows_capacity != q_rows_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_k_rows_capacity != k_rows_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_scores_capacity != out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (staged_last_q_base_index != canonical_last_q_base_index)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_last_k_base_index != canonical_last_k_base_index)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_last_out_base_index != canonical_last_out_base_index)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_q_cells != canonical_required_q_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_required_k_cells != canonical_required_k_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_required_out_cells != canonical_required_out_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_q_bytes != canonical_required_q_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_required_k_bytes != canonical_required_k_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_required_out_bytes != canonical_required_out_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    *out_last_q_base_index = staged_last_q_base_index;
+    *out_last_k_base_index = staged_last_k_base_index;
+    *out_last_out_base_index = staged_last_out_base_index;
+    *out_required_q_cells = staged_required_q_cells;
+    *out_required_k_cells = staged_required_k_cells;
+    *out_required_out_cells = staged_required_out_cells;
+    *out_required_q_bytes = staged_required_q_bytes;
+    *out_required_k_bytes = staged_required_k_bytes;
+    *out_required_out_bytes = staged_required_out_bytes;
+    return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyPreflightOnlyParityCommitOnly(
+    I64 *q_rows_q16,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 *out_last_q_base_index,
+    I64 *out_last_k_base_index,
+    I64 *out_last_out_base_index,
+    I64 *out_required_q_cells,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_q_bytes,
+    I64 *out_required_k_bytes,
+    I64 *out_required_out_bytes)
+{
+    I64 staged_last_q_base_index;
+    I64 staged_last_k_base_index;
+    I64 staged_last_out_base_index;
+    I64 staged_required_q_cells;
+    I64 staged_required_k_cells;
+    I64 staged_required_out_cells;
+    I64 staged_required_q_bytes;
+    I64 staged_required_k_bytes;
+    I64 staged_required_out_bytes;
+
+    I64 snapshot_query_row_count;
+    I64 snapshot_token_count;
+    I64 snapshot_head_dim;
+    I64 recomputed_required_q_cells;
+    I64 recomputed_required_k_cells;
+    I64 recomputed_required_out_cells;
+    I64 recomputed_required_q_bytes;
+    I64 recomputed_required_k_bytes;
+    I64 recomputed_required_out_bytes;
+    I64 recomputed_last_q_base_index;
+    I64 recomputed_last_k_base_index;
+    I64 recomputed_last_out_base_index;
+    I32 status;
+
+    if (!out_last_q_base_index || !out_last_k_base_index ||
+        !out_last_out_base_index || !out_required_q_cells ||
+        !out_required_k_cells || !out_required_out_cells ||
+        !out_required_q_bytes || !out_required_k_bytes ||
+        !out_required_out_bytes)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (out_last_q_base_index == out_last_k_base_index ||
+        out_last_q_base_index == out_last_out_base_index ||
+        out_last_q_base_index == out_required_q_cells ||
+        out_last_q_base_index == out_required_k_cells ||
+        out_last_q_base_index == out_required_out_cells ||
+        out_last_q_base_index == out_required_q_bytes ||
+        out_last_q_base_index == out_required_k_bytes ||
+        out_last_q_base_index == out_required_out_bytes ||
+        out_last_k_base_index == out_last_out_base_index ||
+        out_last_k_base_index == out_required_q_cells ||
+        out_last_k_base_index == out_required_k_cells ||
+        out_last_k_base_index == out_required_out_cells ||
+        out_last_k_base_index == out_required_q_bytes ||
+        out_last_k_base_index == out_required_k_bytes ||
+        out_last_k_base_index == out_required_out_bytes ||
+        out_last_out_base_index == out_required_q_cells ||
+        out_last_out_base_index == out_required_k_cells ||
+        out_last_out_base_index == out_required_out_cells ||
+        out_last_out_base_index == out_required_q_bytes ||
+        out_last_out_base_index == out_required_k_bytes ||
+        out_last_out_base_index == out_required_out_bytes ||
+        out_required_q_cells == out_required_k_cells ||
+        out_required_q_cells == out_required_out_cells ||
+        out_required_q_cells == out_required_q_bytes ||
+        out_required_q_cells == out_required_k_bytes ||
+        out_required_q_cells == out_required_out_bytes ||
+        out_required_k_cells == out_required_out_cells ||
+        out_required_k_cells == out_required_q_bytes ||
+        out_required_k_cells == out_required_k_bytes ||
+        out_required_k_cells == out_required_out_bytes ||
+        out_required_out_cells == out_required_q_bytes ||
+        out_required_out_cells == out_required_k_bytes ||
+        out_required_out_cells == out_required_out_bytes ||
+        out_required_q_bytes == out_required_k_bytes ||
+        out_required_q_bytes == out_required_out_bytes ||
+        out_required_k_bytes == out_required_out_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (query_row_count < 0 || token_count < 0 || head_dim < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    snapshot_query_row_count = query_row_count;
+    snapshot_token_count = token_count;
+    snapshot_head_dim = head_dim;
+
+    // IQ-834 commit-only diagnostics hardening:
+    // 1) stage outputs from the parity helper into private locals;
+    // 2) recompute canonical geometry from immutable snapshot inputs;
+    // 3) enforce exact parity for required-cells/bytes and last-base indices;
+    // 4) atomically publish only after all checks succeed.
+
+    status =
+        AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyPreflightOnlyParity(
+            q_rows_q16,
+            query_row_count,
+            k_rows_q16,
+            token_count,
+            head_dim,
+            out_scores_q32,
+            &staged_last_q_base_index,
+            &staged_last_k_base_index,
+            &staged_last_out_base_index,
+            &staged_required_q_cells,
+            &staged_required_k_cells,
+            &staged_required_out_cells,
+            &staged_required_q_bytes,
+            &staged_required_k_bytes,
+            &staged_required_out_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       head_dim,
+                                       &recomputed_required_q_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(token_count,
+                                       head_dim,
+                                       &recomputed_required_k_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       token_count,
+                                       &recomputed_required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(recomputed_required_q_cells,
+                                       sizeof(I64),
+                                       &recomputed_required_q_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(recomputed_required_k_cells,
+                                       sizeof(I64),
+                                       &recomputed_required_k_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(recomputed_required_out_cells,
+                                       sizeof(I64),
+                                       &recomputed_required_out_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (query_row_count == 0)
+    {
+        recomputed_last_q_base_index = 0;
+        recomputed_last_out_base_index = 0;
+    }
+    else
+    {
+        status = AttentionTryMulI64Checked(query_row_count - 1,
+                                           head_dim,
+                                           &recomputed_last_q_base_index);
+        if (status != ATTN_Q16_OK)
+            return status;
+
+        status = AttentionTryMulI64Checked(query_row_count - 1,
+                                           token_count,
+                                           &recomputed_last_out_base_index);
+        if (status != ATTN_Q16_OK)
+            return status;
+    }
+
+    if (token_count == 0)
+    {
+        recomputed_last_k_base_index = 0;
+    }
+    else
+    {
+        status = AttentionTryMulI64Checked(token_count - 1,
+                                           head_dim,
+                                           &recomputed_last_k_base_index);
+        if (status != ATTN_Q16_OK)
+            return status;
+    }
+
+    if (snapshot_query_row_count != query_row_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_token_count != token_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_head_dim != head_dim)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_q_cells != recomputed_required_q_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_required_k_cells != recomputed_required_k_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_required_out_cells != recomputed_required_out_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_q_bytes != recomputed_required_q_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_required_k_bytes != recomputed_required_k_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_required_out_bytes != recomputed_required_out_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (staged_last_q_base_index != recomputed_last_q_base_index)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_last_k_base_index != recomputed_last_k_base_index)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_last_out_base_index != recomputed_last_out_base_index)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    *out_last_q_base_index = staged_last_q_base_index;
+    *out_last_k_base_index = staged_last_k_base_index;
+    *out_last_out_base_index = staged_last_out_base_index;
+    *out_required_q_cells = staged_required_q_cells;
+    *out_required_k_cells = staged_required_k_cells;
+    *out_required_out_cells = staged_required_out_cells;
+    *out_required_q_bytes = staged_required_q_bytes;
+    *out_required_k_bytes = staged_required_k_bytes;
+    *out_required_out_bytes = staged_required_out_bytes;
+    return ATTN_Q16_OK;
+}
