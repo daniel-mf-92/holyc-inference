@@ -71,6 +71,22 @@ def q8_0_dequantize_block_q16_checked_no_partial_array_commit_only(
         return Q8_0_ERR_BAD_DST_LEN
     if src_blocks is dst_q16:
         return Q8_0_ERR_BAD_DST_LEN
+    if (
+        out_block_count is dst_q16
+        or out_required_src_blocks is dst_q16
+        or out_required_dst_values is dst_q16
+        or out_required_src_bytes is dst_q16
+        or out_required_dst_bytes is dst_q16
+    ):
+        return Q8_0_ERR_BAD_DST_LEN
+    if (
+        out_block_count is src_blocks
+        or out_required_src_blocks is src_blocks
+        or out_required_dst_values is src_blocks
+        or out_required_src_bytes is src_blocks
+        or out_required_dst_bytes is src_blocks
+    ):
+        return Q8_0_ERR_BAD_DST_LEN
 
     if block_count == 0:
         req_src_blocks = 0
