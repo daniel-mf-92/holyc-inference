@@ -111,6 +111,8 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity_
         return TOKENIZER_BPE_ERR_BAD_PARAM
     if staged_required_token_capacity_after_commit[0] != staged_required_token_capacity[0]:
         return TOKENIZER_BPE_ERR_BAD_PARAM
+    if staged_token_count[0] > staged_required_token_capacity_after_commit[0]:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
 
     if prompt_nbytes and max_piece_len > I64_MAX // prompt_nbytes:
         return TOKENIZER_BPE_ERR_OVERFLOW
