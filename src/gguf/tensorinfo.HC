@@ -469,6 +469,107 @@ I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartial(U8 *buf,
     return GGUF_TENSOR_PARSE_OK;
 }
 
+// Commit-only diagnostics wrapper for dims/type/offset tuple decoding.
+//
+// The helper composes `GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartial` and
+// stages canonical diagnostics:
+//   {dim_count, dims_cells, required_bytes, type_value, tensor_offset, last_dim_index}
+// then atomically publishes only after immutable cursor/span snapshots match.
+I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnly(
+    U8 *buf,
+    U64 size,
+    U64 cursor,
+    U32 *out_dim_count,
+    U64 *out_dims_cells,
+    U64 *out_required_bytes,
+    U32 *out_type_value,
+    U64 *out_tensor_offset,
+    U64 *out_last_dim_index,
+    U64 *out_next_cursor)
+{
+    U8 *snapshot_buf;
+    U64 snapshot_size;
+    U64 snapshot_cursor;
+    U32 staged_dim_count;
+    U64 staged_dims[GGUF_TENSOR_MAX_DIMS];
+    U64 staged_n_elements;
+    U32 staged_type_value;
+    U64 staged_tensor_offset;
+    U64 staged_next_cursor;
+    U64 staged_dims_cells;
+    U64 staged_required_bytes;
+    U64 staged_last_dim_index;
+    U64 staged_dims_bytes;
+    U64 computed_end;
+    I64 status;
+
+    if (!buf || !out_dim_count || !out_dims_cells || !out_required_bytes)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+    if (!out_type_value || !out_tensor_offset || !out_last_dim_index || !out_next_cursor)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+    if (cursor > size)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (size > 0x7FFFFFFFFFFFFFFF || cursor > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    snapshot_buf = buf;
+    snapshot_size = size;
+    snapshot_cursor = cursor;
+
+    staged_dim_count = 0;
+    staged_n_elements = 0;
+    staged_type_value = 0;
+    staged_tensor_offset = 0;
+    staged_next_cursor = 0;
+    staged_dims_cells = 0;
+    staged_required_bytes = 0;
+    staged_last_dim_index = 0;
+
+    status = GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartial(
+        buf,
+        size,
+        cursor,
+        &staged_dim_count,
+        staged_dims,
+        &staged_n_elements,
+        &staged_type_value,
+        &staged_tensor_offset,
+        &staged_next_cursor);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+
+    staged_dims_cells = staged_dim_count;
+    staged_last_dim_index = staged_dim_count - 1;
+
+    if (!GGUFTensorTryMulU64(staged_dims_cells, 8, &staged_dims_bytes))
+        return GGUF_TENSOR_PARSE_ERR_DIM_OVERFLOW;
+
+    // required_bytes = 4 (n_dims) + n_dims*8 (dims) + 4 (type) + 8 (offset)
+    if (!GGUFTensorTryAddU64(4, staged_dims_bytes, &staged_required_bytes))
+        return GGUF_TENSOR_PARSE_ERR_DIM_OVERFLOW;
+    if (!GGUFTensorTryAddU64(staged_required_bytes, 4, &staged_required_bytes))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (!GGUFTensorTryAddU64(staged_required_bytes, 8, &staged_required_bytes))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    if (!GGUFTensorTryAddU64(cursor, staged_required_bytes, &computed_end))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (computed_end != staged_next_cursor)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    if (snapshot_buf != buf || snapshot_size != size || snapshot_cursor != cursor)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    *out_dim_count = staged_dim_count;
+    *out_dims_cells = staged_dims_cells;
+    *out_required_bytes = staged_required_bytes;
+    *out_type_value = staged_type_value;
+    *out_tensor_offset = staged_tensor_offset;
+    *out_last_dim_index = staged_last_dim_index;
+    *out_next_cursor = staged_next_cursor;
+    return GGUF_TENSOR_PARSE_OK;
+}
+
 I64 GGUFTensorParseOne(U8 *buf, I64 size, I64 *cursor, GGUFTensorInfo *out)
 {
     U32 n_dims;
