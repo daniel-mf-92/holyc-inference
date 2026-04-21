@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity harness for ...RequiredBytesCommitOnlyPreflightOnlyParityCommitOnly (IQ-922)."""
+"""Parity harness for ...RequiredBytesCommitOnlyPreflightOnlyParityCommitOnly (IQ-926)."""
 
 from __future__ import annotations
 
@@ -254,7 +254,7 @@ def explicit_parity_commit_only_composition(*args, **kwargs) -> tuple[int, tuple
     return KV_Q16_OK, (parity_span[0], parity_bytes[0], parity_k_base[0], parity_v_base[0])
 
 
-def test_source_contains_iq922_function() -> None:
+def test_source_contains_iq926_function() -> None:
     source = Path("src/model/kv_cache.HC").read_text(encoding="utf-8")
     sig = "I32 KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesCommitOnlyPreflightOnlyParityCommitOnly("
     assert sig in source
@@ -456,7 +456,7 @@ def test_randomized_parity() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_iq922_function()
+    test_source_contains_iq926_function()
     test_null_and_alias_guards()
     test_known_vector_success_and_failure_no_partial()
     test_randomized_parity()
