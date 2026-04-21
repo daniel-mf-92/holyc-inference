@@ -2036,16 +2036,13 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityComm
 }
 
 
-// Diagnostics-only parity gate over IQ-960 preflight-only and IQ-959
-// commit-only wrappers.
+// Commit-only diagnostics wrapper over IQ-961 PreflightOnlyParity.
 //
 // Stages canonical tuple from
-//   ...ParityCommitOnlyPreflightOnly
-// and requires exact tuple parity with
-//   ...ParityCommitOnly
-// under immutable caller snapshots before atomic publish.
-// Strict zero-write/no-partial semantics: dst_q16 is never modified.
-I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+//   Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity
+// then revalidates immutable snapshot geometry/capacity and exact tuple parity
+// before atomic publish. Strict no-partial semantics: dst_q16 is never written.
+I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
     Q8_0Block *src_blocks,
     I64 src_block_capacity,
     I64 src_block_stride,
@@ -2073,11 +2070,14 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityComm
     I64 staged_required_src_bytes;
     I64 staged_required_dst_bytes;
 
-    I64 parity_block_count;
-    I64 parity_required_src_blocks;
-    I64 parity_required_dst_values;
-    I64 parity_required_src_bytes;
-    I64 parity_required_dst_bytes;
+    I64 expected_required_src_bytes;
+    I64 expected_required_dst_bytes;
+    I64 recomputed_required_src_blocks;
+    I64 recomputed_required_dst_values;
+    I64 recomputed_required_src_bytes;
+    I64 recomputed_required_dst_bytes;
+    I64 src_last_offset;
+    I64 dst_last_base;
     I32 status;
 
     if (!src_blocks || !dst_q16 || !out_block_count ||
@@ -2110,6 +2110,10 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityComm
         out_required_dst_bytes == dst_q16)
         return Q8_0_ERR_BAD_DST_LEN;
 
+    // Commit-only wrapper contract (IQ-962):
+    // 1) stage canonical tuple from IQ-961 parity preflight helper;
+    // 2) revalidate immutable snapshot and tuple invariants;
+    // 3) atomically publish only after full parity success.
     snapshot_src_blocks = src_blocks;
     snapshot_dst_q16 = dst_q16;
     snapshot_src_block_capacity = src_block_capacity;
@@ -2118,7 +2122,7 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityComm
     snapshot_dst_q16_capacity = dst_q16_capacity;
     snapshot_dst_block_stride_values = dst_block_stride_values;
 
-    status = Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+    status = Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
         src_blocks,
         src_block_capacity,
         src_block_stride,
@@ -2134,22 +2138,6 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityComm
     if (status != Q8_0_OK)
         return status;
 
-    status = Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
-        src_blocks,
-        src_block_capacity,
-        src_block_stride,
-        block_count,
-        dst_q16,
-        dst_q16_capacity,
-        dst_block_stride_values,
-        &parity_block_count,
-        &parity_required_src_blocks,
-        &parity_required_dst_values,
-        &parity_required_src_bytes,
-        &parity_required_dst_bytes);
-    if (status != Q8_0_OK)
-        return status;
-
     if (src_blocks != snapshot_src_blocks ||
         dst_q16 != snapshot_dst_q16 ||
         src_block_capacity != snapshot_src_block_capacity ||
@@ -2159,28 +2147,77 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityComm
         dst_block_stride_values != snapshot_dst_block_stride_values)
         return Q8_0_ERR_BAD_DST_LEN;
 
-    if (staged_required_src_blocks < 0 ||
-        staged_required_dst_values < 0 ||
-        staged_required_src_bytes < 0 ||
-        staged_required_dst_bytes < 0 ||
-        parity_required_src_blocks < 0 ||
-        parity_required_dst_values < 0 ||
-        parity_required_src_bytes < 0 ||
-        parity_required_dst_bytes < 0)
-        return Q8_0_ERR_OVERFLOW;
-
-    if (staged_required_src_blocks > snapshot_src_block_capacity ||
-        staged_required_dst_values > snapshot_dst_q16_capacity ||
-        parity_required_src_blocks > snapshot_src_block_capacity ||
-        parity_required_dst_values > snapshot_dst_q16_capacity)
+    if (snapshot_src_block_capacity < 0 || snapshot_dst_q16_capacity < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (snapshot_block_count < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (snapshot_src_block_stride <= 0 || snapshot_dst_block_stride_values <= 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (snapshot_dst_block_stride_values < Q8_0_VALUES_PER_BLOCK)
         return Q8_0_ERR_BAD_DST_LEN;
 
-    if (staged_block_count != snapshot_block_count ||
-        parity_block_count != snapshot_block_count ||
-        staged_required_src_blocks != parity_required_src_blocks ||
-        staged_required_dst_values != parity_required_dst_values ||
-        staged_required_src_bytes != parity_required_src_bytes ||
-        staged_required_dst_bytes != parity_required_dst_bytes)
+    if (staged_block_count != snapshot_block_count)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (staged_required_src_blocks < 0 || staged_required_dst_values < 0 ||
+        staged_required_src_bytes < 0 || staged_required_dst_bytes < 0)
+        return Q8_0_ERR_OVERFLOW;
+
+    if (staged_required_src_blocks > snapshot_src_block_capacity)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (staged_required_dst_values > snapshot_dst_q16_capacity)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if (!snapshot_block_count)
+    {
+        recomputed_required_src_blocks = 0;
+        recomputed_required_dst_values = 0;
+    }
+    else
+    {
+        if (!Q8_0TryMulI64NonNeg(snapshot_block_count - 1,
+                                 snapshot_src_block_stride,
+                                 &src_last_offset))
+            return Q8_0_ERR_OVERFLOW;
+        if (!Q8_0TryMulI64NonNeg(snapshot_block_count - 1,
+                                 snapshot_dst_block_stride_values,
+                                 &dst_last_base))
+            return Q8_0_ERR_OVERFLOW;
+
+        if (!Q8_0TryAddI64(src_last_offset, 1, &recomputed_required_src_blocks))
+            return Q8_0_ERR_OVERFLOW;
+        if (!Q8_0TryAddI64(dst_last_base,
+                           Q8_0_VALUES_PER_BLOCK,
+                           &recomputed_required_dst_values))
+            return Q8_0_ERR_OVERFLOW;
+    }
+
+    if (!Q8_0TryMulI64NonNeg(recomputed_required_src_blocks,
+                             Q8_0_BLOCK_BYTES,
+                             &recomputed_required_src_bytes))
+        return Q8_0_ERR_OVERFLOW;
+    if (!Q8_0TryMulI64NonNeg(recomputed_required_dst_values,
+                             sizeof(I64),
+                             &recomputed_required_dst_bytes))
+        return Q8_0_ERR_OVERFLOW;
+
+    if (!Q8_0TryMulI64NonNeg(staged_required_src_blocks,
+                             Q8_0_BLOCK_BYTES,
+                             &expected_required_src_bytes))
+        return Q8_0_ERR_OVERFLOW;
+    if (!Q8_0TryMulI64NonNeg(staged_required_dst_values,
+                             sizeof(I64),
+                             &expected_required_dst_bytes))
+        return Q8_0_ERR_OVERFLOW;
+
+    if (staged_required_src_bytes != expected_required_src_bytes)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (staged_required_dst_bytes != expected_required_dst_bytes)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if (staged_required_src_blocks != recomputed_required_src_blocks ||
+        staged_required_dst_values != recomputed_required_dst_values ||
+        staged_required_src_bytes != recomputed_required_src_bytes ||
+        staged_required_dst_bytes != recomputed_required_dst_bytes)
         return Q8_0_ERR_BAD_DST_LEN;
 
     *out_block_count = staged_block_count;
@@ -2190,3 +2227,4 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityComm
     *out_required_dst_bytes = staged_required_dst_bytes;
     return Q8_0_OK;
 }
+
