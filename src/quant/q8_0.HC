@@ -1514,15 +1514,12 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityComm
 }
 
 
-
-
 // Commit-only diagnostics wrapper over PreflightOnlyParity.
 //
 // Stages canonical tuple from
 //   Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity
-// then revalidates immutable caller snapshots and recomputed geometry tuple
-// before atomic publish. Strict no-partial semantics: diagnostics are written
-// only when every parity/invariant check succeeds.
+// then revalidates immutable snapshot geometry/capacity and exact tuple parity
+// before atomic publish. Strict no-partial semantics: dst_q16 is never written.
 I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
     Q8_0Block *src_blocks,
     I64 src_block_capacity,
@@ -1591,6 +1588,10 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityComm
         out_required_dst_bytes == dst_q16)
         return Q8_0_ERR_BAD_DST_LEN;
 
+    // Commit-only wrapper contract (IQ-959):
+    // 1) stage canonical tuple from PreflightOnlyParity diagnostics helper;
+    // 2) revalidate immutable snapshot and tuple invariants;
+    // 3) atomically publish only after full parity success.
     snapshot_src_blocks = src_blocks;
     snapshot_dst_q16 = dst_q16;
     snapshot_src_block_capacity = src_block_capacity;
@@ -1704,3 +1705,14 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityComm
     *out_required_dst_bytes = staged_required_dst_bytes;
     return Q8_0_OK;
 }
+
+
+
+
+// Commit-only diagnostics wrapper over PreflightOnlyParity.
+//
+// Stages canonical tuple from
+//   Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity
+// then revalidates immutable caller snapshots and recomputed geometry tuple
+// before atomic publish. Strict no-partial semantics: diagnostics are written
+// only when every parity/invariant check succeeds.
