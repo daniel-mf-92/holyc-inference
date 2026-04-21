@@ -1377,9 +1377,12 @@ I32 Q4_0Q8_0DotQ32CheckedNoPartialArrayCommitOnlyPreflightOnlyParity(
     I64 snapshot_pair_count;
     I64 snapshot_blocks_per_dot;
     I64 snapshot_out_dot_capacity;
+    I64 scratch_out_capacity;
+    I64 scratch_out_bytes;
     Q4_0Block *snapshot_lhs_ptr;
     Q8_0Block *snapshot_rhs_ptr;
     I64 *snapshot_out_dot_ptr;
+    I64 *scratch_out_q32;
     I32 status;
 
     if (!lhs_q4 || !rhs_q8 || !out_dot_q32)
@@ -1399,6 +1402,23 @@ I32 Q4_0Q8_0DotQ32CheckedNoPartialArrayCommitOnlyPreflightOnlyParity(
         out_required_out_cells == out_required_in_bytes ||
         out_required_out_cells == out_required_out_bytes ||
         out_required_in_bytes == out_required_out_bytes)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    if (out_count == (I64 *)lhs_q4 ||
+        out_count == (I64 *)rhs_q8 ||
+        out_count == out_dot_q32 ||
+        out_required_in_blocks == (I64 *)lhs_q4 ||
+        out_required_in_blocks == (I64 *)rhs_q8 ||
+        out_required_in_blocks == out_dot_q32 ||
+        out_required_out_cells == (I64 *)lhs_q4 ||
+        out_required_out_cells == (I64 *)rhs_q8 ||
+        out_required_out_cells == out_dot_q32 ||
+        out_required_in_bytes == (I64 *)lhs_q4 ||
+        out_required_in_bytes == (I64 *)rhs_q8 ||
+        out_required_in_bytes == out_dot_q32 ||
+        out_required_out_bytes == (I64 *)lhs_q4 ||
+        out_required_out_bytes == (I64 *)rhs_q8 ||
+        out_required_out_bytes == out_dot_q32)
         return Q4_0_Q8_0_ERR_BAD_DST_LEN;
 
     if (lhs_block_capacity < 0 || rhs_block_capacity < 0 || out_dot_capacity < 0)
@@ -1424,6 +1444,9 @@ I32 Q4_0Q8_0DotQ32CheckedNoPartialArrayCommitOnlyPreflightOnlyParity(
     snapshot_pair_count = pair_count;
     snapshot_blocks_per_dot = blocks_per_dot;
     snapshot_out_dot_capacity = out_dot_capacity;
+    scratch_out_q32 = NULL;
+    scratch_out_capacity = pair_count;
+    scratch_out_bytes = 0;
 
     // Stage diagnostics from the no-write preflight companion.
     status = Q4_0Q8_0DotQ32CheckedNoPartialArrayCommitOnlyPreflightOnly(
@@ -1707,8 +1730,8 @@ I32 Q4_0Q8_0DotQ32CheckedNoPartialArrayCommitOnly(
         rhs_block_stride,
         pair_count,
         blocks_per_dot,
-        out_dot_q32,
-        out_dot_capacity);
+        pair_count > 0 ? scratch_out_q32 : out_dot_q32,
+        pair_count > 0 ? scratch_out_capacity : out_dot_capacity);
     if (status != Q4_0_Q8_0_OK)
         return status;
 
