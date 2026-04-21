@@ -14283,6 +14283,184 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnl
     return ATTN_Q16_OK;
 }
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyParityCommitOnly(
+    I64 *q_rows_q16,
+    I64 query_row_count,
+    I64 *k_rows_q16,
+    I64 token_count,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 *out_last_q_base_index,
+    I64 *out_last_k_base_index,
+    I64 *out_last_out_base_index,
+    I64 *out_required_q_cells,
+    I64 *out_required_k_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_q_bytes,
+    I64 *out_required_k_bytes,
+    I64 *out_required_out_bytes)
+{
+    I64 staged_last_q_base_index;
+    I64 staged_last_k_base_index;
+    I64 staged_last_out_base_index;
+    I64 staged_required_q_cells;
+    I64 staged_required_k_cells;
+    I64 staged_required_out_cells;
+    I64 staged_required_q_bytes;
+    I64 staged_required_k_bytes;
+    I64 staged_required_out_bytes;
+    I64 snapshot_query_row_count;
+    I64 snapshot_token_count;
+    I64 snapshot_head_dim;
+    I64 snapshot_q_rows_capacity;
+    I64 snapshot_k_rows_capacity;
+    I64 snapshot_out_scores_capacity;
+    I64 recomputed_q_rows_capacity;
+    I64 recomputed_k_rows_capacity;
+    I64 recomputed_out_scores_capacity;
+    I32 status;
+
+    if (!out_last_q_base_index || !out_last_k_base_index ||
+        !out_last_out_base_index || !out_required_q_cells ||
+        !out_required_k_cells || !out_required_out_cells ||
+        !out_required_q_bytes || !out_required_k_bytes ||
+        !out_required_out_bytes)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (out_last_q_base_index == out_last_k_base_index ||
+        out_last_q_base_index == out_last_out_base_index ||
+        out_last_q_base_index == out_required_q_cells ||
+        out_last_q_base_index == out_required_k_cells ||
+        out_last_q_base_index == out_required_out_cells ||
+        out_last_q_base_index == out_required_q_bytes ||
+        out_last_q_base_index == out_required_k_bytes ||
+        out_last_q_base_index == out_required_out_bytes ||
+        out_last_k_base_index == out_last_out_base_index ||
+        out_last_k_base_index == out_required_q_cells ||
+        out_last_k_base_index == out_required_k_cells ||
+        out_last_k_base_index == out_required_out_cells ||
+        out_last_k_base_index == out_required_q_bytes ||
+        out_last_k_base_index == out_required_k_bytes ||
+        out_last_k_base_index == out_required_out_bytes ||
+        out_last_out_base_index == out_required_q_cells ||
+        out_last_out_base_index == out_required_k_cells ||
+        out_last_out_base_index == out_required_out_cells ||
+        out_last_out_base_index == out_required_q_bytes ||
+        out_last_out_base_index == out_required_k_bytes ||
+        out_last_out_base_index == out_required_out_bytes ||
+        out_required_q_cells == out_required_k_cells ||
+        out_required_q_cells == out_required_out_cells ||
+        out_required_q_cells == out_required_q_bytes ||
+        out_required_q_cells == out_required_k_bytes ||
+        out_required_q_cells == out_required_out_bytes ||
+        out_required_k_cells == out_required_out_cells ||
+        out_required_k_cells == out_required_q_bytes ||
+        out_required_k_cells == out_required_k_bytes ||
+        out_required_k_cells == out_required_out_bytes ||
+        out_required_out_cells == out_required_q_bytes ||
+        out_required_out_cells == out_required_k_bytes ||
+        out_required_out_cells == out_required_out_bytes ||
+        out_required_q_bytes == out_required_k_bytes ||
+        out_required_q_bytes == out_required_out_bytes ||
+        out_required_k_bytes == out_required_out_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (query_row_count < 0 || token_count < 0 || head_dim < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       head_dim,
+                                       &snapshot_q_rows_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(token_count,
+                                       head_dim,
+                                       &snapshot_k_rows_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       token_count,
+                                       &snapshot_out_scores_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    snapshot_query_row_count = query_row_count;
+    snapshot_token_count = token_count;
+    snapshot_head_dim = head_dim;
+
+    // IQ-915 commit-only diagnostics wrapper:
+    // 1) stage canonical tuple from commit-only parity helper;
+    // 2) revalidate immutable geometry and derived capacities;
+    // 3) atomically publish staged diagnostics on full success.
+    status =
+        AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyParity(
+            q_rows_q16,
+            query_row_count,
+            k_rows_q16,
+            token_count,
+            head_dim,
+            out_scores_q32,
+            &staged_last_q_base_index,
+            &staged_last_k_base_index,
+            &staged_last_out_base_index,
+            &staged_required_q_cells,
+            &staged_required_k_cells,
+            &staged_required_out_cells,
+            &staged_required_q_bytes,
+            &staged_required_k_bytes,
+            &staged_required_out_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       head_dim,
+                                       &recomputed_q_rows_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(token_count,
+                                       head_dim,
+                                       &recomputed_k_rows_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       token_count,
+                                       &recomputed_out_scores_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (snapshot_query_row_count != query_row_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_token_count != token_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_head_dim != head_dim)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_q_rows_capacity != recomputed_q_rows_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_k_rows_capacity != recomputed_k_rows_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_scores_capacity != recomputed_out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    *out_last_q_base_index = staged_last_q_base_index;
+    *out_last_k_base_index = staged_last_k_base_index;
+    *out_last_out_base_index = staged_last_out_base_index;
+    *out_required_q_cells = staged_required_q_cells;
+    *out_required_k_cells = staged_required_k_cells;
+    *out_required_out_cells = staged_required_out_cells;
+    *out_required_q_bytes = staged_required_q_bytes;
+    *out_required_k_bytes = staged_required_k_bytes;
+    *out_required_out_bytes = staged_required_out_bytes;
+    return ATTN_Q16_OK;
+}
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyParityPreflightOnly(
     I64 *q_rows_q16,
     I64 query_row_count,
