@@ -540,6 +540,53 @@ I32 FPQ16MulSatCheckedNoPartialArray(I64 *lhs_q16,
     return FP_Q16_OK;
 }
 
+// Diagnostics helper over FPQ16MulSatCheckedNoPartialArray that computes the
+// caller-visible output byte requirement:
+//   required_output_bytes = count * sizeof(I64)
+//
+// Contract:
+// - Composes FPQ16MulSatCheckedNoPartialArray first.
+// - Derives required_output_bytes with checked integer math.
+// - Publishes required_output_bytes exactly once on success/overflow.
+// - Performs no required-bytes write on hard failures.
+I32 FPQ16MulSatCheckedNoPartialArrayRequiredBytes(I64 *lhs_q16,
+                                                  I64 *rhs_q16,
+                                                  I64 *out_q16,
+                                                  I64 count,
+                                                  U64 *out_required_output_bytes)
+{
+    I64 snapshot_count;
+    U64 staged_required_output_bytes;
+    I32 status;
+
+    if (!lhs_q16 || !rhs_q16 || !out_q16 || !out_required_output_bytes)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    snapshot_count = count;
+
+    if ((U64)snapshot_count > (U64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    staged_required_output_bytes = ((U64)snapshot_count) << 3;
+
+    status = FPQ16MulSatCheckedNoPartialArray(lhs_q16,
+                                              rhs_q16,
+                                              out_q16,
+                                              snapshot_count);
+    if (status != FP_Q16_OK && status != FP_Q16_ERR_OVERFLOW)
+        return status;
+
+    // Immutable diagnostics contract: caller-shared scalar inputs must stay
+    // stable across checked composition before publishing required bytes.
+    if (snapshot_count != count)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_required_output_bytes = staged_required_output_bytes;
+    return status;
+}
+
 // Compute byte span [base_addr, end_addr_exclusive) for an I64 lane array.
 // The caller guarantees:
 // - base_ptr is non-null
