@@ -268,7 +268,73 @@ I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnlyParity(
     I64 *out_required_step_logits_cells,
     I64 *out_required_generated_capacity,
     I64 *out_required_random_capacity);
+I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnlyParityCommitOnly(
+    I64 *step_logits_q16,
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 *token_history,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 top_p_q16,
+    I64 *random_q16_values,
+    I64 random_q16_capacity,
+    I64 *workspace_stage_logits_q16,
+    I64 workspace_stage_logits_capacity,
+    I64 *workspace_topk_logits_q16,
+    I64 workspace_topk_logits_capacity,
+    I64 *workspace_topk_indices,
+    I64 workspace_topk_index_capacity,
+    I64 *out_generated_tokens,
+    I64 generated_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_generated_capacity,
+    I64 *out_required_random_capacity);
 I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnlyParityPreflightOnly(
+    I64 *step_logits_q16,
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 *token_history,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 top_p_q16,
+    I64 *random_q16_values,
+    I64 random_q16_capacity,
+    I64 *workspace_stage_logits_q16,
+    I64 workspace_stage_logits_capacity,
+    I64 *workspace_topk_logits_q16,
+    I64 workspace_topk_logits_capacity,
+    I64 *workspace_topk_indices,
+    I64 workspace_topk_index_capacity,
+    I64 *out_generated_tokens,
+    I64 generated_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_generated_capacity,
+    I64 *out_required_random_capacity);
+I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnlyParityCommitOnly(
+    I64 *step_logits_q16,
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 *token_history,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 top_p_q16,
+    I64 *random_q16_values,
+    I64 random_q16_capacity,
+    I64 *workspace_stage_logits_q16,
+    I64 workspace_stage_logits_capacity,
+    I64 *workspace_topk_logits_q16,
+    I64 workspace_topk_logits_capacity,
+    I64 *workspace_topk_indices,
+    I64 workspace_topk_index_capacity,
+    I64 *out_generated_tokens,
+    I64 generated_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_generated_capacity,
+    I64 *out_required_random_capacity);
+I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnlyParityCommitOnly(
     I64 *step_logits_q16,
     I64 step_logits_capacity,
     I64 vocab_size,
@@ -1935,6 +2001,130 @@ I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnlyParity(
     return SAMPLING_Q16_OK;
 }
 
+// IQ-850 strict commit-only diagnostics wrapper for top-k-default parity helper.
+//
+// Contract:
+// 1) Stage required-capacity tuple via parity helper into local outputs.
+// 2) Revalidate immutable generation/capacity snapshot arguments.
+// 3) Atomically publish staged diagnostics only on full success.
+I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnlyParityCommitOnly(
+    I64 *step_logits_q16,
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 *token_history,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 top_p_q16,
+    I64 *random_q16_values,
+    I64 random_q16_capacity,
+    I64 *workspace_stage_logits_q16,
+    I64 workspace_stage_logits_capacity,
+    I64 *workspace_topk_logits_q16,
+    I64 workspace_topk_logits_capacity,
+    I64 *workspace_topk_indices,
+    I64 workspace_topk_index_capacity,
+    I64 *out_generated_tokens,
+    I64 generated_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_generated_capacity,
+    I64 *out_required_random_capacity)
+{
+    I64 snapshot_step_logits_capacity;
+    I64 snapshot_vocab_size;
+    I64 snapshot_max_new_tokens;
+    I64 snapshot_token_history_capacity;
+    I64 snapshot_token_history_count;
+    I64 snapshot_top_p_q16;
+    I64 snapshot_random_q16_capacity;
+    I64 snapshot_workspace_stage_logits_capacity;
+    I64 snapshot_workspace_topk_logits_capacity;
+    I64 snapshot_workspace_topk_index_capacity;
+    I64 snapshot_generated_capacity;
+
+    I64 staged_required_step_logits_cells;
+    I64 staged_required_generated_capacity;
+    I64 staged_required_random_capacity;
+    I32 status;
+
+    if (!out_required_step_logits_cells ||
+        !out_required_generated_capacity ||
+        !out_required_random_capacity)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (out_required_step_logits_cells == out_required_generated_capacity ||
+        out_required_step_logits_cells == out_required_random_capacity ||
+        out_required_generated_capacity == out_required_random_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (!step_logits_q16 || !token_history || !random_q16_values ||
+        !workspace_stage_logits_q16 || !workspace_topk_logits_q16 ||
+        !workspace_topk_indices || !out_generated_tokens)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (top_p_q16 <= 0 || top_p_q16 > SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_step_logits_capacity = step_logits_capacity;
+    snapshot_vocab_size = vocab_size;
+    snapshot_max_new_tokens = max_new_tokens;
+    snapshot_token_history_capacity = token_history_capacity;
+    snapshot_token_history_count = token_history_count;
+    snapshot_top_p_q16 = top_p_q16;
+    snapshot_random_q16_capacity = random_q16_capacity;
+    snapshot_workspace_stage_logits_capacity = workspace_stage_logits_capacity;
+    snapshot_workspace_topk_logits_capacity = workspace_topk_logits_capacity;
+    snapshot_workspace_topk_index_capacity = workspace_topk_index_capacity;
+    snapshot_generated_capacity = generated_capacity;
+
+    staged_required_step_logits_cells = *out_required_step_logits_cells;
+    staged_required_generated_capacity = *out_required_generated_capacity;
+    staged_required_random_capacity = *out_required_random_capacity;
+
+    status = InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnlyParity(
+        step_logits_q16,
+        step_logits_capacity,
+        vocab_size,
+        max_new_tokens,
+        token_history,
+        token_history_capacity,
+        token_history_count,
+        top_p_q16,
+        random_q16_values,
+        random_q16_capacity,
+        workspace_stage_logits_q16,
+        workspace_stage_logits_capacity,
+        workspace_topk_logits_q16,
+        workspace_topk_logits_capacity,
+        workspace_topk_indices,
+        workspace_topk_index_capacity,
+        out_generated_tokens,
+        generated_capacity,
+        &staged_required_step_logits_cells,
+        &staged_required_generated_capacity,
+        &staged_required_random_capacity);
+    if (status)
+        return status;
+
+    if (snapshot_step_logits_capacity != step_logits_capacity ||
+        snapshot_vocab_size != vocab_size ||
+        snapshot_max_new_tokens != max_new_tokens ||
+        snapshot_token_history_capacity != token_history_capacity ||
+        snapshot_token_history_count != token_history_count ||
+        snapshot_top_p_q16 != top_p_q16 ||
+        snapshot_random_q16_capacity != random_q16_capacity ||
+        snapshot_workspace_stage_logits_capacity != workspace_stage_logits_capacity ||
+        snapshot_workspace_topk_logits_capacity != workspace_topk_logits_capacity ||
+        snapshot_workspace_topk_index_capacity != workspace_topk_index_capacity ||
+        snapshot_generated_capacity != generated_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    *out_required_step_logits_cells = staged_required_step_logits_cells;
+    *out_required_generated_capacity = staged_required_generated_capacity;
+    *out_required_random_capacity = staged_required_random_capacity;
+    return SAMPLING_Q16_OK;
+}
+
 // IQ-849 diagnostics-only no-write companion for top-k-default parity helper.
 //
 // Contract:
@@ -2106,6 +2296,249 @@ I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnlyParityPrefli
     *out_required_step_logits_cells = parity_required_step_logits_cells;
     *out_required_generated_capacity = parity_required_generated_capacity;
     *out_required_random_capacity = parity_required_random_capacity;
+    return SAMPLING_Q16_OK;
+}
+
+// IQ-850 commit-only diagnostics wrapper over top-k-default parity gate.
+//
+// Contract:
+// - stage selected diagnostics tuple from `...CommitOnlyParity`;
+// - enforce immutable generation/capacity snapshots across composed call;
+// - publish staged tuple atomically after exact parity has already succeeded.
+I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnlyParityCommitOnly(
+    I64 *step_logits_q16,
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 *token_history,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 top_p_q16,
+    I64 *random_q16_values,
+    I64 random_q16_capacity,
+    I64 *workspace_stage_logits_q16,
+    I64 workspace_stage_logits_capacity,
+    I64 *workspace_topk_logits_q16,
+    I64 workspace_topk_logits_capacity,
+    I64 *workspace_topk_indices,
+    I64 workspace_topk_index_capacity,
+    I64 *out_generated_tokens,
+    I64 generated_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_generated_capacity,
+    I64 *out_required_random_capacity)
+{
+    I64 snapshot_step_logits_capacity;
+    I64 snapshot_vocab_size;
+    I64 snapshot_max_new_tokens;
+    I64 snapshot_token_history_capacity;
+    I64 snapshot_token_history_count;
+    I64 snapshot_top_p_q16;
+    I64 snapshot_random_q16_capacity;
+    I64 snapshot_workspace_stage_logits_capacity;
+    I64 snapshot_workspace_topk_logits_capacity;
+    I64 snapshot_workspace_topk_index_capacity;
+    I64 snapshot_generated_capacity;
+
+    I64 staged_required_step_logits_cells;
+    I64 staged_required_generated_capacity;
+    I64 staged_required_random_capacity;
+    I32 status;
+
+    if (!out_required_step_logits_cells ||
+        !out_required_generated_capacity ||
+        !out_required_random_capacity)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (out_required_step_logits_cells == out_required_generated_capacity ||
+        out_required_step_logits_cells == out_required_random_capacity ||
+        out_required_generated_capacity == out_required_random_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_step_logits_capacity = step_logits_capacity;
+    snapshot_vocab_size = vocab_size;
+    snapshot_max_new_tokens = max_new_tokens;
+    snapshot_token_history_capacity = token_history_capacity;
+    snapshot_token_history_count = token_history_count;
+    snapshot_top_p_q16 = top_p_q16;
+    snapshot_random_q16_capacity = random_q16_capacity;
+    snapshot_workspace_stage_logits_capacity = workspace_stage_logits_capacity;
+    snapshot_workspace_topk_logits_capacity = workspace_topk_logits_capacity;
+    snapshot_workspace_topk_index_capacity = workspace_topk_index_capacity;
+    snapshot_generated_capacity = generated_capacity;
+
+    staged_required_step_logits_cells = *out_required_step_logits_cells;
+    staged_required_generated_capacity = *out_required_generated_capacity;
+    staged_required_random_capacity = *out_required_random_capacity;
+
+    status = InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnlyParity(
+        step_logits_q16,
+        step_logits_capacity,
+        vocab_size,
+        max_new_tokens,
+        token_history,
+        token_history_capacity,
+        token_history_count,
+        top_p_q16,
+        random_q16_values,
+        random_q16_capacity,
+        workspace_stage_logits_q16,
+        workspace_stage_logits_capacity,
+        workspace_topk_logits_q16,
+        workspace_topk_logits_capacity,
+        workspace_topk_indices,
+        workspace_topk_index_capacity,
+        out_generated_tokens,
+        generated_capacity,
+        &staged_required_step_logits_cells,
+        &staged_required_generated_capacity,
+        &staged_required_random_capacity);
+    if (status)
+        return status;
+
+    if (snapshot_step_logits_capacity != step_logits_capacity ||
+        snapshot_vocab_size != vocab_size ||
+        snapshot_max_new_tokens != max_new_tokens ||
+        snapshot_token_history_capacity != token_history_capacity ||
+        snapshot_token_history_count != token_history_count ||
+        snapshot_top_p_q16 != top_p_q16 ||
+        snapshot_random_q16_capacity != random_q16_capacity ||
+        snapshot_workspace_stage_logits_capacity != workspace_stage_logits_capacity ||
+        snapshot_workspace_topk_logits_capacity != workspace_topk_logits_capacity ||
+        snapshot_workspace_topk_index_capacity != workspace_topk_index_capacity ||
+        snapshot_generated_capacity != generated_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    *out_required_step_logits_cells = staged_required_step_logits_cells;
+    *out_required_generated_capacity = staged_required_generated_capacity;
+    *out_required_random_capacity = staged_required_random_capacity;
+    return SAMPLING_Q16_OK;
+}
+
+// IQ-850 commit-only diagnostics wrapper over IQ-843 parity gate.
+//
+// Contract:
+// 1) Stage diagnostics tuple through `...Parity` into locals only.
+// 2) Revalidate immutable generation snapshots including derived top-k.
+// 3) Atomically publish outputs only when full staged parity succeeds.
+I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnlyParityCommitOnly(
+    I64 *step_logits_q16,
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 *token_history,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 top_p_q16,
+    I64 *random_q16_values,
+    I64 random_q16_capacity,
+    I64 *workspace_stage_logits_q16,
+    I64 workspace_stage_logits_capacity,
+    I64 *workspace_topk_logits_q16,
+    I64 workspace_topk_logits_capacity,
+    I64 *workspace_topk_indices,
+    I64 workspace_topk_index_capacity,
+    I64 *out_generated_tokens,
+    I64 generated_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_generated_capacity,
+    I64 *out_required_random_capacity)
+{
+    I64 staged_required_step_logits_cells;
+    I64 staged_required_generated_capacity;
+    I64 staged_required_random_capacity;
+
+    I64 snapshot_step_logits_capacity;
+    I64 snapshot_vocab_size;
+    I64 snapshot_max_new_tokens;
+    I64 snapshot_top_k;
+    I64 snapshot_token_history_capacity;
+    I64 snapshot_token_history_count;
+    I64 snapshot_top_p_q16;
+    I64 snapshot_random_q16_capacity;
+    I64 snapshot_workspace_stage_logits_capacity;
+    I64 snapshot_workspace_topk_logits_capacity;
+    I64 snapshot_workspace_topk_index_capacity;
+    I64 snapshot_generated_capacity;
+    I32 status;
+
+    if (!out_required_step_logits_cells ||
+        !out_required_generated_capacity ||
+        !out_required_random_capacity)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (out_required_step_logits_cells == out_required_generated_capacity ||
+        out_required_step_logits_cells == out_required_random_capacity ||
+        out_required_generated_capacity == out_required_random_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (!step_logits_q16 || !token_history || !random_q16_values ||
+        !workspace_stage_logits_q16 || !workspace_topk_logits_q16 ||
+        !workspace_topk_indices || !out_generated_tokens)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (top_p_q16 <= 0 || top_p_q16 > SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_step_logits_capacity = step_logits_capacity;
+    snapshot_vocab_size = vocab_size;
+    snapshot_max_new_tokens = max_new_tokens;
+    snapshot_top_k = vocab_size;
+    snapshot_token_history_capacity = token_history_capacity;
+    snapshot_token_history_count = token_history_count;
+    snapshot_top_p_q16 = top_p_q16;
+    snapshot_random_q16_capacity = random_q16_capacity;
+    snapshot_workspace_stage_logits_capacity = workspace_stage_logits_capacity;
+    snapshot_workspace_topk_logits_capacity = workspace_topk_logits_capacity;
+    snapshot_workspace_topk_index_capacity = workspace_topk_index_capacity;
+    snapshot_generated_capacity = generated_capacity;
+
+    staged_required_step_logits_cells = *out_required_step_logits_cells;
+    staged_required_generated_capacity = *out_required_generated_capacity;
+    staged_required_random_capacity = *out_required_random_capacity;
+
+    status = InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnlyParity(
+        step_logits_q16,
+        step_logits_capacity,
+        vocab_size,
+        max_new_tokens,
+        token_history,
+        token_history_capacity,
+        token_history_count,
+        top_p_q16,
+        random_q16_values,
+        random_q16_capacity,
+        workspace_stage_logits_q16,
+        workspace_stage_logits_capacity,
+        workspace_topk_logits_q16,
+        workspace_topk_logits_capacity,
+        workspace_topk_indices,
+        workspace_topk_index_capacity,
+        out_generated_tokens,
+        generated_capacity,
+        &staged_required_step_logits_cells,
+        &staged_required_generated_capacity,
+        &staged_required_random_capacity);
+    if (status)
+        return status;
+
+    if (snapshot_step_logits_capacity != step_logits_capacity ||
+        snapshot_vocab_size != vocab_size ||
+        snapshot_max_new_tokens != max_new_tokens ||
+        snapshot_top_k != vocab_size ||
+        snapshot_token_history_capacity != token_history_capacity ||
+        snapshot_token_history_count != token_history_count ||
+        snapshot_top_p_q16 != top_p_q16 ||
+        snapshot_random_q16_capacity != random_q16_capacity ||
+        snapshot_workspace_stage_logits_capacity != workspace_stage_logits_capacity ||
+        snapshot_workspace_topk_logits_capacity != workspace_topk_logits_capacity ||
+        snapshot_workspace_topk_index_capacity != workspace_topk_index_capacity ||
+        snapshot_generated_capacity != generated_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    *out_required_step_logits_cells = staged_required_step_logits_cells;
+    *out_required_generated_capacity = staged_required_generated_capacity;
+    *out_required_random_capacity = staged_required_random_capacity;
     return SAMPLING_Q16_OK;
 }
 
