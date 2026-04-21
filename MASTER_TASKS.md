@@ -967,8 +967,6 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 
 ## Progress Ledger
 
-- 2026-04-22: IQ-989 done — hardened `Q4_0Q8_0DotQ32CheckedNoPartial` in `src/quant/q4_0_q8_0_dot.HC` with checked byte-span alias guards and added `tests/test_q4_0_q8_0_dot_q32_checked_nopartial.py`; validated `python3 tests/test_q4_0_q8_0_dot_q32_checked_nopartial.py && python3 tests/test_q4_0_q8_0_dot_q32_checked_no_partial_array.py` (passed).
-
 - 2026-04-22: IQ-987 done — implemented `GGUFTensorInfoReadCheckedNoPartial` in `src/gguf/tensorinfo.HC` and added `tests/test_gguf_tensor_info_read_checked_nopartial.py`; validated `python3 tests/test_gguf_tensor_info_read_checked_nopartial.py && python3 tests/test_gguf_tensorinfo_parse.py` (passed).
 
 - 2026-04-22: IQ-985 done — enforced true preflight-only zero-write semantics in `src/math/fixedpoint.HC`; validated `python3 tests/test_fixedpoint_q16_mac_sat_checked_no_partial_array_required_bytes_commit_only_preflight_only.py && python3 tests/test_fixedpoint_q16_mac_sat_checked_no_partial_array_required_bytes_commit_only.py && python3 tests/test_fixedpoint_q16_mac_sat_checked_no_partial_array_required_bytes.py` (passed).
