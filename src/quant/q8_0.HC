@@ -2420,3 +2420,217 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityComm
     *out_required_dst_bytes = staged_required_dst_bytes;
     return Q8_0_OK;
 }
+
+
+// Diagnostics-only parity gate over IQ-962 commit-only and IQ-963 preflight-only
+// tuple producers.
+//
+// Stages canonical tuples from both producers, revalidates immutable caller
+// snapshots, recomputes canonical requirements from snapshot geometry, and only
+// publishes diagnostics when all tuple values match exactly. Strict no-write
+// semantics: dst_q16 remains untouched.
+I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyParity(
+    Q8_0Block *src_blocks,
+    I64 src_block_capacity,
+    I64 src_block_stride,
+    I64 block_count,
+    I64 *dst_q16,
+    I64 dst_q16_capacity,
+    I64 dst_block_stride_values,
+    I64 *out_block_count,
+    I64 *out_required_src_blocks,
+    I64 *out_required_dst_values,
+    I64 *out_required_src_bytes,
+    I64 *out_required_dst_bytes)
+{
+    Q8_0Block *snapshot_src_blocks;
+    I64 *snapshot_dst_q16;
+    I64 snapshot_src_block_capacity;
+    I64 snapshot_src_block_stride;
+    I64 snapshot_block_count;
+    I64 snapshot_dst_q16_capacity;
+    I64 snapshot_dst_block_stride_values;
+
+    I64 staged_commit_block_count;
+    I64 staged_commit_required_src_blocks;
+    I64 staged_commit_required_dst_values;
+    I64 staged_commit_required_src_bytes;
+    I64 staged_commit_required_dst_bytes;
+
+    I64 staged_preflight_block_count;
+    I64 staged_preflight_required_src_blocks;
+    I64 staged_preflight_required_dst_values;
+    I64 staged_preflight_required_src_bytes;
+    I64 staged_preflight_required_dst_bytes;
+
+    I64 recomputed_required_src_blocks;
+    I64 recomputed_required_dst_values;
+    I64 recomputed_required_src_bytes;
+    I64 recomputed_required_dst_bytes;
+    I64 src_last_offset;
+    I64 dst_last_base;
+    I32 status;
+
+    if (!src_blocks || !dst_q16 || !out_block_count ||
+        !out_required_src_blocks || !out_required_dst_values ||
+        !out_required_src_bytes || !out_required_dst_bytes)
+        return Q8_0_ERR_NULL_PTR;
+
+    if (out_block_count == out_required_src_blocks ||
+        out_block_count == out_required_dst_values ||
+        out_block_count == out_required_src_bytes ||
+        out_block_count == out_required_dst_bytes ||
+        out_required_src_blocks == out_required_dst_values ||
+        out_required_src_blocks == out_required_src_bytes ||
+        out_required_src_blocks == out_required_dst_bytes ||
+        out_required_dst_values == out_required_src_bytes ||
+        out_required_dst_values == out_required_dst_bytes ||
+        out_required_src_bytes == out_required_dst_bytes)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if ((I64 *)src_blocks == dst_q16 ||
+        out_block_count == (I64 *)src_blocks ||
+        out_required_src_blocks == (I64 *)src_blocks ||
+        out_required_dst_values == (I64 *)src_blocks ||
+        out_required_src_bytes == (I64 *)src_blocks ||
+        out_required_dst_bytes == (I64 *)src_blocks ||
+        out_block_count == dst_q16 ||
+        out_required_src_blocks == dst_q16 ||
+        out_required_dst_values == dst_q16 ||
+        out_required_src_bytes == dst_q16 ||
+        out_required_dst_bytes == dst_q16)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    snapshot_src_blocks = src_blocks;
+    snapshot_dst_q16 = dst_q16;
+    snapshot_src_block_capacity = src_block_capacity;
+    snapshot_src_block_stride = src_block_stride;
+    snapshot_block_count = block_count;
+    snapshot_dst_q16_capacity = dst_q16_capacity;
+    snapshot_dst_block_stride_values = dst_block_stride_values;
+
+    // IQ-969 diagnostics contract:
+    // 1) stage tuple from IQ-962 commit-only diagnostics wrapper;
+    // 2) stage tuple from IQ-963 preflight-only diagnostics companion;
+    // 3) recompute canonical tuple and require exact tuple parity;
+    // 4) publish atomically only after full parity succeeds.
+    status = Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
+        src_blocks,
+        src_block_capacity,
+        src_block_stride,
+        block_count,
+        dst_q16,
+        dst_q16_capacity,
+        dst_block_stride_values,
+        &staged_commit_block_count,
+        &staged_commit_required_src_blocks,
+        &staged_commit_required_dst_values,
+        &staged_commit_required_src_bytes,
+        &staged_commit_required_dst_bytes);
+    if (status != Q8_0_OK)
+        return status;
+
+    status = Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+        src_blocks,
+        src_block_capacity,
+        src_block_stride,
+        block_count,
+        dst_q16,
+        dst_q16_capacity,
+        dst_block_stride_values,
+        &staged_preflight_block_count,
+        &staged_preflight_required_src_blocks,
+        &staged_preflight_required_dst_values,
+        &staged_preflight_required_src_bytes,
+        &staged_preflight_required_dst_bytes);
+    if (status != Q8_0_OK)
+        return status;
+
+    if (src_blocks != snapshot_src_blocks ||
+        dst_q16 != snapshot_dst_q16 ||
+        src_block_capacity != snapshot_src_block_capacity ||
+        src_block_stride != snapshot_src_block_stride ||
+        block_count != snapshot_block_count ||
+        dst_q16_capacity != snapshot_dst_q16_capacity ||
+        dst_block_stride_values != snapshot_dst_block_stride_values)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if (snapshot_src_block_capacity < 0 || snapshot_dst_q16_capacity < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (snapshot_block_count < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (snapshot_src_block_stride <= 0 || snapshot_dst_block_stride_values <= 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (snapshot_dst_block_stride_values < Q8_0_VALUES_PER_BLOCK)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if (staged_commit_block_count != snapshot_block_count ||
+        staged_preflight_block_count != snapshot_block_count)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if (staged_commit_required_src_blocks < 0 ||
+        staged_commit_required_dst_values < 0 ||
+        staged_commit_required_src_bytes < 0 ||
+        staged_commit_required_dst_bytes < 0 ||
+        staged_preflight_required_src_blocks < 0 ||
+        staged_preflight_required_dst_values < 0 ||
+        staged_preflight_required_src_bytes < 0 ||
+        staged_preflight_required_dst_bytes < 0)
+        return Q8_0_ERR_OVERFLOW;
+
+    if (!snapshot_block_count)
+    {
+        recomputed_required_src_blocks = 0;
+        recomputed_required_dst_values = 0;
+    }
+    else
+    {
+        if (!Q8_0TryMulI64NonNeg(snapshot_block_count - 1,
+                                 snapshot_src_block_stride,
+                                 &src_last_offset))
+            return Q8_0_ERR_OVERFLOW;
+        if (!Q8_0TryMulI64NonNeg(snapshot_block_count - 1,
+                                 snapshot_dst_block_stride_values,
+                                 &dst_last_base))
+            return Q8_0_ERR_OVERFLOW;
+
+        if (!Q8_0TryAddI64(src_last_offset, 1, &recomputed_required_src_blocks))
+            return Q8_0_ERR_OVERFLOW;
+        if (!Q8_0TryAddI64(dst_last_base,
+                           Q8_0_VALUES_PER_BLOCK,
+                           &recomputed_required_dst_values))
+            return Q8_0_ERR_OVERFLOW;
+    }
+
+    if (!Q8_0TryMulI64NonNeg(recomputed_required_src_blocks,
+                             Q8_0_BLOCK_BYTES,
+                             &recomputed_required_src_bytes))
+        return Q8_0_ERR_OVERFLOW;
+    if (!Q8_0TryMulI64NonNeg(recomputed_required_dst_values,
+                             sizeof(I64),
+                             &recomputed_required_dst_bytes))
+        return Q8_0_ERR_OVERFLOW;
+
+    if (recomputed_required_src_blocks > snapshot_src_block_capacity ||
+        recomputed_required_dst_values > snapshot_dst_q16_capacity)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if (staged_commit_required_src_blocks != staged_preflight_required_src_blocks ||
+        staged_commit_required_dst_values != staged_preflight_required_dst_values ||
+        staged_commit_required_src_bytes != staged_preflight_required_src_bytes ||
+        staged_commit_required_dst_bytes != staged_preflight_required_dst_bytes)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if (staged_commit_required_src_blocks != recomputed_required_src_blocks ||
+        staged_commit_required_dst_values != recomputed_required_dst_values ||
+        staged_commit_required_src_bytes != recomputed_required_src_bytes ||
+        staged_commit_required_dst_bytes != recomputed_required_dst_bytes)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    *out_block_count = staged_commit_block_count;
+    *out_required_src_blocks = staged_commit_required_src_blocks;
+    *out_required_dst_values = staged_commit_required_dst_values;
+    *out_required_src_bytes = staged_commit_required_src_bytes;
+    *out_required_dst_bytes = staged_commit_required_dst_bytes;
+    return Q8_0_OK;
+}
