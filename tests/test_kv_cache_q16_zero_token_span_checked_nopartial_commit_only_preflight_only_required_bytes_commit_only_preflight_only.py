@@ -492,10 +492,61 @@ def test_required_bytes_overflow_preserves_no_partial_outputs() -> None:
     assert out_end == [555]
 
 
+def test_capacity_mismatch_preserves_no_partial_outputs() -> None:
+    layer_count = 2
+    token_capacity = 4
+    kv_heads = 3
+    head_dim = 5
+    span = kv_heads * head_dim
+    total_cells = layer_count * token_capacity * span
+
+    k_cache = [7] * total_cells
+    v_cache = [11] * total_cells
+    k_before = k_cache.copy()
+    v_before = v_cache.copy()
+
+    layer_idx = 1
+    token_idx = 3
+
+    out_span = [901]
+    out_bytes = [902]
+    out_k_base = [903]
+    out_v_base = [904]
+    out_end = [905]
+
+    # Expected end index is total_cells, so shrinking one capacity must fail.
+    err = kv_cache_q16_zero_token_span_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only(
+        k_cache,
+        total_cells - 1,
+        v_cache,
+        total_cells,
+        layer_idx,
+        token_idx,
+        layer_count,
+        token_capacity,
+        kv_heads,
+        head_dim,
+        out_span,
+        out_bytes,
+        out_k_base,
+        out_v_base,
+        out_end,
+    )
+    assert err == KV_Q16_ERR_BAD_PARAM
+    assert out_span == [901]
+    assert out_bytes == [902]
+    assert out_k_base == [903]
+    assert out_v_base == [904]
+    assert out_end == [905]
+    assert k_cache == k_before
+    assert v_cache == v_before
+
+
 if __name__ == "__main__":
     test_source_contains_required_bytes_commit_only_preflight_only_helper()
     test_known_vector_preflight_only_required_bytes_and_zero_write()
     test_alias_null_and_no_partial_contracts()
     test_randomized_parity_vs_explicit_composition_adversarial()
     test_required_bytes_overflow_preserves_no_partial_outputs()
+    test_capacity_mismatch_preserves_no_partial_outputs()
     print("ok")

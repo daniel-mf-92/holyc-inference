@@ -1776,6 +1776,19 @@ I32 KVCacheQ16ZeroTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesC
     if (staged_end_index != staged_end_recomputed_v)
         return KV_Q16_ERR_BAD_PARAM;
 
+    if (staged_required_span_cells < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (staged_required_token_bytes < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (staged_end_index < staged_k_base_index)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (staged_end_index < staged_v_base_index)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (staged_end_index > k_cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (staged_end_index > v_cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
     if (snapshot_layer_idx != layer_idx ||
         snapshot_token_idx != token_idx ||
         snapshot_layer_count != layer_count ||
