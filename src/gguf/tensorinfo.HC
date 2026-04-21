@@ -302,6 +302,8 @@ I64 GGUFTensorInfoReadNameCheckedNoPartial(U8 *buf,
                                            GGUFTensorString *out_name,
                                            U64 *out_next_cursor)
 {
+    U64 snapshot_size;
+    U64 snapshot_cursor;
     GGUFTensorString staged;
     I64 staged_cursor;
     I64 status;
@@ -313,6 +315,9 @@ I64 GGUFTensorInfoReadNameCheckedNoPartial(U8 *buf,
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
     if (size > 0x7FFFFFFFFFFFFFFF || cursor > 0x7FFFFFFFFFFFFFFF)
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    snapshot_size = size;
+    snapshot_cursor = cursor;
 
     GGUFTensorZeroString(&staged);
 
@@ -344,6 +349,14 @@ I64 GGUFTensorInfoReadNameCheckedNoPartial(U8 *buf,
     {
         GGUFTensorFreeString(&staged);
         return status;
+    }
+
+    // Commit-only publish guard: keep diagnostics/output publication tied to
+    // immutable snapshot values so no-partial contracts stay explicit.
+    if (snapshot_size != size || snapshot_cursor != cursor)
+    {
+        GGUFTensorFreeString(&staged);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
     }
 
     *out_name = staged;
