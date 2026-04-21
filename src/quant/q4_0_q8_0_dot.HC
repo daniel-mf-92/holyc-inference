@@ -1636,9 +1636,12 @@ I32 Q4_0Q8_0DotQ32CheckedNoPartialArrayCommitOnly(
     I64 snapshot_pair_count;
     I64 snapshot_blocks_per_dot;
     I64 snapshot_out_dot_capacity;
+    I64 scratch_out_capacity;
+    I64 scratch_out_bytes;
     Q4_0Block *snapshot_lhs_ptr;
     Q8_0Block *snapshot_rhs_ptr;
     I64 *snapshot_out_dot_ptr;
+    I64 *scratch_out_q32;
     I32 status;
 
     if (!lhs_q4 || !rhs_q8 || !out_dot_q32)
