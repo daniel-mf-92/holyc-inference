@@ -805,6 +805,12 @@ I32 Q4_0Q8_0DotQ32CheckedNoPartial(
     if (block_count < 0)
         return Q4_0_Q8_0_ERR_BAD_DST_LEN;
 
+    // Reject obvious scalar-output aliasing against quant block bases.
+    // Even for block_count==0 we preserve this contract so callers cannot
+    // accidentally publish into model tensor storage through out_dot_q32.
+    if ((I64 *)lhs_q4 == out_dot_q32 || (I64 *)rhs_q8 == out_dot_q32)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
     if (!block_count)
     {
         *out_dot_q32 = 0;

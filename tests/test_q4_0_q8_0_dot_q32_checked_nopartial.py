@@ -197,7 +197,7 @@ def test_capacity_and_stride_bounds() -> None:
             len(lhs),
             1,
             rhs,
-            3,
+            2,
             2,
             2,
             out,
