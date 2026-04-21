@@ -113,7 +113,7 @@ def fpq16_mul_sat_checked_no_partial_array_required_bytes(
 
     if count < 0:
         return FP_Q16_ERR_BAD_PARAM, -1
-    if count > (I64_MAX_VALUE >> 3):
+    if count > (U64_MAX_VALUE >> 3):
         return FP_Q16_ERR_OVERFLOW, -1
 
     required_output_bytes = count << 3
@@ -127,11 +127,12 @@ def test_source_contains_required_bytes_helper_contract() -> None:
     body = source.split(sig, 1)[1].split("I32 FPArrayI64SpanChecked", 1)[0]
     assert "FPQ16MulSatCheckedNoPartialArray(lhs_q16," in body
     assert "if (status != FP_Q16_OK && status != FP_Q16_ERR_OVERFLOW)" in body
-    assert "if (count > (I64_MAX_VALUE >> 3))" in body
+    assert "if ((U64)snapshot_count > (U64_MAX_VALUE >> 3))" in body
+    assert "if (snapshot_count != count)" in body
     assert "*out_required_output_bytes = staged_required_output_bytes;" in body
 
 
-def test_null_required_bytes_ptr_and_output_alias_guard() -> None:
+def test_null_required_bytes_ptr() -> None:
     lhs = [1 << FP_Q16_SHIFT]
     rhs = [2 << FP_Q16_SHIFT]
     out = [0x55]
@@ -189,7 +190,7 @@ def test_randomized_reference_parity_and_no_write_on_hard_failures() -> None:
 
 def run() -> None:
     test_source_contains_required_bytes_helper_contract()
-    test_null_required_bytes_ptr_and_output_alias_guard()
+    test_null_required_bytes_ptr()
     test_known_vectors_and_required_bytes_publication()
     test_randomized_reference_parity_and_no_write_on_hard_failures()
     print("fixedpoint_q16_mul_sat_checked_no_partial_array_required_bytes=ok")
