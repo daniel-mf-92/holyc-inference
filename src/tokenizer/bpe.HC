@@ -111,6 +111,7 @@ I32 TokenizerUTF8ValidateContinuationSpanChecked(U8 *bytes,
 {
     U64 cursor;
     U64 staged_cursor;
+    U64 staged_last_piece_end;
     U64 consumed;
     U64 next_consumed;
     U8 continuation;
@@ -6185,6 +6186,20 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyP
         return err;
 
     if (staged_cursor != snapshot_cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (staged_required_token_capacity != prompt_nbytes)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    staged_last_piece_end = snapshot_cursor + staged_required_token_capacity;
+    if (staged_last_piece_end < snapshot_cursor)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    if (staged_last_piece_end > byte_len)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    if (prompt_nbytes && max_piece_len > 0x7FFFFFFFFFFFFFFF / prompt_nbytes)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    if (staged_required_merge_workspace_bytes != prompt_nbytes * max_piece_len)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
 
     if (snapshot_byte_len != byte_len)
