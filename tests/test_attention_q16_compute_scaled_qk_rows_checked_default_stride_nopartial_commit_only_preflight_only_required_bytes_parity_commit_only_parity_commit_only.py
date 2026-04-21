@@ -259,6 +259,34 @@ def test_error_paths_preserve_outputs() -> None:
     assert err == ATTN_Q16_ERR_NULL_PTR
 
 
+def test_alias_safety_preserve_outputs() -> None:
+    staged = [0] * 8
+    out = [0] * 8
+
+    got_stage_cells = [991]
+    got_stage_bytes = [992]
+    got_out_cells = [993]
+    got_last_out = [994]
+
+    err = attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit_only_preflight_only_required_bytes_parity_commit_only_parity_commit_only(
+        2,
+        3,
+        staged,
+        len(staged),
+        out,
+        len(out),
+        staged,
+        got_stage_bytes,
+        got_out_cells,
+        got_last_out,
+    )
+
+    assert err == ATTN_Q16_ERR_BAD_PARAM
+    assert got_stage_bytes == [992]
+    assert got_out_cells == [993]
+    assert got_last_out == [994]
+
+
 def test_fuzz_parity_vs_explicit_composition() -> None:
     random.seed(20260421_846)
 
