@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity harness for ...CommitOnlyPreflightOnlyRequiredBytes (IQ-823)."""
+"""Parity harness for ...CommitOnlyPreflightOnlyRequiredBytes (IQ-815)."""
 
 from __future__ import annotations
 
@@ -102,6 +102,9 @@ def test_source_contains_required_bytes_helper_and_atomic_publish() -> None:
     )[0]
     assert "TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyPreflightOnly(" in body
     assert "staged_required_merge_workspace_bytes = prompt_nbytes * max_piece_len;" in body
+    assert "if (snapshot_bytes != bytes)" in body
+    assert "if (snapshot_io_cursor_ptr != io_cursor)" in body
+    assert "if (snapshot_out_required_merge_workspace_bytes_ptr !=" in body
     assert "*out_required_token_capacity = staged_required_token_capacity;" in body
     assert "*out_required_merge_workspace_bytes = staged_required_merge_workspace_bytes;" in body
 
@@ -157,7 +160,7 @@ def test_required_bytes_success_and_no_partial_on_failure() -> None:
 
 
 def test_required_bytes_fuzz_parity() -> None:
-    random.seed(20260421_823)
+    random.seed(20260421_815)
 
     for _ in range(2600):
         payload_len = random.randint(0, 128)

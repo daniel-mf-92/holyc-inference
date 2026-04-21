@@ -5334,6 +5334,15 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyP
     U64 *out_required_token_capacity,
     U64 *out_required_merge_workspace_bytes)
 {
+    U8 *snapshot_bytes;
+    U64 *snapshot_io_cursor_ptr;
+    I32 *snapshot_rank_left_tokens;
+    I32 *snapshot_rank_right_tokens;
+    U32 *snapshot_rank_values;
+    I32 *snapshot_rank_merged_tokens;
+    U64 *snapshot_out_required_token_capacity_ptr;
+    U64 *snapshot_out_required_merge_workspace_bytes_ptr;
+
     U64 snapshot_byte_len;
     U64 snapshot_cursor;
     U64 snapshot_prompt_nbytes;
@@ -5357,6 +5366,15 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyP
 
     snapshot_byte_len = byte_len;
     snapshot_cursor = *io_cursor;
+    snapshot_bytes = bytes;
+    snapshot_io_cursor_ptr = io_cursor;
+    snapshot_rank_left_tokens = rank_left_tokens;
+    snapshot_rank_right_tokens = rank_right_tokens;
+    snapshot_rank_values = rank_values;
+    snapshot_rank_merged_tokens = rank_merged_tokens;
+    snapshot_out_required_token_capacity_ptr = out_required_token_capacity;
+    snapshot_out_required_merge_workspace_bytes_ptr =
+        out_required_merge_workspace_bytes;
     snapshot_prompt_nbytes = prompt_nbytes;
     snapshot_rank_table_count = rank_table_count;
     snapshot_rank_table_capacity = rank_table_capacity;
@@ -5365,7 +5383,7 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyP
     if (snapshot_cursor > byte_len)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
 
-    // IQ-823 diagnostics-only helper contract:
+    // IQ-815 diagnostics-only helper contract:
     // 1) reuse canonical commit-only preflight checks to derive token capacity;
     // 2) derive merge-workspace bytes with checked integer multiply;
     // 3) atomically publish both diagnostics only when all checks pass.
@@ -5394,6 +5412,24 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyP
     // Immutable diagnostics contract: commit-only preflight wrappers publish
     // no caller writes besides required outputs and preserve geometry inputs.
     if (snapshot_byte_len != byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_bytes != bytes)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_io_cursor_ptr != io_cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_rank_left_tokens != rank_left_tokens)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_rank_right_tokens != rank_right_tokens)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_rank_values != rank_values)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_rank_merged_tokens != rank_merged_tokens)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_out_required_token_capacity_ptr !=
+        out_required_token_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_out_required_merge_workspace_bytes_ptr !=
+        out_required_merge_workspace_bytes)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
     if (snapshot_cursor != *io_cursor)
         return TOKENIZER_BPE_ERR_BAD_PARAM;

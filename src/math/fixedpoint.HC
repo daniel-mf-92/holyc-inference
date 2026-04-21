@@ -854,6 +854,67 @@ I32 FPQ16MacSatCheckedNoPartialArrayRequiredBytes(I64 *acc_q16,
     return FP_Q16_OK;
 }
 
+// Commit-only diagnostics wrapper over
+// FPQ16MacSatCheckedNoPartialArrayRequiredBytes.
+//
+// This stages required_output_bytes locally, revalidates immutable call-site
+// snapshots, and only then publishes the diagnostics scalar to the caller.
+//
+// Contract:
+// - Composes FPQ16MacSatCheckedNoPartialArrayRequiredBytes first.
+// - Treats {OK, OVERFLOW} as publishable statuses.
+// - Preserves no-partial diagnostics writes on hard failures.
+I32 FPQ16MacSatCheckedNoPartialArrayRequiredBytesCommitOnly(I64 *acc_q16,
+                                                            I64 *a_q16,
+                                                            I64 *b_q16,
+                                                            I64 *out_q16,
+                                                            I64 count,
+                                                            I64 *out_required_output_bytes)
+{
+    I64 snapshot_count;
+    I64 *snapshot_acc_q16;
+    I64 *snapshot_a_q16;
+    I64 *snapshot_b_q16;
+    I64 *snapshot_out_q16;
+    I64 staged_required_output_bytes;
+    I32 status;
+
+    if (!out_required_output_bytes)
+        return FP_Q16_ERR_NULL_PTR;
+
+    snapshot_count = count;
+    snapshot_acc_q16 = acc_q16;
+    snapshot_a_q16 = a_q16;
+    snapshot_b_q16 = b_q16;
+    snapshot_out_q16 = out_q16;
+
+    status = FPQ16MacSatCheckedNoPartialArrayRequiredBytes(acc_q16,
+                                                           a_q16,
+                                                           b_q16,
+                                                           out_q16,
+                                                           count,
+                                                           &staged_required_output_bytes);
+    if (status != FP_Q16_OK && status != FP_Q16_ERR_OVERFLOW)
+        return status;
+
+    if (snapshot_count != count)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_acc_q16 != acc_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_a_q16 != a_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_b_q16 != b_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_q16 != out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_required_output_bytes = staged_required_output_bytes;
+
+    if (status == FP_Q16_ERR_OVERFLOW)
+        return FP_Q16_ERR_OVERFLOW;
+    return FP_Q16_OK;
+}
+
 // Checked elementwise Q16 divide helper with no-partial-write contract.
 I32 FPQ16DivArrayChecked(I64 *num_q16,
                          I64 *den_q16,
@@ -1273,35 +1334,31 @@ I32 FPQ16MulDivArrayRoundedByPositiveIntFromQ16DenCheckedNoAlias(I64 *a_q16,
 
 // Checked integer-only Q16 exponential approximation.
 //
-// Math model:
-//   x = k*ln(2) + r,  where k is nearest integer and |r| <= ln(2)/2
-//   exp(x) = 2^k * exp(r)
-//   exp(r) ≈ 1 + r + r^2/2 + r^3/6 + r^4/24   (all terms in Q16)
+// Range reduction helper used by exp approximation core.
+//
+// Splits x_q16 into:
+//   x_q16 = k*ln(2) + r_q16
+// where k is nearest integer to x/ln(2) and |r_q16| <= ln(2)/2.
 //
 // Contracts:
-// - Null output pointer returns NULL_PTR with no write.
-// - Uses checked Q16 multiply helpers for polynomial terms.
-// - Saturates to I64_MAX_VALUE and returns OVERFLOW on upper overflow.
-// - Underflow to sub-Q16 magnitudes returns 0.
-// - Commits caller output exactly once.
-I32 FPQ16ExpApproxChecked(I64 x_q16,
-                          I64 *out_q16)
+// - All output pointers are required.
+// - Uses checked integer math for k*ln(2) reconstruction and subtraction.
+// - Commits outputs exactly once after all invariants pass.
+I32 FPQ16ExpApproxRangeReduceChecked(I64 x_q16,
+                                     I64 *out_k,
+                                     I64 *out_r_q16)
 {
-    I64 k;
-    I64 shift_mag;
     I64 ln2_q16;
     I64 half_ln2_q16;
+    I64 k;
     I64 k_ln2_q16;
     I64 residual_q16;
-    I64 residual2_q16;
-    I64 residual3_q16;
-    I64 residual4_q16;
-    I64 poly_q16;
-    I64 staged_out_q16;
     U64 abs_k_u64;
 
-    if (!out_q16)
+    if (!out_k || !out_r_q16)
         return FP_Q16_ERR_NULL_PTR;
+    if (out_k == out_r_q16)
+        return FP_Q16_ERR_BAD_PARAM;
 
     ln2_q16 = 45426;       // round(ln(2) * 65536)
     half_ln2_q16 = 22713;  // round(ln(2)/2 * 65536)
@@ -1326,6 +1383,125 @@ I32 FPQ16ExpApproxChecked(I64 x_q16,
         return FP_Q16_ERR_OVERFLOW;
 
     residual_q16 = x_q16 - k_ln2_q16;
+
+    // Because k is nearest-integer rounded, residual must stay within
+    // +/- ln(2)/2 and is safe for polynomial core evaluation.
+    if (residual_q16 < -half_ln2_q16 || residual_q16 > half_ln2_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_k = k;
+    *out_r_q16 = residual_q16;
+    return FP_Q16_OK;
+}
+
+// Checked lane-wise exp range-reduction helper with strict no-partial-write
+// semantics over parallel {x_q16,k,r_q16} arrays.
+//
+// Contracts:
+// - Null pointers return NULL_PTR with no writes.
+// - count < 0 returns BAD_PARAM with no writes.
+// - Any alias/overlap among input/output ranges is rejected.
+// - All lanes are preflighted before any output lane is committed.
+I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArray(I64 *x_q16,
+                                                   I64 *out_k,
+                                                   I64 *out_r_q16,
+                                                   I64 count)
+{
+    I64 i;
+    I64 staged_k;
+    I64 staged_r_q16;
+    U64 x_base;
+    U64 x_end;
+    U64 k_base;
+    U64 k_end;
+    U64 r_base;
+    U64 r_end;
+    I32 status;
+
+    if (!x_q16 || !out_k || !out_r_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Preserve deterministic BAD_PARAM classification for exact-alias tuples
+    // before span arithmetic.
+    if (x_q16 == out_k || x_q16 == out_r_q16 || out_k == out_r_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (!count)
+        return FP_Q16_OK;
+
+    status = FPArrayI64SpanChecked(x_q16, count, &x_base, &x_end);
+    if (status)
+        return status;
+    status = FPArrayI64SpanChecked(out_k, count, &k_base, &k_end);
+    if (status)
+        return status;
+    status = FPArrayI64SpanChecked(out_r_q16, count, &r_base, &r_end);
+    if (status)
+        return status;
+
+    if (FPAddressRangesOverlap(x_base, x_end, k_base, k_end) ||
+        FPAddressRangesOverlap(x_base, x_end, r_base, r_end) ||
+        FPAddressRangesOverlap(k_base, k_end, r_base, r_end))
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Preflight every lane first so hard failures never partially publish.
+    for (i = 0; i < count; i++)
+    {
+        status = FPQ16ExpApproxRangeReduceChecked(x_q16[i],
+                                                  &staged_k,
+                                                  &staged_r_q16);
+        if (status)
+            return status;
+    }
+
+    for (i = 0; i < count; i++)
+    {
+        status = FPQ16ExpApproxRangeReduceChecked(x_q16[i],
+                                                  &out_k[i],
+                                                  &out_r_q16[i]);
+        if (status)
+            return status;
+    }
+
+    return FP_Q16_OK;
+}
+
+// Checked integer-only Q16 exponential approximation.
+//
+// Math model:
+//   x = k*ln(2) + r,  where k is nearest integer and |r| <= ln(2)/2
+//   exp(x) = 2^k * exp(r)
+//   exp(r) ≈ 1 + r + r^2/2 + r^3/6 + r^4/24   (all terms in Q16)
+//
+// Contracts:
+// - Null output pointer returns NULL_PTR with no write.
+// - Uses checked Q16 multiply helpers for polynomial terms.
+// - Saturates to I64_MAX_VALUE and returns OVERFLOW on upper overflow.
+// - Underflow to sub-Q16 magnitudes returns 0.
+// - Commits caller output exactly once.
+I32 FPQ16ExpApproxChecked(I64 x_q16,
+                          I64 *out_q16)
+{
+    I32 status;
+    I64 k;
+    I64 shift_mag;
+    I64 residual_q16;
+    I64 residual2_q16;
+    I64 residual3_q16;
+    I64 residual4_q16;
+    I64 poly_q16;
+    I64 staged_out_q16;
+
+    if (!out_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    status = FPQ16ExpApproxRangeReduceChecked(x_q16,
+                                              &k,
+                                              &residual_q16);
+    if (status != FP_Q16_OK)
+        return status;
 
     if (FPQ16MulChecked(residual_q16,
                         residual_q16,
