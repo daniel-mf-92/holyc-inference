@@ -1107,3 +1107,102 @@ I32 GGUFReadTensorDataQ8_0CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     *out_bytes_read = staged_bytes_read_i64;
     return GGUF_READER_OK;
 }
+
+
+I32 GGUFReadTensorDataQ8_0CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+    U8 *gguf_bytes,
+    U64 gguf_nbytes,
+    U64 tensor_data_base,
+    GGUFReaderTensorInfoQ4_0 *tensor_info,
+    U8 *out_q8_0_blocks,
+    U64 out_q8_0_blocks_capacity,
+    I64 *out_blocks_read,
+    I64 *out_bytes_read)
+{
+    U32 i;
+    U32 staged_n_dims;
+    U32 staged_ggml_type;
+    U64 staged_dims[4];
+    U64 staged_offset;
+    U64 staged_out_capacity;
+    I64 staged_blocks_read_i64;
+    I64 staged_bytes_read_i64;
+    I64 recomputed_blocks_read_i64;
+    I64 recomputed_bytes_read_i64;
+    I32 status;
+
+    if (!gguf_bytes || !tensor_info || !out_q8_0_blocks ||
+        !out_blocks_read || !out_bytes_read)
+        return GGUF_READER_ERR_NULL_PTR;
+
+    if (out_blocks_read == out_bytes_read)
+        return GGUF_READER_ERR_BAD_PARAM;
+
+    if ((U8 *)out_blocks_read == out_q8_0_blocks ||
+        (U8 *)out_bytes_read == out_q8_0_blocks)
+        return GGUF_READER_ERR_BAD_PARAM;
+
+    // Snapshot immutable tensor metadata and caller-reported capacity so this
+    // diagnostics-only wrapper can reject caller mutation before publish.
+    staged_n_dims = tensor_info->n_dims;
+    staged_ggml_type = tensor_info->ggml_type;
+    staged_offset = tensor_info->offset;
+    staged_out_capacity = out_q8_0_blocks_capacity;
+    for (i = 0; i < 4; ++i)
+        staged_dims[i] = tensor_info->dims[i];
+
+    // Stage diagnostics from commit-only parity wrapper.
+    status = GGUFReadTensorDataQ8_0CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(
+        gguf_bytes,
+        gguf_nbytes,
+        tensor_data_base,
+        tensor_info,
+        out_q8_0_blocks,
+        out_q8_0_blocks_capacity,
+        &staged_blocks_read_i64,
+        &staged_bytes_read_i64);
+    if (status != GGUF_READER_OK)
+        return status;
+
+    // Recompute canonical diagnostics from the no-write preflight helper and
+    // require exact tuple parity before atomic publish.
+    status = GGUFReadTensorDataQ8_0CheckedNoPartialCommitOnlyPreflightOnly(
+        gguf_bytes,
+        gguf_nbytes,
+        tensor_data_base,
+        tensor_info,
+        out_q8_0_blocks,
+        out_q8_0_blocks_capacity,
+        &recomputed_blocks_read_i64,
+        &recomputed_bytes_read_i64);
+    if (status != GGUF_READER_OK)
+        return status;
+
+    if (!GGUFReaderTensorInfoQ8_0MatchesSnapshot(tensor_info,
+                                                 staged_n_dims,
+                                                 staged_ggml_type,
+                                                 staged_offset,
+                                                 staged_dims))
+        return GGUF_READER_ERR_BAD_PARAM;
+
+    if (staged_out_capacity != out_q8_0_blocks_capacity)
+        return GGUF_READER_ERR_BAD_PARAM;
+
+    if (staged_blocks_read_i64 != recomputed_blocks_read_i64 ||
+        staged_bytes_read_i64 != recomputed_bytes_read_i64)
+        return GGUF_READER_ERR_BAD_PARAM;
+
+    if (staged_blocks_read_i64 < 0 || staged_bytes_read_i64 < 0)
+        return GGUF_READER_ERR_OVERFLOW;
+
+    if ((U64)staged_bytes_read_i64 > staged_out_capacity)
+        return GGUF_READER_ERR_BAD_CAPACITY;
+
+    // Preflight-only semantics: publish diagnostics only; payload stays
+    // untouched because both composed helpers are no-write variants.
+    *out_blocks_read = staged_blocks_read_i64;
+    *out_bytes_read = staged_bytes_read_i64;
+    return GGUF_READER_OK;
+}
+
+
