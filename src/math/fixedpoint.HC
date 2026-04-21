@@ -582,6 +582,9 @@ I32 FPQ16MulCheckedNoPartialArrayRequiredBytes(I64 *lhs_q16,
 {
     I64 staged_required_cells;
     I64 staged_required_bytes;
+    I64 recomputed_required_cells;
+    I64 recomputed_required_bytes;
+    I64 recomputed_required_bytes_checked;
     U64 lhs_base;
     U64 lhs_end;
     U64 rhs_base;
@@ -1048,6 +1051,28 @@ I32 FPQ16MulCheckedNoPartialArrayRequiredBytesCommitOnly(I64 *lhs_q16,
     if (snapshot_out_q16 != out_q16)
         return FP_Q16_ERR_BAD_PARAM;
     if (snapshot_count != count)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    recomputed_required_cells = snapshot_count;
+
+    status = FPTryMulI64Checked(snapshot_count,
+                                8,
+                                &recomputed_required_bytes_checked);
+    if (status)
+        return status;
+
+    if (snapshot_count > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    recomputed_required_bytes = snapshot_count << 3;
+
+    if (recomputed_required_bytes_checked != recomputed_required_bytes)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_cells != recomputed_required_cells ||
+        staged_required_bytes != recomputed_required_bytes)
         return FP_Q16_ERR_BAD_PARAM;
 
     if (out_required_cells == out_required_bytes)
