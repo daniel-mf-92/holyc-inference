@@ -1788,6 +1788,7 @@ I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParity(
                                                                                  I64 *out_k,
                                                                                  I64 *out_r_q16,
                                                                                  I64 count,
+                                                                                 I64 *out_count,
                                                                                  I64 *out_required_cells,
                                                                                  I64 *out_required_bytes)
 {
@@ -1805,7 +1806,7 @@ I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParity(
 
     if (!x_q16 || !out_k || !out_r_q16)
         return FP_Q16_ERR_NULL_PTR;
-    if (!out_required_cells || !out_required_bytes)
+    if (!out_count || !out_required_cells || !out_required_bytes)
         return FP_Q16_ERR_NULL_PTR;
     if (count < 0)
         return FP_Q16_ERR_BAD_PARAM;
@@ -1813,7 +1814,14 @@ I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParity(
     if (x_q16 == out_k || x_q16 == out_r_q16 || out_k == out_r_q16)
         return FP_Q16_ERR_BAD_PARAM;
 
-    if (out_required_cells == out_required_bytes)
+    if (out_count == out_required_cells ||
+        out_count == out_required_bytes ||
+        out_required_cells == out_required_bytes)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_count == x_q16 ||
+        out_count == out_k ||
+        out_count == out_r_q16)
         return FP_Q16_ERR_BAD_PARAM;
 
     if (out_required_cells == x_q16 ||
@@ -1868,6 +1876,7 @@ I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParity(
     if (preflight_required_bytes != commit_required_bytes)
         return FP_Q16_ERR_BAD_PARAM;
 
+    *out_count = preflight_count;
     *out_required_cells = preflight_required_cells;
     *out_required_bytes = preflight_required_bytes;
     return FP_Q16_OK;
@@ -2472,7 +2481,7 @@ I32 FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnlyParity(I64 *x_q16,
 // FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnlyParity.
 //
 // This helper preserves strict preflight semantics by delegating to the
-// existing preflight-only required-bytes wrapper, recomputing canonical
+// existing commit-only parity wrapper, recomputing canonical
 // required_output_bytes with checked math, and enforcing parity before a
 // single diagnostics publish.
 //
@@ -2489,7 +2498,7 @@ I32 FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnlyParityPreflightOnl
     I64 *snapshot_x_q16;
     I64 *snapshot_out_q16;
     I64 snapshot_count;
-    I64 staged_preflight_required_output_bytes;
+    I64 staged_parity_required_output_bytes;
     I64 staged_canonical_required_output_bytes;
     I32 status;
 
@@ -2509,11 +2518,11 @@ I32 FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnlyParityPreflightOnl
     snapshot_out_q16 = out_q16;
     snapshot_count = count;
 
-    status = FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnlyPreflightOnly(
+    status = FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnlyParity(
         x_q16,
         out_q16,
         count,
-        &staged_preflight_required_output_bytes);
+        &staged_parity_required_output_bytes);
     if (status)
         return status;
 
@@ -2530,10 +2539,10 @@ I32 FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnlyParityPreflightOnl
     if (status)
         return status;
 
-    if (staged_preflight_required_output_bytes != staged_canonical_required_output_bytes)
+    if (staged_parity_required_output_bytes != staged_canonical_required_output_bytes)
         return FP_Q16_ERR_BAD_PARAM;
 
-    *out_required_output_bytes = staged_preflight_required_output_bytes;
+    *out_required_output_bytes = staged_parity_required_output_bytes;
     return FP_Q16_OK;
 }
 

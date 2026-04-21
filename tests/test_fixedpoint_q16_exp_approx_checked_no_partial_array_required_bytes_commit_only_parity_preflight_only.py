@@ -17,6 +17,9 @@ from test_fixedpoint_q16_exp_approx_checked_no_partial_array_required_bytes impo
 from test_fixedpoint_q16_exp_approx_checked_no_partial_array_required_bytes_commit_only_preflight_only import (
     fpq16_exp_approx_checked_no_partial_array_required_bytes_commit_only_preflight_only,
 )
+from test_fixedpoint_q16_exp_approx_checked_no_partial_array_required_bytes_commit_only_parity import (
+    fpq16_exp_approx_checked_no_partial_array_required_bytes_commit_only_parity,
+)
 
 
 def fpq16_exp_approx_checked_no_partial_array_required_bytes_commit_only_parity_preflight_only(
@@ -37,12 +40,12 @@ def fpq16_exp_approx_checked_no_partial_array_required_bytes_commit_only_parity_
 
     snapshot = (x_q16, out_q16, count)
 
-    staged_preflight_required_output_bytes = [0]
-    status = fpq16_exp_approx_checked_no_partial_array_required_bytes_commit_only_preflight_only(
+    staged_parity_required_output_bytes = [0]
+    status = fpq16_exp_approx_checked_no_partial_array_required_bytes_commit_only_parity(
         x_q16,
         out_q16,
         count,
-        staged_preflight_required_output_bytes,
+        staged_parity_required_output_bytes,
     )
     if status != FP_Q16_OK:
         return status
@@ -51,10 +54,10 @@ def fpq16_exp_approx_checked_no_partial_array_required_bytes_commit_only_parity_
         return FP_Q16_ERR_BAD_PARAM
 
     staged_canonical_required_output_bytes = count * 8
-    if staged_preflight_required_output_bytes[0] != staged_canonical_required_output_bytes:
+    if staged_parity_required_output_bytes[0] != staged_canonical_required_output_bytes:
         return FP_Q16_ERR_BAD_PARAM
 
-    out_required_output_bytes_slot[0] = staged_preflight_required_output_bytes[0]
+    out_required_output_bytes_slot[0] = staged_parity_required_output_bytes[0]
     return FP_Q16_OK
 
 
@@ -70,21 +73,21 @@ def explicit_composition(
     if x_q16 is out_q16:
         return FP_Q16_ERR_BAD_PARAM, 0
 
-    preflight_required = [0]
-    status = fpq16_exp_approx_checked_no_partial_array_required_bytes_commit_only_preflight_only(
+    parity_required = [0]
+    status = fpq16_exp_approx_checked_no_partial_array_required_bytes_commit_only_parity(
         x_q16,
         out_q16,
         count,
-        preflight_required,
+        parity_required,
     )
     if status != FP_Q16_OK:
         return status, 0
 
     canonical_required = count * 8
-    if preflight_required[0] != canonical_required:
+    if parity_required[0] != canonical_required:
         return FP_Q16_ERR_BAD_PARAM, 0
 
-    return FP_Q16_OK, preflight_required[0]
+    return FP_Q16_OK, parity_required[0]
 
 
 def test_source_contains_iq916_function() -> None:
@@ -94,11 +97,11 @@ def test_source_contains_iq916_function() -> None:
     body = source.split(sig, 1)[1].split(
         "I32 FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnlyPreflightOnly", 1
     )[0]
-    assert "FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnlyPreflightOnly(" in body
+    assert "FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnlyParity(" in body
     assert "if (snapshot_x_q16 != x_q16)" in body
     assert "FPTryMulI64Checked(count," in body
-    assert "if (staged_preflight_required_output_bytes != staged_canonical_required_output_bytes)" in body
-    assert "*out_required_output_bytes = staged_preflight_required_output_bytes;" in body
+    assert "if (staged_parity_required_output_bytes != staged_canonical_required_output_bytes)" in body
+    assert "*out_required_output_bytes = staged_parity_required_output_bytes;" in body
 
 
 def test_null_bad_param_guards() -> None:
