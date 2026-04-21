@@ -305,3 +305,213 @@ I32 KVCacheQ16WriteTokenCheckedNoPartial(
 
     return KV_Q16_OK;
 }
+
+// Copy one token's K/V slices out of cache slabs with strict no-partial writes.
+// Layout per layer:
+//   [token0 span][token1 span]...[tokenN span]
+// where span = kv_heads * head_dim Q16 cells.
+I32 KVCacheQ16ReadTokenCheckedNoPartial(
+    I64 *k_cache_q16,
+    I64 k_cache_capacity,
+    I64 *v_cache_q16,
+    I64 v_cache_capacity,
+    I64 layer_idx,
+    I64 token_idx,
+    I64 layer_count,
+    I64 token_capacity,
+    I64 kv_heads,
+    I64 head_dim,
+    I64 *k_token_out_q16,
+    I64 k_token_out_capacity,
+    I64 *v_token_out_q16,
+    I64 v_token_out_capacity)
+{
+    I64 k_base_index;
+    I64 k_span_cells;
+    I64 v_base_index;
+    I64 v_span_cells;
+    I64 k_end_index;
+    I64 v_end_index;
+    I64 cell_idx;
+    I32 status;
+
+    if (!k_cache_q16 || !v_cache_q16 || !k_token_out_q16 || !v_token_out_q16)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (k_cache_q16 == v_cache_q16)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (k_token_out_q16 == v_token_out_q16)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (k_cache_capacity < 0 || v_cache_capacity < 0 ||
+        k_token_out_capacity < 0 || v_token_out_capacity < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (layer_idx < 0 || token_idx < 0 ||
+        layer_count < 0 || token_capacity < 0 ||
+        kv_heads < 0 || head_dim < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    // Keep read destination windows distinct from cache slabs so commit phase is
+    // deterministic and cannot self-overwrite source cells under aliasing.
+    if (k_token_out_q16 == k_cache_q16 || k_token_out_q16 == v_cache_q16 ||
+        v_token_out_q16 == k_cache_q16 || v_token_out_q16 == v_cache_q16)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    // Resolve source geometry through canonical checked helpers.
+    status = KVCacheQ16ComputeLayerTokenBaseIndexChecked(layer_idx,
+                                                         token_idx,
+                                                         layer_count,
+                                                         token_capacity,
+                                                         kv_heads,
+                                                         head_dim,
+                                                         &k_base_index,
+                                                         &k_span_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVCacheQ16ComputeLayerTokenBaseIndexChecked(layer_idx,
+                                                         token_idx,
+                                                         layer_count,
+                                                         token_capacity,
+                                                         kv_heads,
+                                                         head_dim,
+                                                         &v_base_index,
+                                                         &v_span_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (k_base_index != v_base_index)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (k_span_cells != v_span_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    status = KVTryAddI64Checked(k_base_index, k_span_cells, &k_end_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVTryAddI64Checked(v_base_index, v_span_cells, &v_end_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (k_end_index > k_cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (v_end_index > v_cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (k_span_cells > k_token_out_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (v_span_cells > v_token_out_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    // All checks are complete above; copy is now an atomic commit region with
+    // no remaining failure branches and therefore no partial-write exits.
+    cell_idx = 0;
+    while (cell_idx < k_span_cells)
+    {
+        k_token_out_q16[cell_idx] = k_cache_q16[k_base_index + cell_idx];
+        v_token_out_q16[cell_idx] = v_cache_q16[v_base_index + cell_idx];
+
+        cell_idx++;
+        if (!cell_idx)
+            return KV_Q16_ERR_OVERFLOW;
+    }
+
+    return KV_Q16_OK;
+}
+
+// Zero one token's K/V slices inside cache slabs with strict no-partial writes.
+// Layout per layer:
+//   [token0 span][token1 span]...[tokenN span]
+// where span = kv_heads * head_dim Q16 cells.
+I32 KVCacheQ16ZeroTokenSpanCheckedNoPartial(
+    I64 *k_cache_q16,
+    I64 k_cache_capacity,
+    I64 *v_cache_q16,
+    I64 v_cache_capacity,
+    I64 layer_idx,
+    I64 token_idx,
+    I64 layer_count,
+    I64 token_capacity,
+    I64 kv_heads,
+    I64 head_dim)
+{
+    I64 k_base_index;
+    I64 k_span_cells;
+    I64 v_base_index;
+    I64 v_span_cells;
+    I64 k_end_index;
+    I64 v_end_index;
+    I64 cell_idx;
+    I32 status;
+
+    if (!k_cache_q16 || !v_cache_q16)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (k_cache_q16 == v_cache_q16)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (k_cache_capacity < 0 || v_cache_capacity < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (layer_idx < 0 || token_idx < 0 ||
+        layer_count < 0 || token_capacity < 0 ||
+        kv_heads < 0 || head_dim < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    // Resolve canonical token geometry via checked base/span helper.
+    status = KVCacheQ16ComputeLayerTokenBaseIndexChecked(layer_idx,
+                                                         token_idx,
+                                                         layer_count,
+                                                         token_capacity,
+                                                         kv_heads,
+                                                         head_dim,
+                                                         &k_base_index,
+                                                         &k_span_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVCacheQ16ComputeLayerTokenBaseIndexChecked(layer_idx,
+                                                         token_idx,
+                                                         layer_count,
+                                                         token_capacity,
+                                                         kv_heads,
+                                                         head_dim,
+                                                         &v_base_index,
+                                                         &v_span_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (k_base_index != v_base_index)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (k_span_cells != v_span_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    status = KVTryAddI64Checked(k_base_index, k_span_cells, &k_end_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVTryAddI64Checked(v_base_index, v_span_cells, &v_end_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (k_end_index > k_cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (v_end_index > v_cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    // All checks are complete above; zero phase is atomic commit region with
+    // no remaining failure branches and therefore no partial-write exits.
+    cell_idx = 0;
+    while (cell_idx < k_span_cells)
+    {
+        k_cache_q16[k_base_index + cell_idx] = 0;
+        v_cache_q16[v_base_index + cell_idx] = 0;
+
+        cell_idx++;
+        if (!cell_idx)
+            return KV_Q16_ERR_OVERFLOW;
+    }
+
+    return KV_Q16_OK;
+}
