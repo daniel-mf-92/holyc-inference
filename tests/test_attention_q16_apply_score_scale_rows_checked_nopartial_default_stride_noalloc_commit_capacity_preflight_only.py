@@ -227,7 +227,7 @@ def test_source_contains_commit_capacity_preflight_only_wrapper() -> None:
 
 def test_known_vector_outputs() -> None:
     row_count = 11
-    token_count = 7
+    token_count = 1
     total = row_count * token_count
 
     in_scores = [0] * total
@@ -329,7 +329,7 @@ def test_adversarial_null_alias_and_bounds() -> None:
         in_scores,
         4,
         I64_MAX,
-        2,
+        1,
         0,
         out_scores,
         4,

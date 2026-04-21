@@ -4986,10 +4986,14 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
     I64 staged_required_stage_cells;
     I64 staged_required_stage_bytes;
     I64 staged_required_out_cells;
+    I64 recomputed_required_in_cells;
     I64 recomputed_required_stage_cells;
     I64 recomputed_required_stage_bytes;
+    I64 recomputed_required_out_cells;
     I64 snapshot_row_count;
     I64 snapshot_token_count;
+    I64 snapshot_score_scale_q16;
+    I64 snapshot_commit_stage_cell_capacity;
     I64 snapshot_stage_capacity;
     I64 snapshot_out_capacity;
     I32 status;
@@ -5031,6 +5035,8 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
     // 3) enforce snapshot and tuple parity before atomic diagnostics publish.
     snapshot_row_count = row_count;
     snapshot_token_count = token_count;
+    snapshot_score_scale_q16 = score_scale_q16;
+    snapshot_commit_stage_cell_capacity = commit_stage_cell_capacity;
     snapshot_stage_capacity = staged_scores_capacity;
     snapshot_out_capacity = out_scores_capacity;
 
@@ -5049,9 +5055,17 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
     if (status != ATTN_Q16_OK)
         return status;
 
-    status = AttentionTryMulI64Checked(snapshot_row_count,
-                                       snapshot_token_count,
-                                       &recomputed_required_stage_cells);
+    status = AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(
+        in_scores_q32,
+        in_scores_capacity,
+        snapshot_row_count,
+        snapshot_token_count,
+        out_scores_q32,
+        snapshot_out_capacity,
+        snapshot_commit_stage_cell_capacity,
+        &recomputed_required_in_cells,
+        &recomputed_required_out_cells,
+        &recomputed_required_stage_cells);
     if (status != ATTN_Q16_OK)
         return status;
 
@@ -5065,6 +5079,10 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
         return ATTN_Q16_ERR_BAD_PARAM;
     if (snapshot_token_count != token_count)
         return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_score_scale_q16 != score_scale_q16)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_commit_stage_cell_capacity != commit_stage_cell_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
     if (snapshot_stage_capacity != staged_scores_capacity)
         return ATTN_Q16_ERR_BAD_PARAM;
     if (snapshot_out_capacity != out_scores_capacity)
@@ -5074,7 +5092,7 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
         return ATTN_Q16_ERR_BAD_PARAM;
     if (staged_required_stage_bytes != recomputed_required_stage_bytes)
         return ATTN_Q16_ERR_BAD_PARAM;
-    if (staged_required_out_cells != recomputed_required_stage_cells)
+    if (staged_required_out_cells != recomputed_required_out_cells)
         return ATTN_Q16_ERR_BAD_PARAM;
 
     if (staged_required_stage_cells > snapshot_stage_capacity)
@@ -5086,9 +5104,7 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
     *out_required_stage_bytes = staged_required_stage_bytes;
     *out_required_out_cells = staged_required_out_cells;
 
-    // Intentionally unused in diagnostics-only path; preserved to keep the
-    // companion signature aligned with IQ-813 commit-capacity execution.
-    score_scale_q16 = score_scale_q16;
+    recomputed_required_in_cells = recomputed_required_in_cells;
 
     return ATTN_Q16_OK;
 }
