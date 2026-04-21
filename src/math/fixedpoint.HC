@@ -1176,6 +1176,8 @@ I32 FPQ16MulCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPrefligh
         return FP_Q16_ERR_BAD_PARAM;
     if (count > out_capacity)
         return FP_Q16_ERR_BAD_PARAM;
+    if (count > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
 
     if (out_required_cells == out_required_bytes)
         return FP_Q16_ERR_BAD_PARAM;
