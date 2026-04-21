@@ -657,6 +657,213 @@ I32 Q4_0Q8_0DotRowsQ16MatrixVectorChecked(
     return Q4_0_Q8_0_OK;
 }
 
+I32 Q4_0Q8_0DotQ32CheckedNoPartialArrayDotOne(
+    Q4_0Block *lhs_q4,
+    I64 lhs_base_block,
+    I64 lhs_block_stride,
+    Q8_0Block *rhs_q8,
+    I64 rhs_base_block,
+    I64 rhs_block_stride,
+    I64 blocks_per_dot,
+    I64 *out_dot_q32)
+{
+    I64 block_idx;
+    I64 lhs_index;
+    I64 rhs_index;
+    I64 lhs_scale_q16;
+    I64 rhs_scale_q16;
+    I64 scale_prod_q32;
+    I64 q_dot_q0;
+    I64 block_dot_q32;
+    I64 total_dot_q32;
+    I64 byte_index;
+    U8 packed_q4;
+
+    if (!lhs_q4 || !rhs_q8 || !out_dot_q32)
+        return Q4_0_Q8_0_ERR_NULL_PTR;
+    if (lhs_base_block < 0 || rhs_base_block < 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+    if (lhs_block_stride <= 0 || rhs_block_stride <= 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+    if (blocks_per_dot < 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    total_dot_q32 = 0;
+    for (block_idx = 0; block_idx < blocks_per_dot; ++block_idx)
+    {
+        if (!Q4_0Q8_0TryMulI64NonNeg(block_idx, lhs_block_stride, &lhs_index))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+        if (!Q4_0Q8_0TryAddI64(lhs_base_block, lhs_index, &lhs_index))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+
+        if (!Q4_0Q8_0TryMulI64NonNeg(block_idx, rhs_block_stride, &rhs_index))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+        if (!Q4_0Q8_0TryAddI64(rhs_base_block, rhs_index, &rhs_index))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+
+        lhs_scale_q16 = Q4_0_Q8_0F16ToQ16(lhs_q4[lhs_index].d_fp16);
+        rhs_scale_q16 = Q4_0_Q8_0F16ToQ16(rhs_q8[rhs_index].d_fp16);
+        if (!Q4_0Q8_0TryMulI64(lhs_scale_q16, rhs_scale_q16, &scale_prod_q32))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+
+        q_dot_q0 = 0;
+        for (byte_index = 0; byte_index < Q4_0_PACKED_BYTES; ++byte_index)
+        {
+            packed_q4 = lhs_q4[lhs_index].qs[byte_index];
+            q_dot_q0 += Q4_0_Q8_0NibbleToSigned(packed_q4, FALSE) * rhs_q8[rhs_index].qs[(byte_index << 1)];
+            q_dot_q0 += Q4_0_Q8_0NibbleToSigned(packed_q4, TRUE) * rhs_q8[rhs_index].qs[(byte_index << 1) + 1];
+        }
+
+        if (!Q4_0Q8_0TryMulI64(scale_prod_q32, q_dot_q0, &block_dot_q32))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+        if (!Q4_0Q8_0TryAddI64(total_dot_q32, block_dot_q32, &total_dot_q32))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+    }
+
+    *out_dot_q32 = total_dot_q32;
+    return Q4_0_Q8_0_OK;
+}
+
+// Checked mixed Q4_0 x Q8_0 array dot kernel with strict no-partial semantics.
+//
+// Array layout:
+//   lhs_pair_base = pair_idx * lhs_pair_stride_blocks
+//   rhs_pair_base = pair_idx * rhs_pair_stride_blocks
+//   lhs_block_idx = lhs_pair_base + block_idx * lhs_block_stride
+//   rhs_block_idx = rhs_pair_base + block_idx * rhs_block_stride
+//
+// Each output lane computes one Q32 mixed dot across `blocks_per_dot` blocks.
+// The function preflights every pair before publishing any output so a hard
+// fault never commits partial output rows.
+I32 Q4_0Q8_0DotQ32CheckedNoPartialArray(
+    Q4_0Block *lhs_q4,
+    I64 lhs_block_capacity,
+    I64 lhs_pair_stride_blocks,
+    I64 lhs_block_stride,
+    Q8_0Block *rhs_q8,
+    I64 rhs_block_capacity,
+    I64 rhs_pair_stride_blocks,
+    I64 rhs_block_stride,
+    I64 pair_count,
+    I64 blocks_per_dot,
+    I64 *out_dot_q32,
+    I64 out_dot_capacity)
+{
+    I64 pair_idx;
+    I64 lhs_pair_base;
+    I64 rhs_pair_base;
+    I64 lhs_last_offset;
+    I64 rhs_last_offset;
+    I64 lhs_last_pair_base;
+    I64 rhs_last_pair_base;
+    I64 lhs_required_blocks;
+    I64 rhs_required_blocks;
+    I64 staged_dot_q32;
+    I32 status;
+
+    if (!lhs_q4 || !rhs_q8 || !out_dot_q32)
+        return Q4_0_Q8_0_ERR_NULL_PTR;
+
+    if (lhs_block_capacity < 0 || rhs_block_capacity < 0 || out_dot_capacity < 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+    if (pair_count < 0 || blocks_per_dot < 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+    if (lhs_pair_stride_blocks <= 0 || rhs_pair_stride_blocks <= 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+    if (lhs_block_stride <= 0 || rhs_block_stride <= 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    if (pair_count > out_dot_capacity)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    if ((I64 *)lhs_q4 == out_dot_q32 || (I64 *)rhs_q8 == out_dot_q32)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    if (!pair_count)
+        return Q4_0_Q8_0_OK;
+
+    if (!blocks_per_dot)
+    {
+        for (pair_idx = 0; pair_idx < pair_count; ++pair_idx)
+            out_dot_q32[pair_idx] = 0;
+        return Q4_0_Q8_0_OK;
+    }
+
+    // Checked capacity preflight for the maximum block index touched by the
+    // strided array geometry.
+    if (!Q4_0Q8_0TryMulI64NonNeg(blocks_per_dot - 1, lhs_block_stride, &lhs_last_offset))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+    if (!Q4_0Q8_0TryMulI64NonNeg(blocks_per_dot - 1, rhs_block_stride, &rhs_last_offset))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+
+    if (!Q4_0Q8_0TryMulI64NonNeg(pair_count - 1, lhs_pair_stride_blocks, &lhs_last_pair_base))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+    if (!Q4_0Q8_0TryMulI64NonNeg(pair_count - 1, rhs_pair_stride_blocks, &rhs_last_pair_base))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+
+    if (!Q4_0Q8_0TryAddI64(lhs_last_pair_base, lhs_last_offset, &lhs_required_blocks))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+    if (!Q4_0Q8_0TryAddI64(rhs_last_pair_base, rhs_last_offset, &rhs_required_blocks))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+
+    if (!Q4_0Q8_0TryAddI64(lhs_required_blocks, 1, &lhs_required_blocks))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+    if (!Q4_0Q8_0TryAddI64(rhs_required_blocks, 1, &rhs_required_blocks))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+
+    if (lhs_required_blocks > lhs_block_capacity)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+    if (rhs_required_blocks > rhs_block_capacity)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    // Preflight pass: compute every pair and discard staged results.
+    // If any pair faults, out_dot_q32 remains untouched.
+    for (pair_idx = 0; pair_idx < pair_count; ++pair_idx)
+    {
+        if (!Q4_0Q8_0TryMulI64NonNeg(pair_idx, lhs_pair_stride_blocks, &lhs_pair_base))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+        if (!Q4_0Q8_0TryMulI64NonNeg(pair_idx, rhs_pair_stride_blocks, &rhs_pair_base))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+
+        status = Q4_0Q8_0DotQ32CheckedNoPartialArrayDotOne(
+            lhs_q4,
+            lhs_pair_base,
+            lhs_block_stride,
+            rhs_q8,
+            rhs_pair_base,
+            rhs_block_stride,
+            blocks_per_dot,
+            &staged_dot_q32);
+        if (status != Q4_0_Q8_0_OK)
+            return status;
+    }
+
+    // Commit pass: repeat computations and publish only after full preflight.
+    for (pair_idx = 0; pair_idx < pair_count; ++pair_idx)
+    {
+        if (!Q4_0Q8_0TryMulI64NonNeg(pair_idx, lhs_pair_stride_blocks, &lhs_pair_base))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+        if (!Q4_0Q8_0TryMulI64NonNeg(pair_idx, rhs_pair_stride_blocks, &rhs_pair_base))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+
+        status = Q4_0Q8_0DotQ32CheckedNoPartialArrayDotOne(
+            lhs_q4,
+            lhs_pair_base,
+            lhs_block_stride,
+            rhs_q8,
+            rhs_pair_base,
+            rhs_block_stride,
+            blocks_per_dot,
+            &staged_dot_q32);
+        if (status != Q4_0_Q8_0_OK)
+            return status;
+
+        out_dot_q32[pair_idx] = staged_dot_q32;
+    }
+
+    return Q4_0_Q8_0_OK;
+}
+
 I32 Q4_0_Q8_0DotRowsQ16MatrixVectorChecked(
     Q4_0Block *matrix_blocks_q4,
     I64 matrix_block_capacity,
