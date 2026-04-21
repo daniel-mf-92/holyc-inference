@@ -1219,6 +1219,23 @@ I32 Q4_0Q8_0DotQ32CheckedNoPartialArrayCommitOnlyPreflightOnly(
         out_required_out_bytes == out_dot_q32)
         return Q4_0_Q8_0_ERR_BAD_DST_LEN;
 
+    if (out_count == (I64 *)lhs_q4 ||
+        out_count == (I64 *)rhs_q8 ||
+        out_count == out_dot_q32 ||
+        out_required_in_blocks == (I64 *)lhs_q4 ||
+        out_required_in_blocks == (I64 *)rhs_q8 ||
+        out_required_in_blocks == out_dot_q32 ||
+        out_required_out_cells == (I64 *)lhs_q4 ||
+        out_required_out_cells == (I64 *)rhs_q8 ||
+        out_required_out_cells == out_dot_q32 ||
+        out_required_in_bytes == (I64 *)lhs_q4 ||
+        out_required_in_bytes == (I64 *)rhs_q8 ||
+        out_required_in_bytes == out_dot_q32 ||
+        out_required_out_bytes == (I64 *)lhs_q4 ||
+        out_required_out_bytes == (I64 *)rhs_q8 ||
+        out_required_out_bytes == out_dot_q32)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
     if (lhs_block_capacity < 0 || rhs_block_capacity < 0 || out_dot_capacity < 0)
         return Q4_0_Q8_0_ERR_BAD_DST_LEN;
     if (pair_count < 0 || blocks_per_dot < 0)
