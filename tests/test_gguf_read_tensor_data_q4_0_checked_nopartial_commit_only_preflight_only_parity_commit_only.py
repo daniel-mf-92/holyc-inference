@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity harness for GGUFReadTensorDataQ4_0...PreflightOnlyParityCommitOnly (IQ-939)."""
+"""Parity harness for GGUFReadTensorDataQ4_0CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly (IQ-939)."""
 
 from __future__ import annotations
 
@@ -58,7 +58,7 @@ def tensor_matches_snapshot(tensor_info: TensorInfoQ40, snap: TensorInfoQ40) -> 
     )
 
 
-def q4_preflight(
+def gguf_read_tensor_data_q4_0_checked_no_partial_commit_only_preflight_only(
     gguf_bytes: bytes | None,
     gguf_nbytes: int,
     tensor_data_base: int,
@@ -129,7 +129,7 @@ def q4_preflight(
     return GGUF_READER_OK
 
 
-def q4_checked_no_partial(
+def gguf_read_tensor_data_q4_0_checked_no_partial(
     gguf_bytes: bytes | None,
     gguf_nbytes: int,
     tensor_data_base: int,
@@ -198,12 +198,13 @@ def q4_checked_no_partial(
     staged = gguf_bytes[payload_start:payload_end]
     for idx, value in enumerate(staged):
         out_q4_0_blocks[idx] = value
+
     out_blocks_read[0] = block_count
     out_bytes_read[0] = required_bytes
     return GGUF_READER_OK
 
 
-def q4_preflight_parity(
+def gguf_read_tensor_data_q4_0_checked_no_partial_commit_only_preflight_only_parity(
     gguf_bytes: bytes | None,
     gguf_nbytes: int,
     tensor_data_base: int,
@@ -233,7 +234,7 @@ def q4_preflight_parity(
 
     staged_blocks = [0]
     staged_bytes = [0]
-    err = q4_preflight(
+    err = gguf_read_tensor_data_q4_0_checked_no_partial_commit_only_preflight_only(
         gguf_bytes,
         gguf_nbytes,
         tensor_data_base,
@@ -249,7 +250,7 @@ def q4_preflight_parity(
     scratch = bytearray(staged_bytes[0]) if staged_bytes[0] else bytearray(1)
     recomputed_blocks = [0]
     recomputed_bytes = [0]
-    err = q4_checked_no_partial(
+    err = gguf_read_tensor_data_q4_0_checked_no_partial(
         gguf_bytes,
         gguf_nbytes,
         tensor_data_base,
@@ -264,6 +265,7 @@ def q4_preflight_parity(
 
     if not tensor_matches_snapshot(tensor_info, snap):
         return GGUF_READER_ERR_BAD_PARAM
+
     if (staged_blocks[0], staged_bytes[0]) != (recomputed_blocks[0], recomputed_bytes[0]):
         return GGUF_READER_ERR_BAD_PARAM
 
@@ -272,7 +274,7 @@ def q4_preflight_parity(
     return GGUF_READER_OK
 
 
-def q4_preflight_parity_commit_only(
+def gguf_read_tensor_data_q4_0_checked_no_partial_commit_only_preflight_only_parity_commit_only(
     gguf_bytes: bytes | None,
     gguf_nbytes: int,
     tensor_data_base: int,
@@ -299,11 +301,11 @@ def q4_preflight_parity_commit_only(
         ggml_type=tensor_info.ggml_type,
         offset=tensor_info.offset,
     )
-    staged_capacity = out_q4_0_blocks_capacity
+    staged_out_capacity = out_q4_0_blocks_capacity
 
     staged_blocks = [0]
     staged_bytes = [0]
-    err = q4_preflight_parity(
+    err = gguf_read_tensor_data_q4_0_checked_no_partial_commit_only_preflight_only_parity(
         gguf_bytes,
         gguf_nbytes,
         tensor_data_base,
@@ -318,11 +320,12 @@ def q4_preflight_parity_commit_only(
 
     if not tensor_matches_snapshot(tensor_info, snap):
         return GGUF_READER_ERR_BAD_PARAM
-    if staged_capacity != out_q4_0_blocks_capacity:
+    if staged_out_capacity != out_q4_0_blocks_capacity:
         return GGUF_READER_ERR_BAD_PARAM
+
     if staged_blocks[0] < 0 or staged_bytes[0] < 0:
         return GGUF_READER_ERR_OVERFLOW
-    if staged_bytes[0] > staged_capacity:
+    if staged_bytes[0] > staged_out_capacity:
         return GGUF_READER_ERR_BAD_CAPACITY
 
     out_blocks_read[0] = staged_blocks[0]
@@ -330,28 +333,30 @@ def q4_preflight_parity_commit_only(
     return GGUF_READER_OK
 
 
-def test_source_contains_iq939_q4_commit_only_function() -> None:
+def test_source_contains_iq939_q4_commit_only_parity_wrapper_contract() -> None:
     source = Path("src/gguf/reader.HC").read_text(encoding="utf-8")
     sig = "I32 GGUFReadTensorDataQ4_0CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly("
     assert sig in source
-    body = source.split(sig, 1)[1].split("\nI32 ", 1)[0]
+    body = source.split(sig, 1)[1].split("\n\n\nI32 ", 1)[0]
 
     assert "status = GGUFReadTensorDataQ4_0CheckedNoPartialCommitOnlyPreflightOnlyParity(" in body
+    assert "if (!GGUFReaderTensorInfoQ4_0MatchesSnapshot(" in body
     assert "if (staged_out_capacity != out_q4_0_blocks_capacity)" in body
+    assert "if (staged_blocks_read_i64 < 0 || staged_bytes_read_i64 < 0)" in body
     assert "if ((U64)staged_bytes_read_i64 > staged_out_capacity)" in body
     assert "*out_blocks_read = staged_blocks_read_i64;" in body
     assert "*out_bytes_read = staged_bytes_read_i64;" in body
 
 
-def test_error_paths_are_no_publish_and_no_write() -> None:
+def test_bad_vectors_and_no_publish_behavior() -> None:
     info = TensorInfoQ40(1, [64, 0, 0, 0], GGUF_READER_GGML_TYPE_Q4_0, 0)
-    blob = bytes(range(128))
-    out = bytearray(b"\xDA" * 128)
+    blob = bytes(range(64))
+    out = bytearray(b"\xA5" * 80)
     out_before = bytes(out)
-    out_blocks = [19]
-    out_bytes = [23]
+    out_blocks = [111]
+    out_bytes = [222]
 
-    err = q4_preflight_parity_commit_only(
+    err = gguf_read_tensor_data_q4_0_checked_no_partial_commit_only_preflight_only_parity_commit_only(
         None,
         0,
         0,
@@ -362,11 +367,11 @@ def test_error_paths_are_no_publish_and_no_write() -> None:
         out_bytes,
     )
     assert err == GGUF_READER_ERR_NULL_PTR
-    assert out_blocks == [19]
-    assert out_bytes == [23]
+    assert out_blocks == [111]
+    assert out_bytes == [222]
     assert bytes(out) == out_before
 
-    err = q4_preflight_parity_commit_only(
+    err = gguf_read_tensor_data_q4_0_checked_no_partial_commit_only_preflight_only_parity_commit_only(
         blob,
         len(blob),
         0,
@@ -377,37 +382,21 @@ def test_error_paths_are_no_publish_and_no_write() -> None:
         out_blocks,
     )
     assert err == GGUF_READER_ERR_BAD_PARAM
-    assert out_blocks == [19]
-    assert bytes(out) == out_before
-
-    bad_cap_info = TensorInfoQ40(1, [64, 0, 0, 0], GGUF_READER_GGML_TYPE_Q4_0, 4)
-    err = q4_preflight_parity_commit_only(
-        b"\x00" * 64,
-        64,
-        0,
-        bad_cap_info,
-        out,
-        8,
-        out_blocks,
-        out_bytes,
-    )
-    assert err == GGUF_READER_ERR_BAD_CAPACITY
-    assert out_blocks == [19]
-    assert out_bytes == [23]
+    assert out_blocks == [111]
     assert bytes(out) == out_before
 
 
-def test_success_publishes_exact_tuple_and_preserves_output_buffer() -> None:
-    payload = bytes((idx * 5 + 1) & 0xFF for idx in range(36))
-    blob = b"\x01\x02\x03\x04" + payload + b"\xEF" * 7
+def test_success_and_capacity_rejection() -> None:
+    payload = bytes((idx * 13 + 5) & 0xFF for idx in range(36))
+    blob = b"\x55\x66\x77\x88" + payload + b"\x00" * 16
     info = TensorInfoQ40(1, [64, 0, 0, 0], GGUF_READER_GGML_TYPE_Q4_0, 4)
 
-    out = bytearray(b"\xAA" * 96)
+    out = bytearray(b"\x3C" * 96)
     out_before = bytes(out)
     out_blocks = [0]
     out_bytes = [0]
 
-    err = q4_preflight_parity_commit_only(
+    err = gguf_read_tensor_data_q4_0_checked_no_partial_commit_only_preflight_only_parity_commit_only(
         blob,
         len(blob),
         0,
@@ -422,11 +411,28 @@ def test_success_publishes_exact_tuple_and_preserves_output_buffer() -> None:
     assert out_bytes == [36]
     assert bytes(out) == out_before
 
+    rejected_blocks = [333]
+    rejected_bytes = [444]
+    err = gguf_read_tensor_data_q4_0_checked_no_partial_commit_only_preflight_only_parity_commit_only(
+        blob,
+        len(blob),
+        0,
+        info,
+        out,
+        35,
+        rejected_blocks,
+        rejected_bytes,
+    )
+    assert err == GGUF_READER_ERR_BAD_CAPACITY
+    assert rejected_blocks == [333]
+    assert rejected_bytes == [444]
+    assert bytes(out) == out_before
+
 
 def run() -> None:
-    test_source_contains_iq939_q4_commit_only_function()
-    test_error_paths_are_no_publish_and_no_write()
-    test_success_publishes_exact_tuple_and_preserves_output_buffer()
+    test_source_contains_iq939_q4_commit_only_parity_wrapper_contract()
+    test_bad_vectors_and_no_publish_behavior()
+    test_success_and_capacity_rejection()
     print("gguf_read_tensor_data_q4_0_checked_nopartial_commit_only_preflight_only_parity_commit_only=ok")
 
 
