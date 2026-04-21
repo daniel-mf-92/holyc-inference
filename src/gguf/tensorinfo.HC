@@ -364,6 +364,88 @@ I64 GGUFTensorInfoReadNameCheckedNoPartial(U8 *buf,
     return GGUF_TENSOR_PARSE_OK;
 }
 
+// Commit-only diagnostics wrapper for tensor name parsing.
+//
+// Composes GGUFTensorInfoReadNameCheckedNoPartial and stages canonical
+// diagnostics tuple {name_len, required_bytes, next_cursor}. Caller receives
+// diagnostics only; staged name storage is always released before return.
+I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnly(U8 *buf,
+                                                     U64 size,
+                                                     U64 cursor,
+                                                     U64 *out_name_len,
+                                                     U64 *out_required_bytes,
+                                                     U64 *out_next_cursor)
+{
+    U8 *snapshot_buf;
+    U64 snapshot_size;
+    U64 snapshot_cursor;
+    GGUFTensorString staged_name;
+    U64 staged_name_len;
+    U64 staged_required_bytes;
+    U64 staged_next_cursor;
+    U64 computed_end;
+    I64 status;
+
+    if (!buf || !out_name_len || !out_required_bytes || !out_next_cursor)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+    if (out_name_len == out_required_bytes ||
+        out_name_len == out_next_cursor ||
+        out_required_bytes == out_next_cursor)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+    if (cursor > size)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (size > 0x7FFFFFFFFFFFFFFF || cursor > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    snapshot_buf = buf;
+    snapshot_size = size;
+    snapshot_cursor = cursor;
+
+    GGUFTensorZeroString(&staged_name);
+    staged_name_len = 0;
+    staged_required_bytes = 0;
+    staged_next_cursor = 0;
+
+    status = GGUFTensorInfoReadNameCheckedNoPartial(buf,
+                                                    size,
+                                                    cursor,
+                                                    &staged_name,
+                                                    &staged_next_cursor);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+
+    staged_name_len = staged_name.len;
+
+    if (!GGUFTensorTryAddU64(8, staged_name_len, &staged_required_bytes))
+    {
+        GGUFTensorFreeString(&staged_name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
+    if (!GGUFTensorTryAddU64(cursor, staged_required_bytes, &computed_end))
+    {
+        GGUFTensorFreeString(&staged_name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
+    if (computed_end != staged_next_cursor)
+    {
+        GGUFTensorFreeString(&staged_name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
+
+    if (snapshot_buf != buf || snapshot_size != size || snapshot_cursor != cursor)
+    {
+        GGUFTensorFreeString(&staged_name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
+
+    GGUFTensorFreeString(&staged_name);
+
+    *out_name_len = staged_name_len;
+    *out_required_bytes = staged_required_bytes;
+    *out_next_cursor = staged_next_cursor;
+    return GGUF_TENSOR_PARSE_OK;
+}
+
 // Checked no-partial parser for `{n_dims, dims[], ggml_type, offset}`.
 // Uses explicit U64 staging math and publishes the tuple atomically only
 // after full span parity and type/dim validation succeed.
