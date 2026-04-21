@@ -1773,6 +1773,111 @@ I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnly(I64 *x
     return FP_Q16_OK;
 }
 
+// Diagnostics-only parity gate over
+// FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnly and
+// FPQ16ExpApproxRangeReduceCheckedNoPartialArray.
+//
+// Contract:
+// - Stages {required_cells,required_bytes} via no-write preflight helper.
+// - Revalidates immutable snapshots {count,x_q16,out_k,out_r_q16}.
+// - Runs canonical lane range-reduction path and recomputes diagnostics with
+//   checked integer math.
+// - Requires exact tuple parity before atomic diagnostics publish.
+// - Preserves strict no-partial diagnostics writes on all failures.
+I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParity(I64 *x_q16,
+                                                                                 I64 *out_k,
+                                                                                 I64 *out_r_q16,
+                                                                                 I64 count,
+                                                                                 I64 *out_required_cells,
+                                                                                 I64 *out_required_bytes)
+{
+    I64 *snapshot_x_q16;
+    I64 *snapshot_out_k;
+    I64 *snapshot_out_r_q16;
+    I64 snapshot_count;
+    I64 preflight_count;
+    I64 preflight_required_cells;
+    I64 preflight_required_bytes;
+    I64 canonical_required_cells;
+    I64 canonical_required_bytes;
+    I32 status;
+
+    if (!x_q16 || !out_k || !out_r_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (!out_required_cells || !out_required_bytes)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (x_q16 == out_k || x_q16 == out_r_q16 || out_k == out_r_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_required_cells == out_required_bytes)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_required_cells == x_q16 ||
+        out_required_cells == out_k ||
+        out_required_cells == out_r_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (out_required_bytes == x_q16 ||
+        out_required_bytes == out_k ||
+        out_required_bytes == out_r_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    snapshot_x_q16 = x_q16;
+    snapshot_out_k = out_k;
+    snapshot_out_r_q16 = out_r_q16;
+    snapshot_count = count;
+
+    status = FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnly(
+        x_q16,
+        out_k,
+        out_r_q16,
+        count,
+        &preflight_count,
+        &preflight_required_cells,
+        &preflight_required_bytes);
+    if (status)
+        return status;
+
+    status = FPQ16ExpApproxRangeReduceCheckedNoPartialArray(x_q16,
+                                                            out_k,
+                                                            out_r_q16,
+                                                            count);
+    if (status)
+        return status;
+
+    if (snapshot_x_q16 != x_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_k != out_k)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_r_q16 != out_r_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_count != count)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    status = FPTryMulI64Checked(count, 2, &canonical_required_cells);
+    if (status)
+        return status;
+
+    status = FPTryMulI64Checked(canonical_required_cells,
+                                sizeof(I64),
+                                &canonical_required_bytes);
+    if (status)
+        return status;
+
+    if (preflight_count != count)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (preflight_required_cells != canonical_required_cells)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (preflight_required_bytes != canonical_required_bytes)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_required_cells = preflight_required_cells;
+    *out_required_bytes = preflight_required_bytes;
+    return FP_Q16_OK;
+}
+
 // Diagnostics helper over FPQ16ExpApproxRangeReduceCheckedNoPartialArray that
 // computes byte requirement for one output lane array in the paired
 // {out_k,out_r_q16} outputs:
@@ -2269,3 +2374,106 @@ I32 FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnly(I64 *x_q16,
     return FP_Q16_OK;
 }
 
+// Diagnostics-only no-write companion over
+// FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnly.
+//
+// This preflight helper validates each source lane with scalar checked exp,
+// keeps out_q16 immutable, computes canonical required_output_bytes with
+// checked integer math, and atomically publishes diagnostics on success.
+//
+// Contract:
+// - Never writes out_q16 (strict preflight/no-partial semantics).
+// - Revalidates immutable {x_q16,out_q16,count} snapshots.
+// - Computes required_output_bytes = count * sizeof(I64) with checked math.
+// - Performs exactly one diagnostics commit on success.
+I32 FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnlyPreflightOnly(I64 *x_q16,
+                                                                             I64 *out_q16,
+                                                                             I64 count,
+                                                                             I64 *out_required_output_bytes)
+{
+    I64 *snapshot_x_q16;
+    I64 *snapshot_out_q16;
+    I64 snapshot_count;
+    I64 staged_required_output_bytes;
+    I64 staged_required_output_bytes_recomputed;
+    I64 staged_lane_q16;
+    U64 required_base;
+    U64 required_end;
+    U64 x_base;
+    U64 x_end;
+    U64 out_base;
+    U64 out_end;
+    I64 i;
+    I32 status;
+
+    if (!x_q16 || !out_q16 || !out_required_output_bytes)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (x_q16 == out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_required_output_bytes == x_q16 ||
+        out_required_output_bytes == out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (count)
+    {
+        status = FPArrayI64SpanChecked(x_q16, count, &x_base, &x_end);
+        if (status)
+            return status;
+
+        status = FPArrayI64SpanChecked(out_q16, count, &out_base, &out_end);
+        if (status)
+            return status;
+
+        if (FPAddressRangesOverlap(x_base, x_end, out_base, out_end))
+            return FP_Q16_ERR_BAD_PARAM;
+
+        required_base = (U64)out_required_output_bytes;
+        if (required_base > (U64_MAX_VALUE - 7))
+            return FP_Q16_ERR_OVERFLOW;
+        required_end = required_base + 8;
+
+        if (FPAddressRangesOverlap(required_base, required_end, x_base, x_end) ||
+            FPAddressRangesOverlap(required_base, required_end, out_base, out_end))
+            return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    snapshot_x_q16 = x_q16;
+    snapshot_out_q16 = out_q16;
+    snapshot_count = count;
+
+    // Preflight validation: ensure every lane is representable by scalar exp,
+    // but do not commit any lane outputs into out_q16.
+    for (i = 0; i < count; ++i)
+    {
+        status = FPQ16ExpApproxChecked(x_q16[i],
+                                       &staged_lane_q16);
+        if (status)
+            return status;
+    }
+
+    if (snapshot_x_q16 != x_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_q16 != out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_count != count)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (count > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    staged_required_output_bytes = count << 3;
+
+    status = FPTryMulI64Checked(count,
+                                8,
+                                &staged_required_output_bytes_recomputed);
+    if (status)
+        return status;
+    if (staged_required_output_bytes != staged_required_output_bytes_recomputed)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_required_output_bytes = staged_required_output_bytes;
+    return FP_Q16_OK;
+}

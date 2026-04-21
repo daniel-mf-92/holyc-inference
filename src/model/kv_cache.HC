@@ -67,6 +67,75 @@ I32 KVTryMulI64Checked(I64 lhs, I64 rhs, I64 *out_prod)
     return KV_Q16_OK;
 }
 
+I32 KVRangeU64EndChecked(U64 base,
+                         U64 size,
+                         U64 *out_end)
+{
+    if (!out_end)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (base > (0xFFFFFFFFFFFFFFFF - size))
+        return KV_Q16_ERR_OVERFLOW;
+
+    *out_end = base + size;
+    return KV_Q16_OK;
+}
+
+I32 KVArrayI64SpanChecked(I64 *arr,
+                          I64 count,
+                          U64 *out_base,
+                          U64 *out_end)
+{
+    I64 span_bytes;
+    U64 base;
+    I32 status;
+
+    if (!out_base || !out_end)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (count < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (!count)
+    {
+        base = (U64)arr;
+        *out_base = base;
+        *out_end = base;
+        return KV_Q16_OK;
+    }
+
+    if (!arr)
+        return KV_Q16_ERR_NULL_PTR;
+
+    status = KVTryMulI64Checked(count,
+                                sizeof(I64),
+                                &span_bytes);
+    if (status != KV_Q16_OK)
+        return status;
+
+    base = (U64)arr;
+    status = KVRangeU64EndChecked(base,
+                                  (U64)span_bytes,
+                                  out_end);
+    if (status != KV_Q16_OK)
+        return status;
+
+    *out_base = base;
+    return KV_Q16_OK;
+}
+
+I32 KVRangesOverlap(U64 lhs_base,
+                    U64 lhs_end,
+                    U64 rhs_base,
+                    U64 rhs_end)
+{
+    if (lhs_end <= lhs_base || rhs_end <= rhs_base)
+        return 0;
+    if (lhs_end <= rhs_base || rhs_end <= lhs_base)
+        return 0;
+    return 1;
+}
+
 // Span in Q16 cells for one token in one layer:
 // span_cells = kv_heads * head_dim
 I32 KVCacheQ16ComputeLayerTokenSpanCellsChecked(
@@ -3343,6 +3412,26 @@ I32 KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartialCommitOnlyPreflightOnlyRequ
     I64 snapshot_v_src_capacity;
     I64 snapshot_k_out_capacity;
     I64 snapshot_v_out_capacity;
+    U64 required_span_cells_base;
+    U64 required_span_cells_end;
+    U64 required_token_bytes_base;
+    U64 required_token_bytes_end;
+    U64 k_base_index_base;
+    U64 k_base_index_end;
+    U64 v_base_index_base;
+    U64 v_base_index_end;
+    U64 k_cache_base;
+    U64 k_cache_end;
+    U64 v_cache_base;
+    U64 v_cache_end;
+    U64 k_src_base;
+    U64 k_src_end;
+    U64 v_src_base;
+    U64 v_src_end;
+    U64 k_out_base;
+    U64 k_out_end;
+    U64 v_out_base;
+    U64 v_out_end;
     I32 status;
 
     if (!out_required_span_cells || !out_required_token_bytes ||
@@ -3381,6 +3470,111 @@ I32 KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartialCommitOnlyPreflightOnlyRequ
         out_v_base_index == v_token_src_q16 ||
         out_v_base_index == k_token_out_q16 ||
         out_v_base_index == v_token_out_q16)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    status = KVRangeU64EndChecked((U64)out_required_span_cells,
+                                  sizeof(I64),
+                                  &required_span_cells_end);
+    if (status != KV_Q16_OK)
+        return status;
+    required_span_cells_base = (U64)out_required_span_cells;
+
+    status = KVRangeU64EndChecked((U64)out_required_token_bytes,
+                                  sizeof(I64),
+                                  &required_token_bytes_end);
+    if (status != KV_Q16_OK)
+        return status;
+    required_token_bytes_base = (U64)out_required_token_bytes;
+
+    status = KVRangeU64EndChecked((U64)out_k_base_index,
+                                  sizeof(I64),
+                                  &k_base_index_end);
+    if (status != KV_Q16_OK)
+        return status;
+    k_base_index_base = (U64)out_k_base_index;
+
+    status = KVRangeU64EndChecked((U64)out_v_base_index,
+                                  sizeof(I64),
+                                  &v_base_index_end);
+    if (status != KV_Q16_OK)
+        return status;
+    v_base_index_base = (U64)out_v_base_index;
+
+    if (KVRangesOverlap(required_span_cells_base, required_span_cells_end,
+                        required_token_bytes_base, required_token_bytes_end) ||
+        KVRangesOverlap(required_span_cells_base, required_span_cells_end,
+                        k_base_index_base, k_base_index_end) ||
+        KVRangesOverlap(required_span_cells_base, required_span_cells_end,
+                        v_base_index_base, v_base_index_end) ||
+        KVRangesOverlap(required_token_bytes_base, required_token_bytes_end,
+                        k_base_index_base, k_base_index_end) ||
+        KVRangesOverlap(required_token_bytes_base, required_token_bytes_end,
+                        v_base_index_base, v_base_index_end) ||
+        KVRangesOverlap(k_base_index_base, k_base_index_end,
+                        v_base_index_base, v_base_index_end))
+        return KV_Q16_ERR_BAD_PARAM;
+
+    status = KVArrayI64SpanChecked(k_cache_q16,
+                                   k_cache_capacity,
+                                   &k_cache_base,
+                                   &k_cache_end);
+    if (status != KV_Q16_OK)
+        return status;
+    status = KVArrayI64SpanChecked(v_cache_q16,
+                                   v_cache_capacity,
+                                   &v_cache_base,
+                                   &v_cache_end);
+    if (status != KV_Q16_OK)
+        return status;
+    status = KVArrayI64SpanChecked(k_token_src_q16,
+                                   k_token_src_capacity,
+                                   &k_src_base,
+                                   &k_src_end);
+    if (status != KV_Q16_OK)
+        return status;
+    status = KVArrayI64SpanChecked(v_token_src_q16,
+                                   v_token_src_capacity,
+                                   &v_src_base,
+                                   &v_src_end);
+    if (status != KV_Q16_OK)
+        return status;
+    status = KVArrayI64SpanChecked(k_token_out_q16,
+                                   k_token_out_capacity,
+                                   &k_out_base,
+                                   &k_out_end);
+    if (status != KV_Q16_OK)
+        return status;
+    status = KVArrayI64SpanChecked(v_token_out_q16,
+                                   v_token_out_capacity,
+                                   &v_out_base,
+                                   &v_out_end);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (KVRangesOverlap(required_span_cells_base, required_span_cells_end, k_cache_base, k_cache_end) ||
+        KVRangesOverlap(required_span_cells_base, required_span_cells_end, v_cache_base, v_cache_end) ||
+        KVRangesOverlap(required_span_cells_base, required_span_cells_end, k_src_base, k_src_end) ||
+        KVRangesOverlap(required_span_cells_base, required_span_cells_end, v_src_base, v_src_end) ||
+        KVRangesOverlap(required_span_cells_base, required_span_cells_end, k_out_base, k_out_end) ||
+        KVRangesOverlap(required_span_cells_base, required_span_cells_end, v_out_base, v_out_end) ||
+        KVRangesOverlap(required_token_bytes_base, required_token_bytes_end, k_cache_base, k_cache_end) ||
+        KVRangesOverlap(required_token_bytes_base, required_token_bytes_end, v_cache_base, v_cache_end) ||
+        KVRangesOverlap(required_token_bytes_base, required_token_bytes_end, k_src_base, k_src_end) ||
+        KVRangesOverlap(required_token_bytes_base, required_token_bytes_end, v_src_base, v_src_end) ||
+        KVRangesOverlap(required_token_bytes_base, required_token_bytes_end, k_out_base, k_out_end) ||
+        KVRangesOverlap(required_token_bytes_base, required_token_bytes_end, v_out_base, v_out_end) ||
+        KVRangesOverlap(k_base_index_base, k_base_index_end, k_cache_base, k_cache_end) ||
+        KVRangesOverlap(k_base_index_base, k_base_index_end, v_cache_base, v_cache_end) ||
+        KVRangesOverlap(k_base_index_base, k_base_index_end, k_src_base, k_src_end) ||
+        KVRangesOverlap(k_base_index_base, k_base_index_end, v_src_base, v_src_end) ||
+        KVRangesOverlap(k_base_index_base, k_base_index_end, k_out_base, k_out_end) ||
+        KVRangesOverlap(k_base_index_base, k_base_index_end, v_out_base, v_out_end) ||
+        KVRangesOverlap(v_base_index_base, v_base_index_end, k_cache_base, k_cache_end) ||
+        KVRangesOverlap(v_base_index_base, v_base_index_end, v_cache_base, v_cache_end) ||
+        KVRangesOverlap(v_base_index_base, v_base_index_end, k_src_base, k_src_end) ||
+        KVRangesOverlap(v_base_index_base, v_base_index_end, v_src_base, v_src_end) ||
+        KVRangesOverlap(v_base_index_base, v_base_index_end, k_out_base, k_out_end) ||
+        KVRangesOverlap(v_base_index_base, v_base_index_end, v_out_base, v_out_end))
         return KV_Q16_ERR_BAD_PARAM;
 
     snapshot_layer_idx = layer_idx;
