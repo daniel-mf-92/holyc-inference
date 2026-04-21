@@ -255,6 +255,100 @@ I32 GGUFHeaderParseChecked(U8 *header_bytes,
     return GGUFHeaderValidateAndSizeChecked(out_header, out_header_bytes);
 }
 
+// Checked no-partial GGUF header reader.
+//
+// Contract:
+// - Parses canonical GGUF fixed header fields from immutable byte span.
+// - Uses checked little-endian integer reads with strict bound validation.
+// - Performs zero writes to out_header/out_header_bytes on any failure path.
+// - Commits parsed header + consumed-bytes exactly once on success.
+I32 GGUFHeaderReadCheckedNoPartial(U8 *header_bytes,
+                                   U64 header_nbytes,
+                                   GGUFHeader *out_header,
+                                   U64 *out_header_bytes)
+{
+    U8 *snapshot_header_bytes;
+    U64 snapshot_header_nbytes;
+    U32 staged_magic;
+    U32 staged_version;
+    U64 staged_tensor_count;
+    U64 staged_metadata_kv_count;
+    U64 staged_header_bytes;
+    GGUFHeader staged_header;
+    I32 status;
+
+    if (!header_bytes || !out_header || !out_header_bytes)
+        return GGUF_HEADER_ERR_NULL_PTR;
+
+    if (header_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_HEADER_ERR_OVERFLOW;
+    if (header_nbytes < GGUF_HEADER_BYTES)
+        return GGUF_HEADER_ERR_TRUNCATED;
+
+    snapshot_header_bytes = header_bytes;
+    snapshot_header_nbytes = header_nbytes;
+
+    status = GGUFReadU32LEChecked(header_bytes,
+                                  header_nbytes,
+                                  GGUF_HEADER_MAGIC_OFFSET,
+                                  &staged_magic);
+    if (status)
+        return status;
+    if (staged_magic != GGUF_MAGIC_U32)
+        return GGUF_HEADER_ERR_BAD_MAGIC;
+
+    status = GGUFReadU32LEChecked(header_bytes,
+                                  header_nbytes,
+                                  GGUF_HEADER_VERSION_OFFSET,
+                                  &staged_version);
+    if (status)
+        return status;
+    if (!GGUFHeaderVersionSupported(staged_version))
+        return GGUF_HEADER_ERR_BAD_VERSION;
+
+    status = GGUFReadU64LEChecked(header_bytes,
+                                  header_nbytes,
+                                  GGUF_HEADER_TENSOR_COUNT_OFFSET,
+                                  &staged_tensor_count);
+    if (status)
+        return status;
+
+    status = GGUFReadU64LEChecked(header_bytes,
+                                  header_nbytes,
+                                  GGUF_HEADER_METADATA_COUNT_OFFSET,
+                                  &staged_metadata_kv_count);
+    if (status)
+        return status;
+
+    // Revalidate immutable snapshot before publishing staged outputs.
+    if (snapshot_header_bytes != header_bytes)
+        return GGUF_HEADER_ERR_BAD_PARAM;
+    if (snapshot_header_nbytes != header_nbytes)
+        return GGUF_HEADER_ERR_BAD_PARAM;
+
+    staged_header.magic = staged_magic;
+    staged_header.version = staged_version;
+    staged_header.tensor_count = staged_tensor_count;
+    staged_header.metadata_kv_count = staged_metadata_kv_count;
+
+    status = GGUFHeaderValidateAndSizeChecked(&staged_header,
+                                              &staged_header_bytes);
+    if (status)
+        return status;
+
+    if (snapshot_header_bytes != header_bytes)
+        return GGUF_HEADER_ERR_BAD_PARAM;
+    if (snapshot_header_nbytes != header_nbytes)
+        return GGUF_HEADER_ERR_BAD_PARAM;
+
+    out_header->magic = staged_header.magic;
+    out_header->version = staged_header.version;
+    out_header->tensor_count = staged_header.tensor_count;
+    out_header->metadata_kv_count = staged_header.metadata_kv_count;
+    *out_header_bytes = staged_header_bytes;
+    return GGUF_HEADER_OK;
+}
+
 Bool GGUFCanRead(U8 *buf, I64 size, I64 cursor, I64 need)
 {
     if (!buf)

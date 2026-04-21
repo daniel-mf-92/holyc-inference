@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity harness for FPQ16MulCheckedNoPartialArrayCommitOnlyPreflightOnlyParity (IQ-974)."""
+"""Parity harness for FPQ16MulCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly (IQ-978)."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from test_fixedpoint_q16_mul_checked_no_partial_array_commit_only_preflight_only
 )
 
 
-def fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity(
+def fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only(
     lhs_q16: list[int] | None,
     rhs_q16: list[int] | None,
     out_q16: list[int] | None,
@@ -172,9 +172,9 @@ def explicit_parity_composition(
     return FP_Q16_OK
 
 
-def test_source_contains_iq974_function() -> None:
+def test_source_contains_iq978_function() -> None:
     source = Path("src/math/fixedpoint.HC").read_text(encoding="utf-8")
-    sig = "I32 FPQ16MulCheckedNoPartialArrayCommitOnlyPreflightOnlyParity(I64 *lhs_q16,"
+    sig = "I32 FPQ16MulCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(I64 *lhs_q16,"
     assert sig in source
     body = source.split(sig, 1)[1].split(
         "I32 FPQ16MulCheckedNoPartialArrayRequiredBytesCommitOnlyPreflightOnly", 1
@@ -200,7 +200,7 @@ def test_null_bad_param_and_no_publish_on_fail() -> None:
     out_cells = [777]
     out_bytes = [888]
 
-    err = fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity(
+    err = fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only(
         None,
         rhs,
         out,
@@ -213,7 +213,7 @@ def test_null_bad_param_and_no_publish_on_fail() -> None:
     assert out_cells == [777]
     assert out_bytes == [888]
 
-    err = fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity(
+    err = fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only(
         lhs,
         rhs,
         out,
@@ -226,7 +226,7 @@ def test_null_bad_param_and_no_publish_on_fail() -> None:
     assert out_cells == [777]
     assert out_bytes == [888]
 
-    err = fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity(
+    err = fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only(
         lhs,
         rhs,
         out,
@@ -247,7 +247,7 @@ def test_publish_and_snapshot_mutation_guard() -> None:
 
     out_cells = [0]
     out_bytes = [0]
-    err = fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity(
+    err = fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only(
         lhs,
         rhs,
         out,
@@ -262,7 +262,7 @@ def test_publish_and_snapshot_mutation_guard() -> None:
 
     fail_cells = [111]
     fail_bytes = [222]
-    err = fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity(
+    err = fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only(
         lhs,
         rhs,
         out,
@@ -283,7 +283,7 @@ def test_output_alias_rejected_without_publish() -> None:
     out = [0, 0, 0]
 
     out_bytes = [123]
-    err = fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity(
+    err = fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only(
         lhs,
         rhs,
         out,
@@ -308,7 +308,7 @@ def test_randomized_vs_explicit_composition() -> None:
 
         out_cells_actual = [0x55AA]
         out_bytes_actual = [0xAA55]
-        status_actual = fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity(
+        status_actual = fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only(
             lhs,
             rhs,
             out,
