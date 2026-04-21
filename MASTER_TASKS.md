@@ -959,6 +959,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 
 ## Progress Ledger
 
+- 2026-04-21: IQ-980 done — expanded adversarial alias/count/overflow coverage in `tests/test_fixedpoint_q16_mul_checked_no_partial_array_required_bytes_commit_only_preflight_only_parity_commit_only_preflight_only_parity.py` and validated overflow-guard parity contract for `FPQ16MulCheckedNoPartialArrayRequiredBytesCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity`; focused fixedpoint parity chain passed.
 - 2026-04-21: IQ-975 done — added `FPQ16MulCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnly` in `src/math/fixedpoint.HC` and harness `tests/test_fixedpoint_q16_mul_checked_no_partial_array_commit_only_preflight_only_parity_commit_only.py`; validated focused fixedpoint parity commit-only suite (passed).
 - 2026-04-21: IQ-986 done — added `GGUFHeaderReadCheckedNoPartial` + `tests/test_gguf_header_read_checked_nopartial.py`; validated `python3 tests/test_gguf_header_read_checked_nopartial.py` (passed).
 - 2026-04-21: IQ-978 done — added `FPQ16MulCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly` in `src/math/fixedpoint.HC` with parity harness `tests/test_fixedpoint_q16_mul_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only.py`; validated `./.venv/bin/python -m pytest -q tests/test_fixedpoint_q16_mul_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only.py` (passed).
