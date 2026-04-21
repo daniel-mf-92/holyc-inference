@@ -15,6 +15,7 @@
 // Runtime path is integer-only after one fp16->Q16 conversion per block.
 
 #define Q8_0_VALUES_PER_BLOCK 32
+#define Q8_0_BLOCK_SIZE       Q8_0_VALUES_PER_BLOCK
 #define Q8_0_PACKED_BYTES     32
 #define Q8_0_BLOCK_BYTES      34
 
@@ -317,4 +318,28 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArray(
     }
 
     return Q8_0_OK;
+}
+
+// Canonical default-stride wrapper for contiguous per-block decode output.
+// Keeps all checked/no-partial behavior in one audited core helper.
+I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayDefaultStride(
+    Q8_0Block *src_blocks,
+    I64 src_block_capacity,
+    I64 src_block_stride,
+    I64 block_count,
+    I64 *dst_q16,
+    I64 dst_q16_capacity)
+{
+    I64 out_stride_values;
+
+    out_stride_values = Q8_0_BLOCK_SIZE;
+
+    return Q8_0DequantizeBlockQ16CheckedNoPartialArray(
+        src_blocks,
+        src_block_capacity,
+        src_block_stride,
+        block_count,
+        dst_q16,
+        dst_q16_capacity,
+        out_stride_values);
 }
