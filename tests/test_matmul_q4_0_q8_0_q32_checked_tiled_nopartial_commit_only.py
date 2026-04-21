@@ -135,7 +135,7 @@ def test_source_contains_iq_993_signature_and_commit_atomic_publish() -> None:
     source = pathlib.Path("src/matmul/q4_0_q8_0_matmul.HC").read_text(encoding="utf-8")
     sig = "I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnly("
     assert sig in source
-    body = source.split(sig, 1)[1]
+    body = source.rsplit(sig, 1)[1]
     assert "MatMulQ4_0Q8_0Q32CheckedTiledNoPartial(" in body
     assert "snapshot_tile_rows" in body
     assert "snapshot_tile_cols" in body
