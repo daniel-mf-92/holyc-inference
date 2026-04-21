@@ -1775,14 +1775,14 @@ I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnly(I64 *x
 
 // Diagnostics-only parity gate over
 // FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnly and
-// FPQ16ExpApproxRangeReduceCheckedNoPartialArray.
+// FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnly.
 //
 // Contract:
 // - Stages {required_cells,required_bytes} via no-write preflight helper.
 // - Revalidates immutable snapshots {count,x_q16,out_k,out_r_q16}.
-// - Runs canonical lane range-reduction path and recomputes diagnostics with
-//   checked integer math.
-// - Requires exact tuple parity before atomic diagnostics publish.
+// - Stages a second diagnostics tuple through commit-only composition.
+// - Requires exact tuple parity on {count,required_cells,required_bytes}
+//   before atomic diagnostics publish.
 // - Preserves strict no-partial diagnostics writes on all failures.
 I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParity(I64 *x_q16,
                                                                                  I64 *out_k,
@@ -1798,8 +1798,9 @@ I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParity(
     I64 preflight_count;
     I64 preflight_required_cells;
     I64 preflight_required_bytes;
-    I64 canonical_required_cells;
-    I64 canonical_required_bytes;
+    I64 commit_count;
+    I64 commit_required_cells;
+    I64 commit_required_bytes;
     I32 status;
 
     if (!x_q16 || !out_k || !out_r_q16)
@@ -1840,10 +1841,14 @@ I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParity(
     if (status)
         return status;
 
-    status = FPQ16ExpApproxRangeReduceCheckedNoPartialArray(x_q16,
-                                                            out_k,
-                                                            out_r_q16,
-                                                            count);
+    status = FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnly(
+        x_q16,
+        out_k,
+        out_r_q16,
+        count,
+        &commit_count,
+        &commit_required_cells,
+        &commit_required_bytes);
     if (status)
         return status;
 
@@ -1856,21 +1861,11 @@ I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParity(
     if (snapshot_count != count)
         return FP_Q16_ERR_BAD_PARAM;
 
-    status = FPTryMulI64Checked(count, 2, &canonical_required_cells);
-    if (status)
-        return status;
-
-    status = FPTryMulI64Checked(canonical_required_cells,
-                                sizeof(I64),
-                                &canonical_required_bytes);
-    if (status)
-        return status;
-
-    if (preflight_count != count)
+    if (preflight_count != commit_count)
         return FP_Q16_ERR_BAD_PARAM;
-    if (preflight_required_cells != canonical_required_cells)
+    if (preflight_required_cells != commit_required_cells)
         return FP_Q16_ERR_BAD_PARAM;
-    if (preflight_required_bytes != canonical_required_bytes)
+    if (preflight_required_bytes != commit_required_bytes)
         return FP_Q16_ERR_BAD_PARAM;
 
     *out_required_cells = preflight_required_cells;

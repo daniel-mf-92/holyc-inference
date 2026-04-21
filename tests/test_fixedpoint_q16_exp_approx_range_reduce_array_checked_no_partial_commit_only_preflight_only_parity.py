@@ -13,21 +13,14 @@ from test_fixedpoint_q16_exp_approx_range_reduce_array_checked_no_partial import
     FP_Q16_ERR_BAD_PARAM,
     FP_Q16_ERR_NULL_PTR,
     FP_Q16_OK,
-    fpq16_exp_approx_range_reduce_checked_no_partial_array,
+)
+from test_fixedpoint_q16_exp_approx_range_reduce_array_checked_no_partial_commit_only import (
+    fpq16_exp_approx_range_reduce_checked_no_partial_array_commit_only,
 )
 from test_fixedpoint_q16_exp_approx_range_reduce_array_checked_no_partial_commit_only_preflight_only import (
     FP_Q16_ERR_OVERFLOW,
     fpq16_exp_approx_range_reduce_checked_no_partial_array_commit_only_preflight_only,
 )
-
-
-def fp_try_mul_i64_checked(lhs: int, rhs: int) -> tuple[int, int]:
-    i64_min = -(1 << 63)
-    i64_max = (1 << 63) - 1
-    prod = lhs * rhs
-    if prod < i64_min or prod > i64_max:
-        return FP_Q16_ERR_OVERFLOW, 0
-    return FP_Q16_OK, prod
 
 
 def fpq16_exp_approx_range_reduce_checked_no_partial_array_commit_only_preflight_only_parity(
@@ -82,26 +75,29 @@ def fpq16_exp_approx_range_reduce_checked_no_partial_array_commit_only_preflight
     if status != FP_Q16_OK:
         return status
 
-    status = fpq16_exp_approx_range_reduce_checked_no_partial_array(x_q16, out_k, out_r_q16, count)
+    commit_count = [0]
+    commit_required_cells = [0]
+    commit_required_bytes = [0]
+    status = fpq16_exp_approx_range_reduce_checked_no_partial_array_commit_only(
+        x_q16,
+        out_k,
+        out_r_q16,
+        count,
+        commit_count,
+        commit_required_cells,
+        commit_required_bytes,
+    )
     if status != FP_Q16_OK:
         return status
 
     if snapshot != (x_q16, out_k, out_r_q16, count):
         return FP_Q16_ERR_BAD_PARAM
 
-    status, canonical_required_cells = fp_try_mul_i64_checked(count, 2)
-    if status != FP_Q16_OK:
-        return status
-
-    status, canonical_required_bytes = fp_try_mul_i64_checked(canonical_required_cells, 8)
-    if status != FP_Q16_OK:
-        return status
-
-    if staged_count[0] != count:
+    if staged_count[0] != commit_count[0]:
         return FP_Q16_ERR_BAD_PARAM
-    if staged_required_cells[0] != canonical_required_cells:
+    if staged_required_cells[0] != commit_required_cells[0]:
         return FP_Q16_ERR_BAD_PARAM
-    if staged_required_bytes[0] != canonical_required_bytes:
+    if staged_required_bytes[0] != commit_required_bytes[0]:
         return FP_Q16_ERR_BAD_PARAM
 
     out_count[0] = staged_count[0]
@@ -134,21 +130,29 @@ def explicit_composition(
     if status != FP_Q16_OK:
         return status, (0, 0, 0)
 
-    status = fpq16_exp_approx_range_reduce_checked_no_partial_array(x_q16, out_k, out_r_q16, count)
+    commit_count = [0]
+    commit_cells = [0]
+    commit_bytes = [0]
+    status = fpq16_exp_approx_range_reduce_checked_no_partial_array_commit_only(
+        x_q16,
+        out_k,
+        out_r_q16,
+        count,
+        commit_count,
+        commit_cells,
+        commit_bytes,
+    )
     if status != FP_Q16_OK:
         return status, (0, 0, 0)
 
-    status, cells = fp_try_mul_i64_checked(count, 2)
-    if status != FP_Q16_OK:
-        return status, (0, 0, 0)
-    status, bytes_ = fp_try_mul_i64_checked(cells, 8)
-    if status != FP_Q16_OK:
-        return status, (0, 0, 0)
-
-    if staged_count[0] != count or staged_cells[0] != cells or staged_bytes[0] != bytes_:
+    if (
+        staged_count[0] != commit_count[0]
+        or staged_cells[0] != commit_cells[0]
+        or staged_bytes[0] != commit_bytes[0]
+    ):
         return FP_Q16_ERR_BAD_PARAM, (0, 0, 0)
 
-    return FP_Q16_OK, (count, cells, bytes_)
+    return FP_Q16_OK, (commit_count[0], commit_cells[0], commit_bytes[0])
 
 
 def test_source_contains_iq913_helper() -> None:
@@ -158,9 +162,9 @@ def test_source_contains_iq913_helper() -> None:
     body = source.split(sig, 1)[1].split("I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayRequiredBytes", 1)[0]
     assert "I64 *out_count," in body
     assert "FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnly(" in body
-    assert "status = FPQ16ExpApproxRangeReduceCheckedNoPartialArray(x_q16," in body
-    assert "status = FPTryMulI64Checked(count, 2, &canonical_required_cells);" in body
-    assert "status = FPTryMulI64Checked(canonical_required_cells," in body
+    assert "status = FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnly(" in body
+    assert "&commit_count," in body
+    assert "if (preflight_count != commit_count)" in body
     assert "*out_count = preflight_count;" in body
     assert "*out_required_cells = preflight_required_cells;" in body
     assert "*out_required_bytes = preflight_required_bytes;" in body
