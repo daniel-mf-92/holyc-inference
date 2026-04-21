@@ -677,6 +677,8 @@ I32 Q4_0Q8_0DotQ32CheckedNoPartialArrayDotOne(
     I64 block_dot_q32;
     I64 total_dot_q32;
     I64 byte_index;
+    I64 low_term_q0;
+    I64 high_term_q0;
     U8 packed_q4;
 
     if (!lhs_q4 || !rhs_q8 || !out_dot_q32)
@@ -710,8 +712,14 @@ I32 Q4_0Q8_0DotQ32CheckedNoPartialArrayDotOne(
         for (byte_index = 0; byte_index < Q4_0_PACKED_BYTES; ++byte_index)
         {
             packed_q4 = lhs_q4[lhs_index].qs[byte_index];
-            q_dot_q0 += Q4_0_Q8_0NibbleToSigned(packed_q4, FALSE) * rhs_q8[rhs_index].qs[(byte_index << 1)];
-            q_dot_q0 += Q4_0_Q8_0NibbleToSigned(packed_q4, TRUE) * rhs_q8[rhs_index].qs[(byte_index << 1) + 1];
+
+            low_term_q0 = Q4_0_Q8_0NibbleToSigned(packed_q4, FALSE) * rhs_q8[rhs_index].qs[(byte_index << 1)];
+            high_term_q0 = Q4_0_Q8_0NibbleToSigned(packed_q4, TRUE) * rhs_q8[rhs_index].qs[(byte_index << 1) + 1];
+
+            if (!Q4_0Q8_0TryAddI64(q_dot_q0, low_term_q0, &q_dot_q0))
+                return Q4_0_Q8_0_ERR_OVERFLOW;
+            if (!Q4_0Q8_0TryAddI64(q_dot_q0, high_term_q0, &q_dot_q0))
+                return Q4_0_Q8_0_ERR_OVERFLOW;
         }
 
         if (!Q4_0Q8_0TryMulI64(scale_prod_q32, q_dot_q0, &block_dot_q32))

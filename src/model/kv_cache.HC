@@ -4405,3 +4405,201 @@ I32 KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartialCommitOnlyPreflightOnlyRequ
     *out_v_base_index = staged_v_base_index;
     return KV_Q16_OK;
 }
+
+// Diagnostics-only no-write companion over commit-only parity helper.
+// Stages parity-checked tuple outputs, recomputes canonical geometry/bytes
+// from immutable snapshots, and atomically publishes diagnostics only when
+// every invariant matches under strict zero-write/no-partial semantics.
+I32 KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+    I64 *k_cache_q16,
+    I64 k_cache_capacity,
+    I64 *v_cache_q16,
+    I64 v_cache_capacity,
+    I64 layer_idx,
+    I64 token_idx,
+    I64 layer_count,
+    I64 token_capacity,
+    I64 kv_heads,
+    I64 head_dim,
+    I64 *k_token_src_q16,
+    I64 k_token_src_capacity,
+    I64 *v_token_src_q16,
+    I64 v_token_src_capacity,
+    I64 *k_token_out_q16,
+    I64 k_token_out_capacity,
+    I64 *v_token_out_q16,
+    I64 v_token_out_capacity,
+    I64 *out_required_span_cells,
+    I64 *out_required_token_bytes,
+    I64 *out_k_base_index,
+    I64 *out_v_base_index)
+{
+    I64 staged_required_span_cells;
+    I64 staged_required_token_bytes;
+    I64 staged_k_base_index;
+    I64 staged_v_base_index;
+    I64 staged_span_cells_recomputed_k;
+    I64 staged_span_cells_recomputed_v;
+    I64 staged_k_base_index_recomputed;
+    I64 staged_v_base_index_recomputed;
+    I64 staged_required_token_bytes_recomputed;
+    I64 snapshot_layer_idx;
+    I64 snapshot_token_idx;
+    I64 snapshot_layer_count;
+    I64 snapshot_token_capacity;
+    I64 snapshot_kv_heads;
+    I64 snapshot_head_dim;
+    I64 snapshot_k_cache_capacity;
+    I64 snapshot_v_cache_capacity;
+    I64 snapshot_k_src_capacity;
+    I64 snapshot_v_src_capacity;
+    I64 snapshot_k_out_capacity;
+    I64 snapshot_v_out_capacity;
+    I32 status;
+
+    if (!out_required_span_cells || !out_required_token_bytes ||
+        !out_k_base_index || !out_v_base_index)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (out_required_span_cells == out_required_token_bytes ||
+        out_required_span_cells == out_k_base_index ||
+        out_required_span_cells == out_v_base_index ||
+        out_required_token_bytes == out_k_base_index ||
+        out_required_token_bytes == out_v_base_index ||
+        out_k_base_index == out_v_base_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (out_required_span_cells == k_cache_q16 ||
+        out_required_span_cells == v_cache_q16 ||
+        out_required_span_cells == k_token_src_q16 ||
+        out_required_span_cells == v_token_src_q16 ||
+        out_required_span_cells == k_token_out_q16 ||
+        out_required_span_cells == v_token_out_q16 ||
+        out_required_token_bytes == k_cache_q16 ||
+        out_required_token_bytes == v_cache_q16 ||
+        out_required_token_bytes == k_token_src_q16 ||
+        out_required_token_bytes == v_token_src_q16 ||
+        out_required_token_bytes == k_token_out_q16 ||
+        out_required_token_bytes == v_token_out_q16 ||
+        out_k_base_index == k_cache_q16 ||
+        out_k_base_index == v_cache_q16 ||
+        out_k_base_index == k_token_src_q16 ||
+        out_k_base_index == v_token_src_q16 ||
+        out_k_base_index == k_token_out_q16 ||
+        out_k_base_index == v_token_out_q16 ||
+        out_v_base_index == k_cache_q16 ||
+        out_v_base_index == v_cache_q16 ||
+        out_v_base_index == k_token_src_q16 ||
+        out_v_base_index == v_token_src_q16 ||
+        out_v_base_index == k_token_out_q16 ||
+        out_v_base_index == v_token_out_q16)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    snapshot_layer_idx = layer_idx;
+    snapshot_token_idx = token_idx;
+    snapshot_layer_count = layer_count;
+    snapshot_token_capacity = token_capacity;
+    snapshot_kv_heads = kv_heads;
+    snapshot_head_dim = head_dim;
+    snapshot_k_cache_capacity = k_cache_capacity;
+    snapshot_v_cache_capacity = v_cache_capacity;
+    snapshot_k_src_capacity = k_token_src_capacity;
+    snapshot_v_src_capacity = v_token_src_capacity;
+    snapshot_k_out_capacity = k_token_out_capacity;
+    snapshot_v_out_capacity = v_token_out_capacity;
+
+    status = KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesCommitOnlyPreflightOnlyParityCommitOnly(
+        k_cache_q16,
+        k_cache_capacity,
+        v_cache_q16,
+        v_cache_capacity,
+        layer_idx,
+        token_idx,
+        layer_count,
+        token_capacity,
+        kv_heads,
+        head_dim,
+        k_token_src_q16,
+        k_token_src_capacity,
+        v_token_src_q16,
+        v_token_src_capacity,
+        k_token_out_q16,
+        k_token_out_capacity,
+        v_token_out_q16,
+        v_token_out_capacity,
+        &staged_required_span_cells,
+        &staged_required_token_bytes,
+        &staged_k_base_index,
+        &staged_v_base_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVCacheQ16ComputeLayerTokenBaseIndexChecked(layer_idx,
+                                                         token_idx,
+                                                         layer_count,
+                                                         token_capacity,
+                                                         kv_heads,
+                                                         head_dim,
+                                                         &staged_k_base_index_recomputed,
+                                                         &staged_span_cells_recomputed_k);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVCacheQ16ComputeLayerTokenBaseIndexChecked(layer_idx,
+                                                         token_idx,
+                                                         layer_count,
+                                                         token_capacity,
+                                                         kv_heads,
+                                                         head_dim,
+                                                         &staged_v_base_index_recomputed,
+                                                         &staged_span_cells_recomputed_v);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (staged_span_cells_recomputed_k != staged_span_cells_recomputed_v)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    status = KVTryMulI64Checked(staged_span_cells_recomputed_k,
+                                sizeof(I64),
+                                &staged_required_token_bytes_recomputed);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (staged_required_span_cells < 0 ||
+        staged_required_token_bytes < 0 ||
+        staged_k_base_index < 0 ||
+        staged_v_base_index < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_span_cells_recomputed_k < 0 ||
+        staged_required_token_bytes_recomputed < 0 ||
+        staged_k_base_index_recomputed < 0 ||
+        staged_v_base_index_recomputed < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_span_cells != staged_span_cells_recomputed_k ||
+        staged_required_token_bytes != staged_required_token_bytes_recomputed ||
+        staged_k_base_index != staged_k_base_index_recomputed ||
+        staged_v_base_index != staged_v_base_index_recomputed)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_layer_idx != layer_idx ||
+        snapshot_token_idx != token_idx ||
+        snapshot_layer_count != layer_count ||
+        snapshot_token_capacity != token_capacity ||
+        snapshot_kv_heads != kv_heads ||
+        snapshot_head_dim != head_dim ||
+        snapshot_k_cache_capacity != k_cache_capacity ||
+        snapshot_v_cache_capacity != v_cache_capacity ||
+        snapshot_k_src_capacity != k_token_src_capacity ||
+        snapshot_v_src_capacity != v_token_src_capacity ||
+        snapshot_k_out_capacity != k_token_out_capacity ||
+        snapshot_v_out_capacity != v_token_out_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    *out_required_span_cells = staged_required_span_cells;
+    *out_required_token_bytes = staged_required_token_bytes;
+    *out_k_base_index = staged_k_base_index;
+    *out_v_base_index = staged_v_base_index;
+    return KV_Q16_OK;
+}
