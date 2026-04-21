@@ -127,8 +127,9 @@ def test_source_contains_required_bytes_helper_contract() -> None:
     body = source.split(sig, 1)[1].split("I32 FPArrayI64SpanChecked", 1)[0]
     assert "FPQ16MulSatCheckedNoPartialArray(lhs_q16," in body
     assert "if (status != FP_Q16_OK && status != FP_Q16_ERR_OVERFLOW)" in body
-    assert "if ((U64)snapshot_count > (U64_MAX_VALUE >> 3))" in body
-    assert "if (snapshot_count != count)" in body
+    assert "if (count > (I64_MAX_VALUE >> 3))" in body
+    assert "if (out_required_output_bytes == lhs_q16 ||" in body
+    assert "if ((required_end > lhs_base && lhs_end > required_base) ||" in body
     assert "*out_required_output_bytes = staged_required_output_bytes;" in body
 
 

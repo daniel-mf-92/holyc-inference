@@ -553,38 +553,76 @@ I32 FPQ16MulSatCheckedNoPartialArrayRequiredBytes(I64 *lhs_q16,
                                                   I64 *rhs_q16,
                                                   I64 *out_q16,
                                                   I64 count,
-                                                  U64 *out_required_output_bytes)
+                                                  I64 *out_required_output_bytes)
 {
-    I64 snapshot_count;
-    U64 staged_required_output_bytes;
+    I64 staged_required_output_bytes;
+    U64 span_bytes;
+    U64 required_base;
+    U64 required_end;
+    U64 lhs_base;
+    U64 lhs_end;
+    U64 rhs_base;
+    U64 rhs_end;
+    U64 out_base;
+    U64 out_end;
     I32 status;
 
     if (!lhs_q16 || !rhs_q16 || !out_q16 || !out_required_output_bytes)
         return FP_Q16_ERR_NULL_PTR;
-
     if (count < 0)
         return FP_Q16_ERR_BAD_PARAM;
 
-    snapshot_count = count;
+    if (out_required_output_bytes == lhs_q16 ||
+        out_required_output_bytes == rhs_q16 ||
+        out_required_output_bytes == out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
 
-    if ((U64)snapshot_count > (U64_MAX_VALUE >> 3))
-        return FP_Q16_ERR_OVERFLOW;
-    staged_required_output_bytes = ((U64)snapshot_count) << 3;
+    // Preserve no-partial semantics by rejecting any overlap between the
+    // diagnostics scalar and lane-array spans before delegated compute.
+    if (count)
+    {
+        if (count > (I64_MAX_VALUE >> 3))
+            return FP_Q16_ERR_OVERFLOW;
+
+        span_bytes = ((U64)count) << 3;
+
+        required_base = (U64)out_required_output_bytes;
+        if (required_base > (U64_MAX_VALUE - 7))
+            return FP_Q16_ERR_OVERFLOW;
+        required_end = required_base + 8;
+
+        lhs_base = (U64)lhs_q16;
+        rhs_base = (U64)rhs_q16;
+        out_base = (U64)out_q16;
+
+        if (lhs_base > (U64_MAX_VALUE - span_bytes) ||
+            rhs_base > (U64_MAX_VALUE - span_bytes) ||
+            out_base > (U64_MAX_VALUE - span_bytes))
+            return FP_Q16_ERR_OVERFLOW;
+
+        lhs_end = lhs_base + span_bytes;
+        rhs_end = rhs_base + span_bytes;
+        out_end = out_base + span_bytes;
+
+        if ((required_end > lhs_base && lhs_end > required_base) ||
+            (required_end > rhs_base && rhs_end > required_base) ||
+            (required_end > out_base && out_end > required_base))
+            return FP_Q16_ERR_BAD_PARAM;
+    }
 
     status = FPQ16MulSatCheckedNoPartialArray(lhs_q16,
                                               rhs_q16,
                                               out_q16,
-                                              snapshot_count);
+                                              count);
     if (status != FP_Q16_OK && status != FP_Q16_ERR_OVERFLOW)
         return status;
 
-    // Immutable diagnostics contract: caller-shared scalar inputs must stay
-    // stable across checked composition before publishing required bytes.
-    if (snapshot_count != count)
-        return FP_Q16_ERR_BAD_PARAM;
-
+    staged_required_output_bytes = count << 3;
     *out_required_output_bytes = staged_required_output_bytes;
-    return status;
+
+    if (status == FP_Q16_ERR_OVERFLOW)
+        return FP_Q16_ERR_OVERFLOW;
+    return FP_Q16_OK;
 }
 
 // Compute byte span [base_addr, end_addr_exclusive) for an I64 lane array.
@@ -727,6 +765,91 @@ I32 FPQ16MacSatCheckedNoPartialArray(I64 *acc_q16,
     }
 
     if (overflow_seen)
+        return FP_Q16_ERR_OVERFLOW;
+    return FP_Q16_OK;
+}
+
+// Diagnostics helper over FPQ16MacSatCheckedNoPartialArray that computes the
+// caller-visible output byte requirement:
+//   required_output_bytes = count * sizeof(I64)
+//
+// Contract:
+// - Composes FPQ16MacSatCheckedNoPartialArray first.
+// - Derives required_output_bytes with checked integer math.
+// - Publishes required_output_bytes exactly once on success/overflow.
+// - Performs no required-bytes write on hard failures.
+I32 FPQ16MacSatCheckedNoPartialArrayRequiredBytes(I64 *acc_q16,
+                                                  I64 *a_q16,
+                                                  I64 *b_q16,
+                                                  I64 *out_q16,
+                                                  I64 count,
+                                                  I64 *out_required_output_bytes)
+{
+    I64 staged_required_output_bytes;
+    U64 acc_base;
+    U64 acc_end;
+    U64 a_base;
+    U64 a_end;
+    U64 b_base;
+    U64 b_end;
+    U64 out_base;
+    U64 out_end;
+    U64 required_base;
+    U64 required_end;
+    I32 status;
+
+    if (!acc_q16 || !a_q16 || !b_q16 || !out_q16 || !out_required_output_bytes)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_required_output_bytes == acc_q16 ||
+        out_required_output_bytes == a_q16 ||
+        out_required_output_bytes == b_q16 ||
+        out_required_output_bytes == out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Preserve no-partial semantics by rejecting any overlap between the
+    // diagnostics scalar and lane-array spans before delegated compute.
+    if (count)
+    {
+        status = FPArrayI64SpanChecked(acc_q16, count, &acc_base, &acc_end);
+        if (status)
+            return status;
+        status = FPArrayI64SpanChecked(a_q16, count, &a_base, &a_end);
+        if (status)
+            return status;
+        status = FPArrayI64SpanChecked(b_q16, count, &b_base, &b_end);
+        if (status)
+            return status;
+        status = FPArrayI64SpanChecked(out_q16, count, &out_base, &out_end);
+        if (status)
+            return status;
+
+        required_base = (U64)out_required_output_bytes;
+        if (required_base > (U64_MAX_VALUE - 7))
+            return FP_Q16_ERR_OVERFLOW;
+        required_end = required_base + 8;
+
+        if (FPAddressRangesOverlap(required_base, required_end, acc_base, acc_end) ||
+            FPAddressRangesOverlap(required_base, required_end, a_base, a_end) ||
+            FPAddressRangesOverlap(required_base, required_end, b_base, b_end) ||
+            FPAddressRangesOverlap(required_base, required_end, out_base, out_end))
+            return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    status = FPQ16MacSatCheckedNoPartialArray(acc_q16,
+                                              a_q16,
+                                              b_q16,
+                                              out_q16,
+                                              count);
+    if (status != FP_Q16_OK && status != FP_Q16_ERR_OVERFLOW)
+        return status;
+
+    staged_required_output_bytes = count << 3;
+    *out_required_output_bytes = staged_required_output_bytes;
+
+    if (status == FP_Q16_ERR_OVERFLOW)
         return FP_Q16_ERR_OVERFLOW;
     return FP_Q16_OK;
 }
