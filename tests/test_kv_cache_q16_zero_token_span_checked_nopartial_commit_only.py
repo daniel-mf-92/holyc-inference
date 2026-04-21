@@ -74,6 +74,8 @@ def kv_cache_q16_zero_token_span_checked_nopartial_commit_only(
         token_capacity,
         kv_heads,
         head_dim,
+        k_cache_capacity,
+        v_cache_capacity,
     )
 
     k_base = [0]
@@ -109,11 +111,18 @@ def kv_cache_q16_zero_token_span_checked_nopartial_commit_only(
     if k_base[0] != v_base[0] or k_span[0] != v_span[0]:
         return KV_Q16_ERR_BAD_PARAM
 
-    err, staged_end_index = try_add_i64_checked(k_base[0], k_span[0])
+    err, staged_k_end_index = try_add_i64_checked(k_base[0], k_span[0])
     if err != KV_Q16_OK:
         return err
 
-    if staged_end_index > k_cache_capacity or staged_end_index > v_cache_capacity:
+    err, staged_v_end_index = try_add_i64_checked(v_base[0], v_span[0])
+    if err != KV_Q16_OK:
+        return err
+
+    if staged_k_end_index != staged_v_end_index:
+        return KV_Q16_ERR_BAD_PARAM
+
+    if staged_k_end_index > k_cache_capacity or staged_v_end_index > v_cache_capacity:
         return KV_Q16_ERR_BAD_PARAM
 
     if snapshot != (
@@ -123,6 +132,8 @@ def kv_cache_q16_zero_token_span_checked_nopartial_commit_only(
         token_capacity,
         kv_heads,
         head_dim,
+        k_cache_capacity,
+        v_cache_capacity,
     ):
         return KV_Q16_ERR_BAD_PARAM
 
@@ -143,7 +154,7 @@ def kv_cache_q16_zero_token_span_checked_nopartial_commit_only(
 
     out_base_index[0] = k_base[0]
     out_span_cells[0] = k_span[0]
-    out_end_index[0] = staged_end_index
+    out_end_index[0] = staged_k_end_index
     return KV_Q16_OK
 
 
@@ -186,10 +197,14 @@ def test_source_contains_commit_only_zero_helper() -> None:
     body = source.split(signature, 1)[1]
 
     assert "KVCacheQ16ComputeLayerTokenBaseIndexChecked" in body
-    assert "KVTryAddI64Checked" in body
+    assert "staged_required_span_cells" in body
+    assert "staged_v_base_index" in body
+    assert "KVTryAddI64Checked(staged_v_base_index" in body
     assert "KVCacheQ16ZeroTokenSpanCheckedNoPartial(" in body
-    assert "if (staged_end_index > k_cache_capacity)" in body
-    assert "if (staged_end_index > v_cache_capacity)" in body
+    assert "if (staged_k_end_index > k_cache_capacity)" in body
+    assert "if (staged_v_end_index > v_cache_capacity)" in body
+    assert "snapshot_k_cache_capacity" in body
+    assert "snapshot_v_cache_capacity" in body
 
 
 def test_known_vector_commit_and_diagnostics() -> None:
@@ -408,10 +423,73 @@ def test_randomized_parity_vs_explicit_composition() -> None:
             assert out_end_a == out_end_b
 
 
+def test_randomized_capacity_mismatch_rejects_without_writes() -> None:
+    rng = random.Random(879)
+
+    for _ in range(240):
+        layer_count = rng.randint(1, 5)
+        token_capacity = rng.randint(1, 8)
+        kv_heads = rng.randint(1, 4)
+        head_dim = rng.randint(1, 8)
+        span = kv_heads * head_dim
+        total_cells = layer_count * token_capacity * span
+
+        layer_idx = rng.randint(0, layer_count - 1)
+        token_idx = rng.randint(0, token_capacity - 1)
+
+        base_out = [0]
+        span_out = [0]
+        err = kv_cache_q16_compute_layer_token_base_index_checked(
+            layer_idx,
+            token_idx,
+            layer_count,
+            token_capacity,
+            kv_heads,
+            head_dim,
+            base_out,
+            span_out,
+        )
+        assert err == KV_Q16_OK
+        required_end = base_out[0] + span_out[0]
+
+        # Ensure valid geometry but deliberately under-report capacity for this token.
+        k_cache = [rng.randint(-1000, 1000) for _ in range(total_cells)]
+        v_cache = [rng.randint(-1000, 1000) for _ in range(total_cells)]
+        k_before = k_cache.copy()
+        v_before = v_cache.copy()
+
+        out_base = [111]
+        out_span = [222]
+        out_end = [333]
+
+        err = kv_cache_q16_zero_token_span_checked_nopartial_commit_only(
+            k_cache,
+            required_end - 1,
+            v_cache,
+            required_end - 1,
+            layer_idx,
+            token_idx,
+            layer_count,
+            token_capacity,
+            kv_heads,
+            head_dim,
+            out_base,
+            out_span,
+            out_end,
+        )
+        assert err == KV_Q16_ERR_BAD_PARAM
+        assert k_cache == k_before
+        assert v_cache == v_before
+        assert out_base == [111]
+        assert out_span == [222]
+        assert out_end == [333]
+
+
 if __name__ == "__main__":
     test_source_contains_commit_only_zero_helper()
     test_known_vector_commit_and_diagnostics()
     test_null_alias_and_no_partial_failure()
     test_overflow_passthrough_from_checked_add()
     test_randomized_parity_vs_explicit_composition()
+    test_randomized_capacity_mismatch_rejects_without_writes()
     print("ok")
