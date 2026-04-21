@@ -212,6 +212,24 @@ I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityCommitOnlyPr
     I64 *out_block_dots_per_iter,
     I64 *out_total_cells,
     I64 *out_total_block_dots);
+I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParityPreflightOnly(
+    Q4_0Block *lhs_q4_blocks,
+    I64 lhs_q4_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_q8_col_blocks,
+    I64 rhs_q8_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_cells_q32,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells,
+    I64 iter_count,
+    I64 *out_cells_per_iter,
+    I64 *out_block_dots_per_iter,
+    I64 *out_total_cells,
+    I64 *out_total_block_dots);
 I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityPreflightOnly(
     Q4_0Block *lhs_q4_blocks,
     I64 lhs_q4_block_capacity,
@@ -2062,5 +2080,126 @@ I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityCommitOnlyPr
     *out_block_dots_per_iter = commit_block_dots_per_iter;
     *out_total_cells = commit_total_cells;
     *out_total_block_dots = commit_total_block_dots;
+    return Q4_0_Q8_0_MATMUL_OK;
+}
+
+I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParityPreflightOnly(
+    Q4_0Block *lhs_q4_blocks,
+    I64 lhs_q4_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_q8_col_blocks,
+    I64 rhs_q8_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_cells_q32,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells,
+    I64 iter_count,
+    I64 *out_cells_per_iter,
+    I64 *out_block_dots_per_iter,
+    I64 *out_total_cells,
+    I64 *out_total_block_dots)
+{
+    I64 parity_cells_per_iter;
+    I64 parity_block_dots_per_iter;
+    I64 parity_total_cells;
+    I64 parity_total_block_dots;
+
+    I64 canonical_cells_per_iter;
+    I64 canonical_block_dots_per_iter;
+    I64 canonical_total_cells;
+    I64 canonical_total_block_dots;
+
+    I64 snapshot_row_count;
+    I64 snapshot_col_count;
+    I64 snapshot_k_block_count;
+    I64 snapshot_iter_count;
+    I32 status;
+
+    if (!out_cells_per_iter || !out_block_dots_per_iter ||
+        !out_total_cells || !out_total_block_dots)
+        return Q4_0_Q8_0_MATMUL_ERR_NULL_PTR;
+
+    snapshot_row_count = row_count;
+    snapshot_col_count = col_count;
+    snapshot_k_block_count = k_block_count;
+    snapshot_iter_count = iter_count;
+
+    parity_cells_per_iter = 0;
+    parity_block_dots_per_iter = 0;
+    parity_total_cells = 0;
+    parity_total_block_dots = 0;
+
+    canonical_cells_per_iter = 0;
+    canonical_block_dots_per_iter = 0;
+    canonical_total_cells = 0;
+    canonical_total_block_dots = 0;
+
+    // IQ-862 diagnostics-only no-write companion over IQ-856 parity gate:
+    // stage tuple outputs through the canonical parity wrapper, rederive
+    // benchmark counts from immutable geometry, and publish only on exact
+    // tuple agreement with strict zero-publish semantics on failure.
+    status = Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParity(
+        lhs_q4_blocks,
+        lhs_q4_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_q8_col_blocks,
+        rhs_q8_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q32,
+        out_cell_capacity,
+        out_row_stride_cells,
+        iter_count,
+        &parity_cells_per_iter,
+        &parity_block_dots_per_iter,
+        &parity_total_cells,
+        &parity_total_block_dots);
+    if (status != Q4_0_Q8_0_MATMUL_OK)
+        return status;
+
+    if (snapshot_row_count != row_count ||
+        snapshot_col_count != col_count ||
+        snapshot_k_block_count != k_block_count ||
+        snapshot_iter_count != iter_count)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(snapshot_row_count,
+                                       snapshot_col_count,
+                                       &canonical_cells_per_iter))
+        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+
+    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(canonical_cells_per_iter,
+                                       snapshot_k_block_count,
+                                       &canonical_block_dots_per_iter))
+        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+
+    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(canonical_cells_per_iter,
+                                       snapshot_iter_count,
+                                       &canonical_total_cells))
+        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+
+    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(canonical_block_dots_per_iter,
+                                       snapshot_iter_count,
+                                       &canonical_total_block_dots))
+        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+
+    if (parity_cells_per_iter != canonical_cells_per_iter)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (parity_block_dots_per_iter != canonical_block_dots_per_iter)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (parity_total_cells != canonical_total_cells)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (parity_total_block_dots != canonical_total_block_dots)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    *out_cells_per_iter = parity_cells_per_iter;
+    *out_block_dots_per_iter = parity_block_dots_per_iter;
+    *out_total_cells = parity_total_cells;
+    *out_total_block_dots = parity_total_block_dots;
     return Q4_0_Q8_0_MATMUL_OK;
 }

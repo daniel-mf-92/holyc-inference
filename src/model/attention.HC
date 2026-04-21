@@ -1035,6 +1035,22 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
     I64 *staged_scores_q32,
     I64 staged_scores_capacity);
 
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacityPreflightOnly(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 commit_stage_cell_capacity,
+    I64 commit_stage_byte_capacity,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_required_out_cells);
+
 I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacityDefaultCapacity(
     I64 *in_scores_q32,
     I64 in_scores_capacity,
@@ -4951,6 +4967,132 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
         out_scores_capacity);
 }
 
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacityPreflightOnly(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 commit_stage_cell_capacity,
+    I64 commit_stage_byte_capacity,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_required_out_cells)
+{
+    I64 staged_required_stage_cells;
+    I64 staged_required_stage_bytes;
+    I64 staged_required_out_cells;
+    I64 recomputed_required_stage_cells;
+    I64 recomputed_required_stage_bytes;
+    I64 snapshot_row_count;
+    I64 snapshot_token_count;
+    I64 snapshot_stage_capacity;
+    I64 snapshot_out_capacity;
+    I32 status;
+
+    if (!out_required_stage_cells || !out_required_stage_bytes ||
+        !out_required_out_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (out_required_stage_cells == out_required_stage_bytes ||
+        out_required_stage_cells == out_required_out_cells ||
+        out_required_stage_bytes == out_required_out_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (!in_scores_q32 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (in_scores_capacity < 0 || out_scores_capacity < 0 ||
+        staged_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (commit_stage_cell_capacity < 0 || commit_stage_byte_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (out_required_stage_cells == in_scores_q32 ||
+        out_required_stage_cells == out_scores_q32 ||
+        out_required_stage_cells == staged_scores_q32 ||
+        out_required_stage_bytes == in_scores_q32 ||
+        out_required_stage_bytes == out_scores_q32 ||
+        out_required_stage_bytes == staged_scores_q32 ||
+        out_required_out_cells == in_scores_q32 ||
+        out_required_out_cells == out_scores_q32 ||
+        out_required_out_cells == staged_scores_q32)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // IQ-860 diagnostics-only no-write contract:
+    // 1) stage the required-size tuple through the IQ-813 diagnostics path;
+    // 2) recompute canonical required sizes from immutable snapshots;
+    // 3) enforce snapshot and tuple parity before atomic diagnostics publish.
+    snapshot_row_count = row_count;
+    snapshot_token_count = token_count;
+    snapshot_stage_capacity = staged_scores_capacity;
+    snapshot_out_capacity = out_scores_capacity;
+
+    status = AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitCapacity(
+        in_scores_q32,
+        in_scores_capacity,
+        row_count,
+        token_count,
+        out_scores_q32,
+        out_scores_capacity,
+        commit_stage_cell_capacity,
+        commit_stage_byte_capacity,
+        &staged_required_stage_cells,
+        &staged_required_stage_bytes,
+        &staged_required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(snapshot_row_count,
+                                       snapshot_token_count,
+                                       &recomputed_required_stage_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(recomputed_required_stage_cells,
+                                       sizeof(I64),
+                                       &recomputed_required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (snapshot_row_count != row_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_token_count != token_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_stage_capacity != staged_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_capacity != out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_stage_cells != recomputed_required_stage_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_required_stage_bytes != recomputed_required_stage_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_required_out_cells != recomputed_required_stage_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_stage_cells > snapshot_stage_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_required_out_cells > snapshot_out_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    *out_required_stage_cells = staged_required_stage_cells;
+    *out_required_stage_bytes = staged_required_stage_bytes;
+    *out_required_out_cells = staged_required_out_cells;
+
+    // Intentionally unused in diagnostics-only path; preserved to keep the
+    // companion signature aligned with IQ-813 commit-capacity execution.
+    score_scale_q16 = score_scale_q16;
+
+    return ATTN_Q16_OK;
+}
+
 I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacityDefaultCapacity(
     I64 *in_scores_q32,
     I64 in_scores_capacity,
@@ -5028,6 +5170,10 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
     I64 snapshot_score_scale_q16;
     I64 snapshot_commit_stage_cell_capacity;
     I64 snapshot_commit_stage_byte_capacity;
+    I64 snapshot_out_scores_capacity;
+    I64 snapshot_staged_scores_capacity;
+    I64 snapshot_parity_out_scores_capacity;
+    I64 snapshot_parity_staged_scores_capacity;
     I64 required_stage_cells;
     I64 required_stage_bytes;
     I64 required_out_cells;
@@ -5069,6 +5215,10 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
     snapshot_score_scale_q16 = score_scale_q16;
     snapshot_commit_stage_cell_capacity = commit_stage_cell_capacity;
     snapshot_commit_stage_byte_capacity = commit_stage_byte_capacity;
+    snapshot_out_scores_capacity = out_scores_capacity;
+    snapshot_staged_scores_capacity = staged_scores_capacity;
+    snapshot_parity_out_scores_capacity = parity_out_scores_capacity;
+    snapshot_parity_staged_scores_capacity = parity_staged_scores_capacity;
 
     // IQ-861 parity gate contract:
     // 1) Stage required-byte/cell diagnostics from canonical no-alloc helper.
@@ -5163,7 +5313,11 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
     if (snapshot_row_count != row_count || snapshot_token_count != token_count ||
         snapshot_score_scale_q16 != score_scale_q16 ||
         snapshot_commit_stage_cell_capacity != commit_stage_cell_capacity ||
-        snapshot_commit_stage_byte_capacity != commit_stage_byte_capacity)
+        snapshot_commit_stage_byte_capacity != commit_stage_byte_capacity ||
+        snapshot_out_scores_capacity != out_scores_capacity ||
+        snapshot_staged_scores_capacity != staged_scores_capacity ||
+        snapshot_parity_out_scores_capacity != parity_out_scores_capacity ||
+        snapshot_parity_staged_scores_capacity != parity_staged_scores_capacity)
         return ATTN_Q16_ERR_BAD_PARAM;
 
     publish_status = AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(

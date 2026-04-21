@@ -386,6 +386,10 @@ def test_source_contains_noalloc_commit_capacity_parity_helper() -> None:
     assert "AttentionQ16ApplyScoreScaleRowsCheckedDefaultStride(" in body
     assert "if (explicit_status != canonical_status)" in body
     assert "if (publish_status != canonical_status)" in body
+    assert "snapshot_out_scores_capacity = out_scores_capacity;" in body
+    assert "snapshot_staged_scores_capacity = staged_scores_capacity;" in body
+    assert "snapshot_parity_out_scores_capacity = parity_out_scores_capacity;" in body
+    assert "snapshot_parity_staged_scores_capacity = parity_staged_scores_capacity;" in body
 
 
 def test_known_vectors_match_and_publish_parity() -> None:
