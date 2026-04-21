@@ -272,6 +272,43 @@ def test_publish_and_snapshot_mutation_guard() -> None:
     assert fail_bytes == [702]
 
 
+def test_adversarial_alias_and_output_immutability() -> None:
+    lhs = [1 << 16, 2 << 16, 3 << 16, 4 << 16]
+    rhs = [5 << 16, 6 << 16, 7 << 16, 8 << 16]
+    out = [0x777] * 4
+
+    out_cells = [901]
+    out_bytes = [902]
+
+    err = fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only_parity(
+        lhs,
+        rhs,
+        out,
+        4,
+        4,
+        lhs,
+        out_bytes,
+    )
+    assert err == FP_Q16_ERR_BAD_PARAM
+    assert out_cells == [901]
+    assert out_bytes == [902]
+    assert out == [0x777] * 4
+
+    err = fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only_parity(
+        lhs,
+        rhs,
+        out,
+        4,
+        4,
+        out_cells,
+        out,
+    )
+    assert err == FP_Q16_ERR_BAD_PARAM
+    assert out_cells == [901]
+    assert out_bytes == [902]
+    assert out == [0x777] * 4
+
+
 def test_randomized_parity_vs_explicit_composition() -> None:
     rng = random.Random(20260422_982)
 
@@ -301,9 +338,46 @@ def test_randomized_parity_vs_explicit_composition() -> None:
             assert out_bytes == [0x2222]
 
 
+def test_boundary_count_max_shifted_overflow_guard() -> None:
+    lhs = [1 << 16]
+    rhs = [1 << 16]
+    out = [0]
+    out_cells = [1234]
+    out_bytes = [5678]
+
+    max_ok = I64_MAX_VALUE >> 3
+    err = fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only_parity(
+        lhs,
+        rhs,
+        out,
+        max_ok,
+        max_ok,
+        out_cells,
+        out_bytes,
+    )
+    assert err == FP_Q16_ERR_BAD_PARAM
+    assert out_cells == [1234]
+    assert out_bytes == [5678]
+
+    err = fpq16_mul_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only_parity(
+        lhs,
+        rhs,
+        out,
+        max_ok + 1,
+        max_ok + 1,
+        out_cells,
+        out_bytes,
+    )
+    assert err == FP_Q16_ERR_OVERFLOW
+    assert out_cells == [1234]
+    assert out_bytes == [5678]
+
+
 if __name__ == "__main__":
     test_source_contains_iq982_function()
     test_null_bad_param_overflow_and_no_publish_on_fail()
     test_publish_and_snapshot_mutation_guard()
+    test_adversarial_alias_and_output_immutability()
     test_randomized_parity_vs_explicit_composition()
+    test_boundary_count_max_shifted_overflow_guard()
     print("fixedpoint_q16_mul_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only_parity=ok")
