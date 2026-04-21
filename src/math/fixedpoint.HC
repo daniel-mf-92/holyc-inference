@@ -1882,6 +1882,88 @@ I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParity(
     return FP_Q16_OK;
 }
 
+// Commit-only diagnostics wrapper over
+// FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParity.
+//
+// Contract:
+// - Stages canonical {count,required_cells,required_bytes} through parity gate.
+// - Revalidates immutable snapshots {count,x_q16,out_k,out_r_q16}.
+// - Publishes staged diagnostics atomically on success.
+// - Preserves strict no-partial diagnostics writes on all failures.
+I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnly(I64 *x_q16,
+                                                                                           I64 *out_k,
+                                                                                           I64 *out_r_q16,
+                                                                                           I64 count,
+                                                                                           I64 *out_count,
+                                                                                           I64 *out_required_cells,
+                                                                                           I64 *out_required_bytes)
+{
+    I64 *snapshot_x_q16;
+    I64 *snapshot_out_k;
+    I64 *snapshot_out_r_q16;
+    I64 snapshot_count;
+    I64 staged_count;
+    I64 staged_required_cells;
+    I64 staged_required_bytes;
+    I32 status;
+
+    if (!x_q16 || !out_k || !out_r_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (!out_count || !out_required_cells || !out_required_bytes)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (x_q16 == out_k || x_q16 == out_r_q16 || out_k == out_r_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_count == out_required_cells ||
+        out_count == out_required_bytes ||
+        out_required_cells == out_required_bytes)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_count == x_q16 ||
+        out_count == out_k ||
+        out_count == out_r_q16 ||
+        out_required_cells == x_q16 ||
+        out_required_cells == out_k ||
+        out_required_cells == out_r_q16 ||
+        out_required_bytes == x_q16 ||
+        out_required_bytes == out_k ||
+        out_required_bytes == out_r_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    snapshot_x_q16 = x_q16;
+    snapshot_out_k = out_k;
+    snapshot_out_r_q16 = out_r_q16;
+    snapshot_count = count;
+
+    status = FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParity(
+        x_q16,
+        out_k,
+        out_r_q16,
+        count,
+        &staged_count,
+        &staged_required_cells,
+        &staged_required_bytes);
+    if (status)
+        return status;
+
+    if (snapshot_x_q16 != x_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_k != out_k)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_r_q16 != out_r_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_count != count)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_count = staged_count;
+    *out_required_cells = staged_required_cells;
+    *out_required_bytes = staged_required_bytes;
+    return FP_Q16_OK;
+}
+
 // Diagnostics helper over FPQ16ExpApproxRangeReduceCheckedNoPartialArray that
 // computes byte requirement for one output lane array in the paired
 // {out_k,out_r_q16} outputs:
