@@ -17,6 +17,20 @@ Q8_0_ERR_BAD_DST_LEN = 2
 Q8_0_ERR_OVERFLOW = 3
 Q8_0_VALUES_PER_BLOCK = 32
 Q8_0_I64_MAX = (1 << 63) - 1
+Q8_0_I64_MIN = -(1 << 63)
+
+
+def try_mul_i64(lhs: int, rhs: int) -> tuple[bool, int]:
+    if lhs == 0 or rhs == 0:
+        return True, 0
+    if (lhs == Q8_0_I64_MIN and rhs == -1) or (rhs == Q8_0_I64_MIN and lhs == -1):
+        return False, 0
+
+    abs_lhs = -lhs if lhs < 0 else lhs
+    abs_rhs = -rhs if rhs < 0 else rhs
+    if abs_lhs > Q8_0_I64_MAX // abs_rhs:
+        return False, 0
+    return True, lhs * rhs
 
 
 def q8_0_dequantize_block_q16_checked_no_partial_array(
@@ -39,6 +53,8 @@ def q8_0_dequantize_block_q16_checked_no_partial_array(
         return Q8_0_ERR_BAD_DST_LEN
     if dst_block_stride_values < Q8_0_VALUES_PER_BLOCK:
         return Q8_0_ERR_BAD_DST_LEN
+    if src_blocks is dst_q16:
+        return Q8_0_ERR_BAD_DST_LEN
 
     if block_count == 0:
         return Q8_0_OK
@@ -59,6 +75,16 @@ def q8_0_dequantize_block_q16_checked_no_partial_array(
     if dst_required_values > dst_q16_capacity:
         return Q8_0_ERR_BAD_DST_LEN
 
+    # Overflow preflight pass (zero-write).
+    for block_idx in range(block_count):
+        src_index = block_idx * src_block_stride
+        scale_q16 = ref.f16_to_q16(src_blocks[src_index][0])
+        q8_signed = ref.unpack_q8_signed(src_blocks[src_index][1])
+        for lane in range(Q8_0_VALUES_PER_BLOCK):
+            ok, _ = try_mul_i64(scale_q16, q8_signed[lane])
+            if not ok:
+                return Q8_0_ERR_OVERFLOW
+
     staged = dst_q16[:]
     for block_idx in range(block_count):
         src_index = block_idx * src_block_stride
@@ -67,7 +93,10 @@ def q8_0_dequantize_block_q16_checked_no_partial_array(
         scale_q16 = ref.f16_to_q16(src_blocks[src_index][0])
         q8_signed = ref.unpack_q8_signed(src_blocks[src_index][1])
         for lane in range(Q8_0_VALUES_PER_BLOCK):
-            staged[dst_base + lane] = scale_q16 * q8_signed[lane]
+            ok, decode_q16 = try_mul_i64(scale_q16, q8_signed[lane])
+            if not ok:
+                return Q8_0_ERR_OVERFLOW
+            staged[dst_base + lane] = decode_q16
 
     for idx, value in enumerate(staged):
         dst_q16[idx] = value
@@ -101,8 +130,10 @@ def test_source_contains_iq928_function() -> None:
     assert "if (dst_block_stride_values < Q8_0_VALUES_PER_BLOCK)" in body
     assert "if (!Q8_0TryMulI64NonNeg(block_count - 1, src_block_stride, &src_last_offset))" in body
     assert "if (!Q8_0TryAddI64(dst_last_base, Q8_0_VALUES_PER_BLOCK, &dst_required_values))" in body
+    assert "// Overflow preflight pass (zero-write): validate every per-lane decode" in body
+    assert "if (!Q8_0TryMulI64(scale_q16, q_signed, &decode_q16))" in body
     assert "// Commit pass: decode each block only after full preflight success." in body
-    assert "dst_q16[dst_base + lane] = scale_q16 * src_blocks[src_index].qs[lane];" in body
+    assert "dst_q16[dst_base + lane] = decode_q16;" in body
 
 
 def test_null_and_shape_guards() -> None:
@@ -167,6 +198,27 @@ def test_preflight_failure_keeps_output_unchanged() -> None:
     )
 
     assert err == Q8_0_ERR_BAD_DST_LEN
+    assert out == before
+
+
+def test_overflow_preflight_keeps_output_unchanged() -> None:
+    # d_fp16=+INF saturates to huge Q16; times 127 must overflow I64.
+    overflow_block = (0x7C00, ref.pack_q8_signed([127] * 32))
+    blocks = [overflow_block]
+    out = [4321] * 64
+    before = out[:]
+
+    err = q8_0_dequantize_block_q16_checked_no_partial_array(
+        blocks,
+        src_block_capacity=1,
+        src_block_stride=1,
+        block_count=1,
+        dst_q16=out,
+        dst_q16_capacity=len(out),
+        dst_block_stride_values=32,
+    )
+
+    assert err == Q8_0_ERR_OVERFLOW
     assert out == before
 
 
@@ -246,6 +298,7 @@ if __name__ == "__main__":
     test_source_contains_iq928_function()
     test_null_and_shape_guards()
     test_preflight_failure_keeps_output_unchanged()
+    test_overflow_preflight_keeps_output_unchanged()
     test_known_edge_vectors_signed_byte_extremes()
     test_random_strided_parity()
     print("ok")

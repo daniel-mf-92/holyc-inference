@@ -23,6 +23,7 @@
 #define Q8_0_ERR_BAD_DST_LEN  2
 #define Q8_0_ERR_OVERFLOW     3
 #define Q8_0_I64_MAX          0x7FFFFFFFFFFFFFFF
+#define Q8_0_I64_MIN          -0x8000000000000000
 
 class Q8_0Block
 {
@@ -62,6 +63,34 @@ Bool Q8_0TryAddI64(I64 lhs, I64 rhs, I64 *out_sum)
         return FALSE;
 
     *out_sum = lhs + rhs;
+    return TRUE;
+}
+
+Bool Q8_0TryMulI64(I64 lhs, I64 rhs, I64 *out_prod)
+{
+    I64 abs_lhs;
+    I64 abs_rhs;
+
+    if (!out_prod)
+        return FALSE;
+
+    if (!lhs || !rhs)
+    {
+        *out_prod = 0;
+        return TRUE;
+    }
+
+    if ((lhs == Q8_0_I64_MIN && rhs == -1) ||
+        (rhs == Q8_0_I64_MIN && lhs == -1))
+        return FALSE;
+
+    abs_lhs = (lhs < 0) ? -lhs : lhs;
+    abs_rhs = (rhs < 0) ? -rhs : rhs;
+
+    if (abs_lhs > Q8_0_I64_MAX / abs_rhs)
+        return FALSE;
+
+    *out_prod = lhs * rhs;
     return TRUE;
 }
 
@@ -214,6 +243,8 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArray(
     I64 src_required_blocks;
     I64 dst_required_values;
     I64 scale_q16;
+    I64 q_signed;
+    I64 decode_q16;
 
     if (!src_blocks || !dst_q16)
         return Q8_0_ERR_NULL_PTR;
@@ -251,6 +282,22 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArray(
     if (dst_required_values > dst_q16_capacity)
         return Q8_0_ERR_BAD_DST_LEN;
 
+    // Overflow preflight pass (zero-write): validate every per-lane decode
+    // multiply so commit pass cannot fault after writing a prefix.
+    for (block_idx = 0; block_idx < block_count; ++block_idx)
+    {
+        if (!Q8_0TryMulI64NonNeg(block_idx, src_block_stride, &src_index))
+            return Q8_0_ERR_OVERFLOW;
+
+        scale_q16 = Q8_0F16ToQ16(src_blocks[src_index].d_fp16);
+        for (lane = 0; lane < Q8_0_VALUES_PER_BLOCK; ++lane)
+        {
+            q_signed = src_blocks[src_index].qs[lane];
+            if (!Q8_0TryMulI64(scale_q16, q_signed, &decode_q16))
+                return Q8_0_ERR_OVERFLOW;
+        }
+    }
+
     // Commit pass: decode each block only after full preflight success.
     for (block_idx = 0; block_idx < block_count; ++block_idx)
     {
@@ -261,7 +308,12 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArray(
 
         scale_q16 = Q8_0F16ToQ16(src_blocks[src_index].d_fp16);
         for (lane = 0; lane < Q8_0_VALUES_PER_BLOCK; ++lane)
-            dst_q16[dst_base + lane] = scale_q16 * src_blocks[src_index].qs[lane];
+        {
+            q_signed = src_blocks[src_index].qs[lane];
+            if (!Q8_0TryMulI64(scale_q16, q_signed, &decode_q16))
+                return Q8_0_ERR_OVERFLOW;
+            dst_q16[dst_base + lane] = decode_q16;
+        }
     }
 
     return Q8_0_OK;

@@ -4445,6 +4445,13 @@ I32 KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartialCommitOnlyPreflightOnlyRequ
         staged_v_base_index_canonical < 0)
         return KV_Q16_ERR_BAD_PARAM;
 
+    // Canonical span/byte relationship must be exact for Q16 cells.
+    if ((staged_required_token_bytes % sizeof(I64)) != 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if ((staged_required_token_bytes / sizeof(I64)) != staged_required_span_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+
     if (staged_required_span_cells != staged_required_span_cells_canonical ||
         staged_required_token_bytes != staged_required_token_bytes_canonical ||
         staged_k_base_index != staged_k_base_index_canonical ||
