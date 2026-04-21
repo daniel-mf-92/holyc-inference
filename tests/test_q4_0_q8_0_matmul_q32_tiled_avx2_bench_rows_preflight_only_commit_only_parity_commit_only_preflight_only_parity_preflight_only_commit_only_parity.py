@@ -243,6 +243,151 @@ def test_known_vector_and_no_partial_publish_on_failure() -> None:
     assert tbd_fail == [0xDDDD]
 
 
+def test_adversarial_geometry_capacity_vectors_match_explicit_composition() -> None:
+    vectors = [
+        # degenerate but valid zero-work geometry
+        dict(rc=0, cc=0, kb=0, it=0, ls=0, rs=0, os=0, lc=1, rc2=1, oc=1),
+        # exact-fit capacities
+        dict(rc=1, cc=1, kb=1, it=1, ls=1, rs=1, os=1, lc=1, rc2=1, oc=1),
+        # over-provisioned strides/capacities
+        dict(rc=3, cc=2, kb=2, it=4, ls=5, rs=4, os=6, lc=15, rc2=8, oc=18),
+        # under-capacity lhs
+        dict(rc=4, cc=3, kb=2, it=2, ls=2, rs=2, os=3, lc=7, rc2=6, oc=12),
+        # under-capacity rhs
+        dict(rc=2, cc=4, kb=3, it=2, ls=3, rs=3, os=4, lc=6, rc2=11, oc=8),
+        # under-capacity output
+        dict(rc=3, cc=3, kb=2, it=2, ls=2, rs=2, os=3, lc=6, rc2=6, oc=8),
+        # negative iter count rejected
+        dict(rc=2, cc=2, kb=2, it=-1, ls=2, rs=2, os=2, lc=4, rc2=4, oc=4),
+        # bad stride smaller than k_block_count
+        dict(rc=2, cc=2, kb=3, it=1, ls=2, rs=3, os=2, lc=4, rc2=6, oc=4),
+    ]
+
+    for i, vec in enumerate(vectors):
+        rng = random.Random(20260421_868100 + i)
+
+        lhs = [make_q4_block(rng) for _ in range(max(1, vec["lc"]))]
+        rhs = [make_q8_block(rng) for _ in range(max(1, vec["rc2"]))]
+        out_a = [0x5A5A] * max(1, vec["oc"])
+        out_b = list(out_a)
+
+        cpi_a = [0x1111]
+        cpi_b = [0x1111]
+        bdi_a = [0x2222]
+        bdi_b = [0x2222]
+        tc_a = [0x3333]
+        tc_b = [0x3333]
+        tbd_a = [0x4444]
+        tbd_b = [0x4444]
+
+        err_a = q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity_commit_only_preflight_only_parity_preflight_only_commit_only_parity(
+            lhs,
+            vec["lc"],
+            vec["rc"],
+            vec["ls"],
+            rhs,
+            vec["rc2"],
+            vec["cc"],
+            vec["rs"],
+            vec["kb"],
+            out_a,
+            vec["oc"],
+            vec["os"],
+            vec["it"],
+            cpi_a,
+            bdi_a,
+            tc_a,
+            tbd_a,
+        )
+        err_b = explicit_checked_composition(
+            lhs,
+            vec["lc"],
+            vec["rc"],
+            vec["ls"],
+            rhs,
+            vec["rc2"],
+            vec["cc"],
+            vec["rs"],
+            vec["kb"],
+            out_b,
+            vec["oc"],
+            vec["os"],
+            vec["it"],
+            cpi_b,
+            bdi_b,
+            tc_b,
+            tbd_b,
+        )
+
+        assert err_a == err_b
+        assert out_a == out_b
+        assert cpi_a == cpi_b
+        assert bdi_a == bdi_b
+        assert tc_a == tc_b
+        assert tbd_a == tbd_b
+
+
+def test_no_partial_publish_when_subwrappers_disagree() -> None:
+    row_count = 3
+    col_count = 4
+    k_block_count = 2
+    iter_count = 3
+    lhs_stride = 2
+    rhs_stride = 2
+    out_stride = 4
+
+    rng = random.Random(20260421_868200)
+    lhs = [make_q4_block(rng) for _ in range(row_count * lhs_stride)]
+    rhs = [make_q8_block(rng) for _ in range(col_count * rhs_stride)]
+    out = [0x7777] * (row_count * out_stride)
+
+    cpi = [0xA1A1]
+    bdi = [0xB2B2]
+    tc = [0xC3C3]
+    tbd = [0xD4D4]
+
+    global q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity_commit_only_preflight_only_parity_preflight_only
+    real_preflight = (
+        q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity_commit_only_preflight_only_parity_preflight_only
+    )
+
+    def tampered_preflight(*args):
+        err = real_preflight(*args)
+        if err == Q4_0_Q8_0_AVX2_OK:
+            args[14][0] += 1
+        return err
+
+    q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity_commit_only_preflight_only_parity_preflight_only = tampered_preflight
+    try:
+        err = q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity_commit_only_preflight_only_parity_preflight_only_commit_only_parity(
+            lhs,
+            len(lhs),
+            row_count,
+            lhs_stride,
+            rhs,
+            len(rhs),
+            col_count,
+            rhs_stride,
+            k_block_count,
+            out,
+            len(out),
+            out_stride,
+            iter_count,
+            cpi,
+            bdi,
+            tc,
+            tbd,
+        )
+    finally:
+        q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity_commit_only_preflight_only_parity_preflight_only = real_preflight
+
+    assert err == Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    assert cpi == [0xA1A1]
+    assert bdi == [0xB2B2]
+    assert tc == [0xC3C3]
+    assert tbd == [0xD4D4]
+
+
 def test_fuzz_parity_against_explicit_checked_composition() -> None:
     random.seed(20260421_868)
 
@@ -325,5 +470,7 @@ def test_fuzz_parity_against_explicit_checked_composition() -> None:
 if __name__ == "__main__":
     test_source_contains_signature_and_parity_gate()
     test_known_vector_and_no_partial_publish_on_failure()
+    test_adversarial_geometry_capacity_vectors_match_explicit_composition()
+    test_no_partial_publish_when_subwrappers_disagree()
     test_fuzz_parity_against_explicit_checked_composition()
     print("ok")
