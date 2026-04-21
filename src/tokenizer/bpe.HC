@@ -5844,9 +5844,13 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyP
 
     U64 preflight_required_token_capacity;
     U64 preflight_required_merge_workspace_bytes;
+    U64 preflight_last_piece_end;
+    U64 preflight_cursor;
 
     U64 commit_required_token_capacity;
     U64 commit_required_merge_workspace_bytes;
+    U64 commit_last_piece_end;
+    U64 commit_cursor;
 
     U64 expected_last_piece_end;
     I32 err;
@@ -5881,11 +5885,12 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyP
     // 4) atomically publish only when both tuples exactly agree.
     preflight_required_token_capacity = *out_required_token_capacity;
     preflight_required_merge_workspace_bytes = *out_required_merge_workspace_bytes;
+    preflight_cursor = snapshot_cursor;
     err =
         TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyPreflightOnlyRequiredBytes(
             bytes,
             byte_len,
-            io_cursor,
+            &preflight_cursor,
             prompt_nbytes,
             rank_left_tokens,
             rank_right_tokens,
@@ -5898,14 +5903,23 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyP
             &preflight_required_merge_workspace_bytes);
     if (err != TOKENIZER_BPE_OK)
         return err;
+    if (preflight_cursor != snapshot_cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    preflight_last_piece_end = snapshot_cursor + preflight_required_token_capacity;
+    if (preflight_last_piece_end < snapshot_cursor)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    if (preflight_last_piece_end > byte_len)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
 
     commit_required_token_capacity = *out_required_token_capacity;
     commit_required_merge_workspace_bytes = *out_required_merge_workspace_bytes;
+    commit_cursor = snapshot_cursor;
     err =
         TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyRequiredBytesPreflightOnly(
             bytes,
             byte_len,
-            io_cursor,
+            &commit_cursor,
             prompt_nbytes,
             rank_left_tokens,
             rank_right_tokens,
@@ -5918,6 +5932,14 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyP
             &commit_required_merge_workspace_bytes);
     if (err != TOKENIZER_BPE_OK)
         return err;
+    if (commit_cursor != snapshot_cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    commit_last_piece_end = snapshot_cursor + commit_required_token_capacity;
+    if (commit_last_piece_end < snapshot_cursor)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    if (commit_last_piece_end > byte_len)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
 
     if (snapshot_byte_len != byte_len)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
@@ -5943,12 +5965,16 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyP
     if (preflight_required_merge_workspace_bytes !=
         commit_required_merge_workspace_bytes)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (preflight_last_piece_end != commit_last_piece_end)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
 
     if (preflight_required_token_capacity != prompt_nbytes)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
     if (prompt_nbytes && max_piece_len > 0x7FFFFFFFFFFFFFFF / prompt_nbytes)
         return TOKENIZER_BPE_ERR_OVERFLOW;
     if (preflight_required_merge_workspace_bytes != prompt_nbytes * max_piece_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (preflight_last_piece_end != expected_last_piece_end)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
 
     *out_required_token_capacity = preflight_required_token_capacity;
