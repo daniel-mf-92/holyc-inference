@@ -364,16 +364,119 @@ I64 GGUFTensorInfoReadNameCheckedNoPartial(U8 *buf,
     return GGUF_TENSOR_PARSE_OK;
 }
 
+// Checked no-partial parser for `{n_dims, dims[], ggml_type, offset}`.
+// Uses explicit U64 staging math and publishes the tuple atomically only
+// after full span parity and type/dim validation succeed.
+I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartial(U8 *buf,
+                                                     U64 size,
+                                                     U64 cursor,
+                                                     U32 *out_n_dims,
+                                                     U64 *out_dims,
+                                                     U64 *out_n_elements,
+                                                     U32 *out_ggml_type,
+                                                     U64 *out_offset,
+                                                     U64 *out_next_cursor)
+{
+    U64 snapshot_size;
+    U64 snapshot_cursor;
+    I64 staged_cursor;
+    U32 staged_n_dims;
+    U64 staged_dims[GGUF_TENSOR_MAX_DIMS];
+    U64 staged_n_elements;
+    U32 staged_ggml_type;
+    U64 staged_offset;
+    I64 status;
+    U64 dims_bytes;
+    U64 checked_end;
+    U64 i;
+
+    if (!buf || !out_n_dims || !out_dims || !out_n_elements || !out_ggml_type || !out_offset || !out_next_cursor)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+    if (cursor > size)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (size > 0x7FFFFFFFFFFFFFFF || cursor > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    snapshot_size = size;
+    snapshot_cursor = cursor;
+
+    staged_cursor = cursor;
+    staged_n_dims = 0;
+    staged_n_elements = 1;
+    staged_ggml_type = 0;
+    staged_offset = 0;
+    for (i = 0; i < GGUF_TENSOR_MAX_DIMS; ++i)
+        staged_dims[i] = 0;
+
+    if (!GGUFTensorReadU32LE(buf, (I64)size, &staged_cursor, &staged_n_dims))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (!staged_n_dims || staged_n_dims > GGUF_TENSOR_MAX_DIMS)
+        return GGUF_TENSOR_PARSE_ERR_BAD_DIMS;
+
+    // Decode each dim explicitly so every element-count multiply is visible
+    // and overflow-checked before any caller-visible publication.
+    for (i = 0; i < staged_n_dims; ++i)
+    {
+        if (!GGUFTensorReadU64LE(buf, (I64)size, &staged_cursor, &staged_dims[i]))
+            return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+        if (!staged_dims[i])
+            return GGUF_TENSOR_PARSE_ERR_BAD_DIM_SIZE;
+        if (staged_n_elements > 0xFFFFFFFFFFFFFFFF / staged_dims[i])
+            return GGUF_TENSOR_PARSE_ERR_DIM_OVERFLOW;
+
+        staged_n_elements *= staged_dims[i];
+    }
+
+    if (!GGUFTensorReadU32LE(buf, (I64)size, &staged_cursor, &staged_ggml_type))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (!GGUFTensorTypeKnown(staged_ggml_type))
+        return GGUF_TENSOR_PARSE_ERR_BAD_TYPE;
+
+    if (!GGUFTensorReadU64LE(buf, (I64)size, &staged_cursor, &staged_offset))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    if (!GGUFTensorTryAddU64(cursor, 4, &checked_end))
+        status = GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    else if (!GGUFTensorTryMulU64(staged_n_dims, 8, &dims_bytes))
+        status = GGUF_TENSOR_PARSE_ERR_DIM_OVERFLOW;
+    else if (!GGUFTensorTryAddU64(checked_end, dims_bytes, &checked_end))
+        status = GGUF_TENSOR_PARSE_ERR_DIM_OVERFLOW;
+    else if (!GGUFTensorTryAddU64(checked_end, 4, &checked_end))
+        status = GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    else if (!GGUFTensorTryAddU64(checked_end, 8, &checked_end))
+        status = GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    else if (checked_end > size)
+        status = GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    else if ((U64)staged_cursor != checked_end)
+        status = GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    else
+        status = GGUF_TENSOR_PARSE_OK;
+
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+
+    if (snapshot_size != size || snapshot_cursor != cursor)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    *out_n_dims = staged_n_dims;
+    for (i = 0; i < GGUF_TENSOR_MAX_DIMS; ++i)
+        out_dims[i] = staged_dims[i];
+    *out_n_elements = staged_n_elements;
+    *out_ggml_type = staged_ggml_type;
+    *out_offset = staged_offset;
+    *out_next_cursor = checked_end;
+
+    return GGUF_TENSOR_PARSE_OK;
+}
+
 I64 GGUFTensorParseOne(U8 *buf, I64 size, I64 *cursor, GGUFTensorInfo *out)
 {
     U32 n_dims;
-    U64 dim;
-    U64 prod;
+    U64 n_elements;
     U32 ggml_type;
     U64 offset;
     U64 next_cursor;
     I64 err;
-    U32 i;
 
     if (!cursor || !out)
         return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
@@ -389,37 +492,21 @@ I64 GGUFTensorParseOne(U8 *buf, I64 size, I64 *cursor, GGUFTensorInfo *out)
         return err;
     *cursor = next_cursor;
 
-    if (!GGUFTensorReadU32LE(buf, size, cursor, &n_dims))
-        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
-    if (!n_dims || n_dims > GGUF_TENSOR_MAX_DIMS)
-        return GGUF_TENSOR_PARSE_ERR_BAD_DIMS;
-
-    // The tensor element count is the exact product of dims. Keep this explicit
-    // and overflow-checked so later offset math is auditable and safe.
-    prod = 1;
-    for (i = 0; i < n_dims; ++i)
-    {
-        if (!GGUFTensorReadU64LE(buf, size, cursor, &dim))
-            return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
-        if (!dim)
-            return GGUF_TENSOR_PARSE_ERR_BAD_DIM_SIZE;
-        if (prod > 0xFFFFFFFFFFFFFFFF / dim)
-            return GGUF_TENSOR_PARSE_ERR_DIM_OVERFLOW;
-
-        out->dims[i] = dim;
-        prod *= dim;
-    }
-
-    if (!GGUFTensorReadU32LE(buf, size, cursor, &ggml_type))
-        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
-    if (!GGUFTensorTypeKnown(ggml_type))
-        return GGUF_TENSOR_PARSE_ERR_BAD_TYPE;
-
-    if (!GGUFTensorReadU64LE(buf, size, cursor, &offset))
-        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    err = GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartial(buf,
+                                                           size,
+                                                           *cursor,
+                                                           &n_dims,
+                                                           out->dims,
+                                                           &n_elements,
+                                                           &ggml_type,
+                                                           &offset,
+                                                           &next_cursor);
+    if (err != GGUF_TENSOR_PARSE_OK)
+        return err;
+    *cursor = next_cursor;
 
     out->n_dims = n_dims;
-    out->n_elements = prod;
+    out->n_elements = n_elements;
     out->ggml_type = ggml_type;
     out->offset = offset;
 
