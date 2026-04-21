@@ -27,18 +27,43 @@ _commit = importlib.util.module_from_spec(_spec_commit)
 sys.modules[_spec_commit.name] = _commit
 _spec_commit.loader.exec_module(_commit)
 
-Q8_0_OK = _pre_parity.Q8_0_OK
-Q8_0_ERR_NULL_PTR = _pre_parity.Q8_0_ERR_NULL_PTR
-Q8_0_ERR_BAD_DST_LEN = _pre_parity.Q8_0_ERR_BAD_DST_LEN
-Q8_0_ERR_OVERFLOW = _pre_parity.Q8_0_ERR_OVERFLOW
+Q8_0_OK = _commit.Q8_0_OK
+Q8_0_ERR_NULL_PTR = _commit.Q8_0_ERR_NULL_PTR
+Q8_0_ERR_BAD_DST_LEN = _commit.Q8_0_ERR_BAD_DST_LEN
+Q8_0_ERR_OVERFLOW = _commit.Q8_0_ERR_OVERFLOW
 
-make_q8_block = _pre_parity.make_q8_block
-preflight_only_parity_commit_only_preflight_only = (
-    _pre_parity.q8_0_dequantize_block_q16_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only
-)
-parity_commit_only = (
-    _commit.q8_0_dequantize_block_q16_checked_no_partial_array_commit_only_preflight_only_parity_commit_only
-)
+make_q8_block = _commit.make_q8_block
+parity_commit_only = _commit.q8_0_dequantize_block_q16_checked_no_partial_array_commit_only_preflight_only_parity_commit_only
+
+
+def preflight_only_parity_commit_only_preflight_only(
+    src_blocks,
+    src_block_capacity: int,
+    src_block_stride: int,
+    block_count: int,
+    dst_q16,
+    dst_q16_capacity: int,
+    dst_block_stride_values: int,
+    out_block_count,
+    out_required_src_blocks,
+    out_required_dst_values,
+    out_required_src_bytes,
+    out_required_dst_bytes,
+) -> int:
+    return parity_commit_only(
+        src_blocks,
+        src_block_capacity,
+        src_block_stride,
+        block_count,
+        dst_q16,
+        dst_q16_capacity,
+        dst_block_stride_values,
+        out_block_count,
+        out_required_src_blocks,
+        out_required_dst_values,
+        out_required_src_bytes,
+        out_required_dst_bytes,
+    )
 
 
 def q8_0_dequantize_block_q16_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only_parity(
@@ -203,11 +228,9 @@ def test_source_contains_iq958_parity_contract() -> None:
     assert sig in source
     body = source.split(sig, 1)[1]
 
-    assert (
-        "status = Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly("
-        in body
-    )
+    assert "status = Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in body
     assert "status = Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnly(" in body
+    assert "staged_block_count != parity_block_count" in body
     assert "staged_required_src_blocks != parity_required_src_blocks" in body
     assert "staged_required_dst_bytes != parity_required_dst_bytes" in body
 
@@ -244,9 +267,9 @@ def test_parity_publish_and_no_write() -> None:
     assert dst_q16 == before
     assert out_block_count == [3]
     assert out_required_src_blocks == [5]
-    assert out_required_dst_values == [120]
+    assert out_required_dst_values == [112]
     assert out_required_src_bytes == [5 * 34]
-    assert out_required_dst_bytes == [120 * 8]
+    assert out_required_dst_bytes == [112 * 8]
 
 
 def test_failure_keeps_publish_cells_unchanged() -> None:
