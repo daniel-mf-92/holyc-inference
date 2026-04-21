@@ -137,9 +137,8 @@ def test_source_contains_iq_993_signature_and_commit_atomic_publish() -> None:
     assert sig in source
     body = source.split(sig, 1)[1]
     assert "MatMulQ4_0Q8_0Q32CheckedTiledNoPartial(" in body
-    assert "snapshot_tile_row_span" in body
-    assert "snapshot_tile_col_span" in body
-    assert "Q4_0Q8_0MatMulComputeTileGridChecked(" in body
+    assert "snapshot_tile_rows" in body
+    assert "snapshot_tile_cols" in body
     assert "*out_required_out_cells = staged_required_out_cells;" in body
     assert "*out_required_out_bytes = staged_required_out_bytes;" in body
     assert "*out_tile_rows = staged_tile_rows;" in body

@@ -70,7 +70,7 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnly(
     I64 *out_required_out_bytes,
     I64 *out_tile_rows,
     I64 *out_tile_cols);
-I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnly(
+I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyPreflightOnly(
     Q4_0Block *lhs_q4_blocks,
     I64 lhs_q4_block_capacity,
     I64 row_count,
@@ -80,8 +80,8 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnly(
     I64 col_count,
     I64 rhs_col_stride_blocks,
     I64 k_block_count,
-    I64 tile_rows,
-    I64 tile_cols,
+    I64 tile_row_span,
+    I64 tile_col_span,
     I64 *out_cells_q32,
     I64 out_cell_capacity,
     I64 out_row_stride_cells,
@@ -971,17 +971,16 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnly(
     I64 *out_tile_rows,
     I64 *out_tile_cols)
 {
+    I64 snapshot_row_count;
+    I64 snapshot_col_count;
+    I64 snapshot_k_block_count;
+    I64 snapshot_tile_rows;
+    I64 snapshot_tile_cols;
+    I64 snapshot_out_capacity;
     I64 staged_required_out_cells;
     I64 staged_required_out_bytes;
     I64 staged_tile_rows;
     I64 staged_tile_cols;
-
-    I64 snapshot_row_count;
-    I64 snapshot_col_count;
-    I64 snapshot_k_block_count;
-    I64 snapshot_tile_row_span;
-    I64 snapshot_tile_col_span;
-    I64 snapshot_out_capacity;
     I32 status;
 
     if (!out_required_out_cells || !out_required_out_bytes ||
@@ -991,8 +990,8 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnly(
     snapshot_row_count = row_count;
     snapshot_col_count = col_count;
     snapshot_k_block_count = k_block_count;
-    snapshot_tile_row_span = tile_rows;
-    snapshot_tile_col_span = tile_cols;
+    snapshot_tile_rows = tile_rows;
+    snapshot_tile_cols = tile_cols;
     snapshot_out_capacity = out_cell_capacity;
 
     staged_required_out_cells = 0;
@@ -1001,9 +1000,9 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnly(
     staged_tile_cols = 0;
 
     // IQ-993 commit-only diagnostics wrapper:
-    // 1) execute canonical no-partial tiled matmul to publish output cells,
-    // 2) revalidate immutable geometry/capacity snapshots,
-    // 3) compute canonical diagnostics tuple, then atomically publish.
+    // 1) execute canonical no-partial tiled matmul (all output writes live here),
+    // 2) stage deterministic diagnostics from immutable geometry snapshots,
+    // 3) publish diagnostics atomically only after snapshot revalidation.
     status = MatMulQ4_0Q8_0Q32CheckedTiledNoPartial(
         lhs_q4_blocks,
         lhs_q4_block_capacity,
@@ -1025,8 +1024,8 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnly(
     if (snapshot_row_count != row_count ||
         snapshot_col_count != col_count ||
         snapshot_k_block_count != k_block_count ||
-        snapshot_tile_row_span != tile_rows ||
-        snapshot_tile_col_span != tile_cols ||
+        snapshot_tile_rows != tile_rows ||
+        snapshot_tile_cols != tile_cols ||
         snapshot_out_capacity != out_cell_capacity)
         return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
 
@@ -1039,126 +1038,12 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnly(
         return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
 
     if (!Q4_0Q8_0MatMulTryMulI64NonNeg(staged_required_out_cells,
-                                       8,
-                                       &staged_required_out_bytes))
-        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
-
-    staged_tile_rows = snapshot_tile_row_span;
-    staged_tile_cols = snapshot_tile_col_span;
-
-    *out_required_out_cells = staged_required_out_cells;
-    *out_required_out_bytes = staged_required_out_bytes;
-    *out_tile_rows = staged_tile_rows;
-    *out_tile_cols = staged_tile_cols;
-    return Q4_0_Q8_0_MATMUL_OK;
-}
-
-I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnly(
-    Q4_0Block *lhs_q4_blocks,
-    I64 lhs_q4_block_capacity,
-    I64 row_count,
-    I64 lhs_row_stride_blocks,
-    Q8_0Block *rhs_q8_col_blocks,
-    I64 rhs_q8_block_capacity,
-    I64 col_count,
-    I64 rhs_col_stride_blocks,
-    I64 k_block_count,
-    I64 tile_row_span,
-    I64 tile_col_span,
-    I64 *out_cells_q32,
-    I64 out_cell_capacity,
-    I64 out_row_stride_cells,
-    I64 *out_required_out_cells,
-    I64 *out_required_out_bytes,
-    I64 *out_tile_rows,
-    I64 *out_tile_cols)
-{
-    I64 snapshot_row_count;
-    I64 snapshot_col_count;
-    I64 snapshot_k_block_count;
-    I64 snapshot_tile_row_span;
-    I64 snapshot_tile_col_span;
-    I64 snapshot_out_capacity;
-    I64 staged_required_out_cells;
-    I64 staged_required_out_bytes;
-    I64 staged_tile_rows;
-    I64 staged_tile_cols;
-    I64 tile_row_count;
-    I64 tile_col_count;
-    I64 tile_total_count;
-    I32 status;
-
-    if (!out_required_out_cells || !out_required_out_bytes ||
-        !out_tile_rows || !out_tile_cols)
-        return Q4_0_Q8_0_MATMUL_ERR_NULL_PTR;
-
-    snapshot_row_count = row_count;
-    snapshot_col_count = col_count;
-    snapshot_k_block_count = k_block_count;
-    snapshot_tile_row_span = tile_row_span;
-    snapshot_tile_col_span = tile_col_span;
-    snapshot_out_capacity = out_cell_capacity;
-
-    staged_required_out_cells = *out_required_out_cells;
-    staged_required_out_bytes = *out_required_out_bytes;
-    staged_tile_rows = *out_tile_rows;
-    staged_tile_cols = *out_tile_cols;
-
-    // IQ-993 commit-only wrapper:
-    // 1) run canonical no-partial tiled kernel;
-    // 2) stage canonical diagnostics derived from immutable geometry;
-    // 3) atomically publish staged diagnostics only after snapshot revalidation.
-    status = MatMulQ4_0Q8_0Q32CheckedTiledNoPartial(
-        lhs_q4_blocks,
-        lhs_q4_block_capacity,
-        row_count,
-        lhs_row_stride_blocks,
-        rhs_q8_col_blocks,
-        rhs_q8_block_capacity,
-        col_count,
-        rhs_col_stride_blocks,
-        k_block_count,
-        tile_row_span,
-        tile_col_span,
-        out_cells_q32,
-        out_cell_capacity,
-        out_row_stride_cells);
-    if (status != Q4_0_Q8_0_MATMUL_OK)
-        return status;
-
-    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(row_count,
-                                       out_row_stride_cells,
-                                       &staged_required_out_cells))
-        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
-    if (staged_required_out_cells > out_cell_capacity)
-        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
-
-    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(staged_required_out_cells,
                                        sizeof(I64),
                                        &staged_required_out_bytes))
         return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
 
-    if (!Q4_0Q8_0MatMulComputeTileGridChecked(row_count,
-                                              col_count,
-                                              tile_row_span,
-                                              tile_col_span,
-                                              &tile_row_count,
-                                              &tile_col_count,
-                                              &tile_total_count))
-        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
-    if (row_count && col_count && !tile_total_count)
-        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
-
-    staged_tile_rows = tile_row_span;
-    staged_tile_cols = tile_col_span;
-
-    if (snapshot_row_count != row_count ||
-        snapshot_col_count != col_count ||
-        snapshot_k_block_count != k_block_count ||
-        snapshot_tile_row_span != tile_row_span ||
-        snapshot_tile_col_span != tile_col_span ||
-        snapshot_out_capacity != out_cell_capacity)
-        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    staged_tile_rows = snapshot_tile_rows;
+    staged_tile_cols = snapshot_tile_cols;
 
     *out_required_out_cells = staged_required_out_cells;
     *out_required_out_bytes = staged_required_out_bytes;
