@@ -280,6 +280,41 @@ def test_error_paths_preserve_outputs() -> None:
     assert got_last_out == [804]
 
 
+def test_overflow_vectors_preserve_outputs() -> None:
+    i64_max = (1 << 63) - 1
+    staged = [0]
+    out = [0]
+
+    for query_row_count, token_count in (
+        (i64_max, 2),
+        (2, i64_max),
+        ((1 << 62), 4),
+    ):
+        got_stage_cells = [451]
+        got_stage_bytes = [452]
+        got_out_cells = [453]
+        got_last_out = [454]
+
+        err = attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit_only_preflight_only_required_bytes_parity_commit_only_parity(
+            query_row_count,
+            token_count,
+            staged,
+            i64_max,
+            out,
+            i64_max,
+            got_stage_cells,
+            got_stage_bytes,
+            got_out_cells,
+            got_last_out,
+        )
+
+        assert err == ATTN_Q16_ERR_BAD_PARAM
+        assert got_stage_cells == [451]
+        assert got_stage_bytes == [452]
+        assert got_out_cells == [453]
+        assert got_last_out == [454]
+
+
 def test_randomized_commit_only_parity_vs_explicit_composition() -> None:
     rng = random.Random(20260421_842)
 
@@ -346,6 +381,7 @@ if __name__ == "__main__":
     test_source_contains_required_bytes_parity_commit_only_parity_wrapper()
     test_known_vector_commit_only_parity_outputs()
     test_error_paths_preserve_outputs()
+    test_overflow_vectors_preserve_outputs()
     test_randomized_commit_only_parity_vs_explicit_composition()
     print(
         "attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit_only_preflight_only_required_bytes_parity_commit_only_parity=ok"
