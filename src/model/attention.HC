@@ -4938,8 +4938,6 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
         score_scale_q16,
         staged_scores_q32,
         staged_scores_capacity);
-    if (status != canonical_status)
-        return ATTN_Q16_ERR_BAD_PARAM;
     if (status != ATTN_Q16_OK)
         return status;
 
@@ -5141,6 +5139,8 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
         score_scale_q16,
         staged_scores_q32,
         staged_scores_capacity);
+    if (status != canonical_status)
+        return ATTN_Q16_ERR_BAD_PARAM;
     if (status != ATTN_Q16_OK)
         return status;
 
