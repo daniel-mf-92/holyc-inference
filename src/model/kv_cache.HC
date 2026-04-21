@@ -2954,6 +2954,12 @@ I32 KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartial(
     I64 snapshot_head_dim;
     I64 snapshot_k_cache_capacity;
     I64 snapshot_v_cache_capacity;
+    I64 *snapshot_k_cache_ptr;
+    I64 *snapshot_v_cache_ptr;
+    I64 *snapshot_k_src_ptr;
+    I64 *snapshot_v_src_ptr;
+    I64 *snapshot_k_out_ptr;
+    I64 *snapshot_v_out_ptr;
     I64 snapshot_k_src_capacity;
     I64 snapshot_v_src_capacity;
     I64 snapshot_k_out_capacity;
@@ -3000,6 +3006,12 @@ I32 KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartial(
     snapshot_head_dim = head_dim;
     snapshot_k_cache_capacity = k_cache_capacity;
     snapshot_v_cache_capacity = v_cache_capacity;
+    snapshot_k_cache_ptr = k_cache_q16;
+    snapshot_v_cache_ptr = v_cache_q16;
+    snapshot_k_src_ptr = k_token_src_q16;
+    snapshot_v_src_ptr = v_token_src_q16;
+    snapshot_k_out_ptr = k_token_out_q16;
+    snapshot_v_out_ptr = v_token_out_q16;
     snapshot_k_src_capacity = k_token_src_capacity;
     snapshot_v_src_capacity = v_token_src_capacity;
     snapshot_k_out_capacity = k_token_out_capacity;
@@ -3653,6 +3665,12 @@ I32 KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartialCommitOnlyPreflightOnlyRequ
         snapshot_head_dim != head_dim ||
         snapshot_k_cache_capacity != k_cache_capacity ||
         snapshot_v_cache_capacity != v_cache_capacity ||
+        snapshot_k_cache_ptr != k_cache_q16 ||
+        snapshot_v_cache_ptr != v_cache_q16 ||
+        snapshot_k_src_ptr != k_token_src_q16 ||
+        snapshot_v_src_ptr != v_token_src_q16 ||
+        snapshot_k_out_ptr != k_token_out_q16 ||
+        snapshot_v_out_ptr != v_token_out_q16 ||
         snapshot_k_src_capacity != k_token_src_capacity ||
         snapshot_v_src_capacity != v_token_src_capacity ||
         snapshot_k_out_capacity != k_token_out_capacity ||
