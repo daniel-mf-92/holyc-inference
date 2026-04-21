@@ -471,6 +471,92 @@ I32 FPQ16MulArrayChecked(I64 *lhs_q16,
     return FP_Q16_OK;
 }
 
+// Checked elementwise Q16 multiply helper with strict no-partial semantics:
+//   out_q16[i] = round_half_up((lhs_q16[i] * rhs_q16[i]) / 2^16)
+//
+// Contract:
+// - Null pointers return NULL_PTR and perform no writes.
+// - count < 0 returns BAD_PARAM and performs no writes.
+// - Any overlap among {lhs_q16,rhs_q16,out_q16} is rejected.
+// - The full lane set is preflighted before committing output writes.
+// - On first lane overflow/domain failure, returns that status with no writes.
+I32 FPQ16MulCheckedNoPartialArray(I64 *lhs_q16,
+                                  I64 *rhs_q16,
+                                  I64 *out_q16,
+                                  I64 count)
+{
+    I64 i;
+    I64 last_index;
+    I64 lane_value;
+    U64 span_bytes;
+    U64 lhs_base;
+    U64 lhs_end;
+    U64 rhs_base;
+    U64 rhs_end;
+    U64 out_base;
+    U64 out_end;
+    I32 err;
+
+    if (!lhs_q16 || !rhs_q16 || !out_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Reject exact alias pairs up-front so callers get deterministic BAD_PARAM
+    // before pointer-span math.
+    if (lhs_q16 == rhs_q16 || lhs_q16 == out_q16 || rhs_q16 == out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (!count)
+        return FP_Q16_OK;
+
+    // Guard pointer-span math before indexed lane access.
+    last_index = count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    span_bytes = ((U64)count) << 3;
+    lhs_base = (U64)lhs_q16;
+    rhs_base = (U64)rhs_q16;
+    out_base = (U64)out_q16;
+
+    if (lhs_base > (U64_MAX_VALUE - span_bytes) ||
+        rhs_base > (U64_MAX_VALUE - span_bytes) ||
+        out_base > (U64_MAX_VALUE - span_bytes))
+        return FP_Q16_ERR_OVERFLOW;
+
+    lhs_end = lhs_base + span_bytes;
+    rhs_end = rhs_base + span_bytes;
+    out_end = out_base + span_bytes;
+
+    // Reject any span overlap to preserve strict no-partial semantics.
+    if ((lhs_end > rhs_base && rhs_end > lhs_base) ||
+        (lhs_end > out_base && out_end > lhs_base) ||
+        (rhs_end > out_base && out_end > rhs_base))
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Preflight all lanes first so hard failures never partially write output.
+    for (i = 0; i < count; i++)
+    {
+        err = FPQ16MulChecked(lhs_q16[i],
+                              rhs_q16[i],
+                              &lane_value);
+        if (err)
+            return err;
+    }
+
+    for (i = 0; i < count; i++)
+    {
+        err = FPQ16MulChecked(lhs_q16[i],
+                              rhs_q16[i],
+                              &out_q16[i]);
+        if (err)
+            return err;
+    }
+
+    return FP_Q16_OK;
+}
+
 // Checked + saturating elementwise Q16 multiply helper with strict
 // stage-then-commit semantics:
 //   out_q16[i] = sat_i64(round_half_up((lhs_q16[i] * rhs_q16[i]) / 2^16))
