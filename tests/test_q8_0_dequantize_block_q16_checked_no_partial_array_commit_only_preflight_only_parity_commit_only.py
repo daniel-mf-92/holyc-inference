@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity harness for Q8_0DequantizeBlockQ16...PreflightOnlyParityCommitOnly (IQ-951)."""
+"""Parity harness for Q8_0DequantizeBlockQ16...PreflightOnlyParityCommitOnly (IQ-953)."""
 
 from __future__ import annotations
 
@@ -47,6 +47,10 @@ def q8_0_dequantize_block_q16_checked_no_partial_array_commit_only_preflight_onl
     out_required_src_bytes,
     out_required_dst_bytes,
     mutate_snapshot: bool = False,
+    corrupt_staged_blocks_delta: int = 0,
+    corrupt_staged_dst_values_delta: int = 0,
+    corrupt_staged_src_bytes_delta: int = 0,
+    corrupt_staged_dst_bytes_delta: int = 0,
 ) -> int:
     if (
         src_blocks is None
@@ -119,6 +123,15 @@ def q8_0_dequantize_block_q16_checked_no_partial_array_commit_only_preflight_onl
     if err != Q8_0_OK:
         return err
 
+    if corrupt_staged_blocks_delta:
+        staged_required_src_blocks[0] += corrupt_staged_blocks_delta
+    if corrupt_staged_dst_values_delta:
+        staged_required_dst_values[0] += corrupt_staged_dst_values_delta
+    if corrupt_staged_src_bytes_delta:
+        staged_required_src_bytes[0] += corrupt_staged_src_bytes_delta
+    if corrupt_staged_dst_bytes_delta:
+        staged_required_dst_bytes[0] += corrupt_staged_dst_bytes_delta
+
     if mutate_snapshot:
         block_count += 1
 
@@ -148,6 +161,24 @@ def q8_0_dequantize_block_q16_checked_no_partial_array_commit_only_preflight_onl
     if staged_required_dst_values[0] > snap_dst_q16_capacity:
         return Q8_0_ERR_BAD_DST_LEN
 
+    if snap_block_count == 0:
+        recomputed_required_src_blocks = 0
+        recomputed_required_dst_values = 0
+    else:
+        src_last_offset = (snap_block_count - 1) * snap_src_block_stride
+        dst_last_base = (snap_block_count - 1) * snap_dst_block_stride_values
+        recomputed_required_src_blocks = src_last_offset + 1
+        recomputed_required_dst_values = dst_last_base + Q8_0_VALUES_PER_BLOCK
+
+    ok, recomputed_required_src_bytes = try_mul_i64_nonneg(
+        recomputed_required_src_blocks, Q8_0_BLOCK_BYTES
+    )
+    if not ok:
+        return Q8_0_ERR_OVERFLOW
+    ok, recomputed_required_dst_bytes = try_mul_i64_nonneg(recomputed_required_dst_values, 8)
+    if not ok:
+        return Q8_0_ERR_OVERFLOW
+
     ok, expected_required_src_bytes = try_mul_i64_nonneg(
         staged_required_src_blocks[0], Q8_0_BLOCK_BYTES
     )
@@ -162,6 +193,15 @@ def q8_0_dequantize_block_q16_checked_no_partial_array_commit_only_preflight_onl
     if staged_required_dst_bytes[0] != expected_required_dst_bytes:
         return Q8_0_ERR_BAD_DST_LEN
 
+    if staged_required_src_blocks[0] != recomputed_required_src_blocks:
+        return Q8_0_ERR_BAD_DST_LEN
+    if staged_required_dst_values[0] != recomputed_required_dst_values:
+        return Q8_0_ERR_BAD_DST_LEN
+    if staged_required_src_bytes[0] != recomputed_required_src_bytes:
+        return Q8_0_ERR_BAD_DST_LEN
+    if staged_required_dst_bytes[0] != recomputed_required_dst_bytes:
+        return Q8_0_ERR_BAD_DST_LEN
+
     out_block_count[0] = staged_block_count[0]
     out_required_src_blocks[0] = staged_required_src_blocks[0]
     out_required_dst_values[0] = staged_required_dst_values[0]
@@ -170,15 +210,19 @@ def q8_0_dequantize_block_q16_checked_no_partial_array_commit_only_preflight_onl
     return Q8_0_OK
 
 
-def test_source_contains_iq951_commit_only_contract() -> None:
+def test_source_contains_iq953_commit_only_contract() -> None:
     source = Path("src/quant/q8_0.HC").read_text(encoding="utf-8")
     sig = "I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnly("
     assert sig in source
     body = source.split(sig, 1)[1]
 
     assert "status = Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParity(" in body
+    assert "// Commit-only wrapper contract (IQ-953):" in body
     assert "if (staged_block_count != snapshot_block_count)" in body
+    assert "if (!snapshot_block_count)" in body
+    assert "if (!Q8_0TryMulI64NonNeg(recomputed_required_src_blocks," in body
     assert "if (!Q8_0TryMulI64NonNeg(staged_required_src_blocks," in body
+    assert "if (staged_required_src_blocks != recomputed_required_src_blocks ||" in body
     assert "if (staged_required_src_bytes != expected_required_src_bytes)" in body
     assert "*out_required_dst_bytes = staged_required_dst_bytes;" in body
 
@@ -341,12 +385,86 @@ def test_overflow_and_capacity_failures() -> None:
     assert err == Q8_0_ERR_OVERFLOW
 
 
+def test_zero_blocks_publish_zero_tuple() -> None:
+    rng = random.Random(3953)
+    src_blocks = [make_q8_block(rng) for _ in range(3)]
+    dst = [901] * 64
+
+    block_out = [10]
+    req_src_blocks_out = [11]
+    req_dst_values_out = [12]
+    req_src_bytes_out = [13]
+    req_dst_bytes_out = [14]
+
+    err = q8_0_dequantize_block_q16_checked_no_partial_array_commit_only_preflight_only_parity_commit_only(
+        src_blocks,
+        3,
+        1,
+        0,
+        dst,
+        len(dst),
+        Q8_0_VALUES_PER_BLOCK,
+        block_out,
+        req_src_blocks_out,
+        req_dst_values_out,
+        req_src_bytes_out,
+        req_dst_bytes_out,
+    )
+    assert err == Q8_0_OK
+    assert block_out == [0]
+    assert req_src_blocks_out == [0]
+    assert req_dst_values_out == [0]
+    assert req_src_bytes_out == [0]
+    assert req_dst_bytes_out == [0]
+
+
+def test_recomputed_tuple_guard_rejects_corrupt_stage_values() -> None:
+    rng = random.Random(4953)
+    src_blocks = [make_q8_block(rng) for _ in range(10)]
+    dst = [222] * 320
+
+    def run_case(**kwargs: int) -> int:
+        block_out = [31]
+        req_src_blocks_out = [32]
+        req_dst_values_out = [33]
+        req_src_bytes_out = [34]
+        req_dst_bytes_out = [35]
+        err = q8_0_dequantize_block_q16_checked_no_partial_array_commit_only_preflight_only_parity_commit_only(
+            src_blocks,
+            10,
+            2,
+            5,
+            dst,
+            len(dst),
+            40,
+            block_out,
+            req_src_blocks_out,
+            req_dst_values_out,
+            req_src_bytes_out,
+            req_dst_bytes_out,
+            **kwargs,
+        )
+        assert block_out == [31]
+        assert req_src_blocks_out == [32]
+        assert req_dst_values_out == [33]
+        assert req_src_bytes_out == [34]
+        assert req_dst_bytes_out == [35]
+        return err
+
+    assert run_case(corrupt_staged_blocks_delta=1) == Q8_0_ERR_BAD_DST_LEN
+    assert run_case(corrupt_staged_dst_values_delta=1) == Q8_0_ERR_BAD_DST_LEN
+    assert run_case(corrupt_staged_src_bytes_delta=1) == Q8_0_ERR_BAD_DST_LEN
+    assert run_case(corrupt_staged_dst_bytes_delta=1) == Q8_0_ERR_BAD_DST_LEN
+
+
 def run() -> None:
-    test_source_contains_iq951_commit_only_contract()
+    test_source_contains_iq953_commit_only_contract()
     test_null_and_alias_guards()
     test_success_and_atomic_publish()
     test_snapshot_mismatch_no_publish()
     test_overflow_and_capacity_failures()
+    test_zero_blocks_publish_zero_tuple()
+    test_recomputed_tuple_guard_rejects_corrupt_stage_values()
     print(
         "q8_0_dequantize_block_q16_checked_no_partial_array_commit_only_preflight_only_parity_commit_only=ok"
     )
@@ -354,4 +472,3 @@ def run() -> None:
 
 if __name__ == "__main__":
     run()
-
