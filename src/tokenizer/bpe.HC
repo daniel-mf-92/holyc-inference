@@ -111,7 +111,6 @@ I32 TokenizerUTF8ValidateContinuationSpanChecked(U8 *bytes,
 {
     U64 cursor;
     U64 staged_cursor;
-    U64 staged_last_piece_end;
     U64 consumed;
     U64 next_consumed;
     U8 continuation;
@@ -5559,6 +5558,7 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyR
     U64 staged_required_token_capacity;
     U64 staged_required_merge_workspace_bytes;
     U64 staged_cursor;
+    U64 staged_last_piece_end;
     U64 staged_token_count;
     U64 staged_commit_required_token_capacity;
     U64 staged_token_capacity;
@@ -6133,6 +6133,7 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyP
     U64 staged_required_token_capacity;
     U64 staged_required_merge_workspace_bytes;
     U64 staged_cursor;
+    U64 staged_last_piece_end;
 
     I32 err;
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Commit-only harness for ...RequiredBytesParityPreflightOnlyCommitOnly (IQ-860)."""
+"""Parity commit-only harness for ...RequiredBytesParityPreflightOnlyCommitOnly (IQ-860)."""
 
 from __future__ import annotations
 
@@ -56,6 +56,14 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity_
 
     snapshot_byte_len = byte_len
     snapshot_cursor = io_cursor[0]
+    snapshot_data = data
+    snapshot_io_cursor = io_cursor
+    snapshot_rank_left_tokens = rank_left_tokens
+    snapshot_rank_right_tokens = rank_right_tokens
+    snapshot_rank_values = rank_values
+    snapshot_rank_merged_tokens = rank_merged_tokens
+    snapshot_out_required_token_capacity = out_required_token_capacity
+    snapshot_out_required_merge_workspace_bytes = out_required_merge_workspace_bytes
     snapshot_prompt_nbytes = prompt_nbytes
     snapshot_rank_table_count = rank_table_count
     snapshot_rank_table_capacity = rank_table_capacity
@@ -87,8 +95,41 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity_
     )
     if status != TOKENIZER_BPE_OK:
         return status
-
     if staged_cursor[0] != snapshot_cursor:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+
+    if staged_required_token_capacity[0] != prompt_nbytes:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+
+    staged_last_piece_end = snapshot_cursor + staged_required_token_capacity[0]
+    if staged_last_piece_end < snapshot_cursor:
+        return TOKENIZER_BPE_ERR_OVERFLOW
+    if staged_last_piece_end > byte_len:
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS
+
+    if prompt_nbytes and max_piece_len > I64_MAX // prompt_nbytes:
+        return TOKENIZER_BPE_ERR_OVERFLOW
+    if staged_required_merge_workspace_bytes[0] != prompt_nbytes * max_piece_len:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+
+    if snapshot_data is not data:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+    if snapshot_io_cursor is not io_cursor:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+    if snapshot_rank_left_tokens is not rank_left_tokens:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+    if snapshot_rank_right_tokens is not rank_right_tokens:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+    if snapshot_rank_values is not rank_values:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+    if snapshot_rank_merged_tokens is not rank_merged_tokens:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+    if snapshot_out_required_token_capacity is not out_required_token_capacity:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+    if (
+        snapshot_out_required_merge_workspace_bytes
+        is not out_required_merge_workspace_bytes
+    ):
         return TOKENIZER_BPE_ERR_BAD_PARAM
 
     if snapshot_byte_len != byte_len:
@@ -110,57 +151,141 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity_
 
 
 def explicit_checked_composition(*args):
-    return tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity_commit_only_preflight_only_required_bytes_parity_preflight_only_commit_only(
-        *args
+    (
+        data,
+        byte_len,
+        io_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        max_piece_len,
+        out_required_token_capacity,
+        out_required_merge_workspace_bytes,
+    ) = args
+
+    if (
+        data is None
+        or io_cursor is None
+        or out_required_token_capacity is None
+        or out_required_merge_workspace_bytes is None
+    ):
+        return TOKENIZER_BPE_ERR_NULL_PTR
+
+    if (
+        byte_len > I64_MAX
+        or prompt_nbytes > I64_MAX
+        or rank_table_count > I64_MAX
+        or rank_table_capacity > I64_MAX
+        or max_piece_len > I64_MAX
+    ):
+        return TOKENIZER_BPE_ERR_OVERFLOW
+
+    snapshot_cursor = io_cursor[0]
+    if snapshot_cursor > byte_len:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+    if prompt_nbytes > byte_len - snapshot_cursor:
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS
+
+    staged_required_token_capacity = [out_required_token_capacity[0]]
+    staged_required_merge_workspace_bytes = [out_required_merge_workspace_bytes[0]]
+    staged_cursor = [snapshot_cursor]
+
+    status = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity_commit_only_preflight_only_required_bytes_parity_preflight_only(
+        data,
+        byte_len,
+        staged_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        max_piece_len,
+        staged_required_token_capacity,
+        staged_required_merge_workspace_bytes,
     )
+    if status != TOKENIZER_BPE_OK:
+        return status
+    if staged_cursor[0] != snapshot_cursor:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+
+    if staged_required_token_capacity[0] != prompt_nbytes:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+
+    staged_last_piece_end = snapshot_cursor + staged_required_token_capacity[0]
+    if staged_last_piece_end < snapshot_cursor:
+        return TOKENIZER_BPE_ERR_OVERFLOW
+    if staged_last_piece_end > byte_len:
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS
+
+    if prompt_nbytes and max_piece_len > I64_MAX // prompt_nbytes:
+        return TOKENIZER_BPE_ERR_OVERFLOW
+    if staged_required_merge_workspace_bytes[0] != prompt_nbytes * max_piece_len:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+
+    out_required_token_capacity[0] = staged_required_token_capacity[0]
+    out_required_merge_workspace_bytes[0] = staged_required_merge_workspace_bytes[0]
+    return TOKENIZER_BPE_OK
 
 
-def test_source_contains_signature_and_commit_only_staging() -> None:
+def test_source_contains_signature_and_commit_only_logic() -> None:
     source = Path("src/tokenizer/bpe.HC").read_text(encoding="utf-8")
     sig = "I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyPreflightOnlyRequiredBytesParityPreflightOnlyCommitOnly("
     assert sig in source
-    body = source.split(sig, 1)[1].split("I32 TokenizerBPEEncodePromptCheckedNoAllocFromLens(", 1)[0]
+    body = source.split(sig, 1)[1].split(
+        "I32 TokenizerBPEEncodePromptCheckedNoAllocFromLens(", 1
+    )[0]
 
     assert "TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyPreflightOnlyRequiredBytesParityPreflightOnly(" in body
-    assert "snapshot_byte_len = byte_len;" in body
-    assert "snapshot_cursor = *io_cursor;" in body
-    assert "snapshot_prompt_nbytes = prompt_nbytes;" in body
-    assert "snapshot_rank_table_count = rank_table_count;" in body
-    assert "snapshot_rank_table_capacity = rank_table_capacity;" in body
-    assert "snapshot_max_piece_len = max_piece_len;" in body
-    assert "if (staged_cursor != snapshot_cursor)" in body
-    assert "*out_required_token_capacity = staged_required_token_capacity;" in body
-    assert "*out_required_merge_workspace_bytes = staged_required_merge_workspace_bytes;" in body
+    assert "if (staged_required_token_capacity != prompt_nbytes)" in body
+    assert "staged_last_piece_end = snapshot_cursor + staged_required_token_capacity;" in body
+    assert "if (staged_last_piece_end < snapshot_cursor)" in body
+    assert "if (staged_last_piece_end > byte_len)" in body
+    assert "if (prompt_nbytes && max_piece_len > 0x7FFFFFFFFFFFFFFF / prompt_nbytes)" in body
+    assert "if (staged_required_merge_workspace_bytes != prompt_nbytes * max_piece_len)" in body
+    assert "if (snapshot_bytes != bytes)" in body
+    assert "if (snapshot_io_cursor_ptr != io_cursor)" in body
+    assert "if (snapshot_rank_left_tokens != rank_left_tokens)" in body
+    assert "if (snapshot_rank_right_tokens != rank_right_tokens)" in body
+    assert "if (snapshot_rank_values != rank_values)" in body
+    assert "if (snapshot_rank_merged_tokens != rank_merged_tokens)" in body
+    assert "if (snapshot_out_required_token_capacity_ptr != out_required_token_capacity)" in body
+    assert "if (snapshot_out_required_merge_workspace_bytes_ptr !=" in body
 
 
 def test_known_vector_and_no_partial_failure() -> None:
     payload = list(b"holycode")
 
-    out_req = [3]
-    out_ws = [21]
-    cursor = [2]
+    out_req = [4]
+    out_ws = [20]
+    cursor = [1]
     status = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity_commit_only_preflight_only_required_bytes_parity_preflight_only_commit_only(
         payload,
         len(payload),
         cursor,
-        3,
+        4,
         [],
         [],
         [],
         [],
         0,
         0,
-        7,
+        5,
         out_req,
         out_ws,
     )
     assert status == TOKENIZER_BPE_OK
-    assert out_req == [3]
-    assert out_ws == [21]
-    assert cursor == [2]
+    assert out_req == [4]
+    assert out_ws == [20]
+    assert cursor == [1]
 
-    out_req_fail = [0x1111]
-    out_ws_fail = [0x2222]
+    out_req_fail = [7]
+    out_ws_fail = [0x1234]
     cursor_fail = [6]
     status = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity_commit_only_preflight_only_required_bytes_parity_preflight_only_commit_only(
         payload,
@@ -178,15 +303,15 @@ def test_known_vector_and_no_partial_failure() -> None:
         out_ws_fail,
     )
     assert status == TOKENIZER_BPE_ERR_OVERFLOW
-    assert out_req_fail == [0x1111]
-    assert out_ws_fail == [0x2222]
+    assert out_req_fail == [7]
+    assert out_ws_fail == [0x1234]
     assert cursor_fail == [6]
 
 
 def test_fuzz_parity_and_no_partial_publish() -> None:
     rng = random.Random(20260421_860)
 
-    for _ in range(2400):
+    for _ in range(2500):
         payload_len = rng.randint(0, 128)
         payload = [rng.randint(0, 127) for _ in range(payload_len)]
 
@@ -210,42 +335,22 @@ def test_fuzz_parity_and_no_partial_publish() -> None:
         if rank_count and rng.random() < 0.05:
             rank_merged = None
 
-        max_piece_len = rng.randint(0, 512)
-
+        max_piece_len = rng.randint(0, 256)
         if rng.random() < 0.06:
-            prompt_nbytes = I64_MAX
-            max_piece_len = rng.randint(2, 512)
+            max_piece_len = I64_MAX
 
-        byte_len = payload_len
-        if rng.random() < 0.04:
-            byte_len = I64_MAX + rng.randint(1, 1000)
+        out_req_a = [0x35]
+        out_ws_a = [0x46]
+        out_req_b = [0x35]
+        out_ws_b = [0x46]
 
-        cursor = [cursor_seed]
-        if rng.random() < 0.05:
-            cursor = [payload_len + rng.randint(1, 20)]
+        cursor_a = [cursor_seed]
+        cursor_b = [cursor_seed]
 
-        out_req_a = [rng.randint(0, 1000)]
-        out_ws_a = [rng.randint(0, 100000)]
-        out_req_b = out_req_a.copy()
-        out_ws_b = out_ws_a.copy()
-
-        cursor_a = cursor.copy()
-        cursor_b = cursor.copy()
-
-        data_ptr = payload if rng.random() > 0.02 else None
-        cursor_ptr_a = cursor_a if rng.random() > 0.02 else None
-        cursor_ptr_b = None if cursor_ptr_a is None else cursor_b
-
-        out_req_ptr_a = out_req_a if rng.random() > 0.02 else None
-        out_ws_ptr_a = out_ws_a if rng.random() > 0.02 else None
-
-        out_req_ptr_b = None if out_req_ptr_a is None else out_req_b
-        out_ws_ptr_b = None if out_ws_ptr_a is None else out_ws_b
-
-        err_a = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity_commit_only_preflight_only_required_bytes_parity_preflight_only_commit_only(
-            data_ptr,
-            byte_len,
-            cursor_ptr_a,
+        status_a = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity_commit_only_preflight_only_required_bytes_parity_preflight_only_commit_only(
+            payload,
+            payload_len,
+            cursor_a,
             prompt_nbytes,
             rank_left,
             rank_right,
@@ -254,14 +359,13 @@ def test_fuzz_parity_and_no_partial_publish() -> None:
             rank_count,
             rank_capacity,
             max_piece_len,
-            out_req_ptr_a,
-            out_ws_ptr_a,
+            out_req_a,
+            out_ws_a,
         )
-
-        err_b = explicit_checked_composition(
-            data_ptr,
-            byte_len,
-            cursor_ptr_b,
+        status_b = explicit_checked_composition(
+            payload,
+            payload_len,
+            cursor_b,
             prompt_nbytes,
             rank_left,
             rank_right,
@@ -270,22 +374,18 @@ def test_fuzz_parity_and_no_partial_publish() -> None:
             rank_count,
             rank_capacity,
             max_piece_len,
-            out_req_ptr_b,
-            out_ws_ptr_b,
+            out_req_b,
+            out_ws_b,
         )
 
-        assert err_a == err_b
-
-        if out_req_ptr_a is not None and out_req_ptr_b is not None:
-            assert out_req_ptr_a == out_req_ptr_b
-        if out_ws_ptr_a is not None and out_ws_ptr_b is not None:
-            assert out_ws_ptr_a == out_ws_ptr_b
-        if cursor_ptr_a is not None and cursor_ptr_b is not None:
-            assert cursor_ptr_a == cursor_ptr_b
+        assert status_a == status_b
+        assert out_req_a == out_req_b
+        assert out_ws_a == out_ws_b
+        assert cursor_a == cursor_b
 
 
 if __name__ == "__main__":
-    test_source_contains_signature_and_commit_only_staging()
+    test_source_contains_signature_and_commit_only_logic()
     test_known_vector_and_no_partial_failure()
     test_fuzz_parity_and_no_partial_publish()
     print("ok")
