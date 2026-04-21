@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity harness for Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityPreflightOnly (IQ-836)."""
+"""Parity harness for Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityPreflightOnly (IQ-847)."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent))
 
 from test_q4_0_q8_0_matmul_tiled_avx2_q32 import (
+    Q4_0_Q8_0_AVX2_ERR_OVERFLOW,
     Q4_0_Q8_0_AVX2_ERR_BAD_LEN,
     Q4_0_Q8_0_AVX2_ERR_NULL_PTR,
     Q4_0_Q8_0_AVX2_OK,
@@ -17,7 +18,8 @@ from test_q4_0_q8_0_matmul_tiled_avx2_q32 import (
     make_q8_block,
 )
 from test_q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only import (
-    q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only,
+    I64_MAX,
+    try_mul_i64_nonneg,
 )
 from test_q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity import (
     q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity,
@@ -61,10 +63,10 @@ def q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity
     parity_total_cells = [0xAAA3]
     parity_total_block_dots = [0xAAA4]
 
-    canonical_cells_per_iter = [0xBBB1]
-    canonical_block_dots_per_iter = [0xBBB2]
-    canonical_total_cells = [0xBBB3]
-    canonical_total_block_dots = [0xBBB4]
+    canonical_cells_per_iter = 0
+    canonical_block_dots_per_iter = 0
+    canonical_total_cells = 0
+    canonical_total_block_dots = 0
 
     err = q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity(
         lhs_q4_blocks,
@@ -88,7 +90,57 @@ def q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity
     if err != Q4_0_Q8_0_AVX2_OK:
         return err
 
-    err = q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only(
+    if snapshot_row_count != row_count:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    if snapshot_col_count != col_count:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    if snapshot_k_block_count != k_block_count:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    if snapshot_iter_count != iter_count:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+
+    ok, canonical_cells_per_iter = try_mul_i64_nonneg(
+        snapshot_row_count, snapshot_col_count
+    )
+    if not ok:
+        return Q4_0_Q8_0_AVX2_ERR_OVERFLOW
+
+    ok, canonical_block_dots_per_iter = try_mul_i64_nonneg(
+        canonical_cells_per_iter, snapshot_k_block_count
+    )
+    if not ok:
+        return Q4_0_Q8_0_AVX2_ERR_OVERFLOW
+
+    ok, canonical_total_cells = try_mul_i64_nonneg(
+        canonical_cells_per_iter, snapshot_iter_count
+    )
+    if not ok:
+        return Q4_0_Q8_0_AVX2_ERR_OVERFLOW
+
+    ok, canonical_total_block_dots = try_mul_i64_nonneg(
+        canonical_block_dots_per_iter, snapshot_iter_count
+    )
+    if not ok:
+        return Q4_0_Q8_0_AVX2_ERR_OVERFLOW
+
+    if parity_cells_per_iter[0] != canonical_cells_per_iter:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    if parity_block_dots_per_iter[0] != canonical_block_dots_per_iter:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    if parity_total_cells[0] != canonical_total_cells:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    if parity_total_block_dots[0] != canonical_total_block_dots:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+
+    out_cells_per_iter[0] = parity_cells_per_iter[0]
+    out_block_dots_per_iter[0] = parity_block_dots_per_iter[0]
+    out_total_cells[0] = parity_total_cells[0]
+    out_total_block_dots[0] = parity_total_block_dots[0]
+    return Q4_0_Q8_0_AVX2_OK
+
+
+def explicit_checked_composition(*args):
+    (
         lhs_q4_blocks,
         lhs_q4_block_capacity,
         row_count,
@@ -102,10 +154,48 @@ def q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity
         out_cell_capacity,
         out_row_stride_cells,
         iter_count,
-        canonical_cells_per_iter,
-        canonical_block_dots_per_iter,
-        canonical_total_cells,
-        canonical_total_block_dots,
+        out_cells_per_iter,
+        out_block_dots_per_iter,
+        out_total_cells,
+        out_total_block_dots,
+    ) = args
+
+    if (
+        out_cells_per_iter is None
+        or out_block_dots_per_iter is None
+        or out_total_cells is None
+        or out_total_block_dots is None
+    ):
+        return Q4_0_Q8_0_AVX2_ERR_NULL_PTR
+
+    snapshot_row_count = row_count
+    snapshot_col_count = col_count
+    snapshot_k_block_count = k_block_count
+    snapshot_iter_count = iter_count
+
+    parity_cells_per_iter = [0xABC1]
+    parity_block_dots_per_iter = [0xABC2]
+    parity_total_cells = [0xABC3]
+    parity_total_block_dots = [0xABC4]
+
+    err = q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity(
+        lhs_q4_blocks,
+        lhs_q4_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_q8_col_blocks,
+        rhs_q8_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q32,
+        out_cell_capacity,
+        out_row_stride_cells,
+        iter_count,
+        parity_cells_per_iter,
+        parity_block_dots_per_iter,
+        parity_total_cells,
+        parity_total_block_dots,
     )
     if err != Q4_0_Q8_0_AVX2_OK:
         return err
@@ -119,13 +209,26 @@ def q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity
     if snapshot_iter_count != iter_count:
         return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
 
-    if parity_cells_per_iter[0] != canonical_cells_per_iter[0]:
+    ok, canonical_cells_per_iter = try_mul_i64_nonneg(snapshot_row_count, snapshot_col_count)
+    if not ok:
+        return Q4_0_Q8_0_AVX2_ERR_OVERFLOW
+    ok, canonical_block_dots_per_iter = try_mul_i64_nonneg(canonical_cells_per_iter, snapshot_k_block_count)
+    if not ok:
+        return Q4_0_Q8_0_AVX2_ERR_OVERFLOW
+    ok, canonical_total_cells = try_mul_i64_nonneg(canonical_cells_per_iter, snapshot_iter_count)
+    if not ok:
+        return Q4_0_Q8_0_AVX2_ERR_OVERFLOW
+    ok, canonical_total_block_dots = try_mul_i64_nonneg(canonical_block_dots_per_iter, snapshot_iter_count)
+    if not ok:
+        return Q4_0_Q8_0_AVX2_ERR_OVERFLOW
+
+    if parity_cells_per_iter[0] != canonical_cells_per_iter:
         return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
-    if parity_block_dots_per_iter[0] != canonical_block_dots_per_iter[0]:
+    if parity_block_dots_per_iter[0] != canonical_block_dots_per_iter:
         return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
-    if parity_total_cells[0] != canonical_total_cells[0]:
+    if parity_total_cells[0] != canonical_total_cells:
         return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
-    if parity_total_block_dots[0] != canonical_total_block_dots[0]:
+    if parity_total_block_dots[0] != canonical_total_block_dots:
         return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
 
     out_cells_per_iter[0] = parity_cells_per_iter[0]
@@ -135,21 +238,15 @@ def q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity
     return Q4_0_Q8_0_AVX2_OK
 
 
-def explicit_checked_composition(*args):
-    return (
-        q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity_preflight_only(
-            *args
-        )
-    )
-
-
 def test_source_contains_signature_and_zero_write_parity_preflight_logic() -> None:
     source = Path("src/matmul/q4_0_q8_0_matmul.HC").read_text(encoding="utf-8")
     sig = "I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityPreflightOnly("
     assert sig in source
     body = source.split(sig, 1)[1]
     assert "Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParity(" in body
-    assert "Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnly(" in body
+    assert "Q4_0Q8_0MatMulTryMulI64NonNeg(snapshot_row_count," in body
+    assert "Q4_0Q8_0MatMulTryMulI64NonNeg(canonical_cells_per_iter," in body
+    assert "Q4_0Q8_0MatMulTryMulI64NonNeg(canonical_block_dots_per_iter," in body
     assert "if (parity_cells_per_iter != canonical_cells_per_iter)" in body
     assert "if (parity_block_dots_per_iter != canonical_block_dots_per_iter)" in body
     assert "if (parity_total_cells != canonical_total_cells)" in body
@@ -158,6 +255,7 @@ def test_source_contains_signature_and_zero_write_parity_preflight_logic() -> No
     assert "*out_block_dots_per_iter = parity_block_dots_per_iter;" in body
     assert "*out_total_cells = parity_total_cells;" in body
     assert "*out_total_block_dots = parity_total_block_dots;" in body
+    assert "return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;" in body
 
 
 def test_known_vector_and_failure_no_publish() -> None:
@@ -232,6 +330,51 @@ def test_known_vector_and_failure_no_publish() -> None:
     assert bdi_fail == [0xBBBB]
     assert tc_fail == [0xCCCC]
     assert tbd_fail == [0xDDDD]
+
+
+def test_overflow_path_no_publish() -> None:
+    row_count = I64_MAX
+    col_count = 2
+    k_block_count = 1
+    iter_count = 1
+    lhs_stride = 1
+    rhs_stride = 1
+    out_stride = 2
+
+    rng = random.Random(20260421_8472)
+    lhs = [make_q4_block(rng)]
+    rhs = [make_q8_block(rng) for _ in range(2)]
+    out = [0x2222, 0x3333]
+
+    cpi = [0x1111]
+    bdi = [0x2222]
+    tc = [0x3333]
+    tbd = [0x4444]
+
+    err = q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity_preflight_only(
+        lhs,
+        len(lhs),
+        row_count,
+        lhs_stride,
+        rhs,
+        len(rhs),
+        col_count,
+        rhs_stride,
+        k_block_count,
+        out,
+        len(out),
+        out_stride,
+        iter_count,
+        cpi,
+        bdi,
+        tc,
+        tbd,
+    )
+    assert err == Q4_0_Q8_0_AVX2_ERR_OVERFLOW
+    assert cpi == [0x1111]
+    assert bdi == [0x2222]
+    assert tc == [0x3333]
+    assert tbd == [0x4444]
 
 
 def test_fuzz_parity_against_explicit_checked_composition() -> None:
@@ -316,5 +459,6 @@ def test_fuzz_parity_against_explicit_checked_composition() -> None:
 if __name__ == "__main__":
     test_source_contains_signature_and_zero_write_parity_preflight_logic()
     test_known_vector_and_failure_no_publish()
+    test_overflow_path_no_publish()
     test_fuzz_parity_against_explicit_checked_composition()
     print("ok")
