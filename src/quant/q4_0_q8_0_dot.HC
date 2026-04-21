@@ -872,6 +872,217 @@ I32 Q4_0Q8_0DotQ32CheckedNoPartialArray(
     return Q4_0_Q8_0_OK;
 }
 
+
+// Diagnostics-only no-write companion for mixed Q4_0 x Q8_0 checked-array dots.
+//
+// This helper validates immutable geometry/pointer snapshots and publishes only
+// canonical required-size diagnostics:
+//   count               = pair_count
+//   required_in_blocks  = max(required_lhs_blocks, required_rhs_blocks)
+//   required_out_cells  = pair_count
+//   required_in_bytes   = required_lhs_blocks*sizeof(Q4_0Block) + required_rhs_blocks*sizeof(Q8_0Block)
+//   required_out_bytes  = required_out_cells*sizeof(I64)
+//
+// It never writes caller dot outputs; diagnostics commit atomically only after
+// full checked preflight and snapshot revalidation succeed.
+I32 Q4_0Q8_0DotQ32CheckedNoPartialArrayCommitOnlyPreflightOnly(
+    Q4_0Block *lhs_q4,
+    I64 lhs_block_capacity,
+    I64 lhs_pair_stride_blocks,
+    I64 lhs_block_stride,
+    Q8_0Block *rhs_q8,
+    I64 rhs_block_capacity,
+    I64 rhs_pair_stride_blocks,
+    I64 rhs_block_stride,
+    I64 pair_count,
+    I64 blocks_per_dot,
+    I64 *out_dot_q32,
+    I64 out_dot_capacity,
+    I64 *out_count,
+    I64 *out_required_in_blocks,
+    I64 *out_required_out_cells,
+    I64 *out_required_in_bytes,
+    I64 *out_required_out_bytes)
+{
+    I64 staged_count;
+    I64 staged_required_in_blocks;
+    I64 staged_required_out_cells;
+    I64 staged_required_in_bytes;
+    I64 staged_required_out_bytes;
+    I64 lhs_last_offset;
+    I64 rhs_last_offset;
+    I64 lhs_last_pair_base;
+    I64 rhs_last_pair_base;
+    I64 lhs_required_blocks;
+    I64 rhs_required_blocks;
+    I64 lhs_required_bytes;
+    I64 rhs_required_bytes;
+    I64 snapshot_lhs_block_capacity;
+    I64 snapshot_lhs_pair_stride_blocks;
+    I64 snapshot_lhs_block_stride;
+    I64 snapshot_rhs_block_capacity;
+    I64 snapshot_rhs_pair_stride_blocks;
+    I64 snapshot_rhs_block_stride;
+    I64 snapshot_pair_count;
+    I64 snapshot_blocks_per_dot;
+    I64 snapshot_out_dot_capacity;
+    Q4_0Block *snapshot_lhs_ptr;
+    Q8_0Block *snapshot_rhs_ptr;
+    I64 *snapshot_out_dot_ptr;
+
+    if (!lhs_q4 || !rhs_q8 || !out_dot_q32)
+        return Q4_0_Q8_0_ERR_NULL_PTR;
+
+    if (!out_count || !out_required_in_blocks || !out_required_out_cells ||
+        !out_required_in_bytes || !out_required_out_bytes)
+        return Q4_0_Q8_0_ERR_NULL_PTR;
+
+    if (out_count == out_required_in_blocks ||
+        out_count == out_required_out_cells ||
+        out_count == out_required_in_bytes ||
+        out_count == out_required_out_bytes ||
+        out_required_in_blocks == out_required_out_cells ||
+        out_required_in_blocks == out_required_in_bytes ||
+        out_required_in_blocks == out_required_out_bytes ||
+        out_required_out_cells == out_required_in_bytes ||
+        out_required_out_cells == out_required_out_bytes ||
+        out_required_in_bytes == out_required_out_bytes)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    if (out_count == (I64 *)lhs_q4 ||
+        out_count == (I64 *)rhs_q8 ||
+        out_count == out_dot_q32 ||
+        out_required_in_blocks == (I64 *)lhs_q4 ||
+        out_required_in_blocks == (I64 *)rhs_q8 ||
+        out_required_in_blocks == out_dot_q32 ||
+        out_required_out_cells == (I64 *)lhs_q4 ||
+        out_required_out_cells == (I64 *)rhs_q8 ||
+        out_required_out_cells == out_dot_q32 ||
+        out_required_in_bytes == (I64 *)lhs_q4 ||
+        out_required_in_bytes == (I64 *)rhs_q8 ||
+        out_required_in_bytes == out_dot_q32 ||
+        out_required_out_bytes == (I64 *)lhs_q4 ||
+        out_required_out_bytes == (I64 *)rhs_q8 ||
+        out_required_out_bytes == out_dot_q32)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    if (lhs_block_capacity < 0 || rhs_block_capacity < 0 || out_dot_capacity < 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+    if (pair_count < 0 || blocks_per_dot < 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+    if (lhs_pair_stride_blocks <= 0 || rhs_pair_stride_blocks <= 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+    if (lhs_block_stride <= 0 || rhs_block_stride <= 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    if (pair_count > out_dot_capacity)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    snapshot_lhs_ptr = lhs_q4;
+    snapshot_rhs_ptr = rhs_q8;
+    snapshot_out_dot_ptr = out_dot_q32;
+    snapshot_lhs_block_capacity = lhs_block_capacity;
+    snapshot_lhs_pair_stride_blocks = lhs_pair_stride_blocks;
+    snapshot_lhs_block_stride = lhs_block_stride;
+    snapshot_rhs_block_capacity = rhs_block_capacity;
+    snapshot_rhs_pair_stride_blocks = rhs_pair_stride_blocks;
+    snapshot_rhs_block_stride = rhs_block_stride;
+    snapshot_pair_count = pair_count;
+    snapshot_blocks_per_dot = blocks_per_dot;
+    snapshot_out_dot_capacity = out_dot_capacity;
+
+    staged_count = pair_count;
+    staged_required_out_cells = pair_count;
+    if (!Q4_0Q8_0TryMulI64NonNeg(staged_required_out_cells,
+                                 sizeof(I64),
+                                 &staged_required_out_bytes))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+
+    if (!pair_count || !blocks_per_dot)
+    {
+        staged_required_in_blocks = 0;
+        staged_required_in_bytes = 0;
+    }
+    else
+    {
+        if (!Q4_0Q8_0TryMulI64NonNeg(blocks_per_dot - 1,
+                                     lhs_block_stride,
+                                     &lhs_last_offset))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+        if (!Q4_0Q8_0TryMulI64NonNeg(blocks_per_dot - 1,
+                                     rhs_block_stride,
+                                     &rhs_last_offset))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+
+        if (!Q4_0Q8_0TryMulI64NonNeg(pair_count - 1,
+                                     lhs_pair_stride_blocks,
+                                     &lhs_last_pair_base))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+        if (!Q4_0Q8_0TryMulI64NonNeg(pair_count - 1,
+                                     rhs_pair_stride_blocks,
+                                     &rhs_last_pair_base))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+
+        if (!Q4_0Q8_0TryAddI64(lhs_last_pair_base,
+                               lhs_last_offset,
+                               &lhs_required_blocks))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+        if (!Q4_0Q8_0TryAddI64(rhs_last_pair_base,
+                               rhs_last_offset,
+                               &rhs_required_blocks))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+
+        if (!Q4_0Q8_0TryAddI64(lhs_required_blocks, 1, &lhs_required_blocks))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+        if (!Q4_0Q8_0TryAddI64(rhs_required_blocks, 1, &rhs_required_blocks))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+
+        if (lhs_required_blocks > lhs_block_capacity)
+            return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+        if (rhs_required_blocks > rhs_block_capacity)
+            return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+        if (lhs_required_blocks >= rhs_required_blocks)
+            staged_required_in_blocks = lhs_required_blocks;
+        else
+            staged_required_in_blocks = rhs_required_blocks;
+
+        if (!Q4_0Q8_0TryMulI64NonNeg(lhs_required_blocks,
+                                     sizeof(Q4_0Block),
+                                     &lhs_required_bytes))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+        if (!Q4_0Q8_0TryMulI64NonNeg(rhs_required_blocks,
+                                     sizeof(Q8_0Block),
+                                     &rhs_required_bytes))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+        if (!Q4_0Q8_0TryAddI64(lhs_required_bytes,
+                               rhs_required_bytes,
+                               &staged_required_in_bytes))
+            return Q4_0_Q8_0_ERR_OVERFLOW;
+    }
+
+    if (snapshot_lhs_ptr != lhs_q4 ||
+        snapshot_rhs_ptr != rhs_q8 ||
+        snapshot_out_dot_ptr != out_dot_q32 ||
+        snapshot_lhs_block_capacity != lhs_block_capacity ||
+        snapshot_lhs_pair_stride_blocks != lhs_pair_stride_blocks ||
+        snapshot_lhs_block_stride != lhs_block_stride ||
+        snapshot_rhs_block_capacity != rhs_block_capacity ||
+        snapshot_rhs_pair_stride_blocks != rhs_pair_stride_blocks ||
+        snapshot_rhs_block_stride != rhs_block_stride ||
+        snapshot_pair_count != pair_count ||
+        snapshot_blocks_per_dot != blocks_per_dot ||
+        snapshot_out_dot_capacity != out_dot_capacity)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    *out_count = staged_count;
+    *out_required_in_blocks = staged_required_in_blocks;
+    *out_required_out_cells = staged_required_out_cells;
+    *out_required_in_bytes = staged_required_in_bytes;
+    *out_required_out_bytes = staged_required_out_bytes;
+    return Q4_0_Q8_0_OK;
+}
+
 I32 Q4_0_Q8_0DotRowsQ16MatrixVectorChecked(
     Q4_0Block *matrix_blocks_q4,
     I64 matrix_block_capacity,
