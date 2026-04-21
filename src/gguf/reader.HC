@@ -189,6 +189,62 @@ I32 GGUFReadTensorDataQ4_0CheckedNoPartial(
     return GGUF_READER_OK;
 }
 
+I32 GGUFReadTensorDataQ4_0CheckedNoPartialCommitOnly(
+    U8 *gguf_bytes,
+    U64 gguf_nbytes,
+    U64 tensor_data_base,
+    GGUFReaderTensorInfoQ4_0 *tensor_info,
+    U8 *out_q4_0_blocks,
+    U64 out_q4_0_blocks_capacity,
+    I64 *out_blocks_read,
+    I64 *out_bytes_read)
+{
+    U32 i;
+    U32 staged_n_dims;
+    U32 staged_ggml_type;
+    U64 staged_dims[4];
+    U64 staged_offset;
+    I64 staged_blocks_read_i64;
+    I64 staged_bytes_read_i64;
+    I32 status;
+
+    if (!gguf_bytes || !tensor_info || !out_q4_0_blocks ||
+        !out_blocks_read || !out_bytes_read)
+        return GGUF_READER_ERR_NULL_PTR;
+
+    // Snapshot immutable tensor metadata so diagnostics publish only if the
+    // caller did not mutate geometry while the checked read ran.
+    staged_n_dims = tensor_info->n_dims;
+    staged_ggml_type = tensor_info->ggml_type;
+    staged_offset = tensor_info->offset;
+    for (i = 0; i < 4; ++i)
+        staged_dims[i] = tensor_info->dims[i];
+
+    status = GGUFReadTensorDataQ4_0CheckedNoPartial(
+        gguf_bytes,
+        gguf_nbytes,
+        tensor_data_base,
+        tensor_info,
+        out_q4_0_blocks,
+        out_q4_0_blocks_capacity,
+        &staged_blocks_read_i64,
+        &staged_bytes_read_i64);
+    if (status != GGUF_READER_OK)
+        return status;
+
+    if (!GGUFReaderTensorInfoQ4_0MatchesSnapshot(tensor_info,
+                                                 staged_n_dims,
+                                                 staged_ggml_type,
+                                                 staged_offset,
+                                                 staged_dims))
+        return GGUF_READER_ERR_BAD_PARAM;
+
+    // Commit-only diagnostics publish.
+    *out_blocks_read = staged_blocks_read_i64;
+    *out_bytes_read = staged_bytes_read_i64;
+    return GGUF_READER_OK;
+}
+
 I32 GGUFReadTensorDataQ8_0CheckedNoPartial(
     U8 *gguf_bytes,
     U64 gguf_nbytes,
