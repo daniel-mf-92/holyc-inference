@@ -1288,19 +1288,6 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityComm
         dst_block_stride_values != snapshot_dst_block_stride_values)
         return Q8_0_ERR_BAD_DST_LEN;
 
-    if (staged_block_count < 0 ||
-        staged_required_src_blocks < 0 || staged_required_dst_values < 0 ||
-        staged_required_src_bytes < 0 || staged_required_dst_bytes < 0)
-        return Q8_0_ERR_OVERFLOW;
-    if (recomputed_required_src_blocks < 0 || recomputed_required_dst_values < 0 ||
-        recomputed_required_src_bytes < 0 || recomputed_required_dst_bytes < 0)
-        return Q8_0_ERR_OVERFLOW;
-
-    if (staged_required_src_blocks > snapshot_src_block_capacity)
-        return Q8_0_ERR_BAD_DST_LEN;
-    if (staged_required_dst_values > snapshot_dst_q16_capacity)
-        return Q8_0_ERR_BAD_DST_LEN;
-
     if (recomputed_required_src_blocks > snapshot_src_block_capacity)
         return Q8_0_ERR_BAD_DST_LEN;
     if (recomputed_required_dst_values > snapshot_dst_q16_capacity)
