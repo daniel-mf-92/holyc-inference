@@ -5006,6 +5006,158 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
         staged_scores_capacity);
 }
 
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacityParity(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 commit_stage_cell_capacity,
+    I64 commit_stage_byte_capacity,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 *parity_out_scores_q32,
+    I64 parity_out_scores_capacity,
+    I64 *parity_staged_scores_q32,
+    I64 parity_staged_scores_capacity)
+{
+    I64 snapshot_row_count;
+    I64 snapshot_token_count;
+    I64 snapshot_score_scale_q16;
+    I64 snapshot_commit_stage_cell_capacity;
+    I64 snapshot_commit_stage_byte_capacity;
+    I64 required_stage_cells;
+    I64 required_stage_bytes;
+    I64 required_out_cells;
+    I64 recomputed_required_stage_bytes;
+    I64 elem_index;
+    I32 status;
+
+    if (!in_scores_q32 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+    if (!staged_scores_q32 || !parity_out_scores_q32 || !parity_staged_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (in_scores_capacity < 0 || out_scores_capacity < 0 ||
+        staged_scores_capacity < 0 || parity_out_scores_capacity < 0 ||
+        parity_staged_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (commit_stage_cell_capacity < 0 || commit_stage_byte_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (staged_scores_q32 == in_scores_q32 || staged_scores_q32 == out_scores_q32 ||
+        staged_scores_q32 == parity_out_scores_q32 ||
+        staged_scores_q32 == parity_staged_scores_q32)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (parity_out_scores_q32 == in_scores_q32 ||
+        parity_out_scores_q32 == out_scores_q32 ||
+        parity_out_scores_q32 == parity_staged_scores_q32)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (parity_staged_scores_q32 == in_scores_q32 ||
+        parity_staged_scores_q32 == out_scores_q32)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    snapshot_row_count = row_count;
+    snapshot_token_count = token_count;
+    snapshot_score_scale_q16 = score_scale_q16;
+    snapshot_commit_stage_cell_capacity = commit_stage_cell_capacity;
+    snapshot_commit_stage_byte_capacity = commit_stage_byte_capacity;
+
+    // IQ-861 parity gate contract:
+    // 1) Stage required-byte/cell diagnostics from canonical no-alloc helper.
+    // 2) Execute canonical commit-capacity path into dedicated parity buffers.
+    // 3) Independently stage default-stride scaled rows and require exact
+    //    element parity with canonical output before any caller publish.
+    // 4) Atomically publish via commit-only helper only after full parity.
+    status = AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitCapacity(
+        in_scores_q32,
+        in_scores_capacity,
+        row_count,
+        token_count,
+        out_scores_q32,
+        out_scores_capacity,
+        commit_stage_cell_capacity,
+        commit_stage_byte_capacity,
+        &required_stage_cells,
+        &required_stage_bytes,
+        &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (required_stage_cells < 0 || required_stage_bytes < 0 || required_out_cells < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionTryMulI64Checked(required_stage_cells,
+                                       sizeof(I64),
+                                       &recomputed_required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (required_stage_bytes != recomputed_required_stage_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (!row_count || !token_count)
+        return ATTN_Q16_OK;
+
+    if (required_stage_cells > staged_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_stage_cells > parity_staged_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_out_cells > out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_out_cells > parity_out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacity(
+        in_scores_q32,
+        in_scores_capacity,
+        row_count,
+        token_count,
+        score_scale_q16,
+        parity_out_scores_q32,
+        parity_out_scores_capacity,
+        commit_stage_cell_capacity,
+        commit_stage_byte_capacity,
+        parity_staged_scores_q32,
+        parity_staged_scores_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionQ16ApplyScoreScaleRowsCheckedDefaultStride(
+        in_scores_q32,
+        in_scores_capacity,
+        row_count,
+        token_count,
+        score_scale_q16,
+        staged_scores_q32,
+        staged_scores_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    for (elem_index = 0; elem_index < required_out_cells; elem_index++) {
+        if (staged_scores_q32[elem_index] != parity_out_scores_q32[elem_index])
+            return ATTN_Q16_ERR_BAD_PARAM;
+    }
+
+    if (snapshot_row_count != row_count || snapshot_token_count != token_count ||
+        snapshot_score_scale_q16 != score_scale_q16 ||
+        snapshot_commit_stage_cell_capacity != commit_stage_cell_capacity ||
+        snapshot_commit_stage_byte_capacity != commit_stage_byte_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    return AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(
+        row_count,
+        token_count,
+        staged_scores_q32,
+        staged_scores_capacity,
+        required_stage_cells,
+        out_scores_q32,
+        out_scores_capacity);
+}
+
 I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(
     I64 row_count,
     I64 token_count,
