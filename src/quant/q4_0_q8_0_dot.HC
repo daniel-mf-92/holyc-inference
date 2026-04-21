@@ -199,6 +199,35 @@ Bool Q4_0Q8_0TryMulI64(I64 lhs, I64 rhs, I64 *out_prod)
     return TRUE;
 }
 
+Bool Q4_0Q8_0ByteSpanEndChecked(U8 *base_ptr, I64 byte_count, U8 **out_end_ptr)
+{
+    I64 base_addr;
+    I64 end_addr;
+
+    if (!base_ptr || !out_end_ptr)
+        return FALSE;
+    if (byte_count < 0)
+        return FALSE;
+
+    base_addr = (I64)base_ptr;
+    if (!Q4_0Q8_0TryAddI64(base_addr, byte_count, &end_addr))
+        return FALSE;
+
+    *out_end_ptr = (U8 *)end_addr;
+    return TRUE;
+}
+
+Bool Q4_0Q8_0ByteSpansOverlap(U8 *a_start, U8 *a_end, U8 *b_start, U8 *b_end)
+{
+    if (!a_start || !a_end || !b_start || !b_end)
+        return FALSE;
+
+    if (a_start >= a_end || b_start >= b_end)
+        return FALSE;
+
+    return (a_start < b_end) && (b_start < a_end);
+}
+
 I32 Q4_0Q8_0PackQ4BlockToI16LanesAVX2(Q4_0Block *src_q4, I16 *dst_i16, I64 dst_len)
 {
     I64 byte_index;
@@ -729,6 +758,109 @@ I32 Q4_0Q8_0DotQ32CheckedNoPartialArrayDotOne(
     }
 
     *out_dot_q32 = total_dot_q32;
+    return Q4_0_Q8_0_OK;
+}
+
+// Checked mixed Q4_0 x Q8_0 single-dot helper with strict no-partial commit.
+//
+// Geometry:
+//   lhs_block_idx = block_idx * lhs_block_stride
+//   rhs_block_idx = block_idx * rhs_block_stride
+//
+// The function stages one scalar dot and commits output only after all checked
+// geometry/capacity/overflow validation succeeds.
+I32 Q4_0Q8_0DotQ32CheckedNoPartial(
+    Q4_0Block *lhs_q4,
+    I64 lhs_block_capacity,
+    I64 lhs_block_stride,
+    Q8_0Block *rhs_q8,
+    I64 rhs_block_capacity,
+    I64 rhs_block_stride,
+    I64 block_count,
+    I64 *out_dot_q32)
+{
+    I64 lhs_last_offset;
+    I64 rhs_last_offset;
+    I64 lhs_required_blocks;
+    I64 rhs_required_blocks;
+    I64 lhs_required_bytes;
+    I64 rhs_required_bytes;
+    I64 out_required_bytes;
+    I64 staged_dot_q32;
+    U8 *lhs_start;
+    U8 *lhs_end;
+    U8 *rhs_start;
+    U8 *rhs_end;
+    U8 *out_start;
+    U8 *out_end;
+    I32 status;
+
+    if (!lhs_q4 || !rhs_q8 || !out_dot_q32)
+        return Q4_0_Q8_0_ERR_NULL_PTR;
+
+    if (lhs_block_capacity < 0 || rhs_block_capacity < 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+    if (lhs_block_stride <= 0 || rhs_block_stride <= 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+    if (block_count < 0)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    if (!block_count)
+    {
+        *out_dot_q32 = 0;
+        return Q4_0_Q8_0_OK;
+    }
+
+    if (!Q4_0Q8_0TryMulI64NonNeg(block_count - 1, lhs_block_stride, &lhs_last_offset))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+    if (!Q4_0Q8_0TryMulI64NonNeg(block_count - 1, rhs_block_stride, &rhs_last_offset))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+
+    if (!Q4_0Q8_0TryAddI64(lhs_last_offset, 1, &lhs_required_blocks))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+    if (!Q4_0Q8_0TryAddI64(rhs_last_offset, 1, &rhs_required_blocks))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+
+    if (lhs_required_blocks > lhs_block_capacity)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+    if (rhs_required_blocks > rhs_block_capacity)
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    if (!Q4_0Q8_0TryMulI64NonNeg(lhs_required_blocks, sizeof(Q4_0Block), &lhs_required_bytes))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+    if (!Q4_0Q8_0TryMulI64NonNeg(rhs_required_blocks, sizeof(Q8_0Block), &rhs_required_bytes))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+    out_required_bytes = sizeof(I64);
+
+    lhs_start = (U8 *)lhs_q4;
+    rhs_start = (U8 *)rhs_q8;
+    out_start = (U8 *)out_dot_q32;
+
+    if (!Q4_0Q8_0ByteSpanEndChecked(lhs_start, lhs_required_bytes, &lhs_end))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+    if (!Q4_0Q8_0ByteSpanEndChecked(rhs_start, rhs_required_bytes, &rhs_end))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+    if (!Q4_0Q8_0ByteSpanEndChecked(out_start, out_required_bytes, &out_end))
+        return Q4_0_Q8_0_ERR_OVERFLOW;
+
+    if (Q4_0Q8_0ByteSpansOverlap(lhs_start, lhs_end, out_start, out_end))
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+    if (Q4_0Q8_0ByteSpansOverlap(rhs_start, rhs_end, out_start, out_end))
+        return Q4_0_Q8_0_ERR_BAD_DST_LEN;
+
+    status = Q4_0Q8_0DotQ32CheckedNoPartialArrayDotOne(
+        lhs_q4,
+        0,
+        lhs_block_stride,
+        rhs_q8,
+        0,
+        rhs_block_stride,
+        block_count,
+        &staged_dot_q32);
+    if (status != Q4_0_Q8_0_OK)
+        return status;
+
+    *out_dot_q32 = staged_dot_q32;
     return Q4_0_Q8_0_OK;
 }
 
