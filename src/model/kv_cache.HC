@@ -702,6 +702,10 @@ I32 KVCacheQ16ReadTokenCheckedNoPartialCommitOnlyPreflightOnly(
     if (staged_k_span_cells != staged_v_span_cells)
         return KV_Q16_ERR_BAD_PARAM;
 
+    if (staged_k_base_index < 0 || staged_v_base_index < 0 ||
+        staged_k_span_cells < 0 || staged_v_span_cells < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
     status = KVTryAddI64Checked(staged_k_base_index,
                                 staged_k_span_cells,
                                 &staged_k_end_index);

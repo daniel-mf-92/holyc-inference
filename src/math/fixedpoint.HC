@@ -199,6 +199,115 @@ I32 FPQ16MulChecked(I64 a_q16,
                                         out_q16);
 }
 
+// Checked + saturating Q16 multiply:
+//   out_q16 = sat_i64(round_half_up((a_q16 * b_q16) / 2^16))
+//
+// Contract:
+// - On NULL output pointer: return NULL_PTR and perform no write.
+// - On in-range result: write output and return OK.
+// - On saturation: write saturated bound and return OVERFLOW.
+I32 FPQ16MulSatChecked(I64 a_q16,
+                       I64 b_q16,
+                       I64 *out_q16)
+{
+    U64 abs_a;
+    U64 abs_b;
+    U64 abs_prod;
+    U64 rounded_mag;
+    U64 frac_mask;
+    U64 frac_part;
+    U64 limit;
+    I64 is_negative;
+
+    if (!out_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (!a_q16 || !b_q16)
+    {
+        *out_q16 = 0;
+        return FP_Q16_OK;
+    }
+
+    abs_a = FPAbsToU64(a_q16);
+    abs_b = FPAbsToU64(b_q16);
+    is_negative = ((a_q16 < 0) ^ (b_q16 < 0));
+
+    if (abs_a > (U64_MAX_VALUE / abs_b))
+    {
+        if (is_negative)
+            *out_q16 = I64_MIN_VALUE;
+        else
+            *out_q16 = I64_MAX_VALUE;
+        return FP_Q16_ERR_OVERFLOW;
+    }
+
+    abs_prod = abs_a * abs_b;
+    frac_mask = (((U64)1) << FP_Q16_SHIFT) - 1;
+    frac_part = abs_prod & frac_mask;
+
+    rounded_mag = abs_prod >> FP_Q16_SHIFT;
+    if (frac_part >= (((U64)1) << (FP_Q16_SHIFT - 1)))
+        rounded_mag++;
+
+    limit = (U64)I64_MAX_VALUE;
+    if (is_negative)
+        limit = 0x8000000000000000;
+
+    if (rounded_mag > limit)
+    {
+        if (is_negative)
+            *out_q16 = I64_MIN_VALUE;
+        else
+            *out_q16 = I64_MAX_VALUE;
+        return FP_Q16_ERR_OVERFLOW;
+    }
+
+    *out_q16 = FPSignApplyFromU64(rounded_mag, is_negative);
+    return FP_Q16_OK;
+}
+
+// Checked + saturating Q16 multiply-accumulate:
+//   out_q16 = sat_i64(acc_q16 + FPQ16MulSatChecked(a_q16, b_q16))
+//
+// Contract:
+// - Uses saturating multiply above.
+// - Detects signed addition overflow explicitly.
+// - Returns OVERFLOW when multiply or add saturated.
+// - Writes exactly once on all non-NULL exits.
+I32 FPQ16MacSatChecked(I64 acc_q16,
+                       I64 a_q16,
+                       I64 b_q16,
+                       I64 *out_q16)
+{
+    I64 mul_q16;
+    I64 sum_q16;
+    I32 mul_status;
+
+    if (!out_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    mul_status = FPQ16MulSatChecked(a_q16, b_q16, &mul_q16);
+
+    if (mul_q16 > 0 && acc_q16 > I64_MAX_VALUE - mul_q16)
+    {
+        *out_q16 = I64_MAX_VALUE;
+        return FP_Q16_ERR_OVERFLOW;
+    }
+    if (mul_q16 < 0 && acc_q16 < I64_MIN_VALUE - mul_q16)
+    {
+        *out_q16 = I64_MIN_VALUE;
+        return FP_Q16_ERR_OVERFLOW;
+    }
+
+    sum_q16 = acc_q16 + mul_q16;
+    *out_q16 = sum_q16;
+
+    if (mul_status != FP_Q16_OK)
+        return FP_Q16_ERR_OVERFLOW;
+
+    return FP_Q16_OK;
+}
+
 I64 FPQ16Div(I64 num, I64 den)
 {
     U64 abs_num;
