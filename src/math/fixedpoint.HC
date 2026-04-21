@@ -540,6 +540,54 @@ I32 FPQ16MulSatCheckedNoPartialArray(I64 *lhs_q16,
     return FP_Q16_OK;
 }
 
+// Compute byte span [base_addr, end_addr_exclusive) for an I64 lane array.
+// The caller guarantees:
+// - base_ptr is non-null
+// - count > 0
+I32 FPArrayI64SpanChecked(I64 *base_ptr,
+                          I64 count,
+                          U64 *out_base_addr,
+                          U64 *out_end_addr_exclusive)
+{
+    U64 base_addr;
+    U64 byte_count;
+
+    if (!base_ptr || !out_base_addr || !out_end_addr_exclusive)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count <= 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if ((U64)count > (U64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    base_addr = (U64)base_ptr;
+    byte_count = ((U64)count) << 3;
+
+    if (base_addr > (U64_MAX_VALUE - byte_count))
+        return FP_Q16_ERR_OVERFLOW;
+
+    *out_base_addr = base_addr;
+    *out_end_addr_exclusive = base_addr + byte_count;
+    return FP_Q16_OK;
+}
+
+I32 FPAddressRangesOverlap(U64 a_base,
+                           U64 a_end_exclusive,
+                           U64 b_base,
+                           U64 b_end_exclusive)
+{
+    if (a_end_exclusive <= a_base)
+        return 0;
+    if (b_end_exclusive <= b_base)
+        return 0;
+
+    if (a_end_exclusive <= b_base)
+        return 0;
+    if (b_end_exclusive <= a_base)
+        return 0;
+    return 1;
+}
+
 // Checked + saturating Q16 MAC over arrays with strict stage-then-commit
 // semantics and explicit alias/bounds validation:
 //   out_q16[i] = sat_i64(acc_q16[i] + mul_q16(a_q16[i], b_q16[i]))
@@ -558,9 +606,15 @@ I32 FPQ16MacSatCheckedNoPartialArray(I64 *acc_q16,
                                      I64 count)
 {
     I64 i;
-    I64 last_index;
-    I64 last_byte_offset;
     I64 lane_value;
+    U64 acc_base;
+    U64 acc_end;
+    U64 a_base;
+    U64 a_end;
+    U64 b_base;
+    U64 b_end;
+    U64 out_base;
+    U64 out_end;
     I32 err;
     I32 overflow_seen;
 
@@ -568,27 +622,38 @@ I32 FPQ16MacSatCheckedNoPartialArray(I64 *acc_q16,
         return FP_Q16_ERR_NULL_PTR;
     if (count < 0)
         return FP_Q16_ERR_BAD_PARAM;
-    if (!count)
-        return FP_Q16_OK;
 
+    // Fast-path exact-alias rejection before span math. This keeps
+    // deterministic BAD_PARAM behavior for identical pointers and
+    // documents the no-alias contract at call-site granularity.
     if (acc_q16 == a_q16 || acc_q16 == b_q16 || acc_q16 == out_q16 ||
         a_q16 == b_q16 || a_q16 == out_q16 || b_q16 == out_q16)
         return FP_Q16_ERR_BAD_PARAM;
 
-    // Guard pointer-span math before indexed lane access.
-    last_index = count - 1;
-    if (last_index > (I64_MAX_VALUE >> 3))
-        return FP_Q16_ERR_OVERFLOW;
+    if (!count)
+        return FP_Q16_OK;
+    // Guard pointer-span math before indexed lane access and reject
+    // any overlap between input/output ranges.
+    err = FPArrayI64SpanChecked(acc_q16, count, &acc_base, &acc_end);
+    if (err)
+        return err;
+    err = FPArrayI64SpanChecked(a_q16, count, &a_base, &a_end);
+    if (err)
+        return err;
+    err = FPArrayI64SpanChecked(b_q16, count, &b_base, &b_end);
+    if (err)
+        return err;
+    err = FPArrayI64SpanChecked(out_q16, count, &out_base, &out_end);
+    if (err)
+        return err;
 
-    last_byte_offset = last_index << 3;
-    if ((U64)acc_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
-        return FP_Q16_ERR_OVERFLOW;
-    if ((U64)a_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
-        return FP_Q16_ERR_OVERFLOW;
-    if ((U64)b_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
-        return FP_Q16_ERR_OVERFLOW;
-    if ((U64)out_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
-        return FP_Q16_ERR_OVERFLOW;
+    if (FPAddressRangesOverlap(acc_base, acc_end, a_base, a_end) ||
+        FPAddressRangesOverlap(acc_base, acc_end, b_base, b_end) ||
+        FPAddressRangesOverlap(acc_base, acc_end, out_base, out_end) ||
+        FPAddressRangesOverlap(a_base, a_end, b_base, b_end) ||
+        FPAddressRangesOverlap(a_base, a_end, out_base, out_end) ||
+        FPAddressRangesOverlap(b_base, b_end, out_base, out_end))
+        return FP_Q16_ERR_BAD_PARAM;
 
     // Preflight all lanes first so hard failures never partially write output.
     for (i = 0; i < count; i++)
