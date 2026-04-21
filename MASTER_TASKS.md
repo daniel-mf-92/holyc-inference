@@ -1943,4 +1943,4 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 
 
 ## In Progress Ledger
-- 2026-04-21: IQ-878 done — added `KVCacheQ16WriteTokenCheckedNoPartialCommitOnlyPreflightOnly` + `tests/test_kv_cache_q16_write_token_checked_nopartial_commit_only_preflight_only.py`; targeted KV-cache pytest passed.
+- 2026-04-21: IQ-878 done — hardened `KVCacheQ16WriteTokenCheckedNoPartialCommitOnlyPreflightOnly` immutable cache-capacity snapshots and added `tests/test_kv_cache_q16_write_token_checked_nopartial_commit_only_preflight_only.py`; `python3 tests/test_kv_cache_q16_write_token_checked_nopartial_commit_only_preflight_only.py && python3 tests/test_kv_cache_q16_write_token_checked_nopartial_commit_only.py && python3 tests/test_kv_cache_q16_write_token_checked_nopartial.py` passed.
