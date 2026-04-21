@@ -293,6 +293,64 @@ I64 GGUFTensorReadString(U8 *buf, I64 size, I64 *cursor, GGUFTensorString *out)
     return GGUF_TENSOR_PARSE_OK;
 }
 
+// Checked no-partial parser for one GGUF tensor name string.
+// Reads `{u64 name_len, name_len bytes}` from `cursor` and atomically publishes
+// `{name,next_cursor}` only after full span validation succeeds.
+I64 GGUFTensorInfoReadNameCheckedNoPartial(U8 *buf,
+                                           U64 size,
+                                           U64 cursor,
+                                           GGUFTensorString *out_name,
+                                           U64 *out_next_cursor)
+{
+    GGUFTensorString staged;
+    I64 staged_cursor;
+    I64 status;
+    U64 checked_end;
+
+    if (!buf || !out_name || !out_next_cursor)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+    if (cursor > size)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (size > 0x7FFFFFFFFFFFFFFF || cursor > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    GGUFTensorZeroString(&staged);
+
+    staged_cursor = cursor;
+    status = GGUFTensorReadString(buf,
+                                  (I64)size,
+                                  &staged_cursor,
+                                  &staged);
+    if (status != GGUF_TENSOR_PARSE_OK)
+    {
+        GGUFTensorFreeString(&staged);
+        return status;
+    }
+
+    // Keep cursor arithmetic explicit and overflow-checked in U64 so bounds are
+    // auditable before publishing caller-visible outputs.
+    if (!GGUFTensorTryAddU64(cursor, 8, &checked_end))
+        status = GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    else if (!GGUFTensorTryAddU64(checked_end, staged.len, &checked_end))
+        status = GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    else if (checked_end > size)
+        status = GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    else if ((U64)staged_cursor != checked_end)
+        status = GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    else
+        status = GGUF_TENSOR_PARSE_OK;
+
+    if (status != GGUF_TENSOR_PARSE_OK)
+    {
+        GGUFTensorFreeString(&staged);
+        return status;
+    }
+
+    *out_name = staged;
+    *out_next_cursor = checked_end;
+    return GGUF_TENSOR_PARSE_OK;
+}
+
 I64 GGUFTensorParseOne(U8 *buf, I64 size, I64 *cursor, GGUFTensorInfo *out)
 {
     U32 n_dims;
@@ -300,6 +358,7 @@ I64 GGUFTensorParseOne(U8 *buf, I64 size, I64 *cursor, GGUFTensorInfo *out)
     U64 prod;
     U32 ggml_type;
     U64 offset;
+    U64 next_cursor;
     I64 err;
     U32 i;
 
@@ -308,9 +367,14 @@ I64 GGUFTensorParseOne(U8 *buf, I64 size, I64 *cursor, GGUFTensorInfo *out)
 
     GGUFTensorZeroInfo(out);
 
-    err = GGUFTensorReadString(buf, size, cursor, &out->name);
+    err = GGUFTensorInfoReadNameCheckedNoPartial(buf,
+                                                 size,
+                                                 *cursor,
+                                                 &out->name,
+                                                 &next_cursor);
     if (err != GGUF_TENSOR_PARSE_OK)
         return err;
+    *cursor = next_cursor;
 
     if (!GGUFTensorReadU32LE(buf, size, cursor, &n_dims))
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
