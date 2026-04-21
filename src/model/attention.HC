@@ -11127,11 +11127,12 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
     I64 commit_preflight_required_out_cells;
     I64 commit_preflight_last_out_index;
 
-    I64 preflight_required_stage_cells;
-    I64 preflight_required_out_cells;
-    I64 preflight_last_out_index;
+    I64 required_bytes_required_stage_cells;
+    I64 required_bytes_required_stage_bytes;
+    I64 required_bytes_required_out_cells;
+    I64 required_bytes_last_out_index;
 
-    I64 expected_required_stage_bytes;
+    I64 expected_commit_required_stage_bytes;
 
     I64 snapshot_query_row_count;
     I64 snapshot_token_count;
@@ -11164,10 +11165,10 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
     snapshot_staged_scores_capacity = staged_scores_capacity;
     snapshot_out_scores_capacity = out_scores_capacity;
 
-    // IQ-804 diagnostics-only parity contract:
+    // IQ-803 diagnostics-only required-bytes parity gate:
     // 1) stage tuple from canonical commit-only preflight helper;
-    // 2) stage tuple from canonical default-stride preflight helper;
-    // 3) derive required bytes from checked cells*sizeof(I64);
+    // 2) stage tuple from canonical required-bytes helper;
+    // 3) derive bytes from commit-only cells using checked math;
     // 4) enforce immutable snapshot + exact tuple parity;
     // 5) atomically publish diagnostics only on full success.
     status =
@@ -11184,29 +11185,23 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
     if (status != ATTN_Q16_OK)
         return status;
 
-    status =
-        AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnly(
-            query_row_count,
-            token_count,
-            staged_scores_q32,
-            staged_scores_capacity,
-            out_scores_q32,
-            out_scores_capacity,
-            &preflight_required_stage_cells,
-            &preflight_required_out_cells,
-            &preflight_last_out_index);
+    status = AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnlyRequiredBytes(
+        query_row_count,
+        token_count,
+        staged_scores_q32,
+        staged_scores_capacity,
+        out_scores_q32,
+        out_scores_capacity,
+        &required_bytes_required_stage_cells,
+        &required_bytes_required_stage_bytes,
+        &required_bytes_required_out_cells,
+        &required_bytes_last_out_index);
     if (status != ATTN_Q16_OK)
         return status;
 
     status = AttentionTryMulI64Checked(commit_preflight_required_stage_cells,
                                        sizeof(I64),
                                        &expected_commit_required_stage_bytes);
-    if (status != ATTN_Q16_OK)
-        return status;
-
-    status = AttentionTryMulI64Checked(preflight_required_stage_cells,
-                                       sizeof(I64),
-                                       &expected_preflight_required_stage_bytes);
     if (status != ATTN_Q16_OK)
         return status;
 
@@ -11219,15 +11214,16 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
     if (snapshot_out_scores_capacity != out_scores_capacity)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    if (commit_preflight_required_stage_cells != preflight_required_stage_cells)
+    if (commit_preflight_required_stage_cells !=
+        required_bytes_required_stage_cells)
         return ATTN_Q16_ERR_BAD_PARAM;
-    if (commit_preflight_required_out_cells != preflight_required_out_cells)
+    if (commit_preflight_required_out_cells != required_bytes_required_out_cells)
         return ATTN_Q16_ERR_BAD_PARAM;
-    if (commit_preflight_last_out_index != preflight_last_out_index)
+    if (commit_preflight_last_out_index != required_bytes_last_out_index)
         return ATTN_Q16_ERR_BAD_PARAM;
 
     if (expected_commit_required_stage_bytes !=
-        expected_preflight_required_stage_bytes)
+        required_bytes_required_stage_bytes)
         return ATTN_Q16_ERR_BAD_PARAM;
 
     *out_required_stage_cells = commit_preflight_required_stage_cells;
