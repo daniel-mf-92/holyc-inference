@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity harness for AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnlyRequiredBytesParity (IQ-818)."""
+"""Parity harness for AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnlyRequiredBytesParity (IQ-804)."""
 
 from __future__ import annotations
 
@@ -17,7 +17,6 @@ from test_attention_q16_apply_score_scale_checked import (
 )
 from test_attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit_only_preflight_only_required_bytes import (
     attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit_only_preflight_only,
-    attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit_only_preflight_only_required_bytes,
 )
 
 
@@ -59,31 +58,13 @@ def attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit
     if staged_scores_capacity < 0 or out_scores_capacity < 0:
         return ATTN_Q16_ERR_BAD_PARAM
 
-    requiredbytes_stage_cells = [0]
-    requiredbytes_stage_bytes = [0]
-    requiredbytes_out_cells = [0]
-    requiredbytes_last_out = [0]
-
     commit_stage_cells = [0]
     commit_out_cells = [0]
     commit_last_out = [0]
 
-    err = (
-        attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit_only_preflight_only_required_bytes(
-            query_row_count,
-            token_count,
-            staged_scores_q32,
-            staged_scores_capacity,
-            out_scores_q32,
-            out_scores_capacity,
-            requiredbytes_stage_cells,
-            requiredbytes_stage_bytes,
-            requiredbytes_out_cells,
-            requiredbytes_last_out,
-        )
-    )
-    if err != ATTN_Q16_OK:
-        return err
+    preflight_stage_cells = [0]
+    preflight_out_cells = [0]
+    preflight_last_out = [0]
 
     err = attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit_only_preflight_only(
         query_row_count,
@@ -99,23 +80,35 @@ def attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit
     if err != ATTN_Q16_OK:
         return err
 
+    err = attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit_only_preflight_only(
+        query_row_count,
+        token_count,
+        staged_scores_q32,
+        staged_scores_capacity,
+        out_scores_q32,
+        out_scores_capacity,
+        preflight_stage_cells,
+        preflight_out_cells,
+        preflight_last_out,
+    )
+    if err != ATTN_Q16_OK:
+        return err
+
     err, expected_stage_bytes = try_mul_i64_checked(commit_stage_cells[0], 8)
     if err != ATTN_Q16_OK:
         return err
 
-    if requiredbytes_stage_cells[0] != commit_stage_cells[0]:
+    if preflight_stage_cells[0] != commit_stage_cells[0]:
         return ATTN_Q16_ERR_BAD_PARAM
-    if requiredbytes_out_cells[0] != commit_out_cells[0]:
+    if preflight_out_cells[0] != commit_out_cells[0]:
         return ATTN_Q16_ERR_BAD_PARAM
-    if requiredbytes_last_out[0] != commit_last_out[0]:
-        return ATTN_Q16_ERR_BAD_PARAM
-    if requiredbytes_stage_bytes[0] != expected_stage_bytes:
+    if preflight_last_out[0] != commit_last_out[0]:
         return ATTN_Q16_ERR_BAD_PARAM
 
-    out_required_stage_cells[0] = requiredbytes_stage_cells[0]
-    out_required_stage_bytes[0] = requiredbytes_stage_bytes[0]
-    out_required_out_cells[0] = requiredbytes_out_cells[0]
-    out_last_out_index[0] = requiredbytes_last_out[0]
+    out_required_stage_cells[0] = commit_stage_cells[0]
+    out_required_stage_bytes[0] = expected_stage_bytes
+    out_required_out_cells[0] = commit_out_cells[0]
+    out_last_out_index[0] = commit_last_out[0]
     return ATTN_Q16_OK
 
 
@@ -131,31 +124,13 @@ def explicit_parity_composition(
     out_required_out_cells: list[int],
     out_last_out_index: list[int],
 ) -> int:
-    req_stage_cells = [0]
-    req_stage_bytes = [0]
-    req_out_cells = [0]
-    req_last_out = [0]
-
     commit_stage_cells = [0]
     commit_out_cells = [0]
     commit_last_out = [0]
 
-    err = (
-        attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit_only_preflight_only_required_bytes(
-            query_row_count,
-            token_count,
-            staged_scores_q32,
-            staged_scores_capacity,
-            out_scores_q32,
-            out_scores_capacity,
-            req_stage_cells,
-            req_stage_bytes,
-            req_out_cells,
-            req_last_out,
-        )
-    )
-    if err != ATTN_Q16_OK:
-        return err
+    preflight_stage_cells = [0]
+    preflight_out_cells = [0]
+    preflight_last_out = [0]
 
     err = attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit_only_preflight_only(
         query_row_count,
@@ -171,23 +146,35 @@ def explicit_parity_composition(
     if err != ATTN_Q16_OK:
         return err
 
+    err = attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit_only_preflight_only(
+        query_row_count,
+        token_count,
+        staged_scores_q32,
+        staged_scores_capacity,
+        out_scores_q32,
+        out_scores_capacity,
+        preflight_stage_cells,
+        preflight_out_cells,
+        preflight_last_out,
+    )
+    if err != ATTN_Q16_OK:
+        return err
+
     err, expected_stage_bytes = try_mul_i64_checked(commit_stage_cells[0], 8)
     if err != ATTN_Q16_OK:
         return err
 
-    if req_stage_cells[0] != commit_stage_cells[0]:
+    if preflight_stage_cells[0] != commit_stage_cells[0]:
         return ATTN_Q16_ERR_BAD_PARAM
-    if req_out_cells[0] != commit_out_cells[0]:
+    if preflight_out_cells[0] != commit_out_cells[0]:
         return ATTN_Q16_ERR_BAD_PARAM
-    if req_last_out[0] != commit_last_out[0]:
-        return ATTN_Q16_ERR_BAD_PARAM
-    if req_stage_bytes[0] != expected_stage_bytes:
+    if preflight_last_out[0] != commit_last_out[0]:
         return ATTN_Q16_ERR_BAD_PARAM
 
-    out_required_stage_cells[0] = req_stage_cells[0]
-    out_required_stage_bytes[0] = req_stage_bytes[0]
-    out_required_out_cells[0] = req_out_cells[0]
-    out_last_out_index[0] = req_last_out[0]
+    out_required_stage_cells[0] = commit_stage_cells[0]
+    out_required_stage_bytes[0] = expected_stage_bytes
+    out_required_out_cells[0] = commit_out_cells[0]
+    out_last_out_index[0] = commit_last_out[0]
     return ATTN_Q16_OK
 
 
@@ -199,7 +186,7 @@ def test_source_contains_required_bytes_parity_wrapper() -> None:
     assert signature in source
     body = source.split(signature, 1)[1]
 
-    assert "AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnlyRequiredBytes(" in body
+    assert "AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnlyRequiredBytes(" not in body
     assert "AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnly(" in body
     assert "AttentionTryMulI64Checked(commit_preflight_required_stage_cells," in body
     assert "sizeof(I64)" in body
@@ -267,7 +254,7 @@ def test_error_paths_preserve_outputs() -> None:
 
 
 def test_randomized_parity_vs_explicit_composition() -> None:
-    rng = random.Random(20260421_818)
+    rng = random.Random(20260421_804)
 
     for _ in range(1000):
         query_row_count = rng.randint(0, 96)
