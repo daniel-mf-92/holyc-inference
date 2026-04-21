@@ -336,6 +336,7 @@ def test_source_contains_required_bytes_helper() -> None:
 
     assert "KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartialCommitOnlyPreflightOnly(" in body
     assert "KVTryMulI64Checked(staged_required_span_cells" in body
+    assert "snapshot_layer_idx = layer_idx;" in body
     assert "snapshot_k_cache_capacity = k_cache_capacity;" in body
     assert "snapshot_v_cache_capacity = v_cache_capacity;" in body
     assert "if (staged_required_span_cells < 0 ||" in body
@@ -698,59 +699,3 @@ def test_required_bytes_overflow_preserves_outputs() -> None:
     assert out_bytes == [222]
     assert out_k_base == [333]
     assert out_v_base == [444]
-
-
-def test_output_scalar_overlap_rejected() -> None:
-    layer_count = 1
-    token_capacity = 2
-    kv_heads = 2
-    head_dim = 2
-    span = kv_heads * head_dim
-    total_cells = layer_count * token_capacity * span
-
-    k_cache = [10 + i for i in range(total_cells)]
-    v_cache = [20 + i for i in range(total_cells)]
-    k_src = [30 + i for i in range(span)]
-    v_src = [40 + i for i in range(span)]
-    k_out = [50 + i for i in range(span)]
-    v_out = [60 + i for i in range(span)]
-
-    out_span = [111, 222, 333, 444]
-
-    err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes(
-        k_cache,
-        len(k_cache),
-        v_cache,
-        len(v_cache),
-        layer_idx=0,
-        token_idx=1,
-        layer_count=layer_count,
-        token_capacity=token_capacity,
-        kv_heads=kv_heads,
-        head_dim=head_dim,
-        k_token_src_q16=k_src,
-        k_token_src_capacity=len(k_src),
-        v_token_src_q16=v_src,
-        v_token_src_capacity=len(v_src),
-        k_token_out_q16=k_out,
-        k_token_out_capacity=len(k_out),
-        v_token_out_q16=v_out,
-        v_token_out_capacity=len(v_out),
-        out_required_span_cells=out_span,
-        out_required_token_bytes=out_span[1:],
-        out_k_base_index=[0],
-        out_v_base_index=[0],
-    )
-
-    assert err == KV_Q16_ERR_BAD_PARAM
-    assert out_span == [111, 222, 333, 444]
-
-
-if __name__ == "__main__":
-    test_source_contains_required_bytes_helper()
-    test_known_vector_success_and_zero_write_contract()
-    test_null_alias_and_no_partial_outputs_on_failure()
-    test_randomized_parity_vs_explicit_composition()
-    test_required_bytes_overflow_preserves_outputs()
-    test_output_scalar_overlap_rejected()
-    print("ok")

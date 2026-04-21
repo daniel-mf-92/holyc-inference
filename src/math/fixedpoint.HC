@@ -2374,6 +2374,174 @@ I32 FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnly(I64 *x_q16,
     return FP_Q16_OK;
 }
 
+// Diagnostics-only parity gate over
+// FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnly and
+// FPQ16ExpApproxCheckedNoPartialArrayRequiredBytes.
+//
+// Contract:
+// - Stages required_output_bytes through commit-only wrapper.
+// - Revalidates immutable {x_q16,out_q16,count} snapshots.
+// - Recomputes canonical required_output_bytes through base helper.
+// - Enforces exact tuple parity before atomic diagnostics publish.
+// - Preserves strict no-partial diagnostics writes on all failures.
+I32 FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnlyParity(I64 *x_q16,
+                                                                     I64 *out_q16,
+                                                                     I64 count,
+                                                                     I64 *out_required_output_bytes)
+{
+    U64 required_base;
+    U64 required_end;
+    U64 x_base;
+    U64 x_end;
+    U64 out_base;
+    U64 out_end;
+    I64 *snapshot_x_q16;
+    I64 *snapshot_out_q16;
+    I64 snapshot_count;
+    I64 staged_commit_required_output_bytes;
+    I64 staged_canonical_required_output_bytes;
+    I32 status;
+
+    if (!x_q16 || !out_q16 || !out_required_output_bytes)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (x_q16 == out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_required_output_bytes == x_q16 ||
+        out_required_output_bytes == out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Keep strict no-partial semantics for final diagnostics publish by
+    // rejecting scalar-output overlap against caller array spans.
+    if (count)
+    {
+        status = FPArrayI64SpanChecked(x_q16, count, &x_base, &x_end);
+        if (status)
+            return status;
+
+        status = FPArrayI64SpanChecked(out_q16, count, &out_base, &out_end);
+        if (status)
+            return status;
+
+        if (FPAddressRangesOverlap(x_base, x_end, out_base, out_end))
+            return FP_Q16_ERR_BAD_PARAM;
+
+        required_base = (U64)out_required_output_bytes;
+        if (required_base > (U64_MAX_VALUE - 7))
+            return FP_Q16_ERR_OVERFLOW;
+        required_end = required_base + 8;
+
+        if (FPAddressRangesOverlap(required_base, required_end, x_base, x_end) ||
+            FPAddressRangesOverlap(required_base, required_end, out_base, out_end))
+            return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    snapshot_x_q16 = x_q16;
+    snapshot_out_q16 = out_q16;
+    snapshot_count = count;
+
+    status = FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnly(
+        x_q16,
+        out_q16,
+        count,
+        &staged_commit_required_output_bytes);
+    if (status)
+        return status;
+
+    status = FPQ16ExpApproxCheckedNoPartialArrayRequiredBytes(
+        x_q16,
+        out_q16,
+        count,
+        &staged_canonical_required_output_bytes);
+    if (status)
+        return status;
+
+    if (snapshot_x_q16 != x_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_q16 != out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_count != count)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (staged_commit_required_output_bytes != staged_canonical_required_output_bytes)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_required_output_bytes = staged_commit_required_output_bytes;
+    return FP_Q16_OK;
+}
+
+// Diagnostics-only no-write companion over
+// FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnlyParity.
+//
+// This helper preserves strict preflight semantics by delegating to the
+// existing preflight-only required-bytes wrapper, recomputing canonical
+// required_output_bytes with checked math, and enforcing parity before a
+// single diagnostics publish.
+//
+// Contract:
+// - Never writes out_q16 (strict preflight/no-partial semantics).
+// - Revalidates immutable {x_q16,out_q16,count} snapshots.
+// - Enforces exact parity on {required_output_bytes} before publish.
+// - Performs exactly one diagnostics commit on success.
+I32 FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnlyParityPreflightOnly(I64 *x_q16,
+                                                                                   I64 *out_q16,
+                                                                                   I64 count,
+                                                                                   I64 *out_required_output_bytes)
+{
+    I64 *snapshot_x_q16;
+    I64 *snapshot_out_q16;
+    I64 snapshot_count;
+    I64 staged_preflight_required_output_bytes;
+    I64 staged_canonical_required_output_bytes;
+    I32 status;
+
+    if (!x_q16 || !out_q16 || !out_required_output_bytes)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (x_q16 == out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_required_output_bytes == x_q16 ||
+        out_required_output_bytes == out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    snapshot_x_q16 = x_q16;
+    snapshot_out_q16 = out_q16;
+    snapshot_count = count;
+
+    status = FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnlyPreflightOnly(
+        x_q16,
+        out_q16,
+        count,
+        &staged_preflight_required_output_bytes);
+    if (status)
+        return status;
+
+    if (snapshot_x_q16 != x_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_q16 != out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_count != count)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    status = FPTryMulI64Checked(count,
+                                8,
+                                &staged_canonical_required_output_bytes);
+    if (status)
+        return status;
+
+    if (staged_preflight_required_output_bytes != staged_canonical_required_output_bytes)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_required_output_bytes = staged_preflight_required_output_bytes;
+    return FP_Q16_OK;
+}
+
 // Diagnostics-only no-write companion over
 // FPQ16ExpApproxCheckedNoPartialArrayRequiredBytesCommitOnly.
 //
