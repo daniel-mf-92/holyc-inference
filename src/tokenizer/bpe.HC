@@ -5982,6 +5982,131 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyP
     return TOKENIZER_BPE_OK;
 }
 
+I32 TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyPreflightOnlyRequiredBytesParityPreflightOnly(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    U64 max_piece_len,
+    U64 *out_required_token_capacity,
+    U64 *out_required_merge_workspace_bytes)
+{
+    U64 snapshot_byte_len;
+    U64 snapshot_cursor;
+    U64 snapshot_prompt_nbytes;
+    U64 snapshot_rank_table_count;
+    U64 snapshot_rank_table_capacity;
+    U64 snapshot_max_piece_len;
+
+    U64 staged_required_token_capacity;
+    U64 staged_required_merge_workspace_bytes;
+    U64 staged_last_piece_end;
+    U64 staged_cursor;
+
+    U64 canonical_required_token_capacity;
+    U64 canonical_required_merge_workspace_bytes;
+    U64 canonical_last_piece_end;
+
+    I32 err;
+
+    if (!bytes || !io_cursor || !out_required_token_capacity ||
+        !out_required_merge_workspace_bytes)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        max_piece_len > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    snapshot_byte_len = byte_len;
+    snapshot_cursor = *io_cursor;
+    snapshot_prompt_nbytes = prompt_nbytes;
+    snapshot_rank_table_count = rank_table_count;
+    snapshot_rank_table_capacity = rank_table_capacity;
+    snapshot_max_piece_len = max_piece_len;
+
+    if (snapshot_cursor > byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (prompt_nbytes > byte_len - snapshot_cursor)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    // IQ-859 diagnostics-only no-write companion:
+    // 1) stage parity tuple from IQ-852 helper with isolated cursor/output copies,
+    // 2) recompute canonical tuple from immutable prompt geometry,
+    // 3) enforce exact tuple parity, then publish in one atomic write block.
+    staged_required_token_capacity = *out_required_token_capacity;
+    staged_required_merge_workspace_bytes = *out_required_merge_workspace_bytes;
+    staged_cursor = snapshot_cursor;
+    err =
+        TokenizerBPEEncodePromptCheckedNoAllocFromMaxPieceDefaultCapacityCommitOnlyPreflightOnlyRequiredBytesParity(
+            bytes,
+            byte_len,
+            &staged_cursor,
+            prompt_nbytes,
+            rank_left_tokens,
+            rank_right_tokens,
+            rank_values,
+            rank_merged_tokens,
+            rank_table_count,
+            rank_table_capacity,
+            max_piece_len,
+            &staged_required_token_capacity,
+            &staged_required_merge_workspace_bytes);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+    if (staged_cursor != snapshot_cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    staged_last_piece_end = snapshot_cursor + staged_required_token_capacity;
+    if (staged_last_piece_end < snapshot_cursor)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    if (staged_last_piece_end > byte_len)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    canonical_required_token_capacity = prompt_nbytes;
+    if (prompt_nbytes && max_piece_len > 0x7FFFFFFFFFFFFFFF / prompt_nbytes)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    canonical_required_merge_workspace_bytes = prompt_nbytes * max_piece_len;
+    canonical_last_piece_end = snapshot_cursor + canonical_required_token_capacity;
+    if (canonical_last_piece_end < snapshot_cursor)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    if (canonical_last_piece_end > byte_len)
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+
+    if (snapshot_byte_len != byte_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_cursor != *io_cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_prompt_nbytes != prompt_nbytes)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_rank_table_count != rank_table_count)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_rank_table_capacity != rank_table_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (snapshot_max_piece_len != max_piece_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (staged_required_token_capacity != canonical_required_token_capacity)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (staged_required_merge_workspace_bytes !=
+        canonical_required_merge_workspace_bytes)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    if (staged_last_piece_end != canonical_last_piece_end)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    *out_required_token_capacity = staged_required_token_capacity;
+    *out_required_merge_workspace_bytes = staged_required_merge_workspace_bytes;
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEEncodePromptCheckedNoAllocFromLens(
     U8 *bytes,
     U64 byte_len,

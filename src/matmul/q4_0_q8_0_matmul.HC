@@ -194,6 +194,24 @@ I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityCommitOnlyPr
     I64 *out_block_dots_per_iter,
     I64 *out_total_cells,
     I64 *out_total_block_dots);
+I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParity(
+    Q4_0Block *lhs_q4_blocks,
+    I64 lhs_q4_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_q8_col_blocks,
+    I64 rhs_q8_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_cells_q32,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells,
+    I64 iter_count,
+    I64 *out_cells_per_iter,
+    I64 *out_block_dots_per_iter,
+    I64 *out_total_cells,
+    I64 *out_total_block_dots);
 I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityPreflightOnly(
     Q4_0Block *lhs_q4_blocks,
     I64 lhs_q4_block_capacity,
@@ -1438,21 +1456,21 @@ I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityPreflightOnl
     snapshot_k_block_count = k_block_count;
     snapshot_iter_count = iter_count;
 
+    // IQ-855 strict parity gate:
+    // 1) stage tuple from commit-only parity-preflight composition,
+    // 2) stage canonical tuple from parity preflight-only helper,
+    // 3) enforce immutable geometry snapshots and exact tuple equality,
+    // 4) atomically publish diagnostics only on full success.
     commit_cells_per_iter = *out_cells_per_iter;
     commit_block_dots_per_iter = *out_block_dots_per_iter;
     commit_total_cells = *out_total_cells;
     commit_total_block_dots = *out_total_block_dots;
 
-    preflight_cells_per_iter = commit_cells_per_iter;
-    preflight_block_dots_per_iter = commit_block_dots_per_iter;
-    preflight_total_cells = commit_total_cells;
-    preflight_total_block_dots = commit_total_block_dots;
+    preflight_cells_per_iter = 0;
+    preflight_block_dots_per_iter = 0;
+    preflight_total_cells = 0;
+    preflight_total_block_dots = 0;
 
-    // IQ-855 strict parity gate:
-    // 1) stage tuple via commit-only wrapper over preflight-only parity,
-    // 2) stage canonical preflight-only parity tuple independently,
-    // 3) enforce immutable benchmark snapshots + exact tuple parity,
-    // 4) publish atomically only after full agreement.
     status = Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityPreflightOnlyCommitOnly(
         lhs_q4_blocks,
         lhs_q4_block_capacity,
@@ -1705,6 +1723,129 @@ I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityCommitOnlyPr
     if (commit_total_cells != canonical_total_cells)
         return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
     if (commit_total_block_dots != canonical_total_block_dots)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    *out_cells_per_iter = commit_cells_per_iter;
+    *out_block_dots_per_iter = commit_block_dots_per_iter;
+    *out_total_cells = commit_total_cells;
+    *out_total_block_dots = commit_total_block_dots;
+    return Q4_0_Q8_0_MATMUL_OK;
+}
+
+I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParity(
+    Q4_0Block *lhs_q4_blocks,
+    I64 lhs_q4_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_q8_col_blocks,
+    I64 rhs_q8_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_cells_q32,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells,
+    I64 iter_count,
+    I64 *out_cells_per_iter,
+    I64 *out_block_dots_per_iter,
+    I64 *out_total_cells,
+    I64 *out_total_block_dots)
+{
+    I64 snapshot_row_count;
+    I64 snapshot_col_count;
+    I64 snapshot_k_block_count;
+    I64 snapshot_iter_count;
+
+    I64 preflight_cells_per_iter;
+    I64 preflight_block_dots_per_iter;
+    I64 preflight_total_cells;
+    I64 preflight_total_block_dots;
+
+    I64 commit_cells_per_iter;
+    I64 commit_block_dots_per_iter;
+    I64 commit_total_cells;
+    I64 commit_total_block_dots;
+
+    I32 status;
+
+    if (!out_cells_per_iter || !out_block_dots_per_iter ||
+        !out_total_cells || !out_total_block_dots)
+        return Q4_0_Q8_0_MATMUL_ERR_NULL_PTR;
+
+    snapshot_row_count = row_count;
+    snapshot_col_count = col_count;
+    snapshot_k_block_count = k_block_count;
+    snapshot_iter_count = iter_count;
+
+    preflight_cells_per_iter = *out_cells_per_iter;
+    preflight_block_dots_per_iter = *out_block_dots_per_iter;
+    preflight_total_cells = *out_total_cells;
+    preflight_total_block_dots = *out_total_block_dots;
+
+    commit_cells_per_iter = preflight_cells_per_iter;
+    commit_block_dots_per_iter = preflight_block_dots_per_iter;
+    commit_total_cells = preflight_total_cells;
+    commit_total_block_dots = preflight_total_block_dots;
+
+    // IQ-856 strict parity gate:
+    // stage diagnostics via the no-write preflight companion and canonical
+    // commit-only parity wrapper under immutable benchmark geometry snapshots,
+    // then publish atomically only when all tuple fields agree exactly.
+    status = Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityCommitOnlyPreflightOnly(
+        lhs_q4_blocks,
+        lhs_q4_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_q8_col_blocks,
+        rhs_q8_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q32,
+        out_cell_capacity,
+        out_row_stride_cells,
+        iter_count,
+        &preflight_cells_per_iter,
+        &preflight_block_dots_per_iter,
+        &preflight_total_cells,
+        &preflight_total_block_dots);
+    if (status != Q4_0_Q8_0_MATMUL_OK)
+        return status;
+
+    status = Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityCommitOnly(
+        lhs_q4_blocks,
+        lhs_q4_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_q8_col_blocks,
+        rhs_q8_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q32,
+        out_cell_capacity,
+        out_row_stride_cells,
+        iter_count,
+        &commit_cells_per_iter,
+        &commit_block_dots_per_iter,
+        &commit_total_cells,
+        &commit_total_block_dots);
+    if (status != Q4_0_Q8_0_MATMUL_OK)
+        return status;
+
+    if (snapshot_row_count != row_count ||
+        snapshot_col_count != col_count ||
+        snapshot_k_block_count != k_block_count ||
+        snapshot_iter_count != iter_count)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (preflight_cells_per_iter != commit_cells_per_iter)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (preflight_block_dots_per_iter != commit_block_dots_per_iter)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (preflight_total_cells != commit_total_cells)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (preflight_total_block_dots != commit_total_block_dots)
         return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
 
     *out_cells_per_iter = commit_cells_per_iter;

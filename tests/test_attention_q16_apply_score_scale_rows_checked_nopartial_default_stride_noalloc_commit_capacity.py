@@ -230,6 +230,9 @@ def test_source_contains_noalloc_commit_capacity_wrapper() -> None:
     )
     assert "if (required_stage_cells > staged_scores_capacity)" in body
     assert "if (required_stage_bytes > staging_capacity_bytes)" in body
+    assert "if (required_out_cells > out_scores_capacity)" in body
+    assert "AttentionTryMulI64Checked(required_stage_cells," in body
+    assert "if (required_stage_bytes != recomputed_required_stage_bytes)" in body
 
 
 def test_known_vectors_match_explicit_checked_composition() -> None:
@@ -321,6 +324,35 @@ def test_commit_capacity_rejection_is_no_partial() -> None:
         required * 8,
         staged,
         required - 1,
+    )
+    assert err == ATTN_Q16_ERR_BAD_PARAM
+    assert out_after == out_before
+
+
+def test_out_capacity_rejection_is_no_partial() -> None:
+    row_count = 2
+    token_count = 7
+    score_scale_q16 = 27500
+
+    required = row_count * token_count
+    in_scores = [((i * 13) - 17) << 12 for i in range(required)]
+    staged = [0x7B7B] * required
+
+    out_before = [0x5A5A] * (required - 1)
+    out_after = out_before.copy()
+
+    err = attention_q16_apply_score_scale_rows_checked_nopartial_default_stride_noalloc_commit_capacity(
+        in_scores,
+        required,
+        row_count,
+        token_count,
+        score_scale_q16,
+        out_after,
+        required - 1,
+        required,
+        required * 8,
+        staged,
+        required,
     )
     assert err == ATTN_Q16_ERR_BAD_PARAM
     assert out_after == out_before

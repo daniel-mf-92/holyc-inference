@@ -4851,23 +4851,11 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
     I64 *staged_scores_q32,
     I64 staged_scores_capacity)
 {
-    I64 required_q_cells;
-    I64 required_k_cells;
     I64 required_stage_cells;
     I64 required_stage_bytes;
     I64 required_out_cells;
-    I64 required_q_bytes;
-    I64 required_k_bytes;
-    I64 required_out_bytes;
+    I64 recomputed_required_stage_bytes;
     I64 staging_capacity_bytes;
-    U64 staged_begin;
-    U64 staged_end;
-    U64 q_begin;
-    U64 q_end;
-    U64 k_begin;
-    U64 k_end;
-    U64 out_begin;
-    U64 out_end;
     I32 status;
 
     if (!in_scores_q32 || !out_scores_q32)
@@ -4906,6 +4894,22 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
         &required_out_cells);
     if (status != ATTN_Q16_OK)
         return status;
+
+    // IQ-813 diagnostics hardening:
+    // validate that the returned commit-gating tuple is internally consistent
+    // before any staged compute starts. This preserves strict no-partial
+    // semantics by rejecting malformed diagnostics up front.
+    if (required_stage_cells < 0 || required_stage_bytes < 0 ||
+        required_out_cells < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionTryMulI64Checked(required_stage_cells,
+                                       sizeof(I64),
+                                       &recomputed_required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (required_stage_bytes != recomputed_required_stage_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
 
     if (!row_count || !token_count)
         return ATTN_Q16_OK;

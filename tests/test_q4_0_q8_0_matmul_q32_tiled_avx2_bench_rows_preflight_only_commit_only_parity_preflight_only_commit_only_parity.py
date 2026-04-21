@@ -24,6 +24,35 @@ from test_q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_
 )
 
 
+def count_exact_holyc_signature_occurrences(source: str, signature: str) -> int:
+    count = 0
+    search_start = 0
+
+    while True:
+        idx = source.find(signature, search_start)
+        if idx < 0:
+            break
+
+        cursor = idx + len(signature)
+        depth = 1
+        while cursor < len(source) and depth > 0:
+            if source[cursor] == "(":
+                depth += 1
+            elif source[cursor] == ")":
+                depth -= 1
+            cursor += 1
+
+        while cursor < len(source) and source[cursor].isspace():
+            cursor += 1
+
+        if cursor < len(source) and source[cursor] in {";", "{"}:
+            count += 1
+
+        search_start = idx + 1
+
+    return count
+
+
 def q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity_preflight_only_commit_only_parity(
     lhs_q4_blocks,
     lhs_q4_block_capacity: int,
@@ -145,6 +174,7 @@ def test_source_contains_signature_and_parity_gate() -> None:
     source = Path("src/matmul/q4_0_q8_0_matmul.HC").read_text(encoding="utf-8")
     sig = "I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityPreflightOnlyCommitOnlyParity("
     assert sig in source
+    assert count_exact_holyc_signature_occurrences(source, sig) == 2  # one prototype + one implementation
     body = source.split(sig, 1)[1]
 
     assert "Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityPreflightOnlyCommitOnly(" in body
