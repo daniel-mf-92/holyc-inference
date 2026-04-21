@@ -50,6 +50,34 @@ Bool GGUFReaderTryMulU64(U64 lhs, U64 rhs, U64 *out_prod)
     return TRUE;
 }
 
+Bool GGUFReaderTensorInfoQ4_0MatchesSnapshot(
+    GGUFReaderTensorInfoQ4_0 *tensor_info,
+    U32 staged_n_dims,
+    U32 staged_ggml_type,
+    U64 staged_offset,
+    U64 *staged_dims)
+{
+    U32 i;
+
+    if (!tensor_info || !staged_dims)
+        return FALSE;
+
+    if (tensor_info->n_dims != staged_n_dims)
+        return FALSE;
+    if (tensor_info->ggml_type != staged_ggml_type)
+        return FALSE;
+    if (tensor_info->offset != staged_offset)
+        return FALSE;
+
+    for (i = 0; i < 4; ++i)
+    {
+        if (tensor_info->dims[i] != staged_dims[i])
+            return FALSE;
+    }
+
+    return TRUE;
+}
+
 I32 GGUFReadTensorDataQ4_0CheckedNoPartial(
     U8 *gguf_bytes,
     U64 gguf_nbytes,
@@ -71,6 +99,8 @@ I32 GGUFReadTensorDataQ4_0CheckedNoPartial(
     U64 staged_payload_start;
     U64 staged_payload_end;
     U64 staged_out_end;
+    I64 staged_blocks_read_i64;
+    I64 staged_bytes_read_i64;
     U64 copy_idx;
 
     if (!gguf_bytes || !tensor_info || !out_q4_0_blocks ||
@@ -131,16 +161,27 @@ I32 GGUFReadTensorDataQ4_0CheckedNoPartial(
     if (staged_out_end > out_q4_0_blocks_capacity)
         return GGUF_READER_ERR_BAD_CAPACITY;
 
-    // No-partial semantics: all bounds/capacity checks complete before copy.
-    for (copy_idx = 0; copy_idx < staged_required_bytes; ++copy_idx)
-        out_q4_0_blocks[copy_idx] = gguf_bytes[staged_payload_start + copy_idx];
+    if (!GGUFReaderTensorInfoQ4_0MatchesSnapshot(tensor_info,
+                                                 staged_n_dims,
+                                                 staged_ggml_type,
+                                                 staged_offset,
+                                                 staged_dims))
+        return GGUF_READER_ERR_BAD_PARAM;
 
     if (staged_block_count > 0x7FFFFFFFFFFFFFFF)
         return GGUF_READER_ERR_OVERFLOW;
     if (staged_required_bytes > 0x7FFFFFFFFFFFFFFF)
         return GGUF_READER_ERR_OVERFLOW;
 
-    *out_blocks_read = (I64)staged_block_count;
-    *out_bytes_read = (I64)staged_required_bytes;
+    staged_blocks_read_i64 = (I64)staged_block_count;
+    staged_bytes_read_i64 = (I64)staged_required_bytes;
+
+    // No-partial semantics: all bounds/capacity checks complete before copy.
+    for (copy_idx = 0; copy_idx < staged_required_bytes; ++copy_idx)
+        out_q4_0_blocks[copy_idx] = gguf_bytes[staged_payload_start + copy_idx];
+
+    // Atomic diagnostics publish: commit both counters from staged locals.
+    *out_blocks_read = staged_blocks_read_i64;
+    *out_bytes_read = staged_bytes_read_i64;
     return GGUF_READER_OK;
 }
