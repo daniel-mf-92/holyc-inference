@@ -99,10 +99,10 @@ def q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity
 
 
 def explicit_commit_only_composition(*args):
-    staged_cells_per_iter = [args[14][0]]
-    staged_block_dots_per_iter = [args[15][0]]
-    staged_total_cells = [args[16][0]]
-    staged_total_block_dots = [args[17][0]]
+    staged_cells_per_iter = [args[13][0]]
+    staged_block_dots_per_iter = [args[14][0]]
+    staged_total_cells = [args[15][0]]
+    staged_total_block_dots = [args[16][0]]
 
     err = q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only_parity(
         args[0],
@@ -126,10 +126,10 @@ def explicit_commit_only_composition(*args):
     if err != Q4_0_Q8_0_AVX2_OK:
         return err
 
-    args[14][0] = staged_cells_per_iter[0]
-    args[15][0] = staged_block_dots_per_iter[0]
-    args[16][0] = staged_total_cells[0]
-    args[17][0] = staged_total_block_dots[0]
+    args[13][0] = staged_cells_per_iter[0]
+    args[14][0] = staged_block_dots_per_iter[0]
+    args[15][0] = staged_total_cells[0]
+    args[16][0] = staged_total_block_dots[0]
     return Q4_0_Q8_0_AVX2_OK
 
 
