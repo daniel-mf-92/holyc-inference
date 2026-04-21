@@ -521,6 +521,10 @@ I32 KVCacheQ16ReadTokenCheckedNoPartialCommitOnly(
     if (staged_k_span_cells != staged_v_span_cells)
         return KV_Q16_ERR_BAD_PARAM;
 
+    if (staged_k_base_index < 0 || staged_v_base_index < 0 ||
+        staged_k_span_cells < 0 || staged_v_span_cells < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
     // Defensive no-wrap invariants: checked geometry for token spans must stay
     // non-negative and monotonic before any diagnostics are published.
     if (staged_k_base_index < 0 || staged_v_base_index < 0 ||
