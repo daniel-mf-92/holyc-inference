@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 import random
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path("tests").resolve()))
 
 from test_fixedpoint_q16_mul_checked_no_partial_array_required_bytes import (
     FP_Q16_ERR_BAD_PARAM,
