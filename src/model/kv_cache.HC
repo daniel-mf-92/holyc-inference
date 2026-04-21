@@ -85,6 +85,45 @@ I32 KVCacheQ16ComputeLayerTokenSpanCellsChecked(
                               out_span_cells);
 }
 
+// Total Q16 cells needed for one cache slab (K or V):
+// total_cells = layer_count * token_capacity * kv_heads * head_dim
+// The computation is staged through checked helpers to keep overflow
+// classification deterministic and auditable.
+I32 KVCacheQ16ComputeTotalCellsChecked(
+    I64 layer_count,
+    I64 token_capacity,
+    I64 kv_heads,
+    I64 head_dim,
+    I64 *out_total_cells)
+{
+    I64 token_span_cells;
+    I64 layer_span_cells;
+    I32 status;
+
+    if (!out_total_cells)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (layer_count < 0 || token_capacity < 0 ||
+        kv_heads < 0 || head_dim < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    status = KVCacheQ16ComputeLayerTokenSpanCellsChecked(kv_heads,
+                                                         head_dim,
+                                                         &token_span_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVTryMulI64Checked(token_capacity,
+                                token_span_cells,
+                                &layer_span_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    return KVTryMulI64Checked(layer_count,
+                              layer_span_cells,
+                              out_total_cells);
+}
+
 // Base index in Q16 cells for one token inside one layer slab:
 // layer_span_cells = token_capacity * (kv_heads * head_dim)
 // token_base_in_layer = token_idx * (kv_heads * head_dim)
@@ -185,6 +224,9 @@ I32 KVCacheQ16WriteTokenCheckedNoPartial(
 
     if (!k_cache_q16 || !v_cache_q16 || !k_token_src_q16 || !v_token_src_q16)
         return KV_Q16_ERR_NULL_PTR;
+
+    if (k_cache_q16 == v_cache_q16)
+        return KV_Q16_ERR_BAD_PARAM;
 
     if (k_cache_capacity < 0 || v_cache_capacity < 0 ||
         k_token_src_capacity < 0 || v_token_src_capacity < 0)
