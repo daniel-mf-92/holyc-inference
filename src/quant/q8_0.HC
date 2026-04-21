@@ -830,6 +830,8 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParity(
     I64 recomputed_required_dst_values;
     I64 recomputed_required_src_bytes;
     I64 recomputed_required_dst_bytes;
+    I64 expected_required_src_bytes;
+    I64 expected_required_dst_bytes;
     I64 src_last_offset;
     I64 dst_last_base;
     I32 status;
@@ -940,6 +942,32 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParity(
         block_count != snapshot_block_count ||
         dst_q16_capacity != snapshot_dst_q16_capacity ||
         dst_block_stride_values != snapshot_dst_block_stride_values)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if (staged_block_count < 0 ||
+        staged_required_src_blocks < 0 || staged_required_dst_values < 0 ||
+        staged_required_src_bytes < 0 || staged_required_dst_bytes < 0)
+        return Q8_0_ERR_OVERFLOW;
+    if (recomputed_required_src_blocks < 0 || recomputed_required_dst_values < 0 ||
+        recomputed_required_src_bytes < 0 || recomputed_required_dst_bytes < 0)
+        return Q8_0_ERR_OVERFLOW;
+
+    if (!Q8_0TryMulI64NonNeg(staged_required_src_blocks,
+                             Q8_0_BLOCK_BYTES,
+                             &expected_required_src_bytes))
+        return Q8_0_ERR_OVERFLOW;
+    if (!Q8_0TryMulI64NonNeg(staged_required_dst_values,
+                             sizeof(I64),
+                             &expected_required_dst_bytes))
+        return Q8_0_ERR_OVERFLOW;
+
+    if (staged_required_src_bytes != expected_required_src_bytes ||
+        staged_required_dst_bytes != expected_required_dst_bytes)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if (staged_required_src_blocks > snapshot_src_block_capacity)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (staged_required_dst_values > snapshot_dst_q16_capacity)
         return Q8_0_ERR_BAD_DST_LEN;
 
     if (recomputed_required_src_blocks > snapshot_src_block_capacity)
@@ -1258,6 +1286,19 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityComm
         block_count != snapshot_block_count ||
         dst_q16_capacity != snapshot_dst_q16_capacity ||
         dst_block_stride_values != snapshot_dst_block_stride_values)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if (staged_block_count < 0 ||
+        staged_required_src_blocks < 0 || staged_required_dst_values < 0 ||
+        staged_required_src_bytes < 0 || staged_required_dst_bytes < 0)
+        return Q8_0_ERR_OVERFLOW;
+    if (recomputed_required_src_blocks < 0 || recomputed_required_dst_values < 0 ||
+        recomputed_required_src_bytes < 0 || recomputed_required_dst_bytes < 0)
+        return Q8_0_ERR_OVERFLOW;
+
+    if (staged_required_src_blocks > snapshot_src_block_capacity)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (staged_required_dst_values > snapshot_dst_q16_capacity)
         return Q8_0_ERR_BAD_DST_LEN;
 
     if (recomputed_required_src_blocks > snapshot_src_block_capacity)
