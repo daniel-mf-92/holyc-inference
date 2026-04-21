@@ -4938,6 +4938,8 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
         score_scale_q16,
         staged_scores_q32,
         staged_scores_capacity);
+    if (status != canonical_status)
+        return ATTN_Q16_ERR_BAD_PARAM;
     if (status != ATTN_Q16_OK)
         return status;
 
@@ -5033,6 +5035,9 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
     I64 required_out_cells;
     I64 recomputed_required_stage_bytes;
     I64 elem_index;
+    I32 canonical_status;
+    I32 explicit_status;
+    I32 publish_status;
     I32 status;
 
     if (!in_scores_q32 || !out_scores_q32)
@@ -5110,8 +5115,10 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
         return ATTN_Q16_ERR_BAD_PARAM;
     if (required_out_cells > parity_out_scores_capacity)
         return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_out_cells > parity_staged_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
 
-    status = AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacity(
+    canonical_status = AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCapacity(
         in_scores_q32,
         in_scores_capacity,
         row_count,
@@ -5123,8 +5130,8 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
         commit_stage_byte_capacity,
         parity_staged_scores_q32,
         parity_staged_scores_capacity);
-    if (status != ATTN_Q16_OK)
-        return status;
+    if (canonical_status != ATTN_Q16_OK)
+        return canonical_status;
 
     status = AttentionQ16ApplyScoreScaleRowsCheckedDefaultStride(
         in_scores_q32,
@@ -5137,8 +5144,19 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
     if (status != ATTN_Q16_OK)
         return status;
 
+    explicit_status = AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(
+        row_count,
+        token_count,
+        staged_scores_q32,
+        staged_scores_capacity,
+        required_stage_cells,
+        parity_staged_scores_q32,
+        parity_staged_scores_capacity);
+    if (explicit_status != canonical_status)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
     for (elem_index = 0; elem_index < required_out_cells; elem_index++) {
-        if (staged_scores_q32[elem_index] != parity_out_scores_q32[elem_index])
+        if (parity_staged_scores_q32[elem_index] != parity_out_scores_q32[elem_index])
             return ATTN_Q16_ERR_BAD_PARAM;
     }
 
@@ -5148,7 +5166,7 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
         snapshot_commit_stage_byte_capacity != commit_stage_byte_capacity)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    return AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(
+    publish_status = AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(
         row_count,
         token_count,
         staged_scores_q32,
@@ -5156,6 +5174,16 @@ I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitCap
         required_stage_cells,
         out_scores_q32,
         out_scores_capacity);
+
+    if (publish_status != canonical_status)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    for (elem_index = 0; elem_index < required_out_cells; elem_index++) {
+        if (out_scores_q32[elem_index] != parity_out_scores_q32[elem_index])
+            return ATTN_Q16_ERR_BAD_PARAM;
+    }
+
+    return publish_status;
 }
 
 I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocCommitOnly(
