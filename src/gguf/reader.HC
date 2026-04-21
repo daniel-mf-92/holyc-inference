@@ -235,6 +235,12 @@ I32 GGUFReadTensorDataQ4_0CheckedNoPartialCommitOnly(
         (U8 *)out_bytes_read == out_q4_0_blocks)
         return GGUF_READER_ERR_BAD_PARAM;
 
+    // Keep diagnostics outputs disjoint from tensor metadata storage so
+    // snapshot revalidation cannot be corrupted by aliasing writes.
+    if ((U8 *)out_blocks_read == (U8 *)tensor_info ||
+        (U8 *)out_bytes_read == (U8 *)tensor_info)
+        return GGUF_READER_ERR_BAD_PARAM;
+
     // Snapshot immutable tensor metadata so diagnostics publish only if the
     // caller did not mutate geometry while the checked read ran.
     staged_n_dims = tensor_info->n_dims;
@@ -387,12 +393,17 @@ I32 GGUFReadTensorDataQ4_0CheckedNoPartialCommitOnlyPreflightOnlyParity(
     U32 staged_ggml_type;
     U64 staged_dims[4];
     U64 staged_offset;
+    U64 staged_out_capacity;
     I64 staged_blocks_read_i64;
     I64 staged_bytes_read_i64;
+    U64 recomputed_element_count;
+    U64 recomputed_block_count;
+    U64 recomputed_required_bytes;
+    U64 recomputed_payload_start;
+    U64 recomputed_payload_end;
+    U64 recomputed_out_end;
     I64 recomputed_blocks_read_i64;
     I64 recomputed_bytes_read_i64;
-    U64 scratch_capacity;
-    U8 *scratch_blocks;
     I32 status;
 
     if (!gguf_bytes || !tensor_info || !out_q4_0_blocks ||
@@ -406,10 +417,17 @@ I32 GGUFReadTensorDataQ4_0CheckedNoPartialCommitOnlyPreflightOnlyParity(
         (U8 *)out_bytes_read == out_q4_0_blocks)
         return GGUF_READER_ERR_BAD_PARAM;
 
+    // Keep diagnostics outputs disjoint from tensor metadata storage so
+    // snapshot revalidation cannot be corrupted by aliasing writes.
+    if ((U8 *)out_blocks_read == (U8 *)tensor_info ||
+        (U8 *)out_bytes_read == (U8 *)tensor_info)
+        return GGUF_READER_ERR_BAD_PARAM;
+
     // Snapshot immutable tensor metadata for caller mutation detection.
     staged_n_dims = tensor_info->n_dims;
     staged_ggml_type = tensor_info->ggml_type;
     staged_offset = tensor_info->offset;
+    staged_out_capacity = out_q4_0_blocks_capacity;
     for (i = 0; i < 4; ++i)
         staged_dims[i] = tensor_info->dims[i];
 
@@ -426,59 +444,85 @@ I32 GGUFReadTensorDataQ4_0CheckedNoPartialCommitOnlyPreflightOnlyParity(
     if (status != GGUF_READER_OK)
         return status;
 
-    // Execute canonical checked read into private scratch storage so this
-    // diagnostics gate never mutates caller payload buffers.
-    scratch_blocks = out_q4_0_blocks;
-    scratch_capacity = out_q4_0_blocks_capacity;
-    if (staged_bytes_read_i64 > 0)
+    // Recompute canonical checked-read geometry from immutable snapshots.
+    // This enforces exact tuple parity under strict zero-write semantics.
+    if (!staged_n_dims || staged_n_dims > 4)
+        return GGUF_READER_ERR_BAD_DIM;
+    if (staged_ggml_type != GGUF_READER_GGML_TYPE_Q4_0)
+        return GGUF_READER_ERR_BAD_TYPE;
+
+    recomputed_element_count = 1;
+    for (i = 0; i < staged_n_dims; ++i)
     {
-        scratch_capacity = (U64)staged_bytes_read_i64;
-        scratch_blocks = MAlloc(scratch_capacity);
-        if (!scratch_blocks)
-            return GGUF_READER_ERR_NULL_PTR;
+        if (!staged_dims[i])
+            return GGUF_READER_ERR_BAD_DIM;
+        if (!GGUFReaderTryMulU64(recomputed_element_count,
+                                 staged_dims[i],
+                                 &recomputed_element_count))
+            return GGUF_READER_ERR_OVERFLOW;
     }
 
-    status = GGUFReadTensorDataQ4_0CheckedNoPartial(
-        gguf_bytes,
-        gguf_nbytes,
-        tensor_data_base,
-        tensor_info,
-        scratch_blocks,
-        scratch_capacity,
-        &recomputed_blocks_read_i64,
-        &recomputed_bytes_read_i64);
-    if (status != GGUF_READER_OK)
-    {
-        if (staged_bytes_read_i64 > 0)
-            Free(scratch_blocks);
-        return status;
-    }
+    if (recomputed_element_count % GGUF_READER_Q4_0_BLOCK_SIZE)
+        return GGUF_READER_ERR_BAD_DIM;
+
+    recomputed_block_count =
+        recomputed_element_count / GGUF_READER_Q4_0_BLOCK_SIZE;
+    if (!GGUFReaderTryMulU64(recomputed_block_count,
+                             GGUF_READER_Q4_0_BLOCK_BYTES,
+                             &recomputed_required_bytes))
+        return GGUF_READER_ERR_OVERFLOW;
+
+    if (!GGUFReaderTryAddU64(tensor_data_base,
+                             staged_offset,
+                             &recomputed_payload_start))
+        return GGUF_READER_ERR_OVERFLOW;
+    if (!GGUFReaderTryAddU64(recomputed_payload_start,
+                             recomputed_required_bytes,
+                             &recomputed_payload_end))
+        return GGUF_READER_ERR_OVERFLOW;
+
+    if (recomputed_payload_start > gguf_nbytes)
+        return GGUF_READER_ERR_TRUNCATED;
+    if (recomputed_payload_end > gguf_nbytes)
+        return GGUF_READER_ERR_TRUNCATED;
+
+    if (!GGUFReaderTryAddU64(0,
+                             recomputed_required_bytes,
+                             &recomputed_out_end))
+        return GGUF_READER_ERR_OVERFLOW;
+    if (recomputed_out_end > staged_out_capacity)
+        return GGUF_READER_ERR_BAD_CAPACITY;
+
+    if (recomputed_block_count > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_READER_ERR_OVERFLOW;
+    if (recomputed_required_bytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_READER_ERR_OVERFLOW;
+
+    recomputed_blocks_read_i64 = (I64)recomputed_block_count;
+    recomputed_bytes_read_i64 = (I64)recomputed_required_bytes;
 
     if (!GGUFReaderTensorInfoQ4_0MatchesSnapshot(tensor_info,
                                                  staged_n_dims,
                                                  staged_ggml_type,
                                                  staged_offset,
                                                  staged_dims))
-    {
-        if (staged_bytes_read_i64 > 0)
-            Free(scratch_blocks);
         return GGUF_READER_ERR_BAD_PARAM;
-    }
+
+    if (staged_out_capacity != out_q4_0_blocks_capacity)
+        return GGUF_READER_ERR_BAD_PARAM;
 
     if (staged_blocks_read_i64 != recomputed_blocks_read_i64 ||
         staged_bytes_read_i64 != recomputed_bytes_read_i64)
-    {
-        if (staged_bytes_read_i64 > 0)
-            Free(scratch_blocks);
         return GGUF_READER_ERR_BAD_PARAM;
-    }
+
+    if (staged_blocks_read_i64 < 0 || staged_bytes_read_i64 < 0)
+        return GGUF_READER_ERR_OVERFLOW;
+    if ((U64)staged_bytes_read_i64 > staged_out_capacity)
+        return GGUF_READER_ERR_BAD_CAPACITY;
 
     // Atomic diagnostics publish only after exact tuple parity succeeds.
     *out_blocks_read = staged_blocks_read_i64;
     *out_bytes_read = staged_bytes_read_i64;
-
-    if (staged_bytes_read_i64 > 0)
-        Free(scratch_blocks);
     return GGUF_READER_OK;
 }
 
@@ -963,6 +1007,12 @@ I32 GGUFReadTensorDataQ8_0CheckedNoPartialCommitOnlyPreflightOnlyParity(
         (U8 *)out_bytes_read == out_q8_0_blocks)
         return GGUF_READER_ERR_BAD_PARAM;
 
+    // Keep diagnostics outputs disjoint from tensor metadata storage so
+    // snapshot revalidation cannot be corrupted by aliasing writes.
+    if ((U8 *)out_blocks_read == (U8 *)tensor_info ||
+        (U8 *)out_bytes_read == (U8 *)tensor_info)
+        return GGUF_READER_ERR_BAD_PARAM;
+
     // Snapshot immutable tensor metadata for caller mutation detection.
     staged_n_dims = tensor_info->n_dims;
     staged_ggml_type = tensor_info->ggml_type;
@@ -1095,6 +1145,12 @@ I32 GGUFReadTensorDataQ8_0CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
 
     if ((U8 *)out_blocks_read == out_q8_0_blocks ||
         (U8 *)out_bytes_read == out_q8_0_blocks)
+        return GGUF_READER_ERR_BAD_PARAM;
+
+    // Keep diagnostics outputs disjoint from tensor metadata storage so
+    // post-stage snapshot revalidation cannot be corrupted by aliasing writes.
+    if ((U8 *)out_blocks_read == (U8 *)tensor_info ||
+        (U8 *)out_bytes_read == (U8 *)tensor_info)
         return GGUF_READER_ERR_BAD_PARAM;
 
     // Snapshot immutable tensor metadata and caller-reported output capacity
@@ -1236,4 +1292,3 @@ I32 GGUFReadTensorDataQ8_0CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     *out_bytes_read = staged_bytes_read_i64;
     return GGUF_READER_OK;
 }
-

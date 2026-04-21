@@ -295,6 +295,10 @@ def gguf_read_tensor_data_q8_0_checked_no_partial_commit_only_preflight_only_par
     if out_blocks_read is out_bytes_read:
         return GGUF_READER_ERR_BAD_PARAM
 
+    # HolyC wrapper rejects diagnostics pointers that alias tensor metadata.
+    if out_blocks_read is tensor_info or out_bytes_read is tensor_info:
+        return GGUF_READER_ERR_BAD_PARAM
+
     snap = TensorInfoQ80(
         n_dims=tensor_info.n_dims,
         dims=list(tensor_info.dims[:4]),
@@ -342,6 +346,7 @@ def test_source_contains_iq940_q8_commit_only_parity_wrapper_contract() -> None:
     assert "status = GGUFReadTensorDataQ8_0CheckedNoPartialCommitOnlyPreflightOnlyParity(" in body
     assert "if (!GGUFReaderTensorInfoQ8_0MatchesSnapshot(" in body
     assert "if (staged_out_capacity != out_q8_0_blocks_capacity)" in body
+    assert "if ((U8 *)out_blocks_read == (U8 *)tensor_info ||" in body
     assert "if (staged_blocks_read_i64 < 0 || staged_bytes_read_i64 < 0)" in body
     assert "if ((U64)staged_bytes_read_i64 > staged_out_capacity)" in body
     assert "*out_blocks_read = staged_blocks_read_i64;" in body
@@ -383,6 +388,20 @@ def test_bad_vectors_and_no_publish_behavior() -> None:
     )
     assert err == GGUF_READER_ERR_BAD_PARAM
     assert out_blocks == [111]
+    assert bytes(out) == out_before
+
+    err = gguf_read_tensor_data_q8_0_checked_no_partial_commit_only_preflight_only_parity_commit_only(
+        blob,
+        len(blob),
+        0,
+        info,
+        out,
+        len(out),
+        info,
+        out_bytes,
+    )
+    assert err == GGUF_READER_ERR_BAD_PARAM
+    assert out_bytes == [222]
     assert bytes(out) == out_before
 
 

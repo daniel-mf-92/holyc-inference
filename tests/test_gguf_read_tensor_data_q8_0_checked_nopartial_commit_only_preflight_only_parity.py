@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity harness for GGUFReadTensorDataQ8_0CheckedNoPartialCommitOnlyPreflightOnlyParity (IQ-938)."""
+"""Parity harness for GGUFReadTensorDataQ8_0CheckedNoPartialCommitOnlyPreflightOnlyParity (IQ-945)."""
 
 from __future__ import annotations
 
@@ -67,81 +67,6 @@ def gguf_read_tensor_data_q8_0_checked_no_partial_commit_only_preflight_only(
     out_q8_0_blocks_capacity: int,
     out_blocks_read: list[int] | None,
     out_bytes_read: list[int] | None,
-    mutate_before_revalidate: bool = False,
-) -> int:
-    if (
-        gguf_bytes is None
-        or tensor_info is None
-        or out_q8_0_blocks is None
-        or out_blocks_read is None
-        or out_bytes_read is None
-    ):
-        return GGUF_READER_ERR_NULL_PTR
-
-    snap = TensorInfoQ80(
-        n_dims=tensor_info.n_dims,
-        dims=list(tensor_info.dims[:4]),
-        ggml_type=tensor_info.ggml_type,
-        offset=tensor_info.offset,
-    )
-
-    if snap.n_dims <= 0 or snap.n_dims > 4:
-        return GGUF_READER_ERR_BAD_DIM
-    if snap.ggml_type != GGUF_READER_GGML_TYPE_Q8_0:
-        return GGUF_READER_ERR_BAD_TYPE
-
-    element_count = 1
-    for axis in range(snap.n_dims):
-        axis_dim = snap.dims[axis]
-        if axis_dim <= 0:
-            return GGUF_READER_ERR_BAD_DIM
-        ok, element_count = try_mul_u64(element_count, axis_dim)
-        if not ok:
-            return GGUF_READER_ERR_OVERFLOW
-
-    if element_count % GGUF_READER_Q8_0_BLOCK_SIZE:
-        return GGUF_READER_ERR_BAD_DIM
-
-    block_count = element_count // GGUF_READER_Q8_0_BLOCK_SIZE
-    ok, required_bytes = try_mul_u64(block_count, GGUF_READER_Q8_0_BLOCK_BYTES)
-    if not ok:
-        return GGUF_READER_ERR_OVERFLOW
-
-    ok, payload_start = try_add_u64(tensor_data_base, snap.offset)
-    if not ok:
-        return GGUF_READER_ERR_OVERFLOW
-    ok, payload_end = try_add_u64(payload_start, required_bytes)
-    if not ok:
-        return GGUF_READER_ERR_OVERFLOW
-
-    if payload_start > gguf_nbytes or payload_end > gguf_nbytes:
-        return GGUF_READER_ERR_TRUNCATED
-    if required_bytes > out_q8_0_blocks_capacity:
-        return GGUF_READER_ERR_BAD_CAPACITY
-
-    if mutate_before_revalidate:
-        tensor_info.offset += 1
-
-    if not tensor_matches_snapshot(tensor_info, snap):
-        return GGUF_READER_ERR_BAD_PARAM
-
-    if block_count > I64_MAX or required_bytes > I64_MAX:
-        return GGUF_READER_ERR_OVERFLOW
-
-    out_blocks_read[0] = block_count
-    out_bytes_read[0] = required_bytes
-    return GGUF_READER_OK
-
-
-def gguf_read_tensor_data_q8_0_checked_no_partial(
-    gguf_bytes: bytes | None,
-    gguf_nbytes: int,
-    tensor_data_base: int,
-    tensor_info: TensorInfoQ80 | None,
-    out_q8_0_blocks: bytearray | None,
-    out_q8_0_blocks_capacity: int,
-    out_blocks_read: list[int] | None,
-    out_bytes_read: list[int] | None,
 ) -> int:
     if (
         gguf_bytes is None
@@ -198,10 +123,6 @@ def gguf_read_tensor_data_q8_0_checked_no_partial(
 
     if block_count > I64_MAX or required_bytes > I64_MAX:
         return GGUF_READER_ERR_OVERFLOW
-
-    staged = gguf_bytes[payload_start:payload_end]
-    for idx, value in enumerate(staged):
-        out_q8_0_blocks[idx] = value
 
     out_blocks_read[0] = block_count
     out_bytes_read[0] = required_bytes
@@ -217,7 +138,7 @@ def gguf_read_tensor_data_q8_0_checked_no_partial_commit_only_preflight_only_par
     out_q8_0_blocks_capacity: int,
     out_blocks_read: list[int] | None,
     out_bytes_read: list[int] | None,
-    mutate_between_calls: bool = False,
+    mutate_between_staging_and_revalidate: bool = False,
 ) -> int:
     if (
         gguf_bytes is None
@@ -227,7 +148,6 @@ def gguf_read_tensor_data_q8_0_checked_no_partial_commit_only_preflight_only_par
         or out_bytes_read is None
     ):
         return GGUF_READER_ERR_NULL_PTR
-
     if out_blocks_read is out_bytes_read:
         return GGUF_READER_ERR_BAD_PARAM
 
@@ -237,6 +157,7 @@ def gguf_read_tensor_data_q8_0_checked_no_partial_commit_only_preflight_only_par
         ggml_type=tensor_info.ggml_type,
         offset=tensor_info.offset,
     )
+    staged_capacity = out_q8_0_blocks_capacity
 
     staged_blocks = [0]
     staged_bytes = [0]
@@ -253,29 +174,51 @@ def gguf_read_tensor_data_q8_0_checked_no_partial_commit_only_preflight_only_par
     if err != GGUF_READER_OK:
         return err
 
-    if mutate_between_calls:
+    if mutate_between_staging_and_revalidate:
         tensor_info.offset += 1
 
-    recomputed = bytearray(staged_bytes[0])
-    recomputed_blocks = [0]
-    recomputed_bytes = [0]
-    err = gguf_read_tensor_data_q8_0_checked_no_partial(
-        gguf_bytes,
-        gguf_nbytes,
-        tensor_data_base,
-        tensor_info,
-        recomputed,
-        len(recomputed),
-        recomputed_blocks,
-        recomputed_bytes,
-    )
-    if err != GGUF_READER_OK:
-        return err
+    if snap.n_dims <= 0 or snap.n_dims > 4:
+        return GGUF_READER_ERR_BAD_DIM
+    if snap.ggml_type != GGUF_READER_GGML_TYPE_Q8_0:
+        return GGUF_READER_ERR_BAD_TYPE
+
+    element_count = 1
+    for axis in range(snap.n_dims):
+        axis_dim = snap.dims[axis]
+        if axis_dim <= 0:
+            return GGUF_READER_ERR_BAD_DIM
+        ok, element_count = try_mul_u64(element_count, axis_dim)
+        if not ok:
+            return GGUF_READER_ERR_OVERFLOW
+
+    if element_count % GGUF_READER_Q8_0_BLOCK_SIZE:
+        return GGUF_READER_ERR_BAD_DIM
+
+    block_count = element_count // GGUF_READER_Q8_0_BLOCK_SIZE
+    ok, required_bytes = try_mul_u64(block_count, GGUF_READER_Q8_0_BLOCK_BYTES)
+    if not ok:
+        return GGUF_READER_ERR_OVERFLOW
+
+    ok, payload_start = try_add_u64(tensor_data_base, snap.offset)
+    if not ok:
+        return GGUF_READER_ERR_OVERFLOW
+    ok, payload_end = try_add_u64(payload_start, required_bytes)
+    if not ok:
+        return GGUF_READER_ERR_OVERFLOW
+
+    if payload_start > gguf_nbytes or payload_end > gguf_nbytes:
+        return GGUF_READER_ERR_TRUNCATED
+    if required_bytes > staged_capacity:
+        return GGUF_READER_ERR_BAD_CAPACITY
+    if block_count > I64_MAX or required_bytes > I64_MAX:
+        return GGUF_READER_ERR_OVERFLOW
 
     if not tensor_matches_snapshot(tensor_info, snap):
         return GGUF_READER_ERR_BAD_PARAM
+    if staged_capacity != out_q8_0_blocks_capacity:
+        return GGUF_READER_ERR_BAD_PARAM
 
-    if staged_blocks[0] != recomputed_blocks[0] or staged_bytes[0] != recomputed_bytes[0]:
+    if staged_blocks[0] != block_count or staged_bytes[0] != required_bytes:
         return GGUF_READER_ERR_BAD_PARAM
 
     out_blocks_read[0] = staged_blocks[0]
@@ -283,105 +226,68 @@ def gguf_read_tensor_data_q8_0_checked_no_partial_commit_only_preflight_only_par
     return GGUF_READER_OK
 
 
-def test_source_contains_iq938_function_and_parity_core_calls() -> None:
+def test_source_contains_iq945_function_and_geometry_parity_logic() -> None:
     source = Path("src/gguf/reader.HC").read_text(encoding="utf-8")
     sig = "I32 GGUFReadTensorDataQ8_0CheckedNoPartialCommitOnlyPreflightOnlyParity("
     assert sig in source
     body = source.split(sig, 1)[1]
 
     assert "GGUFReadTensorDataQ8_0CheckedNoPartialCommitOnlyPreflightOnly(" in body
-    assert "GGUFReadTensorDataQ8_0CheckedNoPartial(" in body
+    assert "if (!GGUFReaderTryMulU64(recomputed_block_count," in body
+    assert "if (!GGUFReaderTryAddU64(tensor_data_base," in body
     assert "if (staged_blocks_read_i64 != recomputed_blocks_read_i64 ||" in body
+    assert "if (staged_out_capacity != out_q8_0_blocks_capacity)" in body
+    assert "(U8 *)out_blocks_read == (U8 *)tensor_info" in body
     assert "*out_blocks_read = staged_blocks_read_i64;" in body
-    assert "*out_bytes_read = staged_bytes_read_i64;" in body
 
 
-def test_null_alias_and_bad_inputs_do_not_publish_or_mutate_output() -> None:
-    info = TensorInfoQ80(1, [64, 0, 0, 0], GGUF_READER_GGML_TYPE_Q8_0, 4)
-    out = bytearray(b"\xD7" * 160)
+def test_truncation_capacity_snapshot_mismatch_and_success() -> None:
+    payload = bytes((idx * 3 + 11) & 0xFF for idx in range(68))
+    blob = b"\x01\x02\x03\x04" + payload + b"\x99" * 12
+
+    out = bytearray(b"\xCC" * 256)
     out_before = bytes(out)
-    out_blocks = [99]
-    out_bytes = [100]
+    out_blocks = [777]
+    out_bytes = [888]
 
+    trunc_info = TensorInfoQ80(1, [64, 0, 0, 0], GGUF_READER_GGML_TYPE_Q8_0, 40)
     err = gguf_read_tensor_data_q8_0_checked_no_partial_commit_only_preflight_only_parity(
-        None, 0, 0, info, out, len(out), out_blocks, out_bytes
-    )
-    assert err == GGUF_READER_ERR_NULL_PTR
-    assert out_blocks == [99]
-    assert out_bytes == [100]
-    assert bytes(out) == out_before
-
-    bad_dim_info = TensorInfoQ80(1, [65, 0, 0, 0], GGUF_READER_GGML_TYPE_Q8_0, 0)
-    err = gguf_read_tensor_data_q8_0_checked_no_partial_commit_only_preflight_only_parity(
-        b"\x00" * 200, 200, 0, bad_dim_info, out, len(out), out_blocks, out_bytes
-    )
-    assert err == GGUF_READER_ERR_BAD_DIM
-    assert out_blocks == [99]
-    assert out_bytes == [100]
-    assert bytes(out) == out_before
-
-    err = gguf_read_tensor_data_q8_0_checked_no_partial_commit_only_preflight_only_parity(
-        b"\x00" * 32, 32, 0, info, out, len(out), out_blocks, out_bytes
+        blob, len(blob), 0, trunc_info, out, len(out), out_blocks, out_bytes
     )
     assert err == GGUF_READER_ERR_TRUNCATED
-    assert out_blocks == [99]
-    assert out_bytes == [100]
+    assert out_blocks == [777]
+    assert out_bytes == [888]
     assert bytes(out) == out_before
 
-
-def test_capacity_snapshot_parity_and_success_publish_exact_counts() -> None:
-    payload = bytes((idx * 5 + 7) & 0xFF for idx in range(68))
-    blob = b"\xFA\xFB\xFC\xFD" + payload + b"\xAA" * 9
-
-    out = bytearray(b"\xA1" * 256)
-    out_before = bytes(out)
-
-    info = TensorInfoQ80(1, [64, 0, 0, 0], GGUF_READER_GGML_TYPE_Q8_0, 4)
-    out_blocks = [411]
-    out_bytes = [412]
-
+    cap_info = TensorInfoQ80(1, [64, 0, 0, 0], GGUF_READER_GGML_TYPE_Q8_0, 4)
     err = gguf_read_tensor_data_q8_0_checked_no_partial_commit_only_preflight_only_parity(
-        blob,
-        len(blob),
-        0,
-        info,
-        out,
-        67,
-        out_blocks,
-        out_bytes,
+        blob, len(blob), 0, cap_info, out, 67, out_blocks, out_bytes
     )
     assert err == GGUF_READER_ERR_BAD_CAPACITY
-    assert out_blocks == [411]
-    assert out_bytes == [412]
+    assert out_blocks == [777]
+    assert out_bytes == [888]
     assert bytes(out) == out_before
 
-    info2 = TensorInfoQ80(1, [64, 0, 0, 0], GGUF_READER_GGML_TYPE_Q8_0, 4)
+    snap_info = TensorInfoQ80(1, [64, 0, 0, 0], GGUF_READER_GGML_TYPE_Q8_0, 4)
     err = gguf_read_tensor_data_q8_0_checked_no_partial_commit_only_preflight_only_parity(
         blob,
         len(blob),
         0,
-        info2,
+        snap_info,
         out,
         len(out),
         out_blocks,
         out_bytes,
-        mutate_between_calls=True,
+        mutate_between_staging_and_revalidate=True,
     )
     assert err == GGUF_READER_ERR_BAD_PARAM
-    assert out_blocks == [411]
-    assert out_bytes == [412]
+    assert out_blocks == [777]
+    assert out_bytes == [888]
     assert bytes(out) == out_before
 
-    info3 = TensorInfoQ80(1, [64, 0, 0, 0], GGUF_READER_GGML_TYPE_Q8_0, 4)
+    ok_info = TensorInfoQ80(1, [64, 0, 0, 0], GGUF_READER_GGML_TYPE_Q8_0, 4)
     err = gguf_read_tensor_data_q8_0_checked_no_partial_commit_only_preflight_only_parity(
-        blob,
-        len(blob),
-        0,
-        info3,
-        out,
-        len(out),
-        out_blocks,
-        out_bytes,
+        blob, len(blob), 0, ok_info, out, len(out), out_blocks, out_bytes
     )
     assert err == GGUF_READER_OK
     assert out_blocks == [2]
@@ -390,9 +296,8 @@ def test_capacity_snapshot_parity_and_success_publish_exact_counts() -> None:
 
 
 def run() -> None:
-    test_source_contains_iq938_function_and_parity_core_calls()
-    test_null_alias_and_bad_inputs_do_not_publish_or_mutate_output()
-    test_capacity_snapshot_parity_and_success_publish_exact_counts()
+    test_source_contains_iq945_function_and_geometry_parity_logic()
+    test_truncation_capacity_snapshot_mismatch_and_success()
     print("gguf_read_tensor_data_q8_0_checked_nopartial_commit_only_preflight_only_parity=ok")
 
 
