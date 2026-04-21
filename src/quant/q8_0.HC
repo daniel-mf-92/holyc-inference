@@ -2421,7 +2421,6 @@ I32 Q8_0DequantizeBlockQ16CheckedNoPartialArrayCommitOnlyPreflightOnlyParityComm
     return Q8_0_OK;
 }
 
-
 // Diagnostics-only parity gate over IQ-962 commit-only and IQ-963 preflight-only
 // tuple producers.
 //
