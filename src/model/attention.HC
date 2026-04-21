@@ -14198,10 +14198,28 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnl
     snapshot_token_count = token_count;
     snapshot_head_dim = head_dim;
 
-    // IQ-810 diagnostics-only parity contract:
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       head_dim,
+                                       &snapshot_q_rows_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(token_count,
+                                       head_dim,
+                                       &snapshot_k_rows_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       token_count,
+                                       &snapshot_out_scores_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    // IQ-816 diagnostics-only parity contract:
     // 1) stage full diagnostics tuple from commit-only default-capacity gate;
     // 2) stage canonical tuple from required-bytes preflight default-capacity;
-    // 3) revalidate immutable geometry snapshots;
+    // 3) revalidate immutable geometry/capacity snapshots;
     // 4) enforce exact tuple parity before a single atomic publish.
     status =
         AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnlyDefaultCapacityCommitOnly(
@@ -14248,6 +14266,31 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnl
     if (snapshot_token_count != token_count)
         return ATTN_Q16_ERR_BAD_PARAM;
     if (snapshot_head_dim != head_dim)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       head_dim,
+                                       &recomputed_q_rows_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(token_count,
+                                       head_dim,
+                                       &recomputed_k_rows_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       token_count,
+                                       &recomputed_out_scores_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (snapshot_q_rows_capacity != recomputed_q_rows_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_k_rows_capacity != recomputed_k_rows_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_scores_capacity != recomputed_out_scores_capacity)
         return ATTN_Q16_ERR_BAD_PARAM;
 
     if (commit_last_q_base_index != preflight_last_q_base_index)

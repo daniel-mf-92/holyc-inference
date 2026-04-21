@@ -1568,6 +1568,162 @@ I32 FPQ16MulCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPrefligh
     return FP_Q16_OK;
 }
 
+// Commit-only diagnostics wrapper over
+// FPQ16MulCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity.
+//
+// Stages parity-verified diagnostics tuple locally, revalidates immutable input
+// snapshots, recomputes canonical required tuple math from count, and atomically
+// publishes only when all parity/canonical checks hold.
+//
+// Contract:
+// - Null pointers return NULL_PTR and perform no diagnostics writes.
+// - count/out_capacity < 0 or count > out_capacity return BAD_PARAM.
+// - count > (I64_MAX_VALUE >> 3) returns OVERFLOW and performs no diagnostics writes.
+// - Revalidates immutable {lhs_q16,rhs_q16,out_q16,count,out_capacity} snapshots.
+// - Enforces diagnostics-output alias safety before final publish.
+// - Commits {required_cells,required_bytes} exactly once on success.
+I32 FPQ16MulCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(I64 *lhs_q16,
+                                                                                                        I64 *rhs_q16,
+                                                                                                        I64 *out_q16,
+                                                                                                        I64 count,
+                                                                                                        I64 out_capacity,
+                                                                                                        I64 *out_required_cells,
+                                                                                                        I64 *out_required_bytes)
+{
+    I64 *snapshot_lhs_q16;
+    I64 *snapshot_rhs_q16;
+    I64 *snapshot_out_q16;
+    I64 snapshot_count;
+    I64 snapshot_out_capacity;
+    I64 staged_required_cells;
+    I64 staged_required_bytes;
+    I64 canonical_required_cells;
+    I64 canonical_required_bytes;
+    I64 canonical_required_bytes_checked;
+    U64 lhs_base;
+    U64 lhs_end;
+    U64 rhs_base;
+    U64 rhs_end;
+    U64 out_base;
+    U64 out_end;
+    U64 req_cells_base;
+    U64 req_cells_end;
+    U64 req_bytes_base;
+    U64 req_bytes_end;
+    I32 status;
+
+    if (!lhs_q16 || !rhs_q16 || !out_q16 ||
+        !out_required_cells || !out_required_bytes)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0 || out_capacity < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (count > out_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (count > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    if (out_required_cells == out_required_bytes)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_required_cells == lhs_q16 || out_required_cells == rhs_q16 ||
+        out_required_cells == out_q16 || out_required_bytes == lhs_q16 ||
+        out_required_bytes == rhs_q16 || out_required_bytes == out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    req_cells_base = (U64)out_required_cells;
+    req_bytes_base = (U64)out_required_bytes;
+
+    if (req_cells_base > (U64_MAX_VALUE - 7) ||
+        req_bytes_base > (U64_MAX_VALUE - 7))
+        return FP_Q16_ERR_OVERFLOW;
+
+    req_cells_end = req_cells_base + 8;
+    req_bytes_end = req_bytes_base + 8;
+
+    if (FPAddressRangesOverlap(req_cells_base, req_cells_end, req_bytes_base, req_bytes_end))
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (count)
+    {
+        status = FPArrayI64SpanChecked(lhs_q16, count, &lhs_base, &lhs_end);
+        if (status)
+            return status;
+        status = FPArrayI64SpanChecked(rhs_q16, count, &rhs_base, &rhs_end);
+        if (status)
+            return status;
+        status = FPArrayI64SpanChecked(out_q16, count, &out_base, &out_end);
+        if (status)
+            return status;
+
+        if (FPAddressRangesOverlap(lhs_base, lhs_end, rhs_base, rhs_end) ||
+            FPAddressRangesOverlap(lhs_base, lhs_end, out_base, out_end) ||
+            FPAddressRangesOverlap(rhs_base, rhs_end, out_base, out_end))
+            return FP_Q16_ERR_BAD_PARAM;
+
+        if (FPAddressRangesOverlap(req_cells_base, req_cells_end, lhs_base, lhs_end) ||
+            FPAddressRangesOverlap(req_cells_base, req_cells_end, rhs_base, rhs_end) ||
+            FPAddressRangesOverlap(req_cells_base, req_cells_end, out_base, out_end) ||
+            FPAddressRangesOverlap(req_bytes_base, req_bytes_end, lhs_base, lhs_end) ||
+            FPAddressRangesOverlap(req_bytes_base, req_bytes_end, rhs_base, rhs_end) ||
+            FPAddressRangesOverlap(req_bytes_base, req_bytes_end, out_base, out_end))
+            return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    snapshot_lhs_q16 = lhs_q16;
+    snapshot_rhs_q16 = rhs_q16;
+    snapshot_out_q16 = out_q16;
+    snapshot_count = count;
+    snapshot_out_capacity = out_capacity;
+
+    status = FPQ16MulCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+        lhs_q16,
+        rhs_q16,
+        out_q16,
+        count,
+        out_capacity,
+        &staged_required_cells,
+        &staged_required_bytes);
+    if (status != FP_Q16_OK)
+        return status;
+
+    if (snapshot_lhs_q16 != lhs_q16 ||
+        snapshot_rhs_q16 != rhs_q16 ||
+        snapshot_out_q16 != out_q16 ||
+        snapshot_count != count ||
+        snapshot_out_capacity != out_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    canonical_required_cells = snapshot_count;
+
+    status = FPTryMulI64Checked(snapshot_count,
+                                8,
+                                &canonical_required_bytes_checked);
+    if (status)
+        return status;
+
+    if (snapshot_count > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    canonical_required_bytes = snapshot_count << 3;
+
+    if (canonical_required_bytes != canonical_required_bytes_checked)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_cells != canonical_required_cells ||
+        staged_required_bytes != canonical_required_bytes)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_required_cells == out_required_bytes)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (out_required_cells == lhs_q16 || out_required_cells == rhs_q16 ||
+        out_required_cells == out_q16 || out_required_bytes == lhs_q16 ||
+        out_required_bytes == rhs_q16 || out_required_bytes == out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_required_cells = staged_required_cells;
+    *out_required_bytes = staged_required_bytes;
+    return FP_Q16_OK;
+}
+
 // Diagnostics-only no-write companion over
 // FPQ16MulCheckedNoPartialArrayRequiredBytesCommitOnly.
 //

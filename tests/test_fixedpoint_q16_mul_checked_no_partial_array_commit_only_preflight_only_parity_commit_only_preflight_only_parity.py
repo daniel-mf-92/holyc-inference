@@ -179,7 +179,7 @@ def test_source_contains_iq982_function() -> None:
     sig = "I32 FPQ16MulCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(I64 *lhs_q16,"
     assert sig in source
     body = source.split(sig, 1)[1].split(
-        "I32 FPQ16MulCheckedNoPartialArrayRequiredBytesCommitOnlyPreflightOnly", 1
+        "I32 FPQ16MulCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly", 1
     )[0]
 
     assert "status = FPQ16MulCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in body

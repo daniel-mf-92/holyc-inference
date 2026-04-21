@@ -208,6 +208,10 @@ def test_source_contains_default_capacity_commit_only_parity_helper() -> None:
         "AttentionQ16ComputeScaledQKRowsCheckedDefaultStride"
         "RequiredBytesPreflightOnlyDefaultCapacity("
     ) in body
+    assert body.count("AttentionTryMulI64Checked(") >= 6
+    assert "if (snapshot_q_rows_capacity != recomputed_q_rows_capacity)" in body
+    assert "if (snapshot_k_rows_capacity != recomputed_k_rows_capacity)" in body
+    assert "if (snapshot_out_scores_capacity != recomputed_out_scores_capacity)" in body
 
 
 def test_known_vector() -> None:
