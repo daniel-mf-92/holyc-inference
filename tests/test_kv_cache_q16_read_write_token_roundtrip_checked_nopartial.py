@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 import random
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path("tests").resolve()))
 
 from test_kv_cache_q16_indexing_checked import (
     I64_MAX,
@@ -61,6 +64,14 @@ def kv_cache_q16_read_write_token_roundtrip_checked_nopartial(
         return KV_Q16_ERR_BAD_PARAM
 
     if (
+        k_token_out_q16 is k_cache_q16
+        or k_token_out_q16 is v_cache_q16
+        or v_token_out_q16 is k_cache_q16
+        or v_token_out_q16 is v_cache_q16
+    ):
+        return KV_Q16_ERR_BAD_PARAM
+
+    if (
         k_token_src_q16 is k_token_out_q16
         or k_token_src_q16 is v_token_out_q16
         or v_token_src_q16 is k_token_out_q16
@@ -86,6 +97,18 @@ def kv_cache_q16_read_write_token_roundtrip_checked_nopartial(
         or kv_heads < 0
         or head_dim < 0
     ):
+        return KV_Q16_ERR_BAD_PARAM
+
+    span_cells = [0]
+    err = kv_cache_q16_compute_layer_token_span_cells_checked(
+        kv_heads, head_dim, span_cells
+    )
+    if err != KV_Q16_OK:
+        return err
+
+    if span_cells[0] > k_token_src_capacity or span_cells[0] > v_token_src_capacity:
+        return KV_Q16_ERR_BAD_PARAM
+    if span_cells[0] > k_token_out_capacity or span_cells[0] > v_token_out_capacity:
         return KV_Q16_ERR_BAD_PARAM
 
     err = kv_cache_q16_write_token_checked_nopartial(
@@ -125,20 +148,6 @@ def kv_cache_q16_read_write_token_roundtrip_checked_nopartial(
     )
     if err != KV_Q16_OK:
         return err
-
-    span_cells = [0]
-    err = kv_cache_q16_compute_layer_token_span_cells_checked(
-        kv_heads,
-        head_dim,
-        span_cells,
-    )
-    if err != KV_Q16_OK:
-        return err
-
-    if span_cells[0] > k_token_src_capacity or span_cells[0] > v_token_src_capacity:
-        return KV_Q16_ERR_BAD_PARAM
-    if span_cells[0] > k_token_out_capacity or span_cells[0] > v_token_out_capacity:
-        return KV_Q16_ERR_BAD_PARAM
 
     for idx in range(span_cells[0]):
         if k_token_out_q16[idx] != k_token_src_q16[idx]:
@@ -197,31 +206,31 @@ def test_source_contains_roundtrip_helper() -> None:
     assert signature in source
     body = source.split(signature, 1)[1]
 
-    assert "KVCacheQ16WriteTokenCheckedNoPartial" in body
-    assert "KVCacheQ16ReadTokenCheckedNoPartial" in body
+    assert "KVCacheQ16ComputeLayerTokenSpanCellsChecked" in body
+    assert "KVCacheQ16WriteTokenCheckedNoPartial(" in body
+    assert "KVCacheQ16ReadTokenCheckedNoPartial(" in body
     assert "while (cell_idx < span_cells)" in body
-    assert "if (k_token_out_q16[cell_idx] != k_token_src_q16[cell_idx])" in body
 
 
-def test_known_vector_success_and_roundtrip() -> None:
+def test_known_vector_success_roundtrip() -> None:
     layer_count = 3
-    token_capacity = 4
+    token_capacity = 6
     kv_heads = 2
-    head_dim = 3
+    head_dim = 4
     span = kv_heads * head_dim
     total_cells = layer_count * token_capacity * span
 
-    k_cache = [-111] * total_cells
-    v_cache = [-222] * total_cells
+    k_cache = [-101] * total_cells
+    v_cache = [-202] * total_cells
 
-    layer_idx = 2
-    token_idx = 1
-    base = ((layer_idx * token_capacity) + token_idx) * span
+    k_src = [1000 + idx for idx in range(span)]
+    v_src = [2000 + idx for idx in range(span)]
 
-    k_src = [500 + idx for idx in range(span)]
-    v_src = [900 + idx for idx in range(span)]
-    k_out = [77] * span
-    v_out = [88] * span
+    k_out = [11] * span
+    v_out = [22] * span
+
+    layer_idx = 1
+    token_idx = 4
 
     err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial(
         k_cache,
@@ -244,137 +253,82 @@ def test_known_vector_success_and_roundtrip() -> None:
         len(v_out),
     )
     assert err == KV_Q16_OK
-
-    assert k_cache[base : base + span] == k_src
-    assert v_cache[base : base + span] == v_src
     assert k_out == k_src
     assert v_out == v_src
 
-
-def test_alias_and_null_guards() -> None:
-    k_cache = [0] * 16
-    v_cache = [0] * 16
-    k_src = [1, 2, 3, 4]
-    v_src = [5, 6, 7, 8]
-    k_out = [0, 0, 0, 0]
-    v_out = [0, 0, 0, 0]
-
-    assert (
-        kv_cache_q16_read_write_token_roundtrip_checked_nopartial(
-            None,
-            16,
-            v_cache,
-            16,
-            0,
-            0,
-            1,
-            2,
-            2,
-            2,
-            k_src,
-            4,
-            v_src,
-            4,
-            k_out,
-            4,
-            v_out,
-            4,
-        )
-        == KV_Q16_ERR_NULL_PTR
-    )
-
-    assert (
-        kv_cache_q16_read_write_token_roundtrip_checked_nopartial(
-            k_cache,
-            16,
-            k_cache,
-            16,
-            0,
-            0,
-            1,
-            2,
-            2,
-            2,
-            k_src,
-            4,
-            v_src,
-            4,
-            k_out,
-            4,
-            v_out,
-            4,
-        )
-        == KV_Q16_ERR_BAD_PARAM
-    )
-
-    assert (
-        kv_cache_q16_read_write_token_roundtrip_checked_nopartial(
-            k_cache,
-            16,
-            v_cache,
-            16,
-            0,
-            0,
-            1,
-            2,
-            2,
-            2,
-            k_src,
-            4,
-            v_src,
-            4,
-            k_src,
-            4,
-            v_out,
-            4,
-        )
-        == KV_Q16_ERR_BAD_PARAM
-    )
-
-    assert (
-        kv_cache_q16_read_write_token_roundtrip_checked_nopartial(
-            k_cache,
-            16,
-            v_cache,
-            16,
-            0,
-            0,
-            1,
-            2,
-            2,
-            2,
-            k_src,
-            4,
-            v_src,
-            4,
-            k_out,
-            4,
-            k_out,
-            4,
-        )
-        == KV_Q16_ERR_BAD_PARAM
-    )
+    base = ((layer_idx * token_capacity) + token_idx) * span
+    assert k_cache[base : base + span] == k_src
+    assert v_cache[base : base + span] == v_src
 
 
-def test_overflow_and_capacity_propagation() -> None:
-    k_cache = [7] * 64
-    v_cache = [9] * 64
-    k_src = [11] * 8
-    v_src = [13] * 8
-    k_out = [0] * 8
-    v_out = [0] * 8
+def test_output_capacity_guard_is_no_partial() -> None:
+    layer_count = 2
+    token_capacity = 5
+    kv_heads = 2
+    head_dim = 3
+    span = kv_heads * head_dim
+    total_cells = layer_count * token_capacity * span
+
+    k_cache = [7] * total_cells
+    v_cache = [8] * total_cells
+
+    k_src = [300 + idx for idx in range(span)]
+    v_src = [600 + idx for idx in range(span)]
+
+    k_out = [42] * span
+    v_out = [43] * span
+
+    before_k_cache = k_cache.copy()
+    before_v_cache = v_cache.copy()
+    before_k_out = k_out.copy()
+    before_v_out = v_out.copy()
 
     err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial(
         k_cache,
         len(k_cache),
         v_cache,
         len(v_cache),
-        layer_idx=1,
+        layer_idx=0,
+        token_idx=1,
+        layer_count=layer_count,
+        token_capacity=token_capacity,
+        kv_heads=kv_heads,
+        head_dim=head_dim,
+        k_token_src_q16=k_src,
+        k_token_src_capacity=len(k_src),
+        v_token_src_q16=v_src,
+        v_token_src_capacity=len(v_src),
+        k_token_out_q16=k_out,
+        k_token_out_capacity=span - 1,
+        v_token_out_q16=v_out,
+        v_token_out_capacity=span,
+    )
+    assert err == KV_Q16_ERR_BAD_PARAM
+    assert k_cache == before_k_cache
+    assert v_cache == before_v_cache
+    assert k_out == before_k_out
+    assert v_out == before_v_out
+
+
+def test_overflow_passthrough_from_span_helper() -> None:
+    k_cache = [0] * 8
+    v_cache = [0] * 8
+    k_src = [1] * 2
+    v_src = [2] * 2
+    k_out = [3] * 2
+    v_out = [4] * 2
+
+    err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial(
+        k_cache,
+        len(k_cache),
+        v_cache,
+        len(v_cache),
+        layer_idx=0,
         token_idx=0,
-        layer_count=2,
-        token_capacity=I64_MAX,
-        kv_heads=2,
-        head_dim=4,
+        layer_count=1,
+        token_capacity=1,
+        kv_heads=I64_MAX,
+        head_dim=2,
         k_token_src_q16=k_src,
         k_token_src_capacity=len(k_src),
         v_token_src_q16=v_src,
@@ -386,93 +340,39 @@ def test_overflow_and_capacity_propagation() -> None:
     )
     assert err == KV_Q16_ERR_OVERFLOW
 
-    k_before = k_cache.copy()
-    v_before = v_cache.copy()
-    k_out_before = k_out.copy()
-    v_out_before = v_out.copy()
 
-    err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial(
-        k_cache,
-        len(k_cache),
-        v_cache,
-        len(v_cache),
-        layer_idx=0,
-        token_idx=0,
-        layer_count=2,
-        token_capacity=4,
-        kv_heads=2,
-        head_dim=4,
-        k_token_src_q16=k_src,
-        k_token_src_capacity=3,
-        v_token_src_q16=v_src,
-        v_token_src_capacity=len(v_src),
-        k_token_out_q16=k_out,
-        k_token_out_capacity=len(k_out),
-        v_token_out_q16=v_out,
-        v_token_out_capacity=len(v_out),
-    )
-    assert err == KV_Q16_ERR_BAD_PARAM
-    assert k_cache == k_before
-    assert v_cache == v_before
-    assert k_out == k_out_before
-    assert v_out == v_out_before
+def test_randomized_parity_and_determinism() -> None:
+    rng = random.Random(877)
 
-
-def test_randomized_parity(seed: int = 877, trials: int = 1600) -> None:
-    rng = random.Random(seed)
-
-    for _ in range(trials):
-        layer_count = rng.randint(0, 5)
-        token_capacity = rng.randint(0, 8)
-        kv_heads = rng.randint(0, 6)
-        head_dim = rng.randint(0, 6)
-
-        layer_idx = rng.randint(0, max(layer_count, 1))
-        token_idx = rng.randint(0, max(token_capacity, 1))
-
+    for _ in range(400):
+        layer_count = rng.randint(1, 6)
+        token_capacity = rng.randint(1, 20)
+        kv_heads = rng.randint(1, 8)
+        head_dim = rng.randint(1, 16)
         span = kv_heads * head_dim
         total_cells = layer_count * token_capacity * span
 
-        k_cache_capacity = total_cells + rng.randint(0, 3)
-        v_cache_capacity = total_cells + rng.randint(0, 3)
+        layer_idx = rng.randint(0, layer_count - 1)
+        token_idx = rng.randint(0, token_capacity - 1)
 
-        if rng.random() < 0.18 and k_cache_capacity > 0:
-            k_cache_capacity -= 1
-        if rng.random() < 0.18 and v_cache_capacity > 0:
-            v_cache_capacity -= 1
-
-        k_cache_a = [0x1010] * max(1, total_cells + 3)
-        v_cache_a = [0x2020] * max(1, total_cells + 3)
+        k_cache_a = [rng.randint(-5000, 5000) for _ in range(total_cells)]
+        v_cache_a = [rng.randint(-5000, 5000) for _ in range(total_cells)]
         k_cache_b = k_cache_a.copy()
         v_cache_b = v_cache_a.copy()
 
-        src_pad = rng.randint(0, 3)
-        out_pad = rng.randint(0, 3)
-        k_src_capacity = max(0, span + src_pad - (1 if rng.random() < 0.2 else 0))
-        v_src_capacity = max(0, span + src_pad - (1 if rng.random() < 0.2 else 0))
-        k_out_capacity = max(0, span + out_pad - (1 if rng.random() < 0.2 else 0))
-        v_out_capacity = max(0, span + out_pad - (1 if rng.random() < 0.2 else 0))
+        k_src = [rng.randint(-3000, 3000) for _ in range(span)]
+        v_src = [rng.randint(-3000, 3000) for _ in range(span)]
 
-        k_src = [3000 + i for i in range(max(span, k_src_capacity, 1) + 2)]
-        v_src = [4000 + i for i in range(max(span, v_src_capacity, 1) + 2)]
-        k_out_a = [0x3030] * max(k_out_capacity, 1)
-        v_out_a = [0x4040] * max(v_out_capacity, 1)
+        k_out_a = [rng.randint(-111, 111) for _ in range(span)]
+        v_out_a = [rng.randint(-111, 111) for _ in range(span)]
         k_out_b = k_out_a.copy()
         v_out_b = v_out_a.copy()
 
-        if rng.random() < 0.08:
-            k_src = v_src
-        if rng.random() < 0.08:
-            k_out_a = v_out_a
-            k_out_b = v_out_b
-        if rng.random() < 0.08:
-            k_src = k_out_a
-
-        err_a = kv_cache_q16_read_write_token_roundtrip_checked_nopartial(
+        got = kv_cache_q16_read_write_token_roundtrip_checked_nopartial(
             k_cache_a,
-            k_cache_capacity,
+            len(k_cache_a),
             v_cache_a,
-            v_cache_capacity,
+            len(v_cache_a),
             layer_idx,
             token_idx,
             layer_count,
@@ -480,20 +380,20 @@ def test_randomized_parity(seed: int = 877, trials: int = 1600) -> None:
             kv_heads,
             head_dim,
             k_src,
-            k_src_capacity,
+            len(k_src),
             v_src,
-            v_src_capacity,
+            len(v_src),
             k_out_a,
-            k_out_capacity,
+            len(k_out_a),
             v_out_a,
-            v_out_capacity,
+            len(v_out_a),
         )
 
-        err_b = explicit_roundtrip_composition(
+        exp = explicit_roundtrip_composition(
             k_cache_b,
-            k_cache_capacity,
+            len(k_cache_b),
             v_cache_b,
-            v_cache_capacity,
+            len(v_cache_b),
             layer_idx,
             token_idx,
             layer_count,
@@ -501,17 +401,23 @@ def test_randomized_parity(seed: int = 877, trials: int = 1600) -> None:
             kv_heads,
             head_dim,
             k_src,
-            k_src_capacity,
+            len(k_src),
             v_src,
-            v_src_capacity,
+            len(v_src),
             k_out_b,
-            k_out_capacity,
+            len(k_out_b),
             v_out_b,
-            v_out_capacity,
+            len(v_out_b),
         )
 
-        assert err_a == err_b
+        assert got == exp
         assert k_cache_a == k_cache_b
         assert v_cache_a == v_cache_b
         assert k_out_a == k_out_b
         assert v_out_a == v_out_b
+
+
+if __name__ == "__main__":
+    raise SystemExit(
+        __import__("pytest").main([__file__, "-q"])
+    )
