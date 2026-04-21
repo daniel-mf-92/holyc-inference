@@ -77,6 +77,7 @@ def inference_generate_tokens_checked_topk_default_preflight_only_commit_only_pa
     snapshot_step_logits_capacity = step_logits_capacity
     snapshot_vocab_size = vocab_size
     snapshot_max_new_tokens = max_new_tokens
+    snapshot_top_k = vocab_size
     snapshot_token_history_capacity = token_history_capacity
     snapshot_token_history_count = token_history_count
     snapshot_top_p_q16 = top_p_q16
@@ -150,6 +151,7 @@ def inference_generate_tokens_checked_topk_default_preflight_only_commit_only_pa
         snapshot_step_logits_capacity != step_logits_capacity
         or snapshot_vocab_size != vocab_size
         or snapshot_max_new_tokens != max_new_tokens
+        or snapshot_top_k != vocab_size
         or snapshot_token_history_capacity != token_history_capacity
         or snapshot_token_history_count != token_history_count
         or snapshot_top_p_q16 != top_p_q16
@@ -228,6 +230,8 @@ def test_source_contains_commit_only_parity_commit_only_parity_helper() -> None:
 
     assert "InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnlyParityCommitOnly(" in body
     assert "InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnlyParityPreflightOnly(" in body
+    assert "snapshot_top_k = vocab_size;" in body
+    assert "snapshot_top_k != vocab_size" in body
     assert "if (commit_required_step_logits_cells != preflight_required_step_logits_cells)" in body
     assert "*out_required_step_logits_cells = commit_required_step_logits_cells;" in body
     assert "*out_required_generated_capacity = commit_required_generated_capacity;" in body

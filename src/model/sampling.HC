@@ -1579,6 +1579,7 @@ I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnly(
     I64 snapshot_step_logits_capacity;
     I64 snapshot_vocab_size;
     I64 snapshot_max_new_tokens;
+    I64 snapshot_top_k;
     I64 snapshot_token_history_capacity;
     I64 snapshot_token_history_count;
     I64 snapshot_random_q16_capacity;
@@ -1605,6 +1606,7 @@ I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnly(
     snapshot_step_logits_capacity = step_logits_capacity;
     snapshot_vocab_size = vocab_size;
     snapshot_max_new_tokens = max_new_tokens;
+    snapshot_top_k = vocab_size;
     snapshot_token_history_capacity = token_history_capacity;
     snapshot_token_history_count = token_history_count;
     snapshot_random_q16_capacity = random_q16_capacity;
@@ -1638,6 +1640,7 @@ I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnly(
     if (snapshot_step_logits_capacity != step_logits_capacity ||
         snapshot_vocab_size != vocab_size ||
         snapshot_max_new_tokens != max_new_tokens ||
+        snapshot_top_k != vocab_size ||
         snapshot_token_history_capacity != token_history_capacity ||
         snapshot_token_history_count != token_history_count ||
         snapshot_random_q16_capacity != random_q16_capacity ||
