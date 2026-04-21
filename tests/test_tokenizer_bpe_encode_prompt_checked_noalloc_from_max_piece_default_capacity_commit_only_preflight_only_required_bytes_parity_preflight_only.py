@@ -246,8 +246,8 @@ def test_source_contains_signature_and_parity_preflight_only_logic() -> None:
 def test_known_vector_and_no_partial_failure() -> None:
     payload = list(b"holycode")
 
-    out_req = [9]
-    out_ws = [0xBBBB]
+    out_req = [3]
+    out_ws = [15]
     cursor = [2]
     status = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity_commit_only_preflight_only_required_bytes_parity_preflight_only(
         payload,
