@@ -1497,7 +1497,7 @@ I32 Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnlyCommitOnlyParityPreflightOnl
     snapshot_k_block_count = k_block_count;
     snapshot_iter_count = iter_count;
 
-    // IQ-855 strict parity gate:
+    // IQ-858 strict parity gate:
     // 1) stage tuple from commit-only parity-preflight composition,
     // 2) stage canonical tuple from parity preflight-only helper,
     // 3) enforce immutable geometry snapshots and exact tuple equality,
