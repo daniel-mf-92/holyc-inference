@@ -445,6 +445,50 @@ I64 Q4_0Q8_0MatMulMinI64(I64 lhs, I64 rhs)
     return rhs;
 }
 
+Bool Q4_0Q8_0MatMulComputeTileGridChecked(
+    I64 row_count,
+    I64 col_count,
+    I64 tile_rows,
+    I64 tile_cols,
+    I64 *out_tile_row_count,
+    I64 *out_tile_col_count,
+    I64 *out_tile_total_count)
+{
+    I64 row_plus_tile_minus_one;
+    I64 col_plus_tile_minus_one;
+    I64 tile_row_count;
+    I64 tile_col_count;
+    I64 tile_total_count;
+
+    if (!out_tile_row_count || !out_tile_col_count || !out_tile_total_count)
+        return FALSE;
+    if (row_count < 0 || col_count < 0)
+        return FALSE;
+    if (tile_rows <= 0 || tile_cols <= 0)
+        return FALSE;
+
+    if (!Q4_0Q8_0MatMulTryAddI64NonNeg(row_count,
+                                       tile_rows - 1,
+                                       &row_plus_tile_minus_one))
+        return FALSE;
+    if (!Q4_0Q8_0MatMulTryAddI64NonNeg(col_count,
+                                       tile_cols - 1,
+                                       &col_plus_tile_minus_one))
+        return FALSE;
+
+    tile_row_count = row_plus_tile_minus_one / tile_rows;
+    tile_col_count = col_plus_tile_minus_one / tile_cols;
+    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(tile_row_count,
+                                       tile_col_count,
+                                       &tile_total_count))
+        return FALSE;
+
+    *out_tile_row_count = tile_row_count;
+    *out_tile_col_count = tile_col_count;
+    *out_tile_total_count = tile_total_count;
+    return TRUE;
+}
+
 I32 Q4_0Q8_0MatMulQ16TiledChecked(
     Q4_0Block *lhs_q4_blocks,
     I64 lhs_q4_block_capacity,
@@ -710,8 +754,6 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartial(
     I64 tile_row_count;
     I64 tile_col_count;
     I64 tile_total_count;
-    I64 row_plus_tile_minus_one;
-    I64 col_plus_tile_minus_one;
     I64 row_tile_start;
     I64 col_tile_start;
     I64 row_tile_end;
@@ -760,19 +802,13 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartial(
 
     // Tile-geometry preflight: prove tile enumeration is finite and checked
     // before any output commit path can execute.
-    if (!Q4_0Q8_0MatMulTryAddI64NonNeg(row_count,
-                                       tile_rows - 1,
-                                       &row_plus_tile_minus_one))
-        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
-    if (!Q4_0Q8_0MatMulTryAddI64NonNeg(col_count,
-                                       tile_cols - 1,
-                                       &col_plus_tile_minus_one))
-        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
-    tile_row_count = row_plus_tile_minus_one / tile_rows;
-    tile_col_count = col_plus_tile_minus_one / tile_cols;
-    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(tile_row_count,
-                                       tile_col_count,
-                                       &tile_total_count))
+    if (!Q4_0Q8_0MatMulComputeTileGridChecked(row_count,
+                                              col_count,
+                                              tile_rows,
+                                              tile_cols,
+                                              &tile_row_count,
+                                              &tile_col_count,
+                                              &tile_total_count))
         return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
     if (row_count && col_count && !tile_total_count)
         return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
