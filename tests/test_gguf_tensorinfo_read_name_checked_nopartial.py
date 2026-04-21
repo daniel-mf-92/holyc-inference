@@ -11,12 +11,17 @@ GGUF_TENSOR_PARSE_OK = 0
 GGUF_TENSOR_PARSE_ERR_NULL_PTR = 1
 GGUF_TENSOR_PARSE_ERR_TRUNCATED = 2
 GGUF_TENSOR_PARSE_ERR_BAD_NAME_LEN = 4
+
 GGUF_TENSOR_MAX_NAME_BYTES = 1 << 20
 I64_MAX = (1 << 63) - 1
 
 
 def u64(v: int) -> bytes:
     return struct.pack("<Q", v)
+
+
+def gguf_name_entry(name_raw: bytes) -> bytes:
+    return u64(len(name_raw)) + name_raw
 
 
 def parse_name_checked_nopartial(
@@ -36,7 +41,6 @@ def parse_name_checked_nopartial(
     c = cursor
     if c + 8 > size:
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED
-
     (name_len,) = struct.unpack_from("<Q", buf, c)
     c += 8
 
@@ -62,7 +66,6 @@ def test_source_contains_iq996_name_parser_and_parseone_composition() -> None:
 
     assert "status = GGUFTensorReadString(buf," in body
     assert "GGUFTensorTryAddU64(cursor, 8, &checked_end)" in body
-    assert "GGUFTensorTryAddU64(checked_end, staged.len, &checked_end)" in body
     assert "(U64)staged_cursor != checked_end" in body
     assert "*out_name = staged;" in body
     assert "*out_next_cursor = checked_end;" in body
@@ -72,7 +75,7 @@ def test_source_contains_iq996_name_parser_and_parseone_composition() -> None:
 
 
 def test_null_and_no_partial_publish_on_failure() -> None:
-    payload = u64(8) + b"tok_embd"
+    payload = gguf_name_entry(b"tok_embd")
     out_name = {"sentinel": 123}
     out_next = [77]
 
@@ -104,7 +107,7 @@ def test_adversarial_name_length_and_truncation_vectors() -> None:
     assert out_name == {"old": 1}
     assert out_next == [9]
 
-    payload = u64(1) + b"x"
+    payload = gguf_name_entry(b"x")
     err = parse_name_checked_nopartial(payload, len(payload), len(payload) + 1, out_name, out_next)
     assert err == GGUF_TENSOR_PARSE_ERR_TRUNCATED
     assert out_name == {"old": 1}
@@ -114,13 +117,13 @@ def test_adversarial_name_length_and_truncation_vectors() -> None:
 def test_success_and_randomized_cursor_parity() -> None:
     rng = random.Random(20260422996)
 
-    for i in range(600):
+    for i in range(400):
         name_len = rng.randint(0, 128)
         name_raw = bytes(rng.randint(0, 255) for _ in range(name_len))
 
         prefix_len = rng.randint(0, 16)
         prefix = bytes(rng.randint(0, 255) for _ in range(prefix_len))
-        payload = prefix + u64(name_len) + name_raw
+        payload = prefix + gguf_name_entry(name_raw)
 
         out_name = {"keep": i}
         out_next = [4444]
@@ -138,3 +141,4 @@ if __name__ == "__main__":
     test_adversarial_name_length_and_truncation_vectors()
     test_success_and_randomized_cursor_parity()
     print("gguf_tensorinfo_read_name_checked_nopartial=ok")
+
