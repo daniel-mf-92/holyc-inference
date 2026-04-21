@@ -24,14 +24,99 @@ Q8_0_ERR_BAD_DST_LEN = _prev.Q8_0_ERR_BAD_DST_LEN
 Q8_0_ERR_OVERFLOW = _prev.Q8_0_ERR_OVERFLOW
 Q8_0_VALUES_PER_BLOCK = _prev.Q8_0_VALUES_PER_BLOCK
 Q8_0_BLOCK_BYTES = _prev.Q8_0_BLOCK_BYTES
+Q8_0_I64_MAX = _prev.Q8_0_I64_MAX
 
 make_q8_block = _prev.make_q8_block
-preflight_only = (
-    _prev.q8_0_dequantize_block_q16_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only
-)
+try_mul_i64_nonneg = _prev.try_mul_i64_nonneg
 commit_only_preflight = (
     _prev.q8_0_dequantize_block_q16_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only
 )
+
+
+def preflight_only(
+    src_blocks,
+    src_block_capacity: int,
+    src_block_stride: int,
+    block_count: int,
+    dst_q16,
+    dst_q16_capacity: int,
+    dst_block_stride_values: int,
+    out_block_count,
+    out_required_src_blocks,
+    out_required_dst_values,
+    out_required_src_bytes,
+    out_required_dst_bytes,
+) -> int:
+    if (
+        src_blocks is None
+        or dst_q16 is None
+        or out_block_count is None
+        or out_required_src_blocks is None
+        or out_required_dst_values is None
+        or out_required_src_bytes is None
+        or out_required_dst_bytes is None
+    ):
+        return Q8_0_ERR_NULL_PTR
+
+    outs = [
+        out_block_count,
+        out_required_src_blocks,
+        out_required_dst_values,
+        out_required_src_bytes,
+        out_required_dst_bytes,
+    ]
+    if len({id(x) for x in outs}) != len(outs):
+        return Q8_0_ERR_BAD_DST_LEN
+
+    if src_blocks is dst_q16:
+        return Q8_0_ERR_BAD_DST_LEN
+
+    if src_block_capacity < 0 or dst_q16_capacity < 0:
+        return Q8_0_ERR_BAD_DST_LEN
+    if block_count < 0:
+        return Q8_0_ERR_BAD_DST_LEN
+    if src_block_stride <= 0 or dst_block_stride_values <= 0:
+        return Q8_0_ERR_BAD_DST_LEN
+    if dst_block_stride_values < Q8_0_VALUES_PER_BLOCK:
+        return Q8_0_ERR_BAD_DST_LEN
+
+    if block_count == 0:
+        required_src_blocks = 0
+        required_dst_values = 0
+    else:
+        ok, src_last_offset = try_mul_i64_nonneg(block_count - 1, src_block_stride)
+        if not ok:
+            return Q8_0_ERR_OVERFLOW
+        ok, dst_last_base = try_mul_i64_nonneg(block_count - 1, dst_block_stride_values)
+        if not ok:
+            return Q8_0_ERR_OVERFLOW
+
+        if src_last_offset > Q8_0_I64_MAX - 1:
+            return Q8_0_ERR_OVERFLOW
+        required_src_blocks = src_last_offset + 1
+
+        if dst_last_base > Q8_0_I64_MAX - Q8_0_VALUES_PER_BLOCK:
+            return Q8_0_ERR_OVERFLOW
+        required_dst_values = dst_last_base + Q8_0_VALUES_PER_BLOCK
+
+    ok, required_src_bytes = try_mul_i64_nonneg(required_src_blocks, Q8_0_BLOCK_BYTES)
+    if not ok:
+        return Q8_0_ERR_OVERFLOW
+    ok, required_dst_bytes = try_mul_i64_nonneg(required_dst_values, 8)
+    if not ok:
+        return Q8_0_ERR_OVERFLOW
+
+    if required_src_blocks > src_block_capacity:
+        return Q8_0_ERR_BAD_DST_LEN
+    if required_dst_values > dst_q16_capacity:
+        return Q8_0_ERR_BAD_DST_LEN
+
+    out_block_count[0] = block_count
+    out_required_src_blocks[0] = required_src_blocks
+    out_required_dst_values[0] = required_dst_values
+    out_required_src_bytes[0] = required_src_bytes
+    out_required_dst_bytes[0] = required_dst_bytes
+    return Q8_0_OK
 
 
 def q8_0_dequantize_block_q16_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity(
