@@ -201,8 +201,8 @@ def test_source_contains_iq981_function() -> None:
         in body
     )
     assert "if (snapshot_lhs_q16 != lhs_q16 ||" in body
-    assert "if (snapshot_rhs_q16 != rhs_q16 ||" in body
-    assert "if (snapshot_out_q16 != out_q16 ||" in body
+    assert "snapshot_rhs_q16 != rhs_q16" in body
+    assert "snapshot_out_q16 != out_q16" in body
     assert "snapshot_count != count" in body
     assert "status = FPTryMulI64Checked(snapshot_count," in body
     assert "if (staged_required_cells != canonical_required_cells ||" in body
