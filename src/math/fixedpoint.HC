@@ -1682,6 +1682,59 @@ I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayRequiredBytes(I64 *x_q16,
     return FP_Q16_OK;
 }
 
+// Commit-only diagnostics wrapper over
+// FPQ16ExpApproxRangeReduceCheckedNoPartialArrayRequiredBytes.
+//
+// This stages required_output_bytes locally, revalidates immutable call-site
+// snapshots, and only then publishes the diagnostics scalar to the caller.
+//
+// Contract:
+// - Composes FPQ16ExpApproxRangeReduceCheckedNoPartialArrayRequiredBytes first.
+// - Revalidates immutable {x_q16,out_k,out_r_q16,count} snapshots.
+// - Preserves no-partial diagnostics writes on hard failures.
+I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayRequiredBytesCommitOnly(I64 *x_q16,
+                                                                          I64 *out_k,
+                                                                          I64 *out_r_q16,
+                                                                          I64 count,
+                                                                          I64 *out_required_output_bytes)
+{
+    I64 *snapshot_x_q16;
+    I64 *snapshot_out_k;
+    I64 *snapshot_out_r_q16;
+    I64 snapshot_count;
+    I64 staged_required_output_bytes;
+    I32 status;
+
+    if (!out_required_output_bytes)
+        return FP_Q16_ERR_NULL_PTR;
+
+    snapshot_x_q16 = x_q16;
+    snapshot_out_k = out_k;
+    snapshot_out_r_q16 = out_r_q16;
+    snapshot_count = count;
+
+    status = FPQ16ExpApproxRangeReduceCheckedNoPartialArrayRequiredBytes(
+        x_q16,
+        out_k,
+        out_r_q16,
+        count,
+        &staged_required_output_bytes);
+    if (status != FP_Q16_OK)
+        return status;
+
+    if (snapshot_x_q16 != x_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_k != out_k)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_r_q16 != out_r_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_count != count)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_required_output_bytes = staged_required_output_bytes;
+    return FP_Q16_OK;
+}
+
 // Checked integer-only Q16 exponential approximation.
 //
 // Math model:
@@ -1930,5 +1983,72 @@ I32 FPQ16ExpApproxCheckedNoPartialArray(I64 *x_q16,
             return status;
     }
 
+    return FP_Q16_OK;
+}
+
+// Diagnostics helper over FPQ16ExpApproxCheckedNoPartialArray that computes
+// byte requirement for the output array:
+//   required_output_bytes = count * sizeof(I64)
+//
+// Contract:
+// - Composes FPQ16ExpApproxCheckedNoPartialArray first.
+// - Derives required_output_bytes with checked integer math.
+// - Publishes required_output_bytes exactly once on success.
+// - Performs no required-bytes write on hard failures and overflow paths.
+I32 FPQ16ExpApproxCheckedNoPartialArrayRequiredBytes(I64 *x_q16,
+                                                     I64 *out_q16,
+                                                     I64 count,
+                                                     I64 *out_required_output_bytes)
+{
+    I64 staged_required_output_bytes;
+    U64 required_base;
+    U64 required_end;
+    U64 x_base;
+    U64 x_end;
+    U64 out_base;
+    U64 out_end;
+    I32 status;
+
+    if (!x_q16 || !out_q16 || !out_required_output_bytes)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_required_output_bytes == x_q16 ||
+        out_required_output_bytes == out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Preserve no-partial semantics by rejecting overlap between diagnostics
+    // scalar output and lane-array spans before delegated compute.
+    if (count)
+    {
+        status = FPArrayI64SpanChecked(x_q16, count, &x_base, &x_end);
+        if (status)
+            return status;
+        status = FPArrayI64SpanChecked(out_q16, count, &out_base, &out_end);
+        if (status)
+            return status;
+
+        required_base = (U64)out_required_output_bytes;
+        if (required_base > (U64_MAX_VALUE - 7))
+            return FP_Q16_ERR_OVERFLOW;
+        required_end = required_base + 8;
+
+        if (FPAddressRangesOverlap(required_base, required_end, x_base, x_end) ||
+            FPAddressRangesOverlap(required_base, required_end, out_base, out_end))
+            return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    status = FPQ16ExpApproxCheckedNoPartialArray(x_q16,
+                                                 out_q16,
+                                                 count);
+    if (status)
+        return status;
+
+    if (count > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    staged_required_output_bytes = count << 3;
+    *out_required_output_bytes = staged_required_output_bytes;
     return FP_Q16_OK;
 }
