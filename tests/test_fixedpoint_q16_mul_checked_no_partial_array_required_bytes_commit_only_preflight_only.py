@@ -12,9 +12,11 @@ sys.path.insert(0, str(Path("tests").resolve()))
 from test_fixedpoint_q16_mul_checked_no_partial_array_required_bytes_commit_only import (
     FP_Q16_ERR_BAD_PARAM,
     FP_Q16_ERR_NULL_PTR,
-    FP_Q16_ERR_OVERFLOW,
     FP_Q16_OK,
     fpq16_mul_checked_no_partial_array_required_bytes_commit_only,
+)
+from test_fixedpoint_q16_mul_checked_no_partial_array_required_bytes import (
+    FP_Q16_ERR_OVERFLOW,
 )
 
 
