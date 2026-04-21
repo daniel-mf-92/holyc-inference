@@ -540,6 +540,85 @@ I32 FPQ16MulSatCheckedNoPartialArray(I64 *lhs_q16,
     return FP_Q16_OK;
 }
 
+// Checked + saturating Q16 MAC over arrays with strict stage-then-commit
+// semantics and explicit alias/bounds validation:
+//   out_q16[i] = sat_i64(acc_q16[i] + mul_q16(a_q16[i], b_q16[i]))
+//
+// Contract:
+// - Null pointers return NULL_PTR and perform no writes.
+// - count < 0 returns BAD_PARAM and performs no writes.
+// - Any pointer alias among {acc_q16,a_q16,b_q16,out_q16} is rejected.
+// - The full lane set is preflighted before committing output writes.
+// - If one or more lanes saturate, output is fully committed and OVERFLOW
+//   is returned after publish.
+I32 FPQ16MacSatCheckedNoPartialArray(I64 *acc_q16,
+                                     I64 *a_q16,
+                                     I64 *b_q16,
+                                     I64 *out_q16,
+                                     I64 count)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 lane_value;
+    I32 err;
+    I32 overflow_seen;
+
+    if (!acc_q16 || !a_q16 || !b_q16 || !out_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (!count)
+        return FP_Q16_OK;
+
+    if (acc_q16 == a_q16 || acc_q16 == b_q16 || acc_q16 == out_q16 ||
+        a_q16 == b_q16 || a_q16 == out_q16 || b_q16 == out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Guard pointer-span math before indexed lane access.
+    last_index = count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)acc_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)a_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)b_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)out_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Preflight all lanes first so hard failures never partially write output.
+    for (i = 0; i < count; i++)
+    {
+        err = FPQ16MacSatChecked(acc_q16[i],
+                                 a_q16[i],
+                                 b_q16[i],
+                                 &lane_value);
+        if (err != FP_Q16_OK && err != FP_Q16_ERR_OVERFLOW)
+            return err;
+    }
+
+    overflow_seen = 0;
+    for (i = 0; i < count; i++)
+    {
+        err = FPQ16MacSatChecked(acc_q16[i],
+                                 a_q16[i],
+                                 b_q16[i],
+                                 &out_q16[i]);
+        if (err == FP_Q16_ERR_OVERFLOW)
+            overflow_seen = 1;
+        else if (err != FP_Q16_OK)
+            return err;
+    }
+
+    if (overflow_seen)
+        return FP_Q16_ERR_OVERFLOW;
+    return FP_Q16_OK;
+}
+
 // Checked elementwise Q16 divide helper with no-partial-write contract.
 I32 FPQ16DivArrayChecked(I64 *num_q16,
                          I64 *den_q16,
