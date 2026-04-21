@@ -2469,9 +2469,9 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
     snapshot_staged_scores_capacity = staged_scores_capacity;
     snapshot_out_scores_capacity = out_scores_capacity;
 
-    // IQ-819 diagnostics-only companion contract:
-    // 1) stage tuple from IQ-818 required-bytes parity gate;
-    // 2) recompute tuple from checked row/token geometry;
+    // IQ-838 diagnostics-only no-write companion contract:
+    // 1) stage tuple from canonical required-bytes parity gate;
+    // 2) recompute canonical tuple from immutable geometry snapshots;
     // 3) enforce immutable snapshots and exact tuple parity;
     // 4) atomically publish diagnostics only after full validation.
     status =
@@ -2489,8 +2489,8 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
     if (status != ATTN_Q16_OK)
         return status;
 
-    status = AttentionTryMulI64Checked(query_row_count,
-                                       token_count,
+    status = AttentionTryMulI64Checked(snapshot_query_row_count,
+                                       snapshot_token_count,
                                        &recomputed_required_stage_cells);
     if (status != ATTN_Q16_OK)
         return status;
