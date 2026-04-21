@@ -1270,3 +1270,145 @@ I32 FPQ16MulDivArrayRoundedByPositiveIntFromQ16DenCheckedNoAlias(I64 *a_q16,
                                                                   out_q16,
                                                                   count);
 }
+
+// Checked integer-only Q16 exponential approximation.
+//
+// Math model:
+//   x = k*ln(2) + r,  where k is nearest integer and |r| <= ln(2)/2
+//   exp(x) = 2^k * exp(r)
+//   exp(r) ≈ 1 + r + r^2/2 + r^3/6 + r^4/24   (all terms in Q16)
+//
+// Contracts:
+// - Null output pointer returns NULL_PTR with no write.
+// - Uses checked Q16 multiply helpers for polynomial terms.
+// - Saturates to I64_MAX_VALUE and returns OVERFLOW on upper overflow.
+// - Underflow to sub-Q16 magnitudes returns 0.
+// - Commits caller output exactly once.
+I32 FPQ16ExpApproxChecked(I64 x_q16,
+                          I64 *out_q16)
+{
+    I64 k;
+    I64 shift_mag;
+    I64 ln2_q16;
+    I64 half_ln2_q16;
+    I64 k_ln2_q16;
+    I64 residual_q16;
+    I64 residual2_q16;
+    I64 residual3_q16;
+    I64 residual4_q16;
+    I64 poly_q16;
+    I64 staged_out_q16;
+    U64 abs_k_u64;
+
+    if (!out_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    ln2_q16 = 45426;       // round(ln(2) * 65536)
+    half_ln2_q16 = 22713;  // round(ln(2)/2 * 65536)
+
+    // Round to nearest integer k = round(x / ln(2)) using integer-only math.
+    if (x_q16 >= 0)
+        k = (x_q16 + half_ln2_q16) / ln2_q16;
+    else
+        k = -(((-x_q16) + half_ln2_q16) / ln2_q16);
+
+    abs_k_u64 = FPAbsToU64(k);
+    if (abs_k_u64 > (U64_MAX_VALUE / (U64)ln2_q16))
+        return FP_Q16_ERR_OVERFLOW;
+
+    if (k >= 0)
+        k_ln2_q16 = (I64)(abs_k_u64 * (U64)ln2_q16);
+    else
+        k_ln2_q16 = -(I64)(abs_k_u64 * (U64)ln2_q16);
+
+    if ((k_ln2_q16 > 0 && x_q16 < (I64_MIN_VALUE + k_ln2_q16)) ||
+        (k_ln2_q16 < 0 && x_q16 > (I64_MAX_VALUE + k_ln2_q16)))
+        return FP_Q16_ERR_OVERFLOW;
+
+    residual_q16 = x_q16 - k_ln2_q16;
+
+    if (FPQ16MulChecked(residual_q16,
+                        residual_q16,
+                        &residual2_q16))
+        return FP_Q16_ERR_OVERFLOW;
+
+    if (FPQ16MulChecked(residual2_q16,
+                        residual_q16,
+                        &residual3_q16))
+        return FP_Q16_ERR_OVERFLOW;
+
+    if (FPQ16MulChecked(residual3_q16,
+                        residual_q16,
+                        &residual4_q16))
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Direct polynomial accumulation keeps every approximation term visible.
+    poly_q16 = FP_Q16_ONE;
+    if (residual_q16 > 0 && poly_q16 > (I64_MAX_VALUE - residual_q16))
+        return FP_Q16_ERR_OVERFLOW;
+    if (residual_q16 < 0 && poly_q16 < (I64_MIN_VALUE - residual_q16))
+        return FP_Q16_ERR_OVERFLOW;
+    poly_q16 += residual_q16;
+
+    residual2_q16 = residual2_q16 / 2;
+    residual3_q16 = residual3_q16 / 6;
+    residual4_q16 = residual4_q16 / 24;
+
+    if (residual2_q16 > 0 && poly_q16 > (I64_MAX_VALUE - residual2_q16))
+        return FP_Q16_ERR_OVERFLOW;
+    if (residual2_q16 < 0 && poly_q16 < (I64_MIN_VALUE - residual2_q16))
+        return FP_Q16_ERR_OVERFLOW;
+    poly_q16 += residual2_q16;
+
+    if (residual3_q16 > 0 && poly_q16 > (I64_MAX_VALUE - residual3_q16))
+        return FP_Q16_ERR_OVERFLOW;
+    if (residual3_q16 < 0 && poly_q16 < (I64_MIN_VALUE - residual3_q16))
+        return FP_Q16_ERR_OVERFLOW;
+    poly_q16 += residual3_q16;
+
+    if (residual4_q16 > 0 && poly_q16 > (I64_MAX_VALUE - residual4_q16))
+        return FP_Q16_ERR_OVERFLOW;
+    if (residual4_q16 < 0 && poly_q16 < (I64_MIN_VALUE - residual4_q16))
+        return FP_Q16_ERR_OVERFLOW;
+    poly_q16 += residual4_q16;
+
+    if (poly_q16 <= 0)
+    {
+        *out_q16 = 0;
+        return FP_Q16_OK;
+    }
+
+    if (k >= 0)
+    {
+        if (k >= 63)
+        {
+            *out_q16 = I64_MAX_VALUE;
+            return FP_Q16_ERR_OVERFLOW;
+        }
+
+        if (poly_q16 > (I64_MAX_VALUE >> k))
+        {
+            *out_q16 = I64_MAX_VALUE;
+            return FP_Q16_ERR_OVERFLOW;
+        }
+
+        staged_out_q16 = poly_q16 << k;
+    }
+    else
+    {
+        shift_mag = -k;
+        if (shift_mag >= 63)
+            staged_out_q16 = 0;
+        else
+            staged_out_q16 = FPQ16RoundShiftSigned(poly_q16, shift_mag);
+    }
+
+    if (staged_out_q16 < 0)
+    {
+        *out_q16 = 0;
+        return FP_Q16_OK;
+    }
+
+    *out_q16 = staged_out_q16;
+    return FP_Q16_OK;
+}
