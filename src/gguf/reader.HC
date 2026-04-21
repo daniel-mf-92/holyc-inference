@@ -1,0 +1,146 @@
+// reader.HC
+// Checked GGUF tensor payload reader helpers for HolyC inference runtime.
+
+#define GGUF_READER_OK 0
+#define GGUF_READER_ERR_NULL_PTR 1
+#define GGUF_READER_ERR_BAD_PARAM 2
+#define GGUF_READER_ERR_OVERFLOW 3
+#define GGUF_READER_ERR_TRUNCATED 4
+#define GGUF_READER_ERR_BAD_TYPE 5
+#define GGUF_READER_ERR_BAD_DIM 6
+#define GGUF_READER_ERR_BAD_CAPACITY 7
+
+#define GGUF_READER_GGML_TYPE_Q4_0 2
+#define GGUF_READER_Q4_0_BLOCK_SIZE 32
+#define GGUF_READER_Q4_0_BLOCK_BYTES 18
+
+class GGUFReaderTensorInfoQ4_0
+{
+    U32 n_dims;
+    U64 dims[4];
+    U32 ggml_type;
+    U64 offset;
+};
+
+Bool GGUFReaderTryAddU64(U64 lhs, U64 rhs, U64 *out_sum)
+{
+    if (!out_sum)
+        return FALSE;
+    if (lhs > 0xFFFFFFFFFFFFFFFF - rhs)
+        return FALSE;
+    *out_sum = lhs + rhs;
+    return TRUE;
+}
+
+Bool GGUFReaderTryMulU64(U64 lhs, U64 rhs, U64 *out_prod)
+{
+    if (!out_prod)
+        return FALSE;
+
+    if (!lhs || !rhs)
+    {
+        *out_prod = 0;
+        return TRUE;
+    }
+
+    if (lhs > 0xFFFFFFFFFFFFFFFF / rhs)
+        return FALSE;
+
+    *out_prod = lhs * rhs;
+    return TRUE;
+}
+
+I32 GGUFReadTensorDataQ4_0CheckedNoPartial(
+    U8 *gguf_bytes,
+    U64 gguf_nbytes,
+    U64 tensor_data_base,
+    GGUFReaderTensorInfoQ4_0 *tensor_info,
+    U8 *out_q4_0_blocks,
+    U64 out_q4_0_blocks_capacity,
+    I64 *out_blocks_read,
+    I64 *out_bytes_read)
+{
+    U32 i;
+    U32 staged_n_dims;
+    U32 staged_ggml_type;
+    U64 staged_dims[4];
+    U64 staged_offset;
+    U64 staged_element_count;
+    U64 staged_block_count;
+    U64 staged_required_bytes;
+    U64 staged_payload_start;
+    U64 staged_payload_end;
+    U64 staged_out_end;
+    U64 copy_idx;
+
+    if (!gguf_bytes || !tensor_info || !out_q4_0_blocks ||
+        !out_blocks_read || !out_bytes_read)
+        return GGUF_READER_ERR_NULL_PTR;
+
+    // Snapshot immutable tensor geometry before any math/copy so all publish
+    // happens from one consistent view.
+    staged_n_dims = tensor_info->n_dims;
+    staged_ggml_type = tensor_info->ggml_type;
+    staged_offset = tensor_info->offset;
+    for (i = 0; i < 4; ++i)
+        staged_dims[i] = tensor_info->dims[i];
+
+    if (!staged_n_dims || staged_n_dims > 4)
+        return GGUF_READER_ERR_BAD_DIM;
+    if (staged_ggml_type != GGUF_READER_GGML_TYPE_Q4_0)
+        return GGUF_READER_ERR_BAD_TYPE;
+
+    staged_element_count = 1;
+    for (i = 0; i < staged_n_dims; ++i)
+    {
+        if (!staged_dims[i])
+            return GGUF_READER_ERR_BAD_DIM;
+        if (!GGUFReaderTryMulU64(staged_element_count,
+                                 staged_dims[i],
+                                 &staged_element_count))
+            return GGUF_READER_ERR_OVERFLOW;
+    }
+
+    if (staged_element_count % GGUF_READER_Q4_0_BLOCK_SIZE)
+        return GGUF_READER_ERR_BAD_DIM;
+
+    staged_block_count = staged_element_count / GGUF_READER_Q4_0_BLOCK_SIZE;
+    if (!GGUFReaderTryMulU64(staged_block_count,
+                             GGUF_READER_Q4_0_BLOCK_BYTES,
+                             &staged_required_bytes))
+        return GGUF_READER_ERR_OVERFLOW;
+
+    if (!GGUFReaderTryAddU64(tensor_data_base,
+                             staged_offset,
+                             &staged_payload_start))
+        return GGUF_READER_ERR_OVERFLOW;
+    if (!GGUFReaderTryAddU64(staged_payload_start,
+                             staged_required_bytes,
+                             &staged_payload_end))
+        return GGUF_READER_ERR_OVERFLOW;
+
+    if (staged_payload_start > gguf_nbytes)
+        return GGUF_READER_ERR_TRUNCATED;
+    if (staged_payload_end > gguf_nbytes)
+        return GGUF_READER_ERR_TRUNCATED;
+
+    if (!GGUFReaderTryAddU64(0,
+                             staged_required_bytes,
+                             &staged_out_end))
+        return GGUF_READER_ERR_OVERFLOW;
+    if (staged_out_end > out_q4_0_blocks_capacity)
+        return GGUF_READER_ERR_BAD_CAPACITY;
+
+    // No-partial semantics: all bounds/capacity checks complete before copy.
+    for (copy_idx = 0; copy_idx < staged_required_bytes; ++copy_idx)
+        out_q4_0_blocks[copy_idx] = gguf_bytes[staged_payload_start + copy_idx];
+
+    if (staged_block_count > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_READER_ERR_OVERFLOW;
+    if (staged_required_bytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_READER_ERR_OVERFLOW;
+
+    *out_blocks_read = (I64)staged_block_count;
+    *out_bytes_read = (I64)staged_required_bytes;
+    return GGUF_READER_OK;
+}
