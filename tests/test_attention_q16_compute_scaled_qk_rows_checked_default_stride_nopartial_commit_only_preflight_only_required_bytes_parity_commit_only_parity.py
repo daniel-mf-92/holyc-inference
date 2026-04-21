@@ -295,6 +295,11 @@ def test_overflow_vectors_preserve_outputs() -> None:
         got_out_cells = [453]
         got_last_out = [454]
 
+        exp_stage_cells = [551]
+        exp_stage_bytes = [552]
+        exp_out_cells = [553]
+        exp_last_out = [554]
+
         err = attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit_only_preflight_only_required_bytes_parity_commit_only_parity(
             query_row_count,
             token_count,
@@ -308,7 +313,20 @@ def test_overflow_vectors_preserve_outputs() -> None:
             got_last_out,
         )
 
-        assert err == ATTN_Q16_ERR_BAD_PARAM
+        err_ref = explicit_commit_only_parity_composition(
+            query_row_count,
+            token_count,
+            staged,
+            i64_max,
+            out,
+            i64_max,
+            exp_stage_cells,
+            exp_stage_bytes,
+            exp_out_cells,
+            exp_last_out,
+        )
+
+        assert err == err_ref
         assert got_stage_cells == [451]
         assert got_stage_bytes == [452]
         assert got_out_cells == [453]
