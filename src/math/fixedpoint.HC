@@ -2957,6 +2957,8 @@ I32 FPQ16MacSatCheckedNoPartialArrayRequiredBytes(I64 *acc_q16,
         return FP_Q16_ERR_NULL_PTR;
     if (count < 0)
         return FP_Q16_ERR_BAD_PARAM;
+    if (count > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
 
     if (out_required_output_bytes == acc_q16 ||
         out_required_output_bytes == a_q16 ||
@@ -3142,6 +3144,229 @@ I32 FPQ16MacSatCheckedNoPartialArrayRequiredBytesCommitOnly(I64 *acc_q16,
     }
 
     *out_required_output_bytes = staged_required_output_bytes;
+
+    if (status == FP_Q16_ERR_OVERFLOW)
+        return FP_Q16_ERR_OVERFLOW;
+    return FP_Q16_OK;
+}
+
+// Diagnostics-only no-write companion over
+// FPQ16MacSatCheckedNoPartialArrayRequiredBytesCommitOnly.
+//
+// Stages diagnostics via commit-only helper, revalidates immutable call-site
+// snapshots, recomputes canonical geometry from count, and atomically
+// publishes required_output_bytes only on strict parity success.
+//
+// Contract:
+// - Null pointers return NULL_PTR and perform no diagnostics writes.
+// - count < 0 returns BAD_PARAM.
+// - Revalidates immutable {acc_q16,a_q16,b_q16,out_q16,count} snapshots.
+// - Recomputes required_output_bytes with checked integer math.
+// - Performs exactly one diagnostics publish on success/overflow.
+I32 FPQ16MacSatCheckedNoPartialArrayRequiredBytesCommitOnlyPreflightOnly(I64 *acc_q16,
+                                                                          I64 *a_q16,
+                                                                          I64 *b_q16,
+                                                                          I64 *out_q16,
+                                                                          I64 count,
+                                                                          I64 *out_required_output_bytes)
+{
+    I64 *snapshot_acc_q16;
+    I64 *snapshot_a_q16;
+    I64 *snapshot_b_q16;
+    I64 *snapshot_out_q16;
+    I64 snapshot_count;
+    I64 staged_required_output_bytes;
+    I64 staged_required_cells;
+    I64 recomputed_required_output_bytes;
+    I64 recomputed_required_output_bytes_checked;
+    I64 scratch_cells;
+    I64 scratch_bytes;
+    I64 *scratch_out_q16;
+    U64 acc_base;
+    U64 acc_end;
+    U64 a_base;
+    U64 a_end;
+    U64 b_base;
+    U64 b_end;
+    U64 out_base;
+    U64 out_end;
+    U64 required_base;
+    U64 required_end;
+    I32 status;
+
+    if (!acc_q16 || !a_q16 || !b_q16 || !out_q16 || !out_required_output_bytes)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_required_output_bytes == acc_q16 ||
+        out_required_output_bytes == a_q16 ||
+        out_required_output_bytes == b_q16 ||
+        out_required_output_bytes == out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (count)
+    {
+        status = FPArrayI64SpanChecked(acc_q16, count, &acc_base, &acc_end);
+        if (status)
+            return status;
+        status = FPArrayI64SpanChecked(a_q16, count, &a_base, &a_end);
+        if (status)
+            return status;
+        status = FPArrayI64SpanChecked(b_q16, count, &b_base, &b_end);
+        if (status)
+            return status;
+        status = FPArrayI64SpanChecked(out_q16, count, &out_base, &out_end);
+        if (status)
+            return status;
+
+        required_base = (U64)out_required_output_bytes;
+        if (required_base > (U64_MAX_VALUE - 7))
+            return FP_Q16_ERR_OVERFLOW;
+        required_end = required_base + 8;
+
+        if (FPAddressRangesOverlap(required_base, required_end, acc_base, acc_end) ||
+            FPAddressRangesOverlap(required_base, required_end, a_base, a_end) ||
+            FPAddressRangesOverlap(required_base, required_end, b_base, b_end) ||
+            FPAddressRangesOverlap(required_base, required_end, out_base, out_end))
+            return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    snapshot_acc_q16 = acc_q16;
+    snapshot_a_q16 = a_q16;
+    snapshot_b_q16 = b_q16;
+    snapshot_out_q16 = out_q16;
+    snapshot_count = count;
+
+    // Preflight-only contract: never write caller out_q16. Compose the
+    // commit-only helper with a private scratch output span and discard it.
+    scratch_cells = count;
+    if (scratch_cells < 1)
+        scratch_cells = 1;
+
+    status = FPTryMulI64Checked(scratch_cells,
+                                8,
+                                &scratch_bytes);
+    if (status)
+        return status;
+
+    scratch_out_q16 = MAlloc(scratch_bytes);
+    if (!scratch_out_q16)
+        return FP_Q16_ERR_OVERFLOW;
+
+    status = FPQ16MacSatCheckedNoPartialArrayRequiredBytesCommitOnly(acc_q16,
+                                                                      a_q16,
+                                                                      b_q16,
+                                                                      scratch_out_q16,
+                                                                      count,
+                                                                      &staged_required_output_bytes);
+    if (status != FP_Q16_OK && status != FP_Q16_ERR_OVERFLOW)
+    {
+        Free(scratch_out_q16);
+        return status;
+    }
+
+    if (snapshot_acc_q16 != acc_q16 ||
+        snapshot_a_q16 != a_q16 ||
+        snapshot_b_q16 != b_q16 ||
+        snapshot_out_q16 != out_q16 ||
+        snapshot_count != count)
+    {
+        Free(scratch_out_q16);
+        return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    staged_required_cells = snapshot_count;
+    if (staged_required_cells < 0)
+    {
+        Free(scratch_out_q16);
+        return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    status = FPTryMulI64Checked(staged_required_cells,
+                                8,
+                                &recomputed_required_output_bytes_checked);
+    if (status)
+    {
+        Free(scratch_out_q16);
+        return status;
+    }
+
+    if (staged_required_cells > (I64_MAX_VALUE >> 3))
+    {
+        Free(scratch_out_q16);
+        return FP_Q16_ERR_OVERFLOW;
+    }
+    recomputed_required_output_bytes = staged_required_cells << 3;
+
+    if (recomputed_required_output_bytes != recomputed_required_output_bytes_checked)
+    {
+        Free(scratch_out_q16);
+        return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    if (staged_required_output_bytes != recomputed_required_output_bytes)
+    {
+        Free(scratch_out_q16);
+        return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    if (out_required_output_bytes == acc_q16 ||
+        out_required_output_bytes == a_q16 ||
+        out_required_output_bytes == b_q16 ||
+        out_required_output_bytes == out_q16)
+    {
+        Free(scratch_out_q16);
+        return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    if (count)
+    {
+        status = FPArrayI64SpanChecked(acc_q16, count, &acc_base, &acc_end);
+        if (status)
+        {
+            Free(scratch_out_q16);
+            return status;
+        }
+        status = FPArrayI64SpanChecked(a_q16, count, &a_base, &a_end);
+        if (status)
+        {
+            Free(scratch_out_q16);
+            return status;
+        }
+        status = FPArrayI64SpanChecked(b_q16, count, &b_base, &b_end);
+        if (status)
+        {
+            Free(scratch_out_q16);
+            return status;
+        }
+        status = FPArrayI64SpanChecked(out_q16, count, &out_base, &out_end);
+        if (status)
+        {
+            Free(scratch_out_q16);
+            return status;
+        }
+
+        required_base = (U64)out_required_output_bytes;
+        if (required_base > (U64_MAX_VALUE - 7))
+        {
+            Free(scratch_out_q16);
+            return FP_Q16_ERR_OVERFLOW;
+        }
+        required_end = required_base + 8;
+
+        if (FPAddressRangesOverlap(required_base, required_end, acc_base, acc_end) ||
+            FPAddressRangesOverlap(required_base, required_end, a_base, a_end) ||
+            FPAddressRangesOverlap(required_base, required_end, b_base, b_end) ||
+            FPAddressRangesOverlap(required_base, required_end, out_base, out_end))
+        {
+            Free(scratch_out_q16);
+            return FP_Q16_ERR_BAD_PARAM;
+        }
+    }
+
+    *out_required_output_bytes = staged_required_output_bytes;
+    Free(scratch_out_q16);
 
     if (status == FP_Q16_ERR_OVERFLOW)
         return FP_Q16_ERR_OVERFLOW;

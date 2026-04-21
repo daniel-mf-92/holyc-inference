@@ -178,6 +178,28 @@ Bool GGUFTensorTypeKnown(U32 t)
     return FALSE;
 }
 
+Bool GGUFTensorTryAddU64(U64 a, U64 b, U64 *out)
+{
+    if (!out)
+        return FALSE;
+    if (a > 0xFFFFFFFFFFFFFFFF - b)
+        return FALSE;
+
+    *out = a + b;
+    return TRUE;
+}
+
+Bool GGUFTensorTryMulU64(U64 a, U64 b, U64 *out)
+{
+    if (!out)
+        return FALSE;
+    if (a && b > 0xFFFFFFFFFFFFFFFF / a)
+        return FALSE;
+
+    *out = a * b;
+    return TRUE;
+}
+
 U0 GGUFTensorZeroString(GGUFTensorString *s)
 {
     if (!s)
@@ -327,6 +349,81 @@ I64 GGUFTensorParseOne(U8 *buf, I64 size, I64 *cursor, GGUFTensorInfo *out)
     return GGUF_TENSOR_PARSE_OK;
 }
 
+// Checked no-partial parser for one GGUF tensor-info tuple.
+// Parses {name, n_dims, dims[], ggml_type, offset} using U64 cursor/span math
+// and only publishes to caller outputs after full tuple validation succeeds.
+I64 GGUFTensorInfoReadCheckedNoPartial(U8 *buf,
+                                       U64 size,
+                                       U64 cursor,
+                                       GGUFTensorInfo *out,
+                                       U64 *out_next_cursor)
+{
+    GGUFTensorInfo staged;
+    I64 staged_cursor;
+    I64 status;
+    U64 checked_end;
+    U64 name_end;
+    U64 dims_bytes;
+    U64 dims_end;
+    U64 type_end;
+    U64 offset_end;
+    U64 i;
+
+    if (!buf || !out || !out_next_cursor)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+    if (cursor > size)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (size > 0x7FFFFFFFFFFFFFFF || cursor > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    GGUFTensorZeroInfo(&staged);
+
+    staged_cursor = cursor;
+    status = GGUFTensorParseOne(buf,
+                                (I64)size,
+                                &staged_cursor,
+                                &staged);
+    if (status != GGUF_TENSOR_PARSE_OK)
+    {
+        GGUFTensorFreeString(&staged.name);
+        return status;
+    }
+
+    if (!GGUFTensorTryAddU64(cursor, 8, &checked_end))
+        status = GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    else if (!GGUFTensorTryAddU64(checked_end, staged.name.len, &name_end))
+        status = GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    else if (!GGUFTensorTryAddU64(name_end, 4, &checked_end))
+        status = GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    else if (!GGUFTensorTryMulU64(staged.n_dims, 8, &dims_bytes))
+        status = GGUF_TENSOR_PARSE_ERR_DIM_OVERFLOW;
+    else if (!GGUFTensorTryAddU64(checked_end, dims_bytes, &dims_end))
+        status = GGUF_TENSOR_PARSE_ERR_DIM_OVERFLOW;
+    else if (!GGUFTensorTryAddU64(dims_end, 4, &type_end))
+        status = GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    else if (!GGUFTensorTryAddU64(type_end, 8, &offset_end))
+        status = GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    else if (offset_end > size)
+        status = GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    else if ((U64)staged_cursor != offset_end)
+        status = GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    else
+        status = GGUF_TENSOR_PARSE_OK;
+
+    if (status != GGUF_TENSOR_PARSE_OK)
+    {
+        GGUFTensorFreeString(&staged.name);
+        return status;
+    }
+
+    for (i = staged.n_dims; i < GGUF_TENSOR_MAX_DIMS; ++i)
+        staged.dims[i] = 0;
+
+    *out = staged;
+    *out_next_cursor = staged_cursor;
+    return GGUF_TENSOR_PARSE_OK;
+}
+
 I64 GGUFParseTensorInfo(U8 *buf,
                         I64 size,
                         U64 tensor_count,
@@ -336,6 +433,7 @@ I64 GGUFParseTensorInfo(U8 *buf,
     GGUFTensorInfo *items;
     U64 i;
     I64 err;
+    U64 next_cursor;
 
     if (!buf || !out || !cursor)
         return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
@@ -354,9 +452,14 @@ I64 GGUFParseTensorInfo(U8 *buf,
 
     out->items = items;
 
+    next_cursor = *cursor;
     for (i = 0; i < tensor_count; ++i)
     {
-        err = GGUFTensorParseOne(buf, size, cursor, &items[i]);
+        err = GGUFTensorInfoReadCheckedNoPartial(buf,
+                                                 size,
+                                                 next_cursor,
+                                                 &items[i],
+                                                 &next_cursor);
         if (err != GGUF_TENSOR_PARSE_OK)
         {
             out->count = tensor_count;
@@ -364,6 +467,8 @@ I64 GGUFParseTensorInfo(U8 *buf,
             return err;
         }
     }
+
+    *cursor = next_cursor;
 
     out->count = tensor_count;
     return GGUF_TENSOR_PARSE_OK;
