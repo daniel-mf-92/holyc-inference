@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity harness for FPQ16Mul...RequiredBytesCommitOnlyPreflightOnlyParity (IQ-972)."""
+"""Parity harness for FPQ16Mul...RequiredBytesCommitOnlyPreflightOnlyParity (IQ-976)."""
 
 from __future__ import annotations
 
@@ -149,7 +149,7 @@ def explicit_parity_composition(
     return FP_Q16_OK, (staged_cells[0], staged_bytes[0])
 
 
-def test_source_contains_iq972_function() -> None:
+def test_source_contains_iq976_function() -> None:
     source = Path("src/math/fixedpoint.HC").read_text(encoding="utf-8")
     sig = "I32 FPQ16MulCheckedNoPartialArrayRequiredBytesCommitOnlyPreflightOnlyParity(I64 *lhs_q16,"
     assert sig in source
@@ -159,6 +159,10 @@ def test_source_contains_iq972_function() -> None:
     assert "status = FPQ16MulCheckedNoPartialArrayRequiredBytes(" in body
     assert "if (snapshot_lhs_q16 != lhs_q16 ||" in body
     assert "if (staged_from_preflight_cells != staged_from_required_cells ||" in body
+    assert "if (out_required_cells == out_required_bytes)" in body
+    assert "if (count < 0)" in body
+    assert "status = FPArrayI64SpanChecked(lhs_q16, count, &lhs_base, &lhs_end);" in body
+    assert "FPAddressRangesOverlap(req_cells_base, req_cells_end, lhs_base, lhs_end)" in body
     assert "*out_required_cells = staged_from_preflight_cells;" in body
     assert "*out_required_bytes = staged_from_preflight_bytes;" in body
 
@@ -231,6 +235,44 @@ def test_publish_and_snapshot_mutation_guard() -> None:
     assert fail_bytes == [702]
 
 
+def test_negative_count_and_no_publish() -> None:
+    lhs = [1 << 16, 2 << 16]
+    rhs = [3 << 16, 4 << 16]
+    out = [0, 0]
+
+    out_cells = [31337]
+    out_bytes = [73313]
+    err = fpq16_mul_checked_no_partial_array_required_bytes_commit_only_preflight_only_parity(
+        lhs,
+        rhs,
+        out,
+        -1,
+        out_cells,
+        out_bytes,
+    )
+    assert err == FP_Q16_ERR_BAD_PARAM
+    assert out_cells == [31337]
+    assert out_bytes == [73313]
+
+
+def test_required_tuple_overlap_rejected() -> None:
+    lhs = [1 << 16, 2 << 16, 3 << 16]
+    rhs = [4 << 16, 5 << 16, 6 << 16]
+    out = [0, 0, 0]
+
+    out_bytes = [909]
+    err = fpq16_mul_checked_no_partial_array_required_bytes_commit_only_preflight_only_parity(
+        lhs,
+        rhs,
+        out,
+        3,
+        out_bytes,
+        out_bytes,
+    )
+    assert err == FP_Q16_ERR_BAD_PARAM
+    assert out_bytes == [909]
+
+
 def test_randomized_vs_explicit_composition() -> None:
     rng = random.Random(20260421_972)
 
@@ -268,9 +310,11 @@ def test_randomized_vs_explicit_composition() -> None:
 
 
 def run() -> None:
-    test_source_contains_iq972_function()
+    test_source_contains_iq976_function()
     test_null_alias_and_no_publish_on_fail()
     test_publish_and_snapshot_mutation_guard()
+    test_negative_count_and_no_publish()
+    test_required_tuple_overlap_rejected()
     test_randomized_vs_explicit_composition()
     print("fixedpoint_q16_mul_checked_no_partial_array_required_bytes_commit_only_preflight_only_parity=ok")
 

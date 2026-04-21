@@ -1301,6 +1301,16 @@ I32 FPQ16MulCheckedNoPartialArrayRequiredBytesCommitOnlyPreflightOnlyParity(I64 
     I64 staged_from_preflight_bytes;
     I64 staged_from_required_cells;
     I64 staged_from_required_bytes;
+    U64 lhs_base;
+    U64 lhs_end;
+    U64 rhs_base;
+    U64 rhs_end;
+    U64 out_base;
+    U64 out_end;
+    U64 req_cells_base;
+    U64 req_cells_end;
+    U64 req_bytes_base;
+    U64 req_bytes_end;
     I32 status;
 
     if (!lhs_q16 || !rhs_q16 || !out_q16 ||
@@ -1317,6 +1327,38 @@ I32 FPQ16MulCheckedNoPartialArrayRequiredBytesCommitOnlyPreflightOnlyParity(I64 
         out_required_cells == out_q16 || out_required_bytes == lhs_q16 ||
         out_required_bytes == rhs_q16 || out_required_bytes == out_q16)
         return FP_Q16_ERR_BAD_PARAM;
+
+    if (count)
+    {
+        status = FPArrayI64SpanChecked(lhs_q16, count, &lhs_base, &lhs_end);
+        if (status)
+            return status;
+        status = FPArrayI64SpanChecked(rhs_q16, count, &rhs_base, &rhs_end);
+        if (status)
+            return status;
+        status = FPArrayI64SpanChecked(out_q16, count, &out_base, &out_end);
+        if (status)
+            return status;
+
+        req_cells_base = (U64)out_required_cells;
+        req_bytes_base = (U64)out_required_bytes;
+
+        if (req_cells_base > (U64_MAX_VALUE - 7) ||
+            req_bytes_base > (U64_MAX_VALUE - 7))
+            return FP_Q16_ERR_OVERFLOW;
+
+        req_cells_end = req_cells_base + 8;
+        req_bytes_end = req_bytes_base + 8;
+
+        if (FPAddressRangesOverlap(req_cells_base, req_cells_end, lhs_base, lhs_end) ||
+            FPAddressRangesOverlap(req_cells_base, req_cells_end, rhs_base, rhs_end) ||
+            FPAddressRangesOverlap(req_cells_base, req_cells_end, out_base, out_end) ||
+            FPAddressRangesOverlap(req_bytes_base, req_bytes_end, lhs_base, lhs_end) ||
+            FPAddressRangesOverlap(req_bytes_base, req_bytes_end, rhs_base, rhs_end) ||
+            FPAddressRangesOverlap(req_bytes_base, req_bytes_end, out_base, out_end) ||
+            FPAddressRangesOverlap(req_cells_base, req_cells_end, req_bytes_base, req_bytes_end))
+            return FP_Q16_ERR_BAD_PARAM;
+    }
 
     snapshot_lhs_q16 = lhs_q16;
     snapshot_rhs_q16 = rhs_q16;
@@ -1365,6 +1407,38 @@ I32 FPQ16MulCheckedNoPartialArrayRequiredBytesCommitOnlyPreflightOnlyParity(I64 
         out_required_cells == out_q16 || out_required_bytes == lhs_q16 ||
         out_required_bytes == rhs_q16 || out_required_bytes == out_q16)
         return FP_Q16_ERR_BAD_PARAM;
+
+    if (count)
+    {
+        status = FPArrayI64SpanChecked(lhs_q16, count, &lhs_base, &lhs_end);
+        if (status)
+            return status;
+        status = FPArrayI64SpanChecked(rhs_q16, count, &rhs_base, &rhs_end);
+        if (status)
+            return status;
+        status = FPArrayI64SpanChecked(out_q16, count, &out_base, &out_end);
+        if (status)
+            return status;
+
+        req_cells_base = (U64)out_required_cells;
+        req_bytes_base = (U64)out_required_bytes;
+
+        if (req_cells_base > (U64_MAX_VALUE - 7) ||
+            req_bytes_base > (U64_MAX_VALUE - 7))
+            return FP_Q16_ERR_OVERFLOW;
+
+        req_cells_end = req_cells_base + 8;
+        req_bytes_end = req_bytes_base + 8;
+
+        if (FPAddressRangesOverlap(req_cells_base, req_cells_end, lhs_base, lhs_end) ||
+            FPAddressRangesOverlap(req_cells_base, req_cells_end, rhs_base, rhs_end) ||
+            FPAddressRangesOverlap(req_cells_base, req_cells_end, out_base, out_end) ||
+            FPAddressRangesOverlap(req_bytes_base, req_bytes_end, lhs_base, lhs_end) ||
+            FPAddressRangesOverlap(req_bytes_base, req_bytes_end, rhs_base, rhs_end) ||
+            FPAddressRangesOverlap(req_bytes_base, req_bytes_end, out_base, out_end) ||
+            FPAddressRangesOverlap(req_cells_base, req_cells_end, req_bytes_base, req_bytes_end))
+            return FP_Q16_ERR_BAD_PARAM;
+    }
 
     *out_required_cells = staged_from_preflight_cells;
     *out_required_bytes = staged_from_preflight_bytes;
