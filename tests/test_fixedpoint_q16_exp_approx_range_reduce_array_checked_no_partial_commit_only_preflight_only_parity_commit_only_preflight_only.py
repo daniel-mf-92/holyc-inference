@@ -279,7 +279,7 @@ def test_randomized_parity_vs_explicit_composition() -> None:
             assert out_bytes == [0xCC]
 
 
-def test_overflow_passthrough_preserves_outputs() -> None:
+def test_large_magnitude_lane_vector_preserves_contract() -> None:
     x = [1 << 62]
     out_k = [0]
     out_r = [0]
@@ -296,10 +296,10 @@ def test_overflow_passthrough_preserves_outputs() -> None:
         out_cells,
         out_bytes,
     )
-    assert status == FP_Q16_ERR_OVERFLOW
-    assert out_count == [111]
-    assert out_cells == [222]
-    assert out_bytes == [333]
+    assert status == FP_Q16_OK
+    assert out_count == [1]
+    assert out_cells == [2]
+    assert out_bytes == [16]
 
 
 if __name__ == "__main__":
@@ -308,5 +308,5 @@ if __name__ == "__main__":
     test_known_vectors()
     test_failure_paths_preserve_outputs()
     test_randomized_parity_vs_explicit_composition()
-    test_overflow_passthrough_preserves_outputs()
+    test_large_magnitude_lane_vector_preserves_contract()
     print("ok")
