@@ -1606,7 +1606,8 @@ I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnly(I64 *x_q16,
 }
 
 // Diagnostics helper over FPQ16ExpApproxRangeReduceCheckedNoPartialArray that
-// computes per-output-array byte requirement:
+// computes byte requirement for one output lane array in the paired
+// {out_k,out_r_q16} outputs:
 //   required_output_bytes = count * sizeof(I64)
 //
 // Contract:
@@ -1670,7 +1671,7 @@ I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayRequiredBytes(I64 *x_q16,
                                                             out_k,
                                                             out_r_q16,
                                                             count);
-    if (status != FP_Q16_OK && status != FP_Q16_ERR_OVERFLOW)
+    if (status)
         return status;
 
     if (count > (I64_MAX_VALUE >> 3))
@@ -1678,9 +1679,6 @@ I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayRequiredBytes(I64 *x_q16,
 
     staged_required_output_bytes = count << 3;
     *out_required_output_bytes = staged_required_output_bytes;
-
-    if (status == FP_Q16_ERR_OVERFLOW)
-        return FP_Q16_ERR_OVERFLOW;
     return FP_Q16_OK;
 }
 
@@ -1802,5 +1800,135 @@ I32 FPQ16ExpApproxChecked(I64 x_q16,
     }
 
     *out_q16 = staged_out_q16;
+    return FP_Q16_OK;
+}
+
+// Checked lane-wise exp approximation helper with strict no-partial-write
+// semantics over parallel {x_q16,out_q16} arrays.
+//
+// Contract:
+// - Null pointers return NULL_PTR with no writes.
+// - count < 0 returns BAD_PARAM with no writes.
+// - Any alias/overlap between input/output ranges is rejected.
+// - All lanes are preflighted before any output lane is committed.
+// - OVERFLOW from one or more lanes is reported after full publish.
+I32 FPQ16ExpApproxCheckedNoPartialArray(I64 *x_q16,
+                                        I64 *out_q16,
+                                        I64 count)
+{
+    I64 i;
+    I64 staged_lane_q16;
+    U64 x_base;
+    U64 x_end;
+    U64 out_base;
+    U64 out_end;
+    I32 status;
+    I32 overflow_seen;
+
+    if (!x_q16 || !out_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (x_q16 == out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (!count)
+        return FP_Q16_OK;
+
+    status = FPArrayI64SpanChecked(x_q16, count, &x_base, &x_end);
+    if (status)
+        return status;
+    status = FPArrayI64SpanChecked(out_q16, count, &out_base, &out_end);
+    if (status)
+        return status;
+
+    if (FPAddressRangesOverlap(x_base, x_end, out_base, out_end))
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Preflight every lane first so hard failures never partially publish.
+    overflow_seen = 0;
+    for (i = 0; i < count; i++)
+    {
+        status = FPQ16ExpApproxChecked(x_q16[i],
+                                       &staged_lane_q16);
+        if (status == FP_Q16_ERR_OVERFLOW)
+            overflow_seen = 1;
+        else if (status != FP_Q16_OK)
+            return status;
+    }
+
+    for (i = 0; i < count; i++)
+    {
+        status = FPQ16ExpApproxChecked(x_q16[i],
+                                       &out_q16[i]);
+        if (status == FP_Q16_ERR_OVERFLOW)
+            overflow_seen = 1;
+        else if (status != FP_Q16_OK)
+            return status;
+    }
+
+    if (overflow_seen)
+        return FP_Q16_ERR_OVERFLOW;
+    return FP_Q16_OK;
+}
+
+// Checked lane-wise exp approximation with strict no-partial-write semantics.
+//
+// Math model per lane:
+//   out_q16[i] = FPQ16ExpApproxChecked(x_q16[i])
+//
+// Contracts:
+// - Null pointers return NULL_PTR with no writes.
+// - count < 0 returns BAD_PARAM with no writes.
+// - Any alias/overlap between input/output spans is rejected.
+// - Two-pass execution: preflight every lane first, then commit all lanes.
+I32 FPQ16ExpApproxCheckedNoPartialArray(I64 *x_q16,
+                                        I64 *out_q16,
+                                        I64 count)
+{
+    I64 i;
+    I64 staged_lane_q16;
+    U64 x_base;
+    U64 x_end;
+    U64 out_base;
+    U64 out_end;
+    I32 status;
+
+    if (!x_q16 || !out_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (x_q16 == out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (!count)
+        return FP_Q16_OK;
+
+    status = FPArrayI64SpanChecked(x_q16, count, &x_base, &x_end);
+    if (status)
+        return status;
+    status = FPArrayI64SpanChecked(out_q16, count, &out_base, &out_end);
+    if (status)
+        return status;
+
+    if (FPAddressRangesOverlap(x_base, x_end, out_base, out_end))
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Preflight all lanes first so hard failures never partially publish.
+    for (i = 0; i < count; i++)
+    {
+        status = FPQ16ExpApproxChecked(x_q16[i], &staged_lane_q16);
+        if (status)
+            return status;
+    }
+
+    for (i = 0; i < count; i++)
+    {
+        status = FPQ16ExpApproxChecked(x_q16[i], &out_q16[i]);
+        if (status)
+            return status;
+    }
+
     return FP_Q16_OK;
 }
