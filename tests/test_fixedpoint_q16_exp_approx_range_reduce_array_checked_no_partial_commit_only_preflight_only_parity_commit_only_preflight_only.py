@@ -14,6 +14,7 @@ from test_fixedpoint_q16_exp_approx_range_reduce_array_checked_no_partial import
     FP_Q16_ERR_NULL_PTR,
     FP_Q16_ERR_OVERFLOW,
     FP_Q16_OK,
+    I64_MAX_VALUE,
 )
 from test_fixedpoint_q16_exp_approx_range_reduce_array_checked_no_partial_commit_only_preflight_only_parity_commit_only import (
     fpq16_exp_approx_range_reduce_checked_no_partial_array_commit_only_preflight_only_parity_commit_only,
@@ -72,22 +73,24 @@ def fpq16_exp_approx_range_reduce_checked_no_partial_array_commit_only_preflight
     if status != FP_Q16_OK:
         return status
 
+    if snapshot != (x_q16, out_k, out_r_q16, count):
+        return FP_Q16_ERR_BAD_PARAM
+
     canonical_count = count
-    if canonical_count > ((1 << 63) - 1) >> 1:
+    if canonical_count > (I64_MAX_VALUE >> 1):
         return FP_Q16_ERR_OVERFLOW
-    canonical_cells = canonical_count << 1
-    if canonical_cells > ((1 << 63) - 1) >> 3:
+
+    canonical_required_cells = canonical_count << 1
+    if canonical_required_cells > (I64_MAX_VALUE >> 3):
         return FP_Q16_ERR_OVERFLOW
-    canonical_bytes = canonical_cells << 3
+
+    canonical_required_bytes = canonical_required_cells << 3
 
     if staged_count[0] != canonical_count:
         return FP_Q16_ERR_BAD_PARAM
-    if staged_cells[0] != canonical_cells:
+    if staged_cells[0] != canonical_required_cells:
         return FP_Q16_ERR_BAD_PARAM
-    if staged_bytes[0] != canonical_bytes:
-        return FP_Q16_ERR_BAD_PARAM
-
-    if snapshot != (x_q16, out_k, out_r_q16, count):
+    if staged_bytes[0] != canonical_required_bytes:
         return FP_Q16_ERR_BAD_PARAM
 
     out_count[0] = staged_count[0]
@@ -104,6 +107,8 @@ def explicit_composition(
 ) -> tuple[int, tuple[int, int, int]]:
     if x_q16 is None or out_k is None or out_r_q16 is None:
         return FP_Q16_ERR_NULL_PTR, (0, 0, 0)
+    if count < 0:
+        return FP_Q16_ERR_BAD_PARAM, (0, 0, 0)
 
     staged_count = [0]
     staged_cells = [0]
@@ -120,6 +125,23 @@ def explicit_composition(
     if status != FP_Q16_OK:
         return status, (0, 0, 0)
 
+    canonical_count = count
+    if canonical_count > (I64_MAX_VALUE >> 1):
+        return FP_Q16_ERR_OVERFLOW, (0, 0, 0)
+
+    canonical_required_cells = canonical_count << 1
+    if canonical_required_cells > (I64_MAX_VALUE >> 3):
+        return FP_Q16_ERR_OVERFLOW, (0, 0, 0)
+
+    canonical_required_bytes = canonical_required_cells << 3
+
+    if staged_count[0] != canonical_count:
+        return FP_Q16_ERR_BAD_PARAM, (0, 0, 0)
+    if staged_cells[0] != canonical_required_cells:
+        return FP_Q16_ERR_BAD_PARAM, (0, 0, 0)
+    if staged_bytes[0] != canonical_required_bytes:
+        return FP_Q16_ERR_BAD_PARAM, (0, 0, 0)
+
     return FP_Q16_OK, (staged_count[0], staged_cells[0], staged_bytes[0])
 
 
@@ -128,12 +150,11 @@ def test_source_contains_iq923_helper() -> None:
     sig = "I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(I64 *x_q16,"
     assert sig in source
     body = source.split(sig, 1)[1].split("I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayRequiredBytes", 1)[0]
-    assert "FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParity(" in body
-    assert "if (staged_count != canonical_count)" in body
-    assert "if (staged_required_cells != canonical_required_cells)" in body
-    assert "if (staged_required_bytes != canonical_required_bytes)" in body
-    assert "*out_count = staged_count;" in body
-    assert "*out_required_cells = staged_required_cells;" in body
+    assert "status = FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnly(" in body
+    assert "canonical_count = count;" in body
+    assert "canonical_required_cells = canonical_count << 1;" in body
+    assert "canonical_required_bytes = canonical_required_cells << 3;" in body
+    assert "if (snapshot_count != count)" in body
     assert "*out_required_bytes = staged_required_bytes;" in body
 
 
@@ -171,6 +192,29 @@ def test_null_alias_and_bad_param_paths() -> None:
     )
 
 
+def test_known_vectors() -> None:
+    x = [-(1 << 20), -65_536, -1, 0, 1, 65_536, 1 << 20]
+    out_k = [0] * len(x)
+    out_r = [0] * len(x)
+    out_count = [999]
+    out_cells = [123]
+    out_bytes = [456]
+
+    status = fpq16_exp_approx_range_reduce_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only(
+        x,
+        out_k,
+        out_r,
+        len(x),
+        out_count,
+        out_cells,
+        out_bytes,
+    )
+    assert status == FP_Q16_OK
+    assert out_count[0] == len(x)
+    assert out_cells[0] == len(x) * 2
+    assert out_bytes[0] == len(x) * 16
+
+
 def test_failure_paths_preserve_outputs() -> None:
     x = [0, 1 << 62, -(1 << 62)]
     out_k = [123, 456, 789]
@@ -197,29 +241,6 @@ def test_failure_paths_preserve_outputs() -> None:
         assert out_k == before_k
         assert out_r == before_r
         assert (out_count[0], out_cells[0], out_bytes[0]) == before_tuple
-
-
-def test_known_vectors() -> None:
-    x = [-(1 << 20), -65_536, -1, 0, 1, 65_536, 1 << 20]
-    out_k = [0] * len(x)
-    out_r = [0] * len(x)
-    out_count = [999]
-    out_cells = [123]
-    out_bytes = [456]
-
-    status = fpq16_exp_approx_range_reduce_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only(
-        x,
-        out_k,
-        out_r,
-        len(x),
-        out_count,
-        out_cells,
-        out_bytes,
-    )
-    assert status == FP_Q16_OK
-    assert out_count[0] == len(x)
-    assert out_cells[0] == len(x) * 2
-    assert out_bytes[0] == len(x) * 16
 
 
 def test_randomized_parity_vs_explicit_composition() -> None:
@@ -258,10 +279,34 @@ def test_randomized_parity_vs_explicit_composition() -> None:
             assert out_bytes == [0xCC]
 
 
+def test_overflow_passthrough_preserves_outputs() -> None:
+    x = [1 << 62]
+    out_k = [0]
+    out_r = [0]
+    out_count = [111]
+    out_cells = [222]
+    out_bytes = [333]
+
+    status = fpq16_exp_approx_range_reduce_checked_no_partial_array_commit_only_preflight_only_parity_commit_only_preflight_only(
+        x,
+        out_k,
+        out_r,
+        len(x),
+        out_count,
+        out_cells,
+        out_bytes,
+    )
+    assert status == FP_Q16_ERR_OVERFLOW
+    assert out_count == [111]
+    assert out_cells == [222]
+    assert out_bytes == [333]
+
+
 if __name__ == "__main__":
     test_source_contains_iq923_helper()
     test_null_alias_and_bad_param_paths()
-    test_failure_paths_preserve_outputs()
     test_known_vectors()
+    test_failure_paths_preserve_outputs()
     test_randomized_parity_vs_explicit_composition()
+    test_overflow_passthrough_preserves_outputs()
     print("ok")

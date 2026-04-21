@@ -2026,6 +2026,122 @@ I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParityC
     snapshot_out_r_q16 = out_r_q16;
     snapshot_count = count;
 
+    status = FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParity(
+        x_q16,
+        out_k,
+        out_r_q16,
+        count,
+        &staged_count,
+        &staged_required_cells,
+        &staged_required_bytes);
+    if (status)
+        return status;
+
+    if (snapshot_x_q16 != x_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_k != out_k)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_r_q16 != out_r_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (snapshot_count != count)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    canonical_count = count;
+    if (canonical_count > (I64_MAX_VALUE >> 1))
+        return FP_Q16_ERR_OVERFLOW;
+
+    canonical_required_cells = canonical_count << 1;
+    status = FPTryMulI64Checked(canonical_count, 2, &recomputed_required_cells);
+    if (status)
+        return status;
+    if (canonical_required_cells != recomputed_required_cells)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (canonical_required_cells > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    canonical_required_bytes = canonical_required_cells << 3;
+    status = FPTryMulI64Checked(canonical_required_cells, 8, &recomputed_required_bytes);
+    if (status)
+        return status;
+    if (canonical_required_bytes != recomputed_required_bytes)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (staged_count != canonical_count)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (staged_required_cells != canonical_required_cells)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (staged_required_bytes != canonical_required_bytes)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_count = staged_count;
+    *out_required_cells = staged_required_cells;
+    *out_required_bytes = staged_required_bytes;
+    return FP_Q16_OK;
+}
+
+// Diagnostics-only no-write companion over
+// FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnly.
+//
+// Contract:
+// - Never writes {out_k,out_r_q16}; they are treated as immutable snapshots.
+// - Stages canonical diagnostics tuple through no-write parity helper.
+// - Recomputes canonical tuple from immutable {count} with checked math.
+// - Atomically publishes diagnostics once after parity + snapshot validation.
+// - Preserves strict no-partial diagnostics writes on all failures.
+I32 FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(I64 *x_q16,
+                                                                                                        I64 *out_k,
+                                                                                                        I64 *out_r_q16,
+                                                                                                        I64 count,
+                                                                                                        I64 *out_count,
+                                                                                                        I64 *out_required_cells,
+                                                                                                        I64 *out_required_bytes)
+{
+    I64 *snapshot_x_q16;
+    I64 *snapshot_out_k;
+    I64 *snapshot_out_r_q16;
+    I64 snapshot_count;
+    I64 staged_count;
+    I64 staged_required_cells;
+    I64 staged_required_bytes;
+    I64 canonical_count;
+    I64 canonical_required_cells;
+    I64 canonical_required_bytes;
+    I64 recomputed_required_cells;
+    I64 recomputed_required_bytes;
+    I32 status;
+
+    if (!x_q16 || !out_k || !out_r_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (!out_count || !out_required_cells || !out_required_bytes)
+        return FP_Q16_ERR_NULL_PTR;
+    if (count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (x_q16 == out_k || x_q16 == out_r_q16 || out_k == out_r_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_count == out_required_cells ||
+        out_count == out_required_bytes ||
+        out_required_cells == out_required_bytes)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_count == x_q16 ||
+        out_count == out_k ||
+        out_count == out_r_q16 ||
+        out_required_cells == x_q16 ||
+        out_required_cells == out_k ||
+        out_required_cells == out_r_q16 ||
+        out_required_bytes == x_q16 ||
+        out_required_bytes == out_k ||
+        out_required_bytes == out_r_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    snapshot_x_q16 = x_q16;
+    snapshot_out_k = out_k;
+    snapshot_out_r_q16 = out_r_q16;
+    snapshot_count = count;
+
     status = FPQ16ExpApproxRangeReduceCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnly(
         x_q16,
         out_k,
