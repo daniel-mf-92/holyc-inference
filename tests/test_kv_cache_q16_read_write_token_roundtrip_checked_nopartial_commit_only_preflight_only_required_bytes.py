@@ -336,10 +336,18 @@ def test_source_contains_required_bytes_helper() -> None:
 
     assert "KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartialCommitOnlyPreflightOnly(" in body
     assert "KVTryMulI64Checked(staged_required_span_cells" in body
+    assert "snapshot_k_cache_capacity = k_cache_capacity;" in body
+    assert "snapshot_v_cache_capacity = v_cache_capacity;" in body
+    assert "if (staged_required_span_cells < 0 ||" in body
+    assert "if (staged_required_token_bytes < 0)" in body
+    assert "snapshot_k_cache_capacity != k_cache_capacity ||" in body
+    assert "snapshot_v_cache_capacity != v_cache_capacity ||" in body
     assert "*out_required_span_cells = staged_required_span_cells;" in body
     assert "*out_required_token_bytes = staged_required_token_bytes;" in body
     assert "*out_k_base_index = staged_k_base_index;" in body
     assert "*out_v_base_index = staged_v_base_index;" in body
+    assert "KVArrayI64SpanChecked(" in body
+    assert "KVRangesOverlap(" in body
 
 
 def test_known_vector_success_and_zero_write_contract() -> None:
@@ -692,15 +700,6 @@ def test_required_bytes_overflow_preserves_outputs() -> None:
     assert out_v_base == [444]
 
 
-if __name__ == "__main__":
-    test_source_contains_required_bytes_helper()
-    test_known_vector_success_and_zero_write_contract()
-    test_null_alias_and_no_partial_outputs_on_failure()
-    test_randomized_parity_vs_explicit_composition()
-    test_required_bytes_overflow_preserves_outputs()
-    print("ok")
-
-
 def test_output_scalar_overlap_rejected() -> None:
     layer_count = 1
     token_capacity = 2
@@ -745,3 +744,13 @@ def test_output_scalar_overlap_rejected() -> None:
 
     assert err == KV_Q16_ERR_BAD_PARAM
     assert out_span == [111, 222, 333, 444]
+
+
+if __name__ == "__main__":
+    test_source_contains_required_bytes_helper()
+    test_known_vector_success_and_zero_write_contract()
+    test_null_alias_and_no_partial_outputs_on_failure()
+    test_randomized_parity_vs_explicit_composition()
+    test_required_bytes_overflow_preserves_outputs()
+    test_output_scalar_overlap_rejected()
+    print("ok")
