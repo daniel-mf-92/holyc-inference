@@ -516,6 +516,134 @@ I32 KVCacheQ16ZeroTokenSpanCheckedNoPartial(
     return KV_Q16_OK;
 }
 
+// Commit-only diagnostics wrapper over token-span zero helper.
+// Stages canonical base/span/end geometry first, revalidates immutable inputs,
+// then executes canonical zero commit and atomically publishes diagnostics.
+I32 KVCacheQ16ZeroTokenSpanCheckedNoPartialCommitOnly(
+    I64 *k_cache_q16,
+    I64 k_cache_capacity,
+    I64 *v_cache_q16,
+    I64 v_cache_capacity,
+    I64 layer_idx,
+    I64 token_idx,
+    I64 layer_count,
+    I64 token_capacity,
+    I64 kv_heads,
+    I64 head_dim,
+    I64 *out_base_index,
+    I64 *out_span_cells,
+    I64 *out_end_index)
+{
+    I64 staged_k_base_index;
+    I64 staged_k_span_cells;
+    I64 staged_v_base_index;
+    I64 staged_v_span_cells;
+    I64 staged_end_index;
+    I64 snapshot_layer_idx;
+    I64 snapshot_token_idx;
+    I64 snapshot_layer_count;
+    I64 snapshot_token_capacity;
+    I64 snapshot_kv_heads;
+    I64 snapshot_head_dim;
+    I32 status;
+
+    if (!out_base_index || !out_span_cells || !out_end_index)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (out_base_index == out_span_cells ||
+        out_base_index == out_end_index ||
+        out_span_cells == out_end_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (!k_cache_q16 || !v_cache_q16)
+        return KV_Q16_ERR_NULL_PTR;
+    if (k_cache_q16 == v_cache_q16)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (k_cache_capacity < 0 || v_cache_capacity < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (layer_idx < 0 || token_idx < 0 ||
+        layer_count < 0 || token_capacity < 0 ||
+        kv_heads < 0 || head_dim < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (out_base_index == k_cache_q16 || out_base_index == v_cache_q16 ||
+        out_span_cells == k_cache_q16 || out_span_cells == v_cache_q16 ||
+        out_end_index == k_cache_q16 || out_end_index == v_cache_q16)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    snapshot_layer_idx = layer_idx;
+    snapshot_token_idx = token_idx;
+    snapshot_layer_count = layer_count;
+    snapshot_token_capacity = token_capacity;
+    snapshot_kv_heads = kv_heads;
+    snapshot_head_dim = head_dim;
+
+    status = KVCacheQ16ComputeLayerTokenBaseIndexChecked(layer_idx,
+                                                         token_idx,
+                                                         layer_count,
+                                                         token_capacity,
+                                                         kv_heads,
+                                                         head_dim,
+                                                         &staged_k_base_index,
+                                                         &staged_k_span_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVCacheQ16ComputeLayerTokenBaseIndexChecked(layer_idx,
+                                                         token_idx,
+                                                         layer_count,
+                                                         token_capacity,
+                                                         kv_heads,
+                                                         head_dim,
+                                                         &staged_v_base_index,
+                                                         &staged_v_span_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (staged_k_base_index != staged_v_base_index)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (staged_k_span_cells != staged_v_span_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    status = KVTryAddI64Checked(staged_k_base_index,
+                                staged_k_span_cells,
+                                &staged_end_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (staged_end_index > k_cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (staged_end_index > v_cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_layer_idx != layer_idx ||
+        snapshot_token_idx != token_idx ||
+        snapshot_layer_count != layer_count ||
+        snapshot_token_capacity != token_capacity ||
+        snapshot_kv_heads != kv_heads ||
+        snapshot_head_dim != head_dim)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    status = KVCacheQ16ZeroTokenSpanCheckedNoPartial(
+        k_cache_q16,
+        k_cache_capacity,
+        v_cache_q16,
+        v_cache_capacity,
+        layer_idx,
+        token_idx,
+        layer_count,
+        token_capacity,
+        kv_heads,
+        head_dim);
+    if (status != KV_Q16_OK)
+        return status;
+
+    *out_base_index = staged_k_base_index;
+    *out_span_cells = staged_k_span_cells;
+    *out_end_index = staged_end_index;
+    return KV_Q16_OK;
+}
 
 // Checked diagnostics preflight for one-token K/V write.
 // Resolves destination base/span for both slabs, validates all capacities,
@@ -839,17 +967,6 @@ I32 KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartial(
     if (span_cells > k_token_out_capacity || span_cells > v_token_out_capacity)
         return KV_Q16_ERR_BAD_PARAM;
 
-    status = KVCacheQ16ComputeLayerTokenSpanCellsChecked(kv_heads,
-                                                         head_dim,
-                                                         &span_cells);
-    if (status != KV_Q16_OK)
-        return status;
-
-    if (span_cells > k_token_src_capacity || span_cells > v_token_src_capacity)
-        return KV_Q16_ERR_BAD_PARAM;
-    if (span_cells > k_token_out_capacity || span_cells > v_token_out_capacity)
-        return KV_Q16_ERR_BAD_PARAM;
-
     status = KVCacheQ16WriteTokenCheckedNoPartial(
         k_cache_q16,
         k_cache_capacity,
@@ -911,5 +1028,153 @@ I32 KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartial(
             return KV_Q16_ERR_OVERFLOW;
     }
 
+    return KV_Q16_OK;
+}
+
+// Commit-only diagnostics wrapper over round-trip validator.
+// Stages token geometry diagnostics via commit-only write helper, revalidates
+// immutable inputs, executes canonical round-trip, then atomically publishes.
+I32 KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartialCommitOnly(
+    I64 *k_cache_q16,
+    I64 k_cache_capacity,
+    I64 *v_cache_q16,
+    I64 v_cache_capacity,
+    I64 layer_idx,
+    I64 token_idx,
+    I64 layer_count,
+    I64 token_capacity,
+    I64 kv_heads,
+    I64 head_dim,
+    I64 *k_token_src_q16,
+    I64 k_token_src_capacity,
+    I64 *v_token_src_q16,
+    I64 v_token_src_capacity,
+    I64 *k_token_out_q16,
+    I64 k_token_out_capacity,
+    I64 *v_token_out_q16,
+    I64 v_token_out_capacity,
+    I64 *out_token_cells,
+    I64 *out_token_bytes,
+    I64 *out_k_base_index,
+    I64 *out_v_base_index)
+{
+    I64 staged_token_cells;
+    I64 staged_k_base_index;
+    I64 staged_v_base_index;
+    I64 staged_token_bytes;
+    I64 snapshot_layer_idx;
+    I64 snapshot_token_idx;
+    I64 snapshot_layer_count;
+    I64 snapshot_token_capacity;
+    I64 snapshot_kv_heads;
+    I64 snapshot_head_dim;
+    I64 snapshot_k_src_capacity;
+    I64 snapshot_v_src_capacity;
+    I64 snapshot_k_out_capacity;
+    I64 snapshot_v_out_capacity;
+    I32 status;
+
+    if (!out_token_cells || !out_token_bytes ||
+        !out_k_base_index || !out_v_base_index)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (out_token_cells == out_token_bytes ||
+        out_token_cells == out_k_base_index ||
+        out_token_cells == out_v_base_index ||
+        out_token_bytes == out_k_base_index ||
+        out_token_bytes == out_v_base_index ||
+        out_k_base_index == out_v_base_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (out_token_cells == k_cache_q16 || out_token_cells == v_cache_q16 ||
+        out_token_cells == k_token_src_q16 || out_token_cells == v_token_src_q16 ||
+        out_token_cells == k_token_out_q16 || out_token_cells == v_token_out_q16 ||
+        out_token_bytes == k_cache_q16 || out_token_bytes == v_cache_q16 ||
+        out_token_bytes == k_token_src_q16 || out_token_bytes == v_token_src_q16 ||
+        out_token_bytes == k_token_out_q16 || out_token_bytes == v_token_out_q16 ||
+        out_k_base_index == k_cache_q16 || out_k_base_index == v_cache_q16 ||
+        out_k_base_index == k_token_src_q16 || out_k_base_index == v_token_src_q16 ||
+        out_k_base_index == k_token_out_q16 || out_k_base_index == v_token_out_q16 ||
+        out_v_base_index == k_cache_q16 || out_v_base_index == v_cache_q16 ||
+        out_v_base_index == k_token_src_q16 || out_v_base_index == v_token_src_q16 ||
+        out_v_base_index == k_token_out_q16 || out_v_base_index == v_token_out_q16)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    snapshot_layer_idx = layer_idx;
+    snapshot_token_idx = token_idx;
+    snapshot_layer_count = layer_count;
+    snapshot_token_capacity = token_capacity;
+    snapshot_kv_heads = kv_heads;
+    snapshot_head_dim = head_dim;
+    snapshot_k_src_capacity = k_token_src_capacity;
+    snapshot_v_src_capacity = v_token_src_capacity;
+    snapshot_k_out_capacity = k_token_out_capacity;
+    snapshot_v_out_capacity = v_token_out_capacity;
+
+    status = KVCacheQ16WriteTokenCheckedNoPartialCommitOnly(
+        k_cache_q16,
+        k_cache_capacity,
+        v_cache_q16,
+        v_cache_capacity,
+        layer_idx,
+        token_idx,
+        layer_count,
+        token_capacity,
+        kv_heads,
+        head_dim,
+        k_token_src_q16,
+        k_token_src_capacity,
+        v_token_src_q16,
+        v_token_src_capacity,
+        &staged_token_cells,
+        &staged_k_base_index,
+        &staged_v_base_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVTryMulI64Checked(staged_token_cells,
+                                sizeof(I64),
+                                &staged_token_bytes);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (snapshot_layer_idx != layer_idx ||
+        snapshot_token_idx != token_idx ||
+        snapshot_layer_count != layer_count ||
+        snapshot_token_capacity != token_capacity ||
+        snapshot_kv_heads != kv_heads ||
+        snapshot_head_dim != head_dim ||
+        snapshot_k_src_capacity != k_token_src_capacity ||
+        snapshot_v_src_capacity != v_token_src_capacity ||
+        snapshot_k_out_capacity != k_token_out_capacity ||
+        snapshot_v_out_capacity != v_token_out_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    status = KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartial(
+        k_cache_q16,
+        k_cache_capacity,
+        v_cache_q16,
+        v_cache_capacity,
+        layer_idx,
+        token_idx,
+        layer_count,
+        token_capacity,
+        kv_heads,
+        head_dim,
+        k_token_src_q16,
+        k_token_src_capacity,
+        v_token_src_q16,
+        v_token_src_capacity,
+        k_token_out_q16,
+        k_token_out_capacity,
+        v_token_out_q16,
+        v_token_out_capacity);
+    if (status != KV_Q16_OK)
+        return status;
+
+    *out_token_cells = staged_token_cells;
+    *out_token_bytes = staged_token_bytes;
+    *out_k_base_index = staged_k_base_index;
+    *out_v_base_index = staged_v_base_index;
     return KV_Q16_OK;
 }
