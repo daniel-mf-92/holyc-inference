@@ -252,6 +252,110 @@ I32 GGUFReadTensorDataQ4_0CheckedNoPartialCommitOnly(
     return GGUF_READER_OK;
 }
 
+I32 GGUFReadTensorDataQ4_0CheckedNoPartialCommitOnlyPreflightOnly(
+    U8 *gguf_bytes,
+    U64 gguf_nbytes,
+    U64 tensor_data_base,
+    GGUFReaderTensorInfoQ4_0 *tensor_info,
+    U8 *out_q4_0_blocks,
+    U64 out_q4_0_blocks_capacity,
+    I64 *out_blocks_read,
+    I64 *out_bytes_read)
+{
+    U32 i;
+    U32 staged_n_dims;
+    U32 staged_ggml_type;
+    U64 staged_dims[4];
+    U64 staged_offset;
+    U64 staged_element_count;
+    U64 staged_block_count;
+    U64 staged_required_bytes;
+    U64 staged_payload_start;
+    U64 staged_payload_end;
+    U64 staged_out_end;
+    I64 staged_blocks_read_i64;
+    I64 staged_bytes_read_i64;
+
+    if (!gguf_bytes || !tensor_info || !out_q4_0_blocks ||
+        !out_blocks_read || !out_bytes_read)
+        return GGUF_READER_ERR_NULL_PTR;
+
+    // Snapshot immutable tensor geometry first, then derive diagnostics from
+    // this single view so publish is atomic and deterministic.
+    staged_n_dims = tensor_info->n_dims;
+    staged_ggml_type = tensor_info->ggml_type;
+    staged_offset = tensor_info->offset;
+    for (i = 0; i < 4; ++i)
+        staged_dims[i] = tensor_info->dims[i];
+
+    if (!staged_n_dims || staged_n_dims > 4)
+        return GGUF_READER_ERR_BAD_DIM;
+    if (staged_ggml_type != GGUF_READER_GGML_TYPE_Q4_0)
+        return GGUF_READER_ERR_BAD_TYPE;
+
+    staged_element_count = 1;
+    for (i = 0; i < staged_n_dims; ++i)
+    {
+        if (!staged_dims[i])
+            return GGUF_READER_ERR_BAD_DIM;
+        if (!GGUFReaderTryMulU64(staged_element_count,
+                                 staged_dims[i],
+                                 &staged_element_count))
+            return GGUF_READER_ERR_OVERFLOW;
+    }
+
+    // Q4_0 stores 32 quantized elements per block.
+    if (staged_element_count % GGUF_READER_Q4_0_BLOCK_SIZE)
+        return GGUF_READER_ERR_BAD_DIM;
+
+    staged_block_count = staged_element_count / GGUF_READER_Q4_0_BLOCK_SIZE;
+    if (!GGUFReaderTryMulU64(staged_block_count,
+                             GGUF_READER_Q4_0_BLOCK_BYTES,
+                             &staged_required_bytes))
+        return GGUF_READER_ERR_OVERFLOW;
+
+    if (!GGUFReaderTryAddU64(tensor_data_base,
+                             staged_offset,
+                             &staged_payload_start))
+        return GGUF_READER_ERR_OVERFLOW;
+    if (!GGUFReaderTryAddU64(staged_payload_start,
+                             staged_required_bytes,
+                             &staged_payload_end))
+        return GGUF_READER_ERR_OVERFLOW;
+
+    if (staged_payload_start > gguf_nbytes)
+        return GGUF_READER_ERR_TRUNCATED;
+    if (staged_payload_end > gguf_nbytes)
+        return GGUF_READER_ERR_TRUNCATED;
+
+    if (!GGUFReaderTryAddU64(0,
+                             staged_required_bytes,
+                             &staged_out_end))
+        return GGUF_READER_ERR_OVERFLOW;
+    if (staged_out_end > out_q4_0_blocks_capacity)
+        return GGUF_READER_ERR_BAD_CAPACITY;
+
+    if (!GGUFReaderTensorInfoQ4_0MatchesSnapshot(tensor_info,
+                                                 staged_n_dims,
+                                                 staged_ggml_type,
+                                                 staged_offset,
+                                                 staged_dims))
+        return GGUF_READER_ERR_BAD_PARAM;
+
+    if (staged_block_count > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_READER_ERR_OVERFLOW;
+    if (staged_required_bytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_READER_ERR_OVERFLOW;
+
+    staged_blocks_read_i64 = (I64)staged_block_count;
+    staged_bytes_read_i64 = (I64)staged_required_bytes;
+
+    // Preflight-only: never writes out_q4_0_blocks, only diagnostics.
+    *out_blocks_read = staged_blocks_read_i64;
+    *out_bytes_read = staged_bytes_read_i64;
+    return GGUF_READER_OK;
+}
+
 I32 GGUFReadTensorDataQ8_0CheckedNoPartial(
     U8 *gguf_bytes,
     U64 gguf_nbytes,
@@ -519,4 +623,3 @@ I32 GGUFReadTensorDataQ8_0CheckedNoPartialCommitOnlyPreflightOnly(
     *out_bytes_read = staged_bytes_read_i64;
     return GGUF_READER_OK;
 }
-
