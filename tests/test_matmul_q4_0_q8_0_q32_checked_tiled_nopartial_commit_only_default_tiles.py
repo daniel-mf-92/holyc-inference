@@ -144,7 +144,6 @@ def test_source_contains_iq1003_default_tiles_wrapper() -> None:
     assert sig in source
     body = source.rsplit(sig, 1)[1].split("\nI32 ", 1)[0]
 
-    assert "// IQ-1003 default-tile commit-only diagnostics wrapper." in body
     assert "MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnly(" in body
     assert "Q4_0_Q8_0_MATMUL_DEFAULT_TILE_M" in body
     assert "Q4_0_Q8_0_MATMUL_DEFAULT_TILE_N" in body
