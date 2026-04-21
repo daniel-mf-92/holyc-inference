@@ -244,39 +244,39 @@ def test_source_contains_signature_and_parity_preflight_only_logic() -> None:
 
 
 def test_known_vector_and_no_partial_failure() -> None:
-    payload = list(b"sacred")
+    payload = list(b"holycode")
 
     out_req = [9]
     out_ws = [0xBBBB]
-    cursor = [1]
+    cursor = [2]
     status = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity_commit_only_preflight_only_required_bytes_parity_preflight_only(
         payload,
         len(payload),
         cursor,
-        4,
+        3,
         [],
         [],
         [],
         [],
         0,
         0,
-        7,
+        5,
         out_req,
         out_ws,
     )
     assert status == TOKENIZER_BPE_OK
-    assert out_req == [4]
-    assert out_ws == [28]
-    assert cursor == [1]
+    assert out_req == [3]
+    assert out_ws == [15]
+    assert cursor == [2]
 
     out_req_fail = [5]
     out_ws_fail = [0x1234]
-    cursor_fail = [2]
+    cursor_fail = [6]
     status = tokenizer_bpe_encode_prompt_checked_noalloc_from_max_piece_default_capacity_commit_only_preflight_only_required_bytes_parity_preflight_only(
         payload,
         len(payload),
         cursor_fail,
-        3,
+        2,
         [],
         [],
         [],
@@ -290,7 +290,7 @@ def test_known_vector_and_no_partial_failure() -> None:
     assert status == TOKENIZER_BPE_ERR_OVERFLOW
     assert out_req_fail == [5]
     assert out_ws_fail == [0x1234]
-    assert cursor_fail == [2]
+    assert cursor_fail == [6]
 
 
 def test_fuzz_parity_and_no_partial_publish() -> None:
