@@ -1157,8 +1157,11 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyPreflightOnly(
                                        &staged_required_out_bytes))
         return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
 
-    staged_tile_rows = tile_row_span;
-    staged_tile_cols = tile_col_span;
+    // Publish diagnostics from immutable snapshots only. This keeps the
+    // no-partial contract explicit: staged tuple must be derived from the
+    // same geometry we revalidate right before commit.
+    staged_tile_rows = snapshot_tile_row_span;
+    staged_tile_cols = snapshot_tile_col_span;
 
     if (snapshot_row_count != row_count ||
         snapshot_col_count != col_count ||
