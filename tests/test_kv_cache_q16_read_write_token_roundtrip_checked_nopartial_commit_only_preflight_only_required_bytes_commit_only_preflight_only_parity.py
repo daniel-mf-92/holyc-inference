@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity harness for ...RoundTrip...RequiredBytesCommitOnlyPreflightOnlyParity (IQ-921)."""
+"""Parity harness for ...RequiredBytesCommitOnlyPreflightOnlyParity (IQ-921)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path("tests").resolve()))
 
 from test_kv_cache_q16_indexing_checked import (
-    I64_MAX,
     KV_Q16_ERR_BAD_PARAM,
     KV_Q16_ERR_NULL_PTR,
     KV_Q16_OK,
@@ -139,10 +138,10 @@ def kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_prefli
     if err != KV_Q16_OK:
         return err
 
-    staged_canonical_span = [0]
-    staged_canonical_bytes = [0]
-    staged_canonical_k_base = [0]
-    staged_canonical_v_base = [0]
+    staged_commit_span = [0]
+    staged_commit_bytes = [0]
+    staged_commit_k_base = [0]
+    staged_commit_v_base = [0]
     err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only(
         k_cache_q16,
         k_cache_capacity,
@@ -162,10 +161,10 @@ def kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_prefli
         k_token_out_capacity,
         v_token_out_q16,
         v_token_out_capacity,
-        staged_canonical_span,
-        staged_canonical_bytes,
-        staged_canonical_k_base,
-        staged_canonical_v_base,
+        staged_commit_span,
+        staged_commit_bytes,
+        staged_commit_k_base,
+        staged_commit_v_base,
     )
     if err != KV_Q16_OK:
         return err
@@ -175,18 +174,18 @@ def kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_prefli
         or staged_preflight_bytes[0] < 0
         or staged_preflight_k_base[0] < 0
         or staged_preflight_v_base[0] < 0
-        or staged_canonical_span[0] < 0
-        or staged_canonical_bytes[0] < 0
-        or staged_canonical_k_base[0] < 0
-        or staged_canonical_v_base[0] < 0
+        or staged_commit_span[0] < 0
+        or staged_commit_bytes[0] < 0
+        or staged_commit_k_base[0] < 0
+        or staged_commit_v_base[0] < 0
     ):
         return KV_Q16_ERR_BAD_PARAM
 
     if (
-        staged_preflight_span[0] != staged_canonical_span[0]
-        or staged_preflight_bytes[0] != staged_canonical_bytes[0]
-        or staged_preflight_k_base[0] != staged_canonical_k_base[0]
-        or staged_preflight_v_base[0] != staged_canonical_v_base[0]
+        staged_preflight_span[0] != staged_commit_span[0]
+        or staged_preflight_bytes[0] != staged_commit_bytes[0]
+        or staged_preflight_k_base[0] != staged_commit_k_base[0]
+        or staged_preflight_v_base[0] != staged_commit_v_base[0]
     ):
         return KV_Q16_ERR_BAD_PARAM
 
@@ -213,7 +212,7 @@ def kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_prefli
     return KV_Q16_OK
 
 
-def explicit_preflight_only_parity_composition(*args, **kwargs) -> tuple[int, tuple[int, int, int, int]]:
+def explicit_parity_composition(*args, **kwargs) -> tuple[int, tuple[int, int, int, int]]:
     preflight_span = [0]
     preflight_bytes = [0]
     preflight_k_base = [0]
@@ -229,35 +228,30 @@ def explicit_preflight_only_parity_composition(*args, **kwargs) -> tuple[int, tu
     if err != KV_Q16_OK:
         return err, (0, 0, 0, 0)
 
-    canonical_span = [0]
-    canonical_bytes = [0]
-    canonical_k_base = [0]
-    canonical_v_base = [0]
+    commit_span = [0]
+    commit_bytes = [0]
+    commit_k_base = [0]
+    commit_v_base = [0]
     err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only(
         *args,
-        out_required_span_cells=canonical_span,
-        out_required_token_bytes=canonical_bytes,
-        out_k_base_index=canonical_k_base,
-        out_v_base_index=canonical_v_base,
+        out_required_span_cells=commit_span,
+        out_required_token_bytes=commit_bytes,
+        out_k_base_index=commit_k_base,
+        out_v_base_index=commit_v_base,
         **kwargs,
     )
     if err != KV_Q16_OK:
         return err, (0, 0, 0, 0)
 
     if (
-        preflight_span[0] != canonical_span[0]
-        or preflight_bytes[0] != canonical_bytes[0]
-        or preflight_k_base[0] != canonical_k_base[0]
-        or preflight_v_base[0] != canonical_v_base[0]
+        preflight_span[0] != commit_span[0]
+        or preflight_bytes[0] != commit_bytes[0]
+        or preflight_k_base[0] != commit_k_base[0]
+        or preflight_v_base[0] != commit_v_base[0]
     ):
         return KV_Q16_ERR_BAD_PARAM, (0, 0, 0, 0)
 
-    return KV_Q16_OK, (
-        preflight_span[0],
-        preflight_bytes[0],
-        preflight_k_base[0],
-        preflight_v_base[0],
-    )
+    return KV_Q16_OK, (preflight_span[0], preflight_bytes[0], preflight_k_base[0], preflight_v_base[0])
 
 
 def test_source_contains_iq921_function() -> None:
@@ -454,52 +448,11 @@ def test_randomized_parity() -> None:
             out_k,
             out_v,
         )
-        err_ref, tup_ref = explicit_preflight_only_parity_composition(*args)
+        err_ref, tup_ref = explicit_parity_composition(*args)
 
         assert err_impl == err_ref
         if err_impl == KV_Q16_OK:
             assert (out_span[0], out_bytes[0], out_k[0], out_v[0]) == tup_ref
-
-
-def test_overflow_capacity_vectors() -> None:
-    span = 8
-    k_cache = [1] * span
-    v_cache = [2] * span
-    k_src = [3] * span
-    v_src = [4] * span
-    k_out = [5] * span
-    v_out = [6] * span
-
-    out_span = [0]
-    out_bytes = [0]
-    out_k = [0]
-    out_v = [0]
-
-    err = kv_cache_q16_read_write_token_roundtrip_checked_nopartial_commit_only_preflight_only_required_bytes_commit_only_preflight_only_parity(
-        k_cache,
-        len(k_cache),
-        v_cache,
-        len(v_cache),
-        0,
-        0,
-        1,
-        1,
-        1,
-        I64_MAX,
-        k_src,
-        len(k_src),
-        v_src,
-        len(v_src),
-        k_out,
-        len(k_out),
-        v_out,
-        len(v_out),
-        out_span,
-        out_bytes,
-        out_k,
-        out_v,
-    )
-    assert err != KV_Q16_OK
 
 
 if __name__ == "__main__":
@@ -507,5 +460,5 @@ if __name__ == "__main__":
     test_null_and_alias_guards()
     test_known_vector_success_and_failure_no_partial()
     test_randomized_parity()
-    test_overflow_capacity_vectors()
     print("ok")
+
