@@ -115,8 +115,24 @@ def fpq16_mac_sat_checked_no_partial_array_required_bytes_commit_only(
     count: int,
     out_required_output_bytes: list[int] | None,
 ) -> int:
-    if out_required_output_bytes is None:
+    if (
+        acc_q16 is None
+        or a_q16 is None
+        or b_q16 is None
+        or out_q16 is None
+        or out_required_output_bytes is None
+    ):
         return FP_Q16_ERR_NULL_PTR
+    if count < 0:
+        return FP_Q16_ERR_BAD_PARAM
+
+    if (
+        out_required_output_bytes is acc_q16
+        or out_required_output_bytes is a_q16
+        or out_required_output_bytes is b_q16
+        or out_required_output_bytes is out_q16
+    ):
+        return FP_Q16_ERR_BAD_PARAM
 
     snapshot_count = count
     snapshot_acc_q16 = acc_q16
@@ -145,6 +161,14 @@ def fpq16_mac_sat_checked_no_partial_array_required_bytes_commit_only(
     if snapshot_b_q16 is not b_q16:
         return FP_Q16_ERR_BAD_PARAM
     if snapshot_out_q16 is not out_q16:
+        return FP_Q16_ERR_BAD_PARAM
+
+    if (
+        out_required_output_bytes is acc_q16
+        or out_required_output_bytes is a_q16
+        or out_required_output_bytes is b_q16
+        or out_required_output_bytes is out_q16
+    ):
         return FP_Q16_ERR_BAD_PARAM
 
     out_required_output_bytes[0] = staged_required_output_bytes[0]
@@ -198,6 +222,10 @@ def test_source_contains_required_bytes_commit_only_wrapper() -> None:
     assert "if (snapshot_a_q16 != a_q16)" in body
     assert "if (snapshot_b_q16 != b_q16)" in body
     assert "if (snapshot_out_q16 != out_q16)" in body
+    assert "if (!acc_q16 || !a_q16 || !b_q16 || !out_q16 || !out_required_output_bytes)" in body
+    assert "if (count < 0)" in body
+    assert "if (out_required_output_bytes == acc_q16 ||" in body
+    assert "status = FPArrayI64SpanChecked(acc_q16, count, &acc_base, &acc_end);" in body
     assert "*out_required_output_bytes = staged_required_output_bytes;" in body
 
 
@@ -243,8 +271,7 @@ def test_null_and_alias_contracts_no_partial() -> None:
     )
     assert out == out_before
 
-    # Commit-only wrapper does not reject out_required_output_bytes aliasing input
-    # arrays because it stages required bytes internally before publish.
+    # Commit-only wrapper rejects diagnostics aliasing model buffers.
     shared = [1 << 16]
     out_shared = [0xAAAA]
     wrapped_status = fpq16_mac_sat_checked_no_partial_array_required_bytes_commit_only(
@@ -255,15 +282,26 @@ def test_null_and_alias_contracts_no_partial() -> None:
         1,
         shared,
     )
-    explicit_status = explicit_commit_only_composition(
-        shared,
+    assert wrapped_status == FP_Q16_ERR_BAD_PARAM
+
+
+def test_negative_count_and_no_publish() -> None:
+    acc = [1 << 16]
+    a = [1 << 16]
+    b = [1 << 16]
+    out = [0x1234]
+    out_bytes = [0x9999]
+    status = fpq16_mac_sat_checked_no_partial_array_required_bytes_commit_only(
+        acc,
         a,
         b,
-        [0xAAAA],
-        1,
-        [0],
+        out,
+        -1,
+        out_bytes,
     )
-    assert wrapped_status == explicit_status
+    assert status == FP_Q16_ERR_BAD_PARAM
+    assert out == [0x1234]
+    assert out_bytes == [0x9999]
 
 
 def test_randomized_explicit_composition_parity() -> None:
@@ -311,6 +349,7 @@ def run() -> None:
     test_source_contains_required_bytes_commit_only_wrapper()
     test_known_vector_commit_only_parity()
     test_null_and_alias_contracts_no_partial()
+    test_negative_count_and_no_publish()
     test_randomized_explicit_composition_parity()
     print("fixedpoint_q16_mac_sat_checked_no_partial_array_required_bytes_commit_only=ok")
 
