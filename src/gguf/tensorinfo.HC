@@ -1094,6 +1094,190 @@ I64 GGUFTensorInfoReadCheckedNoPartialCommitOnly(U8 *buf,
     return GGUF_TENSOR_PARSE_OK;
 }
 
+// Diagnostics-only no-write companion for full tensor-info tuple decoding.
+//
+// Composes `...CommitOnly`, recomputes canonical tuple from immutable
+// {buf,size,cursor} snapshots via `...CheckedNoPartial`, and publishes only
+// when all tuple fields match exactly under strict no-partial semantics.
+I64 GGUFTensorInfoReadCheckedNoPartialCommitOnlyPreflightOnly(
+    U8 *buf,
+    U64 size,
+    U64 cursor,
+    U64 *out_name_len,
+    U32 *out_dim_count,
+    U64 *out_dims_cells,
+    U64 *out_required_bytes,
+    U32 *out_type_value,
+    U64 *out_tensor_offset,
+    U64 *out_next_cursor)
+{
+    U8 *snapshot_buf;
+    U64 snapshot_size;
+    U64 snapshot_cursor;
+
+    U64 staged_name_len;
+    U32 staged_dim_count;
+    U64 staged_dims_cells;
+    U64 staged_required_bytes;
+    U32 staged_type_value;
+    U64 staged_tensor_offset;
+    U64 staged_next_cursor;
+
+    GGUFTensorInfo canonical;
+    U64 canonical_next_cursor;
+    U64 canonical_name_len;
+    U32 canonical_dim_count;
+    U64 canonical_dims_cells;
+    U64 canonical_required_bytes;
+    U32 canonical_type_value;
+    U64 canonical_tensor_offset;
+    U64 dims_bytes;
+    U64 computed_end;
+    I64 status;
+
+    if (!buf || !out_name_len || !out_dim_count || !out_dims_cells)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+    if (!out_required_bytes || !out_type_value || !out_tensor_offset || !out_next_cursor)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+
+    if (out_name_len == out_dims_cells ||
+        out_name_len == out_required_bytes ||
+        out_name_len == out_tensor_offset ||
+        out_name_len == out_next_cursor ||
+        out_dim_count == out_type_value ||
+        out_dims_cells == out_required_bytes ||
+        out_dims_cells == out_tensor_offset ||
+        out_dims_cells == out_next_cursor ||
+        out_required_bytes == out_tensor_offset ||
+        out_required_bytes == out_next_cursor ||
+        out_tensor_offset == out_next_cursor)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+
+    if (cursor > size)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (size > 0x7FFFFFFFFFFFFFFF || cursor > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    snapshot_buf = buf;
+    snapshot_size = size;
+    snapshot_cursor = cursor;
+
+    staged_name_len = 0;
+    staged_dim_count = 0;
+    staged_dims_cells = 0;
+    staged_required_bytes = 0;
+    staged_type_value = 0;
+    staged_tensor_offset = 0;
+    staged_next_cursor = 0;
+
+    GGUFTensorZeroInfo(&canonical);
+    canonical_next_cursor = 0;
+    canonical_name_len = 0;
+    canonical_dim_count = 0;
+    canonical_dims_cells = 0;
+    canonical_required_bytes = 0;
+    canonical_type_value = 0;
+    canonical_tensor_offset = 0;
+
+    status = GGUFTensorInfoReadCheckedNoPartialCommitOnly(buf,
+                                                           size,
+                                                           cursor,
+                                                           &staged_name_len,
+                                                           &staged_dim_count,
+                                                           &staged_dims_cells,
+                                                           &staged_required_bytes,
+                                                           &staged_type_value,
+                                                           &staged_tensor_offset,
+                                                           &staged_next_cursor);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+
+    status = GGUFTensorInfoReadCheckedNoPartial(buf,
+                                                size,
+                                                cursor,
+                                                &canonical,
+                                                &canonical_next_cursor);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+
+    canonical_name_len = canonical.name.len;
+    canonical_dim_count = canonical.n_dims;
+    canonical_dims_cells = canonical_dim_count;
+    canonical_type_value = canonical.ggml_type;
+    canonical_tensor_offset = canonical.offset;
+
+    if (!GGUFTensorTryAddU64(8, canonical_name_len, &canonical_required_bytes))
+    {
+        GGUFTensorFreeString(&canonical.name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
+    if (!GGUFTensorTryAddU64(canonical_required_bytes, 4, &canonical_required_bytes))
+    {
+        GGUFTensorFreeString(&canonical.name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
+    if (!GGUFTensorTryMulU64(canonical_dims_cells, 8, &dims_bytes))
+    {
+        GGUFTensorFreeString(&canonical.name);
+        return GGUF_TENSOR_PARSE_ERR_DIM_OVERFLOW;
+    }
+    if (!GGUFTensorTryAddU64(canonical_required_bytes, dims_bytes, &canonical_required_bytes))
+    {
+        GGUFTensorFreeString(&canonical.name);
+        return GGUF_TENSOR_PARSE_ERR_DIM_OVERFLOW;
+    }
+    if (!GGUFTensorTryAddU64(canonical_required_bytes, 4, &canonical_required_bytes))
+    {
+        GGUFTensorFreeString(&canonical.name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
+    if (!GGUFTensorTryAddU64(canonical_required_bytes, 8, &canonical_required_bytes))
+    {
+        GGUFTensorFreeString(&canonical.name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
+
+    if (!GGUFTensorTryAddU64(cursor, canonical_required_bytes, &computed_end))
+    {
+        GGUFTensorFreeString(&canonical.name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
+    if (computed_end != canonical_next_cursor)
+    {
+        GGUFTensorFreeString(&canonical.name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
+
+    if (snapshot_buf != buf || snapshot_size != size || snapshot_cursor != cursor)
+    {
+        GGUFTensorFreeString(&canonical.name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
+
+    if (staged_name_len != canonical_name_len ||
+        staged_dim_count != canonical_dim_count ||
+        staged_dims_cells != canonical_dims_cells ||
+        staged_required_bytes != canonical_required_bytes ||
+        staged_type_value != canonical_type_value ||
+        staged_tensor_offset != canonical_tensor_offset ||
+        staged_next_cursor != canonical_next_cursor)
+    {
+        GGUFTensorFreeString(&canonical.name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
+
+    *out_name_len = staged_name_len;
+    *out_dim_count = staged_dim_count;
+    *out_dims_cells = staged_dims_cells;
+    *out_required_bytes = staged_required_bytes;
+    *out_type_value = staged_type_value;
+    *out_tensor_offset = staged_tensor_offset;
+    *out_next_cursor = staged_next_cursor;
+
+    GGUFTensorFreeString(&canonical.name);
+    return GGUF_TENSOR_PARSE_OK;
+}
+
 I64 GGUFParseTensorInfo(U8 *buf,
                         I64 size,
                         U64 tensor_count,
