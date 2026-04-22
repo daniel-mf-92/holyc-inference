@@ -1416,6 +1416,16 @@ I32 SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(
         canonical_selected_count > canonical_required_workspace_cells)
         return FP_Q16_ERR_BAD_PARAM;
 
+    // Immutable top-k snapshot is the publication ceiling for selected lanes.
+    if (staged_selected_count > snapshot_top_k ||
+        canonical_selected_count > snapshot_top_k)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Required scratch cells must always include all logits lanes.
+    if (staged_required_workspace_cells < snapshot_logits_count ||
+        canonical_required_workspace_cells < snapshot_logits_count)
+        return FP_Q16_ERR_BAD_PARAM;
+
     // Immutable workspace snapshot remains the hard publication ceiling.
     if (staged_required_workspace_cells > snapshot_workspace_capacity ||
         canonical_required_workspace_cells > snapshot_workspace_capacity)

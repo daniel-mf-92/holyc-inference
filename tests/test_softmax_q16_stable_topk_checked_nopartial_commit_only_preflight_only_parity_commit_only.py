@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly (IQ-1102)."""
+"""Harness for SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly (IQ-1104)."""
 
 from __future__ import annotations
 
@@ -137,6 +137,8 @@ def test_source_contains_signature_and_composition_chain() -> None:
     assert "SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnly(" in body
     assert "if (staged_required_workspace_cells < 0 ||" in body
     assert "if (staged_selected_count > staged_required_workspace_cells ||" in body
+    assert "if (staged_selected_count > snapshot_top_k ||" in body
+    assert "if (staged_required_workspace_cells < snapshot_logits_count ||" in body
     assert "if (staged_required_workspace_cells > snapshot_workspace_capacity ||" in body
     assert "if (staged_required_workspace_cells != canonical_required_workspace_cells ||" in body
 
@@ -356,6 +358,110 @@ def test_rejects_workspace_oversubscription_before_publish() -> None:
     assert out_max == [0xCCCC]
 
 
+def test_rejects_selected_count_above_snapshot_topk() -> None:
+    logits = [21, 18, 17]
+    out_required = [0x1111]
+    out_selected = [0x2222]
+    out_max = [0x3333]
+
+    def staged_bad(*_args, **_kwargs):
+        _kwargs["out_required_workspace_cells"][0] = 5
+        _kwargs["out_selected_count"][0] = 3
+        _kwargs["out_max_logit_q16"][0] = 21
+        return FP_Q16_OK
+
+    def canonical_bad(*_args, **_kwargs):
+        _kwargs["out_required_workspace_cells"][0] = 5
+        _kwargs["out_selected_count"][0] = 3
+        _kwargs["out_max_logit_q16"][0] = 21
+        return FP_Q16_OK
+
+    err = softmax_q16_stable_topk_checked_nopartial_commit_only_preflight_only_parity_commit_only(
+        logits,
+        logits_count=3,
+        top_k=2,
+        workspace_capacity=6,
+        out_required_workspace_cells=out_required,
+        out_selected_count=out_selected,
+        out_max_logit_q16=out_max,
+        staged_fn=lambda l, lc, tk, wc, r, s, m: staged_bad(
+            logits_q16=l,
+            logits_count=lc,
+            top_k=tk,
+            workspace_capacity=wc,
+            out_required_workspace_cells=r,
+            out_selected_count=s,
+            out_max_logit_q16=m,
+        ),
+        canonical_fn=lambda l, lc, tk, wc, r, s, m: canonical_bad(
+            logits_q16=l,
+            logits_count=lc,
+            top_k=tk,
+            workspace_capacity=wc,
+            out_required_workspace_cells=r,
+            out_selected_count=s,
+            out_max_logit_q16=m,
+        ),
+    )
+
+    assert err == FP_Q16_ERR_BAD_PARAM
+    assert out_required == [0x1111]
+    assert out_selected == [0x2222]
+    assert out_max == [0x3333]
+
+
+def test_rejects_required_workspace_below_logits_count() -> None:
+    logits = [5, 2, -1, 3]
+    out_required = [0xAAAA]
+    out_selected = [0xBBBB]
+    out_max = [0xCCCC]
+
+    def staged_bad(*_args, **_kwargs):
+        _kwargs["out_required_workspace_cells"][0] = 3
+        _kwargs["out_selected_count"][0] = 2
+        _kwargs["out_max_logit_q16"][0] = 5
+        return FP_Q16_OK
+
+    def canonical_bad(*_args, **_kwargs):
+        _kwargs["out_required_workspace_cells"][0] = 3
+        _kwargs["out_selected_count"][0] = 2
+        _kwargs["out_max_logit_q16"][0] = 5
+        return FP_Q16_OK
+
+    err = softmax_q16_stable_topk_checked_nopartial_commit_only_preflight_only_parity_commit_only(
+        logits,
+        logits_count=4,
+        top_k=2,
+        workspace_capacity=10,
+        out_required_workspace_cells=out_required,
+        out_selected_count=out_selected,
+        out_max_logit_q16=out_max,
+        staged_fn=lambda l, lc, tk, wc, r, s, m: staged_bad(
+            logits_q16=l,
+            logits_count=lc,
+            top_k=tk,
+            workspace_capacity=wc,
+            out_required_workspace_cells=r,
+            out_selected_count=s,
+            out_max_logit_q16=m,
+        ),
+        canonical_fn=lambda l, lc, tk, wc, r, s, m: canonical_bad(
+            logits_q16=l,
+            logits_count=lc,
+            top_k=tk,
+            workspace_capacity=wc,
+            out_required_workspace_cells=r,
+            out_selected_count=s,
+            out_max_logit_q16=m,
+        ),
+    )
+
+    assert err == FP_Q16_ERR_BAD_PARAM
+    assert out_required == [0xAAAA]
+    assert out_selected == [0xBBBB]
+    assert out_max == [0xCCCC]
+
+
 if __name__ == "__main__":
     test_source_contains_signature_and_composition_chain()
     test_known_vector()
@@ -364,4 +470,6 @@ if __name__ == "__main__":
     test_fuzz_parity_vs_components()
     test_rejects_negative_cardinality_from_staged_path()
     test_rejects_workspace_oversubscription_before_publish()
+    test_rejects_selected_count_above_snapshot_topk()
+    test_rejects_required_workspace_below_logits_count()
     print("ok")
