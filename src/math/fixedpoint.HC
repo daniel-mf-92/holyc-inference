@@ -216,6 +216,7 @@ I32 FPQ16MulShiftRoundChecked(I64 lhs,
 {
     U64 abs_lhs;
     U64 abs_rhs;
+    U64 signed_limit;
     U64 product_mag;
     U64 quotient;
     U64 remainder;
@@ -237,6 +238,9 @@ I32 FPQ16MulShiftRoundChecked(I64 lhs,
     abs_lhs = FPAbsToU64(lhs);
     abs_rhs = FPAbsToU64(rhs);
     is_negative = ((lhs < 0) ^ (rhs < 0));
+    signed_limit = (U64)I64_MAX_VALUE;
+    if (is_negative)
+        signed_limit = 0x8000000000000000;
 
     if (abs_lhs > (U64_MAX_VALUE / abs_rhs))
         return FP_Q16_ERR_OVERFLOW;
@@ -256,7 +260,7 @@ I32 FPQ16MulShiftRoundChecked(I64 lhs,
     // Half-away-from-zero: ties increment magnitude before sign restore.
     if (remainder >= half)
     {
-        if (quotient == U64_MAX_VALUE)
+        if (quotient >= signed_limit)
             return FP_Q16_ERR_OVERFLOW;
         quotient++;
     }

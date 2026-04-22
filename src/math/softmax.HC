@@ -479,6 +479,148 @@ I32 FPQ16SoftmaxNormalizePhasePreflightChecked(I64 *exp_lanes_q16,
     return FP_Q16_OK;
 }
 
+// Checked prefix-sum builder for Q16 probability lanes with deterministic
+// exact-one correction.
+//
+// Purpose:
+// - Build cumulative sums for top-p scans from `probs_q16`.
+// - Guarantee final cumulative total is exactly 1.0_q16.
+// - Preserve no-partial-write semantics on validation/overflow failures.
+//
+// Correction semantics:
+// - diff = 1.0_q16 - sum(probs_q16)
+// - diff > 0: add `diff` to the last lane.
+// - diff < 0: subtract `-diff` from lanes in reverse order (tail-first),
+//             borrowing up to each lane's full value until exhausted.
+I32 FPQ16SoftmaxPrefixSumChecked(I64 *probs_q16,
+                                 I64 lane_count,
+                                 I64 *prefix_sums_q16,
+                                 I64 *out_total_q16)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 running_sum_q16;
+    I64 corrected_total_q16;
+    I64 diff_q16;
+    I64 borrow_q16;
+    I64 lane_q16;
+    I64 take_q16;
+
+    if (!probs_q16 || !prefix_sums_q16 || !out_total_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (!lane_count)
+    {
+        *out_total_q16 = 0;
+        return FP_Q16_OK;
+    }
+
+    last_index = lane_count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)probs_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+    if ((U64)prefix_sums_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Preflight source lanes and total before any output write.
+    running_sum_q16 = 0;
+    for (i = 0; i < lane_count; i++)
+    {
+        lane_q16 = probs_q16[i];
+        if (lane_q16 < 0)
+            return FP_Q16_ERR_BAD_PARAM;
+        if (lane_q16 > (I64_MAX_VALUE - running_sum_q16))
+            return FP_Q16_ERR_OVERFLOW;
+        running_sum_q16 += lane_q16;
+    }
+
+    corrected_total_q16 = running_sum_q16;
+    diff_q16 = FP_Q16_ONE - running_sum_q16;
+
+    if (diff_q16 > 0)
+    {
+        if (corrected_total_q16 > (I64_MAX_VALUE - diff_q16))
+            return FP_Q16_ERR_OVERFLOW;
+        corrected_total_q16 += diff_q16;
+    }
+    else if (diff_q16 < 0)
+    {
+        borrow_q16 = -diff_q16;
+        for (i = lane_count - 1; i >= 0 && borrow_q16 > 0; i--)
+        {
+            lane_q16 = probs_q16[i];
+            if (lane_q16 >= borrow_q16)
+                borrow_q16 = 0;
+            else
+                borrow_q16 -= lane_q16;
+        }
+        if (borrow_q16)
+            return FP_Q16_ERR_BAD_PARAM;
+
+        corrected_total_q16 += diff_q16;
+    }
+
+    if (corrected_total_q16 != FP_Q16_ONE)
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Stage corrected lanes into output buffer first.
+    if (diff_q16 >= 0)
+    {
+        for (i = 0; i < lane_count; i++)
+            prefix_sums_q16[i] = probs_q16[i];
+
+        prefix_sums_q16[last_index] += diff_q16;
+    }
+    else
+    {
+        borrow_q16 = -diff_q16;
+        for (i = lane_count - 1; i >= 0; i--)
+        {
+            lane_q16 = probs_q16[i];
+            if (borrow_q16 > 0)
+            {
+                take_q16 = borrow_q16;
+                if (take_q16 > lane_q16)
+                    take_q16 = lane_q16;
+                prefix_sums_q16[i] = lane_q16 - take_q16;
+                borrow_q16 -= take_q16;
+            }
+            else
+            {
+                prefix_sums_q16[i] = lane_q16;
+            }
+        }
+
+        if (borrow_q16)
+            return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    // Convert corrected lanes into cumulative sums.
+    running_sum_q16 = 0;
+    for (i = 0; i < lane_count; i++)
+    {
+        if (prefix_sums_q16[i] < 0)
+            return FP_Q16_ERR_BAD_PARAM;
+        if (prefix_sums_q16[i] > (I64_MAX_VALUE - running_sum_q16))
+            return FP_Q16_ERR_OVERFLOW;
+
+        running_sum_q16 += prefix_sums_q16[i];
+        prefix_sums_q16[i] = running_sum_q16;
+    }
+
+    if (running_sum_q16 != FP_Q16_ONE)
+        return FP_Q16_ERR_OVERFLOW;
+
+    *out_total_q16 = running_sum_q16;
+    return FP_Q16_OK;
+}
+
 // Checked composed helper for alias-permitted split-phase softmax.
 // Pipeline:
 //   1) exp_lanes_q16 <- exp(preclamped_logits_q16)

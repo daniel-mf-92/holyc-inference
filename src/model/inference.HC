@@ -633,6 +633,14 @@ I32 InferenceForwardDispatchRegistryInitQ16CheckedNoPartialCommitOnlyPreflightOn
         staged_default_arch_id != canonical_default_arch_id)
         return SAMPLING_Q16_ERR_BAD_PARAM;
 
+    if (staged_registry_count != DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT ||
+        canonical_registry_count != DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (staged_default_arch_id != DISPATCH_ARCH_Q16_ID_LLAMA ||
+        canonical_default_arch_id != DISPATCH_ARCH_Q16_ID_LLAMA)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
     for (slot_index = 0;
          slot_index < DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT;
          slot_index++)
@@ -722,7 +730,7 @@ I32 InferenceForwardDispatchRegistryInitQ16CheckedNoPartialCommitOnlyPreflightOn
     return SAMPLING_Q16_OK;
 }
 
-// IQ-1129 commit-only diagnostics wrapper over registry-init parity gate.
+// IQ-1129 commit-only diagnostics wrapper for registry-init parity.
 //
 // Compose:
 //   1) stage parity-validated tuple via
@@ -813,6 +821,14 @@ I32 InferenceForwardDispatchRegistryInitQ16CheckedNoPartialCommitOnlyPreflightOn
 
     if (staged_registry_count != canonical_registry_count ||
         staged_default_arch_id != canonical_default_arch_id)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (staged_registry_count != DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT ||
+        canonical_registry_count != DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (staged_default_arch_id != DISPATCH_ARCH_Q16_ID_LLAMA ||
+        canonical_default_arch_id != DISPATCH_ARCH_Q16_ID_LLAMA)
         return SAMPLING_Q16_ERR_BAD_PARAM;
 
     for (slot_index = 0;

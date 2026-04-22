@@ -679,6 +679,55 @@ I32 FPQ16ExpMulPow2Checked(I64 base_q16,
     return FP_Q16_OK;
 }
 
+// IQ-1133 integer-only base-2 exponent approximation:
+//   out_exp2_q16 ~= 2^(input_q16)
+//
+// Strategy:
+// - Convert base-2 exponent to natural-exponent domain in Q16:
+//     exp_input_q16 = input_q16 * ln(2)
+// - Reuse the checked ln(2) range-reduction + bounded polynomial core
+//   implemented by FPQ16ExpFromClampedInputChecked.
+// - Keep all arithmetic integer-only and auditable.
+//
+// Error/overflow behavior:
+// - Null output pointer => NULL_PTR.
+// - Multiply overflow while building exp_input_q16 saturates deterministically:
+//     positive input -> I64_MAX
+//     negative input -> 0
+// - Otherwise propagates checked exp status surfaces unchanged.
+I32 FPQ16Exp2ApproxChecked(I64 input_q16,
+                           I64 *out_exp2_q16)
+{
+    I64 exp_input_q16;
+    I64 staged_out_q16;
+    I32 status;
+
+    if (!out_exp2_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    status = FPQ16MulChecked(input_q16,
+                             EXP_Q16_LN2,
+                             &exp_input_q16);
+    if (status == FP_Q16_ERR_OVERFLOW)
+    {
+        if (input_q16 >= 0)
+            *out_exp2_q16 = EXP_Q16_SAT_MAX_OUTPUT;
+        else
+            *out_exp2_q16 = EXP_Q16_SAT_MIN_OUTPUT;
+        return FP_Q16_OK;
+    }
+    if (status)
+        return status;
+
+    status = FPQ16ExpFromClampedInputChecked(exp_input_q16,
+                                             &staged_out_q16);
+    if (status)
+        return status;
+
+    *out_exp2_q16 = staged_out_q16;
+    return FP_Q16_OK;
+}
+
 // Checked Q16 exp evaluation for callers that already performed input-domain
 // clamping. This helper refuses out-of-domain inputs instead of clamping:
 //   requires EXP_Q16_MIN_INPUT <= clamped_input_q16 <= EXP_Q16_MAX_INPUT
