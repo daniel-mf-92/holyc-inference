@@ -5907,3 +5907,149 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
     *out_last_cell_index = staged_last_cell_index;
     return KV_Q16_OK;
 }
+
+// IQ-1072 diagnostics-only parity gate over IQ-1071 preflight companion and
+// IQ-1070 canonical commit wrapper.
+//
+// Compose:
+// 1) stage tuple via `...RequiredBytesParityCommitOnlyPreflightOnly`;
+// 2) stage canonical tuple via `...RequiredBytesParityCommitOnly`;
+// 3) enforce immutable span snapshots and strict tuple parity;
+// 4) publish atomically only on exact parity success.
+I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnlyPreflightOnlyParity(
+    I64 layer_count,
+    I64 head_count,
+    I64 head_dim,
+    I64 token_start,
+    I64 token_count,
+    I64 cache_capacity,
+    I64 *out_required_cells,
+    I64 *out_required_bytes,
+    I64 *out_last_cell_index)
+{
+    I64 staged_preflight_required_cells;
+    I64 staged_preflight_required_bytes;
+    I64 staged_preflight_last_cell_index;
+
+    I64 staged_commit_required_cells;
+    I64 staged_commit_required_bytes;
+    I64 staged_commit_last_cell_index;
+
+    I64 snapshot_layer_count;
+    I64 snapshot_head_count;
+    I64 snapshot_head_dim;
+    I64 snapshot_token_start;
+    I64 snapshot_token_count;
+    I64 snapshot_cache_capacity;
+
+    I64 *snapshot_out_required_cells;
+    I64 *snapshot_out_required_bytes;
+    I64 *snapshot_out_last_cell_index;
+    I32 status;
+
+    if (!out_required_cells || !out_required_bytes || !out_last_cell_index)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (out_required_cells == out_required_bytes ||
+        out_required_cells == out_last_cell_index ||
+        out_required_bytes == out_last_cell_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (layer_count < 0 || head_count < 0 || head_dim < 0 ||
+        token_start < 0 || token_count < 0 || cache_capacity < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    snapshot_layer_count = layer_count;
+    snapshot_head_count = head_count;
+    snapshot_head_dim = head_dim;
+    snapshot_token_start = token_start;
+    snapshot_token_count = token_count;
+    snapshot_cache_capacity = cache_capacity;
+
+    snapshot_out_required_cells = out_required_cells;
+    snapshot_out_required_bytes = out_required_bytes;
+    snapshot_out_last_cell_index = out_last_cell_index;
+
+    status =
+        KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnlyPreflightOnly(
+            layer_count,
+            head_count,
+            head_dim,
+            token_start,
+            token_count,
+            cache_capacity,
+            &staged_preflight_required_cells,
+            &staged_preflight_required_bytes,
+            &staged_preflight_last_cell_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status =
+        KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnly(
+            layer_count,
+            head_count,
+            head_dim,
+            token_start,
+            token_count,
+            cache_capacity,
+            &staged_commit_required_cells,
+            &staged_commit_required_bytes,
+            &staged_commit_last_cell_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (snapshot_layer_count != layer_count ||
+        snapshot_head_count != head_count ||
+        snapshot_head_dim != head_dim ||
+        snapshot_token_start != token_start ||
+        snapshot_token_count != token_count ||
+        snapshot_cache_capacity != cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_out_required_cells != out_required_cells ||
+        snapshot_out_required_bytes != out_required_bytes ||
+        snapshot_out_last_cell_index != out_last_cell_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (out_required_cells == out_required_bytes ||
+        out_required_cells == out_last_cell_index ||
+        out_required_bytes == out_last_cell_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (staged_preflight_required_cells < 0 ||
+        staged_preflight_required_bytes < 0 ||
+        staged_preflight_last_cell_index < 0 ||
+        staged_commit_required_cells < 0 ||
+        staged_commit_required_bytes < 0 ||
+        staged_commit_last_cell_index < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if ((staged_preflight_required_bytes % sizeof(I64)) != 0)
+        return KV_Q16_ERR_BAD_PARAM;
+    if ((staged_preflight_required_bytes / sizeof(I64)) !=
+        staged_preflight_required_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if ((staged_commit_required_bytes % sizeof(I64)) != 0)
+        return KV_Q16_ERR_BAD_PARAM;
+    if ((staged_commit_required_bytes / sizeof(I64)) !=
+        staged_commit_required_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (!staged_preflight_required_cells && staged_preflight_last_cell_index)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (!staged_commit_required_cells && staged_commit_last_cell_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (staged_preflight_required_cells != staged_commit_required_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (staged_preflight_required_bytes != staged_commit_required_bytes)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (staged_preflight_last_cell_index != staged_commit_last_cell_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    *out_required_cells = staged_preflight_required_cells;
+    *out_required_bytes = staged_preflight_required_bytes;
+    *out_last_cell_index = staged_preflight_last_cell_index;
+    return KV_Q16_OK;
+}
