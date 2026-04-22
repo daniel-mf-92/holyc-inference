@@ -468,6 +468,73 @@ I32 FPQ16LnArrayCheckedNoPartialCommitOnlyPreflightOnlyParity(I64 *input_q16,
     return INTLOG_STATUS_OK;
 }
 
+// Commit-only diagnostics wrapper over
+// FPQ16LnArrayCheckedNoPartialCommitOnlyPreflightOnlyParity.
+//
+// Contract:
+// - Does not write caller out_q16 lanes.
+// - Revalidates immutable {input_q16,count,out_q16,out_capacity_bytes} snapshots.
+// - Recomputes canonical required-byte geometry and enforces exact parity.
+// - Atomically publishes required bytes once at success boundary.
+I32 FPQ16LnArrayCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(I64 *input_q16,
+                                                                        I64 count,
+                                                                        I64 *out_q16,
+                                                                        I64 out_capacity_bytes,
+                                                                        I64 *required_bytes_out)
+{
+    I64 *snapshot_input_q16;
+    I64 snapshot_count;
+    I64 *snapshot_out_q16;
+    I64 snapshot_out_capacity_bytes;
+    I64 staged_required_bytes;
+    I64 canonical_required_bytes;
+    I32 status;
+
+    if (!required_bytes_out)
+        return INTLOG_STATUS_BADPTR;
+
+    *required_bytes_out = 0;
+
+    snapshot_input_q16 = input_q16;
+    snapshot_count = count;
+    snapshot_out_q16 = out_q16;
+    snapshot_out_capacity_bytes = out_capacity_bytes;
+
+    status = FPQ16LnArrayCheckedNoPartialCommitOnlyPreflightOnlyParity(input_q16,
+                                                                        count,
+                                                                        out_q16,
+                                                                        out_capacity_bytes,
+                                                                        &staged_required_bytes);
+    if (status != INTLOG_STATUS_OK)
+        return status;
+
+    if (snapshot_input_q16 != input_q16 ||
+        snapshot_count != count ||
+        snapshot_out_q16 != out_q16 ||
+        snapshot_out_capacity_bytes != out_capacity_bytes)
+        return INTLOG_STATUS_BADCOUNT;
+
+    if (!count)
+        canonical_required_bytes = 0;
+    else if (count > (I64_MAX_VALUE / 8))
+        return INTLOG_STATUS_OVERFLOW;
+    else
+        canonical_required_bytes = count * 8;
+
+    if (staged_required_bytes != canonical_required_bytes)
+        return INTLOG_STATUS_OVERFLOW;
+
+    // Final immutable snapshot revalidation immediately before publish.
+    if (snapshot_input_q16 != input_q16 ||
+        snapshot_count != count ||
+        snapshot_out_q16 != out_q16 ||
+        snapshot_out_capacity_bytes != out_capacity_bytes)
+        return INTLOG_STATUS_BADCOUNT;
+
+    *required_bytes_out = staged_required_bytes;
+    return INTLOG_STATUS_OK;
+}
+
 I32 FPQ16LnArrayCheckedNoPartialDefault(I64 *input_q16,
                                         I64 count,
                                         I64 *out_q16)
