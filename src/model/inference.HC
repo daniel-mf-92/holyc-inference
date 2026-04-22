@@ -17,6 +17,8 @@
 #define DISPATCH_ARCH_Q16_ID_QWEN2   3
 #define DISPATCH_ARCH_Q16_ID_PHI3    4
 
+#define DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT 4
+
 I32 InferenceForwardQ16CheckedNoPartial(
     I64 *embed_q16,
     I64 embed_capacity,
@@ -173,6 +175,143 @@ I32 InferenceDispatchParseArchitectureIdChecked(U8 *meta_key_bytes,
     }
 
     return SAMPLING_Q16_ERR_BAD_PARAM;
+}
+
+// IQ-1098 explicit architecture registry initialization for WS10.
+//
+// Contract:
+// - Materialize auditable, deterministic dispatch slots:
+//   {"llama","mistral","qwen2","phi3"}.
+// - Stage all outputs privately, then atomically publish on success.
+// - Revalidate immutable slot-count/output-pointer snapshots before publish.
+// - Reject duplicate tags, duplicate arch IDs, or unsupported tag->ID pairs.
+I32 InferenceForwardDispatchRegistryInitQ16CheckedNoPartial(
+    U8 **out_registry_tags,
+    I64 *out_registry_tag_lens,
+    I64 *out_registry_arch_ids,
+    I64 registry_slot_capacity,
+    I64 *out_registry_count,
+    I64 *out_default_arch_id)
+{
+    U8 *staged_tags[DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT];
+    I64 staged_tag_lens[DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT];
+    I64 staged_arch_ids[DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT];
+    I64 staged_registry_count;
+    I64 staged_default_arch_id;
+
+    U8 *canonical_key;
+    I64 canonical_key_len;
+
+    I64 slot_index;
+    I64 compare_index;
+    I64 parsed_arch_id;
+    I64 snapshot_registry_slot_capacity;
+    U8 **snapshot_out_registry_tags;
+    I64 *snapshot_out_registry_tag_lens;
+    I64 *snapshot_out_registry_arch_ids;
+    I64 *snapshot_out_registry_count;
+    I64 *snapshot_out_default_arch_id;
+    I32 status;
+
+    if (!out_registry_tags || !out_registry_tag_lens || !out_registry_arch_ids ||
+        !out_registry_count || !out_default_arch_id)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (registry_slot_capacity < DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (out_registry_count == out_default_arch_id)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_registry_slot_capacity = registry_slot_capacity;
+    snapshot_out_registry_tags = out_registry_tags;
+    snapshot_out_registry_tag_lens = out_registry_tag_lens;
+    snapshot_out_registry_arch_ids = out_registry_arch_ids;
+    snapshot_out_registry_count = out_registry_count;
+    snapshot_out_default_arch_id = out_default_arch_id;
+
+    staged_tags[0] = (U8 *)"llama";
+    staged_tags[1] = (U8 *)"mistral";
+    staged_tags[2] = (U8 *)"qwen2";
+    staged_tags[3] = (U8 *)"phi3";
+
+    staged_tag_lens[0] = 5;
+    staged_tag_lens[1] = 7;
+    staged_tag_lens[2] = 5;
+    staged_tag_lens[3] = 4;
+
+    staged_arch_ids[0] = DISPATCH_ARCH_Q16_ID_LLAMA;
+    staged_arch_ids[1] = DISPATCH_ARCH_Q16_ID_MISTRAL;
+    staged_arch_ids[2] = DISPATCH_ARCH_Q16_ID_QWEN2;
+    staged_arch_ids[3] = DISPATCH_ARCH_Q16_ID_PHI3;
+
+    staged_registry_count = DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT;
+    staged_default_arch_id = DISPATCH_ARCH_Q16_ID_LLAMA;
+
+    canonical_key = (U8 *)DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE;
+    canonical_key_len = DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE_LEN;
+
+    for (slot_index = 0;
+         slot_index < DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT;
+         slot_index++)
+    {
+        if (!staged_tags[slot_index] || staged_tag_lens[slot_index] <= 0)
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+
+        status = InferenceDispatchParseArchitectureIdChecked(
+            canonical_key,
+            canonical_key_len,
+            staged_tags[slot_index],
+            staged_tag_lens[slot_index],
+            &parsed_arch_id);
+        if (status)
+            return status;
+
+        if (parsed_arch_id != staged_arch_ids[slot_index])
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+
+    for (slot_index = 0;
+         slot_index < DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT;
+         slot_index++)
+    {
+        for (compare_index = slot_index + 1;
+             compare_index < DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT;
+             compare_index++)
+        {
+            if (staged_arch_ids[slot_index] == staged_arch_ids[compare_index])
+                return SAMPLING_Q16_ERR_BAD_PARAM;
+
+            if (InferenceDispatchByteSpanEquals(staged_tags[slot_index],
+                                                staged_tag_lens[slot_index],
+                                                staged_tags[compare_index],
+                                                staged_tag_lens[compare_index]))
+                return SAMPLING_Q16_ERR_BAD_PARAM;
+        }
+    }
+
+    if (snapshot_registry_slot_capacity != registry_slot_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_out_registry_tags != out_registry_tags ||
+        snapshot_out_registry_tag_lens != out_registry_tag_lens ||
+        snapshot_out_registry_arch_ids != out_registry_arch_ids ||
+        snapshot_out_registry_count != out_registry_count ||
+        snapshot_out_default_arch_id != out_default_arch_id)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    for (slot_index = 0;
+         slot_index < DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT;
+         slot_index++)
+    {
+        out_registry_tags[slot_index] = staged_tags[slot_index];
+        out_registry_tag_lens[slot_index] = staged_tag_lens[slot_index];
+        out_registry_arch_ids[slot_index] = staged_arch_ids[slot_index];
+    }
+
+    *out_registry_count = staged_registry_count;
+    *out_default_arch_id = staged_default_arch_id;
+    return SAMPLING_Q16_OK;
 }
 
 // IQ-1094 explicit architecture dispatch for HolyC integer-only forward path.

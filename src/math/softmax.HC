@@ -1162,6 +1162,20 @@ I32 SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyP
         snapshot_out_max_logit_q16 != out_max_logit_q16)
         return FP_Q16_ERR_BAD_PARAM;
 
+    // Geometry tuple fields must stay non-negative for both staged and
+    // canonical paths. max_logit_q16 may be negative and is parity-checked
+    // below, but required workspace and selected count are cardinalities.
+    if (staged_required_workspace_cells < 0 ||
+        staged_selected_count < 0 ||
+        canonical_required_workspace_cells < 0 ||
+        canonical_selected_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Enforce cardinality ordering before parity publication.
+    if (staged_selected_count > staged_required_workspace_cells ||
+        canonical_selected_count > canonical_required_workspace_cells)
+        return FP_Q16_ERR_BAD_PARAM;
+
     if (staged_required_workspace_cells != canonical_required_workspace_cells ||
         staged_selected_count != canonical_selected_count ||
         staged_max_logit_q16 != canonical_max_logit_q16)
