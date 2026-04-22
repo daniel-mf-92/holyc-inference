@@ -2184,6 +2184,17 @@ I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnly(
     I64 snapshot_workspace_topk_logits_capacity;
     I64 snapshot_workspace_topk_index_capacity;
     I64 snapshot_generated_capacity;
+
+    I64 *snapshot_step_logits_q16;
+    I64 *snapshot_token_history;
+    I64 *snapshot_random_q16_values;
+    I64 *snapshot_workspace_stage_logits_q16;
+    I64 *snapshot_workspace_topk_logits_q16;
+    I64 *snapshot_workspace_topk_indices;
+    I64 *snapshot_out_generated_tokens;
+    I64 *snapshot_out_required_logits;
+    I64 *snapshot_out_required_tokens;
+    I64 *snapshot_out_final_token_count;
     I32 status;
 
     if (!out_required_step_logits_cells ||
@@ -2215,6 +2226,17 @@ I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnly(
     snapshot_workspace_topk_logits_capacity = workspace_topk_logits_capacity;
     snapshot_workspace_topk_index_capacity = workspace_topk_index_capacity;
     snapshot_generated_capacity = generated_capacity;
+
+    snapshot_step_logits_q16 = step_logits_q16;
+    snapshot_token_history = token_history;
+    snapshot_random_q16_values = random_q16_values;
+    snapshot_workspace_stage_logits_q16 = workspace_stage_logits_q16;
+    snapshot_workspace_topk_logits_q16 = workspace_topk_logits_q16;
+    snapshot_workspace_topk_indices = workspace_topk_indices;
+    snapshot_out_generated_tokens = out_generated_tokens;
+    snapshot_out_required_logits = out_required_logits;
+    snapshot_out_required_tokens = out_required_tokens;
+    snapshot_out_final_token_count = out_final_token_count;
 
     status = InferenceGenerateTokensCheckedTopKDefaultPreflightOnly(
         step_logits_q16,
@@ -2255,6 +2277,18 @@ I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnly(
         snapshot_workspace_topk_logits_capacity != workspace_topk_logits_capacity ||
         snapshot_workspace_topk_index_capacity != workspace_topk_index_capacity ||
         snapshot_generated_capacity != generated_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_step_logits_q16 != step_logits_q16 ||
+        snapshot_token_history != token_history ||
+        snapshot_random_q16_values != random_q16_values ||
+        snapshot_workspace_stage_logits_q16 != workspace_stage_logits_q16 ||
+        snapshot_workspace_topk_logits_q16 != workspace_topk_logits_q16 ||
+        snapshot_workspace_topk_indices != workspace_topk_indices ||
+        snapshot_out_generated_tokens != out_generated_tokens ||
+        snapshot_out_required_logits != out_required_logits ||
+        snapshot_out_required_tokens != out_required_tokens ||
+        snapshot_out_final_token_count != out_final_token_count)
         return SAMPLING_Q16_ERR_BAD_PARAM;
 
     *out_required_step_logits_cells = staged_required_step_logits_cells;
