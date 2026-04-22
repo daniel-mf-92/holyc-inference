@@ -694,6 +694,208 @@ I32 FPQ16SoftmaxPrefixSumCheckedNoPartial(I64 *probs_q16,
     return FP_Q16_OK;
 }
 
+// Commit-only wrapper over FPQ16SoftmaxPrefixSumChecked.
+//
+// Purpose:
+// - Build canonical corrected prefix sums on staged scratch.
+// - Publish caller prefix lanes and summary tuple atomically only after
+//   canonical kernel success and immutable snapshot revalidation.
+//
+// Summary tuple:
+// - total_q16      := final corrected cumulative total.
+// - last_prefix_q16:= final lane in cumulative prefix output.
+I32 FPQ16SoftmaxPrefixSumCheckedCommitOnly(I64 *probs_q16,
+                                           I64 lane_count,
+                                           I64 *prefix_sums_q16,
+                                           I64 *out_total_q16,
+                                           I64 *out_last_prefix_q16)
+{
+    I64 *snapshot_probs_q16;
+    I64 snapshot_lane_count;
+    I64 *snapshot_prefix_sums_q16;
+    I64 *snapshot_out_total_q16;
+    I64 *snapshot_out_last_prefix_q16;
+    I64 required_prefix_bytes;
+    I64 *staged_prefix_q16;
+    I64 staged_total_q16;
+    I64 staged_last_prefix_q16;
+    I64 i;
+    I32 status;
+
+    if (!probs_q16 || !prefix_sums_q16 || !out_total_q16 || !out_last_prefix_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    snapshot_probs_q16 = probs_q16;
+    snapshot_lane_count = lane_count;
+    snapshot_prefix_sums_q16 = prefix_sums_q16;
+    snapshot_out_total_q16 = out_total_q16;
+    snapshot_out_last_prefix_q16 = out_last_prefix_q16;
+
+    if (!snapshot_lane_count)
+    {
+        *out_total_q16 = 0;
+        *out_last_prefix_q16 = 0;
+        return FP_Q16_OK;
+    }
+
+    if (snapshot_lane_count > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    required_prefix_bytes = snapshot_lane_count << 3;
+    staged_prefix_q16 = MAlloc(required_prefix_bytes);
+    if (!staged_prefix_q16)
+        return FP_Q16_ERR_OVERFLOW;
+
+    status = FPQ16SoftmaxPrefixSumChecked(snapshot_probs_q16,
+                                          snapshot_lane_count,
+                                          staged_prefix_q16,
+                                          &staged_total_q16);
+    if (status)
+    {
+        Free(staged_prefix_q16);
+        return status;
+    }
+
+    staged_last_prefix_q16 = staged_prefix_q16[snapshot_lane_count - 1];
+
+    if (snapshot_probs_q16 != probs_q16 ||
+        snapshot_lane_count != lane_count ||
+        snapshot_prefix_sums_q16 != prefix_sums_q16 ||
+        snapshot_out_total_q16 != out_total_q16 ||
+        snapshot_out_last_prefix_q16 != out_last_prefix_q16)
+    {
+        Free(staged_prefix_q16);
+        return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    for (i = 0; i < snapshot_lane_count; i++)
+        prefix_sums_q16[i] = staged_prefix_q16[i];
+
+    *out_total_q16 = staged_total_q16;
+    *out_last_prefix_q16 = staged_last_prefix_q16;
+
+    Free(staged_prefix_q16);
+    return FP_Q16_OK;
+}
+
+// Diagnostics zero-write companion over commit-only and canonical checked
+// prefix-sum builders.
+//
+// Purpose:
+// - Leave caller `prefix_sums_q16` untouched on every path.
+// - Recompute summary tuple through two independent paths:
+//     1) FPQ16SoftmaxPrefixSumCheckedCommitOnly
+//     2) FPQ16SoftmaxPrefixSumChecked
+// - Publish `{total_q16,last_prefix_q16}` only when both paths agree exactly.
+//
+// Contracts:
+// - Enforces immutable snapshot `{lane_count}`.
+// - Enforces output-pointer snapshot stability.
+I32 FPQ16SoftmaxPrefixSumCheckedCommitOnlyPreflightOnly(I64 *probs_q16,
+                                                        I64 lane_count,
+                                                        I64 *prefix_sums_q16,
+                                                        I64 *out_total_q16,
+                                                        I64 *out_last_prefix_q16)
+{
+    I64 snapshot_lane_count;
+    I64 *snapshot_out_total_q16;
+    I64 *snapshot_out_last_prefix_q16;
+    I64 required_prefix_bytes;
+    I64 dummy_prefix_q16;
+    I64 *commit_prefix_q16;
+    I64 *checked_prefix_q16;
+    I64 staged_total_q16;
+    I64 staged_last_prefix_q16;
+    I64 canonical_total_q16;
+    I64 canonical_last_prefix_q16;
+    I32 status;
+
+    if (!probs_q16 || !prefix_sums_q16 || !out_total_q16 || !out_last_prefix_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_total_q16 = 0;
+    *out_last_prefix_q16 = 0;
+
+    snapshot_lane_count = lane_count;
+    snapshot_out_total_q16 = out_total_q16;
+    snapshot_out_last_prefix_q16 = out_last_prefix_q16;
+
+    if (!snapshot_lane_count)
+    {
+        *out_total_q16 = 0;
+        *out_last_prefix_q16 = 0;
+        return FP_Q16_OK;
+    }
+
+    if (snapshot_lane_count > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    required_prefix_bytes = snapshot_lane_count << 3;
+    commit_prefix_q16 = MAlloc(required_prefix_bytes);
+    if (!commit_prefix_q16)
+        return FP_Q16_ERR_OVERFLOW;
+
+    checked_prefix_q16 = MAlloc(required_prefix_bytes);
+    if (!checked_prefix_q16)
+    {
+        Free(commit_prefix_q16);
+        return FP_Q16_ERR_OVERFLOW;
+    }
+
+    status = FPQ16SoftmaxPrefixSumCheckedCommitOnly(probs_q16,
+                                                    snapshot_lane_count,
+                                                    commit_prefix_q16,
+                                                    &staged_total_q16,
+                                                    &staged_last_prefix_q16);
+    if (status)
+    {
+        Free(checked_prefix_q16);
+        Free(commit_prefix_q16);
+        return status;
+    }
+
+    status = FPQ16SoftmaxPrefixSumChecked(probs_q16,
+                                          snapshot_lane_count,
+                                          checked_prefix_q16,
+                                          &canonical_total_q16);
+    if (status)
+    {
+        Free(checked_prefix_q16);
+        Free(commit_prefix_q16);
+        return status;
+    }
+
+    canonical_last_prefix_q16 = checked_prefix_q16[snapshot_lane_count - 1];
+
+    if (snapshot_lane_count != lane_count ||
+        snapshot_out_total_q16 != out_total_q16 ||
+        snapshot_out_last_prefix_q16 != out_last_prefix_q16)
+    {
+        Free(checked_prefix_q16);
+        Free(commit_prefix_q16);
+        return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    if (staged_total_q16 != canonical_total_q16 ||
+        staged_last_prefix_q16 != canonical_last_prefix_q16)
+    {
+        Free(checked_prefix_q16);
+        Free(commit_prefix_q16);
+        return FP_Q16_ERR_OVERFLOW;
+    }
+
+    *out_total_q16 = staged_total_q16;
+    *out_last_prefix_q16 = staged_last_prefix_q16;
+
+    Free(checked_prefix_q16);
+    Free(commit_prefix_q16);
+    return FP_Q16_OK;
+}
+
 // Checked composed helper for alias-permitted split-phase softmax.
 // Pipeline:
 //   1) exp_lanes_q16 <- exp(preclamped_logits_q16)
