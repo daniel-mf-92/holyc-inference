@@ -822,3 +822,172 @@ I32 Q8_0MatMulQ16TiledAVX2Checked(
 
     return Q8_0_MATMUL_OK;
 }
+
+// Scalar checked baseline matmul for Q8_0 rows x Q8_0 column-bank rows.
+//
+// No-partial contract:
+// - Compute every output cell into a private stage buffer first.
+// - Publish to caller output only after full row/column pass succeeds.
+// - Any error leaves caller `out_cells_q16` unchanged.
+I32 Q8_0MatMulQ16NaiveCheckedNoPartial(
+    Q8_0Block *lhs_blocks,
+    I64 lhs_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_col_blocks,
+    I64 rhs_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_cells_q16,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells)
+{
+    I64 lhs_required_blocks;
+    I64 rhs_required_blocks;
+    I64 out_required_cells;
+    I64 stage_bytes;
+    I64 row_index;
+    I64 col_index;
+    I64 out_index;
+    I64 lhs_row_base;
+    I64 rhs_col_base;
+    I64 lhs_row_slice_end;
+    I64 rhs_col_slice_end;
+    I64 out_row_base;
+    I64 cell_dot_q16;
+    I64 *staged_cells_q16;
+    Q8_0Block *lhs_row_ptr;
+    Q8_0Block *rhs_col_ptr;
+    I32 status;
+
+    if (!lhs_blocks || !rhs_col_blocks || !out_cells_q16)
+        return Q8_0_MATMUL_ERR_NULL_PTR;
+
+    if (lhs_block_capacity < 0 || rhs_block_capacity < 0 || out_cell_capacity < 0)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    status = Q8_0MatMulTiledValidateStridesAndKChecked(row_count,
+                                                       col_count,
+                                                       lhs_row_stride_blocks,
+                                                       rhs_col_stride_blocks,
+                                                       k_block_count,
+                                                       out_row_stride_cells);
+    if (status != Q8_0_MATMUL_OK)
+        return status;
+
+    status = Q8_0MatMulTiledComputeRequiredCapacitiesChecked(row_count,
+                                                             lhs_row_stride_blocks,
+                                                             col_count,
+                                                             rhs_col_stride_blocks,
+                                                             out_row_stride_cells,
+                                                             &lhs_required_blocks,
+                                                             &rhs_required_blocks,
+                                                             &out_required_cells);
+    if (status != Q8_0_MATMUL_OK)
+        return status;
+
+    if (lhs_required_blocks > lhs_block_capacity)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (rhs_required_blocks > rhs_block_capacity)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (out_required_cells > out_cell_capacity)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (!out_required_cells)
+        return Q8_0_MATMUL_OK;
+
+    if (!Q8_0MatMulTryMulI64NonNeg(out_required_cells,
+                                   sizeof(I64),
+                                   &stage_bytes))
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+
+    staged_cells_q16 = MAlloc(stage_bytes);
+    if (!staged_cells_q16)
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+
+    // Preserve padding semantics: lanes outside active `col_count` but inside
+    // `out_row_stride_cells` keep caller values on success.
+    for (out_index = 0; out_index < out_required_cells; ++out_index)
+        staged_cells_q16[out_index] = out_cells_q16[out_index];
+
+    // Scalar baseline math: explicit row x column traversal with one checked
+    // Q8_0 row-dot per output cell.
+    for (row_index = 0; row_index < row_count; ++row_index)
+    {
+        status = Q8_0MatMulTiledComputeRowBaseChecked(row_index,
+                                                      lhs_row_stride_blocks,
+                                                      out_row_stride_cells,
+                                                      &lhs_row_base,
+                                                      &out_row_base);
+        if (status != Q8_0_MATMUL_OK)
+        {
+            Free(staged_cells_q16);
+            return status;
+        }
+
+        status = Q8_0MatMulTiledValidateRowSliceChecked(lhs_row_base,
+                                                         k_block_count,
+                                                         lhs_block_capacity,
+                                                         &lhs_row_slice_end);
+        if (status != Q8_0_MATMUL_OK)
+        {
+            Free(staged_cells_q16);
+            return status;
+        }
+
+        lhs_row_ptr = &lhs_blocks[lhs_row_base];
+
+        for (col_index = 0; col_index < col_count; ++col_index)
+        {
+            status = Q8_0MatMulTiledComputeRhsColBaseChecked(col_index,
+                                                              rhs_col_stride_blocks,
+                                                              &rhs_col_base);
+            if (status != Q8_0_MATMUL_OK)
+            {
+                Free(staged_cells_q16);
+                return status;
+            }
+
+            status = Q8_0MatMulTiledValidateOutIndexCapacityChecked(out_row_base,
+                                                                     col_index,
+                                                                     out_required_cells,
+                                                                     &out_index);
+            if (status != Q8_0_MATMUL_OK)
+            {
+                Free(staged_cells_q16);
+                return status;
+            }
+
+            status = Q8_0MatMulTiledValidateRowSliceChecked(rhs_col_base,
+                                                             k_block_count,
+                                                             rhs_block_capacity,
+                                                             &rhs_col_slice_end);
+            if (status != Q8_0_MATMUL_OK)
+            {
+                Free(staged_cells_q16);
+                return status;
+            }
+
+            rhs_col_ptr = &rhs_col_blocks[rhs_col_base];
+            cell_dot_q16 = 0;
+            status = Q8_0DotProductBlocksQ16AccumulateChecked(lhs_row_ptr,
+                                                              rhs_col_ptr,
+                                                              k_block_count,
+                                                              &cell_dot_q16);
+            if (status != Q8_0_MATMUL_OK)
+            {
+                Free(staged_cells_q16);
+                return status;
+            }
+
+            staged_cells_q16[out_index] = cell_dot_q16;
+        }
+    }
+
+    for (out_index = 0; out_index < out_required_cells; ++out_index)
+        out_cells_q16[out_index] = staged_cells_q16[out_index];
+
+    Free(staged_cells_q16);
+    return Q8_0_MATMUL_OK;
+}
