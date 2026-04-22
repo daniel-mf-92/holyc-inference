@@ -730,6 +730,235 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParity(
     return GGUF_TENSOR_PARSE_OK;
 }
 
+// IQ-1021 commit-only diagnostics wrapper for tensor name parity preflight.
+//
+// Stages tuple diagnostics via
+// `...CommitOnlyPreflightOnlyParity`, then revalidates immutable
+// {buf,size,cursor} snapshots and canonical span math:
+//   required_bytes = 8 + name_len
+//   next_cursor = cursor + required_bytes
+// and atomically publishes only on strict parity success.
+I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(
+    U8 *buf,
+    U64 size,
+    U64 cursor,
+    U64 *out_name_len,
+    U64 *out_required_bytes,
+    U64 *out_next_cursor)
+{
+    U8 *snapshot_buf;
+    U64 snapshot_size;
+    U64 snapshot_cursor;
+
+    U64 staged_name_len;
+    U64 staged_required_bytes;
+    U64 staged_next_cursor;
+
+    U64 canonical_required_bytes;
+    U64 canonical_next_cursor;
+    U64 span_remaining;
+
+    U8 *out_name_len_ptr;
+    U8 *out_required_bytes_ptr;
+    U8 *out_next_cursor_ptr;
+
+    I64 status;
+
+    if (!buf || !out_name_len || !out_required_bytes || !out_next_cursor)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+
+    out_name_len_ptr = (U8 *)out_name_len;
+    out_required_bytes_ptr = (U8 *)out_required_bytes;
+    out_next_cursor_ptr = (U8 *)out_next_cursor;
+
+    if (out_name_len_ptr == out_required_bytes_ptr ||
+        out_name_len_ptr == out_next_cursor_ptr ||
+        out_required_bytes_ptr == out_next_cursor_ptr)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+
+    if (cursor > size)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (size > 0x7FFFFFFFFFFFFFFF || cursor > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    snapshot_buf = buf;
+    snapshot_size = size;
+    snapshot_cursor = cursor;
+
+    staged_name_len = 0;
+    staged_required_bytes = 0;
+    staged_next_cursor = 0;
+
+    canonical_required_bytes = 0;
+    canonical_next_cursor = 0;
+    span_remaining = 0;
+
+    status = GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParity(
+        buf,
+        size,
+        cursor,
+        &staged_name_len,
+        &staged_required_bytes,
+        &staged_next_cursor);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+
+    if (snapshot_buf != buf || snapshot_size != size || snapshot_cursor != cursor)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    if (staged_name_len > GGUF_TENSOR_MAX_NAME_BYTES)
+        return GGUF_TENSOR_PARSE_ERR_BAD_NAME_LEN;
+
+    if (!GGUFTensorTryAddU64(8, staged_name_len, &canonical_required_bytes))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (staged_required_bytes != canonical_required_bytes)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    span_remaining = size - cursor;
+    if (staged_required_bytes > span_remaining)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    if (!GGUFTensorTryAddU64(cursor, staged_required_bytes, &canonical_next_cursor))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (staged_next_cursor < cursor)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (canonical_next_cursor > size)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (canonical_next_cursor != staged_next_cursor)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    *out_name_len = staged_name_len;
+    *out_required_bytes = staged_required_bytes;
+    *out_next_cursor = staged_next_cursor;
+    return GGUF_TENSOR_PARSE_OK;
+}
+
+// IQ-1022 diagnostics-only no-write companion for tensor name parity commit.
+//
+// Composes `...ParityCommitOnly` and canonical
+// `...CommitOnlyPreflightOnly`, recomputes canonical span tuple
+// `{name_len, required_bytes, next_cursor}` from immutable snapshots,
+// and atomically publishes outputs only on strict tuple parity.
+I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+    U8 *buf,
+    U64 size,
+    U64 cursor,
+    U64 *out_name_len,
+    U64 *out_required_bytes,
+    U64 *out_next_cursor)
+{
+    U8 *snapshot_buf;
+    U64 snapshot_size;
+    U64 snapshot_cursor;
+
+    U64 staged_commit_name_len;
+    U64 staged_commit_required_bytes;
+    U64 staged_commit_next_cursor;
+    U64 staged_commit_required_check;
+    U64 staged_commit_computed_end;
+
+    U64 canonical_name_len;
+    U64 canonical_required_bytes;
+    U64 canonical_next_cursor;
+    U64 canonical_required_check;
+    U64 canonical_computed_end;
+
+    U8 *out_name_len_ptr;
+    U8 *out_required_bytes_ptr;
+    U8 *out_next_cursor_ptr;
+
+    I64 status;
+
+    if (!buf || !out_name_len || !out_required_bytes || !out_next_cursor)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+
+    out_name_len_ptr = (U8 *)out_name_len;
+    out_required_bytes_ptr = (U8 *)out_required_bytes;
+    out_next_cursor_ptr = (U8 *)out_next_cursor;
+
+    if (out_name_len_ptr == out_required_bytes_ptr ||
+        out_name_len_ptr == out_next_cursor_ptr ||
+        out_required_bytes_ptr == out_next_cursor_ptr)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+
+    if (cursor > size)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (size > 0x7FFFFFFFFFFFFFFF || cursor > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    snapshot_buf = buf;
+    snapshot_size = size;
+    snapshot_cursor = cursor;
+
+    staged_commit_name_len = 0;
+    staged_commit_required_bytes = 0;
+    staged_commit_next_cursor = 0;
+    staged_commit_required_check = 0;
+    staged_commit_computed_end = 0;
+
+    canonical_name_len = 0;
+    canonical_required_bytes = 0;
+    canonical_next_cursor = 0;
+    canonical_required_check = 0;
+    canonical_computed_end = 0;
+
+    status = GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(
+        buf,
+        size,
+        cursor,
+        &staged_commit_name_len,
+        &staged_commit_required_bytes,
+        &staged_commit_next_cursor);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+
+    status = GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnly(
+        buf,
+        size,
+        cursor,
+        &canonical_name_len,
+        &canonical_required_bytes,
+        &canonical_next_cursor);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+
+    if (!GGUFTensorTryAddU64(8, staged_commit_name_len, &staged_commit_required_check))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (!GGUFTensorTryAddU64(8, canonical_name_len, &canonical_required_check))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    if (!GGUFTensorTryAddU64(cursor,
+                             staged_commit_required_bytes,
+                             &staged_commit_computed_end))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (!GGUFTensorTryAddU64(cursor,
+                             canonical_required_bytes,
+                             &canonical_computed_end))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    if (staged_commit_computed_end > size ||
+        canonical_computed_end > size)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (staged_commit_computed_end != staged_commit_next_cursor ||
+        canonical_computed_end != canonical_next_cursor)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    if (snapshot_buf != buf || snapshot_size != size || snapshot_cursor != cursor)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    if (staged_commit_name_len != canonical_name_len ||
+        staged_commit_required_bytes != canonical_required_bytes ||
+        staged_commit_next_cursor != canonical_next_cursor ||
+        staged_commit_required_bytes != staged_commit_required_check ||
+        canonical_required_bytes != canonical_required_check)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    *out_name_len = staged_commit_name_len;
+    *out_required_bytes = staged_commit_required_bytes;
+    *out_next_cursor = staged_commit_next_cursor;
+    return GGUF_TENSOR_PARSE_OK;
+}
+
 // Checked no-partial parser for `{n_dims, dims[], ggml_type, offset}`.
 // Uses explicit U64 staging math and publishes the tuple atomically only
 // after full span parity and type/dim validation succeed.
