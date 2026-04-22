@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1126 architecture parity-preflight parity gate."""
+"""Harness for IQ-1125 architecture parity-preflight parity commit-only wrapper."""
 
 from __future__ import annotations
 
@@ -9,11 +9,9 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent))
 
 from test_gguf_metadata_read_architecture_tag_checked_nopartial import (
-    GGUF_MAX_METADATA_COUNT,
     GGUF_META_TABLE_ERR_BAD_PARAM,
     GGUF_META_TABLE_ERR_NULL_PTR,
     GGUF_META_TABLE_ERR_OUT_OF_BOUNDS,
-    GGUF_META_TABLE_ERR_TYPE_MISMATCH,
     GGUF_META_TABLE_OK,
     GGUF_TYPE_STRING,
     GGUF_TYPE_UINT8,
@@ -21,14 +19,16 @@ from test_gguf_metadata_read_architecture_tag_checked_nopartial import (
 )
 from test_gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only import (
     GGUF_META_TABLE_ERR_TYPE_MISMATCH as GGUF_META_TABLE_ERR_TYPE_MISMATCH_CHAIN,
-    gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_reference,
 )
-from test_gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only import (
-    gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_reference,
+from test_gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only import (
+    gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_reference,
+)
+from test_gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity import (
+    gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference,
 )
 
 
-def gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference(
+def gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
     *,
     buf: bytes | None,
     buf_nbytes: int,
@@ -81,74 +81,82 @@ def gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_
     out_tag_len_ref_snapshot = out_tag_len_ref
     out_next_cursor_ref_snapshot = out_next_cursor_ref
 
-    pre_arch = [0]
-    pre_off = [0]
-    pre_len = [0]
-    pre_next = [0]
-    pre_cursor = [cursor_snapshot]
+    staged_arch = [0]
+    staged_off = [0]
+    staged_len = [0]
+    staged_next = [0]
+    staged_cursor = [cursor_snapshot]
 
-    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_reference(
+    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference(
         buf=buf,
         buf_nbytes=buf_nbytes,
-        cursor_ref=pre_cursor,
+        cursor_ref=staged_cursor,
         table_end=table_end,
         metadata_count=metadata_count,
-        out_arch_tag=pre_arch,
-        out_tag_offset=pre_off,
-        out_tag_len=pre_len,
-        out_next_cursor=pre_next,
+        out_arch_tag_ref=staged_arch,
+        out_tag_offset_ref=staged_off,
+        out_tag_len_ref=staged_len,
+        out_next_cursor_ref=staged_next,
     )
     if rc != GGUF_META_TABLE_OK:
         return rc
 
-    if pre_cursor[0] != pre_next[0]:
+    if staged_cursor[0] != staged_next[0]:
         return GGUF_META_TABLE_ERR_BAD_PARAM
-    if pre_off[0] > buf_nbytes:
+    if staged_off[0] > buf_nbytes:
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
-    if pre_len[0] > buf_nbytes - pre_off[0]:
+    if staged_len[0] > buf_nbytes - staged_off[0]:
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
 
-    pre_end = pre_off[0] + pre_len[0]
-    if pre_end > table_end:
+    staged_end = staged_off[0] + staged_len[0]
+    if staged_end > table_end:
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
-    if pre_end != pre_next[0]:
+    if staged_end != staged_next[0]:
         return GGUF_META_TABLE_ERR_BAD_PARAM
-    if pre_next[0] > buf_nbytes or pre_next[0] > table_end:
+    if staged_next[0] < cursor_snapshot:
+        return GGUF_META_TABLE_ERR_BAD_PARAM
+    if staged_off[0] < cursor_snapshot:
+        return GGUF_META_TABLE_ERR_BAD_PARAM
+    if staged_next[0] > buf_nbytes or staged_next[0] > table_end:
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
 
-    commit_arch = [0]
-    commit_off = [0]
-    commit_len = [0]
-    commit_next = [0]
-    commit_cursor = [cursor_snapshot]
+    canonical_arch = [0]
+    canonical_off = [0]
+    canonical_len = [0]
+    canonical_next = [0]
+    canonical_cursor = [cursor_snapshot]
 
-    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_reference(
+    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
         buf=buf,
         buf_nbytes=buf_nbytes,
-        cursor_ref=commit_cursor,
+        cursor_ref=canonical_cursor,
         table_end=table_end,
         metadata_count=metadata_count,
-        out_arch_tag_ref=commit_arch,
-        out_tag_offset_ref=commit_off,
-        out_tag_len_ref=commit_len,
-        out_next_cursor_ref=commit_next,
+        out_arch_tag_ref=canonical_arch,
+        out_tag_offset_ref=canonical_off,
+        out_tag_len_ref=canonical_len,
+        out_next_cursor_ref=canonical_next,
     )
     if rc != GGUF_META_TABLE_OK:
         return rc
 
-    if commit_cursor[0] != commit_next[0]:
+    if canonical_cursor[0] != canonical_next[0]:
         return GGUF_META_TABLE_ERR_BAD_PARAM
-    if commit_off[0] > buf_nbytes:
+    if canonical_off[0] > buf_nbytes:
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
-    if commit_len[0] > buf_nbytes - commit_off[0]:
+    if canonical_len[0] > buf_nbytes - canonical_off[0]:
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
 
-    commit_end = commit_off[0] + commit_len[0]
-    if commit_end > table_end:
+    canonical_end = canonical_off[0] + canonical_len[0]
+    if canonical_end > table_end:
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
-    if commit_end != commit_next[0]:
+    if canonical_end != canonical_next[0]:
         return GGUF_META_TABLE_ERR_BAD_PARAM
-    if commit_next[0] > buf_nbytes or commit_next[0] > table_end:
+    if canonical_next[0] < cursor_snapshot:
+        return GGUF_META_TABLE_ERR_BAD_PARAM
+    if canonical_off[0] < cursor_snapshot:
+        return GGUF_META_TABLE_ERR_BAD_PARAM
+    if canonical_next[0] > buf_nbytes or canonical_next[0] > table_end:
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
 
     if (
@@ -168,25 +176,25 @@ def gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_
     ):
         return GGUF_META_TABLE_ERR_BAD_PARAM
 
-    if pre_arch[0] != commit_arch[0]:
+    if staged_arch[0] != canonical_arch[0]:
         return GGUF_META_TABLE_ERR_BAD_PARAM
-    if pre_off[0] != commit_off[0]:
+    if staged_off[0] != canonical_off[0]:
         return GGUF_META_TABLE_ERR_BAD_PARAM
-    if pre_len[0] != commit_len[0]:
+    if staged_len[0] != canonical_len[0]:
         return GGUF_META_TABLE_ERR_BAD_PARAM
-    if pre_next[0] != commit_next[0]:
-        return GGUF_META_TABLE_ERR_BAD_PARAM
-
-    if pre_len[0] <= 0:
-        return GGUF_META_TABLE_ERR_BAD_PARAM
-    if pre_off[0] > pre_next[0]:
+    if staged_next[0] != canonical_next[0]:
         return GGUF_META_TABLE_ERR_BAD_PARAM
 
-    out_arch_tag_ref[0] = pre_arch[0]
-    out_tag_offset_ref[0] = pre_off[0]
-    out_tag_len_ref[0] = pre_len[0]
-    out_next_cursor_ref[0] = pre_next[0]
-    cursor_ref[0] = pre_next[0]
+    if staged_len[0] <= 0:
+        return GGUF_META_TABLE_ERR_BAD_PARAM
+    if staged_off[0] > staged_next[0]:
+        return GGUF_META_TABLE_ERR_BAD_PARAM
+
+    out_arch_tag_ref[0] = staged_arch[0]
+    out_tag_offset_ref[0] = staged_off[0]
+    out_tag_len_ref[0] = staged_len[0]
+    out_next_cursor_ref[0] = staged_next[0]
+    cursor_ref[0] = staged_next[0]
     return GGUF_META_TABLE_OK
 
 
@@ -197,21 +205,21 @@ def _make_blob(entries: list[tuple[bytes, int, bytes | int]]) -> bytes:
     return bytes(blob)
 
 
-def test_success_publishes_from_preflight_tuple() -> None:
+def test_success_publishes_exact_staged_tuple() -> None:
     buf = _make_blob(
         [
-            (b"architecture", GGUF_TYPE_STRING, b"phi3"),
+            (b"architecture", GGUF_TYPE_STRING, b"qwen2"),
             (b"general.architecture", GGUF_TYPE_STRING, b"llama"),
         ]
     )
 
     cursor = [0]
-    out_arch = [77]
-    out_off = [66]
-    out_len = [55]
-    out_next = [44]
+    out_arch = [91]
+    out_off = [81]
+    out_len = [71]
+    out_next = [61]
 
-    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference(
+    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
         buf=buf,
         buf_nbytes=len(buf),
         cursor_ref=cursor,
@@ -232,8 +240,8 @@ def test_success_publishes_from_preflight_tuple() -> None:
 def test_duplicate_key_rejected_without_publish() -> None:
     buf = _make_blob(
         [
-            (b"architecture", GGUF_TYPE_STRING, b"llama"),
-            (b"architecture", GGUF_TYPE_STRING, b"phi3"),
+            (b"general.architecture", GGUF_TYPE_STRING, b"llama"),
+            (b"general.architecture", GGUF_TYPE_STRING, b"phi3"),
         ]
     )
 
@@ -243,7 +251,7 @@ def test_duplicate_key_rejected_without_publish() -> None:
     out_len = [7]
     out_next = [6]
 
-    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference(
+    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
         buf=buf,
         buf_nbytes=len(buf),
         cursor_ref=cursor,
@@ -266,7 +274,7 @@ def test_duplicate_key_rejected_without_publish() -> None:
 def test_type_mismatch_rejected_without_publish() -> None:
     buf = _make_blob(
         [
-            (b"general.architecture", GGUF_TYPE_UINT8, 3),
+            (b"general.architecture", GGUF_TYPE_UINT8, 2),
         ]
     )
 
@@ -276,7 +284,7 @@ def test_type_mismatch_rejected_without_publish() -> None:
     out_len = [14]
     out_next = [15]
 
-    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference(
+    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
         buf=buf,
         buf_nbytes=len(buf),
         cursor_ref=cursor,
@@ -309,7 +317,7 @@ def test_truncated_span_rejected_without_publish() -> None:
     out_len = [23]
     out_next = [24]
 
-    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference(
+    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
         buf=buf,
         buf_nbytes=len(buf),
         cursor_ref=cursor,
@@ -329,15 +337,71 @@ def test_truncated_span_rejected_without_publish() -> None:
     assert out_next == [24]
 
 
-def test_source_contains_iq1126_function_and_chain() -> None:
+def test_pointer_alias_rejected() -> None:
+    buf = _make_blob(
+        [
+            (b"general.architecture", GGUF_TYPE_STRING, b"llama"),
+        ]
+    )
+
+    shared = [0]
+
+    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
+        buf=buf,
+        buf_nbytes=len(buf),
+        cursor_ref=shared,
+        table_end=len(buf),
+        metadata_count=1,
+        out_arch_tag_ref=shared,
+        out_tag_offset_ref=[0],
+        out_tag_len_ref=[0],
+        out_next_cursor_ref=[0],
+    )
+
+    assert rc == GGUF_META_TABLE_ERR_BAD_PARAM
+
+
+def test_output_alias_rejected_without_publish() -> None:
+    buf = _make_blob(
+        [
+            (b"general.architecture", GGUF_TYPE_STRING, b"llama"),
+        ]
+    )
+
+    cursor = [0]
+    out_arch = [31]
+    out_len = [33]
+    shared = [32]
+
+    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
+        buf=buf,
+        buf_nbytes=len(buf),
+        cursor_ref=cursor,
+        table_end=len(buf),
+        metadata_count=1,
+        out_arch_tag_ref=out_arch,
+        out_tag_offset_ref=shared,
+        out_tag_len_ref=out_len,
+        out_next_cursor_ref=shared,
+    )
+
+    assert rc == GGUF_META_TABLE_ERR_BAD_PARAM
+    assert cursor == [0]
+    assert out_arch == [31]
+    assert out_len == [33]
+    assert shared == [32]
+
+
+def test_source_contains_iq1125_function_and_chain() -> None:
     src = Path("src/gguf/metadata.HC").read_text(encoding="utf-8")
     sig = (
         "I32 GGUFMetadataReadArchitectureTagCheckedNoPartial"
-        "CommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity("
+        "CommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly("
     )
     assert src.count(sig) >= 1
 
     def_start = -1
+    def_count = 0
     search_from = 0
     while True:
         idx = src.find(sig, search_from)
@@ -346,132 +410,34 @@ def test_source_contains_iq1126_function_and_chain() -> None:
         brace_idx = src.find("{", idx)
         semi_idx = src.find(";", idx)
         if brace_idx >= 0 and (semi_idx < 0 or brace_idx < semi_idx):
+            def_count += 1
             def_start = idx
-            break
         search_from = idx + len(sig)
 
     assert def_start >= 0
+    assert def_count == 1
     body = src[def_start:].split("Bool GGUFMetaCanRead(", 1)[0]
 
-    assert "GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnly(" in body
-    assert "GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(" in body
+    assert "GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in body
+    assert "GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in body
     assert "if (cursor_ptr_snapshot != cursor ||" in body
-    assert "if (arch_preflight != arch_parity_commit)" in body
-    assert "if (tag_end_preflight > table_end)" in body
-    assert "if (tag_end_parity_commit > table_end)" in body
-    assert "if (next_cursor_preflight < cursor_snapshot)" in body
-    assert "if (next_cursor_parity_commit < cursor_snapshot)" in body
-    assert "if (metadata_count > GGUF_MAX_METADATA_COUNT)" in body
-    assert "if (buf_snapshot != buf ||" in body
-
-
-def test_pointer_alias_rejected_without_publish() -> None:
-    buf = _make_blob(
-        [
-            (b"general.architecture", GGUF_TYPE_STRING, b"llama"),
-        ]
-    )
-
-    alias_slot = [123]
-    out_off = [8]
-    out_len = [7]
-    out_next = [6]
-
-    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference(
-        buf=buf,
-        buf_nbytes=len(buf),
-        cursor_ref=alias_slot,
-        table_end=len(buf),
-        metadata_count=1,
-        out_arch_tag_ref=alias_slot,
-        out_tag_offset_ref=out_off,
-        out_tag_len_ref=out_len,
-        out_next_cursor_ref=out_next,
-    )
-
-    assert rc == GGUF_META_TABLE_ERR_BAD_PARAM
-    assert alias_slot == [123]
-    assert out_off == [8]
-    assert out_len == [7]
-    assert out_next == [6]
-
-
-def test_metadata_count_overflow_rejected_without_publish() -> None:
-    buf = _make_blob(
-        [
-            (b"general.architecture", GGUF_TYPE_STRING, b"llama"),
-        ]
-    )
-
-    cursor = [0]
-    out_arch = [5]
-    out_off = [6]
-    out_len = [7]
-    out_next = [8]
-
-    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference(
-        buf=buf,
-        buf_nbytes=len(buf),
-        cursor_ref=cursor,
-        table_end=len(buf),
-        metadata_count=GGUF_MAX_METADATA_COUNT + 1,
-        out_arch_tag_ref=out_arch,
-        out_tag_offset_ref=out_off,
-        out_tag_len_ref=out_len,
-        out_next_cursor_ref=out_next,
-    )
-
-    assert rc == GGUF_META_TABLE_ERR_BAD_PARAM
-    assert cursor == [0]
-    assert out_arch == [5]
-    assert out_off == [6]
-    assert out_len == [7]
-    assert out_next == [8]
-
-
-def test_nonzero_cursor_respects_window_and_monotonic_publish() -> None:
-    prefix = _encode_kv(b"irrelevant", GGUF_TYPE_STRING, b"noop")
-    target = _encode_kv(b"general.architecture", GGUF_TYPE_STRING, b"mistral")
-    buf = bytes(prefix + target)
-
-    cursor = [len(prefix)]
-    out_arch = [0]
-    out_off = [0]
-    out_len = [0]
-    out_next = [0]
-
-    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference(
-        buf=buf,
-        buf_nbytes=len(buf),
-        cursor_ref=cursor,
-        table_end=len(buf),
-        metadata_count=1,
-        out_arch_tag_ref=out_arch,
-        out_tag_offset_ref=out_off,
-        out_tag_len_ref=out_len,
-        out_next_cursor_ref=out_next,
-    )
-
-    assert rc == GGUF_META_TABLE_OK
-    assert out_arch[0] == 2
-    assert out_off[0] >= len(prefix)
-    assert out_next[0] >= len(prefix)
-    assert cursor[0] == out_next[0]
-    assert bytes(buf[out_off[0] : out_off[0] + out_len[0]]) == b"mistral"
+    assert "if (arch_staged != arch_canonical)" in body
+    assert "if (next_cursor_staged < cursor_snapshot)" in body
+    assert "if (next_cursor_canonical < cursor_snapshot)" in body
 
 
 def run() -> None:
-    test_success_publishes_from_preflight_tuple()
+    test_success_publishes_exact_staged_tuple()
     test_duplicate_key_rejected_without_publish()
     test_type_mismatch_rejected_without_publish()
     test_truncated_span_rejected_without_publish()
-    test_source_contains_iq1126_function_and_chain()
-    test_pointer_alias_rejected_without_publish()
-    test_metadata_count_overflow_rejected_without_publish()
-    test_nonzero_cursor_respects_window_and_monotonic_publish()
+    test_pointer_alias_rejected()
+    test_output_alias_rejected_without_publish()
+    test_source_contains_iq1125_function_and_chain()
     print(
         "gguf_metadata_read_architecture_tag_checked_nopartial_"
-        "commit_only_preflight_only_parity_commit_only_preflight_only_parity=ok"
+        "commit_only_preflight_only_parity_commit_only_preflight_only_"
+        "parity_commit_only=ok"
     )
 
 

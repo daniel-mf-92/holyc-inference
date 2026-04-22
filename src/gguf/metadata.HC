@@ -944,6 +944,17 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParity
                                                                                                                 U64 *out_tag_len,
                                                                                                                 U64 *out_next_cursor);
 
+I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(U8 *buf,
+                                                                                                                          U64 buf_nbytes,
+                                                                                                                          U64 *cursor,
+                                                                                                                          U64 table_end,
+                                                                                                                          U64 metadata_count,
+                                                                                                                          U32 *out_arch_tag,
+                                                                                                                          U64 *out_tag_offset,
+                                                                                                                          U64 *out_tag_len,
+                                                                                                                          U64 *out_next_cursor);
+
+
 I32 GGUFMetadataReadArrayHeaderChecked(U8 *buf,
                                        U64 buf_nbytes,
                                        U64 *cursor,
@@ -6968,7 +6979,7 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParity
     return GGUF_META_TABLE_OK;
 }
 
-// IQ-1119 diagnostics-only parity gate for architecture-tag commit/preflight
+// IQ-1126 diagnostics-only parity gate for architecture-tag commit/preflight
 // wrappers.
 //
 // Composes `...CommitOnlyPreflightOnly` and
@@ -7365,6 +7376,210 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParity
     if (tag_len_staged != tag_len_parity_preflight)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
     if (next_cursor_staged != next_cursor_parity_preflight)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (tag_len_staged <= 0)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_off_staged > next_cursor_staged)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    *out_arch_tag = arch_staged;
+    *out_tag_offset = tag_off_staged;
+    *out_tag_len = tag_len_staged;
+    *out_next_cursor = next_cursor_staged;
+    *cursor = next_cursor_staged;
+    return GGUF_META_TABLE_OK;
+}
+
+
+// IQ-1125 commit-only diagnostics wrapper over
+// `GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity`.
+//
+// Compose staged tuple from parity-preflight diagnostics path + canonical tuple
+// from `...ParityCommitOnlyPreflightOnly`, then publish exactly once on strict
+// tuple parity:
+//   {arch_tag, tag_offset, tag_len, next_cursor}
+I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
+    U8 *buf,
+    U64 buf_nbytes,
+    U64 *cursor,
+    U64 table_end,
+    U64 metadata_count,
+    U32 *out_arch_tag,
+    U64 *out_tag_offset,
+    U64 *out_tag_len,
+    U64 *out_next_cursor)
+{
+    U8 *buf_snapshot;
+    U64 buf_nbytes_snapshot;
+    U64 table_end_snapshot;
+    U64 metadata_count_snapshot;
+
+    U64 cursor_snapshot;
+
+    U64 *cursor_ptr_snapshot;
+    U32 *out_arch_tag_ptr_snapshot;
+    U64 *out_tag_offset_ptr_snapshot;
+    U64 *out_tag_len_ptr_snapshot;
+    U64 *out_next_cursor_ptr_snapshot;
+
+    U32 arch_staged;
+    U64 tag_off_staged;
+    U64 tag_len_staged;
+    U64 next_cursor_staged;
+    U64 cursor_staged;
+
+    U32 arch_canonical;
+    U64 tag_off_canonical;
+    U64 tag_len_canonical;
+    U64 next_cursor_canonical;
+    U64 cursor_canonical;
+
+    U64 tag_end_staged;
+    U64 tag_end_canonical;
+
+    I32 err;
+
+    if (!buf || !cursor || !out_arch_tag || !out_tag_offset ||
+        !out_tag_len || !out_next_cursor)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    if ((U8 *)cursor == (U8 *)out_arch_tag ||
+        (U8 *)cursor == (U8 *)out_tag_offset ||
+        (U8 *)cursor == (U8 *)out_tag_len ||
+        (U8 *)cursor == (U8 *)out_next_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if ((U8 *)out_arch_tag == (U8 *)out_tag_offset ||
+        (U8 *)out_arch_tag == (U8 *)out_tag_len ||
+        (U8 *)out_arch_tag == (U8 *)out_next_cursor ||
+        (U8 *)out_tag_offset == (U8 *)out_tag_len ||
+        (U8 *)out_tag_offset == (U8 *)out_next_cursor ||
+        (U8 *)out_tag_len == (U8 *)out_next_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (buf_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (table_end > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (metadata_count > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (metadata_count > GGUF_MAX_METADATA_COUNT)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (table_end > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (*cursor > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (*cursor > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (*cursor > table_end)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    buf_snapshot = buf;
+    buf_nbytes_snapshot = buf_nbytes;
+    table_end_snapshot = table_end;
+    metadata_count_snapshot = metadata_count;
+
+    cursor_snapshot = *cursor;
+
+    cursor_ptr_snapshot = cursor;
+    out_arch_tag_ptr_snapshot = out_arch_tag;
+    out_tag_offset_ptr_snapshot = out_tag_offset;
+    out_tag_len_ptr_snapshot = out_tag_len;
+    out_next_cursor_ptr_snapshot = out_next_cursor;
+
+    cursor_staged = cursor_snapshot;
+    err = GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+        buf,
+        buf_nbytes,
+        &cursor_staged,
+        table_end,
+        metadata_count,
+        &arch_staged,
+        &tag_off_staged,
+        &tag_len_staged,
+        &next_cursor_staged);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    if (cursor_staged != next_cursor_staged)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (arch_staged < GGUF_ARCH_TAG_LLAMA || arch_staged > GGUF_ARCH_TAG_PHI3)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_off_staged > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (tag_len_staged > buf_nbytes - tag_off_staged)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    tag_end_staged = tag_off_staged + tag_len_staged;
+    if (tag_end_staged > table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (tag_end_staged != next_cursor_staged)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (next_cursor_staged < cursor_snapshot)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_off_staged < cursor_snapshot)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (next_cursor_staged > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (next_cursor_staged > table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    cursor_canonical = cursor_snapshot;
+    err = GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+        buf,
+        buf_nbytes,
+        &cursor_canonical,
+        table_end,
+        metadata_count,
+        &arch_canonical,
+        &tag_off_canonical,
+        &tag_len_canonical,
+        &next_cursor_canonical);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    if (cursor_canonical != next_cursor_canonical)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (arch_canonical < GGUF_ARCH_TAG_LLAMA || arch_canonical > GGUF_ARCH_TAG_PHI3)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_off_canonical > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (tag_len_canonical > buf_nbytes - tag_off_canonical)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    tag_end_canonical = tag_off_canonical + tag_len_canonical;
+    if (tag_end_canonical > table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (tag_end_canonical != next_cursor_canonical)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (next_cursor_canonical < cursor_snapshot)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_off_canonical < cursor_snapshot)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (next_cursor_canonical > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (next_cursor_canonical > table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    if (buf_snapshot != buf ||
+        buf_nbytes_snapshot != buf_nbytes ||
+        table_end_snapshot != table_end ||
+        metadata_count_snapshot != metadata_count)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (cursor_ptr_snapshot != cursor ||
+        out_arch_tag_ptr_snapshot != out_arch_tag ||
+        out_tag_offset_ptr_snapshot != out_tag_offset ||
+        out_tag_len_ptr_snapshot != out_tag_len ||
+        out_next_cursor_ptr_snapshot != out_next_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (arch_staged != arch_canonical)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_off_staged != tag_off_canonical)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_len_staged != tag_len_canonical)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (next_cursor_staged != next_cursor_canonical)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
 
     if (tag_len_staged <= 0)
