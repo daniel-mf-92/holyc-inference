@@ -199,6 +199,73 @@ I32 FPQ16MulChecked(I64 a_q16,
                                         out_q16);
 }
 
+// Checked signed multiply with power-of-two divisor and deterministic
+// half-away-from-zero rounding:
+//   out_value = round_half_away_from_zero((lhs * rhs) / 2^shift)
+//
+// Contract:
+// - out_value must be non-null.
+// - shift must be in [0, 62].
+// - Uses unsigned-magnitude arithmetic to avoid signed UB.
+// - Returns OVERFLOW if multiply magnitude overflows or rounded magnitude
+//   cannot be represented in signed I64 with final sign.
+I32 FPQ16MulShiftRoundChecked(I64 lhs,
+                              I64 rhs,
+                              I64 shift,
+                              I64 *out_value)
+{
+    U64 abs_lhs;
+    U64 abs_rhs;
+    U64 product_mag;
+    U64 quotient;
+    U64 remainder;
+    U64 remainder_mask;
+    U64 half;
+    I64 is_negative;
+
+    if (!out_value)
+        return FP_Q16_ERR_NULL_PTR;
+    if (shift < 0 || shift > 62)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (!lhs || !rhs)
+    {
+        *out_value = 0;
+        return FP_Q16_OK;
+    }
+
+    abs_lhs = FPAbsToU64(lhs);
+    abs_rhs = FPAbsToU64(rhs);
+    is_negative = ((lhs < 0) ^ (rhs < 0));
+
+    if (abs_lhs > (U64_MAX_VALUE / abs_rhs))
+        return FP_Q16_ERR_OVERFLOW;
+
+    product_mag = abs_lhs * abs_rhs;
+
+    if (!shift)
+        return FPTryApplySignFromU64Checked(product_mag,
+                                            is_negative,
+                                            out_value);
+
+    quotient = product_mag >> shift;
+    remainder_mask = (((U64)1) << shift) - 1;
+    remainder = product_mag & remainder_mask;
+    half = ((U64)1) << (shift - 1);
+
+    // Half-away-from-zero: ties increment magnitude before sign restore.
+    if (remainder >= half)
+    {
+        if (quotient == U64_MAX_VALUE)
+            return FP_Q16_ERR_OVERFLOW;
+        quotient++;
+    }
+
+    return FPTryApplySignFromU64Checked(quotient,
+                                        is_negative,
+                                        out_value);
+}
+
 // Checked + saturating Q16 multiply:
 //   out_q16 = sat_i64(round_half_up((a_q16 * b_q16) / 2^16))
 //
