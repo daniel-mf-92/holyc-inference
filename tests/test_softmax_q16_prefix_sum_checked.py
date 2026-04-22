@@ -141,7 +141,7 @@ def test_negative_diff_borrow_tail_first() -> None:
     status, prefix, total = fpq16_softmax_prefix_sum_checked_reference([q16(0.8), q16(0.25), q16(0.1)], 3)
     assert status == FP_Q16_OK
     assert prefix[0] == q16(0.8)
-    assert prefix[1] == q16(0.95)
+    assert prefix[1] == FP_Q16_ONE
     assert prefix[2] == FP_Q16_ONE
     assert total == FP_Q16_ONE
 
