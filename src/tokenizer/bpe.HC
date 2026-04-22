@@ -15,6 +15,144 @@
 #define TOKENIZER_BPE_ERR_NULL_PTR 101
 #define TOKENIZER_BPE_ERR_BAD_PARAM 102
 #define TOKENIZER_BPE_ERR_OVERFLOW 103
+#define TOKENIZER_BPE_ERR_NOT_FOUND 104
+#define TOKENIZER_BPE_ERR_TYPE_MISMATCH 105
+#define TOKENIZER_BPE_ERR_RANGE 106
+
+// Mirror GGUF metadata parse status codes used by GGUFMetaGetI64ByKey so
+// tokenizer logic can map metadata failures into tokenizer-specific errors.
+#define TOKENIZER_GGUF_META_PARSE_OK 0
+#define TOKENIZER_GGUF_META_PARSE_ERR_NULL_PTR 1
+#define TOKENIZER_GGUF_META_PARSE_ERR_NOT_FOUND 9
+#define TOKENIZER_GGUF_META_PARSE_ERR_TYPE_MISMATCH 10
+
+I64 GGUFMetaGetI64ByKey(U0 *table, U8 *key, I64 *out);
+
+I32 TokenizerBPESpecialTokenResolveOneChecked(U0 *metadata_table,
+                                              U8 *metadata_key,
+                                              I32 fallback_token_id,
+                                              Bool allow_missing_without_fallback,
+                                              I32 *out_token_id,
+                                              Bool *out_has_token)
+{
+    I64 meta_value_i64;
+    I64 meta_status;
+
+    if (!metadata_table || !metadata_key || !out_token_id || !out_has_token)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    meta_value_i64 = 0;
+    meta_status = GGUFMetaGetI64ByKey(metadata_table, metadata_key, &meta_value_i64);
+
+    if (meta_status == TOKENIZER_GGUF_META_PARSE_OK) {
+        if (meta_value_i64 < 0)
+            return TOKENIZER_BPE_ERR_RANGE;
+        if (meta_value_i64 > 0x7FFFFFFF)
+            return TOKENIZER_BPE_ERR_OVERFLOW;
+
+        *out_token_id = meta_value_i64;
+        *out_has_token = TRUE;
+        return TOKENIZER_BPE_OK;
+    }
+
+    if (meta_status == TOKENIZER_GGUF_META_PARSE_ERR_NOT_FOUND) {
+        if (fallback_token_id >= 0) {
+            *out_token_id = fallback_token_id;
+            *out_has_token = TRUE;
+            return TOKENIZER_BPE_OK;
+        }
+
+        if (allow_missing_without_fallback) {
+            *out_token_id = -1;
+            *out_has_token = FALSE;
+            return TOKENIZER_BPE_OK;
+        }
+
+        return TOKENIZER_BPE_ERR_NOT_FOUND;
+    }
+
+    if (meta_status == TOKENIZER_GGUF_META_PARSE_ERR_TYPE_MISMATCH)
+        return TOKENIZER_BPE_ERR_TYPE_MISMATCH;
+
+    if (meta_status == TOKENIZER_GGUF_META_PARSE_ERR_NULL_PTR)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    return TOKENIZER_BPE_ERR_BAD_PARAM;
+}
+
+I32 TokenizerBPESpecialTokensResolveCheckedNoPartial(U0 *metadata_table,
+                                                     I32 fallback_bos_token_id,
+                                                     I32 fallback_eos_token_id,
+                                                     I32 fallback_pad_token_id,
+                                                     Bool allow_missing_without_fallback,
+                                                     I32 *out_bos_token_id,
+                                                     I32 *out_eos_token_id,
+                                                     I32 *out_pad_token_id,
+                                                     Bool *out_has_bos,
+                                                     Bool *out_has_eos,
+                                                     Bool *out_has_pad)
+{
+    I32 staged_bos;
+    I32 staged_eos;
+    I32 staged_pad;
+    Bool staged_has_bos;
+    Bool staged_has_eos;
+    Bool staged_has_pad;
+    I32 err;
+
+    if (!metadata_table || !out_bos_token_id || !out_eos_token_id ||
+        !out_pad_token_id || !out_has_bos || !out_has_eos || !out_has_pad)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    // Preflight fallback-domain contract: fallback IDs must be either disabled
+    // (-1) or valid non-negative token IDs.
+    if (fallback_bos_token_id < -1 || fallback_eos_token_id < -1 ||
+        fallback_pad_token_id < -1)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    staged_bos = *out_bos_token_id;
+    staged_eos = *out_eos_token_id;
+    staged_pad = *out_pad_token_id;
+    staged_has_bos = *out_has_bos;
+    staged_has_eos = *out_has_eos;
+    staged_has_pad = *out_has_pad;
+
+    err = TokenizerBPESpecialTokenResolveOneChecked(metadata_table,
+                                                    "tokenizer.ggml.bos_token_id",
+                                                    fallback_bos_token_id,
+                                                    allow_missing_without_fallback,
+                                                    &staged_bos,
+                                                    &staged_has_bos);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    err = TokenizerBPESpecialTokenResolveOneChecked(metadata_table,
+                                                    "tokenizer.ggml.eos_token_id",
+                                                    fallback_eos_token_id,
+                                                    allow_missing_without_fallback,
+                                                    &staged_eos,
+                                                    &staged_has_eos);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    err = TokenizerBPESpecialTokenResolveOneChecked(metadata_table,
+                                                    "tokenizer.ggml.padding_token_id",
+                                                    fallback_pad_token_id,
+                                                    allow_missing_without_fallback,
+                                                    &staged_pad,
+                                                    &staged_has_pad);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    // All-or-nothing publish of the BOS/EOS/PAD tuple.
+    *out_bos_token_id = staged_bos;
+    *out_eos_token_id = staged_eos;
+    *out_pad_token_id = staged_pad;
+    *out_has_bos = staged_has_bos;
+    *out_has_eos = staged_has_eos;
+    *out_has_pad = staged_has_pad;
+    return TOKENIZER_BPE_OK;
+}
 
 Bool TokenizerUTF8IsContinuationByte(U8 byte)
 {
