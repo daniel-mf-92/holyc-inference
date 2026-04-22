@@ -184,7 +184,7 @@ def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parit
 
 
 def test_source_contains_topk_topp_commit_only_preflight_only_parity() -> None:
-    source = Path("src/model/sampling.HC").read_text(encoding="utf-8")
+    source = Path("src/model/inference.HC").read_text(encoding="utf-8")
     sig = "I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParity("
     assert sig in source
     assert "snapshot_step_logits_q16 = step_logits_q16;" in source
