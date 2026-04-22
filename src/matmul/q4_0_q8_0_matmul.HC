@@ -2016,12 +2016,17 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     I64 *out_tile_rows,
     I64 *out_tile_cols)
 {
+    I64 snapshot_lhs_q4_block_capacity;
     I64 snapshot_row_count;
+    I64 snapshot_lhs_row_stride_blocks;
+    I64 snapshot_rhs_q8_block_capacity;
     I64 snapshot_col_count;
+    I64 snapshot_rhs_col_stride_blocks;
     I64 snapshot_k_block_count;
     I64 snapshot_tile_row_span;
     I64 snapshot_tile_col_span;
     I64 snapshot_out_capacity;
+    I64 snapshot_out_row_stride_cells;
 
     I64 preflight_required_out_cells;
     I64 preflight_required_out_bytes;
@@ -2057,12 +2062,17 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyPreflightOnlyParityCommitOnl
         out_tile_cols == out_cells_q32)
         return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
 
+    snapshot_lhs_q4_block_capacity = lhs_q4_block_capacity;
     snapshot_row_count = row_count;
+    snapshot_lhs_row_stride_blocks = lhs_row_stride_blocks;
+    snapshot_rhs_q8_block_capacity = rhs_q8_block_capacity;
     snapshot_col_count = col_count;
+    snapshot_rhs_col_stride_blocks = rhs_col_stride_blocks;
     snapshot_k_block_count = k_block_count;
     snapshot_tile_row_span = tile_row_span;
     snapshot_tile_col_span = tile_col_span;
     snapshot_out_capacity = out_cell_capacity;
+    snapshot_out_row_stride_cells = out_row_stride_cells;
 
     preflight_required_out_cells = 0;
     preflight_required_out_bytes = 0;
@@ -2118,12 +2128,17 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     if (status != Q4_0_Q8_0_MATMUL_OK)
         return status;
 
-    if (snapshot_row_count != row_count ||
+    if (snapshot_lhs_q4_block_capacity != lhs_q4_block_capacity ||
+        snapshot_row_count != row_count ||
+        snapshot_lhs_row_stride_blocks != lhs_row_stride_blocks ||
+        snapshot_rhs_q8_block_capacity != rhs_q8_block_capacity ||
         snapshot_col_count != col_count ||
+        snapshot_rhs_col_stride_blocks != rhs_col_stride_blocks ||
         snapshot_k_block_count != k_block_count ||
         snapshot_tile_row_span != tile_row_span ||
         snapshot_tile_col_span != tile_col_span ||
-        snapshot_out_capacity != out_cell_capacity)
+        snapshot_out_capacity != out_cell_capacity ||
+        snapshot_out_row_stride_cells != out_row_stride_cells)
         return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
 
     if (preflight_required_out_cells != canonical_required_out_cells ||
