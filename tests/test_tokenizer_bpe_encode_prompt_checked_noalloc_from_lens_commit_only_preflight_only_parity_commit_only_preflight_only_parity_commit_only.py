@@ -42,6 +42,7 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
     out_required_token_capacity: list[int] | None,
     out_required_token_bytes: list[int] | None,
     out_next_cursor: list[int] | None,
+    out_max_piece_len: list[int] | None,
     staged_fn=tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only_parity,
     canonical_fn=tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only,
 ) -> int:
@@ -52,13 +53,17 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
         or out_required_token_capacity is None
         or out_required_token_bytes is None
         or out_next_cursor is None
+        or out_max_piece_len is None
     ):
         return TOKENIZER_BPE_ERR_NULL_PTR
 
     if (
         out_required_token_capacity is out_required_token_bytes
         or out_required_token_capacity is out_next_cursor
+        or out_required_token_capacity is out_max_piece_len
         or out_required_token_bytes is out_next_cursor
+        or out_required_token_bytes is out_max_piece_len
+        or out_next_cursor is out_max_piece_len
     ):
         return TOKENIZER_BPE_ERR_NULL_PTR
 
@@ -86,10 +91,12 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
     snapshot_out_required = out_required_token_capacity
     snapshot_out_required_bytes = out_required_token_bytes
     snapshot_out_next_cursor = out_next_cursor
+    snapshot_out_max_piece = out_max_piece_len
 
     staged_required = [0]
     staged_required_bytes = [0]
     staged_next_cursor = [0]
+    staged_max_piece = [0]
     err = staged_fn(
         data,
         byte_len,
@@ -108,6 +115,7 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
         staged_required,
         staged_required_bytes,
         staged_next_cursor,
+        staged_max_piece,
     )
     if err != TOKENIZER_BPE_OK:
         return err
@@ -160,6 +168,7 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
         snapshot_out_required is not out_required_token_capacity
         or snapshot_out_required_bytes is not out_required_token_bytes
         or snapshot_out_next_cursor is not out_next_cursor
+        or snapshot_out_max_piece is not out_max_piece_len
     ):
         return TOKENIZER_BPE_ERR_BAD_PARAM
 
@@ -173,9 +182,13 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
     if canonical_max_piece[0] > I64_MAX:
         return TOKENIZER_BPE_ERR_OVERFLOW
 
+    if staged_max_piece[0] != canonical_max_piece[0]:
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+
     out_required_token_capacity[0] = staged_required[0]
     out_required_token_bytes[0] = staged_required_bytes[0]
     out_next_cursor[0] = staged_next_cursor[0]
+    out_max_piece_len[0] = staged_max_piece[0]
     return TOKENIZER_BPE_OK
 
 
@@ -214,6 +227,7 @@ def test_source_contains_signature_and_composition_chain() -> None:
     assert "TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in body
     assert "TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnly(" in body
     assert "snapshot_out_required_token_capacity_ptr" in body
+    assert "staged_max_piece_len != canonical_preflight_max_piece_len" in body
 
 
 def test_output_alias_rejected() -> None:
@@ -223,6 +237,7 @@ def test_output_alias_rejected() -> None:
 
     req_and_bytes = [999]
     next_cursor = [777]
+    max_piece = [555]
     cursor = [0]
 
     err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only(
@@ -243,11 +258,13 @@ def test_output_alias_rejected() -> None:
         req_and_bytes,
         req_and_bytes,
         next_cursor,
+        max_piece,
     )
 
     assert err == TOKENIZER_BPE_ERR_NULL_PTR
     assert req_and_bytes == [999]
     assert next_cursor == [777]
+    assert max_piece == [555]
     assert cursor == [0]
 
 
@@ -259,6 +276,7 @@ def test_known_vector_success() -> None:
     req = [0xAAAA]
     req_bytes = [0xBBBB]
     next_cursor = [0xCCCC]
+    max_piece = [0xDDDD]
     cursor = [0]
 
     err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only(
@@ -279,12 +297,14 @@ def test_known_vector_success() -> None:
         req,
         req_bytes,
         next_cursor,
+        max_piece,
     )
 
     assert err == TOKENIZER_BPE_OK
     assert req == [len(payload)]
     assert req_bytes == [len(payload) * 4]
     assert next_cursor[0] == len(payload)
+    assert max_piece[0] == 4
     assert cursor[0] == 0
 
 
@@ -294,15 +314,17 @@ def test_tuple_mismatch_rejected() -> None:
     vocab_lens = [1, 2, 3, 5]
 
     def bad_staged(*args, **kwargs):
-        out_req, out_bytes, out_next = args[-3], args[-2], args[-1]
+        out_req, out_bytes, out_next, out_max_piece = args[-4], args[-3], args[-2], args[-1]
         out_req[0] = 7
         out_bytes[0] = 28
         out_next[0] = 4
+        out_max_piece[0] = 1
         return TOKENIZER_BPE_OK
 
     req = [1]
     req_bytes = [2]
     next_cursor = [3]
+    max_piece = [4]
     cursor = [0]
 
     err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only(
@@ -323,6 +345,7 @@ def test_tuple_mismatch_rejected() -> None:
         req,
         req_bytes,
         next_cursor,
+        max_piece,
         staged_fn=bad_staged,
     )
 
@@ -330,6 +353,7 @@ def test_tuple_mismatch_rejected() -> None:
     assert req == [1]
     assert req_bytes == [2]
     assert next_cursor == [3]
+    assert max_piece == [4]
 
 
 def test_randomized_vectors() -> None:
@@ -347,6 +371,7 @@ def test_randomized_vectors() -> None:
         req = [0]
         req_bytes = [0]
         next_cursor = [0]
+        max_piece = [0]
         cursor = [cursor0]
 
         err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only(
@@ -367,12 +392,14 @@ def test_randomized_vectors() -> None:
             req,
             req_bytes,
             next_cursor,
+            max_piece,
         )
 
         assert err == TOKENIZER_BPE_OK
         assert req[0] >= 0
         assert req_bytes[0] == req[0] * 4
         assert next_cursor[0] == cursor0 + prompt_nbytes
+        assert max_piece[0] >= 0
         assert cursor[0] == cursor0
 
 

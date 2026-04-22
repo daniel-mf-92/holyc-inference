@@ -6303,10 +6303,10 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
     return KV_Q16_OK;
 }
 
-// IQ-1089 diagnostics-only zero-write companion over IQ-1088 commit wrapper.
+// IQ-1091 diagnostics-only zero-write companion over IQ-1088 commit wrapper.
 //
 // Compose:
-// 1) stage tuple via `...RequiredBytesParityCommitOnlyPreflightOnlyParityCommitOnly`;
+// 1) stage tuple via `...RequiredBytesParityCommitOnly`;
 // 2) stage canonical tuple via `...RequiredBytesParityCommitOnlyPreflightOnlyParity`;
 // 3) recompute tuple from immutable snapshots with checked integer math;
 // 4) publish atomically only on strict three-way tuple parity success.
@@ -6372,7 +6372,7 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
     snapshot_out_last_cell_index = out_last_cell_index;
 
     status =
-        KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnlyPreflightOnlyParityCommitOnly(
+        KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnly(
             layer_count,
             head_count,
             head_dim,

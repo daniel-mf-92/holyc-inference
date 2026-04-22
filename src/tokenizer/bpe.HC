@@ -7117,6 +7117,7 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParity(
     U8 *out_required_token_bytes_ptr;
     U8 *out_next_cursor_ptr;
     U8 *out_max_piece_len_ptr;
+    U8 *out_max_piece_len_ptr;
 
     U64 snapshot_cursor;
     U64 canonical_required_token_capacity;
@@ -7137,15 +7138,19 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParity(
 
     if (!bytes || !io_cursor || !vocab_piece_lens ||
         !out_required_token_capacity || !out_required_token_bytes ||
-        !out_next_cursor)
+        !out_next_cursor || !out_max_piece_len)
         return TOKENIZER_BPE_ERR_NULL_PTR;
 
     out_required_token_capacity_ptr = (U8 *)out_required_token_capacity;
     out_required_token_bytes_ptr = (U8 *)out_required_token_bytes;
     out_next_cursor_ptr = (U8 *)out_next_cursor;
+    out_max_piece_len_ptr = (U8 *)out_max_piece_len;
     if (out_required_token_capacity_ptr == out_required_token_bytes_ptr ||
         out_required_token_capacity_ptr == out_next_cursor_ptr ||
-        out_required_token_bytes_ptr == out_next_cursor_ptr)
+        out_required_token_capacity_ptr == out_max_piece_len_ptr ||
+        out_required_token_bytes_ptr == out_next_cursor_ptr ||
+        out_required_token_bytes_ptr == out_max_piece_len_ptr ||
+        out_next_cursor_ptr == out_max_piece_len_ptr)
         return TOKENIZER_BPE_ERR_NULL_PTR;
 
     if (byte_len > 0x7FFFFFFFFFFFFFFF ||
@@ -7328,7 +7333,8 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityC
     U64 out_token_capacity,
     U64 *out_required_token_capacity,
     U64 *out_required_token_bytes,
-    U64 *out_next_cursor)
+    U64 *out_next_cursor,
+    U64 *out_max_piece_len)
 {
     U8 *out_required_token_capacity_ptr;
     U8 *out_required_token_bytes_ptr;
@@ -7341,6 +7347,7 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityC
     U64 staged_required_token_capacity;
     U64 staged_required_token_bytes;
     U64 staged_next_cursor;
+    U64 staged_max_piece_len;
 
     U64 staged_canonical_required_token_capacity;
     U64 staged_canonical_max_piece_len;
@@ -7479,11 +7486,13 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityC
     U64 out_token_capacity,
     U64 *out_required_token_capacity,
     U64 *out_required_token_bytes,
-    U64 *out_next_cursor)
+    U64 *out_next_cursor,
+    U64 *out_max_piece_len)
 {
     U8 *out_required_token_capacity_ptr;
     U8 *out_required_token_bytes_ptr;
     U8 *out_next_cursor_ptr;
+    U8 *out_max_piece_len_ptr;
 
     U8 *snapshot_bytes;
     U64 snapshot_byte_len;
@@ -7663,11 +7672,13 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityC
     U64 out_token_capacity,
     U64 *out_required_token_capacity,
     U64 *out_required_token_bytes,
-    U64 *out_next_cursor)
+    U64 *out_next_cursor,
+    U64 *out_max_piece_len)
 {
     U8 *out_required_token_capacity_ptr;
     U8 *out_required_token_bytes_ptr;
     U8 *out_next_cursor_ptr;
+    U8 *out_max_piece_len_ptr;
 
     U8 *snapshot_bytes;
     U64 snapshot_byte_len;
@@ -7682,6 +7693,9 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityC
     U8 *snapshot_out_required_token_capacity_ptr;
     U8 *snapshot_out_required_token_bytes_ptr;
     U8 *snapshot_out_next_cursor_ptr;
+    U8 *snapshot_out_max_piece_len_ptr;
+    U8 *snapshot_out_max_piece_len_ptr;
+    U8 *snapshot_out_max_piece_len_ptr;
     U8 *snapshot_out_max_piece_len_ptr;
 
     U64 staged_preflight_required_token_capacity;
@@ -7733,6 +7747,7 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityC
     snapshot_out_required_token_capacity_ptr = out_required_token_capacity_ptr;
     snapshot_out_required_token_bytes_ptr = out_required_token_bytes_ptr;
     snapshot_out_next_cursor_ptr = out_next_cursor_ptr;
+    snapshot_out_max_piece_len_ptr = out_max_piece_len_ptr;
     snapshot_out_max_piece_len_ptr = out_max_piece_len_ptr;
 
     err =
@@ -7940,7 +7955,8 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityC
             out_token_capacity,
             &staged_required_token_capacity,
             &staged_required_token_bytes,
-            &staged_next_cursor);
+            &staged_next_cursor,
+            &staged_max_piece_len);
     if (err != TOKENIZER_BPE_OK)
         return err;
 
@@ -8037,6 +8053,9 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityC
     if (canonical_preflight_max_piece_len > 0x7FFFFFFFFFFFFFFF)
         return TOKENIZER_BPE_ERR_OVERFLOW;
 
+    if (staged_max_piece_len != canonical_preflight_max_piece_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
     *out_required_token_capacity = staged_required_token_capacity;
     *out_required_token_bytes = staged_required_token_bytes;
     *out_next_cursor = staged_next_cursor;
@@ -8072,11 +8091,13 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityC
     U64 out_token_capacity,
     U64 *out_required_token_capacity,
     U64 *out_required_token_bytes,
-    U64 *out_next_cursor)
+    U64 *out_next_cursor,
+    U64 *out_max_piece_len)
 {
     U8 *out_required_token_capacity_ptr;
     U8 *out_required_token_bytes_ptr;
     U8 *out_next_cursor_ptr;
+    U8 *out_max_piece_len_ptr;
 
     U8 *snapshot_bytes;
     U64 snapshot_byte_len;
@@ -8091,6 +8112,7 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityC
     U8 *snapshot_out_required_token_capacity_ptr;
     U8 *snapshot_out_required_token_bytes_ptr;
     U8 *snapshot_out_next_cursor_ptr;
+    U8 *snapshot_out_max_piece_len_ptr;
 
     U64 staged_required_token_capacity;
     U64 staged_required_token_bytes;
@@ -8109,15 +8131,19 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityC
 
     if (!bytes || !io_cursor || !vocab_piece_lens ||
         !out_required_token_capacity || !out_required_token_bytes ||
-        !out_next_cursor)
+        !out_next_cursor || !out_max_piece_len)
         return TOKENIZER_BPE_ERR_NULL_PTR;
 
     out_required_token_capacity_ptr = (U8 *)out_required_token_capacity;
     out_required_token_bytes_ptr = (U8 *)out_required_token_bytes;
     out_next_cursor_ptr = (U8 *)out_next_cursor;
+    out_max_piece_len_ptr = (U8 *)out_max_piece_len;
     if (out_required_token_capacity_ptr == out_required_token_bytes_ptr ||
         out_required_token_capacity_ptr == out_next_cursor_ptr ||
-        out_required_token_bytes_ptr == out_next_cursor_ptr)
+        out_required_token_capacity_ptr == out_max_piece_len_ptr ||
+        out_required_token_bytes_ptr == out_next_cursor_ptr ||
+        out_required_token_bytes_ptr == out_max_piece_len_ptr ||
+        out_next_cursor_ptr == out_max_piece_len_ptr)
         return TOKENIZER_BPE_ERR_NULL_PTR;
 
     if (byte_len > 0x7FFFFFFFFFFFFFFF ||
@@ -8142,6 +8168,7 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityC
     snapshot_out_required_token_capacity_ptr = out_required_token_capacity_ptr;
     snapshot_out_required_token_bytes_ptr = out_required_token_bytes_ptr;
     snapshot_out_next_cursor_ptr = out_next_cursor_ptr;
+    snapshot_out_max_piece_len_ptr = out_max_piece_len_ptr;
 
     err =
         TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
@@ -8231,12 +8258,16 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityC
     if (snapshot_out_required_token_capacity_ptr !=
             (U8 *)out_required_token_capacity ||
         snapshot_out_required_token_bytes_ptr != (U8 *)out_required_token_bytes ||
-        snapshot_out_next_cursor_ptr != (U8 *)out_next_cursor)
+        snapshot_out_next_cursor_ptr != (U8 *)out_next_cursor ||
+        snapshot_out_max_piece_len_ptr != (U8 *)out_max_piece_len)
         return TOKENIZER_BPE_ERR_BAD_PARAM;
 
     if (out_required_token_capacity == out_required_token_bytes ||
         out_required_token_capacity == out_next_cursor ||
-        out_required_token_bytes == out_next_cursor)
+        out_required_token_capacity == out_max_piece_len ||
+        out_required_token_bytes == out_next_cursor ||
+        out_required_token_bytes == out_max_piece_len ||
+        out_next_cursor == out_max_piece_len)
         return TOKENIZER_BPE_ERR_NULL_PTR;
 
     if (staged_required_token_capacity != canonical_required_token_capacity ||

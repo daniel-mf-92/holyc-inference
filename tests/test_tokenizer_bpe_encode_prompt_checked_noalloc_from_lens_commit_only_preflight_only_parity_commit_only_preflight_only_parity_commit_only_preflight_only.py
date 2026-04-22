@@ -422,6 +422,54 @@ def test_no_partial_publish_on_canonical_mismatch() -> None:
     assert max_piece == [44]
 
 
+def test_no_partial_publish_on_staged_max_piece_mismatch() -> None:
+    left, right, ranks, merged = _build_rank_tables()
+    payload = list("hello world".encode("utf-8"))
+    vocab_lens = [1, 2, 3, 5]
+
+    def _bad_staged(*args, **kwargs):
+        out_req, out_bytes, out_next, out_max_piece = args[-4], args[-3], args[-2], args[-1]
+        out_req[0] = len(payload)
+        out_bytes[0] = len(payload) * 4
+        out_next[0] = len(payload)
+        out_max_piece[0] = 1
+        return TOKENIZER_BPE_OK
+
+    req = [111]
+    req_bytes = [222]
+    next_cursor = [333]
+    max_piece = [444]
+    cursor = [0]
+
+    err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only(
+        payload,
+        len(payload),
+        cursor,
+        len(payload),
+        left,
+        right,
+        ranks,
+        merged,
+        len(ranks),
+        len(ranks),
+        vocab_lens,
+        len(vocab_lens),
+        len(vocab_lens),
+        len(payload),
+        req,
+        req_bytes,
+        next_cursor,
+        max_piece,
+        staged_fn=_bad_staged,
+    )
+
+    assert err == TOKENIZER_BPE_ERR_BAD_PARAM
+    assert req == [111]
+    assert req_bytes == [222]
+    assert next_cursor == [333]
+    assert max_piece == [444]
+
+
 def test_randomized_adversarial_vectors() -> None:
     rng = random.Random(20260422_1085)
     left, right, ranks, merged = _build_rank_tables()
@@ -475,5 +523,6 @@ if __name__ == "__main__":
     test_known_vector_success()
     test_no_partial_publish_on_staged_mismatch()
     test_no_partial_publish_on_canonical_mismatch()
+    test_no_partial_publish_on_staged_max_piece_mismatch()
     test_randomized_adversarial_vectors()
     print("ok")
