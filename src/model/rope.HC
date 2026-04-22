@@ -24,6 +24,10 @@
 #define ROPE_Q16_TWO_PI   411775
 #define ROPE_Q16_HALF_PI  102944
 
+#define ROPE_Q16_LUT_BITS  10
+#define ROPE_Q16_LUT_SIZE  (1 << ROPE_Q16_LUT_BITS)
+#define ROPE_Q16_LUT_MASK  (ROPE_Q16_LUT_SIZE - 1)
+
 // Declared in src/math/intlog.HC and src/math/intexp.HC.
 I64 FPQ16Ln(I64 x_q16);
 I64 FPQ16Exp(I64 x_q16);
@@ -153,6 +157,12 @@ I32 RoPEQ16RotateHeadRangeByTokenWindowCheckedStridedNoPartialPreflightOnlyDefau
                                                                                           I64 *out_last_head_base_index,
                                                                                           I64 *out_last_head_last_pair_y_index,
                                                                                           I64 *out_last_token_position);
+I32 RoPEQ16ApplyPairChecked(I64 *head_cells_q16,
+                            I64 head_cell_capacity,
+                            I64 head_base_index,
+                            I64 pair_index,
+                            I64 pair_stride_cells,
+                            I64 angle_q16);
 
 U64 RoPEAbsToU64(I64 x)
 {
@@ -548,6 +558,98 @@ I32 RoPEQ16CosApproxChecked(I64 angle_q16,
                                    out_cos_q16);
 }
 
+I64 rope_q16_lut_sin[ROPE_Q16_LUT_SIZE];
+I64 rope_q16_lut_cos[ROPE_Q16_LUT_SIZE];
+Bool rope_q16_lut_ready = FALSE;
+
+// Build integer RoPE trig LUT once with Q16 samples over [0, 2*pi).
+I32 RoPEQ16EnsureTrigLUTChecked()
+{
+    I64 index;
+    I64 scaled_q16;
+    I64 angle_q16;
+    I32 status;
+
+    if (rope_q16_lut_ready)
+        return ROPE_Q16_OK;
+
+    for (index = 0; index < ROPE_Q16_LUT_SIZE; index++)
+    {
+        status = RoPETryMulI64Checked(index,
+                                      ROPE_Q16_TWO_PI,
+                                      &scaled_q16);
+        if (status != ROPE_Q16_OK)
+            return status;
+
+        status = RoPEQ16DivByPositiveIntRoundedChecked(scaled_q16,
+                                                       ROPE_Q16_LUT_SIZE,
+                                                       &angle_q16);
+        if (status != ROPE_Q16_OK)
+            return status;
+
+        status = RoPEQ16SinApproxChecked(angle_q16,
+                                         &rope_q16_lut_sin[index]);
+        if (status != ROPE_Q16_OK)
+            return status;
+
+        status = RoPEQ16CosApproxChecked(angle_q16,
+                                         &rope_q16_lut_cos[index]);
+        if (status != ROPE_Q16_OK)
+            return status;
+    }
+
+    rope_q16_lut_ready = TRUE;
+    return ROPE_Q16_OK;
+}
+
+// Lookup integer sin/cos for an arbitrary Q16 angle.
+I32 RoPEQ16LookupSinCosChecked(I64 angle_q16,
+                               I64 *out_sin_q16,
+                               I64 *out_cos_q16)
+{
+    I64 reduced_q16;
+    I64 scaled_index_q16;
+    I64 lut_index;
+    I32 status;
+
+    if (!out_sin_q16 || !out_cos_q16)
+        return ROPE_Q16_ERR_NULL_PTR;
+
+    status = RoPEQ16EnsureTrigLUTChecked();
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    reduced_q16 = angle_q16 % ROPE_Q16_TWO_PI;
+    if (reduced_q16 < 0)
+    {
+        status = RoPETryAddI64Checked(reduced_q16,
+                                      ROPE_Q16_TWO_PI,
+                                      &reduced_q16);
+        if (status != ROPE_Q16_OK)
+            return status;
+    }
+
+    status = RoPETryMulI64Checked(reduced_q16,
+                                  ROPE_Q16_LUT_SIZE,
+                                  &scaled_index_q16);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPEQ16DivByPositiveIntRoundedChecked(scaled_index_q16,
+                                                   ROPE_Q16_TWO_PI,
+                                                   &lut_index);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    if (lut_index < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    lut_index &= ROPE_Q16_LUT_MASK;
+    *out_sin_q16 = rope_q16_lut_sin[lut_index];
+    *out_cos_q16 = rope_q16_lut_cos[lut_index];
+    return ROPE_Q16_OK;
+}
+
 // Compute RoPE per-position angle increment for one rotary pair index:
 //   step_q16 = exp(-(2*pair_index/head_dim) * ln(freq_base_q16))
 //
@@ -716,6 +818,115 @@ I32 RoPEQ16RotatePairChecked(I64 x_q16,
     return RoPETryAddI64Checked(x_sin,
                                 y_cos,
                                 out_y_rot_q16);
+}
+
+// Apply one RoPE rotation pair in-place with checked lane indexing.
+// Layout:
+//   x index = head_base_index + pair_index * pair_stride_cells
+//   y index = x index + 1
+I32 RoPEQ16ApplyPairChecked(I64 *head_cells_q16,
+                            I64 head_cell_capacity,
+                            I64 head_base_index,
+                            I64 pair_index,
+                            I64 pair_stride_cells,
+                            I64 angle_q16)
+{
+    I64 pair_offset;
+    I64 x_index;
+    I64 y_index;
+    I64 x_q16;
+    I64 y_q16;
+    I64 sin_q16;
+    I64 cos_q16;
+    I64 x_cos;
+    I64 y_sin;
+    I64 x_sin;
+    I64 y_cos;
+    I64 x_rot_q16;
+    I64 y_rot_q16;
+    I32 status;
+
+    if (!head_cells_q16)
+        return ROPE_Q16_ERR_NULL_PTR;
+
+    if (head_cell_capacity < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (head_base_index < 0 || pair_index < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (pair_stride_cells < 2)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    status = RoPETryMulI64Checked(pair_index,
+                                  pair_stride_cells,
+                                  &pair_offset);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPETryAddI64Checked(head_base_index,
+                                  pair_offset,
+                                  &x_index);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPETryAddI64Checked(x_index,
+                                  1,
+                                  &y_index);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    if (x_index < 0 || y_index < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (x_index >= head_cell_capacity || y_index >= head_cell_capacity)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    x_q16 = head_cells_q16[x_index];
+    y_q16 = head_cells_q16[y_index];
+
+    status = RoPEQ16LookupSinCosChecked(angle_q16,
+                                        &sin_q16,
+                                        &cos_q16);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPEQ16MulChecked(x_q16,
+                               cos_q16,
+                               &x_cos);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPEQ16MulChecked(y_q16,
+                               sin_q16,
+                               &y_sin);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPEQ16MulChecked(x_q16,
+                               sin_q16,
+                               &x_sin);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPEQ16MulChecked(y_q16,
+                               cos_q16,
+                               &y_cos);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPETrySubI64Checked(x_cos,
+                                  y_sin,
+                                  &x_rot_q16);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    status = RoPETryAddI64Checked(x_sin,
+                                  y_cos,
+                                  &y_rot_q16);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    head_cells_q16[x_index] = x_rot_q16;
+    head_cells_q16[y_index] = y_rot_q16;
+    return ROPE_Q16_OK;
 }
 
 // Compose full one-step rotary application for one pair at one token position:
