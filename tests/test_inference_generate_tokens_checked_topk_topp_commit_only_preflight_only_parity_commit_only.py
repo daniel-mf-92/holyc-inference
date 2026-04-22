@@ -16,6 +16,7 @@ from test_inference_generate_tokens_checked_topk_topp_commit_only_preflight_only
 from test_inference_generate_tokens_preflight_checked import (
     SAMPLING_Q16_ERR_BAD_PARAM,
     SAMPLING_Q16_ERR_NULL_PTR,
+    SAMPLING_Q16_ERR_OVERFLOW,
     SAMPLING_Q16_OK,
 )
 
@@ -140,6 +141,32 @@ def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parit
     )
     if status != SAMPLING_Q16_OK:
         return status
+
+    parity_required_logits = staged_required_logits[0]
+    parity_required_tokens = staged_required_tokens[0]
+    parity_final_token_count = staged_final_token_count[0]
+
+    if max_new_tokens < 0 or token_history_count < 0 or vocab_size < 0:
+        return SAMPLING_Q16_ERR_BAD_PARAM
+
+    if max_new_tokens:
+        if vocab_size > 0x7FFFFFFFFFFFFFFF // max_new_tokens:
+            return SAMPLING_Q16_ERR_OVERFLOW
+        canonical_required_logits = vocab_size * max_new_tokens
+    else:
+        canonical_required_logits = 0
+
+    canonical_required_tokens = max_new_tokens
+    canonical_final_token_count = token_history_count + max_new_tokens
+    if canonical_final_token_count > 0x7FFFFFFFFFFFFFFF:
+        return SAMPLING_Q16_ERR_OVERFLOW
+
+    if (
+        parity_required_logits != canonical_required_logits
+        or parity_required_tokens != canonical_required_tokens
+        or parity_final_token_count != canonical_final_token_count
+    ):
+        return SAMPLING_Q16_ERR_BAD_PARAM
 
     if (
         snapshot_step_logits_capacity != step_logits_capacity
@@ -324,6 +351,93 @@ def test_bad_param_no_publish() -> None:
     assert out_final_token_count == [213]
 
 
+def test_canonical_tuple_mismatch_no_publish() -> None:
+    out_required_logits = [301]
+    out_required_tokens = [302]
+    out_final_token_count = [303]
+
+    def _wrong_tuple(**kwargs: int) -> int:
+        kwargs["out_required_logits"][0] = kwargs["step_logits_capacity"] + 1
+        kwargs["out_required_tokens"][0] = kwargs["max_new_tokens"]
+        kwargs["out_final_token_count"][0] = kwargs["token_history_count"] + kwargs["max_new_tokens"]
+        return SAMPLING_Q16_OK
+
+    status = (
+        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_reference(
+            step_logits_q16=[0] * 64,
+            step_logits_capacity=64,
+            vocab_size=16,
+            max_new_tokens=4,
+            token_history=[0] * 16,
+            token_history_capacity=16,
+            token_history_count=8,
+            temperature_q16=SAMPLING_Q16_ONE,
+            top_k=16,
+            top_p_q16=SAMPLING_Q16_ONE,
+            repetition_penalty_q16=SAMPLING_Q16_ONE,
+            random_q16_values=[0, 1, 2, 3],
+            random_q16_capacity=4,
+            workspace_stage_logits_q16=[0] * 16,
+            workspace_stage_logits_capacity=16,
+            workspace_topk_logits_q16=[0] * 16,
+            workspace_topk_logits_capacity=16,
+            workspace_topk_indices=[0] * 16,
+            workspace_topk_index_capacity=16,
+            out_generated_tokens=[0] * 4,
+            generated_capacity=4,
+            out_required_logits=out_required_logits,
+            out_required_tokens=out_required_tokens,
+            out_final_token_count=out_final_token_count,
+            parity_fn=_wrong_tuple,
+        )
+    )
+
+    assert status == SAMPLING_Q16_ERR_BAD_PARAM
+    assert out_required_logits == [301]
+    assert out_required_tokens == [302]
+    assert out_final_token_count == [303]
+
+
+def test_canonical_logits_overflow_no_publish() -> None:
+    out_required_logits = [401]
+    out_required_tokens = [402]
+    out_final_token_count = [403]
+
+    status = (
+        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_reference(
+            step_logits_q16=[0],
+            step_logits_capacity=0,
+            vocab_size=0x7FFFFFFFFFFFFFFF,
+            max_new_tokens=2,
+            token_history=[0] * 3,
+            token_history_capacity=3,
+            token_history_count=1,
+            temperature_q16=SAMPLING_Q16_ONE,
+            top_k=1,
+            top_p_q16=SAMPLING_Q16_ONE,
+            repetition_penalty_q16=SAMPLING_Q16_ONE,
+            random_q16_values=[0] * 2,
+            random_q16_capacity=2,
+            workspace_stage_logits_q16=[0] * 2,
+            workspace_stage_logits_capacity=2,
+            workspace_topk_logits_q16=[0] * 2,
+            workspace_topk_logits_capacity=2,
+            workspace_topk_indices=[0] * 2,
+            workspace_topk_index_capacity=2,
+            out_generated_tokens=[0] * 2,
+            generated_capacity=2,
+            out_required_logits=out_required_logits,
+            out_required_tokens=out_required_tokens,
+            out_final_token_count=out_final_token_count,
+        )
+    )
+
+    assert status == SAMPLING_Q16_ERR_OVERFLOW
+    assert out_required_logits == [401]
+    assert out_required_tokens == [402]
+    assert out_final_token_count == [403]
+
+
 def test_randomized_adversarial_prompt_capacity_termination_vectors() -> None:
     rng = random.Random(20260422_1057)
 
@@ -371,5 +485,7 @@ if __name__ == "__main__":
     test_known_vector_success()
     test_parity_error_no_publish()
     test_bad_param_no_publish()
+    test_canonical_tuple_mismatch_no_publish()
+    test_canonical_logits_overflow_no_publish()
     test_randomized_adversarial_prompt_capacity_termination_vectors()
     print("inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only=ok")

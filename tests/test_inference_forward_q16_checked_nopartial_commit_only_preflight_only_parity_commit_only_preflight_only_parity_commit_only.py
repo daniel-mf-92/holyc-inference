@@ -96,12 +96,7 @@ def parity_commit_only_preflight_only_parity_commit_only_reference(
     if status != MODEL_Q16_OK:
         return status
 
-    canonical_dense = [0]
-    canonical_workspace = [0]
-    canonical_block = [0]
-    canonical_logits = [0]
-
-    status = preflight_only_fn(
+    status, canonical_diag = preflight_only_fn(
         embed_capacity=embed_capacity,
         block_attn_capacity=block_attn_capacity,
         block_ffn_capacity=block_ffn_capacity,
@@ -113,13 +108,15 @@ def parity_commit_only_preflight_only_parity_commit_only_reference(
         logits_capacity=logits_capacity,
         row_count=row_count,
         lane_count=lane_count,
-        out_dense_cells=canonical_dense,
-        out_required_workspace_cells=canonical_workspace,
-        out_required_block_tensor_cells=canonical_block,
-        out_required_logits_cells=canonical_logits,
     )
     if status != MODEL_Q16_OK:
         return status
+    assert canonical_diag is not None
+
+    canonical_dense = canonical_diag["dense_cells"]
+    canonical_workspace = canonical_diag["required_workspace_cells"]
+    canonical_block = canonical_diag["required_block_tensor_cells"]
+    canonical_logits = canonical_diag["required_logits_cells"]
 
     if (
         snapshot_row_count != row_count
@@ -148,13 +145,13 @@ def parity_commit_only_preflight_only_parity_commit_only_reference(
     ):
         return MODEL_Q16_ERR_BAD_PARAM
 
-    if staged_dense[0] != canonical_dense[0]:
+    if staged_dense[0] != canonical_dense:
         return MODEL_Q16_ERR_BAD_PARAM
-    if staged_workspace[0] != canonical_workspace[0]:
+    if staged_workspace[0] != canonical_workspace:
         return MODEL_Q16_ERR_BAD_PARAM
-    if staged_block[0] != canonical_block[0]:
+    if staged_block[0] != canonical_block:
         return MODEL_Q16_ERR_BAD_PARAM
-    if staged_logits[0] != canonical_logits[0]:
+    if staged_logits[0] != canonical_logits:
         return MODEL_Q16_ERR_BAD_PARAM
 
     out_dense_cells[0] = staged_dense[0]
