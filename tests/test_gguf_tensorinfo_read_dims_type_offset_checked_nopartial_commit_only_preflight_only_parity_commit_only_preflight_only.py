@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly (IQ-1025)."""
+"""Harness for IQ-1032 dims/type/offset parity commit-only preflight companion."""
 
 from __future__ import annotations
 
@@ -10,39 +10,22 @@ from pathlib import Path
 sys.path.insert(0, str(Path("tests").resolve()))
 
 from test_gguf_tensorinfo_read_dims_type_offset_checked_nopartial import (
-    GGUF_TENSOR_PARSE_ERR_BAD_DIMS,
     GGUF_TENSOR_PARSE_ERR_BAD_TYPE,
     GGUF_TENSOR_PARSE_ERR_NULL_PTR,
     GGUF_TENSOR_PARSE_ERR_TRUNCATED,
     GGUF_TENSOR_PARSE_OK,
     KNOWN_TYPES,
-    U64_MAX,
     dims_type_offset_entry,
 )
-from test_gguf_tensorinfo_read_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity import (
-    parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity,
+from test_gguf_tensorinfo_read_dims_type_offset_checked_nopartial_commit_only_preflight_only import (
+    parse_dims_type_offset_checked_nopartial_commit_only_preflight_only,
+)
+from test_gguf_tensorinfo_read_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_commit_only import (
+    parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_commit_only,
 )
 
 
-def u64_add(a: int, b: int) -> int | None:
-    if a < 0 or b < 0:
-        return None
-    if a > U64_MAX - b:
-        return None
-    return a + b
-
-
-def u64_mul(a: int, b: int) -> int | None:
-    if a < 0 or b < 0:
-        return None
-    if a == 0 or b == 0:
-        return 0
-    if a > U64_MAX // b:
-        return None
-    return a * b
-
-
-def parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_commit_only(
+def parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only(
     buf: bytes | None,
     size: int,
     cursor: int,
@@ -85,99 +68,127 @@ def parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_c
 
     if cursor > size:
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED
+    if size > 0x7FFFFFFFFFFFFFFF or cursor > 0x7FFFFFFFFFFFFFFF:
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
 
     snapshot_buf = buf
     snapshot_size = size
     snapshot_cursor = cursor
 
-    staged_dim_count = [0]
-    staged_dims_cells = [0]
-    staged_required_bytes = [0]
-    staged_type_value = [0]
-    staged_tensor_offset = [0]
-    staged_last_dim_index = [0]
+    staged_commit_dim_count = [0]
+    staged_commit_dims_cells = [0]
+    staged_commit_required_bytes = [0]
+    staged_commit_type_value = [0]
+    staged_commit_tensor_offset = [0]
+    staged_commit_last_dim_index = [0]
 
-    err = parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity(
+    staged_pre_dim_count = [0]
+    staged_pre_dims_cells = [0]
+    staged_pre_required_bytes = [0]
+    staged_pre_type_value = [0]
+    staged_pre_tensor_offset = [0]
+    staged_pre_last_dim_index = [0]
+
+    status = parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_commit_only(
         buf,
         size,
         cursor,
-        staged_dim_count,
-        staged_dims_cells,
-        staged_required_bytes,
-        staged_type_value,
-        staged_tensor_offset,
-        staged_last_dim_index,
+        staged_commit_dim_count,
+        staged_commit_dims_cells,
+        staged_commit_required_bytes,
+        staged_commit_type_value,
+        staged_commit_tensor_offset,
+        staged_commit_last_dim_index,
     )
-    if err != GGUF_TENSOR_PARSE_OK:
-        return err
+    if status != GGUF_TENSOR_PARSE_OK:
+        return status
+
+    status = parse_dims_type_offset_checked_nopartial_commit_only_preflight_only(
+        buf,
+        size,
+        cursor,
+        staged_pre_dim_count,
+        staged_pre_dims_cells,
+        staged_pre_required_bytes,
+        staged_pre_type_value,
+        staged_pre_tensor_offset,
+        staged_pre_last_dim_index,
+    )
+    if status != GGUF_TENSOR_PARSE_OK:
+        return status
 
     if snapshot_buf is not buf or snapshot_size != size or snapshot_cursor != cursor:
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED
 
-    if staged_dim_count[0] == 0:
-        return GGUF_TENSOR_PARSE_ERR_BAD_DIMS
-    if staged_dims_cells[0] != staged_dim_count[0]:
-        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
-    if staged_last_dim_index[0] != staged_dim_count[0] - 1:
-        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
-
-    dims_bytes = u64_mul(staged_dims_cells[0], 8)
-    if dims_bytes is None:
-        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
-    required = u64_add(4, dims_bytes)
-    if required is None:
-        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
-    required = u64_add(required, 4)
-    if required is None:
-        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
-    required = u64_add(required, 8)
-    if required is None:
+    if (
+        staged_commit_dim_count[0] != staged_pre_dim_count[0]
+        or staged_commit_dims_cells[0] != staged_pre_dims_cells[0]
+        or staged_commit_required_bytes[0] != staged_pre_required_bytes[0]
+        or staged_commit_type_value[0] != staged_pre_type_value[0]
+        or staged_commit_tensor_offset[0] != staged_pre_tensor_offset[0]
+        or staged_commit_last_dim_index[0] != staged_pre_last_dim_index[0]
+    ):
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED
 
-    if staged_required_bytes[0] != required:
+    if (
+        staged_commit_dims_cells[0] != staged_commit_dim_count[0]
+        or staged_pre_dims_cells[0] != staged_pre_dim_count[0]
+    ):
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED
 
-    next_cursor = u64_add(cursor, staged_required_bytes[0])
-    if next_cursor is None or next_cursor > size:
+    if (
+        staged_commit_type_value[0] not in KNOWN_TYPES
+        or staged_pre_type_value[0] not in KNOWN_TYPES
+    ):
+        return GGUF_TENSOR_PARSE_ERR_BAD_TYPE
+
+    commit_end = cursor + staged_commit_required_bytes[0]
+    if commit_end > size:
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED
 
-    out_dim_count[0] = staged_dim_count[0]
-    out_dims_cells[0] = staged_dims_cells[0]
-    out_required_bytes[0] = staged_required_bytes[0]
-    out_type_value[0] = staged_type_value[0]
-    out_tensor_offset[0] = staged_tensor_offset[0]
-    out_last_dim_index[0] = staged_last_dim_index[0]
+    pre_end = cursor + staged_pre_required_bytes[0]
+    if pre_end > size:
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
+
+    out_dim_count[0] = staged_commit_dim_count[0]
+    out_dims_cells[0] = staged_commit_dims_cells[0]
+    out_required_bytes[0] = staged_commit_required_bytes[0]
+    out_type_value[0] = staged_commit_type_value[0]
+    out_tensor_offset[0] = staged_commit_tensor_offset[0]
+    out_last_dim_index[0] = staged_commit_last_dim_index[0]
     return GGUF_TENSOR_PARSE_OK
 
 
 def explicit_checked_composition(*args):
-    return parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_commit_only(
+    return parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only(
         *args
     )
 
 
-def test_source_contains_iq1025_signature_and_commit_only_contract() -> None:
+def test_source_contains_iq1032_signature_and_contract() -> None:
     source = Path("src/gguf/tensorinfo.HC").read_text(encoding="utf-8")
-    sig = "I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly("
+    sig = "I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly("
     assert sig in source
     body = source.split(sig, 1)[1].split("I64 GGUFTensorParseOne(", 1)[0]
 
-    assert "status = GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParity(" in body
-    assert "if (!staged_dim_count)" in body
-    assert "if (staged_dim_count > GGUF_TENSOR_MAX_DIMS)" in body
-    assert "if (staged_dims_cells != staged_dim_count)" in body
-    assert "if (staged_last_dim_index != (U64)(staged_dim_count - 1))" in body
-    assert "if (!GGUFTensorTypeKnown(staged_type_value))" in body
-    assert "if (!GGUFTensorTryMulU64(staged_dims_cells, 8, &canonical_dims_bytes))" in body
-    assert "if (staged_required_bytes > span_remaining)" in body
-    assert "if (!GGUFTensorTryAddU64(cursor, staged_required_bytes, &canonical_next_cursor))" in body
-    assert "if (canonical_next_cursor > size)" in body
-    assert "*out_dim_count = staged_dim_count;" in body
-    assert "*out_dims_cells = staged_dims_cells;" in body
-    assert "*out_required_bytes = staged_required_bytes;" in body
-    assert "*out_type_value = staged_type_value;" in body
-    assert "*out_tensor_offset = staged_tensor_offset;" in body
-    assert "*out_last_dim_index = staged_last_dim_index;" in body
+    assert "IQ-1032 diagnostics-only no-write companion" in source
+    assert "GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(" in body
+    assert "GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnly(" in body
+    assert "if (snapshot_buf != buf || snapshot_size != size || snapshot_cursor != cursor)" in body
+    assert "staged_commit_dim_count != staged_pre_dim_count" in body
+    assert "staged_commit_dims_cells != staged_pre_dims_cells" in body
+    assert "staged_commit_required_bytes != staged_pre_required_bytes" in body
+    assert "staged_commit_type_value != staged_pre_type_value" in body
+    assert "staged_commit_tensor_offset != staged_pre_tensor_offset" in body
+    assert "staged_commit_last_dim_index != staged_pre_last_dim_index" in body
+    assert "staged_commit_dims_cells != staged_commit_dim_count" in body
+    assert "staged_pre_dims_cells != staged_pre_dim_count" in body
+    assert "!GGUFTensorTypeKnown(staged_commit_type_value)" in body
+    assert "!GGUFTensorTypeKnown(staged_pre_type_value)" in body
+    assert "if (!GGUFTensorTryAddU64(cursor," in body
+    assert "if (staged_commit_computed_end > size)" in body
+    assert "if (staged_pre_computed_end > size)" in body
+    assert "*out_dim_count = staged_commit_dim_count;" in body
 
 
 def test_known_vector_success_and_no_partial_on_error() -> None:
@@ -190,7 +201,7 @@ def test_known_vector_success_and_no_partial_on_error() -> None:
     out_tensor_offset = [0x45]
     out_last_dim_index = [0x46]
 
-    err = parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_commit_only(
+    err = parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only(
         payload,
         len(payload),
         0,
@@ -217,7 +228,7 @@ def test_known_vector_success_and_no_partial_on_error() -> None:
         out_tensor_offset[0],
         out_last_dim_index[0],
     )
-    err = parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_commit_only(
+    err = parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only(
         payload,
         len(payload) - 1,
         0,
@@ -239,7 +250,7 @@ def test_known_vector_success_and_no_partial_on_error() -> None:
     ) == before
 
 
-def test_bad_type_and_max_dims_rejected() -> None:
+def test_bad_type_and_randomized_parity() -> None:
     out_dim_count = [0x41]
     out_dims_cells = [0x42]
     out_required_bytes = [0x43]
@@ -249,7 +260,7 @@ def test_bad_type_and_max_dims_rejected() -> None:
 
     bad_type = max(KNOWN_TYPES) + 100
     payload_bad_type = dims_type_offset_entry([16, 8], bad_type, 123)
-    err = parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_commit_only(
+    err = parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only(
         payload_bad_type,
         len(payload_bad_type),
         0,
@@ -262,25 +273,9 @@ def test_bad_type_and_max_dims_rejected() -> None:
     )
     assert err in (GGUF_TENSOR_PARSE_ERR_BAD_TYPE, GGUF_TENSOR_PARSE_ERR_TRUNCATED)
 
-    payload_too_many_dims = dims_type_offset_entry([1] * 9, 8, 0)
-    err = parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_commit_only(
-        payload_too_many_dims,
-        len(payload_too_many_dims),
-        0,
-        out_dim_count,
-        out_dims_cells,
-        out_required_bytes,
-        out_type_value,
-        out_tensor_offset,
-        out_last_dim_index,
-    )
-    assert err in (GGUF_TENSOR_PARSE_ERR_BAD_DIMS, GGUF_TENSOR_PARSE_ERR_TRUNCATED)
+    rng = random.Random(202604221032)
 
-
-def test_randomized_parity_vs_explicit_composition() -> None:
-    rng = random.Random(202604221025)
-
-    for i in range(800):
+    for _ in range(850):
         dim_count = rng.randint(1, 4)
         dims = [rng.randint(1, 256) for _ in range(dim_count)]
         ggml_type = rng.choice([0, 1, 2, 8, 16])
@@ -298,7 +293,7 @@ def test_randomized_parity_vs_explicit_composition() -> None:
         out_a = [[0x11], [0x12], [0x13], [0x14], [0x15], [0x16]]
         out_b = [[0x11], [0x12], [0x13], [0x14], [0x15], [0x16]]
 
-        got = parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_commit_only(
+        got = parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only(
             buf,
             size,
             cursor,
@@ -327,8 +322,7 @@ def test_randomized_parity_vs_explicit_composition() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_iq1025_signature_and_commit_only_contract()
+    test_source_contains_iq1032_signature_and_contract()
     test_known_vector_success_and_no_partial_on_error()
-    test_bad_type_and_max_dims_rejected()
-    test_randomized_parity_vs_explicit_composition()
+    test_bad_type_and_randomized_parity()
     print("ok")
