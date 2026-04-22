@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import random
+import re
 import sys
 from pathlib import Path
 
@@ -150,10 +151,91 @@ def test_source_contains_required_bytes_parity_commit_only_preflight_only_parity
     source = Path("src/model/kv_cache.HC").read_text(encoding="utf-8")
     sig = "I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnlyPreflightOnlyParity("
     assert sig in source
+    assert len(re.findall(re.escape(sig), source)) == 1
     body = source.split(sig, 1)[1]
     assert "KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnlyPreflightOnly(" in body
     assert "KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnly(" in body
     assert "if (staged_preflight_required_cells != staged_commit_required_cells)" in body
+
+
+def test_capacity_edge_vectors_and_no_partial_publish_on_failure() -> None:
+    vectors = [
+        dict(layer_count=1, head_count=1, head_dim=1, token_start=0, token_count=1),
+        dict(layer_count=2, head_count=4, head_dim=8, token_start=9, token_count=3),
+        dict(layer_count=3, head_count=2, head_dim=5, token_start=17, token_count=0),
+    ]
+
+    for vector in vectors:
+        cells_per_token = vector["layer_count"] * vector["head_count"] * vector["head_dim"]
+        base_index = vector["token_start"] * cells_per_token
+        required_cells = vector["token_count"] * cells_per_token
+        exact_capacity = base_index + required_cells
+
+        out_cells = [111]
+        out_bytes = [222]
+        out_last = [333]
+        err = kv_cache_q16_reserve_token_span_checked_nopartial_commit_only_preflight_only_required_bytes_parity_commit_only_preflight_only_parity(
+            vector["layer_count"],
+            vector["head_count"],
+            vector["head_dim"],
+            vector["token_start"],
+            vector["token_count"],
+            exact_capacity,
+            out_cells,
+            out_bytes,
+            out_last,
+        )
+        assert err == KV_Q16_OK
+        assert out_cells == [required_cells]
+        assert out_bytes == [required_cells * 8]
+        assert out_last == ([0] if required_cells == 0 else [base_index + required_cells - 1])
+
+        out_cells = [444]
+        out_bytes = [555]
+        out_last = [666]
+        err = kv_cache_q16_reserve_token_span_checked_nopartial_commit_only_preflight_only_required_bytes_parity_commit_only_preflight_only_parity(
+            vector["layer_count"],
+            vector["head_count"],
+            vector["head_dim"],
+            vector["token_start"],
+            vector["token_count"],
+            exact_capacity - 1,
+            out_cells,
+            out_bytes,
+            out_last,
+        )
+        assert err == KV_Q16_ERR_BAD_PARAM
+        assert out_cells == [444]
+        assert out_bytes == [555]
+        assert out_last == [666]
+
+
+def test_i64_limit_overflow_vectors_preserve_outputs() -> None:
+    vectors = [
+        dict(layer_count=I64_MAX, head_count=2, head_dim=1, token_start=0, token_count=1),
+        dict(layer_count=I64_MAX // 4, head_count=2, head_dim=2, token_start=3, token_count=1),
+        dict(layer_count=I64_MAX // 8 + 1, head_count=1, head_dim=1, token_start=0, token_count=1),
+    ]
+
+    for vector in vectors:
+        out_cells = [9001]
+        out_bytes = [9002]
+        out_last = [9003]
+        err = kv_cache_q16_reserve_token_span_checked_nopartial_commit_only_preflight_only_required_bytes_parity_commit_only_preflight_only_parity(
+            vector["layer_count"],
+            vector["head_count"],
+            vector["head_dim"],
+            vector["token_start"],
+            vector["token_count"],
+            I64_MAX,
+            out_cells,
+            out_bytes,
+            out_last,
+        )
+        assert err == KV_Q16_ERR_OVERFLOW
+        assert out_cells == [9001]
+        assert out_bytes == [9002]
+        assert out_last == [9003]
 
 
 def test_known_vector_required_cells_bytes_and_last_index() -> None:
@@ -247,8 +329,10 @@ def test_randomized_parity_vs_explicit_composition() -> None:
 if __name__ == "__main__":
     test_source_contains_required_bytes_parity_commit_only_preflight_only_parity_helper()
     test_known_vector_required_cells_bytes_and_last_index()
+    test_capacity_edge_vectors_and_no_partial_publish_on_failure()
     test_error_and_guard_paths()
     test_overflow_surfaces()
+    test_i64_limit_overflow_vectors_preserve_outputs()
     test_randomized_parity_vs_explicit_composition()
     print(
         "kv_cache_q16_reserve_token_span_checked_nopartial_commit_only_preflight_only_required_bytes_parity_commit_only_preflight_only_parity=ok"
