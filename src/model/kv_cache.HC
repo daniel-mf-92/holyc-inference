@@ -5097,3 +5097,123 @@ I32 KVCacheQ16AppendTokenCheckedNoPartialCommitOnlyPreflightOnlyParity(
     *out_next_token_index = staged_next_token_index_commit;
     return KV_Q16_OK;
 }
+
+// IQ-1061 diagnostics-only reserve helper for token-span geometry.
+// Computes checked reservation requirements without touching cache buffers.
+// Outputs are atomically published only after full invariant validation.
+I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytes(
+    I64 layer_count,
+    I64 head_count,
+    I64 head_dim,
+    I64 token_start,
+    I64 token_count,
+    I64 cache_capacity,
+    I64 *out_required_cells,
+    I64 *out_required_bytes,
+    I64 *out_last_cell_index)
+{
+    I64 staged_cells_per_token;
+    I64 staged_required_cells;
+    I64 staged_required_bytes;
+    I64 staged_base_index;
+    I64 staged_end_index;
+    I64 staged_last_cell_index;
+
+    I64 snapshot_layer_count;
+    I64 snapshot_head_count;
+    I64 snapshot_head_dim;
+    I64 snapshot_token_start;
+    I64 snapshot_token_count;
+    I64 snapshot_cache_capacity;
+    I32 status;
+
+    if (!out_required_cells || !out_required_bytes || !out_last_cell_index)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (out_required_cells == out_required_bytes ||
+        out_required_cells == out_last_cell_index ||
+        out_required_bytes == out_last_cell_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (layer_count < 0 || head_count < 0 || head_dim < 0 ||
+        token_start < 0 || token_count < 0 || cache_capacity < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    snapshot_layer_count = layer_count;
+    snapshot_head_count = head_count;
+    snapshot_head_dim = head_dim;
+    snapshot_token_start = token_start;
+    snapshot_token_count = token_count;
+    snapshot_cache_capacity = cache_capacity;
+
+    // cells_per_token = layer_count * head_count * head_dim
+    status = KVTryMulI64Checked(layer_count,
+                                head_count,
+                                &staged_cells_per_token);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVTryMulI64Checked(staged_cells_per_token,
+                                head_dim,
+                                &staged_cells_per_token);
+    if (status != KV_Q16_OK)
+        return status;
+
+    // base_index = token_start * cells_per_token
+    status = KVTryMulI64Checked(token_start,
+                                staged_cells_per_token,
+                                &staged_base_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (staged_base_index > cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    // required_cells = token_count * cells_per_token
+    status = KVTryMulI64Checked(token_count,
+                                staged_cells_per_token,
+                                &staged_required_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVTryAddI64Checked(staged_base_index,
+                                staged_required_cells,
+                                &staged_end_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (staged_end_index > cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    status = KVTryMulI64Checked(staged_required_cells,
+                                sizeof(I64),
+                                &staged_required_bytes);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (!staged_required_cells)
+    {
+        staged_last_cell_index = 0;
+    }
+    else
+    {
+        status = KVTryAddI64Checked(staged_end_index,
+                                    -1,
+                                    &staged_last_cell_index);
+        if (status != KV_Q16_OK)
+            return status;
+    }
+
+    if (snapshot_layer_count != layer_count ||
+        snapshot_head_count != head_count ||
+        snapshot_head_dim != head_dim ||
+        snapshot_token_start != token_start ||
+        snapshot_token_count != token_count ||
+        snapshot_cache_capacity != cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    *out_required_cells = staged_required_cells;
+    *out_required_bytes = staged_required_bytes;
+    *out_last_cell_index = staged_last_cell_index;
+    return KV_Q16_OK;
+}

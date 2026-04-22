@@ -141,6 +141,11 @@ def attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit
     if staged_last_out_index[0] != recomputed_last_out_index:
         return ATTN_Q16_ERR_BAD_PARAM
 
+    if staged_required_stage_cells[0] > snapshot_staged_scores_capacity:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if staged_required_out_cells[0] > snapshot_out_scores_capacity:
+        return ATTN_Q16_ERR_BAD_PARAM
+
     out_required_stage_cells[0] = staged_required_stage_cells[0]
     out_required_stage_bytes[0] = staged_required_stage_bytes[0]
     out_required_out_cells[0] = staged_required_out_cells[0]
@@ -234,6 +239,8 @@ def test_source_contains_required_bytes_parity_preflight_only_wrapper() -> None:
     assert "snapshot_out_scores_capacity = out_scores_capacity;" in body
     assert "if (snapshot_staged_scores_q32 != staged_scores_q32)" in body
     assert "if (snapshot_out_scores_q32 != out_scores_q32)" in body
+    assert "if (staged_required_stage_cells > snapshot_staged_scores_capacity)" in body
+    assert "if (staged_required_out_cells > snapshot_out_scores_capacity)" in body
 
 
 def test_known_vector_outputs() -> None:

@@ -2606,6 +2606,12 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
     if (staged_last_out_index != expected_last_out_index)
         return ATTN_Q16_ERR_BAD_PARAM;
 
+    // IQ-819 hardened invariant revalidation: capacities must still cover staged tuple.
+    if (staged_required_stage_cells > snapshot_staged_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_required_out_cells > snapshot_out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
     *out_required_stage_cells = staged_required_stage_cells;
     *out_required_stage_bytes = staged_required_stage_bytes;
     *out_required_out_cells = staged_required_out_cells;

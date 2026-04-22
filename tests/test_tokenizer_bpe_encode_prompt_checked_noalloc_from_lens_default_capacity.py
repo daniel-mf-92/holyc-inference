@@ -178,7 +178,30 @@ def explicit_checked_composition(
     out_required_token_capacity: list[int] | None,
     out_max_piece_len: list[int] | None,
 ) -> int:
-    return tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_default_capacity(
+    if (
+        data is None
+        or io_cursor is None
+        or vocab_piece_lens is None
+        or out_token_ids is None
+        or out_token_count is None
+        or out_required_token_capacity is None
+        or out_max_piece_len is None
+    ):
+        return TOKENIZER_BPE_ERR_NULL_PTR
+
+    if (
+        byte_len > I64_MAX
+        or prompt_nbytes > I64_MAX
+        or rank_table_count > I64_MAX
+        or rank_table_capacity > I64_MAX
+        or vocab_piece_count > I64_MAX
+        or vocab_piece_capacity > I64_MAX
+    ):
+        return TOKENIZER_BPE_ERR_OVERFLOW
+
+    derived_out_token_capacity = prompt_nbytes
+
+    return tokenizer_bpe_encode_prompt_checked_noalloc_from_lens(
         data,
         byte_len,
         io_cursor,
@@ -193,6 +216,7 @@ def explicit_checked_composition(
         vocab_piece_count,
         vocab_piece_capacity,
         out_token_ids,
+        derived_out_token_capacity,
         out_token_count,
         out_required_token_capacity,
         out_max_piece_len,
@@ -216,6 +240,7 @@ def test_source_contains_lens_default_capacity_helpers() -> None:
     assert sig_default in source
     body_default = source.split(sig_default, 1)[1]
     assert "derived_out_token_capacity = prompt_nbytes;" in body_default
+    assert "IQ-821 default-capacity contract" in body_default
     assert "TokenizerBPEEncodePromptCheckedNoAllocFromLens(" in body_default
 
 
