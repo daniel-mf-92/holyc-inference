@@ -163,6 +163,13 @@ I32 RoPEQ16ApplyPairChecked(I64 *head_cells_q16,
                             I64 pair_index,
                             I64 pair_stride_cells,
                             I64 angle_q16);
+I32 RoPEQ16RotateHeadByPositionApplyPairChecked(I64 *head_cells_q16,
+                                                I64 head_cell_capacity,
+                                                I64 head_base_index,
+                                                I64 head_dim,
+                                                I64 pair_stride_cells,
+                                                I64 freq_base_q16,
+                                                I64 position);
 
 U64 RoPEAbsToU64(I64 x)
 {
@@ -1127,6 +1134,94 @@ I32 RoPEQ16RotateHeadByPositionChecked(I64 *head_cells_q16,
 
         head_cells_q16[x_index] = x_rot_q16;
         head_cells_q16[y_index] = y_rot_q16;
+    }
+
+    return ROPE_Q16_OK;
+}
+
+// Rotate one head in-place by deriving pair angle-step per lane and delegating
+// the actual in-place lane write to `RoPEQ16ApplyPairChecked`.
+//
+// Why this variant exists:
+//   - keeps pair index progression explicit/auditable,
+//   - reuses shared checked lane write math from one helper,
+//   - preserves integer-only RoPE angle derivation:
+//       step(i)  = base^(-(2*i)/head_dim)
+//       angle(i) = position * step(i)
+I32 RoPEQ16RotateHeadByPositionApplyPairChecked(I64 *head_cells_q16,
+                                                I64 head_cell_capacity,
+                                                I64 head_base_index,
+                                                I64 head_dim,
+                                                I64 pair_stride_cells,
+                                                I64 freq_base_q16,
+                                                I64 position)
+{
+    I64 pair_count;
+    I64 pair_index;
+    I64 last_pair_y_index;
+    I64 lane_x_index;
+    I64 lane_y_index;
+    I64 angle_step_q16;
+    I64 angle_q16;
+    I32 status;
+
+    if (!head_cells_q16)
+        return ROPE_Q16_ERR_NULL_PTR;
+
+    status = RoPEQ16ValidateHeadSpanForDimChecked(head_cell_capacity,
+                                                  head_base_index,
+                                                  head_dim,
+                                                  pair_stride_cells,
+                                                  &last_pair_y_index);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    pair_count = head_dim >> 1;
+    lane_x_index = head_base_index;
+
+    for (pair_index = 0; pair_index < pair_count; pair_index++)
+    {
+        status = RoPETryAddI64Checked(lane_x_index,
+                                      1,
+                                      &lane_y_index);
+        if (status != ROPE_Q16_OK)
+            return status;
+
+        if (lane_x_index < 0 || lane_y_index < 0)
+            return ROPE_Q16_ERR_BAD_PARAM;
+        if (lane_y_index > last_pair_y_index)
+            return ROPE_Q16_ERR_BAD_PARAM;
+
+        status = RoPEQ16AngleStepChecked(freq_base_q16,
+                                         head_dim,
+                                         pair_index,
+                                         &angle_step_q16);
+        if (status != ROPE_Q16_OK)
+            return status;
+
+        status = RoPEQ16AngleForPositionChecked(angle_step_q16,
+                                                position,
+                                                &angle_q16);
+        if (status != ROPE_Q16_OK)
+            return status;
+
+        status = RoPEQ16ApplyPairChecked(head_cells_q16,
+                                         head_cell_capacity,
+                                         head_base_index,
+                                         pair_index,
+                                         pair_stride_cells,
+                                         angle_q16);
+        if (status != ROPE_Q16_OK)
+            return status;
+
+        if (pair_index + 1 < pair_count)
+        {
+            status = RoPETryAddI64Checked(lane_x_index,
+                                          pair_stride_cells,
+                                          &lane_x_index);
+            if (status != ROPE_Q16_OK)
+                return status;
+        }
     }
 
     return ROPE_Q16_OK;
