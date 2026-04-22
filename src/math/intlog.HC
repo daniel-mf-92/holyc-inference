@@ -279,6 +279,48 @@ I32 FPQ16LnArrayCheckedNoPartial(I64 *input_q16,
     return INTLOG_STATUS_OK;
 }
 
+// Commit-only wrapper for ln() array lanes.
+//
+// This path computes all output lanes into staged scratch first, then
+// atomically publishes to caller output only after every lane is available.
+// That keeps no-partial semantics explicit even when future checked ln()
+// kernels gain failure modes beyond pure scalar FPQ16Ln.
+I32 FPQ16LnArrayCheckedNoPartialCommitOnly(I64 *input_q16,
+                                           I64 count,
+                                           I64 *out_q16,
+                                           I64 out_capacity_bytes)
+{
+    I64 required_bytes;
+    I64 i;
+    I64 *staged_out_q16;
+    I32 status;
+
+    status = FPQ16LnArrayCheckedNoPartialPreflight(input_q16,
+                                                   count,
+                                                   out_q16,
+                                                   &required_bytes);
+    if (status != INTLOG_STATUS_OK)
+        return status;
+    if (out_capacity_bytes < required_bytes)
+        return INTLOG_STATUS_BADCOUNT;
+
+    if (!count)
+        return INTLOG_STATUS_OK;
+
+    staged_out_q16 = MAlloc(required_bytes);
+    if (!staged_out_q16)
+        return INTLOG_STATUS_BADPTR;
+
+    for (i = 0; i < count; i++)
+        staged_out_q16[i] = FPQ16Ln(input_q16[i]);
+
+    for (i = 0; i < count; i++)
+        out_q16[i] = staged_out_q16[i];
+
+    Free(staged_out_q16);
+    return INTLOG_STATUS_OK;
+}
+
 I32 FPQ16LnArrayCheckedNoPartialDefault(I64 *input_q16,
                                         I64 count,
                                         I64 *out_q16)
