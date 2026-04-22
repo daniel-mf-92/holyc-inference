@@ -259,6 +259,8 @@ I64 GGUFTensorInfoValidateDimsChecked(U32 n_dims,
     {
         if (!dims[i])
             return GGUF_TENSOR_PARSE_ERR_BAD_DIM_SIZE;
+        // Integer-only checked product: this is exact tensor element count math,
+        // never float, and never wraps silently.
         if (!GGUFTensorTryMulU64(n_elements, dims[i], &next_n_elements))
             return GGUF_TENSOR_PARSE_ERR_DIM_OVERFLOW;
 
@@ -270,6 +272,8 @@ I64 GGUFTensorInfoValidateDimsChecked(U32 n_dims,
         return status;
     if (!block_elems)
         return GGUF_TENSOR_PARSE_ERR_BAD_TYPE;
+    // Packed quant formats store fixed element quanta per block; total element
+    // count must divide exactly by that block size.
     if (n_elements % block_elems)
         return GGUF_TENSOR_PARSE_ERR_BAD_DIM_SIZE;
 
@@ -1494,6 +1498,8 @@ I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartial(U8 *buf,
 
     if (!GGUFTensorReadU32LE(buf, (I64)size, &staged_cursor, &staged_ggml_type))
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (!GGUFTensorTypeKnown(staged_ggml_type))
+        return GGUF_TENSOR_PARSE_ERR_BAD_TYPE;
 
     status = GGUFTensorInfoValidateDimsChecked(staged_n_dims,
                                                staged_dims,

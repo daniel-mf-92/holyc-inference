@@ -2286,6 +2286,82 @@ I64 GGUFTensorInfoLoadPayloadWindowByIndexAbs(U64 tensor_index,
     return GGUF_TDBASE_OK;
 }
 
+I64 GGUFTensorPayloadReadWindowChecked(U64 owner_tensor_index,
+                                       U64 payload_abs_start,
+                                       U64 payload_nbytes,
+                                       U64 tensor_count,
+                                       U64 *tensor_abs_starts,
+                                       U64 *tensor_abs_ends,
+                                       U64 *sorted_tensor_indices,
+                                       U64 *sorted_position_by_tensor,
+                                       U64 *out_abs_start,
+                                       U64 *out_abs_end,
+                                       U64 *out_span_start_in_tensor,
+                                       U64 *out_span_end_in_tensor)
+{
+    U64 payload_abs_end;
+    U64 resolved_owner_tensor_index;
+    U64 resolved_owner_abs_start;
+    U64 resolved_owner_abs_end;
+    U64 owner_abs_start;
+    U64 owner_abs_end;
+    I64 err;
+
+    if (!tensor_abs_starts || !tensor_abs_ends || !sorted_tensor_indices ||
+        !sorted_position_by_tensor || !out_abs_start || !out_abs_end ||
+        !out_span_start_in_tensor || !out_span_end_in_tensor)
+        return GGUF_TDBASE_ERR_NULL_PTR;
+
+    // Deterministic outputs for all failure paths.
+    *out_abs_start = 0;
+    *out_abs_end = 0;
+    *out_span_start_in_tensor = 0;
+    *out_span_end_in_tensor = 0;
+
+    // Checked end computation for half-open payload window [start, end).
+    if (payload_abs_start > 0xFFFFFFFFFFFFFFFF - payload_nbytes)
+        return GGUF_TDBASE_ERR_OVERFLOW;
+    payload_abs_end = payload_abs_start + payload_nbytes;
+
+    // For non-empty windows, confirm the caller-provided owner tensor matches
+    // the tensor discovered by absolute-start lookup.
+    if (payload_nbytes)
+    {
+        err = GGUFTensorLookupByAbsOffset(payload_abs_start,
+                                          tensor_count,
+                                          tensor_abs_starts,
+                                          tensor_abs_ends,
+                                          sorted_tensor_indices,
+                                          &resolved_owner_tensor_index,
+                                          &resolved_owner_abs_start,
+                                          &resolved_owner_abs_end);
+        if (err != GGUF_TDBASE_OK)
+            return err;
+
+        if (resolved_owner_tensor_index != owner_tensor_index)
+            return GGUF_TDBASE_ERR_OUT_OF_BOUNDS;
+    }
+
+    // Resolve and validate the full caller window inside declared owner span.
+    err = GGUFTensorLookupSpanByIndexAndAbsRange(owner_tensor_index,
+                                                 payload_abs_start,
+                                                 payload_abs_end,
+                                                 tensor_count,
+                                                 tensor_abs_starts,
+                                                 tensor_abs_ends,
+                                                 sorted_position_by_tensor,
+                                                 &owner_abs_start,
+                                                 &owner_abs_end,
+                                                 out_span_start_in_tensor,
+                                                 out_span_end_in_tensor);
+    if (err != GGUF_TDBASE_OK)
+        return err;
+
+    *out_abs_start = payload_abs_start;
+    *out_abs_end = payload_abs_end;
+    return GGUF_TDBASE_OK;
+}
+
 I64 GGUFTensorInfoLoadPayloadWindowByRelSpan(U64 payload_rel_start,
                                              U64 payload_rel_end,
                                              U64 tensor_data_base,
