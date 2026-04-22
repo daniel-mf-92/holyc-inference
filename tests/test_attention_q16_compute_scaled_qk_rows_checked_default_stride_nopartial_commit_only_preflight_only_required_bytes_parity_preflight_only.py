@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity harness for ...RequiredBytesParityPreflightOnly (IQ-838)."""
+"""Parity harness for ...RequiredBytesParityPreflightOnly (IQ-819)."""
 
 from __future__ import annotations
 
@@ -61,6 +61,8 @@ def attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit
 
     snapshot_query_row_count = query_row_count
     snapshot_token_count = token_count
+    snapshot_staged_scores_q32 = staged_scores_q32
+    snapshot_out_scores_q32 = out_scores_q32
     snapshot_staged_scores_capacity = staged_scores_capacity
     snapshot_out_scores_capacity = out_scores_capacity
 
@@ -108,6 +110,10 @@ def attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit
     if snapshot_query_row_count != query_row_count:
         return ATTN_Q16_ERR_BAD_PARAM
     if snapshot_token_count != token_count:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if snapshot_staged_scores_q32 is not staged_scores_q32:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if snapshot_out_scores_q32 is not out_scores_q32:
         return ATTN_Q16_ERR_BAD_PARAM
     if snapshot_staged_scores_capacity != staged_scores_capacity:
         return ATTN_Q16_ERR_BAD_PARAM
@@ -210,8 +216,12 @@ def test_source_contains_required_bytes_parity_preflight_only_wrapper() -> None:
     )
     assert "snapshot_query_row_count = query_row_count;" in body
     assert "snapshot_token_count = token_count;" in body
+    assert "snapshot_staged_scores_q32 = staged_scores_q32;" in body
+    assert "snapshot_out_scores_q32 = out_scores_q32;" in body
     assert "snapshot_staged_scores_capacity = staged_scores_capacity;" in body
     assert "snapshot_out_scores_capacity = out_scores_capacity;" in body
+    assert "if (snapshot_staged_scores_q32 != staged_scores_q32)" in body
+    assert "if (snapshot_out_scores_q32 != out_scores_q32)" in body
 
 
 def test_known_vector_outputs() -> None:
@@ -275,6 +285,34 @@ def test_error_paths_preserve_outputs() -> None:
     assert got_out_cells == [903]
     assert got_last_out == [904]
 
+
+
+
+def test_alias_rejection_for_output_vs_input_buffers() -> None:
+    staged = [0] * 8
+    out = [0] * 8
+
+    got_stage_bytes = [71]
+    got_out_cells = [72]
+    got_last_out = [73]
+
+    err = attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit_only_preflight_only_required_bytes_parity_preflight_only(
+        1,
+        8,
+        staged,
+        len(staged),
+        out,
+        len(out),
+        staged,
+        got_stage_bytes,
+        got_out_cells,
+        got_last_out,
+    )
+
+    assert err == ATTN_Q16_ERR_BAD_PARAM
+    assert got_stage_bytes == [71]
+    assert got_out_cells == [72]
+    assert got_last_out == [73]
 
 def test_randomized_preflight_only_vs_explicit_composition() -> None:
     rng = random.Random(20260421_838)
@@ -342,6 +380,7 @@ if __name__ == "__main__":
     test_source_contains_required_bytes_parity_preflight_only_wrapper()
     test_known_vector_outputs()
     test_error_paths_preserve_outputs()
+    test_alias_rejection_for_output_vs_input_buffers()
     test_randomized_preflight_only_vs_explicit_composition()
     print(
         "attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit_only_preflight_only_required_bytes_parity_preflight_only=ok"

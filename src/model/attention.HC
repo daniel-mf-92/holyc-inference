@@ -2494,6 +2494,8 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
     I64 recomputed_required_stage_bytes;
     I64 expected_last_out_index;
 
+    I64 *snapshot_staged_scores_q32;
+    I64 *snapshot_out_scores_q32;
     I64 snapshot_query_row_count;
     I64 snapshot_token_count;
     I64 snapshot_staged_scores_capacity;
@@ -2525,16 +2527,6 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
         out_last_out_index == out_scores_q32)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    if (out_required_stage_cells == staged_scores_q32 ||
-        out_required_stage_cells == out_scores_q32 ||
-        out_required_stage_bytes == staged_scores_q32 ||
-        out_required_stage_bytes == out_scores_q32 ||
-        out_required_out_cells == staged_scores_q32 ||
-        out_required_out_cells == out_scores_q32 ||
-        out_last_out_index == staged_scores_q32 ||
-        out_last_out_index == out_scores_q32)
-        return ATTN_Q16_ERR_BAD_PARAM;
-
     if (query_row_count < 0 || token_count < 0)
         return ATTN_Q16_ERR_BAD_PARAM;
     if (staged_scores_capacity < 0 || out_scores_capacity < 0)
@@ -2542,10 +2534,12 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
 
     snapshot_query_row_count = query_row_count;
     snapshot_token_count = token_count;
+    snapshot_staged_scores_q32 = staged_scores_q32;
+    snapshot_out_scores_q32 = out_scores_q32;
     snapshot_staged_scores_capacity = staged_scores_capacity;
     snapshot_out_scores_capacity = out_scores_capacity;
 
-    // IQ-838 diagnostics-only no-write companion contract:
+    // IQ-819 diagnostics-only no-write companion contract:
     // 1) stage tuple from canonical required-bytes parity gate;
     // 2) recompute canonical tuple from immutable geometry snapshots;
     // 3) enforce immutable snapshots and exact tuple parity;
@@ -2593,6 +2587,10 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
     if (snapshot_query_row_count != query_row_count)
         return ATTN_Q16_ERR_BAD_PARAM;
     if (snapshot_token_count != token_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_staged_scores_q32 != staged_scores_q32)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_scores_q32 != out_scores_q32)
         return ATTN_Q16_ERR_BAD_PARAM;
     if (snapshot_staged_scores_capacity != staged_scores_capacity)
         return ATTN_Q16_ERR_BAD_PARAM;
