@@ -310,7 +310,7 @@ def test_source_contains_iq_1097_symbol() -> None:
     body = source.split(sig, 1)[1]
     assert "InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in body
     assert "InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnly(" in body
-    assert "if (staged_parity_required_logits != staged_commit_required_logits ||" in body
+    assert "if (staged_preflight_required_logits != staged_commit_required_logits ||" in body
     assert "snapshot_out_final_token_count != out_final_token_count" in body
     assert "if (!step_logits_q16 || !token_history || !random_q16_values ||" in source
     assert "if (staged_preflight_required_logits != staged_commit_required_logits ||" in body
@@ -777,7 +777,7 @@ def test_adversarial_matrix_parity_with_explicit_composition() -> None:
         expected_logits = [0]
         expected_tokens = [0]
         expected_final = [0]
-        expected_status = inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference(
+        expected_status = inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
             **kwargs,
             out_required_logits=expected_logits,
             out_required_tokens=expected_tokens,
