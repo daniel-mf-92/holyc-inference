@@ -222,6 +222,7 @@ I64 FPQ16LnRatio(I64 num_q16, I64 den_q16)
 #define INTLOG_STATUS_BADPTR -1
 #define INTLOG_STATUS_BADCOUNT -2
 #define INTLOG_STATUS_OVERFLOW -3
+#define INTLOG_STATUS_DOMAIN -4
 
 I32 FPQ16LnArrayCheckedNoPartialPreflight(I64 *input_q16,
                                           I64 count,
@@ -371,4 +372,96 @@ I32 FPQ16Log2ArrayCheckedNoPartialDefault(I64 *input_q16,
                                           count,
                                           out_q16,
                                           required_bytes);
+}
+
+I32 FPQ16LnRatioArrayCheckedNoPartialPreflight(I64 *num_q16,
+                                               I64 *den_q16,
+                                               I64 count,
+                                               I64 *out_q16,
+                                               I64 *required_bytes_out)
+{
+    I64 bytes;
+    I64 i;
+
+    if (!required_bytes_out)
+        return INTLOG_STATUS_BADPTR;
+
+    *required_bytes_out = 0;
+
+    if (count < 0)
+        return INTLOG_STATUS_BADCOUNT;
+    if (!num_q16 || !den_q16 || !out_q16)
+        return INTLOG_STATUS_BADPTR;
+
+    if (count == 0)
+    {
+        *required_bytes_out = 0;
+        return INTLOG_STATUS_OK;
+    }
+    if (count > (I64_MAX_VALUE / 8))
+        return INTLOG_STATUS_OVERFLOW;
+
+    bytes = count * 8;
+
+    // Strict ln(num/den) domain: every lane must be strictly positive.
+    // This scan runs before any output publication to keep no-partial writes.
+    for (i = 0; i < count; i++)
+    {
+        if (num_q16[i] <= 0 || den_q16[i] <= 0)
+            return INTLOG_STATUS_DOMAIN;
+    }
+
+    *required_bytes_out = bytes;
+    return INTLOG_STATUS_OK;
+}
+
+I32 FPQ16LnRatioArrayCheckedNoPartial(I64 *num_q16,
+                                      I64 *den_q16,
+                                      I64 count,
+                                      I64 *out_q16,
+                                      I64 out_capacity_bytes)
+{
+    I64 required_bytes;
+    I64 i;
+    I32 status;
+
+    status = FPQ16LnRatioArrayCheckedNoPartialPreflight(num_q16,
+                                                        den_q16,
+                                                        count,
+                                                        out_q16,
+                                                        &required_bytes);
+    if (status != INTLOG_STATUS_OK)
+        return status;
+    if (out_capacity_bytes < required_bytes)
+        return INTLOG_STATUS_BADCOUNT;
+
+    // Domain and geometry were fully validated up-front. Publish is
+    // deterministic and all-or-nothing on failure paths.
+    for (i = 0; i < count; i++)
+        out_q16[i] = FPQ16LnRatio(num_q16[i], den_q16[i]);
+
+    return INTLOG_STATUS_OK;
+}
+
+I32 FPQ16LnRatioArrayCheckedNoPartialDefault(I64 *num_q16,
+                                             I64 *den_q16,
+                                             I64 count,
+                                             I64 *out_q16)
+{
+    I64 required_bytes;
+    I32 status;
+
+    status = FPQ16LnRatioArrayCheckedNoPartialPreflight(num_q16,
+                                                        den_q16,
+                                                        count,
+                                                        out_q16,
+                                                        &required_bytes);
+    if (status != INTLOG_STATUS_OK)
+        return status;
+
+    return FPQ16LnRatioArrayCheckedNoPartial(num_q16,
+                                             den_q16,
+                                             count,
+                                             out_q16,
+                                             required_bytes);
 }
