@@ -133,7 +133,7 @@ def test_source_contains_signature_and_composition_chain() -> None:
         "I32 FPQ16TopKSelectLogitsCheckedNoAlias(",
         1,
     )[0]
-    assert "SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParity(" in body
+    assert "SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in body
     assert "SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnly(" in body
     assert "if (staged_required_workspace_cells < 0 ||" in body
     assert "if (staged_selected_count > staged_required_workspace_cells ||" in body

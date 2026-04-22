@@ -1460,6 +1460,130 @@ I32 SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(
 // Notes:
 //   - Selection uses explicit rank counting (stable descending order) so every
 //     ordering decision is visible and auditable.
+
+// IQ-1107 commit-only diagnostics wrapper over deep parity-preflight chain.
+//
+// Compose:
+//   1) staged diagnostics tuple from
+//      `SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity`
+//   2) canonical diagnostics tuple from
+//      `SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly`
+// and atomically publish only after immutable snapshot + tuple parity checks.
+I32 SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
+    I64 *logits_q16,
+    I64 logits_count,
+    I64 top_k,
+    I64 workspace_capacity,
+    I64 *out_required_workspace_cells,
+    I64 *out_selected_count,
+    I64 *out_max_logit_q16)
+{
+    I64 staged_required_workspace_cells;
+    I64 staged_selected_count;
+    I64 staged_max_logit_q16;
+
+    I64 canonical_required_workspace_cells;
+    I64 canonical_selected_count;
+    I64 canonical_max_logit_q16;
+
+    I64 *snapshot_logits_q16;
+    I64 snapshot_logits_count;
+    I64 snapshot_top_k;
+    I64 snapshot_workspace_capacity;
+
+    I64 *snapshot_out_required_workspace_cells;
+    I64 *snapshot_out_selected_count;
+    I64 *snapshot_out_max_logit_q16;
+
+    I32 status;
+
+    if (!logits_q16 || !out_required_workspace_cells ||
+        !out_selected_count || !out_max_logit_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (out_required_workspace_cells == logits_q16 ||
+        out_selected_count == logits_q16 ||
+        out_max_logit_q16 == logits_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_required_workspace_cells == out_selected_count ||
+        out_required_workspace_cells == out_max_logit_q16 ||
+        out_selected_count == out_max_logit_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (logits_count < 0 || top_k < 0 || workspace_capacity < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (top_k > logits_count)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    snapshot_logits_q16 = logits_q16;
+    snapshot_logits_count = logits_count;
+    snapshot_top_k = top_k;
+    snapshot_workspace_capacity = workspace_capacity;
+
+    snapshot_out_required_workspace_cells = out_required_workspace_cells;
+    snapshot_out_selected_count = out_selected_count;
+    snapshot_out_max_logit_q16 = out_max_logit_q16;
+
+    status =
+        SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+        logits_q16,
+        logits_count,
+        top_k,
+        workspace_capacity,
+        &staged_required_workspace_cells,
+        &staged_selected_count,
+        &staged_max_logit_q16);
+    if (status)
+        return status;
+
+    status = SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(
+        logits_q16,
+        logits_count,
+        top_k,
+        workspace_capacity,
+        &canonical_required_workspace_cells,
+        &canonical_selected_count,
+        &canonical_max_logit_q16);
+    if (status)
+        return status;
+
+    if (snapshot_logits_q16 != logits_q16 ||
+        snapshot_logits_count != logits_count ||
+        snapshot_top_k != top_k ||
+        snapshot_workspace_capacity != workspace_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_out_required_workspace_cells != out_required_workspace_cells ||
+        snapshot_out_selected_count != out_selected_count ||
+        snapshot_out_max_logit_q16 != out_max_logit_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_workspace_cells < 0 ||
+        staged_selected_count < 0 ||
+        canonical_required_workspace_cells < 0 ||
+        canonical_selected_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (staged_selected_count > staged_required_workspace_cells ||
+        canonical_selected_count > canonical_required_workspace_cells)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_workspace_cells > snapshot_workspace_capacity ||
+        canonical_required_workspace_cells > snapshot_workspace_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_workspace_cells != canonical_required_workspace_cells ||
+        staged_selected_count != canonical_selected_count ||
+        staged_max_logit_q16 != canonical_max_logit_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_required_workspace_cells = staged_required_workspace_cells;
+    *out_selected_count = staged_selected_count;
+    *out_max_logit_q16 = staged_max_logit_q16;
+    return FP_Q16_OK;
+}
+
 I32 FPQ16TopKSelectLogitsCheckedNoAlias(I64 *logits_q16,
                                         I64 lane_count,
                                         I64 k,
