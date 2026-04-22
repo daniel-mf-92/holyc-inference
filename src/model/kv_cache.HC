@@ -5934,6 +5934,15 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
         recomputed_last_cell_index >= snapshot_cache_capacity)
         return KV_Q16_ERR_BAD_PARAM;
 
+    if (staged_required_cells && staged_last_cell_index >= snapshot_cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (canonical_required_cells &&
+        canonical_last_cell_index >= snapshot_cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (recomputed_required_cells &&
+        recomputed_last_cell_index >= snapshot_cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
     if (staged_required_cells != canonical_required_cells)
         return KV_Q16_ERR_BAD_PARAM;
     if (staged_required_bytes != canonical_required_bytes)
