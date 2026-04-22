@@ -1775,6 +1775,7 @@ I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParit
     U64 canonical_dims_bytes;
     U64 canonical_required_bytes;
     U64 canonical_next_cursor;
+    U64 span_remaining;
 
     I64 status;
 
@@ -1833,6 +1834,7 @@ I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParit
     canonical_dims_bytes = 0;
     canonical_required_bytes = 0;
     canonical_next_cursor = 0;
+    span_remaining = 0;
 
     status = GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParity(
         buf,
@@ -1852,11 +1854,15 @@ I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParit
 
     if (!staged_dim_count)
         return GGUF_TENSOR_PARSE_ERR_BAD_DIM_COUNT;
+    if (staged_dim_count > GGUF_TENSOR_MAX_DIMS)
+        return GGUF_TENSOR_PARSE_ERR_BAD_DIM_COUNT;
 
     if (staged_dims_cells != staged_dim_count)
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
     if (staged_last_dim_index != (U64)(staged_dim_count - 1))
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (!GGUFTensorTypeKnown(staged_type_value))
+        return GGUF_TENSOR_PARSE_ERR_BAD_TYPE;
 
     if (!GGUFTensorTryMulU64(staged_dims_cells, 8, &canonical_dims_bytes))
         return GGUF_TENSOR_PARSE_ERR_DIM_OVERFLOW;
@@ -1868,6 +1874,10 @@ I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParit
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
 
     if (staged_required_bytes != canonical_required_bytes)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    span_remaining = size - cursor;
+    if (staged_required_bytes > span_remaining)
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
 
     if (!GGUFTensorTryAddU64(cursor, staged_required_bytes, &canonical_next_cursor))
