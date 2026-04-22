@@ -178,6 +178,104 @@ Bool GGUFTensorTypeKnown(U32 t)
     return FALSE;
 }
 
+// Returns the ggml element count represented by one storage block for type `t`.
+// Scalars are block size 1; packed quantized formats require divisibility.
+I64 GGUFTensorTypeBlockElemsChecked(U32 t, U64 *out_block_elems)
+{
+    if (!out_block_elems)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+
+    switch (t)
+    {
+        case GGML_TYPE_F32:
+        case GGML_TYPE_F16:
+        case GGML_TYPE_I8:
+        case GGML_TYPE_I16:
+        case GGML_TYPE_I32:
+        case GGML_TYPE_I64:
+        case GGML_TYPE_F64:
+        case GGML_TYPE_BF16:
+            *out_block_elems = 1;
+            return GGUF_TENSOR_PARSE_OK;
+
+        case GGML_TYPE_Q4_0:
+        case GGML_TYPE_Q4_1:
+        case GGML_TYPE_Q5_0:
+        case GGML_TYPE_Q5_1:
+        case GGML_TYPE_Q8_0:
+        case GGML_TYPE_Q8_1:
+        case GGML_TYPE_Q4_0_4_4:
+        case GGML_TYPE_Q4_0_4_8:
+        case GGML_TYPE_Q4_0_8_8:
+            *out_block_elems = 32;
+            return GGUF_TENSOR_PARSE_OK;
+
+        case GGML_TYPE_Q2_K:
+        case GGML_TYPE_Q3_K:
+        case GGML_TYPE_Q4_K:
+        case GGML_TYPE_Q5_K:
+        case GGML_TYPE_Q6_K:
+        case GGML_TYPE_Q8_K:
+        case GGML_TYPE_IQ2_XXS:
+        case GGML_TYPE_IQ2_XS:
+        case GGML_TYPE_IQ3_XXS:
+        case GGML_TYPE_IQ1_S:
+        case GGML_TYPE_IQ4_NL:
+        case GGML_TYPE_IQ3_S:
+        case GGML_TYPE_IQ2_S:
+        case GGML_TYPE_IQ4_XS:
+        case GGML_TYPE_IQ1_M:
+        case GGML_TYPE_TQ1_0:
+        case GGML_TYPE_TQ2_0:
+            *out_block_elems = 256;
+            return GGUF_TENSOR_PARSE_OK;
+    }
+
+    return GGUF_TENSOR_PARSE_ERR_BAD_TYPE;
+}
+
+// Validates tensor dims/type tuple with checked product math and block divisibility.
+// Contract: publishes `*out_n_elements` only on success.
+I64 GGUFTensorInfoValidateDimsChecked(U32 n_dims,
+                                      U64 *dims,
+                                      U32 ggml_type,
+                                      U64 *out_n_elements)
+{
+    U64 n_elements;
+    U64 block_elems;
+    U64 i;
+    I64 status;
+
+    if (!dims || !out_n_elements)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+    if (!n_dims || n_dims > GGUF_TENSOR_MAX_DIMS)
+        return GGUF_TENSOR_PARSE_ERR_BAD_DIMS;
+    if (!GGUFTensorTypeKnown(ggml_type))
+        return GGUF_TENSOR_PARSE_ERR_BAD_TYPE;
+
+    n_elements = 1;
+    for (i = 0; i < n_dims; ++i)
+    {
+        if (!dims[i])
+            return GGUF_TENSOR_PARSE_ERR_BAD_DIM_SIZE;
+        if (n_elements > 0xFFFFFFFFFFFFFFFF / dims[i])
+            return GGUF_TENSOR_PARSE_ERR_DIM_OVERFLOW;
+
+        n_elements *= dims[i];
+    }
+
+    status = GGUFTensorTypeBlockElemsChecked(ggml_type, &block_elems);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+    if (!block_elems)
+        return GGUF_TENSOR_PARSE_ERR_BAD_TYPE;
+    if (n_elements % block_elems)
+        return GGUF_TENSOR_PARSE_ERR_BAD_DIM_SIZE;
+
+    *out_n_elements = n_elements;
+    return GGUF_TENSOR_PARSE_OK;
+}
+
 Bool GGUFTensorTryAddU64(U64 a, U64 b, U64 *out)
 {
     if (!out)
@@ -1374,7 +1472,7 @@ I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartial(U8 *buf,
 
     staged_cursor = cursor;
     staged_n_dims = 0;
-    staged_n_elements = 1;
+    staged_n_elements = 0;
     staged_ggml_type = 0;
     staged_offset = 0;
     for (i = 0; i < GGUF_TENSOR_MAX_DIMS; ++i)
@@ -1385,24 +1483,23 @@ I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartial(U8 *buf,
     if (!staged_n_dims || staged_n_dims > GGUF_TENSOR_MAX_DIMS)
         return GGUF_TENSOR_PARSE_ERR_BAD_DIMS;
 
-    // Decode each dim explicitly so every element-count multiply is visible
-    // and overflow-checked before any caller-visible publication.
+    // Decode each dimension explicitly first. Product/divisibility validation
+    // runs only after `ggml_type` is known so block-size math is exact.
     for (i = 0; i < staged_n_dims; ++i)
     {
         if (!GGUFTensorReadU64LE(buf, (I64)size, &staged_cursor, &staged_dims[i]))
             return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
-        if (!staged_dims[i])
-            return GGUF_TENSOR_PARSE_ERR_BAD_DIM_SIZE;
-        if (staged_n_elements > 0xFFFFFFFFFFFFFFFF / staged_dims[i])
-            return GGUF_TENSOR_PARSE_ERR_DIM_OVERFLOW;
-
-        staged_n_elements *= staged_dims[i];
     }
 
     if (!GGUFTensorReadU32LE(buf, (I64)size, &staged_cursor, &staged_ggml_type))
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
-    if (!GGUFTensorTypeKnown(staged_ggml_type))
-        return GGUF_TENSOR_PARSE_ERR_BAD_TYPE;
+
+    status = GGUFTensorInfoValidateDimsChecked(staged_n_dims,
+                                               staged_dims,
+                                               staged_ggml_type,
+                                               &staged_n_elements);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
 
     if (!GGUFTensorReadU64LE(buf, (I64)size, &staged_cursor, &staged_offset))
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
