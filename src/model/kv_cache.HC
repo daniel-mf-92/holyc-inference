@@ -5502,6 +5502,144 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
     return KV_Q16_OK;
 }
 
+// IQ-1071 diagnostics-only zero-write companion over IQ-1070 commit-only parity.
+//
+// This helper stages tuple outputs from the commit-only parity wrapper,
+// recomputes the canonical tuple via IQ-1064 parity preflight path, validates
+// immutable geometry/output-pointer snapshots, and atomically publishes only on
+// exact parity success.
+I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnlyPreflightOnly(
+    I64 layer_count,
+    I64 head_count,
+    I64 head_dim,
+    I64 token_start,
+    I64 token_count,
+    I64 cache_capacity,
+    I64 *out_required_cells,
+    I64 *out_required_bytes,
+    I64 *out_last_cell_index)
+{
+    I64 staged_required_cells;
+    I64 staged_required_bytes;
+    I64 staged_last_cell_index;
+
+    I64 canonical_required_cells;
+    I64 canonical_required_bytes;
+    I64 canonical_last_cell_index;
+
+    I64 snapshot_layer_count;
+    I64 snapshot_head_count;
+    I64 snapshot_head_dim;
+    I64 snapshot_token_start;
+    I64 snapshot_token_count;
+    I64 snapshot_cache_capacity;
+
+    I64 *snapshot_out_required_cells;
+    I64 *snapshot_out_required_bytes;
+    I64 *snapshot_out_last_cell_index;
+
+    I32 status;
+
+    if (!out_required_cells || !out_required_bytes || !out_last_cell_index)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (out_required_cells == out_required_bytes ||
+        out_required_cells == out_last_cell_index ||
+        out_required_bytes == out_last_cell_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (layer_count < 0 || head_count < 0 || head_dim < 0 ||
+        token_start < 0 || token_count < 0 || cache_capacity < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    snapshot_layer_count = layer_count;
+    snapshot_head_count = head_count;
+    snapshot_head_dim = head_dim;
+    snapshot_token_start = token_start;
+    snapshot_token_count = token_count;
+    snapshot_cache_capacity = cache_capacity;
+
+    snapshot_out_required_cells = out_required_cells;
+    snapshot_out_required_bytes = out_required_bytes;
+    snapshot_out_last_cell_index = out_last_cell_index;
+
+    status = KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnly(
+        layer_count,
+        head_count,
+        head_dim,
+        token_start,
+        token_count,
+        cache_capacity,
+        &staged_required_cells,
+        &staged_required_bytes,
+        &staged_last_cell_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParity(
+        layer_count,
+        head_count,
+        head_dim,
+        token_start,
+        token_count,
+        cache_capacity,
+        &canonical_required_cells,
+        &canonical_required_bytes,
+        &canonical_last_cell_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (snapshot_layer_count != layer_count ||
+        snapshot_head_count != head_count ||
+        snapshot_head_dim != head_dim ||
+        snapshot_token_start != token_start ||
+        snapshot_token_count != token_count ||
+        snapshot_cache_capacity != cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_out_required_cells != out_required_cells ||
+        snapshot_out_required_bytes != out_required_bytes ||
+        snapshot_out_last_cell_index != out_last_cell_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (out_required_cells == out_required_bytes ||
+        out_required_cells == out_last_cell_index ||
+        out_required_bytes == out_last_cell_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_cells < 0 || staged_required_bytes < 0 ||
+        staged_last_cell_index < 0 || canonical_required_cells < 0 ||
+        canonical_required_bytes < 0 || canonical_last_cell_index < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if ((staged_required_bytes % sizeof(I64)) != 0)
+        return KV_Q16_ERR_BAD_PARAM;
+    if ((staged_required_bytes / sizeof(I64)) != staged_required_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if ((canonical_required_bytes % sizeof(I64)) != 0)
+        return KV_Q16_ERR_BAD_PARAM;
+    if ((canonical_required_bytes / sizeof(I64)) != canonical_required_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (!staged_required_cells && staged_last_cell_index)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (!canonical_required_cells && canonical_last_cell_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_cells != canonical_required_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (staged_required_bytes != canonical_required_bytes)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (staged_last_cell_index != canonical_last_cell_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    *out_required_cells = staged_required_cells;
+    *out_required_bytes = staged_required_bytes;
+    *out_last_cell_index = staged_last_cell_index;
+    return KV_Q16_OK;
+}
+
 // IQ-1071 diagnostics-only zero-write companion over IQ-1070 commit wrapper.
 //
 // Compose:
