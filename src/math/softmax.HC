@@ -1306,11 +1306,11 @@ I32 SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyP
     return FP_Q16_OK;
 }
 
-// IQ-1102 commit-only diagnostics wrapper over canonical parity preflight.
+// IQ-1104 commit-only diagnostics wrapper over deep parity-preflight chain.
 //
 // Compose:
 //   1) staged diagnostics tuple from
-//      `SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParity`
+//      `SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity`
 //   2) canonical diagnostics tuple from
 //      `SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnly`
 // and atomically publish only after immutable snapshot + tuple parity checks.
@@ -1370,7 +1370,8 @@ I32 SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(
     snapshot_out_selected_count = out_selected_count;
     snapshot_out_max_logit_q16 = out_max_logit_q16;
 
-    status = SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParity(
+    status =
+        SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
         logits_q16,
         logits_count,
         top_k,
