@@ -9,6 +9,9 @@
 #define FP_Q16_ERR_BAD_PARAM 2
 #define FP_Q16_ERR_OVERFLOW  4
 
+#define SOFTMAX_EXP_Q16_MAX_INPUT  655360
+#define SOFTMAX_EXP_Q16_MIN_INPUT -655360
+
 #define I64_MAX_VALUE  0x7FFFFFFFFFFFFFFF
 #define I64_MIN_VALUE -0x8000000000000000
 #define U64_MAX_VALUE  0xFFFFFFFFFFFFFFFF
@@ -2624,6 +2627,172 @@ I32 FPQ16TopKSampleFromProbabilitiesChecked(I64 *probs_q16,
     }
 
     *out_index = selected_index;
+    return FP_Q16_OK;
+}
+
+// Checked row-wise stable softmax over Q16 logits.
+//
+// For each logical row r and lane i:
+//   shifted[r,i] = clamp(logits[r,i] - max_j(logits[r,j]), EXP_MIN, EXP_MAX)
+//   probs[r,*]   = softmax(shifted[r,*])
+//
+// Contracts:
+//   - logits_q16, probs_q16, scratch_q16 are non-null.
+//   - row_count and lane_count are >= 0.
+//   - When lane_count > 0, logits_row_stride and probs_row_stride are >= lane_count.
+//   - logits_capacity/probs_capacity are in I64 cells, not bytes.
+//   - scratch_capacity must cover:
+//       stage_cells = row_count * lane_count
+//       temp_cells  = 2 * lane_count (shifted row + exp row scratch)
+//       total_cells = stage_cells + temp_cells
+//
+// No-partial write guarantee:
+//   - Output rows in probs_q16 are published only after all rows succeed.
+I32 FPQ16SoftmaxRowsStableCheckedNoPartial(I64 *logits_q16,
+                                           I64 logits_capacity,
+                                           I64 row_count,
+                                           I64 lane_count,
+                                           I64 logits_row_stride,
+                                           I64 *probs_q16,
+                                           I64 probs_capacity,
+                                           I64 probs_row_stride,
+                                           I64 *scratch_q16,
+                                           I64 scratch_capacity)
+{
+    I64 required_logits_cells;
+    I64 required_probs_cells;
+    I64 stage_cells;
+    I64 temp_cells;
+    I64 required_scratch_cells;
+    I64 row;
+    I64 lane;
+    I64 row_max_q16;
+    I64 delta_q16;
+    I64 *shifted_row_q16;
+    I64 *exp_row_q16;
+    I64 *staged_probs_q16;
+    I64 *logits_row_q16;
+    I64 *probs_row_q16;
+    I32 status;
+
+    if (!logits_q16 || !probs_q16 || !scratch_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (row_count < 0 || lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (logits_capacity < 0 || probs_capacity < 0 || scratch_capacity < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (lane_count > 0)
+    {
+        if (logits_row_stride < lane_count || probs_row_stride < lane_count)
+            return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    required_logits_cells = 0;
+    required_probs_cells = 0;
+    if (row_count > 0 && lane_count > 0)
+    {
+        I64 last_row;
+        I64 last_logits_base;
+        I64 last_probs_base;
+
+        last_row = row_count - 1;
+
+        if (last_row > 0 && logits_row_stride > (I64_MAX_VALUE / last_row))
+            return FP_Q16_ERR_OVERFLOW;
+        if (last_row > 0 && probs_row_stride > (I64_MAX_VALUE / last_row))
+            return FP_Q16_ERR_OVERFLOW;
+
+        last_logits_base = last_row * logits_row_stride;
+        last_probs_base = last_row * probs_row_stride;
+
+        if (last_logits_base > (I64_MAX_VALUE - (lane_count - 1)))
+            return FP_Q16_ERR_OVERFLOW;
+        if (last_probs_base > (I64_MAX_VALUE - (lane_count - 1)))
+            return FP_Q16_ERR_OVERFLOW;
+
+        required_logits_cells = last_logits_base + lane_count;
+        required_probs_cells = last_probs_base + lane_count;
+    }
+
+    if (logits_capacity < required_logits_cells)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (probs_capacity < required_probs_cells)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    stage_cells = 0;
+    if (row_count > 0 && lane_count > 0)
+    {
+        if (row_count > (I64_MAX_VALUE / lane_count))
+            return FP_Q16_ERR_OVERFLOW;
+        stage_cells = row_count * lane_count;
+    }
+
+    if (lane_count > (I64_MAX_VALUE / 2))
+        return FP_Q16_ERR_OVERFLOW;
+    temp_cells = lane_count * 2;
+
+    if (stage_cells > (I64_MAX_VALUE - temp_cells))
+        return FP_Q16_ERR_OVERFLOW;
+    required_scratch_cells = stage_cells + temp_cells;
+
+    if (scratch_capacity < required_scratch_cells)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (row_count == 0 || lane_count == 0)
+        return FP_Q16_OK;
+
+    staged_probs_q16 = scratch_q16;
+    shifted_row_q16 = scratch_q16 + stage_cells;
+    exp_row_q16 = shifted_row_q16 + lane_count;
+
+    // Stage every row into scratch first; caller output stays untouched on error.
+    for (row = 0; row < row_count; row++)
+    {
+        logits_row_q16 = logits_q16 + (row * logits_row_stride);
+        row_max_q16 = logits_row_q16[0];
+
+        for (lane = 1; lane < lane_count; lane++)
+        {
+            if (logits_row_q16[lane] > row_max_q16)
+                row_max_q16 = logits_row_q16[lane];
+        }
+
+        for (lane = 0; lane < lane_count; lane++)
+        {
+            // Checked subtraction for delta = logits - row_max.
+            if (row_max_q16 < 0 && logits_row_q16[lane] > (I64_MAX_VALUE + row_max_q16))
+                return FP_Q16_ERR_OVERFLOW;
+            if (row_max_q16 > 0 && logits_row_q16[lane] < (I64_MIN_VALUE + row_max_q16))
+                return FP_Q16_ERR_OVERFLOW;
+
+            delta_q16 = logits_row_q16[lane] - row_max_q16;
+
+            // Clamp to checked exp-domain required by FPQ16SoftmaxFromPreclampedChecked.
+            if (delta_q16 < SOFTMAX_EXP_Q16_MIN_INPUT)
+                delta_q16 = SOFTMAX_EXP_Q16_MIN_INPUT;
+            else if (delta_q16 > SOFTMAX_EXP_Q16_MAX_INPUT)
+                delta_q16 = SOFTMAX_EXP_Q16_MAX_INPUT;
+
+            shifted_row_q16[lane] = delta_q16;
+        }
+
+        status = FPQ16SoftmaxFromPreclampedChecked(shifted_row_q16,
+                                                   exp_row_q16,
+                                                   lane_count,
+                                                   staged_probs_q16 + (row * lane_count));
+        if (status)
+            return status;
+    }
+
+    // Commit phase: publish staged rows once all rows are valid.
+    for (row = 0; row < row_count; row++)
+    {
+        probs_row_q16 = probs_q16 + (row * probs_row_stride);
+        for (lane = 0; lane < lane_count; lane++)
+            probs_row_q16[lane] = staged_probs_q16[(row * lane_count) + lane];
+    }
+
     return FP_Q16_OK;
 }
 

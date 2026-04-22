@@ -901,6 +901,300 @@ I32 FPQ16RMSNormRowsChecked(I64 *input_q16,
     return 0;
 }
 
+// Checked batched row-wise RMSNorm with strict no-partial publish.
+//
+// Difference from FPQ16RMSNormRowsChecked:
+// - caches one inverse denominator per row during preflight
+// - stages every output lane into scratch
+// - performs one final publish pass into caller output only after all rows
+//   fully validate and stage
+//
+// Math per row:
+//   inv[row] = 1 / sqrt(mean(input_row^2) + eps)
+//   staged[out_row + lane] = round_q16(input_lane * inv[row] * gamma_lane)
+I32 FPQ16RMSNormRowsCheckedNoPartial(I64 *input_q16,
+                                     I64 input_capacity,
+                                     I64 input_row_stride,
+                                     I64 *gamma_q16,
+                                     I64 gamma_capacity,
+                                     I64 gamma_row_stride,
+                                     I64 *output_q16,
+                                     I64 output_capacity,
+                                     I64 output_row_stride,
+                                     I64 row_count,
+                                     I64 lane_count,
+                                     I64 eps_q16)
+{
+    I64 last_row;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 required_input_cells;
+    I64 required_gamma_cells;
+    I64 required_output_cells;
+    I64 row_index;
+    I64 lane_index;
+    I64 input_row_base;
+    I64 gamma_row_base;
+    I64 output_row_base;
+    I64 next_input_row_base;
+    I64 next_gamma_row_base;
+    I64 next_output_row_base;
+    I64 inv_denom_q16;
+    I64 denom_q16;
+    I64 norm_lane_q16;
+    I64 weighted_lane_q16;
+    I64 inv_rows_bytes;
+    I64 staged_output_bytes;
+    U64 input_span_start;
+    U64 input_span_end;
+    U64 gamma_span_start;
+    U64 gamma_span_end;
+    U64 output_span_start;
+    U64 output_span_end;
+    I64 *inv_denom_rows_q16;
+    I64 *staged_output_q16;
+    I32 status;
+
+    if (!input_q16 || !gamma_q16 || !output_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (input_capacity < 0 || gamma_capacity < 0 || output_capacity < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (input_row_stride < 0 || gamma_row_stride < 0 || output_row_stride < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (eps_q16 < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (!row_count || !lane_count)
+        return 0;
+
+    if (input_row_stride < lane_count || gamma_row_stride < lane_count ||
+        output_row_stride < lane_count)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Alias safety: in-place rows are allowed only with matching row bases.
+    if (input_q16 == output_q16 && input_row_stride != output_row_stride)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (gamma_q16 == output_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    last_row = row_count - 1;
+
+    status = FPQ16RMSNormTryMulI64Checked(last_row,
+                                          input_row_stride,
+                                          &required_input_cells);
+    if (status)
+        return status;
+    status = FPQ16RMSNormTryAddI64Checked(required_input_cells,
+                                          lane_count,
+                                          &required_input_cells);
+    if (status)
+        return status;
+
+    status = FPQ16RMSNormTryMulI64Checked(last_row,
+                                          gamma_row_stride,
+                                          &required_gamma_cells);
+    if (status)
+        return status;
+    status = FPQ16RMSNormTryAddI64Checked(required_gamma_cells,
+                                          lane_count,
+                                          &required_gamma_cells);
+    if (status)
+        return status;
+
+    status = FPQ16RMSNormTryMulI64Checked(last_row,
+                                          output_row_stride,
+                                          &required_output_cells);
+    if (status)
+        return status;
+    status = FPQ16RMSNormTryAddI64Checked(required_output_cells,
+                                          lane_count,
+                                          &required_output_cells);
+    if (status)
+        return status;
+
+    if (required_input_cells > input_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (required_gamma_cells > gamma_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (required_output_cells > output_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Guard pointer-span arithmetic for full required windows.
+    last_index = required_input_cells - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)input_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_index = required_gamma_cells - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)gamma_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_index = required_output_cells - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)output_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    input_span_start = (U64)input_q16;
+    gamma_span_start = (U64)gamma_q16;
+    output_span_start = (U64)output_q16;
+
+    input_span_end = input_span_start + ((U64)required_input_cells << 3);
+    gamma_span_end = gamma_span_start + ((U64)required_gamma_cells << 3);
+    output_span_end = output_span_start + ((U64)required_output_cells << 3);
+
+    if (input_q16 != output_q16)
+    {
+        if (!(input_span_end <= output_span_start ||
+              output_span_end <= input_span_start))
+            return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    if (!(gamma_span_end <= output_span_start ||
+          output_span_end <= gamma_span_start))
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (row_count > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    inv_rows_bytes = row_count << 3;
+
+    if (required_output_cells > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    staged_output_bytes = required_output_cells << 3;
+
+    inv_denom_rows_q16 = MAlloc(inv_rows_bytes);
+    if (!inv_denom_rows_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    staged_output_q16 = MAlloc(staged_output_bytes);
+    if (!staged_output_q16)
+    {
+        Free(inv_denom_rows_q16);
+        return FP_Q16_ERR_NULL_PTR;
+    }
+
+    input_row_base = 0;
+    gamma_row_base = 0;
+    output_row_base = 0;
+
+    // Phase 1: compute and cache per-row inverse denom, validate arithmetic,
+    // and stage every output lane without touching caller output.
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        status = FPQ16RMSNormComputeInvDenomChecked(input_q16 + input_row_base,
+                                                    lane_count,
+                                                    eps_q16,
+                                                    &inv_denom_q16,
+                                                    &denom_q16);
+        if (status)
+        {
+            Free(staged_output_q16);
+            Free(inv_denom_rows_q16);
+            return status;
+        }
+
+        inv_denom_rows_q16[row_index] = inv_denom_q16;
+
+        for (lane_index = 0; lane_index < lane_count; lane_index++)
+        {
+            status = FPQ16MulChecked(input_q16[input_row_base + lane_index],
+                                     inv_denom_q16,
+                                     &norm_lane_q16);
+            if (status)
+            {
+                Free(staged_output_q16);
+                Free(inv_denom_rows_q16);
+                return status;
+            }
+
+            status = FPQ16MulChecked(norm_lane_q16,
+                                     gamma_q16[gamma_row_base + lane_index],
+                                     &weighted_lane_q16);
+            if (status)
+            {
+                Free(staged_output_q16);
+                Free(inv_denom_rows_q16);
+                return status;
+            }
+
+            staged_output_q16[output_row_base + lane_index] = weighted_lane_q16;
+        }
+
+        status = FPQ16RMSNormTryAddI64Checked(input_row_base,
+                                              input_row_stride,
+                                              &next_input_row_base);
+        if (status)
+        {
+            Free(staged_output_q16);
+            Free(inv_denom_rows_q16);
+            return status;
+        }
+        status = FPQ16RMSNormTryAddI64Checked(gamma_row_base,
+                                              gamma_row_stride,
+                                              &next_gamma_row_base);
+        if (status)
+        {
+            Free(staged_output_q16);
+            Free(inv_denom_rows_q16);
+            return status;
+        }
+        status = FPQ16RMSNormTryAddI64Checked(output_row_base,
+                                              output_row_stride,
+                                              &next_output_row_base);
+        if (status)
+        {
+            Free(staged_output_q16);
+            Free(inv_denom_rows_q16);
+            return status;
+        }
+
+        input_row_base = next_input_row_base;
+        gamma_row_base = next_gamma_row_base;
+        output_row_base = next_output_row_base;
+    }
+
+    // Phase 2: commit only validated staged rows to caller output.
+    output_row_base = 0;
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        // Re-touch cached inverse denominator table per row so the commit pass
+        // preserves row ordering invariants proven during stage build.
+        // (Math lanes are already staged and validated in phase 1.)
+        if (inv_denom_rows_q16[row_index] <= 0)
+        {
+            Free(staged_output_q16);
+            Free(inv_denom_rows_q16);
+            return FP_Q16_ERR_DOMAIN;
+        }
+        for (lane_index = 0; lane_index < lane_count; lane_index++)
+            output_q16[output_row_base + lane_index] = staged_output_q16[output_row_base + lane_index];
+
+        status = FPQ16RMSNormTryAddI64Checked(output_row_base,
+                                              output_row_stride,
+                                              &next_output_row_base);
+        if (status)
+        {
+            Free(staged_output_q16);
+            Free(inv_denom_rows_q16);
+            return status;
+        }
+        output_row_base = next_output_row_base;
+    }
+
+    Free(staged_output_q16);
+    Free(inv_denom_rows_q16);
+    return 0;
+}
+
 U0 FPQ16RMSNorm(I64 *input, I64 *weight, I64 *output, I64 count, I64 eps_q16)
 {
     I64 i;
