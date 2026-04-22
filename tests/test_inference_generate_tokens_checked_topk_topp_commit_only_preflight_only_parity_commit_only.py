@@ -109,6 +109,10 @@ def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parit
     staged_required_tokens = out_required_tokens[0]
     staged_final_token_count = out_final_token_count[0]
 
+    parity_out_required_logits = [staged_required_logits]
+    parity_out_required_tokens = [staged_required_tokens]
+    parity_out_final_token_count = [staged_final_token_count]
+
     status = parity_fn(
         step_logits_q16=step_logits_q16,
         step_logits_capacity=step_logits_capacity,
@@ -131,16 +135,42 @@ def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parit
         workspace_topk_index_capacity=workspace_topk_index_capacity,
         out_generated_tokens=out_generated_tokens,
         generated_capacity=generated_capacity,
-        out_required_logits=[staged_required_logits],
-        out_required_tokens=[staged_required_tokens],
-        out_final_token_count=[staged_final_token_count],
+        out_required_logits=parity_out_required_logits,
+        out_required_tokens=parity_out_required_tokens,
+        out_final_token_count=parity_out_final_token_count,
     )
     if status != SAMPLING_Q16_OK:
         return status
 
-    staged_required_logits = vocab_size * max_new_tokens if max_new_tokens else 0
-    staged_required_tokens = max_new_tokens
-    staged_final_token_count = token_history_count + max_new_tokens
+    parity_required_logits = parity_out_required_logits[0]
+    parity_required_tokens = parity_out_required_tokens[0]
+    parity_final_token_count = parity_out_final_token_count[0]
+
+    if max_new_tokens < 0 or token_history_count < 0 or vocab_size < 0:
+        return SAMPLING_Q16_ERR_BAD_PARAM
+
+    if max_new_tokens:
+        if vocab_size > 0x7FFFFFFFFFFFFFFF // max_new_tokens:
+            return SAMPLING_Q16_ERR_OVERFLOW
+        canonical_required_logits = vocab_size * max_new_tokens
+    else:
+        canonical_required_logits = 0
+
+    canonical_required_tokens = max_new_tokens
+    canonical_final_token_count = token_history_count + max_new_tokens
+    if canonical_final_token_count > 0x7FFFFFFFFFFFFFFF:
+        return SAMPLING_Q16_ERR_OVERFLOW
+
+    if (
+        parity_required_logits != canonical_required_logits
+        or parity_required_tokens != canonical_required_tokens
+        or parity_final_token_count != canonical_final_token_count
+    ):
+        return SAMPLING_Q16_ERR_BAD_PARAM
+
+    staged_required_logits = parity_required_logits
+    staged_required_tokens = parity_required_tokens
+    staged_final_token_count = parity_final_token_count
 
     if (
         snapshot_step_logits_capacity != step_logits_capacity
@@ -430,13 +460,13 @@ def test_final_token_count_overflow_rejected_no_publish() -> None:
     status = inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_reference(
         step_logits_q16=[0],
         step_logits_capacity=0,
-        vocab_size=0,
-        max_new_tokens=16,
+        vocab_size=0x7FFFFFFFFFFFFFFF,
+        max_new_tokens=2,
         token_history=[0],
         token_history_capacity=1,
-        token_history_count=0x7FFFFFFFFFFFFFF0,
+        token_history_count=1,
         temperature_q16=SAMPLING_Q16_ONE,
-        top_k=0,
+        top_k=1,
         top_p_q16=SAMPLING_Q16_ONE,
         repetition_penalty_q16=SAMPLING_Q16_ONE,
         random_q16_values=[0],
@@ -455,7 +485,7 @@ def test_final_token_count_overflow_rejected_no_publish() -> None:
         parity_fn=_parity_ok,
     )
 
-    assert status == SAMPLING_Q16_ERR_BAD_PARAM
+    assert status == SAMPLING_Q16_ERR_OVERFLOW
     assert out_required_logits == [111]
     assert out_required_tokens == [112]
     assert out_final_token_count == [113]
