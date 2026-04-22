@@ -804,6 +804,110 @@ I32 FPQ16TopKSelectIndicesChecked(I64 *logits_q16,
     return FP_Q16_OK;
 }
 
+// IQ-1083 diagnostics-only stable softmax/top-k preflight helper.
+//
+// This helper computes the canonical diagnostics tuple used by higher-level
+// sampling paths before any probability or token writes occur:
+//   - required_workspace_cells: scratch cells needed for max-subtracted
+//     softmax staging plus top-k staging.
+//   - selected_count: effective top-k lane count to process.
+//   - max_logit_q16: maximum lane used as the stable subtraction anchor.
+//
+// Contracts:
+//   - logits_q16 and all outputs are non-null.
+//   - logits_count, top_k, workspace_capacity are all >= 0.
+//   - top_k <= logits_count.
+//   - workspace_capacity must cover required_workspace_cells.
+//   - No partial writes: all outputs are staged then atomically committed.
+I32 SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnly(
+    I64 *logits_q16,
+    I64 logits_count,
+    I64 top_k,
+    I64 workspace_capacity,
+    I64 *out_required_workspace_cells,
+    I64 *out_selected_count,
+    I64 *out_max_logit_q16)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 staged_required_workspace_cells;
+    I64 staged_selected_count;
+    I64 staged_max_logit_q16;
+    I64 window_delta_q16;
+
+    if (!logits_q16 || !out_required_workspace_cells ||
+        !out_selected_count || !out_max_logit_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (out_required_workspace_cells == out_selected_count ||
+        out_required_workspace_cells == out_max_logit_q16 ||
+        out_selected_count == out_max_logit_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (logits_count < 0 || top_k < 0 || workspace_capacity < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (top_k > logits_count)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    staged_required_workspace_cells = 0;
+    staged_selected_count = 0;
+    staged_max_logit_q16 = 0;
+
+    if (!logits_count)
+    {
+        *out_required_workspace_cells = 0;
+        *out_selected_count = 0;
+        *out_max_logit_q16 = 0;
+        return FP_Q16_OK;
+    }
+
+    // Guard pointer-span arithmetic before indexed reads.
+    last_index = logits_count - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)logits_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    // Scratch model: one lane for stable max-subtracted logits and one lane
+    // for top-k staged logits/indices diagnostics.
+    if (logits_count > (I64_MAX_VALUE - top_k))
+        return FP_Q16_ERR_OVERFLOW;
+    staged_required_workspace_cells = logits_count + top_k;
+
+    if (staged_required_workspace_cells > workspace_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    staged_selected_count = top_k;
+    staged_max_logit_q16 = logits_q16[0];
+
+    for (i = 1; i < logits_count; i++)
+    {
+        if (logits_q16[i] > staged_max_logit_q16)
+            staged_max_logit_q16 = logits_q16[i];
+    }
+
+    // Validate max-subtracted softmax window arithmetic in pure integer domain:
+    // delta = max_logit_q16 - lane_logit_q16 must be non-negative and
+    // representable in signed I64 for every lane.
+    for (i = 0; i < logits_count; i++)
+    {
+        if (logits_q16[i] < 0 &&
+            staged_max_logit_q16 > (I64_MAX_VALUE + logits_q16[i]))
+            return FP_Q16_ERR_OVERFLOW;
+
+        window_delta_q16 = staged_max_logit_q16 - logits_q16[i];
+        if (window_delta_q16 < 0)
+            return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    *out_required_workspace_cells = staged_required_workspace_cells;
+    *out_selected_count = staged_selected_count;
+    *out_max_logit_q16 = staged_max_logit_q16;
+    return FP_Q16_OK;
+}
+
 // Checked deterministic top-k selector that emits both logits and indices into
 // disjoint caller-owned output buffers.
 // Output contract:

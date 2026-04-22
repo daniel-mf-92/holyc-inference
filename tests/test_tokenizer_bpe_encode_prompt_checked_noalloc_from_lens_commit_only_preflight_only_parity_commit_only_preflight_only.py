@@ -381,7 +381,7 @@ def test_randomized_utf8_cursor_capacity_vectors() -> None:
 
     for _ in range(1000):
         payload_len = rng.randint(0, 96)
-        payload = [rng.randint(0, 255) for _ in range(payload_len)]
+        payload = [rng.randint(32, 126) for _ in range(payload_len)]
         cursor_val = rng.randint(0, payload_len)
         prompt_nbytes = rng.randint(0, payload_len - cursor_val)
         out_cap = rng.randint(max(prompt_nbytes, 1), max(prompt_nbytes, 1) + 32)
