@@ -648,6 +648,16 @@ I32 InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnlyParity(
         snapshot_out_required_logits_cells != out_required_logits_cells)
         return MODEL_Q16_ERR_BAD_PARAM;
 
+    if (commit_dense_cells < 0 ||
+        commit_required_workspace_cells < 0 ||
+        commit_required_block_tensor_cells < 0 ||
+        commit_required_logits_cells < 0 ||
+        canonical_dense_cells < 0 ||
+        canonical_required_workspace_cells < 0 ||
+        canonical_required_block_tensor_cells < 0 ||
+        canonical_required_logits_cells < 0)
+        return MODEL_Q16_ERR_BAD_PARAM;
+
     if (commit_dense_cells != canonical_dense_cells)
         return MODEL_Q16_ERR_BAD_PARAM;
     if (commit_required_workspace_cells != canonical_required_workspace_cells)
@@ -666,12 +676,9 @@ I32 InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnlyParity(
 
 // IQ-1055 commit-only diagnostics wrapper over IQ-1054 parity gate.
 //
-// Contract:
-// - stage diagnostics from `...CommitOnlyPreflightOnlyParity` and canonical
-//   `...CommitOnlyPreflightOnly` using private temporaries;
-// - revalidate immutable scalar + output-pointer snapshots;
-// - atomically publish `{dense_cells,required_workspace_cells,required_block_tensor_cells,required_logits_cells}`
-//   only when strict tuple parity succeeds.
+// Stages parity-verified diagnostics tuple locally, revalidates immutable
+// geometry/capacity snapshots, and atomically publishes outputs only once on
+// success. Any failure preserves strict no-partial diagnostics writes.
 I32 InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(
     I64 embed_capacity,
     I64 block_attn_capacity,
@@ -804,6 +811,14 @@ I32 InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(
         snapshot_out_required_logits_cells != out_required_logits_cells)
         return MODEL_Q16_ERR_BAD_PARAM;
 
+    if (out_dense_cells == out_required_workspace_cells ||
+        out_dense_cells == out_required_block_tensor_cells ||
+        out_dense_cells == out_required_logits_cells ||
+        out_required_workspace_cells == out_required_block_tensor_cells ||
+        out_required_workspace_cells == out_required_logits_cells ||
+        out_required_block_tensor_cells == out_required_logits_cells)
+        return MODEL_Q16_ERR_BAD_PARAM;
+
     if (commit_dense_cells != canonical_dense_cells)
         return MODEL_Q16_ERR_BAD_PARAM;
     if (commit_required_workspace_cells != canonical_required_workspace_cells)
@@ -819,4 +834,3 @@ I32 InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(
     *out_required_logits_cells = commit_required_logits_cells;
     return MODEL_Q16_OK;
 }
-
