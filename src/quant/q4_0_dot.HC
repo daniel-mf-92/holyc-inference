@@ -302,6 +302,57 @@ I32 Q4_0DotBlocksQ32CheckedNoPartial(Q4_0Block *lhs,
     return Q4_0_OK;
 }
 
+// Commit-only diagnostics wrapper for checked no-partial Q4_0 block dots.
+//
+// Contracts:
+// - Delegates math/overflow behavior to `Q4_0DotBlocksQ32CheckedNoPartial`.
+// - Stages `{dot_q32,dot_q16}` and publishes atomically only on success.
+// - Revalidates immutable call snapshot `{lhs_ptr,rhs_ptr,block_count}` before
+//   publishing diagnostics tuple so caller-observable outputs stay deterministic.
+I32 Q4_0DotBlocksQ32CheckedNoPartialCommitOnly(Q4_0Block *lhs,
+                                               Q4_0Block *rhs,
+                                               I64 block_count,
+                                               I64 *out_dot_q32,
+                                               I64 *out_dot_q16)
+{
+    Q4_0Block *snapshot_lhs_ptr;
+    Q4_0Block *snapshot_rhs_ptr;
+    I64 snapshot_block_count;
+    I64 staged_dot_q32;
+    I64 staged_dot_q16;
+    I32 status;
+
+    if (!lhs || !rhs || !out_dot_q32 || !out_dot_q16)
+        return Q4_0_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q4_0_ERR_BAD_DST_LEN;
+
+    // Atomic tuple publish requires distinct destination slots.
+    if (out_dot_q32 == out_dot_q16)
+        return Q4_0_ERR_BAD_DST_LEN;
+
+    snapshot_lhs_ptr = lhs;
+    snapshot_rhs_ptr = rhs;
+    snapshot_block_count = block_count;
+
+    status = Q4_0DotBlocksQ32CheckedNoPartial(lhs,
+                                              rhs,
+                                              block_count,
+                                              &staged_dot_q32,
+                                              &staged_dot_q16);
+    if (status != Q4_0_OK)
+        return status;
+
+    if (snapshot_lhs_ptr != lhs ||
+        snapshot_rhs_ptr != rhs ||
+        snapshot_block_count != block_count)
+        return Q4_0_ERR_BAD_DST_LEN;
+
+    *out_dot_q32 = staged_dot_q32;
+    *out_dot_q16 = staged_dot_q16;
+    return Q4_0_OK;
+}
+
 I64 Q4_0DotQ32ToQ16(I64 dot_q32)
 {
     return Q4_0RoundShiftRightSigned(dot_q32, 16);
