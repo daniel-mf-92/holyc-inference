@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path("tests").resolve()))
 
 from test_gguf_tensorinfo_read_dims_type_offset_checked_nopartial import (
+    GGUF_TENSOR_PARSE_ERR_BAD_DIMS,
     GGUF_TENSOR_PARSE_ERR_BAD_TYPE,
     GGUF_TENSOR_PARSE_ERR_NULL_PTR,
     GGUF_TENSOR_PARSE_ERR_TRUNCATED,
@@ -130,9 +131,20 @@ def parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_c
     ):
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED
 
+    if staged_preflight_dim_count[0] == 0 or staged_commit_dim_count[0] == 0:
+        return GGUF_TENSOR_PARSE_ERR_BAD_DIMS
+    if staged_preflight_dim_count[0] > 8 or staged_commit_dim_count[0] > 8:
+        return GGUF_TENSOR_PARSE_ERR_BAD_DIMS
+
     if (
         staged_preflight_dims_cells[0] != staged_preflight_dim_count[0]
         or staged_commit_dims_cells[0] != staged_commit_dim_count[0]
+    ):
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
+
+    if (
+        staged_preflight_last_dim_index[0] != staged_preflight_dim_count[0] - 1
+        or staged_commit_last_dim_index[0] != staged_commit_dim_count[0] - 1
     ):
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED
 
@@ -148,6 +160,9 @@ def parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_c
 
     commit_end = cursor + staged_commit_required_bytes[0]
     if commit_end > size:
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
+
+    if preflight_end != commit_end:
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED
 
     out_dim_count[0] = staged_commit_dim_count[0]
@@ -181,13 +196,19 @@ def test_source_contains_iq1033_signature_and_contract() -> None:
     assert "staged_preflight_type_value != staged_commit_type_value" in body
     assert "staged_preflight_tensor_offset != staged_commit_tensor_offset" in body
     assert "staged_preflight_last_dim_index != staged_commit_last_dim_index" in body
+    assert "if (!staged_preflight_dim_count || !staged_commit_dim_count)" in body
+    assert "staged_preflight_dim_count > GGUF_TENSOR_MAX_DIMS" in body
+    assert "staged_commit_dim_count > GGUF_TENSOR_MAX_DIMS" in body
     assert "staged_preflight_dims_cells != staged_preflight_dim_count" in body
     assert "staged_commit_dims_cells != staged_commit_dim_count" in body
+    assert "staged_preflight_last_dim_index != (U64)(staged_preflight_dim_count - 1)" in body
+    assert "staged_commit_last_dim_index != (U64)(staged_commit_dim_count - 1)" in body
     assert "!GGUFTensorTypeKnown(staged_preflight_type_value)" in body
     assert "!GGUFTensorTypeKnown(staged_commit_type_value)" in body
     assert "if (!GGUFTensorTryAddU64(cursor," in body
     assert "if (staged_preflight_computed_end > size)" in body
     assert "if (staged_commit_computed_end > size)" in body
+    assert "if (staged_preflight_computed_end != staged_commit_computed_end)" in body
     assert "*out_dim_count = staged_commit_dim_count;" in body
 
 

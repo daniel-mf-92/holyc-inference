@@ -2222,8 +2222,18 @@ I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParit
         staged_preflight_last_dim_index != staged_commit_last_dim_index)
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
 
+    if (!staged_preflight_dim_count || !staged_commit_dim_count)
+        return GGUF_TENSOR_PARSE_ERR_BAD_DIM_COUNT;
+    if (staged_preflight_dim_count > GGUF_TENSOR_MAX_DIMS ||
+        staged_commit_dim_count > GGUF_TENSOR_MAX_DIMS)
+        return GGUF_TENSOR_PARSE_ERR_BAD_DIM_COUNT;
+
     if (staged_preflight_dims_cells != staged_preflight_dim_count ||
         staged_commit_dims_cells != staged_commit_dim_count)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    if (staged_preflight_last_dim_index != (U64)(staged_preflight_dim_count - 1) ||
+        staged_commit_last_dim_index != (U64)(staged_commit_dim_count - 1))
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
 
     if (!GGUFTensorTypeKnown(staged_preflight_type_value) ||
@@ -2244,12 +2254,181 @@ I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParit
     if (staged_commit_computed_end > size)
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
 
+    if (staged_preflight_computed_end != staged_commit_computed_end)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
     *out_dim_count = staged_commit_dim_count;
     *out_dims_cells = staged_commit_dims_cells;
     *out_required_bytes = staged_commit_required_bytes;
     *out_type_value = staged_commit_type_value;
     *out_tensor_offset = staged_commit_tensor_offset;
     *out_last_dim_index = staged_commit_last_dim_index;
+    return GGUF_TENSOR_PARSE_OK;
+}
+
+// IQ-1038 commit-only diagnostics wrapper for dims parity-preflight gate.
+//
+// Compose `...PreflightOnlyParityCommitOnlyPreflightOnlyParity` and canonical
+// `...PreflightOnlyParityCommitOnlyPreflightOnly`, revalidate immutable
+// `{buf,size,cursor}` snapshots and required-bytes span parity, then
+// atomically publish only when strict tuple parity holds for
+// `{dim_count,dims_cells,required_bytes,type_value,tensor_offset,last_dim_index}`.
+I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
+    U8 *buf,
+    U64 size,
+    U64 cursor,
+    U32 *out_dim_count,
+    U64 *out_dims_cells,
+    U64 *out_required_bytes,
+    U32 *out_type_value,
+    U64 *out_tensor_offset,
+    U64 *out_last_dim_index)
+{
+    U8 *snapshot_buf;
+    U64 snapshot_size;
+    U64 snapshot_cursor;
+
+    U32 staged_parity_dim_count;
+    U64 staged_parity_dims_cells;
+    U64 staged_parity_required_bytes;
+    U32 staged_parity_type_value;
+    U64 staged_parity_tensor_offset;
+    U64 staged_parity_last_dim_index;
+
+    U32 canonical_dim_count;
+    U64 canonical_dims_cells;
+    U64 canonical_required_bytes;
+    U32 canonical_type_value;
+    U64 canonical_tensor_offset;
+    U64 canonical_last_dim_index;
+
+    U64 staged_parity_computed_end;
+    U64 canonical_computed_end;
+
+    I64 status;
+
+    U8 *out_dim_count_ptr;
+    U8 *out_dims_cells_ptr;
+    U8 *out_required_bytes_ptr;
+    U8 *out_type_value_ptr;
+    U8 *out_tensor_offset_ptr;
+    U8 *out_last_dim_index_ptr;
+
+    if (!buf || !out_dim_count || !out_dims_cells || !out_required_bytes)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+    if (!out_type_value || !out_tensor_offset || !out_last_dim_index)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+
+    out_dim_count_ptr = (U8 *)out_dim_count;
+    out_dims_cells_ptr = (U8 *)out_dims_cells;
+    out_required_bytes_ptr = (U8 *)out_required_bytes;
+    out_type_value_ptr = (U8 *)out_type_value;
+    out_tensor_offset_ptr = (U8 *)out_tensor_offset;
+    out_last_dim_index_ptr = (U8 *)out_last_dim_index;
+
+    if (out_dim_count_ptr == out_dims_cells_ptr ||
+        out_dim_count_ptr == out_required_bytes_ptr ||
+        out_dim_count_ptr == out_type_value_ptr ||
+        out_dim_count_ptr == out_tensor_offset_ptr ||
+        out_dim_count_ptr == out_last_dim_index_ptr ||
+        out_dims_cells_ptr == out_required_bytes_ptr ||
+        out_dims_cells_ptr == out_type_value_ptr ||
+        out_dims_cells_ptr == out_tensor_offset_ptr ||
+        out_dims_cells_ptr == out_last_dim_index_ptr ||
+        out_required_bytes_ptr == out_type_value_ptr ||
+        out_required_bytes_ptr == out_tensor_offset_ptr ||
+        out_required_bytes_ptr == out_last_dim_index_ptr ||
+        out_type_value_ptr == out_tensor_offset_ptr ||
+        out_type_value_ptr == out_last_dim_index_ptr ||
+        out_tensor_offset_ptr == out_last_dim_index_ptr)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+
+    if (cursor > size)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (size > 0x7FFFFFFFFFFFFFFF || cursor > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    snapshot_buf = buf;
+    snapshot_size = size;
+    snapshot_cursor = cursor;
+
+    staged_parity_dim_count = 0;
+    staged_parity_dims_cells = 0;
+    staged_parity_required_bytes = 0;
+    staged_parity_type_value = 0;
+    staged_parity_tensor_offset = 0;
+    staged_parity_last_dim_index = 0;
+
+    canonical_dim_count = 0;
+    canonical_dims_cells = 0;
+    canonical_required_bytes = 0;
+    canonical_type_value = 0;
+    canonical_tensor_offset = 0;
+    canonical_last_dim_index = 0;
+
+    staged_parity_computed_end = 0;
+    canonical_computed_end = 0;
+
+    status = GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+        buf,
+        size,
+        cursor,
+        &staged_parity_dim_count,
+        &staged_parity_dims_cells,
+        &staged_parity_required_bytes,
+        &staged_parity_type_value,
+        &staged_parity_tensor_offset,
+        &staged_parity_last_dim_index);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+
+    status = GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+        buf,
+        size,
+        cursor,
+        &canonical_dim_count,
+        &canonical_dims_cells,
+        &canonical_required_bytes,
+        &canonical_type_value,
+        &canonical_tensor_offset,
+        &canonical_last_dim_index);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+
+    if (!GGUFTensorTryAddU64(cursor,
+                             staged_parity_required_bytes,
+                             &staged_parity_computed_end))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (!GGUFTensorTryAddU64(cursor,
+                             canonical_required_bytes,
+                             &canonical_computed_end))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    if (staged_parity_computed_end > size ||
+        canonical_computed_end > size)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    if (snapshot_buf != buf || snapshot_size != size || snapshot_cursor != cursor)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    if (staged_parity_dim_count != canonical_dim_count ||
+        staged_parity_dims_cells != canonical_dims_cells ||
+        staged_parity_required_bytes != canonical_required_bytes ||
+        staged_parity_type_value != canonical_type_value ||
+        staged_parity_tensor_offset != canonical_tensor_offset ||
+        staged_parity_last_dim_index != canonical_last_dim_index)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    if (!GGUFTensorTypeKnown(staged_parity_type_value) ||
+        !GGUFTensorTypeKnown(canonical_type_value))
+        return GGUF_TENSOR_PARSE_ERR_BAD_TYPE;
+
+    *out_dim_count = staged_parity_dim_count;
+    *out_dims_cells = staged_parity_dims_cells;
+    *out_required_bytes = staged_parity_required_bytes;
+    *out_type_value = staged_parity_type_value;
+    *out_tensor_offset = staged_parity_tensor_offset;
+    *out_last_dim_index = staged_parity_last_dim_index;
     return GGUF_TENSOR_PARSE_OK;
 }
 
