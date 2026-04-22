@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for ...ParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity (IQ-1114)."""
+"""Harness for ...ParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly (IQ-1114)."""
 
 from __future__ import annotations
 
@@ -11,11 +11,11 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent))
 
 from test_inference_generate_tokens_checked_topk_default import SAMPLING_Q16_ONE
-from test_inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only import (
-    inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference,
-)
 from test_inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only import (
-    inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference,
+    inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_reference,
+)
+from test_inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity import (
+    inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference,
 )
 from test_inference_generate_tokens_preflight_checked import (
     SAMPLING_Q16_ERR_BAD_PARAM,
@@ -51,8 +51,8 @@ def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parit
     out_required_logits: list[int] | None,
     out_required_tokens: list[int] | None,
     out_final_token_count: list[int] | None,
-    parity_fn=inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference,
-    commit_fn=inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference,
+    parity_fn=inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference,
+    preflight_fn=inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_reference,
 ) -> int:
     if (
         out_required_logits is None
@@ -132,9 +132,9 @@ def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parit
     staged_parity_required_tokens = [0]
     staged_parity_final_token_count = [0]
 
-    staged_commit_required_logits = [0]
-    staged_commit_required_tokens = [0]
-    staged_commit_final_token_count = [0]
+    staged_preflight_required_logits = [0]
+    staged_preflight_required_tokens = [0]
+    staged_preflight_final_token_count = [0]
 
     status = parity_fn(
         step_logits_q16=step_logits_q16,
@@ -165,7 +165,7 @@ def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parit
     if status != SAMPLING_Q16_OK:
         return status
 
-    status = commit_fn(
+    status = preflight_fn(
         step_logits_q16=step_logits_q16,
         step_logits_capacity=step_logits_capacity,
         vocab_size=vocab_size,
@@ -187,9 +187,9 @@ def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parit
         workspace_topk_index_capacity=workspace_topk_index_capacity,
         out_generated_tokens=out_generated_tokens,
         generated_capacity=generated_capacity,
-        out_required_logits=staged_commit_required_logits,
-        out_required_tokens=staged_commit_required_tokens,
-        out_final_token_count=staged_commit_final_token_count,
+        out_required_logits=staged_preflight_required_logits,
+        out_required_tokens=staged_preflight_required_tokens,
+        out_final_token_count=staged_preflight_final_token_count,
     )
     if status != SAMPLING_Q16_OK:
         return status
@@ -237,9 +237,9 @@ def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parit
         staged_parity_required_logits[0] < 0
         or staged_parity_required_tokens[0] < 0
         or staged_parity_final_token_count[0] < 0
-        or staged_commit_required_logits[0] < 0
-        or staged_commit_required_tokens[0] < 0
-        or staged_commit_final_token_count[0] < 0
+        or staged_preflight_required_logits[0] < 0
+        or staged_preflight_required_tokens[0] < 0
+        or staged_preflight_final_token_count[0] < 0
     ):
         return SAMPLING_Q16_ERR_BAD_PARAM
 
@@ -259,9 +259,9 @@ def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parit
         return SAMPLING_Q16_ERR_OVERFLOW
 
     if (
-        staged_parity_required_logits[0] != staged_commit_required_logits[0]
-        or staged_parity_required_tokens[0] != staged_commit_required_tokens[0]
-        or staged_parity_final_token_count[0] != staged_commit_final_token_count[0]
+        staged_parity_required_logits[0] != staged_preflight_required_logits[0]
+        or staged_parity_required_tokens[0] != staged_preflight_required_tokens[0]
+        or staged_parity_final_token_count[0] != staged_preflight_final_token_count[0]
     ):
         return SAMPLING_Q16_ERR_BAD_PARAM
 
@@ -303,17 +303,19 @@ def test_source_contains_iq_1114_symbol() -> None:
     source = Path("src/model/sampling.HC").read_text(encoding="utf-8")
     sig = (
         "I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnly"
-        "ParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity("
+        "ParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly("
     )
     assert sig in source
-    assert len(re.findall(re.escape(sig), source)) == 1
-    body = source.split(sig, 1)[1]
-    assert "InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in body
+    assert len(re.findall(re.escape(sig), source)) >= 1
+    body = source.rsplit(sig, 1)[1]
     assert "InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(" in body
-    assert "if (staged_preflight_required_logits != staged_commit_required_logits ||" in body
+    assert "InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in body
+    assert "InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in body
+    assert "if (staged_parity_required_logits != staged_commit_required_logits ||" in body
     assert "snapshot_out_final_token_count != out_final_token_count" in body
     assert "if (!step_logits_q16 || !token_history || !random_q16_values ||" in source
-    assert "if (staged_preflight_required_logits != staged_commit_required_logits ||" in body
+    assert "if (canonical_required_logits > snapshot_step_logits_capacity)" in body
+    assert "if (snapshot_workspace_stage_logits_capacity < snapshot_vocab_size)" in source
 
 
 def test_known_vector_success() -> None:

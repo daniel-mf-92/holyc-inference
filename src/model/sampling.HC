@@ -4660,21 +4660,21 @@ I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnl
     return SAMPLING_Q16_OK;
 }
 
-// IQ-1093 diagnostics-only no-write companion over IQ-1092 commit-only wrapper.
+// IQ-1116 diagnostics-only no-write companion over IQ-1114 commit-only wrapper.
 //
 // Compose:
-// 1) stage canonical tuple via IQ-1079 parity gate
-//    (`...ParityCommitOnlyPreflightOnlyParity`);
-// 2) stage canonical tuple via IQ-1092 commit-only wrapper
+// 1) stage canonical tuple via IQ-1114 commit-only wrapper
 //    (`...ParityCommitOnlyPreflightOnlyParityCommitOnly`);
+// 2) stage canonical tuple via IQ-1097 parity gate
+//    (`...ParityCommitOnlyPreflightOnlyParity`);
 // 3) revalidate immutable prompt/runtime snapshots and strict tuple parity;
 // 4) publish atomically only on exact parity success.
-// IQ-1093 diagnostics-only zero-write companion over IQ-1092 commit wrapper.
+// IQ-1116 diagnostics-only zero-write companion over IQ-1114 commit wrapper.
 //
 // Compose:
-// 1) stage tuple via IQ-1092 commit wrapper
+// 1) stage tuple via IQ-1114 commit wrapper
 //    (`...ParityCommitOnlyPreflightOnlyParityCommitOnly`);
-// 2) stage tuple via IQ-1079 parity gate
+// 2) stage tuple via IQ-1097 parity gate
 //    (`...ParityCommitOnlyPreflightOnlyParity`);
 // 3) recompute canonical tuple from immutable geometry snapshots;
 // 4) publish atomically only on strict tuple parity success.
@@ -4799,7 +4799,7 @@ I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnl
     staged_parity_required_tokens = 0;
     staged_parity_final_token_count = 0;
 
-    status = InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+    status = InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnly(
         step_logits_q16,
         step_logits_capacity,
         vocab_size,
