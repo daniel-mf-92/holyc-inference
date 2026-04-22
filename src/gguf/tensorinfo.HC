@@ -242,6 +242,7 @@ I64 GGUFTensorInfoValidateDimsChecked(U32 n_dims,
                                       U64 *out_n_elements)
 {
     U64 n_elements;
+    U64 next_n_elements;
     U64 block_elems;
     U64 i;
     I64 status;
@@ -258,10 +259,10 @@ I64 GGUFTensorInfoValidateDimsChecked(U32 n_dims,
     {
         if (!dims[i])
             return GGUF_TENSOR_PARSE_ERR_BAD_DIM_SIZE;
-        if (n_elements > 0xFFFFFFFFFFFFFFFF / dims[i])
+        if (!GGUFTensorTryMulU64(n_elements, dims[i], &next_n_elements))
             return GGUF_TENSOR_PARSE_ERR_DIM_OVERFLOW;
 
-        n_elements *= dims[i];
+        n_elements = next_n_elements;
     }
 
     status = GGUFTensorTypeBlockElemsChecked(ggml_type, &block_elems);
