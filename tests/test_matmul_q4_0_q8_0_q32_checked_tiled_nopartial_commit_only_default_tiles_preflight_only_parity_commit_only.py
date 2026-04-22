@@ -160,10 +160,19 @@ def matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_default_tiles_prefl
     ):
         return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
 
-    out_required_out_cells[0] = staged_required_out_cells[0]
-    out_required_out_bytes[0] = staged_required_out_bytes[0]
-    out_tile_rows[0] = staged_tile_rows[0]
-    out_tile_cols[0] = staged_tile_cols[0]
+    ok, staged_expected_out_bytes = try_mul_i64_nonneg(staged_required_out_cells[0], 8)
+    if not ok:
+        return Q4_0_Q8_0_AVX2_ERR_OVERFLOW
+    if staged_required_out_bytes[0] != staged_expected_out_bytes:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+
+    if staged_tile_rows[0] <= 0 or staged_tile_cols[0] <= 0:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+
+    out_required_out_cells[0] = canonical_required_out_cells
+    out_required_out_bytes[0] = canonical_required_out_bytes
+    out_tile_rows[0] = canonical_tile_rows
+    out_tile_cols[0] = canonical_tile_cols
     return Q4_0_Q8_0_AVX2_OK
 
 
@@ -177,6 +186,7 @@ def test_source_contains_iq1016_signature_and_commit_only_contract() -> None:
     source = pathlib.Path("src/matmul/q4_0_q8_0_matmul.HC").read_text(encoding="utf-8")
     sig = "I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyParityCommitOnly("
     assert sig in source
+    assert source.count(sig) >= 2
     body = source.rsplit(sig, 1)[1].split("\nI32 ", 1)[0]
 
     assert "MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyParity(" in body
@@ -186,10 +196,49 @@ def test_source_contains_iq1016_signature_and_commit_only_contract() -> None:
     assert "staged_required_out_bytes != canonical_required_out_bytes" in body
     assert "staged_tile_rows != canonical_tile_rows" in body
     assert "staged_tile_cols != canonical_tile_cols" in body
-    assert "*out_required_out_cells = staged_required_out_cells;" in body
-    assert "*out_required_out_bytes = staged_required_out_bytes;" in body
-    assert "*out_tile_rows = staged_tile_rows;" in body
-    assert "*out_tile_cols = staged_tile_cols;" in body
+    assert "if (!Q4_0Q8_0MatMulTryMulI64NonNeg(staged_required_out_cells," in body
+    assert "if (staged_required_out_bytes != staged_expected_out_bytes)" in body
+    assert "if (staged_tile_rows <= 0 || staged_tile_cols <= 0)" in body
+    assert "*out_required_out_cells = canonical_required_out_cells;" in body
+    assert "*out_required_out_bytes = canonical_required_out_bytes;" in body
+    assert "*out_tile_rows = canonical_tile_rows;" in body
+    assert "*out_tile_cols = canonical_tile_cols;" in body
+
+
+def test_overflow_vector_preserves_no_partial_commit() -> None:
+    lhs = [make_q4_block(random.Random(202604221016301))]
+    rhs = [make_q8_block(random.Random(202604221016302))]
+    out = [0xFACE]
+
+    req_cells = [0x1111]
+    req_bytes = [0x2222]
+    tile_rows = [0x3333]
+    tile_cols = [0x4444]
+
+    err = matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_default_tiles_preflight_only_parity_commit_only(
+        lhs,
+        1,
+        I64_MAX,
+        1,
+        rhs,
+        1,
+        1,
+        1,
+        1,
+        out,
+        I64_MAX,
+        2,
+        req_cells,
+        req_bytes,
+        tile_rows,
+        tile_cols,
+    )
+
+    assert err == Q4_0_Q8_0_AVX2_ERR_OVERFLOW
+    assert req_cells == [0x1111]
+    assert req_bytes == [0x2222]
+    assert tile_rows == [0x3333]
+    assert tile_cols == [0x4444]
 
 
 def test_known_vector_success_and_alias_guard() -> None:
@@ -363,6 +412,7 @@ def test_randomized_parity_vs_explicit_composition() -> None:
 
 if __name__ == "__main__":
     test_source_contains_iq1016_signature_and_commit_only_contract()
+    test_overflow_vector_preserves_no_partial_commit()
     test_known_vector_success_and_alias_guard()
     test_randomized_parity_vs_explicit_composition()
     print("ok")

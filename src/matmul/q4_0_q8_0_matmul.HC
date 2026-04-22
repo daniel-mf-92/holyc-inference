@@ -142,6 +142,7 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyPar
     I64 canonical_required_out_bytes;
     I64 canonical_tile_rows;
     I64 canonical_tile_cols;
+    I64 staged_expected_out_bytes;
 
     I32 status;
 
@@ -192,6 +193,7 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyPar
     canonical_required_out_bytes = 0;
     canonical_tile_rows = 0;
     canonical_tile_cols = 0;
+    staged_expected_out_bytes = 0;
 
     status = MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyParity(
         lhs_q4_blocks,
@@ -241,10 +243,20 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyPar
         staged_tile_cols != canonical_tile_cols)
         return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
 
-    *out_required_out_cells = staged_required_out_cells;
-    *out_required_out_bytes = staged_required_out_bytes;
-    *out_tile_rows = staged_tile_rows;
-    *out_tile_cols = staged_tile_cols;
+    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(staged_required_out_cells,
+                                       sizeof(I64),
+                                       &staged_expected_out_bytes))
+        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+    if (staged_required_out_bytes != staged_expected_out_bytes)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (staged_tile_rows <= 0 || staged_tile_cols <= 0)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    *out_required_out_cells = canonical_required_out_cells;
+    *out_required_out_bytes = canonical_required_out_bytes;
+    *out_tile_rows = canonical_tile_rows;
+    *out_tile_cols = canonical_tile_cols;
     return Q4_0_Q8_0_MATMUL_OK;
 }
 
@@ -1840,6 +1852,7 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyPar
     I64 canonical_required_out_bytes;
     I64 canonical_tile_rows;
     I64 canonical_tile_cols;
+    I64 staged_expected_out_bytes;
 
     I32 status;
 
@@ -1890,6 +1903,7 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyPar
     canonical_required_out_bytes = 0;
     canonical_tile_rows = 0;
     canonical_tile_cols = 0;
+    staged_expected_out_bytes = 0;
 
     status = MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyParity(
         lhs_q4_blocks,
@@ -1939,10 +1953,20 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyPar
         staged_tile_cols != canonical_tile_cols)
         return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
 
-    *out_required_out_cells = staged_required_out_cells;
-    *out_required_out_bytes = staged_required_out_bytes;
-    *out_tile_rows = staged_tile_rows;
-    *out_tile_cols = staged_tile_cols;
+    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(staged_required_out_cells,
+                                       sizeof(I64),
+                                       &staged_expected_out_bytes))
+        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+    if (staged_required_out_bytes != staged_expected_out_bytes)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (staged_tile_rows <= 0 || staged_tile_cols <= 0)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    *out_required_out_cells = canonical_required_out_cells;
+    *out_required_out_bytes = canonical_required_out_bytes;
+    *out_tile_rows = canonical_tile_rows;
+    *out_tile_cols = canonical_tile_cols;
     return Q4_0_Q8_0_MATMUL_OK;
 }
 
