@@ -19,6 +19,10 @@
 
 #define DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT 4
 
+#define INFERENCE_TOKEN_STREAM_CALLBACK_ABI_VERSION    1
+#define INFERENCE_TOKEN_STREAM_CALLBACK_ABI_TUPLE_CELLS 5
+#define INFERENCE_TOKEN_STREAM_CALLBACK_FLAG_NONE      0
+
 I32 InferenceForwardQ16CheckedNoPartial(
     I64 *embed_q16,
     I64 embed_capacity,
@@ -1453,6 +1457,118 @@ I32 InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnlyP
 
     *out_rows_processed = staged_rows_processed;
     *out_logits_written = staged_logits_written;
+    return SAMPLING_Q16_OK;
+}
+
+// IQ-1170 checked per-token callback dispatcher for Book-of-Truth token stream.
+//
+// Callback ABI tuple (all I64, integer-only):
+//   tuple[0] = ABI version (must equal INFERENCE_TOKEN_STREAM_CALLBACK_ABI_VERSION)
+//   tuple[1] = callback flags (currently only 0 is accepted)
+//   tuple[2] = token index in generated stream
+//   tuple[3] = token id
+//   tuple[4] = token probability/logit in Q16 fixed-point domain
+//
+// Fail-closed semantics:
+// - Any precondition failure returns an error and leaves caller outputs untouched.
+// - Callback return code must be SAMPLING_Q16_OK; any non-zero is rejected.
+// - ABI tuple is staged locally and only committed to caller buffer on success.
+I32 InferenceTokenStreamCallbackDispatchCheckedNoPartial(
+    I32 (*token_callback)(I64 *abi_tuple,
+                          I64 abi_tuple_cells,
+                          I64 user_ctx),
+    I64 *abi_tuple_buffer,
+    I64 abi_tuple_buffer_capacity,
+    I64 token_index,
+    I64 token_id,
+    I64 token_prob_q16,
+    I64 callback_flags,
+    I64 user_ctx,
+    I64 *out_dispatch_count,
+    I64 *out_callback_status)
+{
+    I64 staged_tuple[INFERENCE_TOKEN_STREAM_CALLBACK_ABI_TUPLE_CELLS];
+    I64 staged_dispatch_count;
+    I64 staged_callback_status;
+    I64 snapshot_token_index;
+    I64 snapshot_token_id;
+    I64 snapshot_token_prob_q16;
+    I64 snapshot_callback_flags;
+    I64 snapshot_user_ctx;
+    I64 *snapshot_abi_tuple_buffer;
+    I64 snapshot_abi_tuple_buffer_capacity;
+    I64 *snapshot_out_dispatch_count;
+    I64 *snapshot_out_callback_status;
+    I32 callback_status;
+    I64 lane;
+
+    if (!token_callback || !abi_tuple_buffer ||
+        !out_dispatch_count || !out_callback_status)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (out_dispatch_count == out_callback_status)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (abi_tuple_buffer_capacity < INFERENCE_TOKEN_STREAM_CALLBACK_ABI_TUPLE_CELLS)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (token_index < 0 || token_id < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (callback_flags != INFERENCE_TOKEN_STREAM_CALLBACK_FLAG_NONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_token_index = token_index;
+    snapshot_token_id = token_id;
+    snapshot_token_prob_q16 = token_prob_q16;
+    snapshot_callback_flags = callback_flags;
+    snapshot_user_ctx = user_ctx;
+    snapshot_abi_tuple_buffer = abi_tuple_buffer;
+    snapshot_abi_tuple_buffer_capacity = abi_tuple_buffer_capacity;
+    snapshot_out_dispatch_count = out_dispatch_count;
+    snapshot_out_callback_status = out_callback_status;
+
+    staged_tuple[0] = INFERENCE_TOKEN_STREAM_CALLBACK_ABI_VERSION;
+    staged_tuple[1] = callback_flags;
+    staged_tuple[2] = token_index;
+    staged_tuple[3] = token_id;
+    staged_tuple[4] = token_prob_q16;
+
+    if (snapshot_token_index != token_index ||
+        snapshot_token_id != token_id ||
+        snapshot_token_prob_q16 != token_prob_q16 ||
+        snapshot_callback_flags != callback_flags ||
+        snapshot_user_ctx != user_ctx ||
+        snapshot_abi_tuple_buffer != abi_tuple_buffer ||
+        snapshot_abi_tuple_buffer_capacity != abi_tuple_buffer_capacity ||
+        snapshot_out_dispatch_count != out_dispatch_count ||
+        snapshot_out_callback_status != out_callback_status)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    callback_status = token_callback(staged_tuple,
+                                     INFERENCE_TOKEN_STREAM_CALLBACK_ABI_TUPLE_CELLS,
+                                     user_ctx);
+    if (callback_status)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (staged_tuple[0] != INFERENCE_TOKEN_STREAM_CALLBACK_ABI_VERSION)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (staged_tuple[1] != INFERENCE_TOKEN_STREAM_CALLBACK_FLAG_NONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (staged_tuple[2] != snapshot_token_index)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (staged_tuple[3] != snapshot_token_id)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (staged_tuple[4] != snapshot_token_prob_q16)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    for (lane = 0; lane < INFERENCE_TOKEN_STREAM_CALLBACK_ABI_TUPLE_CELLS; lane++)
+        abi_tuple_buffer[lane] = staged_tuple[lane];
+
+    staged_dispatch_count = 1;
+    staged_callback_status = callback_status;
+    *out_dispatch_count = staged_dispatch_count;
+    *out_callback_status = staged_callback_status;
     return SAMPLING_Q16_OK;
 }
 
