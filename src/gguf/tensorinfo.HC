@@ -608,12 +608,14 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParity(
     U64 staged_pre_next_cursor;
     U64 staged_pre_computed_end;
     U64 staged_pre_required_check;
+    U64 staged_pre_span_remaining;
 
     U64 staged_commit_name_len;
     U64 staged_commit_required_bytes;
     U64 staged_commit_next_cursor;
     U64 staged_commit_computed_end;
     U64 staged_commit_required_check;
+    U64 staged_commit_span_remaining;
 
     I64 status;
 
@@ -647,12 +649,14 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParity(
     staged_pre_next_cursor = 0;
     staged_pre_computed_end = 0;
     staged_pre_required_check = 0;
+    staged_pre_span_remaining = 0;
 
     staged_commit_name_len = 0;
     staged_commit_required_bytes = 0;
     staged_commit_next_cursor = 0;
     staged_commit_computed_end = 0;
     staged_commit_required_check = 0;
+    staged_commit_span_remaining = 0;
 
     status = GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnly(
         buf,
@@ -679,6 +683,10 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParity(
     if (!GGUFTensorTryAddU64(8, staged_commit_name_len, &staged_commit_required_check))
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
 
+    if (staged_pre_name_len > GGUF_TENSOR_MAX_NAME_BYTES ||
+        staged_commit_name_len > GGUF_TENSOR_MAX_NAME_BYTES)
+        return GGUF_TENSOR_PARSE_ERR_BAD_NAME_LEN;
+
     // Keep explicit cursor span checks visible: cursor + required_bytes must
     // exactly match staged next_cursor in both composed paths.
     if (!GGUFTensorTryAddU64(cursor,
@@ -690,8 +698,17 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParity(
                              &staged_commit_computed_end))
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
 
+    staged_pre_span_remaining = size - cursor;
+    staged_commit_span_remaining = size - cursor;
+    if (staged_pre_required_bytes > staged_pre_span_remaining ||
+        staged_commit_required_bytes > staged_commit_span_remaining)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
     if (staged_pre_computed_end > size ||
         staged_commit_computed_end > size)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (staged_pre_next_cursor < cursor ||
+        staged_commit_next_cursor < cursor)
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
     if (staged_pre_computed_end != staged_pre_next_cursor ||
         staged_commit_computed_end != staged_commit_next_cursor)
