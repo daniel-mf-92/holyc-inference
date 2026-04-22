@@ -311,3 +311,112 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnly(
     *out_max_row_matrix_blocks = staged_max_row_matrix_blocks;
     return Q8_0_DOT_BENCH_OK;
 }
+
+// Strict parity gate over commit-only + canonical preflight planners.
+//
+// Contracts:
+// - Enforce immutable caller snapshots for cpu_hz and output destinations.
+// - Require parity between commit-only wrapper and canonical preflight tuple.
+// - Publish diagnostics tuple atomically only on full success.
+I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParity(
+    I64 cpu_hz,
+    I64 *out_shape_count,
+    I64 *out_max_blocks,
+    I64 *out_max_rows,
+    I64 *out_max_row_matrix_blocks)
+{
+    I64 snapshot_cpu_hz;
+    I64 *snapshot_out_shape_count;
+    I64 *snapshot_out_max_blocks;
+    I64 *snapshot_out_max_rows;
+    I64 *snapshot_out_max_row_matrix_blocks;
+
+    I64 parity_shape_count;
+    I64 parity_max_blocks;
+    I64 parity_max_rows;
+    I64 parity_max_row_matrix_blocks;
+
+    I64 canonical_shape_count;
+    I64 canonical_max_blocks;
+    I64 canonical_max_rows;
+    I64 canonical_max_row_matrix_blocks;
+
+    I64 derived_shape_count;
+    I64 derived_max_blocks;
+    I64 derived_max_rows;
+    I64 derived_max_row_matrix_blocks;
+    I32 status;
+
+    if (!out_shape_count || !out_max_blocks || !out_max_rows ||
+        !out_max_row_matrix_blocks)
+        return Q8_0_DOT_BENCH_ERR_NULL_PTR;
+
+    if (out_shape_count == out_max_blocks ||
+        out_shape_count == out_max_rows ||
+        out_shape_count == out_max_row_matrix_blocks ||
+        out_max_blocks == out_max_rows ||
+        out_max_blocks == out_max_row_matrix_blocks ||
+        out_max_rows == out_max_row_matrix_blocks)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    snapshot_cpu_hz = cpu_hz;
+    snapshot_out_shape_count = out_shape_count;
+    snapshot_out_max_blocks = out_max_blocks;
+    snapshot_out_max_rows = out_max_rows;
+    snapshot_out_max_row_matrix_blocks = out_max_row_matrix_blocks;
+
+    status = Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnly(
+        cpu_hz,
+        &parity_shape_count,
+        &parity_max_blocks,
+        &parity_max_rows,
+        &parity_max_row_matrix_blocks);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    status = Q8_0DotBenchRunDefaultSuitePreflightOnly(
+        cpu_hz,
+        &canonical_shape_count,
+        &canonical_max_blocks,
+        &canonical_max_rows,
+        &canonical_max_row_matrix_blocks);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    // Canonical suite tuple derivation: 4 deterministic shapes,
+    // max block_count=32, max row_count=8, max row matrix blocks=8*32.
+    derived_shape_count = 4;
+    derived_max_blocks = 32;
+    derived_max_rows = 8;
+    status = Q8_0DotBenchTryMulI64(derived_max_rows,
+                                   derived_max_blocks,
+                                   &derived_max_row_matrix_blocks);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    if (snapshot_cpu_hz != cpu_hz)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+    if (snapshot_out_shape_count != out_shape_count ||
+        snapshot_out_max_blocks != out_max_blocks ||
+        snapshot_out_max_rows != out_max_rows ||
+        snapshot_out_max_row_matrix_blocks != out_max_row_matrix_blocks)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    if (parity_shape_count != canonical_shape_count ||
+        parity_max_blocks != canonical_max_blocks ||
+        parity_max_rows != canonical_max_rows ||
+        parity_max_row_matrix_blocks != canonical_max_row_matrix_blocks)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    if (canonical_shape_count != derived_shape_count ||
+        canonical_max_blocks != derived_max_blocks ||
+        canonical_max_rows != derived_max_rows ||
+        canonical_max_row_matrix_blocks != derived_max_row_matrix_blocks)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    *out_shape_count = parity_shape_count;
+    *out_max_blocks = parity_max_blocks;
+    *out_max_rows = parity_max_rows;
+    *out_max_row_matrix_blocks = parity_max_row_matrix_blocks;
+    return Q8_0_DOT_BENCH_OK;
+}
