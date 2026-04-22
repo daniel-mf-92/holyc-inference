@@ -321,6 +321,84 @@ I64 GGUFTensorInfoValidateDimsCheckedNoPartial(U32 n_dims,
     return GGUF_TENSOR_PARSE_OK;
 }
 
+// Commit-only diagnostics wrapper for dims/type validation.
+//
+// Composes `GGUFTensorInfoValidateDimsChecked` and stages canonical
+// diagnostics tuple `{n_elements,block_elems}` using immutable
+// `{n_dims,dims_ptr,ggml_type}` snapshots. Tuple parity is revalidated against
+// live inputs before commit so caller-visible outputs publish atomically.
+I64 GGUFTensorInfoValidateDimsCheckedCommitOnly(U32 n_dims,
+                                                U64 *dims,
+                                                U32 ggml_type,
+                                                U64 *out_n_elements,
+                                                U64 *out_block_elems)
+{
+    U32 snapshot_n_dims;
+    U64 *snapshot_dims_ptr;
+    U32 snapshot_ggml_type;
+    U64 staged_n_elements;
+    U64 staged_block_elems;
+    U64 parity_n_elements;
+    U64 parity_block_elems;
+    I64 status;
+
+    if (!dims || !out_n_elements || !out_block_elems)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+    if (out_n_elements == out_block_elems)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+
+    snapshot_n_dims = n_dims;
+    snapshot_dims_ptr = dims;
+    snapshot_ggml_type = ggml_type;
+
+    staged_n_elements = 0;
+    staged_block_elems = 0;
+    status = GGUFTensorInfoValidateDimsChecked(snapshot_n_dims,
+                                               snapshot_dims_ptr,
+                                               snapshot_ggml_type,
+                                               &staged_n_elements);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+
+    status = GGUFTensorTypeBlockElemsChecked(snapshot_ggml_type,
+                                             &staged_block_elems);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+    if (!staged_block_elems)
+        return GGUF_TENSOR_PARSE_ERR_BAD_TYPE;
+    if (staged_n_elements % staged_block_elems)
+        return GGUF_TENSOR_PARSE_ERR_BAD_DIM_SIZE;
+
+    parity_n_elements = 0;
+    parity_block_elems = 0;
+    status = GGUFTensorInfoValidateDimsChecked(n_dims,
+                                               dims,
+                                               ggml_type,
+                                               &parity_n_elements);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+
+    status = GGUFTensorTypeBlockElemsChecked(ggml_type, &parity_block_elems);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+    if (!parity_block_elems)
+        return GGUF_TENSOR_PARSE_ERR_BAD_TYPE;
+    if (parity_n_elements % parity_block_elems)
+        return GGUF_TENSOR_PARSE_ERR_BAD_DIM_SIZE;
+
+    if (snapshot_n_dims != n_dims ||
+        snapshot_dims_ptr != dims ||
+        snapshot_ggml_type != ggml_type)
+        return GGUF_TENSOR_PARSE_ERR_BAD_DIMS;
+    if (staged_n_elements != parity_n_elements ||
+        staged_block_elems != parity_block_elems)
+        return GGUF_TENSOR_PARSE_ERR_BAD_DIMS;
+
+    *out_n_elements = staged_n_elements;
+    *out_block_elems = staged_block_elems;
+    return GGUF_TENSOR_PARSE_OK;
+}
+
 Bool GGUFTensorTryAddU64(U64 a, U64 b, U64 *out)
 {
     if (!out)
