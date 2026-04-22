@@ -2064,15 +2064,15 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     snapshot_tile_col_span = tile_col_span;
     snapshot_out_capacity = out_cell_capacity;
 
-    preflight_required_out_cells = *out_required_out_cells;
-    preflight_required_out_bytes = *out_required_out_bytes;
-    preflight_tile_rows = *out_tile_rows;
-    preflight_tile_cols = *out_tile_cols;
+    preflight_required_out_cells = 0;
+    preflight_required_out_bytes = 0;
+    preflight_tile_rows = 0;
+    preflight_tile_cols = 0;
 
-    canonical_required_out_cells = preflight_required_out_cells;
-    canonical_required_out_bytes = preflight_required_out_bytes;
-    canonical_tile_rows = preflight_tile_rows;
-    canonical_tile_cols = preflight_tile_cols;
+    canonical_required_out_cells = 0;
+    canonical_required_out_bytes = 0;
+    canonical_tile_rows = 0;
+    canonical_tile_cols = 0;
 
     status = MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
         lhs_q4_blocks,
