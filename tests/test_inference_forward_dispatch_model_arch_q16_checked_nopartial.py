@@ -81,6 +81,8 @@ def dispatch_model_arch_checked_nopartial_model(
 ) -> tuple[int, int]:
     if out_rows_processed is out_logits_written:
         return SAMPLING_Q16_ERR_BAD_PARAM, 0
+    if row_count < 0 or lane_count < 0:
+        return SAMPLING_Q16_ERR_BAD_PARAM, 0
 
     snap_rows = out_rows_processed[0]
     snap_logits = out_logits_written[0]
@@ -174,6 +176,38 @@ def test_arch_metadata_key_requires_exact_length() -> None:
     assert rows_out == [11]
     assert logits_out == [22]
 
+
+
+
+def test_negative_geometry_rejected_without_publish() -> None:
+    rows_out = [61]
+    logits_out = [67]
+
+    status, _ = dispatch_model_arch_checked_nopartial_model(
+        meta_key=DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE,
+        arch_value=b"llama",
+        row_count=-1,
+        lane_count=8,
+        out_rows_processed=rows_out,
+        out_logits_written=logits_out,
+        forward_status=SAMPLING_Q16_OK,
+    )
+    assert status == SAMPLING_Q16_ERR_BAD_PARAM
+    assert rows_out == [61]
+    assert logits_out == [67]
+
+    status, _ = dispatch_model_arch_checked_nopartial_model(
+        meta_key=DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE,
+        arch_value=b"llama",
+        row_count=4,
+        lane_count=-2,
+        out_rows_processed=rows_out,
+        out_logits_written=logits_out,
+        forward_status=SAMPLING_Q16_OK,
+    )
+    assert status == SAMPLING_Q16_ERR_BAD_PARAM
+    assert rows_out == [61]
+    assert logits_out == [67]
 
 def test_supported_architectures_publish_atomic_diagnostics() -> None:
     vectors = [
@@ -293,6 +327,7 @@ def test_deterministic_dispatch_vectors() -> None:
 if __name__ == "__main__":
     test_source_contains_explicit_dispatch_cases_and_qwen_alias()
     test_arch_metadata_key_requires_exact_length()
+    test_negative_geometry_rejected_without_publish()
     test_supported_architectures_publish_atomic_diagnostics()
     test_unsupported_tag_and_bad_key_leave_outputs_unchanged()
     test_forward_failure_and_multiply_overflow_are_no_partial()

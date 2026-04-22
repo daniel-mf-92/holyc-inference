@@ -3729,6 +3729,26 @@ I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnl
         staged_commit_final_token_count != recomputed_final_token_count)
         return SAMPLING_Q16_ERR_BAD_PARAM;
 
+    if (snapshot_token_history_count > snapshot_token_history_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_top_k <= 0 || snapshot_top_k > snapshot_vocab_size)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (recomputed_required_logits > snapshot_step_logits_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_top_k > snapshot_workspace_topk_logits_capacity ||
+        snapshot_top_k > snapshot_workspace_topk_index_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (recomputed_required_tokens > snapshot_generated_capacity ||
+        recomputed_required_tokens > snapshot_random_q16_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (recomputed_final_token_count > snapshot_token_history_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
     *out_required_logits = staged_commit_required_logits;
     *out_required_tokens = staged_commit_required_tokens;
     *out_final_token_count = staged_commit_final_token_count;

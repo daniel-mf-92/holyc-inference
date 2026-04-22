@@ -233,6 +233,9 @@ I32 InferenceForwardDispatchModelArchQ16CheckedNoPartial(
     if (out_rows_processed == out_logits_written)
         return SAMPLING_Q16_ERR_BAD_PARAM;
 
+    if (row_count < 0 || lane_count < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
     snapshot_meta_key_bytes = meta_key_bytes;
     snapshot_meta_key_len = meta_key_len;
     snapshot_arch_value_bytes = arch_value_bytes;
