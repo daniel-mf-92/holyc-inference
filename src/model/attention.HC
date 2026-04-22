@@ -11695,6 +11695,16 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
     if (!staged_scores_q32 || !out_scores_q32)
         return ATTN_Q16_ERR_NULL_PTR;
 
+    if (out_required_stage_cells == staged_scores_q32 ||
+        out_required_stage_cells == out_scores_q32 ||
+        out_required_stage_bytes == staged_scores_q32 ||
+        out_required_stage_bytes == out_scores_q32 ||
+        out_required_out_cells == staged_scores_q32 ||
+        out_required_out_cells == out_scores_q32 ||
+        out_last_out_index == staged_scores_q32 ||
+        out_last_out_index == out_scores_q32)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
     if (query_row_count < 0 || token_count < 0)
         return ATTN_Q16_ERR_BAD_PARAM;
     if (staged_scores_capacity < 0 || out_scores_capacity < 0)

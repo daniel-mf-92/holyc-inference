@@ -1637,3 +1637,195 @@ I32 TransformerBlockQ16ApplyCheckedNoPartialCommitOnly(
         row_count,
         lane_count);
 }
+
+// IQ-1050 diagnostics-only preflight companion.
+//
+// Purpose:
+// - derive commit-only workspace contracts for the integer-only block pipeline;
+// - enforce immutable snapshot + tuple parity before publishing outputs;
+// - perform zero writes to model tensors.
+//
+// Published tuple (cells/bytes):
+// - dense_cells            = row_count * lane_count
+// - required_q16_cells     = dense_cells * 3 (norm, attn_rows, ffn_stage)
+// - required_q32_cells     = dense_cells * 3 (attn_in, attn_out, attn_stage)
+// - required_q16_bytes     = required_q16_cells * sizeof(I64)
+// - required_q32_bytes     = required_q32_cells * sizeof(I64)
+I32 TransformerBlockQ16ApplyCheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyPreflightOnly_1050(
+    I64 row_count,
+    I64 lane_count,
+    I64 input_capacity,
+    I64 rms_gamma_capacity,
+    I64 ffn_gate_capacity,
+    I64 ffn_up_capacity,
+    I64 workspace_q16_capacity,
+    I64 workspace_q32_capacity,
+    I64 out_capacity,
+    I64 *out_dense_cells,
+    I64 *out_required_q16_cells,
+    I64 *out_required_q32_cells,
+    I64 *out_required_q16_bytes,
+    I64 *out_required_q32_bytes)
+{
+    I64 staged_dense_cells;
+    I64 staged_required_q16_cells;
+    I64 staged_required_q32_cells;
+    I64 staged_required_q16_bytes;
+    I64 staged_required_q32_bytes;
+
+    I64 recomputed_dense_cells;
+    I64 recomputed_required_q16_cells;
+    I64 recomputed_required_q32_cells;
+    I64 recomputed_required_q16_bytes;
+    I64 recomputed_required_q32_bytes;
+
+    I64 snapshot_row_count;
+    I64 snapshot_lane_count;
+    I64 snapshot_input_capacity;
+    I64 snapshot_rms_gamma_capacity;
+    I64 snapshot_ffn_gate_capacity;
+    I64 snapshot_ffn_up_capacity;
+    I64 snapshot_workspace_q16_capacity;
+    I64 snapshot_workspace_q32_capacity;
+    I64 snapshot_out_capacity;
+    I32 status;
+
+    if (!out_dense_cells || !out_required_q16_cells || !out_required_q32_cells ||
+        !out_required_q16_bytes || !out_required_q32_bytes)
+        return BLOCK_Q16_ERR_NULL_PTR;
+
+    if (out_dense_cells == out_required_q16_cells ||
+        out_dense_cells == out_required_q32_cells ||
+        out_dense_cells == out_required_q16_bytes ||
+        out_dense_cells == out_required_q32_bytes ||
+        out_required_q16_cells == out_required_q32_cells ||
+        out_required_q16_cells == out_required_q16_bytes ||
+        out_required_q16_cells == out_required_q32_bytes ||
+        out_required_q32_cells == out_required_q16_bytes ||
+        out_required_q32_cells == out_required_q32_bytes ||
+        out_required_q16_bytes == out_required_q32_bytes)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    if (row_count < 0 || lane_count < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (input_capacity < 0 || rms_gamma_capacity < 0 ||
+        ffn_gate_capacity < 0 || ffn_up_capacity < 0 ||
+        workspace_q16_capacity < 0 || workspace_q32_capacity < 0 ||
+        out_capacity < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    snapshot_row_count = row_count;
+    snapshot_lane_count = lane_count;
+    snapshot_input_capacity = input_capacity;
+    snapshot_rms_gamma_capacity = rms_gamma_capacity;
+    snapshot_ffn_gate_capacity = ffn_gate_capacity;
+    snapshot_ffn_up_capacity = ffn_up_capacity;
+    snapshot_workspace_q16_capacity = workspace_q16_capacity;
+    snapshot_workspace_q32_capacity = workspace_q32_capacity;
+    snapshot_out_capacity = out_capacity;
+
+    // Canonical staging pass.
+    status = BlockTryMulI64Checked(row_count,
+                                   lane_count,
+                                   &staged_dense_cells);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(staged_dense_cells,
+                                   3,
+                                   &staged_required_q16_cells);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(staged_dense_cells,
+                                   3,
+                                   &staged_required_q32_cells);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(staged_required_q16_cells,
+                                   sizeof(I64),
+                                   &staged_required_q16_bytes);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(staged_required_q32_cells,
+                                   sizeof(I64),
+                                   &staged_required_q32_bytes);
+    if (status)
+        return status;
+
+    if (staged_dense_cells)
+    {
+        if (staged_dense_cells > input_capacity)
+            return BLOCK_Q16_ERR_BAD_PARAM;
+        if (staged_dense_cells > ffn_gate_capacity)
+            return BLOCK_Q16_ERR_BAD_PARAM;
+        if (staged_dense_cells > ffn_up_capacity)
+            return BLOCK_Q16_ERR_BAD_PARAM;
+        if (staged_dense_cells > out_capacity)
+            return BLOCK_Q16_ERR_BAD_PARAM;
+        if (lane_count > rms_gamma_capacity)
+            return BLOCK_Q16_ERR_BAD_PARAM;
+        if (staged_required_q16_cells > workspace_q16_capacity)
+            return BLOCK_Q16_ERR_BAD_PARAM;
+        if (staged_required_q32_cells > workspace_q32_capacity)
+            return BLOCK_Q16_ERR_BAD_PARAM;
+    }
+
+    // Recompute from immutable snapshots and demand strict tuple parity.
+    status = BlockTryMulI64Checked(snapshot_row_count,
+                                   snapshot_lane_count,
+                                   &recomputed_dense_cells);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(recomputed_dense_cells,
+                                   3,
+                                   &recomputed_required_q16_cells);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(recomputed_dense_cells,
+                                   3,
+                                   &recomputed_required_q32_cells);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(recomputed_required_q16_cells,
+                                   sizeof(I64),
+                                   &recomputed_required_q16_bytes);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(recomputed_required_q32_cells,
+                                   sizeof(I64),
+                                   &recomputed_required_q32_bytes);
+    if (status)
+        return status;
+
+    if (snapshot_row_count != row_count || snapshot_lane_count != lane_count)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (snapshot_input_capacity != input_capacity ||
+        snapshot_rms_gamma_capacity != rms_gamma_capacity ||
+        snapshot_ffn_gate_capacity != ffn_gate_capacity ||
+        snapshot_ffn_up_capacity != ffn_up_capacity ||
+        snapshot_workspace_q16_capacity != workspace_q16_capacity ||
+        snapshot_workspace_q32_capacity != workspace_q32_capacity ||
+        snapshot_out_capacity != out_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    if (staged_dense_cells != recomputed_dense_cells ||
+        staged_required_q16_cells != recomputed_required_q16_cells ||
+        staged_required_q32_cells != recomputed_required_q32_cells ||
+        staged_required_q16_bytes != recomputed_required_q16_bytes ||
+        staged_required_q32_bytes != recomputed_required_q32_bytes)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    *out_dense_cells = staged_dense_cells;
+    *out_required_q16_cells = staged_required_q16_cells;
+    *out_required_q32_cells = staged_required_q32_cells;
+    *out_required_q16_bytes = staged_required_q16_bytes;
+    *out_required_q32_bytes = staged_required_q32_bytes;
+    return BLOCK_Q16_OK;
+}
