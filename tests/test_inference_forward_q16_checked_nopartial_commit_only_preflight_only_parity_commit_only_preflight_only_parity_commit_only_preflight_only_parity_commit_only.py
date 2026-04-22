@@ -18,7 +18,7 @@ from test_inference_forward_q16_checked_nopartial_commit_only_preflight_only_par
     parity_commit_only_preflight_only_parity_reference,
 )
 from test_inference_forward_q16_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity import (
-    parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference,
+    parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference,
 )
 
 
@@ -39,7 +39,7 @@ def parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_c
     out_required_workspace_cells: list[int] | None,
     out_required_block_tensor_cells: list[int] | None,
     out_required_logits_cells: list[int] | None,
-    staged_fn=parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference,
+    staged_fn=parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference,
     canonical_fn=parity_commit_only_preflight_only_parity_reference,
 ) -> int:
     if (
@@ -178,7 +178,8 @@ def test_source_contains_iq_1065_symbol() -> None:
         in body
     )
     assert (
-        "status = InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity("
+        "status =\n"
+        "        InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly("
         in body
     )
     assert "if (staged_required_logits_cells != canonical_required_logits_cells)" in body
