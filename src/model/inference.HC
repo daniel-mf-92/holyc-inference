@@ -314,6 +314,137 @@ I32 InferenceForwardDispatchRegistryInitQ16CheckedNoPartial(
     return SAMPLING_Q16_OK;
 }
 
+// IQ-1115 diagnostics-only preflight companion for registry initialization.
+//
+// Contract:
+// - Stage full registry outputs privately through canonical initializer.
+// - Recompute canonical diagnostics tuple `{registry_count, default_arch_id}`
+//   from immutable `registry_slot_capacity` snapshot and fixed architecture set.
+// - Revalidate immutable output-pointer identity before publish.
+// - Publish staged registry table atomically only on exact parity success.
+I32 InferenceForwardDispatchRegistryInitQ16CheckedNoPartialCommitOnlyPreflightOnly(
+    U8 **out_registry_tags,
+    I64 *out_registry_tag_lens,
+    I64 *out_registry_arch_ids,
+    I64 registry_slot_capacity,
+    I64 *out_registry_count,
+    I64 *out_default_arch_id)
+{
+    U8 *staged_tags[DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT];
+    I64 staged_tag_lens[DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT];
+    I64 staged_arch_ids[DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT];
+    I64 staged_registry_count;
+    I64 staged_default_arch_id;
+
+    U8 *canonical_tags[DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT];
+    I64 canonical_tag_lens[DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT];
+    I64 canonical_arch_ids[DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT];
+    I64 canonical_registry_count;
+    I64 canonical_default_arch_id;
+
+    I64 snapshot_registry_slot_capacity;
+    U8 **snapshot_out_registry_tags;
+    I64 *snapshot_out_registry_tag_lens;
+    I64 *snapshot_out_registry_arch_ids;
+    I64 *snapshot_out_registry_count;
+    I64 *snapshot_out_default_arch_id;
+
+    I64 slot_index;
+    I32 status;
+
+    if (!out_registry_tags || !out_registry_tag_lens || !out_registry_arch_ids ||
+        !out_registry_count || !out_default_arch_id)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (registry_slot_capacity < DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (out_registry_count == out_default_arch_id)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_registry_slot_capacity = registry_slot_capacity;
+    snapshot_out_registry_tags = out_registry_tags;
+    snapshot_out_registry_tag_lens = out_registry_tag_lens;
+    snapshot_out_registry_arch_ids = out_registry_arch_ids;
+    snapshot_out_registry_count = out_registry_count;
+    snapshot_out_default_arch_id = out_default_arch_id;
+
+    status = InferenceForwardDispatchRegistryInitQ16CheckedNoPartial(
+        staged_tags,
+        staged_tag_lens,
+        staged_arch_ids,
+        registry_slot_capacity,
+        &staged_registry_count,
+        &staged_default_arch_id);
+    if (status)
+        return status;
+
+    canonical_tags[0] = (U8 *)"llama";
+    canonical_tags[1] = (U8 *)"mistral";
+    canonical_tags[2] = (U8 *)"qwen2";
+    canonical_tags[3] = (U8 *)"phi3";
+
+    canonical_tag_lens[0] = 5;
+    canonical_tag_lens[1] = 7;
+    canonical_tag_lens[2] = 5;
+    canonical_tag_lens[3] = 4;
+
+    canonical_arch_ids[0] = DISPATCH_ARCH_Q16_ID_LLAMA;
+    canonical_arch_ids[1] = DISPATCH_ARCH_Q16_ID_MISTRAL;
+    canonical_arch_ids[2] = DISPATCH_ARCH_Q16_ID_QWEN2;
+    canonical_arch_ids[3] = DISPATCH_ARCH_Q16_ID_PHI3;
+
+    canonical_registry_count = DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT;
+    canonical_default_arch_id = DISPATCH_ARCH_Q16_ID_LLAMA;
+
+    if (snapshot_registry_slot_capacity != registry_slot_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (snapshot_registry_slot_capacity < canonical_registry_count)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_out_registry_tags != out_registry_tags ||
+        snapshot_out_registry_tag_lens != out_registry_tag_lens ||
+        snapshot_out_registry_arch_ids != out_registry_arch_ids ||
+        snapshot_out_registry_count != out_registry_count ||
+        snapshot_out_default_arch_id != out_default_arch_id)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (staged_registry_count != canonical_registry_count ||
+        staged_default_arch_id != canonical_default_arch_id)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    for (slot_index = 0;
+         slot_index < DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT;
+         slot_index++)
+    {
+        if (!staged_tags[slot_index] || staged_tag_lens[slot_index] <= 0)
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+
+        if (staged_tag_lens[slot_index] != canonical_tag_lens[slot_index] ||
+            staged_arch_ids[slot_index] != canonical_arch_ids[slot_index])
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+
+        if (!InferenceDispatchByteSpanEquals(staged_tags[slot_index],
+                                             staged_tag_lens[slot_index],
+                                             canonical_tags[slot_index],
+                                             canonical_tag_lens[slot_index]))
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+
+    for (slot_index = 0;
+         slot_index < DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT;
+         slot_index++)
+    {
+        out_registry_tags[slot_index] = staged_tags[slot_index];
+        out_registry_tag_lens[slot_index] = staged_tag_lens[slot_index];
+        out_registry_arch_ids[slot_index] = staged_arch_ids[slot_index];
+    }
+
+    *out_registry_count = staged_registry_count;
+    *out_default_arch_id = staged_default_arch_id;
+    return SAMPLING_Q16_OK;
+}
+
 // IQ-1094 explicit architecture dispatch for HolyC integer-only forward path.
 //
 // Dispatch contract:
