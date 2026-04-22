@@ -29,24 +29,27 @@ from test_tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_pref
 
 
 def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only(
-    data,
-    byte_len,
-    io_cursor,
-    prompt_nbytes,
-    rank_left_tokens,
-    rank_right_tokens,
-    rank_values,
-    rank_merged_tokens,
-    rank_table_count,
-    rank_table_capacity,
-    vocab_piece_lens,
-    vocab_piece_count,
-    vocab_piece_capacity,
-    out_token_capacity,
-    out_required_token_capacity,
-    out_required_token_bytes,
-    out_next_cursor,
-):
+    data: list[int] | None,
+    byte_len: int,
+    io_cursor: list[int] | None,
+    prompt_nbytes: int,
+    rank_left_tokens: list[int] | None,
+    rank_right_tokens: list[int] | None,
+    rank_values: list[int] | None,
+    rank_merged_tokens: list[int] | None,
+    rank_table_count: int,
+    rank_table_capacity: int,
+    vocab_piece_lens: list[int] | None,
+    vocab_piece_count: int,
+    vocab_piece_capacity: int,
+    out_token_capacity: int,
+    out_required_token_capacity: list[int] | None,
+    out_required_token_bytes: list[int] | None,
+    out_next_cursor: list[int] | None,
+    staged_fn=tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only,
+    parity_fn=tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity,
+    preflight_fn=tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only,
+) -> int:
     if (
         data is None
         or io_cursor is None
@@ -88,7 +91,7 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
     staged_required = [0]
     staged_required_bytes = [0]
     staged_next_cursor = [0]
-    err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only(
+    err = staged_fn(
         data,
         byte_len,
         io_cursor,
@@ -113,7 +116,7 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
     parity_required = [0]
     parity_required_bytes = [0]
     parity_next_cursor = [0]
-    err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity(
+    err = parity_fn(
         data,
         byte_len,
         io_cursor,
@@ -137,7 +140,7 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
 
     preflight_required = [0]
     preflight_max_piece = [0]
-    err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only(
+    err = preflight_fn(
         data,
         byte_len,
         io_cursor,
@@ -202,7 +205,7 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
     return TOKENIZER_BPE_OK
 
 
-def _build_rank_tables():
+def _build_rank_tables() -> tuple[list[int], list[int], list[int], list[int]]:
     entries = sorted(
         [
             (108, 108, 1, 300),
@@ -216,16 +219,20 @@ def _build_rank_tables():
         ],
         key=lambda item: (item[0], item[1]),
     )
-    return [e[0] for e in entries], [e[1] for e in entries], [e[2] for e in entries], [e[3] for e in entries]
+    left = [item[0] for item in entries]
+    right = [item[1] for item in entries]
+    ranks = [item[2] for item in entries]
+    merged = [item[3] for item in entries]
+    return left, right, ranks, merged
 
 
-def test_source_contains_signature_and_chain() -> None:
+def test_source_contains_signature_and_single_definition() -> None:
     source = Path("src/tokenizer/bpe.HC").read_text(encoding="utf-8")
     sig = (
         "I32 TokenizerBPEEncodePromptCheckedNoAllocFromLens"
         "CommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly("
     )
-    assert sig in source
+    assert source.count(sig) == 1
     body = source.split(sig, 1)[1].split(
         "I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesCommitOnly(",
         1,
@@ -233,12 +240,14 @@ def test_source_contains_signature_and_chain() -> None:
     assert "TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityCommitOnly(" in body
     assert "TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParity(" in body
     assert "TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnly(" in body
+    assert "snapshot_out_token_capacity != out_token_capacity" in body
 
 
-def test_known_vector() -> None:
+def test_known_vector_success() -> None:
     left, right, ranks, merged = _build_rank_tables()
     payload = list("hello".encode("utf-8"))
     vocab_lens = [1, 2, 4]
+
     req = [0xAAAA]
     req_bytes = [0xBBBB]
     next_cursor = [0xCCCC]
@@ -271,14 +280,23 @@ def test_known_vector() -> None:
     assert cursor == [0]
 
 
-def test_error_no_write() -> None:
+def test_no_partial_publish_on_staged_mismatch() -> None:
     left, right, ranks, merged = _build_rank_tables()
     payload = list("hello".encode("utf-8"))
     vocab_lens = [1, 2, 4]
 
-    req = [0x1111]
-    req_bytes = [0x2222]
-    next_cursor = [0x3333]
+    def _bad_staged(*args):
+        out_required = args[-3]
+        out_required_bytes = args[-2]
+        out_next_cursor = args[-1]
+        out_required[0] = len(payload)
+        out_required_bytes[0] = len(payload) * 4
+        out_next_cursor[0] = len(payload) - 1
+        return TOKENIZER_BPE_OK
+
+    req = [111]
+    req_bytes = [222]
+    next_cursor = [333]
     cursor = [0]
 
     err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only(
@@ -295,56 +313,115 @@ def test_error_no_write() -> None:
         vocab_lens,
         len(vocab_lens),
         len(vocab_lens),
-        len(payload) - 1,
+        len(payload),
         req,
         req_bytes,
         next_cursor,
+        staged_fn=_bad_staged,
     )
 
     assert err == TOKENIZER_BPE_ERR_BAD_PARAM
-    assert req == [0x1111]
-    assert req_bytes == [0x2222]
-    assert next_cursor == [0x3333]
+    assert req == [111]
+    assert req_bytes == [222]
+    assert next_cursor == [333]
     assert cursor == [0]
 
 
-def test_fuzz_parity() -> None:
-    random.seed(20260422_1066)
+def test_no_partial_publish_on_parity_mismatch() -> None:
     left, right, ranks, merged = _build_rank_tables()
+    payload = list("hello".encode("utf-8"))
+    vocab_lens = [1, 2, 4]
 
-    for _ in range(128):
-        nbytes = random.randint(0, 48)
-        payload = [random.randint(0, 255) for _ in range(nbytes)]
-        cursor = random.randint(0, nbytes) if random.random() > 0.2 else random.randint(nbytes + 1, nbytes + 3)
-        prompt_nbytes = random.randint(0, max(0, nbytes - min(cursor, nbytes)))
+    def _bad_parity(*args):
+        out_required = args[-3]
+        out_required_bytes = args[-2]
+        out_next_cursor = args[-1]
+        out_required[0] = len(payload)
+        out_required_bytes[0] = len(payload) * 4
+        out_next_cursor[0] = len(payload) + 1
+        return TOKENIZER_BPE_OK
 
-        vocab_count = random.randint(0, 10)
-        vocab_capacity = vocab_count + random.randint(0, 2)
-        if random.random() < 0.1:
-            vocab_capacity = max(0, vocab_count - 1)
-        vocab_lens = [random.randint(0, 10) for _ in range(vocab_count)]
+    req = [444]
+    req_bytes = [555]
+    next_cursor = [666]
+    cursor = [0]
 
-        out_cap = random.randint(0, nbytes + 3)
+    err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only(
+        payload,
+        len(payload),
+        cursor,
+        len(payload),
+        left,
+        right,
+        ranks,
+        merged,
+        len(ranks),
+        len(ranks),
+        vocab_lens,
+        len(vocab_lens),
+        len(vocab_lens),
+        len(payload),
+        req,
+        req_bytes,
+        next_cursor,
+        parity_fn=_bad_parity,
+    )
 
-        req_a, req_b = [0x1234], [0x1234]
-        bytes_a, bytes_b = [0x5678], [0x5678]
-        next_a, next_b = [0x9ABC], [0x9ABC]
-        cur_a, cur_b = [cursor], [cursor]
+    assert err == TOKENIZER_BPE_ERR_BAD_PARAM
+    assert req == [444]
+    assert req_bytes == [555]
+    assert next_cursor == [666]
+    assert cursor == [0]
 
-        err_a = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only(
-            payload, nbytes, cur_a, prompt_nbytes, left, right, ranks, merged,
-            len(ranks), len(ranks), vocab_lens, vocab_count, vocab_capacity,
-            out_cap, req_a, bytes_a, next_a,
+
+def test_randomized_utf8_cursor_capacity_vectors() -> None:
+    rng = random.Random(20260422_1066)
+    left, right, ranks, merged = _build_rank_tables()
+    vocab_lens = [1, 2, 4, 8, 16]
+
+    for _ in range(1000):
+        payload_len = rng.randint(0, 96)
+        payload = [rng.randint(0, 255) for _ in range(payload_len)]
+        cursor_val = rng.randint(0, payload_len)
+        prompt_nbytes = rng.randint(0, payload_len - cursor_val)
+        out_cap = rng.randint(max(prompt_nbytes, 1), max(prompt_nbytes, 1) + 32)
+
+        req = [0xA1A1]
+        req_bytes = [0xB2B2]
+        next_cursor = [0xC3C3]
+        io_cursor = [cursor_val]
+
+        err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only(
+            payload,
+            payload_len,
+            io_cursor,
+            prompt_nbytes,
+            left,
+            right,
+            ranks,
+            merged,
+            len(ranks),
+            len(ranks),
+            vocab_lens,
+            len(vocab_lens),
+            len(vocab_lens),
+            out_cap,
+            req,
+            req_bytes,
+            next_cursor,
         )
 
-        err_b = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only(
-            payload, nbytes, cur_b, prompt_nbytes, left, right, ranks, merged,
-            len(ranks), len(ranks), vocab_lens, vocab_count, vocab_capacity,
-            out_cap, req_b, bytes_b, next_b,
-        )
+        assert err == TOKENIZER_BPE_OK
+        assert req[0] <= out_cap
+        assert req_bytes[0] == req[0] * 4
+        assert next_cursor[0] == cursor_val + prompt_nbytes
+        assert io_cursor == [cursor_val]
 
-        assert err_a == err_b
-        assert req_a == req_b
-        assert bytes_a == bytes_b
-        assert next_a == next_b
-        assert cur_a == cur_b
+
+if __name__ == "__main__":
+    test_source_contains_signature_and_single_definition()
+    test_known_vector_success()
+    test_no_partial_publish_on_staged_mismatch()
+    test_no_partial_publish_on_parity_mismatch()
+    test_randomized_utf8_cursor_capacity_vectors()
+    print("ok")
