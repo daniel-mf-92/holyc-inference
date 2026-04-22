@@ -2353,6 +2353,319 @@ I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommit
         out_commit_stage_byte_capacity);
 }
 
+// Diagnostics-only parity gate over default-stride alias-safe required-bytes
+// preflight + canonical default-stride preflight.
+//
+// Publishes exactly one staged diagnostics tuple on success:
+// - required_stage_cells
+// - required_stage_bytes
+// - last_out_index (required_out_cells - 1 when live, else 0)
+//
+// No compute/commit writes happen here; this function is diagnostics-only and
+// preserves strict no-partial publication of output diagnostics.
+I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitOnlyPreflightOnlyParity(
+    I64 *gate_q16,
+    I64 gate_capacity,
+    I64 *up_q16,
+    I64 up_capacity,
+    I64 *out_q16,
+    I64 out_capacity,
+    I64 row_count,
+    I64 lane_count,
+    I64 *staging_out_q16,
+    I64 staging_out_capacity,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_last_out_index)
+{
+    I64 *snapshot_gate_q16;
+    I64 snapshot_gate_capacity;
+    I64 *snapshot_up_q16;
+    I64 snapshot_up_capacity;
+    I64 *snapshot_out_q16;
+    I64 snapshot_out_capacity;
+    I64 snapshot_row_count;
+    I64 snapshot_lane_count;
+    I64 *snapshot_staging_out_q16;
+    I64 snapshot_staging_out_capacity;
+
+    I64 staged_a_required_in_cells;
+    I64 staged_a_required_stage_cells;
+    I64 staged_a_required_stage_bytes;
+    I64 staged_a_required_out_cells;
+    I64 staged_a_commit_stage_cell_capacity;
+    I64 staged_a_commit_stage_byte_capacity;
+
+    I64 staged_b_required_stage_cells;
+    I64 staged_b_required_stage_bytes;
+    I64 staged_b_required_out_cells;
+
+    I64 canonical_stage_bytes;
+    I64 canonical_last_out_index;
+    I64 canonical_commit_stage_cell_capacity;
+    I64 canonical_commit_stage_byte_capacity;
+
+    I32 status;
+
+    if (!gate_q16 || !up_q16 || !out_q16 || !staging_out_q16 ||
+        !out_required_stage_cells || !out_required_stage_bytes ||
+        !out_last_out_index)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (gate_capacity < 0 || up_capacity < 0 || out_capacity < 0 ||
+        staging_out_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || lane_count < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    if (out_required_stage_cells == out_required_stage_bytes ||
+        out_required_stage_cells == out_last_out_index ||
+        out_required_stage_bytes == out_last_out_index)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    snapshot_gate_q16 = gate_q16;
+    snapshot_gate_capacity = gate_capacity;
+    snapshot_up_q16 = up_q16;
+    snapshot_up_capacity = up_capacity;
+    snapshot_out_q16 = out_q16;
+    snapshot_out_capacity = out_capacity;
+    snapshot_row_count = row_count;
+    snapshot_lane_count = lane_count;
+    snapshot_staging_out_q16 = staging_out_q16;
+    snapshot_staging_out_capacity = staging_out_capacity;
+
+    status = FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitCapacityAliasSafeDefaultCapacityPreflightOnly(
+        gate_q16,
+        gate_capacity,
+        up_q16,
+        up_capacity,
+        out_q16,
+        out_capacity,
+        row_count,
+        lane_count,
+        staging_out_q16,
+        staging_out_capacity,
+        &staged_a_required_in_cells,
+        &staged_a_required_stage_cells,
+        &staged_a_required_stage_bytes,
+        &staged_a_required_out_cells,
+        &staged_a_commit_stage_cell_capacity,
+        &staged_a_commit_stage_byte_capacity);
+    if (status)
+        return status;
+
+    status = FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(
+        gate_capacity,
+        up_capacity,
+        out_capacity,
+        row_count,
+        lane_count,
+        staging_out_capacity,
+        &staged_b_required_stage_cells,
+        &staged_b_required_stage_bytes,
+        &staged_b_required_out_cells);
+    if (status)
+        return status;
+
+    if (snapshot_gate_q16 != gate_q16 || snapshot_gate_capacity != gate_capacity ||
+        snapshot_up_q16 != up_q16 || snapshot_up_capacity != up_capacity ||
+        snapshot_out_q16 != out_q16 || snapshot_out_capacity != out_capacity ||
+        snapshot_row_count != row_count || snapshot_lane_count != lane_count ||
+        snapshot_staging_out_q16 != staging_out_q16 ||
+        snapshot_staging_out_capacity != staging_out_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    if (staged_a_required_stage_cells != staged_b_required_stage_cells ||
+        staged_a_required_stage_bytes != staged_b_required_stage_bytes ||
+        staged_a_required_out_cells != staged_b_required_out_cells)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    status = FFNTryMulI64Checked(staged_a_required_stage_cells,
+                                 sizeof(I64),
+                                 &canonical_stage_bytes);
+    if (status)
+        return status;
+    if (canonical_stage_bytes != staged_a_required_stage_bytes)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    if (!staged_a_required_out_cells)
+        canonical_last_out_index = 0;
+    else
+    {
+        status = FFNTryAddI64Checked(staged_a_required_out_cells,
+                                     -1,
+                                     &canonical_last_out_index);
+        if (status)
+            return status;
+    }
+
+    if (!row_count || !lane_count)
+        canonical_commit_stage_cell_capacity = 0;
+    else
+    {
+        status = FFNTryMulI64Checked(row_count - 1,
+                                     lane_count,
+                                     &canonical_commit_stage_cell_capacity);
+        if (status)
+            return status;
+        status = FFNTryAddI64Checked(canonical_commit_stage_cell_capacity,
+                                     lane_count,
+                                     &canonical_commit_stage_cell_capacity);
+        if (status)
+            return status;
+    }
+
+    status = FFNTryMulI64Checked(staging_out_capacity,
+                                 sizeof(I64),
+                                 &canonical_commit_stage_byte_capacity);
+    if (status)
+        return status;
+
+    if (staged_a_commit_stage_cell_capacity != canonical_commit_stage_cell_capacity ||
+        staged_a_commit_stage_byte_capacity != canonical_commit_stage_byte_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    if (staged_a_required_in_cells != staged_a_required_out_cells)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    *out_required_stage_cells = staged_a_required_stage_cells;
+    *out_required_stage_bytes = staged_a_required_stage_bytes;
+    *out_last_out_index = canonical_last_out_index;
+    return FFN_Q16_OK;
+}
+
+// Commit-only diagnostics wrapper over
+// FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitOnlyPreflightOnlyParity.
+//
+// Stages canonical tuple diagnostics and atomically publishes
+// `{required_stage_cells,required_stage_bytes,last_out_index}` only after
+// immutable pointer/shape snapshots and canonical tuple math both revalidate.
+I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitOnlyPreflightOnlyParityCommitOnly(
+    I64 *gate_q16,
+    I64 gate_capacity,
+    I64 *up_q16,
+    I64 up_capacity,
+    I64 *out_q16,
+    I64 out_capacity,
+    I64 row_count,
+    I64 lane_count,
+    I64 *staging_out_q16,
+    I64 staging_out_capacity,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_last_out_index)
+{
+    I64 *snapshot_gate_q16;
+    I64 snapshot_gate_capacity;
+    I64 *snapshot_up_q16;
+    I64 snapshot_up_capacity;
+    I64 *snapshot_out_q16;
+    I64 snapshot_out_capacity;
+    I64 snapshot_row_count;
+    I64 snapshot_lane_count;
+    I64 *snapshot_staging_out_q16;
+    I64 snapshot_staging_out_capacity;
+
+    I64 staged_required_stage_cells;
+    I64 staged_required_stage_bytes;
+    I64 staged_last_out_index;
+
+    I64 canonical_required_stage_bytes;
+    I64 canonical_required_out_cells;
+    I64 canonical_last_out_index;
+    I32 status;
+
+    if (!gate_q16 || !up_q16 || !out_q16 || !staging_out_q16 ||
+        !out_required_stage_cells || !out_required_stage_bytes ||
+        !out_last_out_index)
+        return FFN_Q16_ERR_NULL_PTR;
+
+    if (gate_capacity < 0 || up_capacity < 0 || out_capacity < 0 ||
+        staging_out_capacity < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || lane_count < 0)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    if (out_required_stage_cells == out_required_stage_bytes ||
+        out_required_stage_cells == out_last_out_index ||
+        out_required_stage_bytes == out_last_out_index)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    snapshot_gate_q16 = gate_q16;
+    snapshot_gate_capacity = gate_capacity;
+    snapshot_up_q16 = up_q16;
+    snapshot_up_capacity = up_capacity;
+    snapshot_out_q16 = out_q16;
+    snapshot_out_capacity = out_capacity;
+    snapshot_row_count = row_count;
+    snapshot_lane_count = lane_count;
+    snapshot_staging_out_q16 = staging_out_q16;
+    snapshot_staging_out_capacity = staging_out_capacity;
+
+    status = FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytesCommitOnlyPreflightOnlyParity(
+        gate_q16,
+        gate_capacity,
+        up_q16,
+        up_capacity,
+        out_q16,
+        out_capacity,
+        row_count,
+        lane_count,
+        staging_out_q16,
+        staging_out_capacity,
+        &staged_required_stage_cells,
+        &staged_required_stage_bytes,
+        &staged_last_out_index);
+    if (status)
+        return status;
+
+    if (snapshot_gate_q16 != gate_q16 || snapshot_gate_capacity != gate_capacity ||
+        snapshot_up_q16 != up_q16 || snapshot_up_capacity != up_capacity ||
+        snapshot_out_q16 != out_q16 || snapshot_out_capacity != out_capacity ||
+        snapshot_row_count != row_count || snapshot_lane_count != lane_count ||
+        snapshot_staging_out_q16 != staging_out_q16 ||
+        snapshot_staging_out_capacity != staging_out_capacity)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    status = FFNTryMulI64Checked(staged_required_stage_cells,
+                                 sizeof(I64),
+                                 &canonical_required_stage_bytes);
+    if (status)
+        return status;
+    if (canonical_required_stage_bytes != staged_required_stage_bytes)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    if (!row_count || !lane_count)
+        canonical_required_out_cells = 0;
+    else
+    {
+        status = FFNTryMulI64Checked(row_count,
+                                     lane_count,
+                                     &canonical_required_out_cells);
+        if (status)
+            return status;
+    }
+
+    if (!canonical_required_out_cells)
+        canonical_last_out_index = 0;
+    else
+    {
+        status = FFNTryAddI64Checked(canonical_required_out_cells,
+                                     -1,
+                                     &canonical_last_out_index);
+        if (status)
+            return status;
+    }
+
+    if (staged_last_out_index != canonical_last_out_index)
+        return FFN_Q16_ERR_BAD_PARAM;
+
+    *out_required_stage_cells = staged_required_stage_cells;
+    *out_required_stage_bytes = staged_required_stage_bytes;
+    *out_last_out_index = staged_last_out_index;
+    return FFN_Q16_OK;
+}
+
 I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialStridedNoAllocRequiredBytesCommitCapacityAliasSafeDefaultCapacityPreflightOnly(
     I64 *gate_q16,
     I64 gate_capacity,

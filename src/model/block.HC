@@ -11,6 +11,85 @@
 #define BLOCK_I64_MAX_VALUE  0x7FFFFFFFFFFFFFFF
 #define BLOCK_I64_MIN_VALUE -0x8000000000000000
 
+I32 FPQ16RMSNormChecked(I64 *input_q16,
+                        I64 *gamma_q16,
+                        I64 *output_q16,
+                        I64 count,
+                        I64 eps_q16);
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnlyRequiredBytes(
+    I64 query_row_count,
+    I64 token_count,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_required_out_cells,
+    I64 *out_last_out_index);
+
+I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
+    I64 row_count,
+    I64 lane_count,
+    I64 stage_capacity,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_required_out_cells);
+
+// External checked math/model kernels used by the block apply pipeline.
+I32 FPQ16RMSNormChecked(I64 *input_q16,
+                        I64 *gamma_q16,
+                        I64 *output_q16,
+                        I64 count,
+                        I64 eps_q16);
+
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 staged_scores_capacity,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_required_out_cells);
+
+I32 AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAlloc(
+    I64 *in_scores_q32,
+    I64 in_scores_capacity,
+    I64 row_count,
+    I64 token_count,
+    I64 score_scale_q16,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity);
+
+I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(
+    I64 gate_capacity,
+    I64 up_capacity,
+    I64 out_capacity,
+    I64 row_count,
+    I64 lane_count,
+    I64 stage_capacity,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_required_out_cells);
+
+I32 FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAlloc(
+    I64 *gate_q16,
+    I64 gate_capacity,
+    I64 *up_q16,
+    I64 up_capacity,
+    I64 *out_q16,
+    I64 out_capacity,
+    I64 row_count,
+    I64 lane_count,
+    I64 *staging_out_q16,
+    I64 staging_out_capacity);
+
 I32 BlockTryAddI64Checked(I64 lhs, I64 rhs, I64 *out_sum)
 {
     if (!out_sum)
@@ -639,4 +718,922 @@ I32 TransformerBlockQ16ApplyCheckedNoPartialPreflightOnly(
     *out_required_stage_bytes = required_stage_bytes;
 
     return BLOCK_Q16_OK;
+}
+
+// IQ-1044 commit-only checked transformer-block apply.
+//
+// Pipeline (integer-only):
+// 1) RMSNorm per row into caller-provided norm workspace.
+// 2) Scaled QK attention scores into caller-provided attention workspace.
+// 3) SwiGLU FFN into caller-provided FFN workspace.
+// 4) Deterministic attention projection (Q32->Q16) into stage workspace.
+// 5) Residual add: out = ffn + projected_attention.
+//
+// All writes are staged behind full preflight checks on capacities and index
+// math so failures leave caller output unchanged.
+I32 TransformerBlockQ16ApplyCheckedNoPartialCommitOnly(
+    I64 *input_q16,
+    I64 input_capacity,
+    I64 *norm_gamma_q16,
+    I64 norm_gamma_capacity,
+    I64 *ffn_up_q16,
+    I64 ffn_up_capacity,
+    I64 row_count,
+    I64 lane_count,
+    I64 eps_q16,
+    I64 *workspace_norm_q16,
+    I64 workspace_norm_capacity,
+    I64 *workspace_attn_scores_q32,
+    I64 workspace_attn_scores_capacity,
+    I64 *workspace_ffn_q16,
+    I64 workspace_ffn_capacity,
+    I64 *workspace_stage_q16,
+    I64 workspace_stage_capacity,
+    I64 *out_q16,
+    I64 out_capacity)
+{
+    I64 required_qkv_cells;
+    I64 required_attn_scores;
+    I64 required_ffn_cells;
+    I64 required_out_cells;
+    I64 required_stage_bytes;
+
+    I64 dense_cells;
+    I64 dense_bytes;
+
+    I64 row_index;
+    I64 lane_index;
+    I64 row_base;
+    I64 attn_row_base;
+    I64 lane_token_index;
+    I64 attn_index;
+    I64 dense_index;
+
+    I64 score_scale_q16;
+    I64 projected_q16;
+    I32 status;
+
+    if (!input_q16 || !norm_gamma_q16 || !ffn_up_q16)
+        return BLOCK_Q16_ERR_NULL_PTR;
+    if (!workspace_norm_q16 || !workspace_attn_scores_q32 ||
+        !workspace_ffn_q16 || !workspace_stage_q16 || !out_q16)
+        return BLOCK_Q16_ERR_NULL_PTR;
+
+    if (input_capacity < 0 || norm_gamma_capacity < 0 || ffn_up_capacity < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (workspace_norm_capacity < 0 || workspace_attn_scores_capacity < 0 ||
+        workspace_ffn_capacity < 0 || workspace_stage_capacity < 0 ||
+        out_capacity < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || lane_count < 0 || eps_q16 < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    if (!row_count || !lane_count)
+        return BLOCK_Q16_OK;
+
+    if (norm_gamma_capacity < lane_count)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    status = TransformerBlockQ16ApplyCheckedNoPartialPreflightOnly(
+        row_count,
+        lane_count,
+        &required_qkv_cells,
+        &required_attn_scores,
+        &required_ffn_cells,
+        &required_out_cells,
+        &required_stage_bytes);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(required_out_cells,
+                                   sizeof(I64),
+                                   &dense_bytes);
+    if (status)
+        return status;
+
+    if (required_qkv_cells > input_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (required_qkv_cells > ffn_up_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (required_out_cells > workspace_norm_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (required_attn_scores > workspace_attn_scores_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (required_ffn_cells > workspace_ffn_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (required_out_cells > workspace_stage_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (required_out_cells > out_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    if (required_stage_bytes <= 0 || dense_bytes <= 0)
+        return BLOCK_Q16_ERR_OVERFLOW;
+
+    if (workspace_norm_q16 == out_q16)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (workspace_ffn_q16 == out_q16)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (workspace_stage_q16 == out_q16)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    if (GGUFTensorByteSpansOverlap((U8 *)workspace_norm_q16,
+                                   dense_bytes,
+                                   (U8 *)workspace_ffn_q16,
+                                   dense_bytes))
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (GGUFTensorByteSpansOverlap((U8 *)workspace_norm_q16,
+                                   dense_bytes,
+                                   (U8 *)workspace_stage_q16,
+                                   dense_bytes))
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (GGUFTensorByteSpansOverlap((U8 *)workspace_ffn_q16,
+                                   dense_bytes,
+                                   (U8 *)workspace_stage_q16,
+                                   dense_bytes))
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    // 1) RMSNorm row-by-row into workspace_norm_q16.
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        status = BlockTryMulI64Checked(row_index,
+                                       lane_count,
+                                       &row_base);
+        if (status)
+            return status;
+
+        status = FPQ16RMSNormChecked(input_q16 + row_base,
+                                     norm_gamma_q16,
+                                     workspace_norm_q16 + row_base,
+                                     lane_count,
+                                     eps_q16);
+        if (status)
+            return status;
+    }
+
+    // 2) Attention QK score slab (self-attention style: Q = K = normalized rows).
+    score_scale_q16 = 1 << 16;
+    status = AttentionQ16ComputeScaledQKRowsCheckedNoPartial(
+        workspace_norm_q16,
+        workspace_norm_capacity,
+        row_count,
+        lane_count,
+        workspace_norm_q16,
+        workspace_norm_capacity,
+        row_count,
+        lane_count,
+        lane_count,
+        score_scale_q16,
+        workspace_attn_scores_q32,
+        workspace_attn_scores_capacity,
+        row_count);
+    if (status)
+        return status;
+
+    // 3) FFN SwiGLU stage + commit into workspace_ffn_q16.
+    status = FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAlloc(
+        workspace_norm_q16,
+        workspace_norm_capacity,
+        ffn_up_q16,
+        ffn_up_capacity,
+        workspace_ffn_q16,
+        workspace_ffn_capacity,
+        row_count,
+        lane_count,
+        workspace_stage_q16,
+        workspace_stage_capacity);
+    if (status)
+        return status;
+
+    // 4) Preflight projection index math over full dense output before writes.
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        status = BlockTryMulI64Checked(row_index,
+                                       lane_count,
+                                       &row_base);
+        if (status)
+            return status;
+        status = BlockTryMulI64Checked(row_index,
+                                       row_count,
+                                       &attn_row_base);
+        if (status)
+            return status;
+
+        for (lane_index = 0; lane_index < lane_count; lane_index++)
+        {
+            lane_token_index = lane_index % row_count;
+
+            status = BlockTryAddI64Checked(attn_row_base,
+                                           lane_token_index,
+                                           &attn_index);
+            if (status)
+                return status;
+            status = BlockTryAddI64Checked(row_base,
+                                           lane_index,
+                                           &dense_index);
+            if (status)
+                return status;
+
+            if (attn_index < 0 || attn_index >= required_attn_scores)
+                return BLOCK_Q16_ERR_BAD_PARAM;
+            if (dense_index < 0 || dense_index >= required_out_cells)
+                return BLOCK_Q16_ERR_BAD_PARAM;
+        }
+    }
+
+    // Commit projected attention lanes only after full preflight succeeds.
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        status = BlockTryMulI64Checked(row_index,
+                                       lane_count,
+                                       &row_base);
+        if (status)
+            return status;
+        status = BlockTryMulI64Checked(row_index,
+                                       row_count,
+                                       &attn_row_base);
+        if (status)
+            return status;
+
+        for (lane_index = 0; lane_index < lane_count; lane_index++)
+        {
+            lane_token_index = lane_index % row_count;
+
+            status = BlockTryAddI64Checked(attn_row_base,
+                                           lane_token_index,
+                                           &attn_index);
+            if (status)
+                return status;
+            status = BlockTryAddI64Checked(row_base,
+                                           lane_index,
+                                           &dense_index);
+            if (status)
+                return status;
+
+            projected_q16 = workspace_attn_scores_q32[attn_index] >> 16;
+            workspace_stage_q16[dense_index] = projected_q16;
+        }
+    }
+
+    // 5) Residual combine: final out = ffn + projected_attention.
+    return TransformerBlockQ16ResidualAddRowsCheckedNoPartial(
+        workspace_ffn_q16,
+        workspace_ffn_capacity,
+        lane_count,
+        1,
+        workspace_stage_q16,
+        workspace_stage_capacity,
+        lane_count,
+        1,
+        out_q16,
+        out_capacity,
+        lane_count,
+        1,
+        row_count,
+        lane_count);
+}
+
+// IQ-1044: checked commit-only transformer block compose helper.
+//
+// This function composes a full block application pipeline over caller-owned
+// staged attention/FFN outputs while preserving strict no-partial publication
+// for final `out_q16` writes:
+// 1) preflight block workspace/output requirements;
+// 2) run attention/FFN required-bytes preflight contracts for shape parity;
+// 3) RMSNorm(input) -> staged attention residual add;
+// 4) RMSNorm(attn_residual) -> staged FFN residual add;
+// 5) commit final output slab only after full checked staging succeeds.
+I32 TransformerBlockQ16ApplyCheckedNoPartialCommitOnly(
+    I64 *input_q16,
+    I64 input_capacity,
+    I64 *attn_out_q16,
+    I64 attn_out_capacity,
+    I64 *ffn_out_q16,
+    I64 ffn_out_capacity,
+    I64 *gamma_attn_q16,
+    I64 gamma_attn_capacity,
+    I64 *gamma_ffn_q16,
+    I64 gamma_ffn_capacity,
+    I64 eps_q16,
+    I64 *workspace_q16,
+    I64 workspace_capacity,
+    I64 *out_q16,
+    I64 out_capacity,
+    I64 row_count,
+    I64 lane_count,
+    I64 *out_required_qkv_cells,
+    I64 *out_required_attn_scores,
+    I64 *out_required_ffn_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_stage_bytes)
+{
+    I64 required_qkv_cells;
+    I64 required_attn_scores;
+    I64 required_ffn_cells;
+    I64 required_out_cells;
+    I64 required_stage_bytes;
+    I64 required_stage_cells;
+
+    I64 attn_required_stage_cells;
+    I64 attn_required_stage_bytes;
+    I64 attn_required_out_cells;
+    I64 attn_last_out_index;
+
+    I64 ffn_required_stage_cells;
+    I64 ffn_required_stage_bytes;
+    I64 ffn_required_out_cells;
+
+    I64 dense_cells;
+    I64 norm0_base;
+    I64 residual1_base;
+    I64 norm1_base;
+    I64 attn_scores_base;
+    I64 ffn_stage_base;
+    I64 out_stage_base;
+    I64 row_index;
+    I64 row_base;
+    I64 out_index;
+    I64 workspace_available;
+
+    I64 snapshot_input_capacity;
+    I64 snapshot_attn_out_capacity;
+    I64 snapshot_ffn_out_capacity;
+    I64 snapshot_gamma_attn_capacity;
+    I64 snapshot_gamma_ffn_capacity;
+    I64 snapshot_workspace_capacity;
+    I64 snapshot_out_capacity;
+    I64 snapshot_row_count;
+    I64 snapshot_lane_count;
+    I64 *snapshot_input_q16;
+    I64 *snapshot_attn_out_q16;
+    I64 *snapshot_ffn_out_q16;
+    I64 *snapshot_workspace_q16;
+    I64 *snapshot_out_q16;
+    I32 status;
+
+    if (!input_q16 || !attn_out_q16 || !ffn_out_q16 ||
+        !gamma_attn_q16 || !gamma_ffn_q16 ||
+        !workspace_q16 || !out_q16 ||
+        !out_required_qkv_cells || !out_required_attn_scores ||
+        !out_required_ffn_cells || !out_required_out_cells ||
+        !out_required_stage_bytes)
+        return BLOCK_Q16_ERR_NULL_PTR;
+
+    if (input_capacity < 0 || attn_out_capacity < 0 || ffn_out_capacity < 0 ||
+        gamma_attn_capacity < 0 || gamma_ffn_capacity < 0 ||
+        workspace_capacity < 0 || out_capacity < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    if (row_count < 0 || lane_count < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (eps_q16 < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    if (out_required_qkv_cells == out_required_attn_scores ||
+        out_required_qkv_cells == out_required_ffn_cells ||
+        out_required_qkv_cells == out_required_out_cells ||
+        out_required_qkv_cells == out_required_stage_bytes ||
+        out_required_attn_scores == out_required_ffn_cells ||
+        out_required_attn_scores == out_required_out_cells ||
+        out_required_attn_scores == out_required_stage_bytes ||
+        out_required_ffn_cells == out_required_out_cells ||
+        out_required_ffn_cells == out_required_stage_bytes ||
+        out_required_out_cells == out_required_stage_bytes)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    snapshot_input_q16 = input_q16;
+    snapshot_attn_out_q16 = attn_out_q16;
+    snapshot_ffn_out_q16 = ffn_out_q16;
+    snapshot_workspace_q16 = workspace_q16;
+    snapshot_out_q16 = out_q16;
+
+    snapshot_input_capacity = input_capacity;
+    snapshot_attn_out_capacity = attn_out_capacity;
+    snapshot_ffn_out_capacity = ffn_out_capacity;
+    snapshot_gamma_attn_capacity = gamma_attn_capacity;
+    snapshot_gamma_ffn_capacity = gamma_ffn_capacity;
+    snapshot_workspace_capacity = workspace_capacity;
+    snapshot_out_capacity = out_capacity;
+    snapshot_row_count = row_count;
+    snapshot_lane_count = lane_count;
+
+    status = TransformerBlockQ16ApplyCheckedNoPartialPreflightOnly(
+        row_count,
+        lane_count,
+        &required_qkv_cells,
+        &required_attn_scores,
+        &required_ffn_cells,
+        &required_out_cells,
+        &required_stage_bytes);
+    if (status)
+        return status;
+
+    if (!row_count || !lane_count)
+    {
+        *out_required_qkv_cells = required_qkv_cells;
+        *out_required_attn_scores = required_attn_scores;
+        *out_required_ffn_cells = required_ffn_cells;
+        *out_required_out_cells = required_out_cells;
+        *out_required_stage_bytes = required_stage_bytes;
+        return BLOCK_Q16_OK;
+    }
+
+    status = BlockTryMulI64Checked(row_count,
+                                   lane_count,
+                                   &dense_cells);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(required_qkv_cells,
+                                   sizeof(I64),
+                                   &workspace_available);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(required_stage_bytes,
+                                   1,
+                                   &required_stage_cells);
+    if (status)
+        return status;
+    status = BlockTryMulI64Checked(required_stage_cells,
+                                   1,
+                                   &required_stage_cells);
+    if (status)
+        return status;
+    status = BlockTryMulI64Checked(required_stage_bytes,
+                                   1,
+                                   &required_stage_bytes);
+    if (status)
+        return status;
+
+    if (required_stage_bytes % sizeof(I64))
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    required_stage_cells = required_stage_bytes / sizeof(I64);
+
+    if (input_capacity < required_out_cells)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (attn_out_capacity < required_out_cells)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (ffn_out_capacity < required_out_cells)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (gamma_attn_capacity < lane_count)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (gamma_ffn_capacity < lane_count)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (workspace_capacity < required_stage_cells)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (out_capacity < required_out_cells)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    norm0_base = 0;
+    residual1_base = dense_cells;
+    norm1_base = dense_cells * 2;
+    attn_scores_base = required_qkv_cells;
+
+    status = BlockTryAddI64Checked(attn_scores_base,
+                                   required_attn_scores,
+                                   &ffn_stage_base);
+    if (status)
+        return status;
+    status = BlockTryAddI64Checked(ffn_stage_base,
+                                   required_ffn_cells,
+                                   &out_stage_base);
+    if (status)
+        return status;
+
+    status = AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnlyRequiredBytes(
+        row_count,
+        row_count,
+        workspace_q16 + attn_scores_base,
+        workspace_capacity - attn_scores_base,
+        workspace_q16 + attn_scores_base,
+        workspace_capacity - attn_scores_base,
+        &attn_required_stage_cells,
+        &attn_required_stage_bytes,
+        &attn_required_out_cells,
+        &attn_last_out_index);
+    if (status)
+        return status;
+
+    if (attn_required_stage_cells != required_attn_scores)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (attn_required_out_cells != required_attn_scores)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    status = FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
+        row_count,
+        lane_count,
+        required_ffn_cells,
+        &ffn_required_stage_cells,
+        &ffn_required_stage_bytes,
+        &ffn_required_out_cells);
+    if (status)
+        return status;
+
+    if (ffn_required_stage_cells != required_ffn_cells)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (ffn_required_out_cells != required_ffn_cells)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        status = BlockTryMulI64Checked(row_index,
+                                       lane_count,
+                                       &row_base);
+        if (status)
+            return status;
+
+        status = FPQ16RMSNormChecked(input_q16 + row_base,
+                                     gamma_attn_q16,
+                                     workspace_q16 + norm0_base + row_base,
+                                     lane_count,
+                                     eps_q16);
+        if (status)
+            return status;
+    }
+
+    status = TransformerBlockQ16ResidualAddRowsCheckedNoPartial(
+        workspace_q16 + norm0_base,
+        dense_cells,
+        lane_count,
+        1,
+        attn_out_q16,
+        attn_out_capacity,
+        lane_count,
+        1,
+        workspace_q16 + residual1_base,
+        dense_cells,
+        lane_count,
+        1,
+        row_count,
+        lane_count);
+    if (status)
+        return status;
+
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        status = BlockTryMulI64Checked(row_index,
+                                       lane_count,
+                                       &row_base);
+        if (status)
+            return status;
+
+        status = FPQ16RMSNormChecked(workspace_q16 + residual1_base + row_base,
+                                     gamma_ffn_q16,
+                                     workspace_q16 + norm1_base + row_base,
+                                     lane_count,
+                                     eps_q16);
+        if (status)
+            return status;
+    }
+
+    status = TransformerBlockQ16ResidualAddRowsCheckedNoPartial(
+        workspace_q16 + norm1_base,
+        dense_cells,
+        lane_count,
+        1,
+        ffn_out_q16,
+        ffn_out_capacity,
+        lane_count,
+        1,
+        workspace_q16 + out_stage_base,
+        workspace_capacity - out_stage_base,
+        lane_count,
+        1,
+        row_count,
+        lane_count);
+    if (status)
+        return status;
+
+    if (snapshot_input_q16 != input_q16 ||
+        snapshot_attn_out_q16 != attn_out_q16 ||
+        snapshot_ffn_out_q16 != ffn_out_q16 ||
+        snapshot_workspace_q16 != workspace_q16 ||
+        snapshot_out_q16 != out_q16)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_input_capacity != input_capacity ||
+        snapshot_attn_out_capacity != attn_out_capacity ||
+        snapshot_ffn_out_capacity != ffn_out_capacity ||
+        snapshot_gamma_attn_capacity != gamma_attn_capacity ||
+        snapshot_gamma_ffn_capacity != gamma_ffn_capacity ||
+        snapshot_workspace_capacity != workspace_capacity ||
+        snapshot_out_capacity != out_capacity ||
+        snapshot_row_count != row_count ||
+        snapshot_lane_count != lane_count)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        status = BlockTryMulI64Checked(row_index,
+                                       lane_count,
+                                       &row_base);
+        if (status)
+            return status;
+
+        for (out_index = 0; out_index < lane_count; out_index++)
+        {
+            I64 src_index;
+            I64 dst_index;
+
+            status = BlockTryAddI64Checked(row_base,
+                                           out_index,
+                                           &src_index);
+            if (status)
+                return status;
+            status = BlockTryAddI64Checked(row_base,
+                                           out_index,
+                                           &dst_index);
+            if (status)
+                return status;
+
+            out_q16[dst_index] = workspace_q16[out_stage_base + src_index];
+        }
+    }
+
+    *out_required_qkv_cells = required_qkv_cells;
+    *out_required_attn_scores = required_attn_scores;
+    *out_required_ffn_cells = required_ffn_cells;
+    *out_required_out_cells = required_out_cells;
+    *out_required_stage_bytes = required_stage_bytes;
+    return BLOCK_Q16_OK;
+}
+
+I32 BlockQ32ToQ16RoundedChecked(I64 value_q32, I64 *out_q16)
+{
+    I64 rounding_bias;
+    I64 biased_q32;
+    I32 status;
+
+    if (!out_q16)
+        return BLOCK_Q16_ERR_NULL_PTR;
+
+    rounding_bias = (1 << 15);
+    if (value_q32 < 0)
+        rounding_bias = -rounding_bias;
+
+    status = BlockTryAddI64Checked(value_q32,
+                                   rounding_bias,
+                                   &biased_q32);
+    if (status)
+        return status;
+
+    *out_q16 = biased_q32 >> 16;
+    return BLOCK_Q16_OK;
+}
+
+// Full block apply with explicit caller-owned workspace contracts.
+//
+// Pipeline (all integer-only):
+// 1) RMSNorm each row into Q16 staging
+// 2) Lift Q16->Q32, run checked attention score scaling row-wise
+// 3) Round Q32->Q16 attention result
+// 4) Run checked FFN SwiGLU rows into Q16 staging
+// 5) Residual add input + FFN output into final output
+//
+// All stages use no-partial kernels; this wrapper performs explicit
+// required-bytes preflight for attention/FFN staging before any writes.
+I32 TransformerBlockQ16ApplyCheckedNoPartialCommitOnly(
+    I64 *input_q16,
+    I64 input_capacity,
+    I64 *rms_gamma_q16,
+    I64 rms_gamma_capacity,
+    I64 rms_eps_q16,
+    I64 attn_score_scale_q16,
+    I64 *ffn_gate_q16,
+    I64 ffn_gate_capacity,
+    I64 *ffn_up_q16,
+    I64 ffn_up_capacity,
+    I64 row_count,
+    I64 lane_count,
+    I64 *workspace_q16,
+    I64 workspace_q16_capacity,
+    I64 *workspace_q32,
+    I64 workspace_q32_capacity,
+    I64 *out_q16,
+    I64 out_capacity)
+{
+    I64 dense_cells;
+    I64 required_q16_cells;
+    I64 required_q32_cells;
+    I64 required_q16_bytes;
+    I64 required_q32_bytes;
+    I64 attn_required_stage_cells;
+    I64 attn_required_stage_bytes;
+    I64 attn_required_out_cells;
+    I64 ffn_required_stage_cells;
+    I64 ffn_required_stage_bytes;
+    I64 ffn_required_out_cells;
+    I64 row_index;
+    I64 row_base;
+    I64 cell_index;
+    I64 *norm_rows_q16;
+    I64 *attn_rows_q16;
+    I64 *ffn_stage_q16;
+    I64 *attn_in_q32;
+    I64 *attn_out_q32;
+    I64 *attn_stage_q32;
+    I32 status;
+
+    if (!input_q16 || !rms_gamma_q16 || !ffn_gate_q16 || !ffn_up_q16 ||
+        !workspace_q16 || !workspace_q32 || !out_q16)
+        return BLOCK_Q16_ERR_NULL_PTR;
+
+    if (input_capacity < 0 || rms_gamma_capacity < 0 ||
+        ffn_gate_capacity < 0 || ffn_up_capacity < 0 ||
+        workspace_q16_capacity < 0 || workspace_q32_capacity < 0 ||
+        out_capacity < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || lane_count < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (rms_eps_q16 < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    if (!row_count || !lane_count)
+        return BLOCK_Q16_OK;
+
+    // Output must be disjoint from source/staging so no-partial preflight
+    // reads observe immutable inputs.
+    if (out_q16 == input_q16 || out_q16 == workspace_q16 || out_q16 == workspace_q32)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    status = BlockTryMulI64Checked(row_count,
+                                   lane_count,
+                                   &dense_cells);
+    if (status)
+        return status;
+
+    if (dense_cells > input_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (dense_cells > ffn_gate_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (dense_cells > ffn_up_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (dense_cells > out_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (lane_count > rms_gamma_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    status = BlockTryAddI64Checked(dense_cells,
+                                   dense_cells,
+                                   &required_q16_cells);
+    if (status)
+        return status;
+    status = BlockTryAddI64Checked(required_q16_cells,
+                                   dense_cells,
+                                   &required_q16_cells);
+    if (status)
+        return status;
+
+    status = BlockTryAddI64Checked(dense_cells,
+                                   dense_cells,
+                                   &required_q32_cells);
+    if (status)
+        return status;
+    status = BlockTryAddI64Checked(required_q32_cells,
+                                   dense_cells,
+                                   &required_q32_cells);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(required_q16_cells,
+                                   sizeof(I64),
+                                   &required_q16_bytes);
+    if (status)
+        return status;
+    status = BlockTryMulI64Checked(required_q32_cells,
+                                   sizeof(I64),
+                                   &required_q32_bytes);
+    if (status)
+        return status;
+
+    if (required_q16_cells > workspace_q16_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (required_q32_cells > workspace_q32_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    norm_rows_q16 = workspace_q16;
+    attn_rows_q16 = workspace_q16 + dense_cells;
+    ffn_stage_q16 = workspace_q16 + (dense_cells * 2);
+
+    attn_in_q32 = workspace_q32;
+    attn_out_q32 = workspace_q32 + dense_cells;
+    attn_stage_q32 = workspace_q32 + (dense_cells * 2);
+
+    status = AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(
+        attn_in_q32,
+        dense_cells,
+        row_count,
+        lane_count,
+        attn_out_q32,
+        dense_cells,
+        dense_cells,
+        &attn_required_stage_cells,
+        &attn_required_stage_bytes,
+        &attn_required_out_cells);
+    if (status)
+        return status;
+    if (attn_required_out_cells != dense_cells)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (attn_required_stage_cells > dense_cells)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    status = FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(
+        ffn_gate_capacity,
+        ffn_up_capacity,
+        dense_cells,
+        row_count,
+        lane_count,
+        dense_cells,
+        &ffn_required_stage_cells,
+        &ffn_required_stage_bytes,
+        &ffn_required_out_cells);
+    if (status)
+        return status;
+    if (ffn_required_out_cells != dense_cells)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (ffn_required_stage_cells > dense_cells)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    // Stage 1: row-wise RMSNorm with shared gamma and epsilon.
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        status = BlockTryMulI64Checked(row_index,
+                                       lane_count,
+                                       &row_base);
+        if (status)
+            return status;
+
+        status = FPQ16RMSNormChecked(input_q16 + row_base,
+                                     rms_gamma_q16,
+                                     norm_rows_q16 + row_base,
+                                     lane_count,
+                                     rms_eps_q16);
+        if (status)
+            return status;
+    }
+
+    // Stage 2: lift normalized Q16 rows into Q32 so attention score-scale
+    // kernel can operate on canonical Q32 score lanes.
+    for (cell_index = 0; cell_index < dense_cells; cell_index++)
+    {
+        status = BlockTryMulI64Checked(norm_rows_q16[cell_index],
+                                       (1 << 16),
+                                       &attn_in_q32[cell_index]);
+        if (status)
+            return status;
+    }
+
+    status = AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAlloc(
+        attn_in_q32,
+        dense_cells,
+        row_count,
+        lane_count,
+        attn_score_scale_q16,
+        attn_out_q32,
+        dense_cells,
+        attn_stage_q32,
+        dense_cells);
+    if (status)
+        return status;
+
+    // Stage 3: convert scaled Q32 scores back to Q16 activations.
+    for (cell_index = 0; cell_index < dense_cells; cell_index++)
+    {
+        status = BlockQ32ToQ16RoundedChecked(attn_out_q32[cell_index],
+                                             &attn_rows_q16[cell_index]);
+        if (status)
+            return status;
+    }
+
+    // Stage 4: checked FFN rows over attention activations.
+    status = FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAlloc(
+        ffn_gate_q16,
+        ffn_gate_capacity,
+        ffn_up_q16,
+        ffn_up_capacity,
+        attn_rows_q16,
+        dense_cells,
+        row_count,
+        lane_count,
+        ffn_stage_q16,
+        dense_cells);
+    if (status)
+        return status;
+
+    // Stage 5: residual add back to caller output.
+    return TransformerBlockQ16ResidualAddRowsCheckedNoPartial(
+        input_q16,
+        input_capacity,
+        lane_count,
+        1,
+        attn_rows_q16,
+        dense_cells,
+        lane_count,
+        1,
+        out_q16,
+        out_capacity,
+        lane_count,
+        1,
+        row_count,
+        lane_count);
 }

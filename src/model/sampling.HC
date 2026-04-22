@@ -516,6 +516,381 @@ I32 SamplingTopKSelectIndicesChecked(I64 *logits_q16,
                                          out_index_capacity);
 }
 
+// Diagnostics-only preflight for caller-staged top-k commit pipelines.
+//
+// Contract:
+// - validates immutable input geometry for top-k index+score commit paths;
+// - publishes required tuple `{required_indices,required_scores,selected_count}`
+//   only on full success;
+// - zero-write on all failures.
+I32 SamplingTopKQ16CheckedNoPartialCommitOnlyPreflightOnly(
+    I64 *logits_q16,
+    I64 logits_capacity,
+    I64 vocab_size,
+    I64 k,
+    I64 out_index_capacity,
+    I64 out_score_capacity,
+    I64 *out_required_indices,
+    I64 *out_required_scores,
+    I64 *out_selected_count)
+{
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 required_indices;
+    I64 required_scores;
+    I64 selected_count;
+
+    if (!out_required_indices || !out_required_scores || !out_selected_count)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+    if (!logits_q16)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (logits_capacity < 0 || vocab_size < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (k < 0 || out_index_capacity < 0 || out_score_capacity < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (vocab_size > logits_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (k > vocab_size)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    required_indices = k;
+    required_scores = k;
+    selected_count = k;
+
+    if (required_indices > out_index_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (required_scores > out_score_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (vocab_size)
+    {
+        // Guard pointer-span arithmetic for indexed logit reads used by
+        // commit-time score gather.
+        last_index = vocab_size - 1;
+        if (last_index > 0x0FFFFFFFFFFFFFFF)
+            return SAMPLING_Q16_ERR_OVERFLOW;
+
+        last_byte_offset = last_index << 3;
+        if ((U64)logits_q16 > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+            return SAMPLING_Q16_ERR_OVERFLOW;
+    }
+
+    *out_required_indices = required_indices;
+    *out_required_scores = required_scores;
+    *out_selected_count = selected_count;
+    return SAMPLING_Q16_OK;
+}
+
+// Commit-only top-k selection with staged no-partial writes.
+//
+// The helper composes checked top-k index selection plus score gather into
+// scratch buffers, then commits `{indices,scores,selected_count}` only after
+// all checks succeed.
+I32 SamplingTopKQ16CheckedNoPartialCommitOnly(
+    I64 *logits_q16,
+    I64 logits_capacity,
+    I64 vocab_size,
+    I64 k,
+    I64 *out_topk_indices,
+    I64 out_index_capacity,
+    I64 *out_topk_scores_q16,
+    I64 out_score_capacity,
+    I64 *out_selected_count)
+{
+    I64 required_indices;
+    I64 required_scores;
+    I64 selected_count;
+    I64 staged_index_bytes;
+    I64 staged_score_bytes;
+    I64 i;
+    I64 index_i;
+    I64 *staged_indices;
+    I64 *staged_scores;
+    I32 status;
+
+    if (!out_topk_indices || !out_topk_scores_q16 || !out_selected_count)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    status = SamplingTopKQ16CheckedNoPartialCommitOnlyPreflightOnly(
+        logits_q16,
+        logits_capacity,
+        vocab_size,
+        k,
+        out_index_capacity,
+        out_score_capacity,
+        &required_indices,
+        &required_scores,
+        &selected_count);
+    if (status)
+        return status;
+
+    if (!selected_count)
+    {
+        *out_selected_count = 0;
+        return SAMPLING_Q16_OK;
+    }
+
+    if (required_indices > 0x0FFFFFFFFFFFFFFF)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+    if (required_scores > 0x0FFFFFFFFFFFFFFF)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    staged_index_bytes = required_indices << 3;
+    staged_score_bytes = required_scores << 3;
+
+    staged_indices = MAlloc(staged_index_bytes);
+    if (!staged_indices)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    staged_scores = MAlloc(staged_score_bytes);
+    if (!staged_scores)
+    {
+        Free(staged_indices);
+        return SAMPLING_Q16_ERR_NULL_PTR;
+    }
+
+    status = SamplingTopKSelectIndicesChecked(logits_q16,
+                                              logits_capacity,
+                                              vocab_size,
+                                              k,
+                                              staged_indices,
+                                              required_indices);
+    if (status)
+    {
+        Free(staged_scores);
+        Free(staged_indices);
+        return status;
+    }
+
+    for (i = 0; i < selected_count; i++)
+    {
+        index_i = staged_indices[i];
+        if (index_i < 0 || index_i >= vocab_size)
+        {
+            Free(staged_scores);
+            Free(staged_indices);
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+        }
+
+        staged_scores[i] = logits_q16[index_i];
+    }
+
+    for (i = 0; i < selected_count; i++)
+    {
+        out_topk_indices[i] = staged_indices[i];
+        out_topk_scores_q16[i] = staged_scores[i];
+    }
+    *out_selected_count = selected_count;
+
+    Free(staged_scores);
+    Free(staged_indices);
+    return SAMPLING_Q16_OK;
+}
+
+// Diagnostics-only parity gate over top-k preflight and commit paths.
+//
+// Contracts:
+// - enforces immutable input snapshot parity across both subpaths;
+// - requires exact tuple parity for
+//   `{required_indices,required_scores,selected_count}`;
+// - atomically publishes tuple outputs only on strict parity success.
+I32 SamplingTopKQ16CheckedNoPartialCommitOnlyPreflightOnlyParity(
+    I64 *logits_q16,
+    I64 logits_capacity,
+    I64 vocab_size,
+    I64 k,
+    I64 out_index_capacity,
+    I64 out_score_capacity,
+    I64 *out_required_indices,
+    I64 *out_required_scores,
+    I64 *out_selected_count)
+{
+    I64 snapshot_logits_capacity;
+    I64 snapshot_vocab_size;
+    I64 snapshot_k;
+    I64 snapshot_out_index_capacity;
+    I64 snapshot_out_score_capacity;
+    I64 *snapshot_logits_q16;
+
+    I64 pre_required_indices;
+    I64 pre_required_scores;
+    I64 pre_selected_count;
+
+    I64 commit_selected_count;
+    I64 commit_required_indices;
+    I64 commit_required_scores;
+    I64 *staged_indices;
+    I64 *staged_scores;
+    I64 staged_indices_bytes;
+    I64 staged_scores_bytes;
+    I64 dummy_index;
+    I64 dummy_score;
+    I32 status;
+
+    if (!out_required_indices || !out_required_scores || !out_selected_count)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    snapshot_logits_q16 = logits_q16;
+    snapshot_logits_capacity = logits_capacity;
+    snapshot_vocab_size = vocab_size;
+    snapshot_k = k;
+    snapshot_out_index_capacity = out_index_capacity;
+    snapshot_out_score_capacity = out_score_capacity;
+
+    status = SamplingTopKQ16CheckedNoPartialCommitOnlyPreflightOnly(
+        logits_q16,
+        logits_capacity,
+        vocab_size,
+        k,
+        out_index_capacity,
+        out_score_capacity,
+        &pre_required_indices,
+        &pre_required_scores,
+        &pre_selected_count);
+    if (status)
+        return status;
+
+    if (snapshot_logits_q16 != logits_q16)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (snapshot_logits_capacity != logits_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (snapshot_vocab_size != vocab_size)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (snapshot_k != k)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_index_capacity != out_index_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_score_capacity != out_score_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    dummy_index = 0;
+    dummy_score = 0;
+    staged_indices = &dummy_index;
+    staged_scores = &dummy_score;
+    staged_indices_bytes = 0;
+    staged_scores_bytes = 0;
+
+    if (pre_selected_count)
+    {
+        if (pre_selected_count > 0x0FFFFFFFFFFFFFFF)
+            return SAMPLING_Q16_ERR_OVERFLOW;
+
+        staged_indices_bytes = pre_selected_count << 3;
+        staged_scores_bytes = pre_selected_count << 3;
+
+        staged_indices = MAlloc(staged_indices_bytes);
+        if (!staged_indices)
+            return SAMPLING_Q16_ERR_NULL_PTR;
+
+        staged_scores = MAlloc(staged_scores_bytes);
+        if (!staged_scores)
+        {
+            Free(staged_indices);
+            return SAMPLING_Q16_ERR_NULL_PTR;
+        }
+    }
+
+    status = SamplingTopKQ16CheckedNoPartialCommitOnly(logits_q16,
+                                                       logits_capacity,
+                                                       vocab_size,
+                                                       k,
+                                                       staged_indices,
+                                                       out_index_capacity,
+                                                       staged_scores,
+                                                       out_score_capacity,
+                                                       &commit_selected_count);
+    if (status)
+    {
+        if (pre_selected_count)
+        {
+            Free(staged_scores);
+            Free(staged_indices);
+        }
+        return status;
+    }
+
+    if (snapshot_logits_q16 != logits_q16)
+    {
+        if (pre_selected_count)
+        {
+            Free(staged_scores);
+            Free(staged_indices);
+        }
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+    if (snapshot_logits_capacity != logits_capacity)
+    {
+        if (pre_selected_count)
+        {
+            Free(staged_scores);
+            Free(staged_indices);
+        }
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+    if (snapshot_vocab_size != vocab_size)
+    {
+        if (pre_selected_count)
+        {
+            Free(staged_scores);
+            Free(staged_indices);
+        }
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+    if (snapshot_k != k)
+    {
+        if (pre_selected_count)
+        {
+            Free(staged_scores);
+            Free(staged_indices);
+        }
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+
+    commit_required_indices = commit_selected_count;
+    commit_required_scores = commit_selected_count;
+
+    if (commit_required_indices != pre_required_indices)
+    {
+        if (pre_selected_count)
+        {
+            Free(staged_scores);
+            Free(staged_indices);
+        }
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+    if (commit_required_scores != pre_required_scores)
+    {
+        if (pre_selected_count)
+        {
+            Free(staged_scores);
+            Free(staged_indices);
+        }
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+    if (commit_selected_count != pre_selected_count)
+    {
+        if (pre_selected_count)
+        {
+            Free(staged_scores);
+            Free(staged_indices);
+        }
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+
+    *out_required_indices = pre_required_indices;
+    *out_required_scores = pre_required_scores;
+    *out_selected_count = pre_selected_count;
+
+    if (pre_selected_count)
+    {
+        Free(staged_scores);
+        Free(staged_indices);
+    }
+    return SAMPLING_Q16_OK;
+}
+
 // Checked deterministic top-p cutoff selector over descending probability
 // lanes.
 //
