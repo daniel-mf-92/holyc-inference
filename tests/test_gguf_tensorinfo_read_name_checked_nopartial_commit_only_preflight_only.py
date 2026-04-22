@@ -4,13 +4,15 @@
 from __future__ import annotations
 
 import random
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path("tests").resolve()))
 
 from test_gguf_tensorinfo_read_name_checked_nopartial import (
     GGUF_TENSOR_MAX_NAME_BYTES,
     GGUF_TENSOR_PARSE_ERR_BAD_NAME_LEN,
     GGUF_TENSOR_PARSE_ERR_NULL_PTR,
-    GGUF_TENSOR_PARSE_ERR_TRUNCATED,
     GGUF_TENSOR_PARSE_ERR_TRUNCATED,
     GGUF_TENSOR_PARSE_OK,
     I64_MAX,
