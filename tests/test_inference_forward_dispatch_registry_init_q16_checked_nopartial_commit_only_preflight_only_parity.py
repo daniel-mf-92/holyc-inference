@@ -275,6 +275,10 @@ def test_source_contains_iq1130_signature_and_parity_contract() -> None:
     assert "snapshot_registry_slot_capacity != registry_slot_capacity" in body
     assert "staged_registry_count != canonical_registry_count" in body
     assert "staged_default_arch_id != canonical_default_arch_id" in body
+    assert "InferenceDispatchParseArchitectureIdChecked(" in body
+    assert "staged_default_matches != 1 || canonical_default_matches != 1" in body
+    assert "staged_arch_ids[slot_index] == staged_arch_ids[compare_index]" in body
+    assert "canonical_arch_ids[slot_index] == canonical_arch_ids[compare_index]" in body
 
 
 def test_success_and_error_vectors_match_contract() -> None:
@@ -341,6 +345,26 @@ def test_success_and_error_vectors_match_contract() -> None:
         assert ids == [9, 9, 9, 9]
         assert count == [12]
         assert default_arch == [34]
+
+
+def test_pointer_alias_rejected_with_no_partial_writes() -> None:
+    tags = [b"a", b"b", b"c", b"d"]
+    lens = [1, 1, 1, 1]
+    ids = [9, 9, 9, 9]
+    shared = [55]
+    rc = registry_init_checked_nopartial_commit_only_preflight_only_parity_reference(
+        registry_slot_capacity=4,
+        out_registry_tags=tags,
+        out_registry_tag_lens=lens,
+        out_registry_arch_ids=ids,
+        out_registry_count=shared,
+        out_default_arch_id=shared,
+    )
+    assert rc == SAMPLING_Q16_ERR_BAD_PARAM
+    assert tags == [b"a", b"b", b"c", b"d"]
+    assert lens == [1, 1, 1, 1]
+    assert ids == [9, 9, 9, 9]
+    assert shared == [55]
 
 
 def run() -> None:
