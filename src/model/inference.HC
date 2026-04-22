@@ -10,6 +10,7 @@
 #define SAMPLING_Q16_ONE   (1 << SAMPLING_Q16_SHIFT)
 
 #define DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE "general.architecture"
+#define DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE_LEN 20
 
 #define DISPATCH_ARCH_Q16_ID_LLAMA   1
 #define DISPATCH_ARCH_Q16_ID_MISTRAL 2
@@ -120,10 +121,13 @@ I32 InferenceDispatchParseArchitectureIdChecked(U8 *meta_key_bytes,
         return SAMPLING_Q16_ERR_BAD_PARAM;
 
     canonical_key = (U8 *)DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE;
+    if (meta_key_len != DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE_LEN)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
     if (!InferenceDispatchByteSpanEquals(meta_key_bytes,
                                          meta_key_len,
                                          canonical_key,
-                                         20))
+                                         DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE_LEN))
         return SAMPLING_Q16_ERR_BAD_PARAM;
 
     if (InferenceDispatchByteSpanEquals(arch_value_bytes,
@@ -228,10 +232,6 @@ I32 InferenceForwardDispatchModelArchQ16CheckedNoPartial(
 
     if (out_rows_processed == out_logits_written)
         return SAMPLING_Q16_ERR_BAD_PARAM;
-
-    if (meta_key_len > 0x7FFFFFFFFFFFFFFF ||
-        arch_value_len > 0x7FFFFFFFFFFFFFFF)
-        return SAMPLING_Q16_ERR_OVERFLOW;
 
     snapshot_meta_key_bytes = meta_key_bytes;
     snapshot_meta_key_len = meta_key_len;

@@ -3654,23 +3654,25 @@ I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnl
     if (status)
         return status;
 
-    if (max_new_tokens < 0 || token_history_count < 0 || vocab_size < 0)
+    if (snapshot_max_new_tokens < 0 ||
+        snapshot_token_history_count < 0 ||
+        snapshot_vocab_size < 0)
         return SAMPLING_Q16_ERR_BAD_PARAM;
 
-    if (max_new_tokens)
+    if (snapshot_max_new_tokens)
     {
-        if (vocab_size > 0x7FFFFFFFFFFFFFFF / max_new_tokens)
+        if (snapshot_vocab_size > 0x7FFFFFFFFFFFFFFF / snapshot_max_new_tokens)
             return SAMPLING_Q16_ERR_OVERFLOW;
-        recomputed_required_logits = vocab_size * max_new_tokens;
+        recomputed_required_logits = snapshot_vocab_size * snapshot_max_new_tokens;
     }
     else
     {
         recomputed_required_logits = 0;
     }
 
-    recomputed_required_tokens = max_new_tokens;
-    recomputed_final_token_count = token_history_count + max_new_tokens;
-    if (recomputed_final_token_count < token_history_count)
+    recomputed_required_tokens = snapshot_max_new_tokens;
+    recomputed_final_token_count = snapshot_token_history_count + snapshot_max_new_tokens;
+    if (recomputed_final_token_count < snapshot_token_history_count)
         return SAMPLING_Q16_ERR_OVERFLOW;
 
     if (snapshot_step_logits_capacity != step_logits_capacity ||
