@@ -5427,6 +5427,12 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
     snapshot_out_required_bytes = out_required_bytes;
     snapshot_out_last_cell_index = out_last_cell_index;
 
+    // Immutable pointer snapshot must remain distinct for no-partial publish.
+    if (snapshot_out_required_cells == snapshot_out_required_bytes ||
+        snapshot_out_required_cells == snapshot_out_last_cell_index ||
+        snapshot_out_required_bytes == snapshot_out_last_cell_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
     status = KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParity(
         layer_count,
         head_count,

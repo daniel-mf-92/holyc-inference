@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for ...RequiredBytesParity...ParityCommitOnlyPreflightOnly (IQ-1089)."""
+"""Harness for ...RequiredBytesParity...ParityCommitOnlyPreflightOnly (IQ-1091)."""
 
 from __future__ import annotations
 
@@ -166,9 +166,26 @@ def explicit_composition(
     token_count: int,
     cache_capacity: int,
 ) -> tuple[int, tuple[int, int, int]]:
-    cells = [0]
-    bytes_ = [0]
-    last = [0]
+    staged_cells = [0]
+    staged_bytes = [0]
+    staged_last = [0]
+    err = kv_cache_q16_reserve_token_span_checked_nopartial_commit_only_preflight_only_required_bytes_parity_commit_only_preflight_only_parity_commit_only(
+        layer_count,
+        head_count,
+        head_dim,
+        token_start,
+        token_count,
+        cache_capacity,
+        staged_cells,
+        staged_bytes,
+        staged_last,
+    )
+    if err != KV_Q16_OK:
+        return err, (0, 0, 0)
+
+    canonical_cells = [0]
+    canonical_bytes = [0]
+    canonical_last = [0]
     err = kv_cache_q16_reserve_token_span_checked_nopartial_commit_only_preflight_only_required_bytes_parity_commit_only_preflight_only_parity(
         layer_count,
         head_count,
@@ -176,13 +193,19 @@ def explicit_composition(
         token_start,
         token_count,
         cache_capacity,
-        cells,
-        bytes_,
-        last,
+        canonical_cells,
+        canonical_bytes,
+        canonical_last,
     )
     if err != KV_Q16_OK:
         return err, (0, 0, 0)
-    return KV_Q16_OK, (cells[0], bytes_[0], last[0])
+    if (
+        staged_cells[0] != canonical_cells[0]
+        or staged_bytes[0] != canonical_bytes[0]
+        or staged_last[0] != canonical_last[0]
+    ):
+        return KV_Q16_ERR_BAD_PARAM, (0, 0, 0)
+    return KV_Q16_OK, (staged_cells[0], staged_bytes[0], staged_last[0])
 
 
 def test_source_contains_required_bytes_parity_commit_only_preflight_only_helper() -> None:
@@ -191,7 +214,7 @@ def test_source_contains_required_bytes_parity_commit_only_preflight_only_helper
     assert sig in source
     assert len(re.findall(re.escape(sig), source)) == 1
     body = source.split(sig, 1)[1]
-    assert "KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnlyPreflightOnlyParityCommitOnly(" in body
+    assert "KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnly(" in body
     assert "KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnlyPreflightOnlyParity(" in body
     assert "if (staged_required_cells != canonical_required_cells)" in body
     assert "if (staged_required_cells != recomputed_required_cells)" in body

@@ -96,7 +96,6 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
     staged_required = [0]
     staged_required_bytes = [0]
     staged_next_cursor = [0]
-    staged_max_piece = [0]
     err = staged_fn(
         data,
         byte_len,
@@ -115,7 +114,6 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
         staged_required,
         staged_required_bytes,
         staged_next_cursor,
-        staged_max_piece,
     )
     if err != TOKENIZER_BPE_OK:
         return err
@@ -182,13 +180,10 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
     if canonical_max_piece[0] > I64_MAX:
         return TOKENIZER_BPE_ERR_OVERFLOW
 
-    if staged_max_piece[0] != canonical_max_piece[0]:
-        return TOKENIZER_BPE_ERR_BAD_PARAM
-
     out_required_token_capacity[0] = staged_required[0]
     out_required_token_bytes[0] = staged_required_bytes[0]
     out_next_cursor[0] = staged_next_cursor[0]
-    out_max_piece_len[0] = staged_max_piece[0]
+    out_max_piece_len[0] = canonical_max_piece[0]
     return TOKENIZER_BPE_OK
 
 
@@ -314,11 +309,10 @@ def test_tuple_mismatch_rejected() -> None:
     vocab_lens = [1, 2, 3, 5]
 
     def bad_staged(*args, **kwargs):
-        out_req, out_bytes, out_next, out_max_piece = args[-4], args[-3], args[-2], args[-1]
+        out_req, out_bytes, out_next = args[-3], args[-2], args[-1]
         out_req[0] = 7
         out_bytes[0] = 28
         out_next[0] = 4
-        out_max_piece[0] = 1
         return TOKENIZER_BPE_OK
 
     req = [1]
