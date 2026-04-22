@@ -1700,6 +1700,143 @@ I32 InferenceTokenStreamCallbackDispatchCheckedNoPartialCommitOnlyPreflightOnly(
     return SAMPLING_Q16_OK;
 }
 
+// IQ-1173 strict diagnostics parity gate for callback-dispatch publication.
+//
+// Contract:
+// - Stage diagnostics tuple via
+//   `InferenceTokenStreamCallbackDispatchCheckedNoPartialCommitOnlyPreflightOnly`.
+// - Stage canonical tuple via
+//   `InferenceTokenStreamCallbackDispatchCheckedNoPartial`.
+// - Revalidate immutable callback/input/output snapshots before publish.
+// - Require exact parity for
+//   `{abi_version,flags,token_index,token_id,token_prob_q16,dispatch_count,callback_status}`.
+// - Atomically publish tuple + diagnostics only on strict parity success.
+I32 InferenceTokenStreamCallbackDispatchCheckedNoPartialCommitOnlyPreflightOnlyParity(
+    I32 (*token_callback)(I64 *abi_tuple,
+                          I64 abi_tuple_cells,
+                          I64 user_ctx),
+    I64 *abi_tuple_buffer,
+    I64 abi_tuple_buffer_capacity,
+    I64 token_index,
+    I64 token_id,
+    I64 token_prob_q16,
+    I64 callback_flags,
+    I64 user_ctx,
+    I64 *out_dispatch_count,
+    I64 *out_callback_status)
+{
+    I64 staged_tuple[INFERENCE_TOKEN_STREAM_CALLBACK_ABI_TUPLE_CELLS];
+    I64 staged_dispatch_count;
+    I64 staged_callback_status;
+    I64 canonical_tuple[INFERENCE_TOKEN_STREAM_CALLBACK_ABI_TUPLE_CELLS];
+    I64 canonical_dispatch_count;
+    I64 canonical_callback_status;
+
+    I32 (*snapshot_token_callback)(I64 *abi_tuple,
+                                   I64 abi_tuple_cells,
+                                   I64 user_ctx);
+    I64 snapshot_token_index;
+    I64 snapshot_token_id;
+    I64 snapshot_token_prob_q16;
+    I64 snapshot_callback_flags;
+    I64 snapshot_user_ctx;
+    I64 *snapshot_abi_tuple_buffer;
+    I64 snapshot_abi_tuple_buffer_capacity;
+    I64 *snapshot_out_dispatch_count;
+    I64 *snapshot_out_callback_status;
+    I64 lane;
+    I32 status;
+
+    if (!token_callback || !abi_tuple_buffer ||
+        !out_dispatch_count || !out_callback_status)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (out_dispatch_count == out_callback_status)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (abi_tuple_buffer_capacity < INFERENCE_TOKEN_STREAM_CALLBACK_ABI_TUPLE_CELLS)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (token_index < 0 || token_id < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (callback_flags != INFERENCE_TOKEN_STREAM_CALLBACK_FLAG_NONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_token_callback = token_callback;
+    snapshot_token_index = token_index;
+    snapshot_token_id = token_id;
+    snapshot_token_prob_q16 = token_prob_q16;
+    snapshot_callback_flags = callback_flags;
+    snapshot_user_ctx = user_ctx;
+    snapshot_abi_tuple_buffer = abi_tuple_buffer;
+    snapshot_abi_tuple_buffer_capacity = abi_tuple_buffer_capacity;
+    snapshot_out_dispatch_count = out_dispatch_count;
+    snapshot_out_callback_status = out_callback_status;
+
+    status = InferenceTokenStreamCallbackDispatchCheckedNoPartialCommitOnlyPreflightOnly(
+        token_callback,
+        staged_tuple,
+        INFERENCE_TOKEN_STREAM_CALLBACK_ABI_TUPLE_CELLS,
+        token_index,
+        token_id,
+        token_prob_q16,
+        callback_flags,
+        user_ctx,
+        &staged_dispatch_count,
+        &staged_callback_status);
+    if (status)
+        return status;
+
+    status = InferenceTokenStreamCallbackDispatchCheckedNoPartial(
+        token_callback,
+        canonical_tuple,
+        INFERENCE_TOKEN_STREAM_CALLBACK_ABI_TUPLE_CELLS,
+        token_index,
+        token_id,
+        token_prob_q16,
+        callback_flags,
+        user_ctx,
+        &canonical_dispatch_count,
+        &canonical_callback_status);
+    if (status)
+        return status;
+
+    if (snapshot_token_callback != token_callback ||
+        snapshot_token_index != token_index ||
+        snapshot_token_id != token_id ||
+        snapshot_token_prob_q16 != token_prob_q16 ||
+        snapshot_callback_flags != callback_flags ||
+        snapshot_user_ctx != user_ctx ||
+        snapshot_abi_tuple_buffer != abi_tuple_buffer ||
+        snapshot_abi_tuple_buffer_capacity != abi_tuple_buffer_capacity ||
+        snapshot_out_dispatch_count != out_dispatch_count ||
+        snapshot_out_callback_status != out_callback_status)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_abi_tuple_buffer_capacity < INFERENCE_TOKEN_STREAM_CALLBACK_ABI_TUPLE_CELLS)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    for (lane = 0; lane < INFERENCE_TOKEN_STREAM_CALLBACK_ABI_TUPLE_CELLS; lane++)
+    {
+        if (staged_tuple[lane] != canonical_tuple[lane])
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+
+    if (staged_dispatch_count != canonical_dispatch_count)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (staged_callback_status != canonical_callback_status)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    for (lane = 0; lane < INFERENCE_TOKEN_STREAM_CALLBACK_ABI_TUPLE_CELLS; lane++)
+        abi_tuple_buffer[lane] = staged_tuple[lane];
+
+    *out_dispatch_count = staged_dispatch_count;
+    *out_callback_status = staged_callback_status;
+    return SAMPLING_Q16_OK;
+}
+
 
 
 I32 InferenceGenerateTokensPreflightChecked(
