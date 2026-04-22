@@ -29,6 +29,32 @@
 #define GGML_TYPE_F64   28
 #define GGML_TYPE_BF16  30
 
+#define GGUF_MODEL_VALIDATE_VERSION_V2 2
+#define GGUF_MODEL_VALIDATE_VERSION_V3 3
+
+#define GGUF_MODEL_VALIDATE_VERSION_ALIGN_STATUS_VERSION_SUPPORTED      (1 << 0)
+#define GGUF_MODEL_VALIDATE_VERSION_ALIGN_STATUS_ALIGNMENT_POW2         (1 << 1)
+#define GGUF_MODEL_VALIDATE_VERSION_ALIGN_STATUS_BASE_ALIGNED           (1 << 2)
+#define GGUF_MODEL_VALIDATE_VERSION_ALIGN_STATUS_OFFSETS_ALIGNED        (1 << 3)
+#define GGUF_MODEL_VALIDATE_VERSION_ALIGN_STATUS_ALL_OK \
+    (GGUF_MODEL_VALIDATE_VERSION_ALIGN_STATUS_VERSION_SUPPORTED \
+   | GGUF_MODEL_VALIDATE_VERSION_ALIGN_STATUS_ALIGNMENT_POW2 \
+   | GGUF_MODEL_VALIDATE_VERSION_ALIGN_STATUS_BASE_ALIGNED \
+   | GGUF_MODEL_VALIDATE_VERSION_ALIGN_STATUS_OFFSETS_ALIGNED)
+
+Bool GGUFModelValidateVersionSupported(U32 version)
+{
+    return version == GGUF_MODEL_VALIDATE_VERSION_V2 ||
+           version == GGUF_MODEL_VALIDATE_VERSION_V3;
+}
+
+Bool GGUFModelValidateIsPow2U32(U32 value)
+{
+    if (!value)
+        return FALSE;
+    return (value & (value - 1)) == 0;
+}
+
 Bool GGUFModelValidateTryAddU64(U64 a, U64 b, U64 *out_sum)
 {
     if (!out_sum)
@@ -778,5 +804,73 @@ I64 GGUFModelChecksumHeaderAndTensorDirectory(U8 *header_bytes,
     state ^= state >> 33;
 
     *out_checksum = state;
+    return GGUF_MODEL_VALIDATE_OK;
+}
+
+// IQ-1165
+// Validate GGUF version + tensor-data alignment invariants with commit-only
+// status publication for callers that gate model load before tensor payload IO.
+//
+// Invariants enforced:
+// - GGUF version is in the supported set {2,3}.
+// - `tensor_data_alignment` is non-zero power-of-two.
+// - `tensor_data_base` is aligned to `tensor_data_alignment`.
+// - Every `tensor_offsets[i]` is aligned to `tensor_data_alignment`.
+//
+// No-partial contract:
+// - `*out_status_bits` and `*out_aligned_tensor_count` are only published on
+//   full success; any failure path leaves caller-owned outputs untouched.
+I64 GGUFModelValidateVersionAndAlignmentCheckedNoPartial(
+    U32 gguf_version,
+    U32 tensor_data_alignment,
+    U64 tensor_data_base,
+    U64 *tensor_offsets,
+    U64 tensor_count,
+    U32 *out_status_bits,
+    U64 *out_aligned_tensor_count)
+{
+    U64 tensor_i;
+    U64 mask;
+    U32 staged_status_bits;
+    U64 staged_aligned_tensor_count;
+
+    if (!out_status_bits || !out_aligned_tensor_count)
+        return GGUF_MODEL_VALIDATE_ERR_NULL_PTR;
+
+    if (tensor_count > GGUF_MODEL_VALIDATE_MAX_TENSORS)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+    if (tensor_count && !tensor_offsets)
+        return GGUF_MODEL_VALIDATE_ERR_NULL_PTR;
+
+    if (!GGUFModelValidateVersionSupported(gguf_version))
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+    staged_status_bits = GGUF_MODEL_VALIDATE_VERSION_ALIGN_STATUS_VERSION_SUPPORTED;
+
+    if (!GGUFModelValidateIsPow2U32(tensor_data_alignment))
+        return GGUF_MODEL_VALIDATE_ERR_BAD_ALIGNMENT;
+    staged_status_bits |= GGUF_MODEL_VALIDATE_VERSION_ALIGN_STATUS_ALIGNMENT_POW2;
+
+    mask = (U64)tensor_data_alignment - 1;
+
+    if (tensor_data_base & mask)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_ALIGNMENT;
+    staged_status_bits |= GGUF_MODEL_VALIDATE_VERSION_ALIGN_STATUS_BASE_ALIGNED;
+
+    staged_aligned_tensor_count = 0;
+    for (tensor_i = 0; tensor_i < tensor_count; tensor_i++)
+    {
+        if (tensor_offsets[tensor_i] & mask)
+            return GGUF_MODEL_VALIDATE_ERR_BAD_ALIGNMENT;
+        staged_aligned_tensor_count++;
+    }
+    staged_status_bits |= GGUF_MODEL_VALIDATE_VERSION_ALIGN_STATUS_OFFSETS_ALIGNED;
+
+    if (staged_status_bits != GGUF_MODEL_VALIDATE_VERSION_ALIGN_STATUS_ALL_OK)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+    if (staged_aligned_tensor_count != tensor_count)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+
+    *out_status_bits = staged_status_bits;
+    *out_aligned_tensor_count = staged_aligned_tensor_count;
     return GGUF_MODEL_VALIDATE_OK;
 }
