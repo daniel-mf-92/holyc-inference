@@ -875,7 +875,7 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     return GGUF_TENSOR_PARSE_OK;
 }
 
-// IQ-1029 diagnostics-only no-write companion for tensor name parity commit.
+// IQ-1036 diagnostics-only no-write companion for tensor name parity commit.
 //
 // Composes `...ParityCommitOnly` and canonical
 // `...CommitOnlyPreflightOnly`, recomputes canonical span tuple
