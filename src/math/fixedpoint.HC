@@ -631,6 +631,126 @@ I32 FPQ16MulCheckedNoPartialArray(I64 *lhs_q16,
     return FP_Q16_OK;
 }
 
+// Checked elementwise integer multiply/shift rounding helper with strict
+// no-partial semantics:
+//   out_values[i] = round_half_away_from_zero((lhs[i] * rhs[i]) / 2^shift)
+//
+// Contract:
+// - Null pointers return NULL_PTR and perform no writes.
+// - count/capacities < 0 return BAD_PARAM and perform no writes.
+// - Enforces count <= {lhs_capacity,rhs_capacity,out_capacity}.
+// - Rejects any overlap among {lhs_values,rhs_values,out_values} lane spans.
+// - Uses immutable snapshot parity over {count,capacities,shift} before commit.
+// - Preflights all lanes first, then commits all lanes.
+I32 FPQ16MulShiftRoundCheckedNoPartialArray(I64 *lhs_values,
+                                            I64 lhs_capacity,
+                                            I64 *rhs_values,
+                                            I64 rhs_capacity,
+                                            I64 *out_values,
+                                            I64 out_capacity,
+                                            I64 count,
+                                            I64 shift)
+{
+    I64 snapshot_count;
+    I64 snapshot_lhs_capacity;
+    I64 snapshot_rhs_capacity;
+    I64 snapshot_out_capacity;
+    I64 snapshot_shift;
+    I64 required_lhs;
+    I64 required_rhs;
+    I64 required_out;
+    I64 i;
+    I64 lane_value;
+    U64 span_bytes;
+    U64 lhs_base;
+    U64 lhs_end;
+    U64 rhs_base;
+    U64 rhs_end;
+    U64 out_base;
+    U64 out_end;
+    I32 status;
+
+    if (!lhs_values || !rhs_values || !out_values)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lhs_capacity < 0 || rhs_capacity < 0 || out_capacity < 0 || count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (lhs_values == rhs_values || lhs_values == out_values || rhs_values == out_values)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    snapshot_count = count;
+    snapshot_lhs_capacity = lhs_capacity;
+    snapshot_rhs_capacity = rhs_capacity;
+    snapshot_out_capacity = out_capacity;
+    snapshot_shift = shift;
+
+    required_lhs = snapshot_count;
+    required_rhs = snapshot_count;
+    required_out = snapshot_count;
+
+    if (required_lhs > snapshot_lhs_capacity ||
+        required_rhs > snapshot_rhs_capacity ||
+        required_out > snapshot_out_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (!snapshot_count)
+        return FP_Q16_OK;
+
+    if (snapshot_count > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+
+    span_bytes = ((U64)snapshot_count) << 3;
+    lhs_base = (U64)lhs_values;
+    rhs_base = (U64)rhs_values;
+    out_base = (U64)out_values;
+
+    if (lhs_base > (U64_MAX_VALUE - span_bytes) ||
+        rhs_base > (U64_MAX_VALUE - span_bytes) ||
+        out_base > (U64_MAX_VALUE - span_bytes))
+        return FP_Q16_ERR_OVERFLOW;
+
+    lhs_end = lhs_base + span_bytes;
+    rhs_end = rhs_base + span_bytes;
+    out_end = out_base + span_bytes;
+
+    if ((lhs_end > rhs_base && rhs_end > lhs_base) ||
+        (lhs_end > out_base && out_end > lhs_base) ||
+        (rhs_end > out_base && out_end > rhs_base))
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Phase 1: preflight all lanes; never publish out_values on failure.
+    for (i = 0; i < snapshot_count; i++)
+    {
+        status = FPQ16MulShiftRoundChecked(lhs_values[i],
+                                           rhs_values[i],
+                                           snapshot_shift,
+                                           &lane_value);
+        if (status)
+            return status;
+    }
+
+    // Immutable tuple revalidation before commit publish.
+    if (snapshot_count != count ||
+        snapshot_lhs_capacity != lhs_capacity ||
+        snapshot_rhs_capacity != rhs_capacity ||
+        snapshot_out_capacity != out_capacity ||
+        snapshot_shift != shift)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Phase 2: commit every lane.
+    for (i = 0; i < snapshot_count; i++)
+    {
+        status = FPQ16MulShiftRoundChecked(lhs_values[i],
+                                           rhs_values[i],
+                                           snapshot_shift,
+                                           &out_values[i]);
+        if (status)
+            return status;
+    }
+
+    return FP_Q16_OK;
+}
+
 // Geometry diagnostics helper for FPQ16MulCheckedNoPartialArray.
 //
 // Returns canonical lane requirements without touching out_q16:
