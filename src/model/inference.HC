@@ -659,33 +659,14 @@ I32 InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnly(
     return SAMPLING_Q16_OK;
 }
 
-// IQ-1111 diagnostics parity gate for architecture dispatch preflight wrapper.
-//
-// Compose:
-//   1) preflight/commit-only wrapper
-//      `InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnly`
-//   2) canonical dispatch wrapper
-//      `InferenceForwardDispatchModelArchQ16CheckedNoPartial`
-// then atomically publish only when immutable snapshots and tuple parity hold.
-//
-// Publication tuple:
-//   {rows_processed, logits_written}
-// IQ-1111 diagnostics parity gate over dispatch preflight and canonical tuple
-// recompute.
-//
-// Contract:
-// - stage diagnostics from `...CommitOnlyPreflightOnly`;
-// - recompute canonical tuple from immutable metadata/geometry snapshots;
-// - publish outputs only when tuple parity is exact and pointer snapshots hold.
 // IQ-1111 diagnostics parity gate for architecture dispatch tuple publication.
 //
 // Contract:
 // - Compose staged diagnostics from
 //   `InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnly`.
-// - Recompute canonical tuple using the same architecture parse + checked-multiply
-//   path used by `InferenceForwardDispatchModelArchQ16CheckedNoPartial`.
-// - Publish `{rows_processed, logits_written}` only after strict snapshot
-//   revalidation and exact tuple parity.
+// - Recompute canonical tuple using architecture parse + checked multiply.
+// - Publish `{rows_processed, logits_written}` only after strict immutable
+//   snapshot revalidation and exact tuple parity.
 I32 InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnlyParity(
     U8 *meta_key_bytes,
     I64 meta_key_len,

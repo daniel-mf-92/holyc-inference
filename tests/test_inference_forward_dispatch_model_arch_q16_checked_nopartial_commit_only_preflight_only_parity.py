@@ -218,7 +218,7 @@ def _extract_function_body(source: str, signature: str) -> str:
 def test_source_contains_iq1111_function_and_composition_calls() -> None:
     source = Path("src/model/inference.HC").read_text(encoding="utf-8")
     sig = "I32 InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnlyParity("
-    assert sig in source
+    assert source.count(sig) == 1
 
     body = _extract_function_body(source, sig)
     assert "InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnly(" in body
