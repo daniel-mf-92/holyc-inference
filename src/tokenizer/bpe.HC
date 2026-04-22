@@ -7022,6 +7022,182 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesPreflig
     return TOKENIZER_BPE_OK;
 }
 
+// IQ-1047 diagnostics parity gate for no-alloc lens encode preflight/commit.
+//
+// This helper never mutates caller cursor/token buffers. It composes:
+//   1) canonical preflight-only diagnostics (`...CommitOnlyPreflightOnly`)
+//   2) staged commit-only encode (`...CommitOnly`) into private scratch
+// and publishes `{required_tokens,required_bytes,next_cursor}` only after
+// strict tuple parity succeeds.
+I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParity(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 vocab_piece_capacity,
+    U64 out_token_capacity,
+    U64 *out_required_token_capacity,
+    U64 *out_required_token_bytes,
+    U64 *out_next_cursor)
+{
+    U8 *out_required_token_capacity_ptr;
+    U8 *out_required_token_bytes_ptr;
+    U8 *out_next_cursor_ptr;
+
+    U64 snapshot_cursor;
+    U64 canonical_required_token_capacity;
+    U64 canonical_max_piece_len;
+    U64 canonical_required_token_bytes;
+
+    U64 staged_cursor;
+    U64 staged_token_count;
+    U64 staged_required_token_capacity;
+    U64 staged_max_piece_len;
+    U64 staged_required_token_bytes;
+    U64 staged_expected_next_cursor;
+    U64 staged_scratch_token_capacity;
+    U64 staged_scratch_alloc_bytes;
+
+    I32 *staged_tokens;
+    I32 err;
+
+    if (!bytes || !io_cursor || !vocab_piece_lens ||
+        !out_required_token_capacity || !out_required_token_bytes ||
+        !out_next_cursor)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    out_required_token_capacity_ptr = (U8 *)out_required_token_capacity;
+    out_required_token_bytes_ptr = (U8 *)out_required_token_bytes;
+    out_next_cursor_ptr = (U8 *)out_next_cursor;
+    if (out_required_token_capacity_ptr == out_required_token_bytes_ptr ||
+        out_required_token_capacity_ptr == out_next_cursor_ptr ||
+        out_required_token_bytes_ptr == out_next_cursor_ptr)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_capacity > 0x7FFFFFFFFFFFFFFF ||
+        out_token_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    snapshot_cursor = *io_cursor;
+
+    // Stage canonical diagnostics from explicit-capacity preflight.
+    err = TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnly(
+        bytes,
+        byte_len,
+        io_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        vocab_piece_lens,
+        vocab_piece_count,
+        vocab_piece_capacity,
+        out_token_capacity,
+        &canonical_required_token_capacity,
+        &canonical_max_piece_len);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    if (canonical_required_token_capacity > (0x7FFFFFFFFFFFFFFF / sizeof(I32)))
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    canonical_required_token_bytes = canonical_required_token_capacity * sizeof(I32);
+
+    // Compose commit-only encode path through private staged buffers only.
+    staged_cursor = snapshot_cursor;
+    staged_token_count = 0;
+    staged_required_token_capacity = 0;
+    staged_max_piece_len = 0;
+
+    staged_scratch_token_capacity = out_token_capacity;
+    if (!staged_scratch_token_capacity)
+        staged_scratch_token_capacity = 1;
+
+    if (staged_scratch_token_capacity > (0x7FFFFFFFFFFFFFFF / sizeof(I32)))
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    staged_scratch_alloc_bytes = staged_scratch_token_capacity * sizeof(I32);
+    if (!staged_scratch_alloc_bytes)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    staged_tokens = MAlloc(staged_scratch_alloc_bytes);
+    if (!staged_tokens)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    err = TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnly(
+        bytes,
+        byte_len,
+        &staged_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        vocab_piece_lens,
+        vocab_piece_count,
+        vocab_piece_capacity,
+        staged_tokens,
+        out_token_capacity,
+        &staged_token_count,
+        &staged_required_token_capacity,
+        &staged_max_piece_len);
+    if (err != TOKENIZER_BPE_OK) {
+        Free(staged_tokens);
+        return err;
+    }
+
+    if (snapshot_cursor > byte_len || prompt_nbytes > (byte_len - snapshot_cursor)) {
+        Free(staged_tokens);
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+    }
+    staged_expected_next_cursor = snapshot_cursor + prompt_nbytes;
+
+    if (staged_required_token_capacity > (0x7FFFFFFFFFFFFFFF / sizeof(I32))) {
+        Free(staged_tokens);
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    }
+    staged_required_token_bytes = staged_required_token_capacity * sizeof(I32);
+
+    if (staged_required_token_capacity != canonical_required_token_capacity ||
+        staged_required_token_bytes != canonical_required_token_bytes ||
+        staged_max_piece_len != canonical_max_piece_len ||
+        staged_cursor != staged_expected_next_cursor ||
+        staged_required_token_capacity > out_token_capacity ||
+        staged_token_count > out_token_capacity) {
+        Free(staged_tokens);
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    }
+
+    if (*io_cursor != snapshot_cursor) {
+        Free(staged_tokens);
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+    }
+
+    // Atomic diagnostics publish after strict parity checks succeed.
+    *out_required_token_capacity = canonical_required_token_capacity;
+    *out_required_token_bytes = canonical_required_token_bytes;
+    *out_next_cursor = staged_cursor;
+
+    Free(staged_tokens);
+    return TOKENIZER_BPE_OK;
+}
+
 I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytes(
     U8 *bytes,
     U64 byte_len,

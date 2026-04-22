@@ -42,6 +42,11 @@ I32 TransformerBlockQ16ApplyCheckedNoPartialCommitOnly(
     I64 *out_required_out_cells,
     I64 *out_required_stage_bytes);
 
+Bool GGUFTensorByteSpansOverlap(U8 *a_base,
+                                U64 a_size,
+                                U8 *b_base,
+                                U64 b_size);
+
 I32 ModelTryAddI64Checked(I64 lhs, I64 rhs, I64 *out_sum)
 {
     if (!out_sum)
@@ -136,6 +141,7 @@ I32 InferenceForwardQ16CheckedNoPartial(
     I64 dense_cells;
     I64 doubled_dense_cells;
     I64 required_block_tensor_cells;
+    I64 dense_bytes;
     I64 row_index;
     I64 lane_index;
     I64 row_base;
@@ -191,6 +197,12 @@ I32 InferenceForwardQ16CheckedNoPartial(
     if (status)
         return status;
 
+    status = ModelTryMulI64Checked(dense_cells,
+                                   sizeof(I64),
+                                   &dense_bytes);
+    if (status)
+        return status;
+
     status = ModelTryMulI64Checked(block_count,
                                    dense_cells,
                                    &required_block_tensor_cells);
@@ -206,6 +218,23 @@ I32 InferenceForwardQ16CheckedNoPartial(
     if (workspace_capacity < doubled_dense_cells)
         return MODEL_Q16_ERR_BAD_PARAM;
     if (logits_capacity < dense_cells)
+        return MODEL_Q16_ERR_BAD_PARAM;
+
+    if (dense_bytes <= 0)
+        return MODEL_Q16_ERR_OVERFLOW;
+
+    if (workspace_q16 == logits_q16)
+        return MODEL_Q16_ERR_BAD_PARAM;
+
+    if (GGUFTensorByteSpansOverlap((U8 *)workspace_q16,
+                                   (U64)dense_bytes,
+                                   (U8 *)logits_q16,
+                                   (U64)dense_bytes))
+        return MODEL_Q16_ERR_BAD_PARAM;
+    if (GGUFTensorByteSpansOverlap((U8 *)(workspace_q16 + dense_cells),
+                                   (U64)dense_bytes,
+                                   (U8 *)logits_q16,
+                                   (U64)dense_bytes))
         return MODEL_Q16_ERR_BAD_PARAM;
 
     current_q16 = workspace_q16;
