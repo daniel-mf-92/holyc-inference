@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for ...CommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity (IQ-1069)."""
+"""Parity gate harness for ...CommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity (IQ-1069)."""
 
 from __future__ import annotations
 
@@ -42,8 +42,8 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
     out_required_token_capacity: list[int] | None,
     out_required_token_bytes: list[int] | None,
     out_next_cursor: list[int] | None,
-    staged_fn=tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only,
-    canonical_fn=tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only,
+    preflight_fn=tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only,
+    commit_fn=tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only,
 ) -> int:
     if (
         data is None
@@ -83,10 +83,10 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
     snapshot_vocab_piece_capacity = vocab_piece_capacity
     snapshot_out_token_capacity = out_token_capacity
 
-    staged_required = [0]
-    staged_required_bytes = [0]
-    staged_next_cursor = [0]
-    err = staged_fn(
+    staged_preflight_required = [0]
+    staged_preflight_required_bytes = [0]
+    staged_preflight_next_cursor = [0]
+    err = preflight_fn(
         data,
         byte_len,
         io_cursor,
@@ -101,17 +101,17 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
         vocab_piece_count,
         vocab_piece_capacity,
         out_token_capacity,
-        staged_required,
-        staged_required_bytes,
-        staged_next_cursor,
+        staged_preflight_required,
+        staged_preflight_required_bytes,
+        staged_preflight_next_cursor,
     )
     if err != TOKENIZER_BPE_OK:
         return err
 
-    canonical_required = [0]
-    canonical_required_bytes = [0]
-    canonical_next_cursor = [0]
-    err = canonical_fn(
+    staged_commit_required = [0]
+    staged_commit_required_bytes = [0]
+    staged_commit_next_cursor = [0]
+    err = commit_fn(
         data,
         byte_len,
         io_cursor,
@@ -126,9 +126,9 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
         vocab_piece_count,
         vocab_piece_capacity,
         out_token_capacity,
-        canonical_required,
-        canonical_required_bytes,
-        canonical_next_cursor,
+        staged_commit_required,
+        staged_commit_required_bytes,
+        staged_commit_next_cursor,
     )
     if err != TOKENIZER_BPE_OK:
         return err
@@ -147,15 +147,15 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
         return TOKENIZER_BPE_ERR_BAD_PARAM
 
     if (
-        staged_required[0] != canonical_required[0]
-        or staged_required_bytes[0] != canonical_required_bytes[0]
-        or staged_next_cursor[0] != canonical_next_cursor[0]
+        staged_preflight_required[0] != staged_commit_required[0]
+        or staged_preflight_required_bytes[0] != staged_commit_required_bytes[0]
+        or staged_preflight_next_cursor[0] != staged_commit_next_cursor[0]
     ):
         return TOKENIZER_BPE_ERR_BAD_PARAM
 
-    out_required_token_capacity[0] = staged_required[0]
-    out_required_token_bytes[0] = staged_required_bytes[0]
-    out_next_cursor[0] = staged_next_cursor[0]
+    out_required_token_capacity[0] = staged_preflight_required[0]
+    out_required_token_bytes[0] = staged_preflight_required_bytes[0]
+    out_next_cursor[0] = staged_preflight_next_cursor[0]
     return TOKENIZER_BPE_OK
 
 
@@ -180,7 +180,7 @@ def _build_rank_tables() -> tuple[list[int], list[int], list[int], list[int]]:
     return left, right, ranks, merged
 
 
-def test_source_contains_signature_and_single_definition() -> None:
+def test_source_contains_signature_and_composition_chain() -> None:
     source = Path("src/tokenizer/bpe.HC").read_text(encoding="utf-8")
     sig = (
         "I32 TokenizerBPEEncodePromptCheckedNoAllocFromLens"
@@ -193,7 +193,42 @@ def test_source_contains_signature_and_single_definition() -> None:
     )[0]
     assert "TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in body
     assert "TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityCommitOnly(" in body
-    assert "snapshot_out_token_capacity != out_token_capacity" in body
+    assert "snapshot_out_required_token_capacity_ptr" in body
+
+
+def test_output_alias_rejected() -> None:
+    left, right, ranks, merged = _build_rank_tables()
+    payload = list("hello".encode("utf-8"))
+    vocab_lens = [1, 2, 4]
+
+    req_and_bytes = [999]
+    next_cursor = [777]
+    cursor = [0]
+
+    err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only_parity(
+        payload,
+        len(payload),
+        cursor,
+        len(payload),
+        left,
+        right,
+        ranks,
+        merged,
+        len(ranks),
+        len(ranks),
+        vocab_lens,
+        len(vocab_lens),
+        len(vocab_lens),
+        len(payload),
+        req_and_bytes,
+        req_and_bytes,
+        next_cursor,
+    )
+
+    assert err == TOKENIZER_BPE_ERR_NULL_PTR
+    assert req_and_bytes == [999]
+    assert next_cursor == [777]
+    assert cursor == [0]
 
 
 def test_known_vector_success() -> None:
@@ -233,12 +268,12 @@ def test_known_vector_success() -> None:
     assert cursor == [0]
 
 
-def test_no_partial_publish_on_staged_mismatch() -> None:
+def test_no_partial_publish_on_preflight_mismatch() -> None:
     left, right, ranks, merged = _build_rank_tables()
     payload = list("hello".encode("utf-8"))
     vocab_lens = [1, 2, 4]
 
-    def _bad_staged(*args):
+    def _bad_preflight(*args):
         out_required = args[-3]
         out_required_bytes = args[-2]
         out_next_cursor = args[-1]
@@ -270,7 +305,7 @@ def test_no_partial_publish_on_staged_mismatch() -> None:
         req,
         req_bytes,
         next_cursor,
-        staged_fn=_bad_staged,
+        preflight_fn=_bad_preflight,
     )
 
     assert err == TOKENIZER_BPE_ERR_BAD_PARAM
@@ -280,12 +315,12 @@ def test_no_partial_publish_on_staged_mismatch() -> None:
     assert cursor == [0]
 
 
-def test_no_partial_publish_on_canonical_mismatch() -> None:
+def test_no_partial_publish_on_commit_mismatch() -> None:
     left, right, ranks, merged = _build_rank_tables()
     payload = list("hello".encode("utf-8"))
     vocab_lens = [1, 2, 4]
 
-    def _bad_canonical(*args):
+    def _bad_commit(*args):
         out_required = args[-3]
         out_required_bytes = args[-2]
         out_next_cursor = args[-1]
@@ -317,7 +352,7 @@ def test_no_partial_publish_on_canonical_mismatch() -> None:
         req,
         req_bytes,
         next_cursor,
-        canonical_fn=_bad_canonical,
+        commit_fn=_bad_commit,
     )
 
     assert err == TOKENIZER_BPE_ERR_BAD_PARAM
@@ -372,9 +407,10 @@ def test_randomized_utf8_cursor_capacity_vectors() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_signature_and_single_definition()
+    test_source_contains_signature_and_composition_chain()
+    test_output_alias_rejected()
     test_known_vector_success()
-    test_no_partial_publish_on_staged_mismatch()
-    test_no_partial_publish_on_canonical_mismatch()
+    test_no_partial_publish_on_preflight_mismatch()
+    test_no_partial_publish_on_commit_mismatch()
     test_randomized_utf8_cursor_capacity_vectors()
     print("ok")
