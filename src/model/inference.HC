@@ -659,6 +659,360 @@ I32 InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnly(
     return SAMPLING_Q16_OK;
 }
 
+// IQ-1111 diagnostics parity gate for architecture dispatch preflight wrapper.
+//
+// Compose:
+//   1) preflight/commit-only wrapper
+//      `InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnly`
+//   2) canonical dispatch wrapper
+//      `InferenceForwardDispatchModelArchQ16CheckedNoPartial`
+// then atomically publish only when immutable snapshots and tuple parity hold.
+//
+// Publication tuple:
+//   {rows_processed, logits_written}
+I32 InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnlyParity(
+    U8 *meta_key_bytes,
+    I64 meta_key_len,
+    U8 *arch_value_bytes,
+    I64 arch_value_len,
+    I64 row_count,
+    I64 lane_count,
+    I64 *out_rows_processed,
+    I64 *out_logits_written)
+{
+    U8 *snapshot_meta_key_bytes;
+    I64 snapshot_meta_key_len;
+    U8 *snapshot_arch_value_bytes;
+    I64 snapshot_arch_value_len;
+    I64 snapshot_row_count;
+    I64 snapshot_lane_count;
+
+    I64 *snapshot_out_rows_processed;
+    I64 *snapshot_out_logits_written;
+
+    I64 staged_rows_processed;
+    I64 staged_logits_written;
+
+    I64 canonical_rows_processed;
+    I64 canonical_logits_written;
+
+    I32 status;
+
+    if (!meta_key_bytes || !arch_value_bytes ||
+        !out_rows_processed || !out_logits_written)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (out_rows_processed == out_logits_written)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (row_count < 0 || lane_count < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_meta_key_bytes = meta_key_bytes;
+    snapshot_meta_key_len = meta_key_len;
+    snapshot_arch_value_bytes = arch_value_bytes;
+    snapshot_arch_value_len = arch_value_len;
+    snapshot_row_count = row_count;
+    snapshot_lane_count = lane_count;
+
+    snapshot_out_rows_processed = out_rows_processed;
+    snapshot_out_logits_written = out_logits_written;
+
+    status = InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnly(
+        meta_key_bytes,
+        meta_key_len,
+        arch_value_bytes,
+        arch_value_len,
+        row_count,
+        lane_count,
+        &staged_rows_processed,
+        &staged_logits_written);
+    if (status)
+        return status;
+
+    status = InferenceForwardDispatchModelArchQ16CheckedNoPartial(
+        meta_key_bytes,
+        meta_key_len,
+        arch_value_bytes,
+        arch_value_len,
+        row_count,
+        lane_count,
+        &canonical_rows_processed,
+        &canonical_logits_written);
+    if (status)
+        return status;
+
+    if (snapshot_meta_key_bytes != meta_key_bytes ||
+        snapshot_meta_key_len != meta_key_len ||
+        snapshot_arch_value_bytes != arch_value_bytes ||
+        snapshot_arch_value_len != arch_value_len ||
+        snapshot_row_count != row_count ||
+        snapshot_lane_count != lane_count)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_out_rows_processed != out_rows_processed ||
+        snapshot_out_logits_written != out_logits_written)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (staged_rows_processed != canonical_rows_processed)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (staged_logits_written != canonical_logits_written)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    *out_rows_processed = staged_rows_processed;
+    *out_logits_written = staged_logits_written;
+    return SAMPLING_Q16_OK;
+}
+
+// IQ-1111 diagnostics parity gate over dispatch preflight and canonical tuple
+// recompute.
+//
+// Contract:
+// - stage diagnostics from `...CommitOnlyPreflightOnly`;
+// - recompute canonical tuple from immutable metadata/geometry snapshots;
+// - publish outputs only when tuple parity is exact and pointer snapshots hold.
+I32 InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnlyParity(
+    U8 *meta_key_bytes,
+    I64 meta_key_len,
+    U8 *arch_value_bytes,
+    I64 arch_value_len,
+    I64 row_count,
+    I64 lane_count,
+    I64 *out_rows_processed,
+    I64 *out_logits_written)
+{
+    U8 *snapshot_meta_key_bytes;
+    I64 snapshot_meta_key_len;
+    U8 *snapshot_arch_value_bytes;
+    I64 snapshot_arch_value_len;
+    I64 snapshot_row_count;
+    I64 snapshot_lane_count;
+    I64 *snapshot_out_rows_processed;
+    I64 *snapshot_out_logits_written;
+
+    I64 staged_rows_processed;
+    I64 staged_logits_written;
+    I64 canonical_arch_id;
+    I64 canonical_rows_processed;
+    I64 canonical_logits_written;
+    I32 status;
+
+    if (!meta_key_bytes || !arch_value_bytes ||
+        !out_rows_processed || !out_logits_written)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (out_rows_processed == out_logits_written)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (row_count < 0 || lane_count < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_meta_key_bytes = meta_key_bytes;
+    snapshot_meta_key_len = meta_key_len;
+    snapshot_arch_value_bytes = arch_value_bytes;
+    snapshot_arch_value_len = arch_value_len;
+    snapshot_row_count = row_count;
+    snapshot_lane_count = lane_count;
+    snapshot_out_rows_processed = out_rows_processed;
+    snapshot_out_logits_written = out_logits_written;
+
+    status = InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnly(
+        meta_key_bytes,
+        meta_key_len,
+        arch_value_bytes,
+        arch_value_len,
+        row_count,
+        lane_count,
+        &staged_rows_processed,
+        &staged_logits_written);
+    if (status)
+        return status;
+
+    status = InferenceDispatchParseArchitectureIdChecked(snapshot_meta_key_bytes,
+                                                         snapshot_meta_key_len,
+                                                         snapshot_arch_value_bytes,
+                                                         snapshot_arch_value_len,
+                                                         &canonical_arch_id);
+    if (status)
+        return status;
+
+    switch (canonical_arch_id)
+    {
+    case DISPATCH_ARCH_Q16_ID_LLAMA:
+    case DISPATCH_ARCH_Q16_ID_MISTRAL:
+    case DISPATCH_ARCH_Q16_ID_QWEN2:
+    case DISPATCH_ARCH_Q16_ID_PHI3:
+        break;
+    default:
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+
+    canonical_rows_processed = snapshot_row_count;
+    status = InferenceDispatchTryMulI64Checked(snapshot_row_count,
+                                               snapshot_lane_count,
+                                               &canonical_logits_written);
+    if (status)
+        return status;
+
+    if (snapshot_meta_key_bytes != meta_key_bytes ||
+        snapshot_meta_key_len != meta_key_len ||
+        snapshot_arch_value_bytes != arch_value_bytes ||
+        snapshot_arch_value_len != arch_value_len ||
+        snapshot_row_count != row_count ||
+        snapshot_lane_count != lane_count)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_out_rows_processed != out_rows_processed ||
+        snapshot_out_logits_written != out_logits_written)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (staged_rows_processed != canonical_rows_processed ||
+        staged_logits_written != canonical_logits_written)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    *out_rows_processed = staged_rows_processed;
+    *out_logits_written = staged_logits_written;
+    return SAMPLING_Q16_OK;
+}
+
+// IQ-1111 diagnostics parity gate for architecture dispatch tuple publication.
+//
+// Contract:
+// - Compose staged diagnostics from
+//   `InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnly`.
+// - Recompute canonical tuple using the same architecture parse + checked-multiply
+//   path used by `InferenceForwardDispatchModelArchQ16CheckedNoPartial`.
+// - Publish `{rows_processed, logits_written}` only after strict snapshot
+//   revalidation and exact tuple parity.
+I32 InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnlyParity(
+    U8 *meta_key_bytes,
+    I64 meta_key_len,
+    U8 *arch_value_bytes,
+    I64 arch_value_len,
+    I64 row_count,
+    I64 lane_count,
+    I64 *out_rows_processed,
+    I64 *out_logits_written)
+{
+    I64 staged_arch_id;
+    I64 staged_rows_processed;
+    I64 staged_logits_written;
+
+    I64 canonical_arch_id;
+    I64 canonical_rows_processed;
+    I64 canonical_logits_written;
+
+    U8 *snapshot_meta_key_bytes;
+    I64 snapshot_meta_key_len;
+    U8 *snapshot_arch_value_bytes;
+    I64 snapshot_arch_value_len;
+    I64 snapshot_row_count;
+    I64 snapshot_lane_count;
+    I64 *snapshot_out_rows_processed;
+    I64 *snapshot_out_logits_written;
+    I32 status;
+
+    if (!meta_key_bytes || !arch_value_bytes ||
+        !out_rows_processed || !out_logits_written)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (out_rows_processed == out_logits_written)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (row_count < 0 || lane_count < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_meta_key_bytes = meta_key_bytes;
+    snapshot_meta_key_len = meta_key_len;
+    snapshot_arch_value_bytes = arch_value_bytes;
+    snapshot_arch_value_len = arch_value_len;
+    snapshot_row_count = row_count;
+    snapshot_lane_count = lane_count;
+    snapshot_out_rows_processed = out_rows_processed;
+    snapshot_out_logits_written = out_logits_written;
+
+    status = InferenceDispatchParseArchitectureIdChecked(meta_key_bytes,
+                                                         meta_key_len,
+                                                         arch_value_bytes,
+                                                         arch_value_len,
+                                                         &staged_arch_id);
+    if (status)
+        return status;
+
+    switch (staged_arch_id)
+    {
+    case DISPATCH_ARCH_Q16_ID_LLAMA:
+    case DISPATCH_ARCH_Q16_ID_MISTRAL:
+    case DISPATCH_ARCH_Q16_ID_QWEN2:
+    case DISPATCH_ARCH_Q16_ID_PHI3:
+        break;
+    default:
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+
+    status = InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnly(
+        meta_key_bytes,
+        meta_key_len,
+        arch_value_bytes,
+        arch_value_len,
+        row_count,
+        lane_count,
+        &staged_rows_processed,
+        &staged_logits_written);
+    if (status)
+        return status;
+
+    if (staged_rows_processed < 0 || staged_logits_written < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    status = InferenceDispatchParseArchitectureIdChecked(snapshot_meta_key_bytes,
+                                                         snapshot_meta_key_len,
+                                                         snapshot_arch_value_bytes,
+                                                         snapshot_arch_value_len,
+                                                         &canonical_arch_id);
+    if (status)
+        return status;
+
+    switch (canonical_arch_id)
+    {
+    case DISPATCH_ARCH_Q16_ID_LLAMA:
+    case DISPATCH_ARCH_Q16_ID_MISTRAL:
+    case DISPATCH_ARCH_Q16_ID_QWEN2:
+    case DISPATCH_ARCH_Q16_ID_PHI3:
+        break;
+    default:
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+
+    canonical_rows_processed = snapshot_row_count;
+    status = InferenceDispatchTryMulI64Checked(snapshot_row_count,
+                                               snapshot_lane_count,
+                                               &canonical_logits_written);
+    if (status)
+        return status;
+
+    if (snapshot_meta_key_bytes != meta_key_bytes ||
+        snapshot_meta_key_len != meta_key_len ||
+        snapshot_arch_value_bytes != arch_value_bytes ||
+        snapshot_arch_value_len != arch_value_len ||
+        snapshot_row_count != row_count ||
+        snapshot_lane_count != lane_count)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_out_rows_processed != out_rows_processed ||
+        snapshot_out_logits_written != out_logits_written)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (staged_arch_id != canonical_arch_id ||
+        staged_rows_processed != canonical_rows_processed ||
+        staged_logits_written != canonical_logits_written)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    *out_rows_processed = staged_rows_processed;
+    *out_logits_written = staged_logits_written;
+    return SAMPLING_Q16_OK;
+}
+
 
 I32 InferenceGenerateTokensPreflightChecked(
     I64 step_logits_capacity,
