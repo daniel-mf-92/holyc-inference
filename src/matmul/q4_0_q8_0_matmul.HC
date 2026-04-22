@@ -1881,22 +1881,24 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     I64 snapshot_tile_row_span;
     I64 snapshot_tile_col_span;
     I64 snapshot_out_capacity;
+    I64 snapshot_out_row_stride_cells;
 
     I64 staged_required_out_cells;
     I64 staged_required_out_bytes;
     I64 staged_tile_rows;
     I64 staged_tile_cols;
 
-    I64 canonical_required_out_cells;
-    I64 canonical_required_out_bytes;
-    I64 canonical_tile_rows;
-    I64 canonical_tile_cols;
-    I32 status;
+    I64 required_lhs_blocks;
+    I64 required_rhs_blocks;
+
+    I64 tile_row_count;
+    I64 tile_col_count;
+    I64 tile_total_count;
 
     // IQ-1013 diagnostics-only no-write companion:
-    // 1) stage diagnostics tuple from strict no-write preflight path,
-    // 2) recompute canonical tuple from immutable geometry snapshots,
-    // 3) atomically publish only on exact tuple parity.
+    // recompute canonical diagnostics tuple directly from immutable snapshots,
+    // never write matmul output cells, and atomically publish only once the
+    // staged tuple passes strict geometry/capacity/overflow checks.
     if (!out_required_out_cells || !out_required_out_bytes ||
         !out_tile_rows || !out_tile_cols)
         return Q4_0_Q8_0_MATMUL_ERR_NULL_PTR;
@@ -1929,72 +1931,82 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyPreflightOnlyParityCommitOnl
                                                    out_cell_capacity))
         return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
 
+    if (!lhs_q4_blocks || !rhs_q8_col_blocks || !out_cells_q32)
+        return Q4_0_Q8_0_MATMUL_ERR_NULL_PTR;
+
+    if (lhs_q4_block_capacity < 0 || rhs_q8_block_capacity < 0 || out_cell_capacity < 0)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (row_count < 0 || col_count < 0 || k_block_count < 0)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (lhs_row_stride_blocks < 0 || rhs_col_stride_blocks < 0 || out_row_stride_cells < 0)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (tile_row_span <= 0 || tile_col_span <= 0)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (k_block_count > lhs_row_stride_blocks || k_block_count > rhs_col_stride_blocks)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (row_count > 0 && out_row_stride_cells < col_count)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
     snapshot_row_count = row_count;
     snapshot_col_count = col_count;
     snapshot_k_block_count = k_block_count;
     snapshot_tile_row_span = tile_row_span;
     snapshot_tile_col_span = tile_col_span;
     snapshot_out_capacity = out_cell_capacity;
+    snapshot_out_row_stride_cells = out_row_stride_cells;
 
     staged_required_out_cells = 0;
     staged_required_out_bytes = 0;
     staged_tile_rows = 0;
     staged_tile_cols = 0;
-    canonical_required_out_cells = 0;
-    canonical_required_out_bytes = 0;
-    canonical_tile_rows = 0;
-    canonical_tile_cols = 0;
-
-    status = MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyPreflightOnly(
-        lhs_q4_blocks,
-        lhs_q4_block_capacity,
-        row_count,
-        lhs_row_stride_blocks,
-        rhs_q8_col_blocks,
-        rhs_q8_block_capacity,
-        col_count,
-        rhs_col_stride_blocks,
-        k_block_count,
-        tile_row_span,
-        tile_col_span,
-        out_cells_q32,
-        out_cell_capacity,
-        out_row_stride_cells,
-        &staged_required_out_cells,
-        &staged_required_out_bytes,
-        &staged_tile_rows,
-        &staged_tile_cols);
-    if (status != Q4_0_Q8_0_MATMUL_OK)
-        return status;
 
     if (!Q4_0Q8_0MatMulTryMulI64NonNeg(snapshot_row_count,
-                                       out_row_stride_cells,
-                                       &canonical_required_out_cells))
+                                       lhs_row_stride_blocks,
+                                       &required_lhs_blocks))
+        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(snapshot_col_count,
+                                       rhs_col_stride_blocks,
+                                       &required_rhs_blocks))
+        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(snapshot_row_count,
+                                       snapshot_out_row_stride_cells,
+                                       &staged_required_out_cells))
         return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
 
-    if (canonical_required_out_cells > snapshot_out_capacity)
+    if (required_lhs_blocks > lhs_q4_block_capacity)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (required_rhs_blocks > rhs_q8_block_capacity)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (staged_required_out_cells > snapshot_out_capacity)
         return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
 
-    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(canonical_required_out_cells,
+    if (!Q4_0Q8_0MatMulComputeTileGridChecked(snapshot_row_count,
+                                              snapshot_col_count,
+                                              snapshot_tile_row_span,
+                                              snapshot_tile_col_span,
+                                              &tile_row_count,
+                                              &tile_col_count,
+                                              &tile_total_count))
+        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+    if (snapshot_row_count && snapshot_col_count && !tile_total_count)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(staged_required_out_cells,
                                        sizeof(I64),
-                                       &canonical_required_out_bytes))
+                                       &staged_required_out_bytes))
         return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
 
-    canonical_tile_rows = snapshot_tile_row_span;
-    canonical_tile_cols = snapshot_tile_col_span;
+    staged_tile_rows = snapshot_tile_row_span;
+    staged_tile_cols = snapshot_tile_col_span;
 
     if (snapshot_row_count != row_count ||
         snapshot_col_count != col_count ||
         snapshot_k_block_count != k_block_count ||
         snapshot_tile_row_span != tile_row_span ||
         snapshot_tile_col_span != tile_col_span ||
-        snapshot_out_capacity != out_cell_capacity)
-        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
-
-    if (staged_required_out_cells != canonical_required_out_cells ||
-        staged_required_out_bytes != canonical_required_out_bytes ||
-        staged_tile_rows != canonical_tile_rows ||
-        staged_tile_cols != canonical_tile_cols)
+        snapshot_out_capacity != out_cell_capacity ||
+        snapshot_out_row_stride_cells != out_row_stride_cells)
         return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
 
     *out_required_out_cells = staged_required_out_cells;
