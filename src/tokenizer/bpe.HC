@@ -8091,14 +8091,6 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityC
         out_required_token_bytes == out_next_cursor)
         return TOKENIZER_BPE_ERR_NULL_PTR;
 
-    if (staged_preflight_required_token_capacity < 0 ||
-        staged_preflight_required_token_bytes < 0 ||
-        staged_preflight_next_cursor < 0 ||
-        staged_commit_required_token_capacity < 0 ||
-        staged_commit_required_token_bytes < 0 ||
-        staged_commit_next_cursor < 0)
-        return TOKENIZER_BPE_ERR_BAD_PARAM;
-
     if (staged_preflight_required_token_capacity !=
             staged_commit_required_token_capacity ||
         staged_preflight_required_token_bytes !=
