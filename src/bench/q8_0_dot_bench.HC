@@ -1028,3 +1028,231 @@ I32 Q8_0DotBenchRunDefaultSuite(
     *out_suite_checksum = suite_checksum_snapshot;
     return Q8_0_DOT_BENCH_OK;
 }
+
+// Commit-only preflight diagnostics wrapper over default benchmark suite.
+//
+// Contracts:
+// - Recomputes canonical deterministic tuple
+//   {total_ops,total_cycles,cycles_per_op,remainder_cycles,suite_checksum}
+//   using immutable cpu_hz snapshot.
+// - Enforces output-pointer snapshot stability across staging/parity phases.
+// - Publishes staged tuple atomically only when strict parity succeeds.
+I32 Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnly(
+    I64 cpu_hz,
+    I64 *out_total_ops,
+    I64 *out_total_cycles,
+    I64 *out_cycles_per_op,
+    I64 *out_remainder_cycles,
+    I64 *out_suite_checksum)
+{
+    Q8_0DotBenchShape canonical_shapes[4];
+    I8 lhs_vec[Q8_0_DOT_BENCH_VALUES_PER_BLOCK];
+    I8 rhs_vec[Q8_0_DOT_BENCH_VALUES_PER_BLOCK];
+    I64 snapshot_cpu_hz;
+    I64 *snapshot_out_total_ops;
+    I64 *snapshot_out_total_cycles;
+    I64 *snapshot_out_cycles_per_op;
+    I64 *snapshot_out_remainder_cycles;
+    I64 *snapshot_out_suite_checksum;
+    I64 staged_total_ops;
+    I64 staged_total_cycles;
+    I64 staged_cycles_per_op;
+    I64 staged_remainder_cycles;
+    I64 staged_suite_checksum;
+    I64 canonical_total_ops;
+    I64 canonical_total_cycles;
+    I64 canonical_cycles_per_op;
+    I64 canonical_remainder_cycles;
+    I64 canonical_suite_checksum;
+    I64 shape_idx;
+    I64 vec_idx;
+    I64 dot_calls;
+    I64 block_mac_ops;
+    I64 shape_ops;
+    I64 ns_per_dot;
+    I64 shape_ns;
+    I64 numer_ns_hz;
+    I64 rounded_numer_ns_hz;
+    I64 shape_cycles;
+    I64 vector_dot_q0;
+    I64 vector_dot_term;
+    I64 block_term;
+    I64 row_term;
+    I64 shape_signature;
+    I64 shape_checksum;
+    I32 status;
+
+    if (!out_total_ops || !out_total_cycles || !out_cycles_per_op ||
+        !out_remainder_cycles || !out_suite_checksum)
+        return Q8_0_DOT_BENCH_ERR_NULL_PTR;
+    if (cpu_hz <= 0)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    snapshot_cpu_hz = cpu_hz;
+    snapshot_out_total_ops = out_total_ops;
+    snapshot_out_total_cycles = out_total_cycles;
+    snapshot_out_cycles_per_op = out_cycles_per_op;
+    snapshot_out_remainder_cycles = out_remainder_cycles;
+    snapshot_out_suite_checksum = out_suite_checksum;
+
+    status = Q8_0DotBenchRunDefaultSuite(cpu_hz,
+                                         &staged_total_ops,
+                                         &staged_total_cycles,
+                                         &staged_cycles_per_op,
+                                         &staged_remainder_cycles,
+                                         &staged_suite_checksum);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    if (snapshot_cpu_hz != cpu_hz)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+    if (snapshot_out_total_ops != out_total_ops ||
+        snapshot_out_total_cycles != out_total_cycles ||
+        snapshot_out_cycles_per_op != out_cycles_per_op ||
+        snapshot_out_remainder_cycles != out_remainder_cycles ||
+        snapshot_out_suite_checksum != out_suite_checksum)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    canonical_shapes[0].block_count = 4;
+    canonical_shapes[0].row_count = 1;
+    canonical_shapes[0].row_stride_blocks = 4;
+    canonical_shapes[0].iters = 8192;
+
+    canonical_shapes[1].block_count = 8;
+    canonical_shapes[1].row_count = 2;
+    canonical_shapes[1].row_stride_blocks = 8;
+    canonical_shapes[1].iters = 4096;
+
+    canonical_shapes[2].block_count = 16;
+    canonical_shapes[2].row_count = 4;
+    canonical_shapes[2].row_stride_blocks = 16;
+    canonical_shapes[2].iters = 2048;
+
+    canonical_shapes[3].block_count = 32;
+    canonical_shapes[3].row_count = 8;
+    canonical_shapes[3].row_stride_blocks = 32;
+    canonical_shapes[3].iters = 1024;
+
+    for (vec_idx = 0; vec_idx < Q8_0_DOT_BENCH_VALUES_PER_BLOCK; ++vec_idx)
+    {
+        lhs_vec[vec_idx] = (vec_idx % 17) - 8;
+        rhs_vec[vec_idx] = ((vec_idx * 5 + 3) % 23) - 11;
+    }
+
+    canonical_total_ops = 0;
+    canonical_total_cycles = 0;
+    canonical_suite_checksum = 0;
+
+    for (shape_idx = 0; shape_idx < 4; ++shape_idx)
+    {
+        if (canonical_shapes[shape_idx].row_stride_blocks <
+            canonical_shapes[shape_idx].block_count)
+            return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+        status = Q8_0DotBenchTryMulI64(canonical_shapes[shape_idx].row_count,
+                                       canonical_shapes[shape_idx].iters,
+                                       &dot_calls);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+
+        status = Q8_0DotBenchTryMulI64(canonical_shapes[shape_idx].block_count,
+                                       Q8_0_DOT_BENCH_VALUES_PER_BLOCK,
+                                       &block_mac_ops);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+
+        status = Q8_0DotBenchTryMulI64(dot_calls, block_mac_ops, &shape_ops);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+
+        status = Q8_0DotBenchTryMulI64(canonical_shapes[shape_idx].block_count,
+                                       24,
+                                       &block_term);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+        status = Q8_0DotBenchTryMulI64(canonical_shapes[shape_idx].row_count,
+                                       7,
+                                       &row_term);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+        status = Q8_0DotBenchTryAddI64(600, block_term, &ns_per_dot);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+        status = Q8_0DotBenchTryAddI64(ns_per_dot, row_term, &ns_per_dot);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+
+        status = Q8_0DotBenchTryMulI64(dot_calls, ns_per_dot, &shape_ns);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+        status = Q8_0DotBenchTryMulI64(shape_ns, snapshot_cpu_hz, &numer_ns_hz);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+
+        status = Q8_0DotBenchTryAddI64(numer_ns_hz,
+                                       (Q8_0_DOT_BENCH_NS_PER_SECOND >> 1),
+                                       &rounded_numer_ns_hz);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+        shape_cycles = rounded_numer_ns_hz / Q8_0_DOT_BENCH_NS_PER_SECOND;
+
+        vector_dot_q0 = 0;
+        for (vec_idx = 0; vec_idx < Q8_0_DOT_BENCH_VALUES_PER_BLOCK; ++vec_idx)
+            vector_dot_q0 += lhs_vec[vec_idx] * rhs_vec[(vec_idx + shape_idx) & 31];
+
+        vector_dot_term = vector_dot_q0 * (shape_idx + 1);
+        block_term = canonical_shapes[shape_idx].block_count * 257;
+        row_term = canonical_shapes[shape_idx].row_count * 17;
+        shape_signature = vector_dot_term + block_term + row_term + canonical_shapes[shape_idx].iters;
+
+        status = Q8_0DotBenchTryMulI64(shape_signature, dot_calls, &shape_checksum);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+
+        status = Q8_0DotBenchTryAddI64(canonical_total_ops,
+                                       shape_ops,
+                                       &canonical_total_ops);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+        status = Q8_0DotBenchTryAddI64(canonical_total_cycles,
+                                       shape_cycles,
+                                       &canonical_total_cycles);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+        status = Q8_0DotBenchTryAddI64(canonical_suite_checksum,
+                                       shape_checksum,
+                                       &canonical_suite_checksum);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+    }
+
+    status = Q8_0DotBenchCyclesPerOpChecked(canonical_total_cycles,
+                                            canonical_total_ops,
+                                            &canonical_cycles_per_op,
+                                            &canonical_remainder_cycles);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    if (snapshot_cpu_hz != cpu_hz)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+    if (snapshot_out_total_ops != out_total_ops ||
+        snapshot_out_total_cycles != out_total_cycles ||
+        snapshot_out_cycles_per_op != out_cycles_per_op ||
+        snapshot_out_remainder_cycles != out_remainder_cycles ||
+        snapshot_out_suite_checksum != out_suite_checksum)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    if (staged_total_ops != canonical_total_ops ||
+        staged_total_cycles != canonical_total_cycles ||
+        staged_cycles_per_op != canonical_cycles_per_op ||
+        staged_remainder_cycles != canonical_remainder_cycles ||
+        staged_suite_checksum != canonical_suite_checksum)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    *out_total_ops = staged_total_ops;
+    *out_total_cycles = staged_total_cycles;
+    *out_cycles_per_op = staged_cycles_per_op;
+    *out_remainder_cycles = staged_remainder_cycles;
+    *out_suite_checksum = staged_suite_checksum;
+    return Q8_0_DOT_BENCH_OK;
+}
