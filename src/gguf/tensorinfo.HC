@@ -1192,7 +1192,7 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     return GGUF_TENSOR_PARSE_OK;
 }
 
-// IQ-1024 commit-only diagnostics wrapper for tensor-name parity-preflight gate.
+// IQ-1031 commit-only diagnostics wrapper for tensor-name parity-preflight gate.
 //
 // Composes `...ParityCommitOnlyPreflightOnlyParity` and canonical
 // `...ParityCommitOnlyPreflightOnly`, revalidates immutable
@@ -1216,12 +1216,14 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     U64 staged_parity_next_cursor;
     U64 staged_parity_required_check;
     U64 staged_parity_computed_end;
+    U64 staged_parity_span_remaining;
 
     U64 canonical_name_len;
     U64 canonical_required_bytes;
     U64 canonical_next_cursor;
     U64 canonical_required_check;
     U64 canonical_computed_end;
+    U64 canonical_span_remaining;
 
     U8 *out_name_len_ptr;
     U8 *out_required_bytes_ptr;
@@ -1255,12 +1257,14 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     staged_parity_next_cursor = 0;
     staged_parity_required_check = 0;
     staged_parity_computed_end = 0;
+    staged_parity_span_remaining = 0;
 
     canonical_name_len = 0;
     canonical_required_bytes = 0;
     canonical_next_cursor = 0;
     canonical_required_check = 0;
     canonical_computed_end = 0;
+    canonical_span_remaining = 0;
 
     status = GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
         buf,
@@ -1300,6 +1304,13 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
                              &canonical_computed_end))
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
 
+    staged_parity_span_remaining = size - cursor;
+    canonical_span_remaining = size - cursor;
+
+    if (staged_parity_required_bytes > staged_parity_span_remaining ||
+        canonical_required_bytes > canonical_span_remaining)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
     if (staged_parity_computed_end > size ||
         canonical_computed_end > size)
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
@@ -1311,6 +1322,8 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
 
     if (staged_parity_name_len != canonical_name_len ||
+        staged_parity_name_len > GGUF_TENSOR_MAX_NAME_BYTES ||
+        canonical_name_len > GGUF_TENSOR_MAX_NAME_BYTES ||
         staged_parity_required_bytes != canonical_required_bytes ||
         staged_parity_next_cursor != canonical_next_cursor ||
         staged_parity_required_bytes != staged_parity_required_check ||
@@ -3792,4 +3805,4 @@ I64 GGUFParseTensorInfo(U8 *buf,
     out->count = tensor_count;
     return GGUF_TENSOR_PARSE_OK;
 }
-// IQ1024_MARKER
+// IQ1031_MARKER
