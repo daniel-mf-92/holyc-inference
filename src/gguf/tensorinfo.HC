@@ -281,6 +281,46 @@ I64 GGUFTensorInfoValidateDimsChecked(U32 n_dims,
     return GGUF_TENSOR_PARSE_OK;
 }
 
+// All-or-nothing wrapper for dim/type validation.
+//
+// Composes `GGUFTensorInfoValidateDimsChecked` and stages the canonical
+// `n_elements` result in a local variable. Output is committed only after
+// immutable snapshot parity for `{n_dims,dims_ptr,ggml_type}` succeeds.
+I64 GGUFTensorInfoValidateDimsCheckedNoPartial(U32 n_dims,
+                                               U64 *dims,
+                                               U32 ggml_type,
+                                               U64 *out_n_elements)
+{
+    U32 snapshot_n_dims;
+    U64 *snapshot_dims_ptr;
+    U32 snapshot_ggml_type;
+    U64 staged_n_elements;
+    I64 status;
+
+    if (!dims || !out_n_elements)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+
+    snapshot_n_dims = n_dims;
+    snapshot_dims_ptr = dims;
+    snapshot_ggml_type = ggml_type;
+
+    staged_n_elements = 0;
+    status = GGUFTensorInfoValidateDimsChecked(snapshot_n_dims,
+                                               snapshot_dims_ptr,
+                                               snapshot_ggml_type,
+                                               &staged_n_elements);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+
+    if (snapshot_n_dims != n_dims ||
+        snapshot_dims_ptr != dims ||
+        snapshot_ggml_type != ggml_type)
+        return GGUF_TENSOR_PARSE_ERR_BAD_DIMS;
+
+    *out_n_elements = staged_n_elements;
+    return GGUF_TENSOR_PARSE_OK;
+}
+
 Bool GGUFTensorTryAddU64(U64 a, U64 b, U64 *out)
 {
     if (!out)
