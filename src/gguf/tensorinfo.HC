@@ -875,7 +875,7 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     return GGUF_TENSOR_PARSE_OK;
 }
 
-// IQ-1022 diagnostics-only no-write companion for tensor name parity commit.
+// IQ-1029 diagnostics-only no-write companion for tensor name parity commit.
 //
 // Composes `...ParityCommitOnly` and canonical
 // `...CommitOnlyPreflightOnly`, recomputes canonical span tuple
@@ -904,6 +904,11 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     U64 canonical_next_cursor;
     U64 canonical_required_check;
     U64 canonical_computed_end;
+
+    U64 raw_name_len;
+    U64 raw_required_bytes;
+    U64 raw_computed_end;
+    U64 raw_span_remaining;
 
     U8 *out_name_len_ptr;
     U8 *out_required_bytes_ptr;
@@ -944,6 +949,11 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     canonical_required_check = 0;
     canonical_computed_end = 0;
 
+    raw_name_len = 0;
+    raw_required_bytes = 0;
+    raw_computed_end = 0;
+    raw_span_remaining = 0;
+
     status = GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(
         buf,
         size,
@@ -969,6 +979,35 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     if (!GGUFTensorTryAddU64(8, canonical_name_len, &canonical_required_check))
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
 
+    if (!GGUFTensorCanRead(buf, size, cursor, 8))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    // Reconstruct the on-wire name header directly from immutable bytes so
+    // parity checks are auditable against raw GGUF payload, not only helper
+    // outputs.
+    raw_name_len = (U64)buf[cursor]
+                 | ((U64)buf[cursor + 1] << 8)
+                 | ((U64)buf[cursor + 2] << 16)
+                 | ((U64)buf[cursor + 3] << 24)
+                 | ((U64)buf[cursor + 4] << 32)
+                 | ((U64)buf[cursor + 5] << 40)
+                 | ((U64)buf[cursor + 6] << 48)
+                 | ((U64)buf[cursor + 7] << 56);
+
+    if (raw_name_len > GGUF_TENSOR_MAX_NAME_BYTES)
+        return GGUF_TENSOR_PARSE_ERR_BAD_NAME_LEN;
+    if (!GGUFTensorTryAddU64(8, raw_name_len, &raw_required_bytes))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (cursor > size)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    raw_span_remaining = size - cursor;
+    if (raw_required_bytes > raw_span_remaining)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (!GGUFTensorTryAddU64(cursor, raw_required_bytes, &raw_computed_end))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (raw_computed_end > size)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
     if (!GGUFTensorTryAddU64(cursor,
                              staged_commit_required_bytes,
                              &staged_commit_computed_end))
@@ -989,8 +1028,11 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
 
     if (staged_commit_name_len != canonical_name_len ||
+        staged_commit_name_len != raw_name_len ||
         staged_commit_required_bytes != canonical_required_bytes ||
+        staged_commit_required_bytes != raw_required_bytes ||
         staged_commit_next_cursor != canonical_next_cursor ||
+        staged_commit_next_cursor != raw_computed_end ||
         staged_commit_required_bytes != staged_commit_required_check ||
         canonical_required_bytes != canonical_required_check)
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
