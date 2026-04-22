@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity harness for IQ-1013 default-tiles no-write preflight companion."""
+"""Parity harness for IQ-1026 default-tiles no-write preflight companion."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ import pytest
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parent))
 
-from test_matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_default_tiles_preflight_only import (
-    matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_default_tiles_preflight_only,
+from test_matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_default_tiles_preflight_only_parity_commit_only import (
+    matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_default_tiles_preflight_only_parity_commit_only,
 )
 from test_q4_0_q8_0_matmul_tiled_avx2_q32 import (
     I64_MAX,
@@ -111,7 +111,7 @@ def matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_default_tiles_prefl
     staged_tile_rows = [0]
     staged_tile_cols = [0]
 
-    err = matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_default_tiles_preflight_only(
+    err = matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_default_tiles_preflight_only_parity_commit_only(
         lhs_q4_blocks,
         lhs_q4_block_capacity,
         row_count,
@@ -175,7 +175,7 @@ def explicit_checked_composition(*args):
     )
 
 
-def test_source_contains_iq1013_default_tiles_preflight_companion() -> None:
+def test_source_contains_iq1026_default_tiles_preflight_companion() -> None:
     source = pathlib.Path("src/matmul/q4_0_q8_0_matmul.HC").read_text(encoding="utf-8")
     sig = (
         "I32 "
@@ -184,8 +184,8 @@ def test_source_contains_iq1013_default_tiles_preflight_companion() -> None:
     assert sig in source
     body = source.rsplit(sig, 1)[1].split("\nI32 ", 1)[0]
 
-    assert "// IQ-1013 diagnostics-only no-write companion:" in body
-    assert "MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnly(" in body
+    assert "// IQ-1026 diagnostics-only no-write companion:" in body
+    assert "MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyParityCommitOnly(" in body
     assert "Q4_0Q8_0MatMulDiagPtrOverlapsOutCellsRange(out_required_out_cells," in body
     assert "if (!Q4_0Q8_0MatMulTryMulI64NonNeg(snapshot_row_count," in body
     assert "canonical_tile_rows = Q4_0_Q8_0_MATMUL_DEFAULT_TILE_M;" in body
