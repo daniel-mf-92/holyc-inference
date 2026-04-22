@@ -1569,6 +1569,16 @@ I32 SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyP
         canonical_selected_count > canonical_required_workspace_cells)
         return FP_Q16_ERR_BAD_PARAM;
 
+    // Effective selected lanes must match immutable caller top-k geometry.
+    if (staged_selected_count != snapshot_top_k ||
+        canonical_selected_count != snapshot_top_k)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Required workspace must at least cover the logits lane count.
+    if (staged_required_workspace_cells < snapshot_logits_count ||
+        canonical_required_workspace_cells < snapshot_logits_count)
+        return FP_Q16_ERR_BAD_PARAM;
+
     if (staged_required_workspace_cells > snapshot_workspace_capacity ||
         canonical_required_workspace_cells > snapshot_workspace_capacity)
         return FP_Q16_ERR_BAD_PARAM;

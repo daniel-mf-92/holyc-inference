@@ -6553,9 +6553,22 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParity
                                                                                    U64 *out_tag_len,
                                                                                    U64 *out_next_cursor)
 {
+    U8 *buf_snapshot;
+    U64 buf_nbytes_snapshot;
+    U64 table_end_snapshot;
+    U64 metadata_count_snapshot;
+
     U64 cursor_snapshot;
     U64 cursor_preflight;
     U64 cursor_canonical;
+    U64 tag_end_preflight;
+    U64 tag_end_canonical;
+
+    U64 *cursor_ptr_snapshot;
+    U32 *out_arch_tag_ptr_snapshot;
+    U64 *out_tag_offset_ptr_snapshot;
+    U64 *out_tag_len_ptr_snapshot;
+    U64 *out_next_cursor_ptr_snapshot;
 
     U32 arch_preflight;
     U64 tag_off_preflight;
@@ -6573,6 +6586,20 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParity
         !out_tag_len || !out_next_cursor)
         return GGUF_META_TABLE_ERR_NULL_PTR;
 
+    if ((U8 *)cursor == (U8 *)out_arch_tag ||
+        (U8 *)cursor == (U8 *)out_tag_offset ||
+        (U8 *)cursor == (U8 *)out_tag_len ||
+        (U8 *)cursor == (U8 *)out_next_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if ((U8 *)out_arch_tag == (U8 *)out_tag_offset ||
+        (U8 *)out_arch_tag == (U8 *)out_tag_len ||
+        (U8 *)out_arch_tag == (U8 *)out_next_cursor ||
+        (U8 *)out_tag_offset == (U8 *)out_tag_len ||
+        (U8 *)out_tag_offset == (U8 *)out_next_cursor ||
+        (U8 *)out_tag_len == (U8 *)out_next_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
     if (buf_nbytes > 0x7FFFFFFFFFFFFFFF)
         return GGUF_META_TABLE_ERR_OVERFLOW;
     if (table_end > 0x7FFFFFFFFFFFFFFF)
@@ -6585,10 +6612,23 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParity
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
     if (*cursor > 0x7FFFFFFFFFFFFFFF)
         return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (*cursor > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
     if (*cursor > table_end)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
 
+    buf_snapshot = buf;
+    buf_nbytes_snapshot = buf_nbytes;
+    table_end_snapshot = table_end;
+    metadata_count_snapshot = metadata_count;
+
     cursor_snapshot = *cursor;
+
+    cursor_ptr_snapshot = cursor;
+    out_arch_tag_ptr_snapshot = out_arch_tag;
+    out_tag_offset_ptr_snapshot = out_tag_offset;
+    out_tag_len_ptr_snapshot = out_tag_len;
+    out_next_cursor_ptr_snapshot = out_next_cursor;
 
     cursor_preflight = cursor_snapshot;
     err = GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnly(
@@ -6605,6 +6645,19 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParity
         return err;
     if (cursor_preflight != next_cursor_preflight)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_off_preflight > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (tag_len_preflight > buf_nbytes - tag_off_preflight)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    tag_end_preflight = tag_off_preflight + tag_len_preflight;
+    if (tag_end_preflight > table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (tag_end_preflight != next_cursor_preflight)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (next_cursor_preflight > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (next_cursor_preflight > table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
 
     cursor_canonical = cursor_snapshot;
     err = GGUFMetadataReadArchitectureTagCheckedNoPartial(buf,
@@ -6620,6 +6673,32 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParity
         return err;
     if (cursor_canonical != next_cursor_canonical)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_off_canonical > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (tag_len_canonical > buf_nbytes - tag_off_canonical)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    tag_end_canonical = tag_off_canonical + tag_len_canonical;
+    if (tag_end_canonical > table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (tag_end_canonical != next_cursor_canonical)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (next_cursor_canonical > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (next_cursor_canonical > table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    if (buf_snapshot != buf ||
+        buf_nbytes_snapshot != buf_nbytes ||
+        table_end_snapshot != table_end ||
+        metadata_count_snapshot != metadata_count)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (cursor_ptr_snapshot != cursor ||
+        out_arch_tag_ptr_snapshot != out_arch_tag ||
+        out_tag_offset_ptr_snapshot != out_tag_offset ||
+        out_tag_len_ptr_snapshot != out_tag_len ||
+        out_next_cursor_ptr_snapshot != out_next_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
 
     if (arch_preflight != arch_canonical)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
@@ -6628,6 +6707,11 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParity
     if (tag_len_preflight != tag_len_canonical)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
     if (next_cursor_preflight != next_cursor_canonical)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (tag_len_preflight <= 0)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_off_preflight > next_cursor_preflight)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
 
     *out_arch_tag = arch_preflight;
