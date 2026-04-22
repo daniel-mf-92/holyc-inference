@@ -189,11 +189,11 @@ def test_source_contains_iq1163_rows_nopartial_kernel() -> None:
     assert sig in source
     body = source.split(sig, 1)[1].split("U0 FPQ16RMSNorm(", 1)[0]
 
-    assert "inv_denom_rows_q16 = MAlloc(inv_rows_bytes);" in body
+    assert "status = FPQ16RMSNormRowsChecked(input_q16," in body
     assert "staged_output_q16 = MAlloc(staged_output_bytes);" in body
-    assert "// Phase 1: compute and cache per-row inverse denom" in body
-    assert "// Phase 2: commit only validated staged rows to caller output." in body
-    assert "if (inv_denom_rows_q16[row_index] <= 0)" in body
+    assert "// Phase 1 (preflight): run full checked kernel into private staging so" in body
+    assert "// Phase 2 (commit): one publish pass into caller output." in body
+    assert "snapshot_row_count" in body
 
 
 def test_zero_row_or_lane_short_circuit_no_writes() -> None:
