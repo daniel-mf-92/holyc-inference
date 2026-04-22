@@ -358,6 +358,39 @@ def test_source_contains_iq1119_function_and_chain() -> None:
     assert "if (arch_preflight != arch_parity_commit)" in body
     assert "if (tag_end_preflight > table_end)" in body
     assert "if (tag_end_parity_commit > table_end)" in body
+    assert "if (next_cursor_preflight < cursor_snapshot)" in body
+    assert "if (next_cursor_parity_commit < cursor_snapshot)" in body
+
+
+def test_nonzero_cursor_respects_window_and_monotonic_publish() -> None:
+    prefix = _encode_kv(b"irrelevant", GGUF_TYPE_STRING, b"noop")
+    target = _encode_kv(b"general.architecture", GGUF_TYPE_STRING, b"mistral")
+    buf = bytes(prefix + target)
+
+    cursor = [len(prefix)]
+    out_arch = [0]
+    out_off = [0]
+    out_len = [0]
+    out_next = [0]
+
+    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference(
+        buf=buf,
+        buf_nbytes=len(buf),
+        cursor_ref=cursor,
+        table_end=len(buf),
+        metadata_count=1,
+        out_arch_tag_ref=out_arch,
+        out_tag_offset_ref=out_off,
+        out_tag_len_ref=out_len,
+        out_next_cursor_ref=out_next,
+    )
+
+    assert rc == GGUF_META_TABLE_OK
+    assert out_arch[0] == 2
+    assert out_off[0] >= len(prefix)
+    assert out_next[0] >= len(prefix)
+    assert cursor[0] == out_next[0]
+    assert bytes(buf[out_off[0] : out_off[0] + out_len[0]]) == b"mistral"
 
 
 def run() -> None:
@@ -366,6 +399,7 @@ def run() -> None:
     test_type_mismatch_rejected_without_publish()
     test_truncated_span_rejected_without_publish()
     test_source_contains_iq1119_function_and_chain()
+    test_nonzero_cursor_respects_window_and_monotonic_publish()
     print(
         "gguf_metadata_read_architecture_tag_checked_nopartial_"
         "commit_only_preflight_only_parity_commit_only_preflight_only_parity=ok"
