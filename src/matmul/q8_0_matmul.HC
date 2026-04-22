@@ -150,6 +150,222 @@ I32 Q8_0MatMulTileSchedulerChecked(
     return Q8_0_MATMUL_OK;
 }
 
+// No-partial tile-table scheduler for tiled Q8_0 matmul traversal.
+//
+// Contract:
+// - Build the full deterministic tile span table in private stage arrays.
+// - Publish span starts/ends and span_count only after full schedule succeeds.
+// - On any failure, caller span arrays and `out_span_count` stay unchanged.
+//
+// Span layout (one entry per tile in row-major tile order):
+//   out_row_tile_starts[i], out_row_tile_ends[i],
+//   out_col_tile_starts[i], out_col_tile_ends[i]
+I32 Q8_0MatMulTileSchedulerCheckedNoPartial(
+    I64 row_count,
+    I64 col_count,
+    I64 tile_rows,
+    I64 tile_cols,
+    I64 *out_row_tile_starts,
+    I64 *out_row_tile_ends,
+    I64 *out_col_tile_starts,
+    I64 *out_col_tile_ends,
+    I64 span_capacity,
+    I64 *out_span_count)
+{
+    I64 row_numer;
+    I64 col_numer;
+    I64 row_tile_count;
+    I64 col_tile_count;
+    I64 tile_total_count;
+    I64 stage_bytes;
+    I64 row_tile_start;
+    I64 row_tile_end;
+    I64 col_tile_start;
+    I64 col_tile_end;
+    I64 span_index;
+    I64 snapshot_row_count;
+    I64 snapshot_col_count;
+    I64 snapshot_tile_rows;
+    I64 snapshot_tile_cols;
+    I64 snapshot_span_capacity;
+    I64 *staged_row_tile_starts;
+    I64 *staged_row_tile_ends;
+    I64 *staged_col_tile_starts;
+    I64 *staged_col_tile_ends;
+    I32 status;
+
+    if (!out_span_count)
+        return Q8_0_MATMUL_ERR_NULL_PTR;
+
+    if (span_capacity < 0)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (span_capacity > 0 &&
+        (!out_row_tile_starts ||
+         !out_row_tile_ends ||
+         !out_col_tile_starts ||
+         !out_col_tile_ends))
+        return Q8_0_MATMUL_ERR_NULL_PTR;
+
+    if (row_count < 0 || col_count < 0)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    status = Q8_0MatMulTiledValidateTileShapeChecked(tile_rows,
+                                                     tile_cols);
+    if (status != Q8_0_MATMUL_OK)
+        return status;
+
+    // Checked ceil division for tile counts:
+    //   tile_count = (axis_len + tile_len - 1) / tile_len
+    if (!Q8_0MatMulTryAddI64NonNeg(row_count,
+                                   tile_rows - 1,
+                                   &row_numer))
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+    if (!Q8_0MatMulTryAddI64NonNeg(col_count,
+                                   tile_cols - 1,
+                                   &col_numer))
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+
+    row_tile_count = row_numer / tile_rows;
+    col_tile_count = col_numer / tile_cols;
+
+    if (!Q8_0MatMulTryMulI64NonNeg(row_tile_count,
+                                   col_tile_count,
+                                   &tile_total_count))
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+
+    if (tile_total_count > span_capacity)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (!tile_total_count)
+    {
+        *out_span_count = 0;
+        return Q8_0_MATMUL_OK;
+    }
+
+    snapshot_row_count = row_count;
+    snapshot_col_count = col_count;
+    snapshot_tile_rows = tile_rows;
+    snapshot_tile_cols = tile_cols;
+    snapshot_span_capacity = span_capacity;
+
+    if (!Q8_0MatMulTryMulI64NonNeg(tile_total_count,
+                                   sizeof(I64),
+                                   &stage_bytes))
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+
+    staged_row_tile_starts = MAlloc(stage_bytes);
+    if (!staged_row_tile_starts)
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+
+    staged_row_tile_ends = MAlloc(stage_bytes);
+    if (!staged_row_tile_ends)
+    {
+        Free(staged_row_tile_starts);
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+    }
+
+    staged_col_tile_starts = MAlloc(stage_bytes);
+    if (!staged_col_tile_starts)
+    {
+        Free(staged_row_tile_ends);
+        Free(staged_row_tile_starts);
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+    }
+
+    staged_col_tile_ends = MAlloc(stage_bytes);
+    if (!staged_col_tile_ends)
+    {
+        Free(staged_col_tile_starts);
+        Free(staged_row_tile_ends);
+        Free(staged_row_tile_starts);
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+    }
+
+    span_index = 0;
+    row_tile_start = 0;
+    while (row_tile_start < row_count)
+    {
+        col_tile_start = 0;
+        while (col_tile_start < col_count)
+        {
+            status = Q8_0MatMulTileSchedulerChecked(row_tile_start,
+                                                    col_tile_start,
+                                                    row_count,
+                                                    col_count,
+                                                    tile_rows,
+                                                    tile_cols,
+                                                    &row_tile_end,
+                                                    &col_tile_end);
+            if (status != Q8_0_MATMUL_OK)
+            {
+                Free(staged_col_tile_ends);
+                Free(staged_col_tile_starts);
+                Free(staged_row_tile_ends);
+                Free(staged_row_tile_starts);
+                return status;
+            }
+
+            if (span_index >= tile_total_count)
+            {
+                Free(staged_col_tile_ends);
+                Free(staged_col_tile_starts);
+                Free(staged_row_tile_ends);
+                Free(staged_row_tile_starts);
+                return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+            }
+
+            staged_row_tile_starts[span_index] = row_tile_start;
+            staged_row_tile_ends[span_index] = row_tile_end;
+            staged_col_tile_starts[span_index] = col_tile_start;
+            staged_col_tile_ends[span_index] = col_tile_end;
+            ++span_index;
+
+            col_tile_start = col_tile_end;
+        }
+
+        row_tile_start = row_tile_end;
+    }
+
+    if (span_index != tile_total_count)
+    {
+        Free(staged_col_tile_ends);
+        Free(staged_col_tile_starts);
+        Free(staged_row_tile_ends);
+        Free(staged_row_tile_starts);
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    }
+
+    if (snapshot_row_count != row_count ||
+        snapshot_col_count != col_count ||
+        snapshot_tile_rows != tile_rows ||
+        snapshot_tile_cols != tile_cols ||
+        snapshot_span_capacity != span_capacity)
+    {
+        Free(staged_col_tile_ends);
+        Free(staged_col_tile_starts);
+        Free(staged_row_tile_ends);
+        Free(staged_row_tile_starts);
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    }
+
+    // Atomic publish region: no remaining checked failure paths.
+    for (span_index = 0; span_index < tile_total_count; ++span_index)
+    {
+        out_row_tile_starts[span_index] = staged_row_tile_starts[span_index];
+        out_row_tile_ends[span_index] = staged_row_tile_ends[span_index];
+        out_col_tile_starts[span_index] = staged_col_tile_starts[span_index];
+        out_col_tile_ends[span_index] = staged_col_tile_ends[span_index];
+    }
+    *out_span_count = tile_total_count;
+
+    Free(staged_col_tile_ends);
+    Free(staged_col_tile_starts);
+    Free(staged_row_tile_ends);
+    Free(staged_row_tile_starts);
+    return Q8_0_MATMUL_OK;
+}
+
 // Shared stride/K-span invariants for tiled Q8_0 matmul call-sites.
 // This centralizes the active-K and output-row-stride checks used by
 // scalar and AVX2 entrypoints so BAD_LEN surfaces stay identical.
