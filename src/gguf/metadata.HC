@@ -7137,6 +7137,10 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParity
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
     if (next_cursor_parity_commit > table_end)
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (tag_len_parity_commit <= 0)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_off_parity_commit > next_cursor_parity_commit)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
 
     if (buf_snapshot != buf ||
         buf_nbytes_snapshot != buf_nbytes ||

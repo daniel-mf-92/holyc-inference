@@ -52,6 +52,17 @@ def gguf_model_validate_tensor_layout_checked_nopartial_commit_only_preflight_on
 
     if out_validated_tensor_count_ref is out_total_payload_bytes_ref:
         return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM
+    if (
+        out_validated_tensor_count_ref is tensor_types
+        or out_validated_tensor_count_ref is tensor_offsets
+        or out_validated_tensor_count_ref is tensor_n_dims
+        or out_validated_tensor_count_ref is tensor_dims_flat
+        or out_total_payload_bytes_ref is tensor_types
+        or out_total_payload_bytes_ref is tensor_offsets
+        or out_total_payload_bytes_ref is tensor_n_dims
+        or out_total_payload_bytes_ref is tensor_dims_flat
+    ):
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM
 
     if tensor_count > GGUF_MODEL_VALIDATE_MAX_TENSORS:
         return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM
@@ -124,6 +135,12 @@ def gguf_model_validate_tensor_layout_checked_nopartial_commit_only_preflight_on
 
     if staged_validated[0] > tensor_count:
         return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM
+    if canonical_validated[0] > tensor_count:
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM
+    if tensor_count > 0 and staged_validated[0] != tensor_count:
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM
+    if tensor_count > 0 and canonical_validated[0] != tensor_count:
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM
     if staged_total[0] > data_region_nbytes:
         return GGUF_MODEL_VALIDATE_ERR_OUT_OF_BOUNDS
 
@@ -155,7 +172,9 @@ def test_source_contains_iq1122_signature_and_contract() -> None:
     assert "GGUFModelValidateTensorLayoutCheckedNoPartialCommitOnlyPreflightOnlyParity(" in body
     assert "GGUFModelValidateTensorLayoutCheckedNoPartialCommitOnlyPreflightOnly(" in body
     assert "snapshot_tensor_types != tensor_types" in body
+    assert "(U8 *)out_validated_tensor_count == (U8 *)tensor_offsets" in body
     assert "staged_validated_tensor_count != canonical_validated_tensor_count" in body
+    assert "if (tensor_count > 0 && staged_validated_tensor_count != tensor_count)" in body
 
 
 def test_success_matches_parity_and_preflight_publish() -> None:
@@ -285,6 +304,30 @@ def test_alias_guard_rejected() -> None:
     assert rc == GGUF_MODEL_VALIDATE_ERR_BAD_PARAM
 
 
+
+def test_output_input_alias_rejected() -> None:
+    dims_stride = 1
+    tensor_types = [GGML_TYPE_Q4_0]
+    tensor_offsets = [0]
+    tensor_n_dims = [1]
+    tensor_dims_flat = [32]
+
+    out_total = [91]
+
+    rc = gguf_model_validate_tensor_layout_checked_nopartial_commit_only_preflight_only_parity_commit_only_reference(
+        tensor_types=tensor_types,
+        tensor_offsets=tensor_offsets,
+        tensor_n_dims=tensor_n_dims,
+        tensor_dims_flat=tensor_dims_flat,
+        tensor_count=1,
+        dims_stride=dims_stride,
+        data_region_nbytes=18,
+        out_validated_tensor_count_ref=tensor_offsets,
+        out_total_payload_bytes_ref=out_total,
+    )
+    assert rc == GGUF_MODEL_VALIDATE_ERR_BAD_PARAM
+
+
 def run() -> None:
     test_source_contains_iq1122_signature_and_contract()
     test_success_matches_parity_and_preflight_publish()
@@ -292,6 +335,7 @@ def run() -> None:
     test_type_mismatch_bad_type_passthrough()
     test_out_of_bounds_adversarial_passthrough()
     test_alias_guard_rejected()
+    test_output_input_alias_rejected()
     print(
         "gguf_model_validate_tensor_layout_checked_nopartial_"
         "commit_only_preflight_only_parity_commit_only=ok"

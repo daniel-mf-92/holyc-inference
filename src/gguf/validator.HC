@@ -252,6 +252,15 @@ I64 GGUFModelValidateTensorLayoutCheckedNoPartialCommitOnlyPreflightOnly(
 
     if (out_validated_tensor_count == out_total_payload_bytes)
         return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+    if ((U8 *)out_validated_tensor_count == (U8 *)tensor_types ||
+        (U8 *)out_validated_tensor_count == (U8 *)tensor_offsets ||
+        (U8 *)out_validated_tensor_count == (U8 *)tensor_n_dims ||
+        (U8 *)out_validated_tensor_count == (U8 *)tensor_dims_flat ||
+        (U8 *)out_total_payload_bytes == (U8 *)tensor_types ||
+        (U8 *)out_total_payload_bytes == (U8 *)tensor_offsets ||
+        (U8 *)out_total_payload_bytes == (U8 *)tensor_n_dims ||
+        (U8 *)out_total_payload_bytes == (U8 *)tensor_dims_flat)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
 
     if (tensor_count > GGUF_MODEL_VALIDATE_MAX_TENSORS)
         return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
@@ -314,6 +323,12 @@ I64 GGUFModelValidateTensorLayoutCheckedNoPartialCommitOnlyPreflightOnly(
         return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
 
     if (staged_validated_tensor_count > tensor_count)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+    if (canonical_validated_tensor_count > tensor_count)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+    if (tensor_count > 0 && staged_validated_tensor_count != tensor_count)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+    if (tensor_count > 0 && canonical_validated_tensor_count != tensor_count)
         return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
     if (staged_total_payload_bytes > data_region_nbytes)
         return GGUF_MODEL_VALIDATE_ERR_OUT_OF_BOUNDS;
@@ -476,6 +491,15 @@ I64 GGUFModelValidateTensorLayoutCheckedNoPartialCommitOnlyPreflightOnlyParityCo
 
     if (out_validated_tensor_count == out_total_payload_bytes)
         return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+    if ((U8 *)out_validated_tensor_count == (U8 *)tensor_types ||
+        (U8 *)out_validated_tensor_count == (U8 *)tensor_offsets ||
+        (U8 *)out_validated_tensor_count == (U8 *)tensor_n_dims ||
+        (U8 *)out_validated_tensor_count == (U8 *)tensor_dims_flat ||
+        (U8 *)out_total_payload_bytes == (U8 *)tensor_types ||
+        (U8 *)out_total_payload_bytes == (U8 *)tensor_offsets ||
+        (U8 *)out_total_payload_bytes == (U8 *)tensor_n_dims ||
+        (U8 *)out_total_payload_bytes == (U8 *)tensor_dims_flat)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
 
     if (tensor_count > GGUF_MODEL_VALIDATE_MAX_TENSORS)
         return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
@@ -538,6 +562,12 @@ I64 GGUFModelValidateTensorLayoutCheckedNoPartialCommitOnlyPreflightOnlyParityCo
         return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
 
     if (staged_validated_tensor_count > tensor_count)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+    if (canonical_validated_tensor_count > tensor_count)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+    if (tensor_count > 0 && staged_validated_tensor_count != tensor_count)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+    if (tensor_count > 0 && canonical_validated_tensor_count != tensor_count)
         return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
     if (staged_total_payload_bytes > data_region_nbytes)
         return GGUF_MODEL_VALIDATE_ERR_OUT_OF_BOUNDS;
