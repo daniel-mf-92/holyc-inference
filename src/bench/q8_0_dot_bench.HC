@@ -244,3 +244,70 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnly(
     *out_max_row_matrix_blocks = max_row_matrix_blocks_snapshot;
     return Q8_0_DOT_BENCH_OK;
 }
+
+// Commit-only diagnostics wrapper over default-suite preflight planner.
+//
+// Contracts:
+// - Revalidates immutable cpu_hz snapshot after preflight.
+// - Enforces canonical deterministic suite tuple parity before publish.
+// - Publishes {shape_count,max_blocks,max_rows,max_row_matrix_blocks}
+//   atomically only when all checks pass.
+I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnly(
+    I64 cpu_hz,
+    I64 *out_shape_count,
+    I64 *out_max_blocks,
+    I64 *out_max_rows,
+    I64 *out_max_row_matrix_blocks)
+{
+    I64 cpu_hz_snapshot;
+    I64 staged_shape_count;
+    I64 staged_max_blocks;
+    I64 staged_max_rows;
+    I64 staged_max_row_matrix_blocks;
+    I64 canonical_shape_count;
+    I64 canonical_max_blocks;
+    I64 canonical_max_rows;
+    I64 canonical_max_row_matrix_blocks;
+    I32 status;
+
+    if (!out_shape_count || !out_max_blocks || !out_max_rows ||
+        !out_max_row_matrix_blocks)
+        return Q8_0_DOT_BENCH_ERR_NULL_PTR;
+
+    cpu_hz_snapshot = cpu_hz;
+
+    status = Q8_0DotBenchRunDefaultSuitePreflightOnly(
+        cpu_hz,
+        &staged_shape_count,
+        &staged_max_blocks,
+        &staged_max_rows,
+        &staged_max_row_matrix_blocks);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    if (cpu_hz != cpu_hz_snapshot)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    // Canonical deterministic suite tuple must remain stable.
+    canonical_shape_count = 4;
+    canonical_max_blocks = 32;
+    canonical_max_rows = 8;
+
+    status = Q8_0DotBenchTryMulI64(canonical_max_rows,
+                                   canonical_max_blocks,
+                                   &canonical_max_row_matrix_blocks);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    if (staged_shape_count != canonical_shape_count ||
+        staged_max_blocks != canonical_max_blocks ||
+        staged_max_rows != canonical_max_rows ||
+        staged_max_row_matrix_blocks != canonical_max_row_matrix_blocks)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    *out_shape_count = staged_shape_count;
+    *out_max_blocks = staged_max_blocks;
+    *out_max_rows = staged_max_rows;
+    *out_max_row_matrix_blocks = staged_max_row_matrix_blocks;
+    return Q8_0_DOT_BENCH_OK;
+}
