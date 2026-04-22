@@ -139,6 +139,8 @@ def test_source_contains_iq1129_signature_and_contract() -> None:
     assert "snapshot_registry_slot_capacity != registry_slot_capacity" in body
     assert "if (snapshot_out_registry_tags != out_registry_tags ||" in body
     assert "if (staged_registry_count != canonical_registry_count ||" in body
+    assert "staged_registry_count != DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT" in body
+    assert "staged_default_arch_id != DISPATCH_ARCH_Q16_ID_LLAMA" in body
     assert "*out_registry_count = staged_registry_count;" in body
 
 
