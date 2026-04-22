@@ -321,8 +321,23 @@ def test_truncated_span_rejected_no_partial_publish() -> None:
 def test_source_contains_iq1110_signature_and_chain() -> None:
     src = Path("src/gguf/metadata.HC").read_text(encoding="utf-8")
     sig = "I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly("
-    assert src.count(sig) == 1
-    body = src.split(sig, 1)[1].split("Bool GGUFMetaCanRead(", 1)[0]
+    assert src.count(sig) >= 1
+
+    def_start = -1
+    search_from = 0
+    while True:
+        idx = src.find(sig, search_from)
+        if idx < 0:
+            break
+        brace_idx = src.find("{", idx)
+        semi_idx = src.find(";", idx)
+        if brace_idx >= 0 and (semi_idx < 0 or brace_idx < semi_idx):
+            def_start = idx
+            break
+        search_from = idx + len(sig)
+
+    assert def_start >= 0
+    body = src[def_start:].split("Bool GGUFMetaCanRead(", 1)[0]
 
     assert "GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParity(" in body
     assert "GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnly(" in body
@@ -333,12 +348,40 @@ def test_source_contains_iq1110_signature_and_chain() -> None:
     assert "if (tag_len_staged <= 0)" in body
 
 
+def test_output_alias_rejected_without_publish() -> None:
+    buf = _make_blob([(b"general.architecture", b"llama")])
+
+    cursor = [0]
+    out_arch = [201]
+    shared = [202]
+    out_len = [203]
+
+    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_reference(
+        buf=buf,
+        buf_nbytes=len(buf),
+        cursor_ref=cursor,
+        table_end=len(buf),
+        metadata_count=1,
+        out_arch_tag_ref=out_arch,
+        out_tag_offset_ref=shared,
+        out_tag_len_ref=out_len,
+        out_next_cursor_ref=shared,
+    )
+
+    assert rc == GGUF_META_TABLE_ERR_BAD_PARAM
+    assert cursor == [0]
+    assert out_arch == [201]
+    assert shared == [202]
+    assert out_len == [203]
+
+
 def run() -> None:
     test_success_publishes_once()
     test_missing_key_no_partial_publish()
     test_duplicate_same_priority_rejected_no_partial_publish()
     test_truncated_span_rejected_no_partial_publish()
     test_source_contains_iq1110_signature_and_chain()
+    test_output_alias_rejected_without_publish()
     print("gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only=ok")
 
 
