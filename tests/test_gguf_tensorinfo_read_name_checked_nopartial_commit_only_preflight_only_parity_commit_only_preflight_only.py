@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1022 tensor-name diagnostics no-write companion."""
+"""Harness for IQ-1029 tensor-name diagnostics no-write companion."""
 
 from __future__ import annotations
 
@@ -70,6 +70,10 @@ def parse_name_checked_nopartial_commit_only_preflight_only_parity_commit_only_p
     canonical_required_check = [0]
     canonical_computed_end = [0]
 
+    raw_name_len = [0]
+    raw_required_bytes = [0]
+    raw_computed_end = [0]
+
     status = parse_name_checked_nopartial_commit_only_preflight_only_parity_commit_only(
         buf,
         size,
@@ -97,6 +101,21 @@ def parse_name_checked_nopartial_commit_only_preflight_only_parity_commit_only_p
     if not try_add_u64(8, canonical_name_len[0], canonical_required_check):
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED
 
+    if size < 0 or cursor < 0 or cursor > size or (size - cursor) < 8:
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
+
+    raw_name_len[0] = int.from_bytes(buf[cursor : cursor + 8], "little", signed=False)
+    if raw_name_len[0] > (1 << 20):
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
+    if not try_add_u64(8, raw_name_len[0], raw_required_bytes):
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
+    if raw_required_bytes[0] > (size - cursor):
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
+    if not try_add_u64(cursor, raw_required_bytes[0], raw_computed_end):
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
+    if raw_computed_end[0] > size:
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
+
     if not try_add_u64(cursor, staged_commit_required_bytes[0], staged_commit_computed_end):
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED
     if not try_add_u64(cursor, canonical_required_bytes[0], canonical_computed_end):
@@ -112,8 +131,11 @@ def parse_name_checked_nopartial_commit_only_preflight_only_parity_commit_only_p
 
     if (
         staged_commit_name_len[0] != canonical_name_len[0]
+        or staged_commit_name_len[0] != raw_name_len[0]
         or staged_commit_required_bytes[0] != canonical_required_bytes[0]
+        or staged_commit_required_bytes[0] != raw_required_bytes[0]
         or staged_commit_next_cursor[0] != canonical_next_cursor[0]
+        or staged_commit_next_cursor[0] != raw_computed_end[0]
         or staged_commit_required_bytes[0] != staged_commit_required_check[0]
         or canonical_required_bytes[0] != canonical_required_check[0]
     ):
@@ -129,17 +151,21 @@ def explicit_checked_composition(*args) -> int:
     return parse_name_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only(*args)
 
 
-def test_source_contains_iq1022_signature_and_contract() -> None:
+def test_source_contains_iq1029_signature_and_contract() -> None:
     source = Path("src/gguf/tensorinfo.HC").read_text(encoding="utf-8")
     sig = "I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly("
     assert sig in source
     body = source.rsplit(sig, 1)[1].split("\nI64 ", 1)[0]
 
-    assert "IQ-1022 diagnostics-only no-write companion for tensor name parity commit." in source
+    assert "IQ-1029 diagnostics-only no-write companion for tensor name parity commit." in source
     assert "GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(" in body
     assert "GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnly(" in body
     assert "if (!GGUFTensorTryAddU64(8, staged_commit_name_len, &staged_commit_required_check))" in body
     assert "if (!GGUFTensorTryAddU64(8, canonical_name_len, &canonical_required_check))" in body
+    assert "raw_name_len = (U64)buf[cursor]" in body
+    assert "staged_commit_name_len != raw_name_len" in body
+    assert "staged_commit_required_bytes != raw_required_bytes" in body
+    assert "staged_commit_next_cursor != raw_computed_end" in body
     assert "if (snapshot_buf != buf || snapshot_size != size || snapshot_cursor != cursor)" in body
     assert "staged_commit_name_len != canonical_name_len" in body
     assert "staged_commit_required_bytes != canonical_required_bytes" in body
@@ -183,7 +209,7 @@ def test_known_vector_success_and_alias_guard() -> None:
 
 
 def test_randomized_parity_vs_explicit_composition() -> None:
-    rng = random.Random(20260422_1022)
+    rng = random.Random(20260422_1029)
 
     for _ in range(900):
         name_len = rng.randint(0, 120)
@@ -228,7 +254,7 @@ def test_randomized_parity_vs_explicit_composition() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_iq1022_signature_and_contract()
+    test_source_contains_iq1029_signature_and_contract()
     test_known_vector_success_and_alias_guard()
     test_randomized_parity_vs_explicit_composition()
     print("ok")
