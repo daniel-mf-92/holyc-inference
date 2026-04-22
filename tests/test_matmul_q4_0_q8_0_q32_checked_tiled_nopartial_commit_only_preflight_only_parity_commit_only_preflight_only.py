@@ -9,8 +9,8 @@ import sys
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parent))
 
-from test_matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_preflight_only import (  # noqa: E402
-    matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_preflight_only,
+from test_matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_preflight_only_parity_commit_only import (  # noqa: E402
+    matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_preflight_only_parity_commit_only,
 )
 from test_q4_0_q8_0_matmul_tiled_avx2_q32 import (  # noqa: E402
     I64_MAX,
@@ -192,7 +192,7 @@ def matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_preflight_only_pari
 
 
 def explicit_checked_composition(*args):
-    return matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_preflight_only(
+    return matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_preflight_only_parity_commit_only(
         *args
     )
 
@@ -208,16 +208,17 @@ def test_source_contains_iq1013_signature_and_no_write_recompute_contract() -> N
 
     assert "// IQ-1013 diagnostics-only no-write companion:" in body
     assert "if (!Q4_0Q8_0MatMulTryMulI64NonNeg(snapshot_row_count," in body
-    assert "if (!Q4_0Q8_0MatMulComputeTileGridChecked(snapshot_row_count," in body
-    assert "if (required_lhs_blocks > lhs_q4_block_capacity)" in body
-    assert "if (snapshot_row_count && snapshot_col_count && !tile_total_count)" in body
+    assert "snapshot_lhs_q4_block_capacity = lhs_q4_block_capacity;" in body
     assert "snapshot_out_row_stride_cells = out_row_stride_cells;" in body
+    assert "MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyPreflightOnlyParityCommitOnly(" in body
+    assert "if (staged_required_out_cells != canonical_required_out_cells ||" in body
+    assert "snapshot_lhs_q4_block_capacity != lhs_q4_block_capacity" in body
     assert "*out_required_out_cells = staged_required_out_cells;" in body
     assert "*out_required_out_bytes = staged_required_out_bytes;" in body
     assert "*out_tile_rows = staged_tile_rows;" in body
     assert "*out_tile_cols = staged_tile_cols;" in body
     assert "MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyPreflightOnly(" not in body
-    assert "MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyPreflightOnlyParityCommitOnly(" not in body
+    assert "MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyPreflightOnlyParityCommitOnly(" in body
 
 
 def test_known_vector_success_and_null_rejection() -> None:
