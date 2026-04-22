@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 import random
+import sys
 from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parent))
 
 from test_softmax_q16_stable_topk_checked_nopartial_commit_only_preflight_only import (
     FP_Q16_ERR_BAD_PARAM,
