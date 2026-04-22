@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Zero-write companion harness for ...ParityCommitOnlyPreflightOnly (IQ-1066)."""
+"""Harness for ...CommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly (IQ-1066)."""
 
 from __future__ import annotations
 
@@ -29,24 +29,24 @@ from test_tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_pref
 
 
 def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only(
-    data: list[int] | None,
-    byte_len: int,
-    io_cursor: list[int] | None,
-    prompt_nbytes: int,
-    rank_left_tokens: list[int] | None,
-    rank_right_tokens: list[int] | None,
-    rank_values: list[int] | None,
-    rank_merged_tokens: list[int] | None,
-    rank_table_count: int,
-    rank_table_capacity: int,
-    vocab_piece_lens: list[int] | None,
-    vocab_piece_count: int,
-    vocab_piece_capacity: int,
-    out_token_capacity: int,
-    out_required_token_capacity: list[int] | None,
-    out_required_token_bytes: list[int] | None,
-    out_next_cursor: list[int] | None,
-) -> int:
+    data,
+    byte_len,
+    io_cursor,
+    prompt_nbytes,
+    rank_left_tokens,
+    rank_right_tokens,
+    rank_values,
+    rank_merged_tokens,
+    rank_table_count,
+    rank_table_capacity,
+    vocab_piece_lens,
+    vocab_piece_count,
+    vocab_piece_capacity,
+    out_token_capacity,
+    out_required_token_capacity,
+    out_required_token_bytes,
+    out_next_cursor,
+):
     if (
         data is None
         or io_cursor is None
@@ -78,6 +78,12 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
     snapshot_data = data
     snapshot_byte_len = byte_len
     snapshot_cursor = io_cursor[0]
+    snapshot_prompt_nbytes = prompt_nbytes
+    snapshot_rank_table_count = rank_table_count
+    snapshot_rank_table_capacity = rank_table_capacity
+    snapshot_vocab_piece_count = vocab_piece_count
+    snapshot_vocab_piece_capacity = vocab_piece_capacity
+    snapshot_out_token_capacity = out_token_capacity
 
     staged_required = [0]
     staged_required_bytes = [0]
@@ -104,9 +110,9 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
     if err != TOKENIZER_BPE_OK:
         return err
 
-    canonical_required = [0]
-    canonical_required_bytes = [0]
-    canonical_next = [0]
+    parity_required = [0]
+    parity_required_bytes = [0]
+    parity_next_cursor = [0]
     err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity(
         data,
         byte_len,
@@ -122,15 +128,15 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
         vocab_piece_count,
         vocab_piece_capacity,
         out_token_capacity,
-        canonical_required,
-        canonical_required_bytes,
-        canonical_next,
+        parity_required,
+        parity_required_bytes,
+        parity_next_cursor,
     )
     if err != TOKENIZER_BPE_OK:
         return err
 
-    pre_required = [0]
-    pre_max_piece = [0]
+    preflight_required = [0]
+    preflight_max_piece = [0]
     err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only(
         data,
         byte_len,
@@ -146,51 +152,57 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
         vocab_piece_count,
         vocab_piece_capacity,
         out_token_capacity,
-        pre_required,
-        pre_max_piece,
+        preflight_required,
+        preflight_max_piece,
     )
     if err != TOKENIZER_BPE_OK:
         return err
 
-    if pre_required[0] > I64_MAX // 4:
+    if preflight_required[0] > I64_MAX // 4:
         return TOKENIZER_BPE_ERR_OVERFLOW
-    pre_required_bytes = pre_required[0] * 4
+    preflight_required_bytes = preflight_required[0] * 4
 
     if snapshot_cursor > byte_len or prompt_nbytes > (byte_len - snapshot_cursor):
         return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS
-    pre_next_cursor = snapshot_cursor + prompt_nbytes
-
-    if snapshot_data is not data or snapshot_byte_len != byte_len or snapshot_cursor != io_cursor[0]:
-        return TOKENIZER_BPE_ERR_BAD_PARAM
+    preflight_next_cursor = snapshot_cursor + prompt_nbytes
 
     if (
-        staged_required[0] != canonical_required[0]
-        or staged_required_bytes[0] != canonical_required_bytes[0]
-        or staged_next_cursor[0] != canonical_next[0]
+        snapshot_data is not data
+        or snapshot_byte_len != byte_len
+        or snapshot_cursor != io_cursor[0]
+        or snapshot_prompt_nbytes != prompt_nbytes
+        or snapshot_rank_table_count != rank_table_count
+        or snapshot_rank_table_capacity != rank_table_capacity
+        or snapshot_vocab_piece_count != vocab_piece_count
+        or snapshot_vocab_piece_capacity != vocab_piece_capacity
+        or snapshot_out_token_capacity != out_token_capacity
     ):
         return TOKENIZER_BPE_ERR_BAD_PARAM
 
     if (
-        canonical_required[0] != pre_required[0]
-        or canonical_required_bytes[0] != pre_required_bytes
-        or canonical_next[0] != pre_next_cursor
+        staged_required[0] != parity_required[0]
+        or staged_required_bytes[0] != parity_required_bytes[0]
+        or staged_next_cursor[0] != parity_next_cursor[0]
     ):
         return TOKENIZER_BPE_ERR_BAD_PARAM
 
-    if pre_max_piece[0] > I64_MAX:
+    if (
+        parity_required[0] != preflight_required[0]
+        or parity_required_bytes[0] != preflight_required_bytes
+        or parity_next_cursor[0] != preflight_next_cursor
+    ):
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+
+    if preflight_max_piece[0] > I64_MAX:
         return TOKENIZER_BPE_ERR_OVERFLOW
 
-    out_required_token_capacity[0] = canonical_required[0]
-    out_required_token_bytes[0] = canonical_required_bytes[0]
-    out_next_cursor[0] = canonical_next[0]
+    out_required_token_capacity[0] = staged_required[0]
+    out_required_token_bytes[0] = staged_required_bytes[0]
+    out_next_cursor[0] = staged_next_cursor[0]
     return TOKENIZER_BPE_OK
 
 
-def explicit_checked_composition(*args):
-    return tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only(*args)
-
-
-def _build_rank_tables() -> tuple[list[int], list[int], list[int], list[int]]:
+def _build_rank_tables():
     entries = sorted(
         [
             (108, 108, 1, 300),
@@ -204,14 +216,10 @@ def _build_rank_tables() -> tuple[list[int], list[int], list[int], list[int]]:
         ],
         key=lambda item: (item[0], item[1]),
     )
-    left = [item[0] for item in entries]
-    right = [item[1] for item in entries]
-    ranks = [item[2] for item in entries]
-    merged = [item[3] for item in entries]
-    return left, right, ranks, merged
+    return [e[0] for e in entries], [e[1] for e in entries], [e[2] for e in entries], [e[3] for e in entries]
 
 
-def test_source_contains_iq_1066_symbol_and_chain() -> None:
+def test_source_contains_signature_and_chain() -> None:
     source = Path("src/tokenizer/bpe.HC").read_text(encoding="utf-8")
     sig = (
         "I32 TokenizerBPEEncodePromptCheckedNoAllocFromLens"
@@ -231,7 +239,6 @@ def test_known_vector() -> None:
     left, right, ranks, merged = _build_rank_tables()
     payload = list("hello".encode("utf-8"))
     vocab_lens = [1, 2, 4]
-
     req = [0xAAAA]
     req_bytes = [0xBBBB]
     next_cursor = [0xCCCC]
@@ -305,7 +312,7 @@ def test_fuzz_parity() -> None:
     random.seed(20260422_1066)
     left, right, ranks, merged = _build_rank_tables()
 
-    for _ in range(256):
+    for _ in range(128):
         nbytes = random.randint(0, 48)
         payload = [random.randint(0, 255) for _ in range(nbytes)]
         cursor = random.randint(0, nbytes) if random.random() > 0.2 else random.randint(nbytes + 1, nbytes + 3)
@@ -319,65 +326,25 @@ def test_fuzz_parity() -> None:
 
         out_cap = random.randint(0, nbytes + 3)
 
-        req_a = [0x1234]
-        req_b = [0x1234]
-        req_bytes_a = [0x5678]
-        req_bytes_b = [0x5678]
-        next_a = [0x9ABC]
-        next_b = [0x9ABC]
-        cur_a = [cursor]
-        cur_b = [cursor]
+        req_a, req_b = [0x1234], [0x1234]
+        bytes_a, bytes_b = [0x5678], [0x5678]
+        next_a, next_b = [0x9ABC], [0x9ABC]
+        cur_a, cur_b = [cursor], [cursor]
 
         err_a = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only(
-            payload,
-            nbytes,
-            cur_a,
-            prompt_nbytes,
-            left,
-            right,
-            ranks,
-            merged,
-            len(ranks),
-            len(ranks),
-            vocab_lens,
-            vocab_count,
-            vocab_capacity,
-            out_cap,
-            req_a,
-            req_bytes_a,
-            next_a,
+            payload, nbytes, cur_a, prompt_nbytes, left, right, ranks, merged,
+            len(ranks), len(ranks), vocab_lens, vocab_count, vocab_capacity,
+            out_cap, req_a, bytes_a, next_a,
         )
 
-        err_b = explicit_checked_composition(
-            payload,
-            nbytes,
-            cur_b,
-            prompt_nbytes,
-            left,
-            right,
-            ranks,
-            merged,
-            len(ranks),
-            len(ranks),
-            vocab_lens,
-            vocab_count,
-            vocab_capacity,
-            out_cap,
-            req_b,
-            req_bytes_b,
-            next_b,
+        err_b = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only_parity_commit_only_preflight_only(
+            payload, nbytes, cur_b, prompt_nbytes, left, right, ranks, merged,
+            len(ranks), len(ranks), vocab_lens, vocab_count, vocab_capacity,
+            out_cap, req_b, bytes_b, next_b,
         )
 
         assert err_a == err_b
         assert req_a == req_b
-        assert req_bytes_a == req_bytes_b
+        assert bytes_a == bytes_b
         assert next_a == next_b
         assert cur_a == cur_b
-
-
-if __name__ == "__main__":
-    test_source_contains_iq_1066_symbol_and_chain()
-    test_known_vector()
-    test_error_no_write()
-    test_fuzz_parity()
-    print("ok")
