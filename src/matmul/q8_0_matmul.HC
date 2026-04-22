@@ -1055,3 +1055,132 @@ I32 Q8_0MatMulQ16NaiveCheckedNoPartial(
     Free(staged_cells_q16);
     return Q8_0_MATMUL_OK;
 }
+
+// Commit-only wrapper over no-partial scalar Q8_0 matmul.
+//
+// Contract:
+// - Take immutable snapshots of matrix geometry/strides before compute.
+// - Compute into a private stage buffer via canonical no-partial helper.
+// - Publish staged rows to caller output only after strict snapshot parity.
+// - On any error, caller output remains unchanged.
+I32 Q8_0MatMulQ16NaiveCheckedNoPartialCommitOnly(
+    Q8_0Block *lhs_blocks,
+    I64 lhs_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_col_blocks,
+    I64 rhs_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_cells_q16,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells)
+{
+    I64 lhs_required_blocks;
+    I64 rhs_required_blocks;
+    I64 out_required_cells;
+    I64 stage_bytes;
+    I64 cell_index;
+    I64 snapshot_row_count;
+    I64 snapshot_col_count;
+    I64 snapshot_lhs_row_stride_blocks;
+    I64 snapshot_rhs_col_stride_blocks;
+    I64 snapshot_k_block_count;
+    I64 snapshot_out_row_stride_cells;
+    I64 *staged_cells_q16;
+    I32 status;
+
+    if (!lhs_blocks || !rhs_col_blocks || !out_cells_q16)
+        return Q8_0_MATMUL_ERR_NULL_PTR;
+
+    if (lhs_block_capacity < 0 || rhs_block_capacity < 0 || out_cell_capacity < 0)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    status = Q8_0MatMulTiledValidateStridesAndKChecked(row_count,
+                                                       col_count,
+                                                       lhs_row_stride_blocks,
+                                                       rhs_col_stride_blocks,
+                                                       k_block_count,
+                                                       out_row_stride_cells);
+    if (status != Q8_0_MATMUL_OK)
+        return status;
+
+    status = Q8_0MatMulTiledComputeRequiredCapacitiesChecked(row_count,
+                                                             lhs_row_stride_blocks,
+                                                             col_count,
+                                                             rhs_col_stride_blocks,
+                                                             out_row_stride_cells,
+                                                             &lhs_required_blocks,
+                                                             &rhs_required_blocks,
+                                                             &out_required_cells);
+    if (status != Q8_0_MATMUL_OK)
+        return status;
+
+    if (lhs_required_blocks > lhs_block_capacity)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (rhs_required_blocks > rhs_block_capacity)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    if (out_required_cells > out_cell_capacity)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (!out_required_cells)
+        return Q8_0_MATMUL_OK;
+
+    snapshot_row_count = row_count;
+    snapshot_col_count = col_count;
+    snapshot_lhs_row_stride_blocks = lhs_row_stride_blocks;
+    snapshot_rhs_col_stride_blocks = rhs_col_stride_blocks;
+    snapshot_k_block_count = k_block_count;
+    snapshot_out_row_stride_cells = out_row_stride_cells;
+
+    if (!Q8_0MatMulTryMulI64NonNeg(out_required_cells,
+                                   sizeof(I64),
+                                   &stage_bytes))
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+
+    staged_cells_q16 = MAlloc(stage_bytes);
+    if (!staged_cells_q16)
+        return Q8_0_MATMUL_ERR_OVERFLOW;
+
+    // Preserve row padding lanes exactly as the canonical no-partial helper.
+    for (cell_index = 0; cell_index < out_required_cells; ++cell_index)
+        staged_cells_q16[cell_index] = out_cells_q16[cell_index];
+
+    status = Q8_0MatMulQ16NaiveCheckedNoPartial(
+        lhs_blocks,
+        lhs_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_col_blocks,
+        rhs_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        staged_cells_q16,
+        out_required_cells,
+        out_row_stride_cells);
+    if (status != Q8_0_MATMUL_OK)
+    {
+        Free(staged_cells_q16);
+        return status;
+    }
+
+    if (snapshot_row_count != row_count ||
+        snapshot_col_count != col_count ||
+        snapshot_lhs_row_stride_blocks != lhs_row_stride_blocks ||
+        snapshot_rhs_col_stride_blocks != rhs_col_stride_blocks ||
+        snapshot_k_block_count != k_block_count ||
+        snapshot_out_row_stride_cells != out_row_stride_cells)
+    {
+        Free(staged_cells_q16);
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+    }
+
+    // Atomic publish region: no remaining error branches.
+    for (cell_index = 0; cell_index < out_required_cells; ++cell_index)
+        out_cells_q16[cell_index] = staged_cells_q16[cell_index];
+
+    Free(staged_cells_q16);
+    return Q8_0_MATMUL_OK;
+}
