@@ -2587,6 +2587,8 @@ I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParit
     U64 canonical_computed_end;
     U64 staged_expected_required_bytes;
     U64 canonical_expected_required_bytes;
+    U64 staged_expected_required_bytes;
+    U64 canonical_expected_required_bytes;
 
     I64 status;
 
@@ -2651,6 +2653,8 @@ I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParit
 
     staged_commit_computed_end = 0;
     canonical_computed_end = 0;
+    staged_expected_required_bytes = 0;
+    canonical_expected_required_bytes = 0;
     staged_expected_required_bytes = 0;
     canonical_expected_required_bytes = 0;
 
@@ -3648,6 +3652,36 @@ I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParit
 
     if (staged_commit_dims_cells != staged_commit_dim_count ||
         canonical_dims_cells != canonical_dim_count)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    if (!GGUFTensorTryAddU64(4,
+                             ((U64)staged_commit_dim_count) << 3,
+                             &staged_expected_required_bytes))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (!GGUFTensorTryAddU64(staged_expected_required_bytes,
+                             4,
+                             &staged_expected_required_bytes))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (!GGUFTensorTryAddU64(staged_expected_required_bytes,
+                             8,
+                             &staged_expected_required_bytes))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    if (!GGUFTensorTryAddU64(4,
+                             ((U64)canonical_dim_count) << 3,
+                             &canonical_expected_required_bytes))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (!GGUFTensorTryAddU64(canonical_expected_required_bytes,
+                             4,
+                             &canonical_expected_required_bytes))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (!GGUFTensorTryAddU64(canonical_expected_required_bytes,
+                             8,
+                             &canonical_expected_required_bytes))
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    if (staged_commit_required_bytes != staged_expected_required_bytes ||
+        canonical_required_bytes != canonical_expected_required_bytes)
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
 
     if (staged_commit_last_dim_index != (U64)(staged_commit_dim_count - 1) ||

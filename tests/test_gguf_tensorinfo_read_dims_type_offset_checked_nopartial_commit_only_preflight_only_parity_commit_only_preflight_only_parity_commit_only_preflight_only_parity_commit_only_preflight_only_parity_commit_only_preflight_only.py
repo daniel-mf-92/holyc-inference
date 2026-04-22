@@ -35,6 +35,20 @@ def u64_add(a: int, b: int) -> int | None:
     return a + b
 
 
+def expected_required_bytes_from_dim_count(dim_count: int) -> int | None:
+    dims_bytes = u64_add(0, dim_count << 3)
+    if dims_bytes is None:
+        return None
+    total = u64_add(4, dims_bytes)
+    if total is None:
+        return None
+    total = u64_add(total, 4)
+    if total is None:
+        return None
+    total = u64_add(total, 8)
+    return total
+
+
 def parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only(
     buf: bytes | None,
     size: int,
@@ -158,6 +172,19 @@ def parse_dims_type_offset_checked_nopartial_commit_only_preflight_only_parity_c
     if canonical_dims_cells[0] != canonical_dim_count[0]:
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED
 
+    staged_expected_required_bytes = expected_required_bytes_from_dim_count(
+        staged_commit_dim_count[0]
+    )
+    canonical_expected_required_bytes = expected_required_bytes_from_dim_count(
+        canonical_dim_count[0]
+    )
+    if staged_expected_required_bytes is None or canonical_expected_required_bytes is None:
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
+    if staged_commit_required_bytes[0] != staged_expected_required_bytes:
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
+    if canonical_required_bytes[0] != canonical_expected_required_bytes:
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
+
     if staged_commit_last_dim_index[0] != staged_commit_dim_count[0] - 1:
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED
     if canonical_last_dim_index[0] != canonical_dim_count[0] - 1:
@@ -201,6 +228,10 @@ def test_source_contains_iq1112_signature_and_contract() -> None:
     assert "if (snapshot_buf != buf || snapshot_size != size || snapshot_cursor != cursor)" in body
     assert "if (staged_commit_dim_count != canonical_dim_count ||" in body
     assert "staged_commit_required_bytes != canonical_required_bytes" in body
+    assert "staged_expected_required_bytes" in body
+    assert "canonical_expected_required_bytes" in body
+    assert "staged_commit_required_bytes != staged_expected_required_bytes" in body
+    assert "canonical_required_bytes != canonical_expected_required_bytes" in body
     assert "staged_commit_tensor_offset != canonical_tensor_offset" in body
     assert "if (!GGUFTensorTypeKnown(staged_commit_type_value) ||" in body
     assert "*out_dim_count = canonical_dim_count;" in body
