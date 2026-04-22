@@ -314,7 +314,7 @@ def test_source_contains_iq_1093_symbol() -> None:
     assert "if (staged_commit_required_logits != recomputed_required_logits ||" in body
     assert "snapshot_out_final_token_count != out_final_token_count" in body
     assert "if (!step_logits_q16 || !token_history || !random_q16_values ||" in source
-    assert "if (staged_commit_required_logits > snapshot_step_logits_capacity)" in source
+    assert "if (max_new_tokens < 0 || token_history_count < 0 || vocab_size < 0)" in body
 
 
 def test_known_vector_success() -> None:
