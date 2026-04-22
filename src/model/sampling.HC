@@ -390,31 +390,6 @@ I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnl
     I64 *out_required_logits,
     I64 *out_required_tokens,
     I64 *out_final_token_count);
-I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
-    I64 *step_logits_q16,
-    I64 step_logits_capacity,
-    I64 vocab_size,
-    I64 max_new_tokens,
-    I64 *token_history,
-    I64 token_history_capacity,
-    I64 token_history_count,
-    I64 temperature_q16,
-    I64 top_k,
-    I64 top_p_q16,
-    I64 repetition_penalty_q16,
-    I64 *random_q16_values,
-    I64 random_q16_capacity,
-    I64 *workspace_stage_logits_q16,
-    I64 workspace_stage_logits_capacity,
-    I64 *workspace_topk_logits_q16,
-    I64 workspace_topk_logits_capacity,
-    I64 *workspace_topk_indices,
-    I64 workspace_topk_index_capacity,
-    I64 *out_generated_tokens,
-    I64 generated_capacity,
-    I64 *out_required_logits,
-    I64 *out_required_tokens,
-    I64 *out_final_token_count);
 I32 InferenceGenerateTokensCheckedTopKDefaultPreflightOnlyCommitOnlyParityPreflightOnly(
     I64 *step_logits_q16,
     I64 step_logits_capacity,
@@ -4011,6 +3986,10 @@ I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnl
     I64 canonical_required_tokens;
     I64 canonical_final_token_count;
 
+    I64 canonical_required_logits;
+    I64 canonical_required_tokens;
+    I64 canonical_final_token_count;
+
     I64 snapshot_step_logits_capacity;
     I64 snapshot_vocab_size;
     I64 snapshot_max_new_tokens;
@@ -4182,6 +4161,30 @@ I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnl
         snapshot_token_history_count < 0)
         return SAMPLING_Q16_ERR_BAD_PARAM;
 
+    canonical_required_tokens = snapshot_max_new_tokens;
+
+    // Canonical logits workspace contract: vocab_size logits for each generated step.
+    if (!snapshot_max_new_tokens)
+    {
+        canonical_required_logits = 0;
+    }
+    else
+    {
+        if (snapshot_vocab_size > 0x7FFFFFFFFFFFFFFF / snapshot_max_new_tokens)
+            return SAMPLING_Q16_ERR_OVERFLOW;
+        canonical_required_logits = snapshot_vocab_size * snapshot_max_new_tokens;
+    }
+
+    // Canonical final history length: existing prompt tokens plus generated tokens.
+    canonical_final_token_count = snapshot_token_history_count + snapshot_max_new_tokens;
+    if (canonical_final_token_count < snapshot_token_history_count)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    if (snapshot_vocab_size < 0 ||
+        snapshot_max_new_tokens < 0 ||
+        snapshot_token_history_count < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
     if (snapshot_step_logits_capacity < 0 ||
         snapshot_token_history_capacity < 0 ||
         snapshot_random_q16_capacity < 0 ||
@@ -4216,8 +4219,7 @@ I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnl
     if (canonical_final_token_count < snapshot_token_history_count)
         return SAMPLING_Q16_ERR_OVERFLOW;
 
-    if (canonical_required_logits > snapshot_step_logits_capacity ||
-        canonical_required_logits > snapshot_workspace_stage_logits_capacity)
+    if (canonical_required_logits > snapshot_step_logits_capacity)
         return SAMPLING_Q16_ERR_BAD_PARAM;
 
     if (snapshot_top_k > snapshot_workspace_topk_logits_capacity ||
@@ -4256,6 +4258,15 @@ I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnl
 //    (`...ParityCommitOnlyPreflightOnlyParityCommitOnly`);
 // 3) revalidate immutable prompt/runtime snapshots and strict tuple parity;
 // 4) publish atomically only on exact parity success.
+// IQ-1093 diagnostics-only zero-write companion over IQ-1092 commit wrapper.
+//
+// Compose:
+// 1) stage tuple via IQ-1092 commit wrapper
+//    (`...ParityCommitOnlyPreflightOnlyParityCommitOnly`);
+// 2) stage tuple via IQ-1079 parity gate
+//    (`...ParityCommitOnlyPreflightOnlyParity`);
+// 3) recompute canonical tuple from immutable geometry snapshots;
+// 4) publish atomically only on strict tuple parity success.
 I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
     I64 *step_logits_q16,
     I64 step_logits_capacity,
@@ -4282,13 +4293,17 @@ I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnl
     I64 *out_required_tokens,
     I64 *out_final_token_count)
 {
+    I64 staged_commit_required_logits;
+    I64 staged_commit_required_tokens;
+    I64 staged_commit_final_token_count;
+
     I64 staged_parity_required_logits;
     I64 staged_parity_required_tokens;
     I64 staged_parity_final_token_count;
 
-    I64 staged_commit_required_logits;
-    I64 staged_commit_required_tokens;
-    I64 staged_commit_final_token_count;
+    I64 recomputed_required_logits;
+    I64 recomputed_required_tokens;
+    I64 recomputed_final_token_count;
 
     I64 snapshot_step_logits_capacity;
     I64 snapshot_vocab_size;
@@ -4325,6 +4340,20 @@ I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnl
         out_required_tokens == out_final_token_count)
         return SAMPLING_Q16_ERR_BAD_PARAM;
 
+    if (!step_logits_q16 || !token_history || !random_q16_values ||
+        !workspace_stage_logits_q16 || !workspace_topk_logits_q16 ||
+        !workspace_topk_indices || !out_generated_tokens)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (temperature_q16 <= 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (repetition_penalty_q16 < SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (top_k <= 0 || top_k > vocab_size)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (top_p_q16 <= 0 || top_p_q16 > SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
     snapshot_step_logits_capacity = step_logits_capacity;
     snapshot_vocab_size = vocab_size;
     snapshot_max_new_tokens = max_new_tokens;
@@ -4351,13 +4380,41 @@ I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnl
     snapshot_out_required_tokens = out_required_tokens;
     snapshot_out_final_token_count = out_final_token_count;
 
+    staged_commit_required_logits = 0;
+    staged_commit_required_tokens = 0;
+    staged_commit_final_token_count = 0;
+
     staged_parity_required_logits = 0;
     staged_parity_required_tokens = 0;
     staged_parity_final_token_count = 0;
 
-    staged_commit_required_logits = 0;
-    staged_commit_required_tokens = 0;
-    staged_commit_final_token_count = 0;
+    status = InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
+        step_logits_q16,
+        step_logits_capacity,
+        vocab_size,
+        max_new_tokens,
+        token_history,
+        token_history_capacity,
+        token_history_count,
+        temperature_q16,
+        top_k,
+        top_p_q16,
+        repetition_penalty_q16,
+        random_q16_values,
+        random_q16_capacity,
+        workspace_stage_logits_q16,
+        workspace_stage_logits_capacity,
+        workspace_topk_logits_q16,
+        workspace_topk_logits_capacity,
+        workspace_topk_indices,
+        workspace_topk_index_capacity,
+        out_generated_tokens,
+        generated_capacity,
+        &staged_commit_required_logits,
+        &staged_commit_required_tokens,
+        &staged_commit_final_token_count);
+    if (status)
+        return status;
 
     status = InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
         step_logits_q16,
@@ -4387,33 +4444,24 @@ I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnl
     if (status)
         return status;
 
-    status = InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
-        step_logits_q16,
-        step_logits_capacity,
-        vocab_size,
-        max_new_tokens,
-        token_history,
-        token_history_capacity,
-        token_history_count,
-        temperature_q16,
-        top_k,
-        top_p_q16,
-        repetition_penalty_q16,
-        random_q16_values,
-        random_q16_capacity,
-        workspace_stage_logits_q16,
-        workspace_stage_logits_capacity,
-        workspace_topk_logits_q16,
-        workspace_topk_logits_capacity,
-        workspace_topk_indices,
-        workspace_topk_index_capacity,
-        out_generated_tokens,
-        generated_capacity,
-        &staged_commit_required_logits,
-        &staged_commit_required_tokens,
-        &staged_commit_final_token_count);
-    if (status)
-        return status;
+    if (max_new_tokens < 0 || token_history_count < 0 || vocab_size < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (max_new_tokens)
+    {
+        if (vocab_size > 0x7FFFFFFFFFFFFFFF / max_new_tokens)
+            return SAMPLING_Q16_ERR_OVERFLOW;
+        recomputed_required_logits = vocab_size * max_new_tokens;
+    }
+    else
+    {
+        recomputed_required_logits = 0;
+    }
+
+    recomputed_required_tokens = max_new_tokens;
+    recomputed_final_token_count = token_history_count + max_new_tokens;
+    if (recomputed_final_token_count < token_history_count)
+        return SAMPLING_Q16_ERR_OVERFLOW;
 
     if (snapshot_step_logits_capacity != step_logits_capacity ||
         snapshot_vocab_size != vocab_size ||
@@ -4448,22 +4496,30 @@ I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnl
         out_required_tokens == out_final_token_count)
         return SAMPLING_Q16_ERR_BAD_PARAM;
 
-    if (staged_parity_required_logits < 0 ||
+    if (staged_commit_required_logits < 0 ||
+        staged_commit_required_tokens < 0 ||
+        staged_commit_final_token_count < 0 ||
+        staged_parity_required_logits < 0 ||
         staged_parity_required_tokens < 0 ||
         staged_parity_final_token_count < 0 ||
-        staged_commit_required_logits < 0 ||
-        staged_commit_required_tokens < 0 ||
-        staged_commit_final_token_count < 0)
+        recomputed_required_logits < 0 ||
+        recomputed_required_tokens < 0 ||
+        recomputed_final_token_count < 0)
         return SAMPLING_Q16_ERR_BAD_PARAM;
 
-    if (staged_parity_required_logits != staged_commit_required_logits ||
-        staged_parity_required_tokens != staged_commit_required_tokens ||
-        staged_parity_final_token_count != staged_commit_final_token_count)
+    if (staged_commit_required_logits != staged_parity_required_logits ||
+        staged_commit_required_tokens != staged_parity_required_tokens ||
+        staged_commit_final_token_count != staged_parity_final_token_count)
         return SAMPLING_Q16_ERR_BAD_PARAM;
 
-    *out_required_logits = staged_parity_required_logits;
-    *out_required_tokens = staged_parity_required_tokens;
-    *out_final_token_count = staged_parity_final_token_count;
+    if (staged_commit_required_logits != recomputed_required_logits ||
+        staged_commit_required_tokens != recomputed_required_tokens ||
+        staged_commit_final_token_count != recomputed_final_token_count)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    *out_required_logits = staged_commit_required_logits;
+    *out_required_tokens = staged_commit_required_tokens;
+    *out_final_token_count = staged_commit_final_token_count;
     return SAMPLING_Q16_OK;
 }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for ...ParityCommitOnlyPreflightOnlyParityCommitOnly (IQ-1092)."""
+"""Harness for ...ParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly (IQ-1093)."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from test_inference_generate_tokens_preflight_checked import (
 )
 
 
-def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
+def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
     *,
     step_logits_q16: list[int] | None,
     step_logits_capacity: int,
@@ -299,21 +299,22 @@ def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parit
     return SAMPLING_Q16_OK
 
 
-def test_source_contains_iq_1092_symbol() -> None:
+def test_source_contains_iq_1093_symbol() -> None:
     source = Path("src/model/sampling.HC").read_text(encoding="utf-8")
     sig = (
         "I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnly"
-        "ParityCommitOnlyPreflightOnlyParityCommitOnly("
+        "ParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly("
     )
     assert sig in source
     assert len(re.findall(re.escape(sig), source)) == 1
     body = source.split(sig, 1)[1]
     assert "InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in body
-    assert "InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnly(" in body
-    assert "if (staged_parity_required_logits != staged_commit_required_logits ||" in body
+    assert "InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(" in body
+    assert "if (staged_commit_required_logits != staged_parity_required_logits ||" in body
+    assert "if (staged_commit_required_logits != recomputed_required_logits ||" in body
     assert "snapshot_out_final_token_count != out_final_token_count" in body
     assert "if (!step_logits_q16 || !token_history || !random_q16_values ||" in source
-    assert "if (canonical_required_logits > snapshot_step_logits_capacity)" in source
+    assert "if (staged_commit_required_logits > snapshot_step_logits_capacity)" in source
 
 
 def test_known_vector_success() -> None:
@@ -322,7 +323,7 @@ def test_known_vector_success() -> None:
     out_final_token_count = [333]
 
     status = (
-        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
+        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
             step_logits_q16=[0] * 64,
             step_logits_capacity=64,
             vocab_size=16,
@@ -362,7 +363,7 @@ def test_bad_param_and_no_publish() -> None:
     out_final_token_count = [1003]
 
     status = (
-        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
+        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
             step_logits_q16=[0] * 16,
             step_logits_capacity=16,
             vocab_size=8,
@@ -398,7 +399,7 @@ def test_bad_param_and_no_publish() -> None:
 
 def test_null_output_pointer_rejected() -> None:
     status = (
-        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
+        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
             step_logits_q16=[0] * 4,
             step_logits_capacity=4,
             vocab_size=2,
@@ -430,7 +431,7 @@ def test_null_output_pointer_rejected() -> None:
 
 def test_null_required_input_pointer_rejected() -> None:
     status = (
-        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
+        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
             step_logits_q16=None,
             step_logits_capacity=4,
             vocab_size=2,
@@ -466,7 +467,7 @@ def test_bad_capacity_contract_rejected_without_publish() -> None:
     out_final_token_count = [300]
 
     status = (
-        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
+        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
             step_logits_q16=[0] * 15,
             step_logits_capacity=15,
             vocab_size=8,
@@ -503,7 +504,7 @@ def test_bad_capacity_contract_rejected_without_publish() -> None:
 def test_alias_output_pointer_rejected() -> None:
     aliased = [0]
     status = (
-        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
+        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
             step_logits_q16=[0] * 4,
             step_logits_capacity=4,
             vocab_size=2,
@@ -548,7 +549,7 @@ def test_no_publish_when_parity_tuple_mismatch() -> None:
         return SAMPLING_Q16_OK
 
     status = (
-        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
+        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
             step_logits_q16=[0] * 64,
             step_logits_capacity=64,
             vocab_size=16,
@@ -598,7 +599,7 @@ def test_no_publish_when_commit_tuple_mismatch() -> None:
         return SAMPLING_Q16_OK
 
     status = (
-        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
+        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
             step_logits_q16=[0] * 64,
             step_logits_capacity=64,
             vocab_size=16,
@@ -657,7 +658,7 @@ def test_no_publish_when_canonical_tuple_mismatch() -> None:
         return SAMPLING_Q16_OK
 
     status = (
-        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
+        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
             step_logits_q16=[0] * 64,
             step_logits_capacity=64,
             vocab_size=16,
@@ -701,7 +702,7 @@ def test_overflow_guard_for_required_logits_and_no_publish() -> None:
     huge_vocab = (1 << 62)
 
     status = (
-        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
+        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
             step_logits_q16=[0],
             step_logits_capacity=1,
             vocab_size=huge_vocab,
@@ -787,7 +788,7 @@ def test_adversarial_matrix_parity_with_explicit_composition() -> None:
         out_logits = [909]
         out_tokens = [808]
         out_final = [707]
-        status = inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference(
+        status = inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
             **kwargs,
             out_required_logits=out_logits,
             out_required_tokens=out_tokens,
