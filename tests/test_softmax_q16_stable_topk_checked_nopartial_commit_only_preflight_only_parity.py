@@ -63,6 +63,9 @@ def softmax_q16_stable_topk_checked_nopartial_commit_only_preflight_only_parity(
     snapshot_logits_count = logits_count
     snapshot_top_k = top_k
     snapshot_workspace_capacity = workspace_capacity
+    snapshot_out_required_ref = out_required_workspace_cells
+    snapshot_out_selected_ref = out_selected_count
+    snapshot_out_max_ref = out_max_logit_q16
 
     staged_required = [0]
     staged_selected = [0]
@@ -119,6 +122,13 @@ def softmax_q16_stable_topk_checked_nopartial_commit_only_preflight_only_parity(
         or snapshot_logits_count != logits_count
         or snapshot_top_k != top_k
         or snapshot_workspace_capacity != workspace_capacity
+    ):
+        return FP_Q16_ERR_BAD_PARAM
+
+    if (
+        snapshot_out_required_ref is not out_required_workspace_cells
+        or snapshot_out_selected_ref is not out_selected_count
+        or snapshot_out_max_ref is not out_max_logit_q16
     ):
         return FP_Q16_ERR_BAD_PARAM
 
@@ -283,6 +293,28 @@ def test_pointer_span_overflow_guard() -> None:
     assert out_max == [9]
 
 
+def test_window_delta_overflow_guard() -> None:
+    logits = [I64_MAX_VALUE, -1]
+    out_required = [11]
+    out_selected = [12]
+    out_max = [13]
+
+    err = softmax_q16_stable_topk_checked_nopartial_commit_only_preflight_only_parity(
+        logits,
+        logits_count=2,
+        top_k=1,
+        workspace_capacity=3,
+        out_required_workspace_cells=out_required,
+        out_selected_count=out_selected,
+        out_max_logit_q16=out_max,
+    )
+
+    assert err == FP_Q16_ERR_OVERFLOW
+    assert out_required == [11]
+    assert out_selected == [12]
+    assert out_max == [13]
+
+
 def test_rejects_negative_staged_required_geometry() -> None:
     logits = [11, -3, 4]
     out_required = [0x1111]
@@ -400,6 +432,7 @@ if __name__ == "__main__":
     test_null_output_pointer_rejected()
     test_fuzz_parity_vs_preflight_only()
     test_pointer_span_overflow_guard()
+    test_window_delta_overflow_guard()
     test_rejects_negative_staged_required_geometry()
     test_rejects_staged_selected_exceeding_required_geometry()
     print("ok")
