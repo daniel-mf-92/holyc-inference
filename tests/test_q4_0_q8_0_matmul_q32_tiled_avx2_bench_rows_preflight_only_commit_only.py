@@ -52,6 +52,15 @@ def q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only(
     snapshot_col_count = col_count
     snapshot_k_block_count = k_block_count
     snapshot_iter_count = iter_count
+    snapshot_lhs_q4_block_capacity = lhs_q4_block_capacity
+    snapshot_rhs_q8_block_capacity = rhs_q8_block_capacity
+    snapshot_out_cell_capacity = out_cell_capacity
+    snapshot_lhs_row_stride_blocks = lhs_row_stride_blocks
+    snapshot_rhs_col_stride_blocks = rhs_col_stride_blocks
+    snapshot_out_row_stride_cells = out_row_stride_cells
+    snapshot_lhs_q4_blocks = lhs_q4_blocks
+    snapshot_rhs_q8_col_blocks = rhs_q8_col_blocks
+    snapshot_out_cells_q32 = out_cells_q32
 
     staged_cells_per_iter = [out_cells_per_iter[0]]
     staged_block_dots_per_iter = [out_block_dots_per_iter[0]]
@@ -88,6 +97,24 @@ def q4_0_q8_0_matmul_q32_tiled_avx2_bench_rows_preflight_only_commit_only(
         return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
     if snapshot_iter_count != iter_count:
         return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    if snapshot_lhs_q4_block_capacity != lhs_q4_block_capacity:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    if snapshot_rhs_q8_block_capacity != rhs_q8_block_capacity:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    if snapshot_out_cell_capacity != out_cell_capacity:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    if snapshot_lhs_row_stride_blocks != lhs_row_stride_blocks:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    if snapshot_rhs_col_stride_blocks != rhs_col_stride_blocks:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    if snapshot_out_row_stride_cells != out_row_stride_cells:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    if snapshot_lhs_q4_blocks is not lhs_q4_blocks:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    if snapshot_rhs_q8_col_blocks is not rhs_q8_col_blocks:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+    if snapshot_out_cells_q32 is not out_cells_q32:
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
 
     out_cells_per_iter[0] = staged_cells_per_iter[0]
     out_block_dots_per_iter[0] = staged_block_dots_per_iter[0]
@@ -108,6 +135,18 @@ def test_source_contains_bench_preflight_only_commit_only_signature_and_atomic_p
     assert "Q4_0Q8_0MatMulQ32TiledAVX2BenchRowsPreflightOnly(" in body
     assert "if (status != Q4_0_Q8_0_MATMUL_OK)" in body
     assert "if (snapshot_row_count != row_count ||" in body
+    assert "snapshot_lhs_q4_block_capacity = lhs_q4_block_capacity;" in body
+    assert "snapshot_rhs_q8_block_capacity = rhs_q8_block_capacity;" in body
+    assert "snapshot_out_cell_capacity = out_cell_capacity;" in body
+    assert "snapshot_lhs_q4_blocks = lhs_q4_blocks;" in body
+    assert "snapshot_rhs_q8_col_blocks = rhs_q8_col_blocks;" in body
+    assert "snapshot_out_cells_q32 = out_cells_q32;" in body
+    assert "snapshot_lhs_q4_block_capacity != lhs_q4_block_capacity ||" in body
+    assert "snapshot_rhs_q8_block_capacity != rhs_q8_block_capacity ||" in body
+    assert "snapshot_out_cell_capacity != out_cell_capacity ||" in body
+    assert "snapshot_lhs_q4_blocks != lhs_q4_blocks ||" in body
+    assert "snapshot_rhs_q8_col_blocks != rhs_q8_col_blocks ||" in body
+    assert "snapshot_out_cells_q32 != out_cells_q32)" in body
     assert "*out_cells_per_iter = staged_cells_per_iter;" in body
     assert "*out_block_dots_per_iter = staged_block_dots_per_iter;" in body
     assert "*out_total_cells = staged_total_cells;" in body

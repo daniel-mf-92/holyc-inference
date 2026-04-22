@@ -446,6 +446,137 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnly(U8 *buf,
     return GGUF_TENSOR_PARSE_OK;
 }
 
+// Diagnostics-only no-write companion for tensor name tuple decoding.
+//
+// Composes `...CommitOnly`, then recomputes canonical
+// {name_len, required_bytes, next_cursor} from immutable {buf,size,cursor}
+// snapshots. Outputs are published atomically only when staged and canonical
+// tuples match exactly, preserving strict no-partial semantics.
+I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnly(
+    U8 *buf,
+    U64 size,
+    U64 cursor,
+    U64 *out_name_len,
+    U64 *out_required_bytes,
+    U64 *out_next_cursor)
+{
+    U8 *snapshot_buf;
+    U64 snapshot_size;
+    U64 snapshot_cursor;
+
+    U64 staged_name_len;
+    U64 staged_required_bytes;
+    U64 staged_next_cursor;
+
+    GGUFTensorString canonical_name;
+    U64 canonical_name_len;
+    U64 canonical_required_bytes;
+    U64 canonical_next_cursor;
+    U64 computed_end;
+    I64 status;
+
+    U8 *out_name_len_ptr;
+    U8 *out_required_bytes_ptr;
+    U8 *out_next_cursor_ptr;
+
+    if (!buf || !out_name_len || !out_required_bytes || !out_next_cursor)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+
+    out_name_len_ptr = (U8 *)out_name_len;
+    out_required_bytes_ptr = (U8 *)out_required_bytes;
+    out_next_cursor_ptr = (U8 *)out_next_cursor;
+
+    if (out_name_len_ptr == out_required_bytes_ptr ||
+        out_name_len_ptr == out_next_cursor_ptr ||
+        out_required_bytes_ptr == out_next_cursor_ptr)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+
+    if (cursor > size)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    if (size > 0x7FFFFFFFFFFFFFFF || cursor > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
+    snapshot_buf = buf;
+    snapshot_size = size;
+    snapshot_cursor = cursor;
+
+    staged_name_len = 0;
+    staged_required_bytes = 0;
+    staged_next_cursor = 0;
+
+    GGUFTensorZeroString(&canonical_name);
+    canonical_name_len = 0;
+    canonical_required_bytes = 0;
+    canonical_next_cursor = 0;
+
+    status = GGUFTensorInfoReadNameCheckedNoPartialCommitOnly(buf,
+                                                               size,
+                                                               cursor,
+                                                               &staged_name_len,
+                                                               &staged_required_bytes,
+                                                               &staged_next_cursor);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+
+    status = GGUFTensorInfoReadNameCheckedNoPartial(buf,
+                                                    size,
+                                                    cursor,
+                                                    &canonical_name,
+                                                    &canonical_next_cursor);
+    if (status != GGUF_TENSOR_PARSE_OK)
+    {
+        GGUFTensorFreeString(&canonical_name);
+        return status;
+    }
+
+    canonical_name_len = canonical_name.len;
+    if (!GGUFTensorTryAddU64(8, canonical_name_len, &canonical_required_bytes))
+    {
+        GGUFTensorFreeString(&canonical_name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
+
+    // Keep explicit U64 span math so the byte window is auditable: name header
+    // (8 bytes) + payload (name_len), then cursor + required_bytes.
+    if (!GGUFTensorTryAddU64(cursor, canonical_required_bytes, &computed_end))
+    {
+        GGUFTensorFreeString(&canonical_name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
+    if (computed_end != canonical_next_cursor)
+    {
+        GGUFTensorFreeString(&canonical_name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
+
+    if (snapshot_buf != buf || snapshot_size != size || snapshot_cursor != cursor)
+    {
+        GGUFTensorFreeString(&canonical_name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
+
+    if (staged_name_len != canonical_name_len ||
+        staged_required_bytes != canonical_required_bytes ||
+        staged_next_cursor != canonical_next_cursor)
+    {
+        GGUFTensorFreeString(&canonical_name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
+
+    GGUFTensorFreeString(&canonical_name);
+
+    *out_name_len = staged_name_len;
+    *out_required_bytes = staged_required_bytes;
+    *out_next_cursor = staged_next_cursor;
+    return GGUF_TENSOR_PARSE_OK;
+}
+
+// Diagnostics-only no-write companion for tensor name tuple decoding.
+//
+// Composes `...CommitOnly`, then recomputes canonical
+// {name_len, required_bytes, next_cursor} from immutable {buf,size,cursor}
+// snapshots. Outputs are published atomically only when staged and canonical
+// tuples match exactly, preserving strict no-partial semantics.
 // Checked no-partial parser for `{n_dims, dims[], ggml_type, offset}`.
 // Uses explicit U64 staging math and publishes the tuple atomically only
 // after full span parity and type/dim validation succeed.

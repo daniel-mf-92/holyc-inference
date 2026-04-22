@@ -97,6 +97,8 @@ def parse_one_checked_nopartial_commit_only_preflight_only(
 
     if cursor > size:
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED
+    if size > 0x7FFFFFFFFFFFFFFF or cursor > 0x7FFFFFFFFFFFFFFF:
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED
 
     snapshot_buf = buf
     snapshot_size = size
@@ -372,6 +374,53 @@ def test_null_alias_and_no_partial_publish_on_failure() -> None:
     assert out_next_cursor == [107]
 
 
+
+
+def test_cross_tuple_alias_and_signed_range_rejection() -> None:
+    payload = tensor_entry("blk.0.attn_k.weight", [128, 64], 8, 2048)
+
+    out_name_len = [401]
+    out_dim_count = [402]
+    out_dims_cells = [403]
+    out_required_bytes = [404]
+    out_type_value = [405]
+    out_tensor_offset = [406]
+    out_next_cursor = [407]
+
+    err = parse_one_checked_nopartial_commit_only_preflight_only(
+        payload,
+        len(payload),
+        0,
+        out_name_len,
+        out_dim_count,
+        out_dims_cells,
+        out_required_bytes,
+        out_dim_count,
+        out_tensor_offset,
+        out_next_cursor,
+    )
+    assert err == GGUF_TENSOR_PARSE_ERR_NULL_PTR
+    assert out_name_len == [401]
+    assert out_dim_count == [402]
+    assert out_dims_cells == [403]
+    assert out_required_bytes == [404]
+    assert out_tensor_offset == [406]
+    assert out_next_cursor == [407]
+
+    err = parse_one_checked_nopartial_commit_only_preflight_only(
+        payload,
+        (1 << 63) + 5,
+        0,
+        out_name_len,
+        out_dim_count,
+        out_dims_cells,
+        out_required_bytes,
+        out_type_value,
+        out_tensor_offset,
+        out_next_cursor,
+    )
+    assert err == GGUF_TENSOR_PARSE_ERR_TRUNCATED
+
 def test_adversarial_name_dim_type_span_overflow_vectors() -> None:
     out_name_len = [201]
     out_dim_count = [202]
@@ -580,6 +629,7 @@ def test_success_and_randomized_preflight_tuple_parity() -> None:
 if __name__ == "__main__":
     test_source_contains_iq1010_signature_and_tuple_parity_contract()
     test_null_alias_and_no_partial_publish_on_failure()
+    test_cross_tuple_alias_and_signed_range_rejection()
     test_adversarial_name_dim_type_span_overflow_vectors()
     test_success_and_randomized_preflight_tuple_parity()
     print("gguf_tensor_info_read_checked_nopartial_commit_only_preflight_only=ok")
