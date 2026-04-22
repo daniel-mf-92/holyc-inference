@@ -137,10 +137,30 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_default_capacity(
 
     derived_out_token_capacity = prompt_nbytes
 
-    return tokenizer_bpe_encode_prompt_checked_noalloc_from_lens(
+    snapshot_data = data
+    snapshot_byte_len = byte_len
+    snapshot_prompt_nbytes = prompt_nbytes
+    snapshot_rank_left_tokens = rank_left_tokens
+    snapshot_rank_right_tokens = rank_right_tokens
+    snapshot_rank_values = rank_values
+    snapshot_rank_merged_tokens = rank_merged_tokens
+    snapshot_rank_table_count = rank_table_count
+    snapshot_rank_table_capacity = rank_table_capacity
+    snapshot_vocab_piece_lens = vocab_piece_lens
+    snapshot_vocab_piece_count = vocab_piece_count
+    snapshot_vocab_piece_capacity = vocab_piece_capacity
+    snapshot_out_token_ids = out_token_ids
+    snapshot_cursor = io_cursor[0]
+
+    staged_cursor = [snapshot_cursor]
+    staged_token_count = [0]
+    staged_required_token_capacity = [0]
+    staged_max_piece_len = [0]
+
+    err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens(
         data,
         byte_len,
-        io_cursor,
+        staged_cursor,
         prompt_nbytes,
         rank_left_tokens,
         rank_right_tokens,
@@ -153,10 +173,35 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_default_capacity(
         vocab_piece_capacity,
         out_token_ids,
         derived_out_token_capacity,
-        out_token_count,
-        out_required_token_capacity,
-        out_max_piece_len,
+        staged_token_count,
+        staged_required_token_capacity,
+        staged_max_piece_len,
     )
+    if err != TOKENIZER_BPE_OK:
+        return err
+
+    if (
+        snapshot_data is not data
+        or snapshot_byte_len != byte_len
+        or snapshot_prompt_nbytes != prompt_nbytes
+        or snapshot_rank_left_tokens is not rank_left_tokens
+        or snapshot_rank_right_tokens is not rank_right_tokens
+        or snapshot_rank_values is not rank_values
+        or snapshot_rank_merged_tokens is not rank_merged_tokens
+        or snapshot_rank_table_count != rank_table_count
+        or snapshot_rank_table_capacity != rank_table_capacity
+        or snapshot_vocab_piece_lens is not vocab_piece_lens
+        or snapshot_vocab_piece_count != vocab_piece_count
+        or snapshot_vocab_piece_capacity != vocab_piece_capacity
+        or snapshot_out_token_ids is not out_token_ids
+    ):
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+
+    io_cursor[0] = staged_cursor[0]
+    out_token_count[0] = staged_token_count[0]
+    out_required_token_capacity[0] = staged_required_token_capacity[0]
+    out_max_piece_len[0] = staged_max_piece_len[0]
+    return TOKENIZER_BPE_OK
 
 
 def explicit_checked_composition(
@@ -201,10 +246,15 @@ def explicit_checked_composition(
 
     derived_out_token_capacity = prompt_nbytes
 
-    return tokenizer_bpe_encode_prompt_checked_noalloc_from_lens(
+    staged_cursor = [io_cursor[0]]
+    staged_token_count = [0]
+    staged_required_token_capacity = [0]
+    staged_max_piece_len = [0]
+
+    err = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens(
         data,
         byte_len,
-        io_cursor,
+        staged_cursor,
         prompt_nbytes,
         rank_left_tokens,
         rank_right_tokens,
@@ -217,10 +267,18 @@ def explicit_checked_composition(
         vocab_piece_capacity,
         out_token_ids,
         derived_out_token_capacity,
-        out_token_count,
-        out_required_token_capacity,
-        out_max_piece_len,
+        staged_token_count,
+        staged_required_token_capacity,
+        staged_max_piece_len,
     )
+    if err != TOKENIZER_BPE_OK:
+        return err
+
+    io_cursor[0] = staged_cursor[0]
+    out_token_count[0] = staged_token_count[0]
+    out_required_token_capacity[0] = staged_required_token_capacity[0]
+    out_max_piece_len[0] = staged_max_piece_len[0]
+    return TOKENIZER_BPE_OK
 
 
 def test_source_contains_lens_default_capacity_helpers() -> None:
@@ -241,6 +299,11 @@ def test_source_contains_lens_default_capacity_helpers() -> None:
     body_default = source.split(sig_default, 1)[1]
     assert "derived_out_token_capacity = prompt_nbytes;" in body_default
     assert "IQ-821 default-capacity contract" in body_default
+    assert "snapshot_cursor = *io_cursor;" in body_default
+    assert "staged_cursor = snapshot_cursor;" in body_default
+    assert "if (err != TOKENIZER_BPE_OK)" in body_default
+    assert "*io_cursor = staged_cursor;" in body_default
+    assert "*out_token_count = staged_token_count;" in body_default
     assert "TokenizerBPEEncodePromptCheckedNoAllocFromLens(" in body_default
 
 
