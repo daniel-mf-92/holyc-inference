@@ -1223,7 +1223,10 @@ I64 GGUFTensorInfoReadCheckedNoPartialCommitOnlyPreflightOnly(
                                                 &canonical,
                                                 &canonical_next_cursor);
     if (status != GGUF_TENSOR_PARSE_OK)
+    {
+        GGUFTensorFreeString(&canonical.name);
         return status;
+    }
 
     canonical_name_len = canonical.name.len;
     canonical_dim_count = canonical.n_dims;
