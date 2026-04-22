@@ -229,6 +229,17 @@ def test_source_contains_iq1044_signature_and_pipeline_calls() -> None:
     assert "BlockQ32ToQ16RoundedChecked(" in body
 
 
+def test_source_contains_required_bytes_preflight_contract_calls() -> None:
+    source = Path("src/model/block.HC").read_text(encoding="utf-8")
+    signature = "I32 TransformerBlockQ16ApplyCheckedNoPartialCommitOnly("
+    body = source.rsplit(signature, 1)[1]
+
+    assert "AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(" in body
+    assert "FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(" in body
+    assert "required_q16_cells" in body
+    assert "required_q32_cells" in body
+
+
 def test_targeted_deterministic_fixture_parity() -> None:
     row_count = 2
     lane_count = 4
@@ -275,6 +286,34 @@ def test_invalid_shapes_return_bad_param() -> None:
         4,
     )
     assert err == BLOCK_Q16_ERR_BAD_PARAM
+    assert out == []
+
+
+def test_zero_geometry_short_circuits_to_success() -> None:
+    err, out = transformer_block_q16_apply_checked_nopartial_commit_only_model(
+        [],
+        [Q16_ONE],
+        1,
+        Q16_ONE,
+        [],
+        [],
+        0,
+        6,
+    )
+    assert err == BLOCK_Q16_OK
+    assert out == []
+
+    err, out = transformer_block_q16_apply_checked_nopartial_commit_only_model(
+        [],
+        [Q16_ONE],
+        1,
+        Q16_ONE,
+        [],
+        [],
+        4,
+        0,
+    )
+    assert err == BLOCK_Q16_OK
     assert out == []
 
 
