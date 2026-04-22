@@ -110,6 +110,46 @@ I32 Q8_0MatMulTiledValidateTileShapeChecked(I64 tile_rows,
     return Q8_0_MATMUL_OK;
 }
 
+// Deterministic tile scheduler shared by scalar and AVX2 tiled matmul paths.
+// For the current tile starts, compute bounded tile ends for both axes in one
+// checked call so overflow/BAD_LEN behavior stays identical across kernels.
+I32 Q8_0MatMulTileSchedulerChecked(
+    I64 row_tile_start,
+    I64 col_tile_start,
+    I64 row_count,
+    I64 col_count,
+    I64 tile_rows,
+    I64 tile_cols,
+    I64 *out_row_tile_end,
+    I64 *out_col_tile_end)
+{
+    I32 status;
+
+    if (!out_row_tile_end || !out_col_tile_end)
+        return Q8_0_MATMUL_ERR_NULL_PTR;
+
+    status = Q8_0MatMulTiledValidateTileShapeChecked(tile_rows,
+                                                     tile_cols);
+    if (status != Q8_0_MATMUL_OK)
+        return status;
+
+    status = Q8_0MatMulTiledComputeSpanBoundsChecked(row_tile_start,
+                                                     tile_rows,
+                                                     row_count,
+                                                     out_row_tile_end);
+    if (status != Q8_0_MATMUL_OK)
+        return status;
+
+    status = Q8_0MatMulTiledComputeSpanBoundsChecked(col_tile_start,
+                                                     tile_cols,
+                                                     col_count,
+                                                     out_col_tile_end);
+    if (status != Q8_0_MATMUL_OK)
+        return status;
+
+    return Q8_0_MATMUL_OK;
+}
+
 // Shared stride/K-span invariants for tiled Q8_0 matmul call-sites.
 // This centralizes the active-K and output-row-stride checks used by
 // scalar and AVX2 entrypoints so BAD_LEN surfaces stay identical.
@@ -468,20 +508,28 @@ I32 Q8_0MatMulQ16TiledChecked(
     row_tile_start = 0;
     while (row_tile_start < row_count)
     {
-        status = Q8_0MatMulTiledComputeSpanBoundsChecked(row_tile_start,
-                                                         tile_rows,
-                                                         row_count,
-                                                         &row_tile_end);
+        status = Q8_0MatMulTileSchedulerChecked(row_tile_start,
+                                                0,
+                                                row_count,
+                                                col_count,
+                                                tile_rows,
+                                                tile_cols,
+                                                &row_tile_end,
+                                                &col_tile_end);
         if (status != Q8_0_MATMUL_OK)
             return status;
 
         col_tile_start = 0;
         while (col_tile_start < col_count)
         {
-            status = Q8_0MatMulTiledComputeSpanBoundsChecked(col_tile_start,
-                                                             tile_cols,
-                                                             col_count,
-                                                             &col_tile_end);
+            status = Q8_0MatMulTileSchedulerChecked(row_tile_start,
+                                                    col_tile_start,
+                                                    row_count,
+                                                    col_count,
+                                                    tile_rows,
+                                                    tile_cols,
+                                                    &row_tile_end,
+                                                    &col_tile_end);
             if (status != Q8_0_MATMUL_OK)
                 return status;
 
@@ -606,20 +654,28 @@ I32 Q8_0MatMulQ32TiledAVX2Checked(
     row_tile_start = 0;
     while (row_tile_start < row_count)
     {
-        status = Q8_0MatMulTiledComputeSpanBoundsChecked(row_tile_start,
-                                                         tile_rows,
-                                                         row_count,
-                                                         &row_tile_end);
+        status = Q8_0MatMulTileSchedulerChecked(row_tile_start,
+                                                0,
+                                                row_count,
+                                                col_count,
+                                                tile_rows,
+                                                tile_cols,
+                                                &row_tile_end,
+                                                &col_tile_end);
         if (status != Q8_0_MATMUL_OK)
             return status;
 
         col_tile_start = 0;
         while (col_tile_start < col_count)
         {
-            status = Q8_0MatMulTiledComputeSpanBoundsChecked(col_tile_start,
-                                                             tile_cols,
-                                                             col_count,
-                                                             &col_tile_end);
+            status = Q8_0MatMulTileSchedulerChecked(row_tile_start,
+                                                    col_tile_start,
+                                                    row_count,
+                                                    col_count,
+                                                    tile_rows,
+                                                    tile_cols,
+                                                    &row_tile_end,
+                                                    &col_tile_end);
             if (status != Q8_0_MATMUL_OK)
                 return status;
 
@@ -745,20 +801,28 @@ I32 Q8_0MatMulQ16TiledAVX2Checked(
     row_tile_start = 0;
     while (row_tile_start < row_count)
     {
-        status = Q8_0MatMulTiledComputeSpanBoundsChecked(row_tile_start,
-                                                         tile_rows,
-                                                         row_count,
-                                                         &row_tile_end);
+        status = Q8_0MatMulTileSchedulerChecked(row_tile_start,
+                                                0,
+                                                row_count,
+                                                col_count,
+                                                tile_rows,
+                                                tile_cols,
+                                                &row_tile_end,
+                                                &col_tile_end);
         if (status != Q8_0_MATMUL_OK)
             return status;
 
         col_tile_start = 0;
         while (col_tile_start < col_count)
         {
-            status = Q8_0MatMulTiledComputeSpanBoundsChecked(col_tile_start,
-                                                             tile_cols,
-                                                             col_count,
-                                                             &col_tile_end);
+            status = Q8_0MatMulTileSchedulerChecked(row_tile_start,
+                                                    col_tile_start,
+                                                    row_count,
+                                                    col_count,
+                                                    tile_rows,
+                                                    tile_cols,
+                                                    &row_tile_end,
+                                                    &col_tile_end);
             if (status != Q8_0_MATMUL_OK)
                 return status;
 
