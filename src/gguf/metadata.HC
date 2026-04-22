@@ -18,10 +18,20 @@
 #define GGUF_META_TABLE_ERR_BAD_PARAM 2
 #define GGUF_META_TABLE_ERR_OVERFLOW 3
 #define GGUF_META_TABLE_ERR_OUT_OF_BOUNDS 4
+#define GGUF_META_TABLE_ERR_TYPE_MISMATCH 5
 
 #define GGUF_MAX_METADATA_COUNT (1 << 20)
 #define GGUF_MAX_STRING_BYTES   (1 << 20)
 #define GGUF_MAX_ARRAY_ELEMS    (1 << 24)
+
+#define GGUF_META_ARCH_KEY_GENERAL_ARCHITECTURE     "general.architecture"
+#define GGUF_META_ARCH_KEY_GENERAL_ARCHITECTURE_LEN 20
+#define GGUF_META_ARCH_KEY_GENERAL_ARCH              "general.arch"
+#define GGUF_META_ARCH_KEY_GENERAL_ARCH_LEN          12
+#define GGUF_META_ARCH_KEY_ARCHITECTURE              "architecture"
+#define GGUF_META_ARCH_KEY_ARCHITECTURE_LEN          12
+#define GGUF_META_ARCH_KEY_MODEL_ARCHITECTURE        "model.architecture"
+#define GGUF_META_ARCH_KEY_MODEL_ARCHITECTURE_LEN    18
 
 #define GGUF_TYPE_UINT8   0
 #define GGUF_TYPE_INT8    1
@@ -892,6 +902,15 @@ I32 GGUFMetadataFindKeySpanCheckedNoPartial(U8 *buf,
                                             U64 *out_key_len,
                                             U32 *out_value_type,
                                             U64 *out_next_cursor);
+
+I32 GGUFMetadataReadArchitectureTagCheckedNoPartial(U8 *buf,
+                                                    U64 buf_nbytes,
+                                                    U64 *cursor,
+                                                    U64 table_end,
+                                                    U64 metadata_count,
+                                                    U64 *out_tag_offset,
+                                                    U64 *out_tag_len,
+                                                    U64 *out_next_cursor);
 
 I32 GGUFMetadataReadArrayHeaderChecked(U8 *buf,
                                        U64 buf_nbytes,
@@ -5510,6 +5529,943 @@ I32 GGUFMetadataArrayReadF32BitsChecked(U8 *buf,
     }
 
     *cursor = payload_end;
+    return GGUF_META_TABLE_OK;
+}
+
+// Checked metadata value payload skipper used by key-span scanners.
+// Contract: advances `*cursor` over exactly one payload for `value_type`
+// (the value tag itself is read by the caller), committing cursor only on full
+// success.
+I32 GGUFMetadataSkipValuePayloadChecked(U8 *buf,
+                                        U64 buf_nbytes,
+                                        U64 *cursor,
+                                        U64 table_end,
+                                        U32 value_type)
+{
+    U64 cur;
+    U64 next_cursor;
+    U32 elem_type;
+    U64 elem_count;
+    U64 payload_bytes;
+    U64 payload_end;
+    U64 i;
+    U64 str_len;
+    I32 err;
+
+    if (!buf || !cursor)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    if (buf_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (table_end > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    cur = *cursor;
+    if (cur > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    switch (value_type)
+    {
+        case GGUF_TYPE_UINT8:
+        case GGUF_TYPE_INT8:
+        case GGUF_TYPE_BOOL:
+            err = GGUFMetadataCursorCanAdvanceChecked(cur,
+                                                      1,
+                                                      table_end,
+                                                      &next_cursor);
+            if (err != GGUF_META_TABLE_OK)
+                return err;
+            if (next_cursor > buf_nbytes)
+                return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+            *cursor = next_cursor;
+            return GGUF_META_TABLE_OK;
+
+        case GGUF_TYPE_UINT16:
+        case GGUF_TYPE_INT16:
+            err = GGUFMetadataCursorCanAdvanceChecked(cur,
+                                                      2,
+                                                      table_end,
+                                                      &next_cursor);
+            if (err != GGUF_META_TABLE_OK)
+                return err;
+            if (next_cursor > buf_nbytes)
+                return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+            *cursor = next_cursor;
+            return GGUF_META_TABLE_OK;
+
+        case GGUF_TYPE_UINT32:
+        case GGUF_TYPE_INT32:
+        case GGUF_TYPE_FLOAT32:
+            err = GGUFMetadataCursorCanAdvanceChecked(cur,
+                                                      4,
+                                                      table_end,
+                                                      &next_cursor);
+            if (err != GGUF_META_TABLE_OK)
+                return err;
+            if (next_cursor > buf_nbytes)
+                return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+            *cursor = next_cursor;
+            return GGUF_META_TABLE_OK;
+
+        case GGUF_TYPE_UINT64:
+        case GGUF_TYPE_INT64:
+        case GGUF_TYPE_FLOAT64:
+            err = GGUFMetadataCursorCanAdvanceChecked(cur,
+                                                      8,
+                                                      table_end,
+                                                      &next_cursor);
+            if (err != GGUF_META_TABLE_OK)
+                return err;
+            if (next_cursor > buf_nbytes)
+                return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+            *cursor = next_cursor;
+            return GGUF_META_TABLE_OK;
+
+        case GGUF_TYPE_STRING:
+            err = GGUFMetadataReadStringLenU64Checked(buf,
+                                                      buf_nbytes,
+                                                      &cur,
+                                                      table_end,
+                                                      &str_len);
+            if (err != GGUF_META_TABLE_OK)
+                return err;
+
+            err = GGUFMetadataCursorCanAdvanceChecked(cur,
+                                                      str_len,
+                                                      table_end,
+                                                      &next_cursor);
+            if (err != GGUF_META_TABLE_OK)
+                return err;
+            if (next_cursor > buf_nbytes)
+                return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+            *cursor = next_cursor;
+            return GGUF_META_TABLE_OK;
+
+        case GGUF_TYPE_ARRAY:
+            err = GGUFMetadataReadArrayHeaderChecked(buf,
+                                                     buf_nbytes,
+                                                     &cur,
+                                                     table_end,
+                                                     &elem_type,
+                                                     &elem_count);
+            if (err != GGUF_META_TABLE_OK)
+                return err;
+
+            switch (elem_type)
+            {
+                case GGUF_TYPE_UINT8:
+                case GGUF_TYPE_INT8:
+                case GGUF_TYPE_UINT16:
+                case GGUF_TYPE_INT16:
+                case GGUF_TYPE_UINT32:
+                case GGUF_TYPE_INT32:
+                case GGUF_TYPE_FLOAT32:
+                case GGUF_TYPE_UINT64:
+                case GGUF_TYPE_INT64:
+                case GGUF_TYPE_FLOAT64:
+                case GGUF_TYPE_BOOL:
+                    err = GGUFMetadataArrayPayloadSpanFromFixedTypeAtCursorChecked(elem_type,
+                                                                                    elem_count,
+                                                                                    &cur,
+                                                                                    table_end,
+                                                                                    buf_nbytes,
+                                                                                    &payload_bytes,
+                                                                                    &payload_end);
+                    if (err != GGUF_META_TABLE_OK)
+                        return err;
+                    if (payload_end < cur)
+                        return GGUF_META_TABLE_ERR_OVERFLOW;
+                    if (payload_bytes != payload_end - cur)
+                        return GGUF_META_TABLE_ERR_OVERFLOW;
+                    *cursor = payload_end;
+                    return GGUF_META_TABLE_OK;
+
+                case GGUF_TYPE_STRING:
+                    for (i = 0; i < elem_count; ++i)
+                    {
+                        err = GGUFMetadataReadStringLenU64Checked(buf,
+                                                                  buf_nbytes,
+                                                                  &cur,
+                                                                  table_end,
+                                                                  &str_len);
+                        if (err != GGUF_META_TABLE_OK)
+                            return err;
+
+                        err = GGUFMetadataCursorCanAdvanceChecked(cur,
+                                                                  str_len,
+                                                                  table_end,
+                                                                  &next_cursor);
+                        if (err != GGUF_META_TABLE_OK)
+                            return err;
+                        if (next_cursor > buf_nbytes)
+                            return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+                        cur = next_cursor;
+                    }
+                    *cursor = cur;
+                    return GGUF_META_TABLE_OK;
+            }
+
+            return GGUF_META_TABLE_ERR_BAD_PARAM;
+    }
+
+    return GGUF_META_TABLE_ERR_BAD_PARAM;
+}
+
+// Scan bounded metadata KVs for one exact key and return key/value span
+// descriptors atomically on success.
+//
+// Output contract (success only):
+// - out_key_offset: byte offset to matched key payload
+// - out_key_len: matched key payload length
+// - out_value_type: GGUF value tag associated with the matched key
+// - out_next_cursor: byte offset just after the matched value payload
+// - *cursor is advanced to out_next_cursor
+//
+// No-partial contract: on any failure path (including not-found/duplicates),
+// this function does not mutate outputs and does not mutate `*cursor`.
+I32 GGUFMetadataFindKeySpanCheckedNoPartial(U8 *buf,
+                                            U64 buf_nbytes,
+                                            U64 *cursor,
+                                            U64 table_end,
+                                            U64 metadata_count,
+                                            U8 *target_key_bytes,
+                                            U64 target_key_len,
+                                            U64 *out_key_offset,
+                                            U64 *out_key_len,
+                                            U32 *out_value_type,
+                                            U64 *out_next_cursor)
+{
+    U64 scan_cursor;
+    U64 key_len;
+    U64 key_payload_offset;
+    U64 key_payload_end;
+    U32 value_type;
+    U32 candidate_arch_tag;
+    U64 i;
+    U64 lane;
+    Bool key_match;
+
+    Bool found;
+    U64 staged_key_offset;
+    U64 staged_key_len;
+    U32 staged_value_type;
+    U64 staged_next_cursor;
+
+    I32 err;
+
+    if (!buf || !cursor || !target_key_bytes ||
+        !out_key_offset || !out_key_len || !out_value_type || !out_next_cursor)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    if (buf_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (table_end > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (metadata_count > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (target_key_len > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    if (metadata_count > GGUF_MAX_METADATA_COUNT)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (!target_key_len || target_key_len > GGUF_MAX_STRING_BYTES)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (*cursor > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    scan_cursor = *cursor;
+    if (scan_cursor > table_end)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    found = FALSE;
+    staged_key_offset = 0;
+    staged_key_len = 0;
+    staged_value_type = 0;
+    staged_next_cursor = 0;
+
+    for (i = 0; i < metadata_count; ++i)
+    {
+        err = GGUFMetadataReadStringLenU64Checked(buf,
+                                                  buf_nbytes,
+                                                  &scan_cursor,
+                                                  table_end,
+                                                  &key_len);
+        if (err != GGUF_META_TABLE_OK)
+            return err;
+
+        if (!key_len || key_len > GGUF_MAX_STRING_BYTES)
+            return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+        key_payload_offset = scan_cursor;
+        err = GGUFMetadataCursorCanAdvanceChecked(scan_cursor,
+                                                  key_len,
+                                                  table_end,
+                                                  &key_payload_end);
+        if (err != GGUF_META_TABLE_OK)
+            return err;
+        if (key_payload_end > buf_nbytes)
+            return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+        key_match = FALSE;
+        if (key_len == target_key_len)
+        {
+            key_match = TRUE;
+            for (lane = 0; lane < key_len; ++lane)
+            {
+                if (buf[key_payload_offset + lane] != target_key_bytes[lane])
+                {
+                    key_match = FALSE;
+                    break;
+                }
+            }
+        }
+        scan_cursor = key_payload_end;
+
+        err = GGUFMetadataReadU32LEChecked(buf,
+                                           buf_nbytes,
+                                           &scan_cursor,
+                                           table_end,
+                                           &value_type);
+        if (err != GGUF_META_TABLE_OK)
+            return err;
+        if (!GGUFMetaTypeSupported(value_type))
+            return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+        err = GGUFMetadataSkipValuePayloadChecked(buf,
+                                                  buf_nbytes,
+                                                  &scan_cursor,
+                                                  table_end,
+                                                  value_type);
+        if (err != GGUF_META_TABLE_OK)
+            return err;
+
+        if (key_match)
+        {
+            if (found)
+                return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+            found = TRUE;
+            staged_key_offset = key_payload_offset;
+            staged_key_len = key_len;
+            staged_value_type = value_type;
+            staged_next_cursor = scan_cursor;
+        }
+    }
+
+    if (!found)
+        return GGUF_META_PARSE_ERR_NOT_FOUND;
+
+    *out_key_offset = staged_key_offset;
+    *out_key_len = staged_key_len;
+    *out_value_type = staged_value_type;
+    *out_next_cursor = staged_next_cursor;
+    *cursor = staged_next_cursor;
+    return GGUF_META_TABLE_OK;
+}
+
+#define GGUF_ARCH_TAG_LLAMA   1
+#define GGUF_ARCH_TAG_MISTRAL 2
+#define GGUF_ARCH_TAG_QWEN2   3
+#define GGUF_ARCH_TAG_PHI3    4
+
+U64 GGUFMetadataCStringLen(U8 *s)
+{
+    U64 n;
+
+    if (!s)
+        return 0;
+
+    n = 0;
+    while (s[n])
+        n++;
+    return n;
+}
+
+Bool GGUFMetadataSpanEqualsLiteral(U8 *buf,
+                                   U64 buf_nbytes,
+                                   U64 off,
+                                   U64 len,
+                                   U8 *lit)
+{
+    U64 lit_len;
+    U64 i;
+
+    if (!buf || !lit)
+        return FALSE;
+
+    lit_len = GGUFMetadataCStringLen(lit);
+    if (len != lit_len)
+        return FALSE;
+    if (off > buf_nbytes)
+        return FALSE;
+    if (len > buf_nbytes - off)
+        return FALSE;
+
+    for (i = 0; i < len; ++i)
+    {
+        if (buf[off + i] != lit[i])
+            return FALSE;
+    }
+
+    return TRUE;
+}
+
+I32 GGUFMetadataCanonicalArchTagFromSpanChecked(U8 *buf,
+                                                U64 buf_nbytes,
+                                                U64 off,
+                                                U64 len,
+                                                U32 *out_arch_tag)
+{
+    if (!buf || !out_arch_tag)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    if (GGUFMetadataSpanEqualsLiteral(buf, buf_nbytes, off, len, "llama"))
+    {
+        *out_arch_tag = GGUF_ARCH_TAG_LLAMA;
+        return GGUF_META_TABLE_OK;
+    }
+    if (GGUFMetadataSpanEqualsLiteral(buf, buf_nbytes, off, len, "mistral"))
+    {
+        *out_arch_tag = GGUF_ARCH_TAG_MISTRAL;
+        return GGUF_META_TABLE_OK;
+    }
+    if (GGUFMetadataSpanEqualsLiteral(buf, buf_nbytes, off, len, "qwen2") ||
+        GGUFMetadataSpanEqualsLiteral(buf, buf_nbytes, off, len, "qwen") ||
+        GGUFMetadataSpanEqualsLiteral(buf, buf_nbytes, off, len, "qwen2.5"))
+    {
+        *out_arch_tag = GGUF_ARCH_TAG_QWEN2;
+        return GGUF_META_TABLE_OK;
+    }
+    if (GGUFMetadataSpanEqualsLiteral(buf, buf_nbytes, off, len, "phi3") ||
+        GGUFMetadataSpanEqualsLiteral(buf, buf_nbytes, off, len, "phi-3"))
+    {
+        *out_arch_tag = GGUF_ARCH_TAG_PHI3;
+        return GGUF_META_TABLE_OK;
+    }
+
+    return GGUF_META_TABLE_ERR_BAD_PARAM;
+}
+
+I32 GGUFMetadataKeyArchitecturePriority(U8 *buf,
+                                        U64 buf_nbytes,
+                                        U64 key_off,
+                                        U64 key_len,
+                                        I64 *out_priority)
+{
+    if (!buf || !out_priority)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    if (GGUFMetadataSpanEqualsLiteral(buf,
+                                      buf_nbytes,
+                                      key_off,
+                                      key_len,
+                                      "general.architecture"))
+    {
+        *out_priority = 0;
+        return GGUF_META_TABLE_OK;
+    }
+
+    if (GGUFMetadataSpanEqualsLiteral(buf,
+                                      buf_nbytes,
+                                      key_off,
+                                      key_len,
+                                      "architecture"))
+    {
+        *out_priority = 1;
+        return GGUF_META_TABLE_OK;
+    }
+
+    if (GGUFMetadataSpanEqualsLiteral(buf,
+                                      buf_nbytes,
+                                      key_off,
+                                      key_len,
+                                      "model.architecture"))
+    {
+        *out_priority = 2;
+        return GGUF_META_TABLE_OK;
+    }
+
+    return GGUF_META_PARSE_ERR_NOT_FOUND;
+}
+
+// Read canonical model architecture tag from bounded GGUF metadata entries.
+// Priority order for key lookup:
+//   1) general.architecture
+//   2) architecture
+//   3) model.architecture
+//
+// No-partial contract: outputs and `*cursor` publish only on success.
+I32 GGUFMetadataReadArchitectureTagCheckedNoPartial(U8 *buf,
+                                                    U64 buf_nbytes,
+                                                    U64 *cursor,
+                                                    U64 table_end,
+                                                    U64 metadata_count,
+                                                    U32 *out_arch_tag,
+                                                    U64 *out_tag_offset,
+                                                    U64 *out_tag_len,
+                                                    U64 *out_next_cursor)
+{
+    U64 scan_cursor;
+    U64 key_len;
+    U64 key_off;
+    U64 key_end;
+    U32 value_type;
+    U64 value_len;
+    U64 value_off;
+    U64 value_end;
+    U64 i;
+    I64 priority;
+
+    Bool found;
+    I64 found_priority;
+    U32 staged_arch_tag;
+    U64 staged_tag_off;
+    U64 staged_tag_len;
+    U64 staged_next_cursor;
+
+    I32 err;
+
+    if (!buf || !cursor || !out_arch_tag || !out_tag_offset ||
+        !out_tag_len || !out_next_cursor)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    if (buf_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (table_end > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (metadata_count > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (*cursor > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    if (metadata_count > GGUF_MAX_METADATA_COUNT)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (table_end > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (*cursor > table_end)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    scan_cursor = *cursor;
+    found = FALSE;
+    found_priority = 0x7FFFFFFFFFFFFFFF;
+    staged_arch_tag = 0;
+    staged_tag_off = 0;
+    staged_tag_len = 0;
+    staged_next_cursor = 0;
+
+    for (i = 0; i < metadata_count; ++i)
+    {
+        err = GGUFMetadataReadStringLenU64Checked(buf,
+                                                  buf_nbytes,
+                                                  &scan_cursor,
+                                                  table_end,
+                                                  &key_len);
+        if (err != GGUF_META_TABLE_OK)
+            return err;
+        if (!key_len || key_len > GGUF_MAX_STRING_BYTES)
+            return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+        key_off = scan_cursor;
+        err = GGUFMetadataCursorCanAdvanceChecked(scan_cursor,
+                                                  key_len,
+                                                  table_end,
+                                                  &key_end);
+        if (err != GGUF_META_TABLE_OK)
+            return err;
+        if (key_end > buf_nbytes)
+            return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+        scan_cursor = key_end;
+
+        err = GGUFMetadataReadU32LEChecked(buf,
+                                           buf_nbytes,
+                                           &scan_cursor,
+                                           table_end,
+                                           &value_type);
+        if (err != GGUF_META_TABLE_OK)
+            return err;
+
+        err = GGUFMetadataKeyArchitecturePriority(buf,
+                                                  buf_nbytes,
+                                                  key_off,
+                                                  key_len,
+                                                  &priority);
+        if (err == GGUF_META_PARSE_ERR_NOT_FOUND)
+        {
+            err = GGUFMetadataSkipValuePayloadChecked(buf,
+                                                      buf_nbytes,
+                                                      &scan_cursor,
+                                                      table_end,
+                                                      value_type);
+            if (err != GGUF_META_TABLE_OK)
+                return err;
+            continue;
+        }
+        if (err != GGUF_META_TABLE_OK)
+            return err;
+
+        if (value_type != GGUF_TYPE_STRING)
+            return GGUF_META_TABLE_ERR_TYPE_MISMATCH;
+
+        err = GGUFMetadataReadStringLenU64Checked(buf,
+                                                  buf_nbytes,
+                                                  &scan_cursor,
+                                                  table_end,
+                                                  &value_len);
+        if (err != GGUF_META_TABLE_OK)
+            return err;
+        if (!value_len || value_len > GGUF_MAX_STRING_BYTES)
+            return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+        value_off = scan_cursor;
+        err = GGUFMetadataCursorCanAdvanceChecked(scan_cursor,
+                                                  value_len,
+                                                  table_end,
+                                                  &value_end);
+        if (err != GGUF_META_TABLE_OK)
+            return err;
+        if (value_end > buf_nbytes)
+            return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+        scan_cursor = value_end;
+
+        err = GGUFMetadataCanonicalArchTagFromSpanChecked(buf,
+                                                          buf_nbytes,
+                                                          value_off,
+                                                          value_len,
+                                                          &candidate_arch_tag);
+        if (err != GGUF_META_TABLE_OK)
+            return err;
+
+        if (found && priority == found_priority)
+            return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+        if (!found || priority < found_priority)
+        {
+            found = TRUE;
+            found_priority = priority;
+            staged_arch_tag = candidate_arch_tag;
+            staged_tag_off = value_off;
+            staged_tag_len = value_len;
+            staged_next_cursor = scan_cursor;
+        }
+    }
+
+    if (!found)
+        return GGUF_META_PARSE_ERR_NOT_FOUND;
+
+    *out_arch_tag = staged_arch_tag;
+    *out_tag_offset = staged_tag_off;
+    *out_tag_len = staged_tag_len;
+    *out_next_cursor = staged_next_cursor;
+    *cursor = staged_next_cursor;
+    return GGUF_META_TABLE_OK;
+}
+
+// Extract one architecture-tag string span from GGUF metadata KV entries.
+// Key priority: `general.architecture` first, then fallback aliases:
+// `general.arch`, `architecture`, `model.architecture`.
+//
+// Output contract (success only):
+// - out_tag_offset: byte offset to architecture string payload bytes
+// - out_tag_len: architecture payload byte length
+// - out_next_cursor: byte offset just after architecture payload bytes
+// - *cursor advances to out_next_cursor
+//
+// No-partial contract: any failure path leaves outputs and *cursor unchanged.
+I32 GGUFMetadataReadArchitectureTagCheckedNoPartial(U8 *buf,
+                                                    U64 buf_nbytes,
+                                                    U64 *cursor,
+                                                    U64 table_end,
+                                                    U64 metadata_count,
+                                                    U64 *out_tag_offset,
+                                                    U64 *out_tag_len,
+                                                    U64 *out_next_cursor)
+{
+    U64 scan_cursor;
+    U64 key_len;
+    U64 key_payload_offset;
+    U64 key_payload_end;
+    U32 value_type;
+    U64 tag_len;
+    U64 tag_payload_offset;
+    U64 tag_payload_end;
+    U64 i;
+    U64 lane;
+    Bool key_match;
+
+    Bool found;
+    U64 staged_tag_offset;
+    U64 staged_tag_len;
+    U64 staged_next_cursor;
+
+    I32 err;
+
+    if (!buf || !cursor || !out_tag_offset || !out_tag_len || !out_next_cursor)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    if (buf_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (table_end > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (metadata_count > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    if (metadata_count > GGUF_MAX_METADATA_COUNT)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (*cursor > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    scan_cursor = *cursor;
+    if (scan_cursor > table_end)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    found = FALSE;
+    staged_tag_offset = 0;
+    staged_tag_len = 0;
+    staged_next_cursor = 0;
+
+    for (i = 0; i < metadata_count; ++i)
+    {
+        err = GGUFMetadataReadStringLenU64Checked(buf,
+                                                  buf_nbytes,
+                                                  &scan_cursor,
+                                                  table_end,
+                                                  &key_len);
+        if (err != GGUF_META_TABLE_OK)
+            return err;
+
+        if (!key_len || key_len > GGUF_MAX_STRING_BYTES)
+            return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+        key_payload_offset = scan_cursor;
+        err = GGUFMetadataCursorCanAdvanceChecked(scan_cursor,
+                                                  key_len,
+                                                  table_end,
+                                                  &key_payload_end);
+        if (err != GGUF_META_TABLE_OK)
+            return err;
+        if (key_payload_end > buf_nbytes)
+            return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+        key_match = FALSE;
+
+        if (key_len == GGUF_META_ARCH_KEY_GENERAL_ARCHITECTURE_LEN)
+        {
+            key_match = TRUE;
+            for (lane = 0; lane < key_len; ++lane)
+            {
+                if (buf[key_payload_offset + lane] !=
+                    ((U8 *)GGUF_META_ARCH_KEY_GENERAL_ARCHITECTURE)[lane])
+                {
+                    key_match = FALSE;
+                    break;
+                }
+            }
+        }
+        else if (key_len == GGUF_META_ARCH_KEY_GENERAL_ARCH_LEN)
+        {
+            key_match = TRUE;
+            for (lane = 0; lane < key_len; ++lane)
+            {
+                if (buf[key_payload_offset + lane] !=
+                    ((U8 *)GGUF_META_ARCH_KEY_GENERAL_ARCH)[lane])
+                {
+                    key_match = FALSE;
+                    break;
+                }
+            }
+        }
+        else if (key_len == GGUF_META_ARCH_KEY_ARCHITECTURE_LEN)
+        {
+            key_match = TRUE;
+            for (lane = 0; lane < key_len; ++lane)
+            {
+                if (buf[key_payload_offset + lane] !=
+                    ((U8 *)GGUF_META_ARCH_KEY_ARCHITECTURE)[lane])
+                {
+                    key_match = FALSE;
+                    break;
+                }
+            }
+        }
+        else if (key_len == GGUF_META_ARCH_KEY_MODEL_ARCHITECTURE_LEN)
+        {
+            key_match = TRUE;
+            for (lane = 0; lane < key_len; ++lane)
+            {
+                if (buf[key_payload_offset + lane] !=
+                    ((U8 *)GGUF_META_ARCH_KEY_MODEL_ARCHITECTURE)[lane])
+                {
+                    key_match = FALSE;
+                    break;
+                }
+            }
+        }
+
+        scan_cursor = key_payload_end;
+
+        err = GGUFMetadataReadU32LEChecked(buf,
+                                           buf_nbytes,
+                                           &scan_cursor,
+                                           table_end,
+                                           &value_type);
+        if (err != GGUF_META_TABLE_OK)
+            return err;
+        if (!GGUFMetaTypeSupported(value_type))
+            return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+        if (!key_match)
+        {
+            err = GGUFMetadataSkipValuePayloadChecked(buf,
+                                                      buf_nbytes,
+                                                      &scan_cursor,
+                                                      table_end,
+                                                      value_type);
+            if (err != GGUF_META_TABLE_OK)
+                return err;
+            continue;
+        }
+
+        if (found)
+            return GGUF_META_TABLE_ERR_BAD_PARAM;
+        if (value_type != GGUF_TYPE_STRING)
+            return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+        err = GGUFMetadataReadStringLenU64Checked(buf,
+                                                  buf_nbytes,
+                                                  &scan_cursor,
+                                                  table_end,
+                                                  &tag_len);
+        if (err != GGUF_META_TABLE_OK)
+            return err;
+
+        tag_payload_offset = scan_cursor;
+        err = GGUFMetadataCursorCanAdvanceChecked(scan_cursor,
+                                                  tag_len,
+                                                  table_end,
+                                                  &tag_payload_end);
+        if (err != GGUF_META_TABLE_OK)
+            return err;
+        if (tag_payload_end > buf_nbytes)
+            return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+        found = TRUE;
+        staged_tag_offset = tag_payload_offset;
+        staged_tag_len = tag_len;
+        staged_next_cursor = tag_payload_end;
+        scan_cursor = tag_payload_end;
+    }
+
+    if (!found)
+        return GGUF_META_PARSE_ERR_NOT_FOUND;
+
+    *out_tag_offset = staged_tag_offset;
+    *out_tag_len = staged_tag_len;
+    *out_next_cursor = staged_next_cursor;
+    *cursor = staged_next_cursor;
+    return GGUF_META_TABLE_OK;
+}
+
+// Diagnostics preflight/commit wrapper for architecture-tag decode.
+// This companion preserves no-partial-write behavior by:
+//   1) running canonical decode from immutable snapshots,
+//   2) rerunning canonical decode from the same snapshots,
+//   3) publishing only when tuple parity is exact.
+// Tuple parity contract:
+//   {arch_tag, tag_offset, tag_len, next_cursor}
+I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnly(U8 *buf,
+                                                                            U64 buf_nbytes,
+                                                                            U64 *cursor,
+                                                                            U64 table_end,
+                                                                            U64 metadata_count,
+                                                                            U32 *out_arch_tag,
+                                                                            U64 *out_tag_offset,
+                                                                            U64 *out_tag_len,
+                                                                            U64 *out_next_cursor)
+{
+    U64 cursor_snapshot;
+    U64 cursor_stage;
+    U64 cursor_verify;
+
+    U32 arch_stage;
+    U64 tag_off_stage;
+    U64 tag_len_stage;
+    U64 next_cursor_stage;
+
+    U32 arch_verify;
+    U64 tag_off_verify;
+    U64 tag_len_verify;
+    U64 next_cursor_verify;
+
+    I32 err;
+
+    if (!buf || !cursor || !out_arch_tag || !out_tag_offset ||
+        !out_tag_len || !out_next_cursor)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    if (buf_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (table_end > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (metadata_count > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (metadata_count > GGUF_MAX_METADATA_COUNT)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (table_end > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (*cursor > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (*cursor > table_end)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    cursor_snapshot = *cursor;
+
+    cursor_stage = cursor_snapshot;
+    err = GGUFMetadataReadArchitectureTagCheckedNoPartial(buf,
+                                                          buf_nbytes,
+                                                          &cursor_stage,
+                                                          table_end,
+                                                          metadata_count,
+                                                          &arch_stage,
+                                                          &tag_off_stage,
+                                                          &tag_len_stage,
+                                                          &next_cursor_stage);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+    if (cursor_stage != next_cursor_stage)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    cursor_verify = cursor_snapshot;
+    err = GGUFMetadataReadArchitectureTagCheckedNoPartial(buf,
+                                                          buf_nbytes,
+                                                          &cursor_verify,
+                                                          table_end,
+                                                          metadata_count,
+                                                          &arch_verify,
+                                                          &tag_off_verify,
+                                                          &tag_len_verify,
+                                                          &next_cursor_verify);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+    if (cursor_verify != next_cursor_verify)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (arch_stage != arch_verify)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_off_stage != tag_off_verify)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_len_stage != tag_len_verify)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (next_cursor_stage != next_cursor_verify)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    *out_arch_tag = arch_stage;
+    *out_tag_offset = tag_off_stage;
+    *out_tag_len = tag_len_stage;
+    *out_next_cursor = next_cursor_stage;
+    *cursor = next_cursor_stage;
     return GGUF_META_TABLE_OK;
 }
 
