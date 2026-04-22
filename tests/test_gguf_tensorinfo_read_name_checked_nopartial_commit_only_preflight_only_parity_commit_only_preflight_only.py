@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path("tests").resolve()))
 
 from test_gguf_tensor_info_read_checked_nopartial import (  # noqa: E402
+    GGUF_TENSOR_PARSE_ERR_BAD_NAME_LEN,
     GGUF_TENSOR_PARSE_ERR_NULL_PTR,
     GGUF_TENSOR_PARSE_ERR_TRUNCATED,
     GGUF_TENSOR_PARSE_OK,
@@ -208,6 +209,66 @@ def test_known_vector_success_and_alias_guard() -> None:
     assert alias == [999]
 
 
+def test_failure_paths_preserve_output_sentinels() -> None:
+    payload = gguf_name_entry(b"abc")
+
+    vectors = [
+        (payload, len(payload), len(payload) + 1, {GGUF_TENSOR_PARSE_ERR_TRUNCATED}),
+        (payload[:5], len(payload[:5]), 0, {GGUF_TENSOR_PARSE_ERR_TRUNCATED}),
+        (
+            (1 << 21).to_bytes(8, "little") + b"x",
+            9,
+            0,
+            {GGUF_TENSOR_PARSE_ERR_TRUNCATED, GGUF_TENSOR_PARSE_ERR_BAD_NAME_LEN},
+        ),
+    ]
+
+    for buf, size, cursor, expected_statuses in vectors:
+        out_name = [101]
+        out_required = [202]
+        out_next = [303]
+
+        status = parse_name_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only(
+            buf,
+            size,
+            cursor,
+            out_name,
+            out_required,
+            out_next,
+        )
+
+        assert status in expected_statuses
+        assert out_name == [101]
+        assert out_required == [202]
+        assert out_next == [303]
+
+
+def test_prefix_cursor_vectors_cover_next_cursor_math() -> None:
+    rng = random.Random(1029_73)
+
+    for _ in range(120):
+        prefix = bytes(rng.randint(0, 255) for _ in range(rng.randint(0, 31)))
+        name = bytes(rng.randint(1, 255) for _ in range(rng.randint(0, 96)))
+        payload = prefix + gguf_name_entry(name)
+
+        out_name = [0]
+        out_required = [0]
+        out_next = [0]
+
+        status = parse_name_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only(
+            payload,
+            len(payload),
+            len(prefix),
+            out_name,
+            out_required,
+            out_next,
+        )
+        assert status == GGUF_TENSOR_PARSE_OK
+        assert out_name[0] == len(name)
+        assert out_required[0] == 8 + len(name)
+        assert out_next[0] == len(prefix) + 8 + len(name)
+
+
 def test_randomized_parity_vs_explicit_composition() -> None:
     rng = random.Random(20260422_1029)
 
@@ -256,5 +317,7 @@ def test_randomized_parity_vs_explicit_composition() -> None:
 if __name__ == "__main__":
     test_source_contains_iq1029_signature_and_contract()
     test_known_vector_success_and_alias_guard()
+    test_failure_paths_preserve_output_sentinels()
+    test_prefix_cursor_vectors_cover_next_cursor_math()
     test_randomized_parity_vs_explicit_composition()
     print("ok")
