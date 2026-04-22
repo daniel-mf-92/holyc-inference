@@ -343,3 +343,323 @@ I32 InferenceForwardQ16CheckedNoPartial(
 
     return MODEL_Q16_OK;
 }
+
+// IQ-1053 diagnostics-only preflight helper for forward-pass contracts.
+//
+// Computes canonical dense/workspace/block/logits cell requirements for
+// `InferenceForwardQ16CheckedNoPartial` without touching model tensors.
+// Output publication is strict no-partial: every output remains unchanged on
+// failure, and staged diagnostics are committed atomically after immutable
+// snapshot revalidation.
+I32 InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnly(
+    I64 embed_capacity,
+    I64 block_attn_capacity,
+    I64 block_ffn_capacity,
+    I64 block_count,
+    I64 gamma_attn_capacity,
+    I64 gamma_ffn_capacity,
+    I64 final_norm_gamma_capacity,
+    I64 workspace_capacity,
+    I64 logits_capacity,
+    I64 row_count,
+    I64 lane_count,
+    I64 *out_dense_cells,
+    I64 *out_required_workspace_cells,
+    I64 *out_required_block_tensor_cells,
+    I64 *out_required_logits_cells)
+{
+    I64 staged_dense_cells;
+    I64 staged_required_workspace_cells;
+    I64 staged_required_block_tensor_cells;
+    I64 staged_required_logits_cells;
+
+    I64 snapshot_embed_capacity;
+    I64 snapshot_block_attn_capacity;
+    I64 snapshot_block_ffn_capacity;
+    I64 snapshot_block_count;
+    I64 snapshot_gamma_attn_capacity;
+    I64 snapshot_gamma_ffn_capacity;
+    I64 snapshot_final_norm_gamma_capacity;
+    I64 snapshot_workspace_capacity;
+    I64 snapshot_logits_capacity;
+    I64 snapshot_row_count;
+    I64 snapshot_lane_count;
+    I32 status;
+
+    if (!out_dense_cells || !out_required_workspace_cells ||
+        !out_required_block_tensor_cells || !out_required_logits_cells)
+        return MODEL_Q16_ERR_NULL_PTR;
+
+    if (out_dense_cells == out_required_workspace_cells ||
+        out_dense_cells == out_required_block_tensor_cells ||
+        out_dense_cells == out_required_logits_cells ||
+        out_required_workspace_cells == out_required_block_tensor_cells ||
+        out_required_workspace_cells == out_required_logits_cells ||
+        out_required_block_tensor_cells == out_required_logits_cells)
+        return MODEL_Q16_ERR_BAD_PARAM;
+
+    if (embed_capacity < 0 || block_attn_capacity < 0 || block_ffn_capacity < 0 ||
+        block_count < 0 || gamma_attn_capacity < 0 || gamma_ffn_capacity < 0 ||
+        final_norm_gamma_capacity < 0 || workspace_capacity < 0 ||
+        logits_capacity < 0 || row_count < 0 || lane_count < 0)
+        return MODEL_Q16_ERR_BAD_PARAM;
+
+    snapshot_embed_capacity = embed_capacity;
+    snapshot_block_attn_capacity = block_attn_capacity;
+    snapshot_block_ffn_capacity = block_ffn_capacity;
+    snapshot_block_count = block_count;
+    snapshot_gamma_attn_capacity = gamma_attn_capacity;
+    snapshot_gamma_ffn_capacity = gamma_ffn_capacity;
+    snapshot_final_norm_gamma_capacity = final_norm_gamma_capacity;
+    snapshot_workspace_capacity = workspace_capacity;
+    snapshot_logits_capacity = logits_capacity;
+    snapshot_row_count = row_count;
+    snapshot_lane_count = lane_count;
+
+    if (!row_count || !lane_count)
+    {
+        staged_dense_cells = 0;
+        staged_required_workspace_cells = 0;
+        staged_required_block_tensor_cells = 0;
+        staged_required_logits_cells = 0;
+    }
+    else
+    {
+        status = ModelTryMulI64Checked(row_count,
+                                       lane_count,
+                                       &staged_dense_cells);
+        if (status)
+            return status;
+
+        status = ModelTryMulI64Checked(staged_dense_cells,
+                                       2,
+                                       &staged_required_workspace_cells);
+        if (status)
+            return status;
+
+        status = ModelTryMulI64Checked(block_count,
+                                       staged_dense_cells,
+                                       &staged_required_block_tensor_cells);
+        if (status)
+            return status;
+
+        staged_required_logits_cells = staged_dense_cells;
+
+        if (gamma_attn_capacity < lane_count ||
+            gamma_ffn_capacity < lane_count ||
+            final_norm_gamma_capacity < lane_count)
+            return MODEL_Q16_ERR_BAD_PARAM;
+
+        if (embed_capacity < staged_dense_cells)
+            return MODEL_Q16_ERR_BAD_PARAM;
+        if (block_attn_capacity < staged_required_block_tensor_cells)
+            return MODEL_Q16_ERR_BAD_PARAM;
+        if (block_ffn_capacity < staged_required_block_tensor_cells)
+            return MODEL_Q16_ERR_BAD_PARAM;
+        if (workspace_capacity < staged_required_workspace_cells)
+            return MODEL_Q16_ERR_BAD_PARAM;
+        if (logits_capacity < staged_required_logits_cells)
+            return MODEL_Q16_ERR_BAD_PARAM;
+    }
+
+    if (snapshot_embed_capacity != embed_capacity ||
+        snapshot_block_attn_capacity != block_attn_capacity ||
+        snapshot_block_ffn_capacity != block_ffn_capacity ||
+        snapshot_block_count != block_count ||
+        snapshot_gamma_attn_capacity != gamma_attn_capacity ||
+        snapshot_gamma_ffn_capacity != gamma_ffn_capacity ||
+        snapshot_final_norm_gamma_capacity != final_norm_gamma_capacity ||
+        snapshot_workspace_capacity != workspace_capacity ||
+        snapshot_logits_capacity != logits_capacity ||
+        snapshot_row_count != row_count ||
+        snapshot_lane_count != lane_count)
+        return MODEL_Q16_ERR_BAD_PARAM;
+
+    *out_dense_cells = staged_dense_cells;
+    *out_required_workspace_cells = staged_required_workspace_cells;
+    *out_required_block_tensor_cells = staged_required_block_tensor_cells;
+    *out_required_logits_cells = staged_required_logits_cells;
+    return MODEL_Q16_OK;
+}
+
+// IQ-1054 diagnostics parity gate for forward preflight requirements.
+//
+// Contract:
+// - compose staged requirements via
+//   `InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnly`;
+// - recompute canonical requirements directly from immutable geometry snapshot;
+// - publish `{dense,workspace,block_tensor,logits}` only on strict tuple parity.
+I32 InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnlyParity(
+    I64 embed_capacity,
+    I64 block_attn_capacity,
+    I64 block_ffn_capacity,
+    I64 block_count,
+    I64 gamma_attn_capacity,
+    I64 gamma_ffn_capacity,
+    I64 final_norm_gamma_capacity,
+    I64 workspace_capacity,
+    I64 logits_capacity,
+    I64 row_count,
+    I64 lane_count,
+    I64 *out_dense_cells,
+    I64 *out_required_workspace_cells,
+    I64 *out_required_block_tensor_cells,
+    I64 *out_required_logits_cells)
+{
+    I64 commit_dense_cells;
+    I64 commit_required_workspace_cells;
+    I64 commit_required_block_tensor_cells;
+    I64 commit_required_logits_cells;
+
+    I64 canonical_dense_cells;
+    I64 canonical_required_workspace_cells;
+    I64 canonical_required_block_tensor_cells;
+    I64 canonical_required_logits_cells;
+
+    I64 snapshot_embed_capacity;
+    I64 snapshot_block_attn_capacity;
+    I64 snapshot_block_ffn_capacity;
+    I64 snapshot_block_count;
+    I64 snapshot_gamma_attn_capacity;
+    I64 snapshot_gamma_ffn_capacity;
+    I64 snapshot_final_norm_gamma_capacity;
+    I64 snapshot_workspace_capacity;
+    I64 snapshot_logits_capacity;
+    I64 snapshot_row_count;
+    I64 snapshot_lane_count;
+
+    I64 *snapshot_out_dense_cells;
+    I64 *snapshot_out_required_workspace_cells;
+    I64 *snapshot_out_required_block_tensor_cells;
+    I64 *snapshot_out_required_logits_cells;
+
+    I32 status;
+
+    if (!out_dense_cells || !out_required_workspace_cells ||
+        !out_required_block_tensor_cells || !out_required_logits_cells)
+        return MODEL_Q16_ERR_NULL_PTR;
+
+    if (out_dense_cells == out_required_workspace_cells ||
+        out_dense_cells == out_required_block_tensor_cells ||
+        out_dense_cells == out_required_logits_cells ||
+        out_required_workspace_cells == out_required_block_tensor_cells ||
+        out_required_workspace_cells == out_required_logits_cells ||
+        out_required_block_tensor_cells == out_required_logits_cells)
+        return MODEL_Q16_ERR_BAD_PARAM;
+
+    snapshot_embed_capacity = embed_capacity;
+    snapshot_block_attn_capacity = block_attn_capacity;
+    snapshot_block_ffn_capacity = block_ffn_capacity;
+    snapshot_block_count = block_count;
+    snapshot_gamma_attn_capacity = gamma_attn_capacity;
+    snapshot_gamma_ffn_capacity = gamma_ffn_capacity;
+    snapshot_final_norm_gamma_capacity = final_norm_gamma_capacity;
+    snapshot_workspace_capacity = workspace_capacity;
+    snapshot_logits_capacity = logits_capacity;
+    snapshot_row_count = row_count;
+    snapshot_lane_count = lane_count;
+
+    snapshot_out_dense_cells = out_dense_cells;
+    snapshot_out_required_workspace_cells = out_required_workspace_cells;
+    snapshot_out_required_block_tensor_cells = out_required_block_tensor_cells;
+    snapshot_out_required_logits_cells = out_required_logits_cells;
+
+    status = InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnly(
+        embed_capacity,
+        block_attn_capacity,
+        block_ffn_capacity,
+        block_count,
+        gamma_attn_capacity,
+        gamma_ffn_capacity,
+        final_norm_gamma_capacity,
+        workspace_capacity,
+        logits_capacity,
+        row_count,
+        lane_count,
+        &commit_dense_cells,
+        &commit_required_workspace_cells,
+        &commit_required_block_tensor_cells,
+        &commit_required_logits_cells);
+    if (status)
+        return status;
+
+    if (!row_count || !lane_count)
+    {
+        canonical_dense_cells = 0;
+        canonical_required_workspace_cells = 0;
+        canonical_required_block_tensor_cells = 0;
+        canonical_required_logits_cells = 0;
+    }
+    else
+    {
+        status = ModelTryMulI64Checked(row_count,
+                                       lane_count,
+                                       &canonical_dense_cells);
+        if (status)
+            return status;
+
+        status = ModelTryMulI64Checked(canonical_dense_cells,
+                                       2,
+                                       &canonical_required_workspace_cells);
+        if (status)
+            return status;
+
+        status = ModelTryMulI64Checked(block_count,
+                                       canonical_dense_cells,
+                                       &canonical_required_block_tensor_cells);
+        if (status)
+            return status;
+
+        canonical_required_logits_cells = canonical_dense_cells;
+
+        if (gamma_attn_capacity < lane_count ||
+            gamma_ffn_capacity < lane_count ||
+            final_norm_gamma_capacity < lane_count)
+            return MODEL_Q16_ERR_BAD_PARAM;
+
+        if (embed_capacity < canonical_dense_cells)
+            return MODEL_Q16_ERR_BAD_PARAM;
+        if (block_attn_capacity < canonical_required_block_tensor_cells)
+            return MODEL_Q16_ERR_BAD_PARAM;
+        if (block_ffn_capacity < canonical_required_block_tensor_cells)
+            return MODEL_Q16_ERR_BAD_PARAM;
+        if (workspace_capacity < canonical_required_workspace_cells)
+            return MODEL_Q16_ERR_BAD_PARAM;
+        if (logits_capacity < canonical_required_logits_cells)
+            return MODEL_Q16_ERR_BAD_PARAM;
+    }
+
+    if (snapshot_embed_capacity != embed_capacity ||
+        snapshot_block_attn_capacity != block_attn_capacity ||
+        snapshot_block_ffn_capacity != block_ffn_capacity ||
+        snapshot_block_count != block_count ||
+        snapshot_gamma_attn_capacity != gamma_attn_capacity ||
+        snapshot_gamma_ffn_capacity != gamma_ffn_capacity ||
+        snapshot_final_norm_gamma_capacity != final_norm_gamma_capacity ||
+        snapshot_workspace_capacity != workspace_capacity ||
+        snapshot_logits_capacity != logits_capacity ||
+        snapshot_row_count != row_count ||
+        snapshot_lane_count != lane_count)
+        return MODEL_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_out_dense_cells != out_dense_cells ||
+        snapshot_out_required_workspace_cells != out_required_workspace_cells ||
+        snapshot_out_required_block_tensor_cells != out_required_block_tensor_cells ||
+        snapshot_out_required_logits_cells != out_required_logits_cells)
+        return MODEL_Q16_ERR_BAD_PARAM;
+
+    if (commit_dense_cells != canonical_dense_cells)
+        return MODEL_Q16_ERR_BAD_PARAM;
+    if (commit_required_workspace_cells != canonical_required_workspace_cells)
+        return MODEL_Q16_ERR_BAD_PARAM;
+    if (commit_required_block_tensor_cells != canonical_required_block_tensor_cells)
+        return MODEL_Q16_ERR_BAD_PARAM;
+    if (commit_required_logits_cells != canonical_required_logits_cells)
+        return MODEL_Q16_ERR_BAD_PARAM;
+
+    *out_dense_cells = commit_dense_cells;
+    *out_required_workspace_cells = commit_required_workspace_cells;
+    *out_required_block_tensor_cells = commit_required_block_tensor_cells;
+    *out_required_logits_cells = commit_required_logits_cells;
+    return MODEL_Q16_OK;
+}
