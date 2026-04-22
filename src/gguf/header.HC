@@ -255,6 +255,65 @@ I32 GGUFHeaderParseChecked(U8 *header_bytes,
     return GGUFHeaderValidateAndSizeChecked(out_header, out_header_bytes);
 }
 
+// Checked GGUF header reader with caller-owned cursor advancement.
+//
+// Contract:
+// - Decodes one GGUF fixed header at `*cursor` (little-endian v2/v3 only).
+// - Advances cursor by canonical consumed byte width on success.
+// - Leaves `*cursor` and `out_header` unchanged on failure.
+I32 GGUFHeaderReadVersionedChecked(U8 *header_bytes,
+                                   I64 header_nbytes,
+                                   I64 *cursor,
+                                   GGUFHeader *out_header)
+{
+    I64 snapshot_cursor;
+    I64 staged_cursor;
+    U64 staged_header_bytes;
+    I32 status;
+    GGUFHeader staged_header;
+
+    if (!header_bytes || !cursor || !out_header)
+        return GGUF_HEADER_ERR_NULL_PTR;
+
+    if (header_nbytes < 0)
+        return GGUF_HEADER_ERR_BAD_PARAM;
+
+    snapshot_cursor = *cursor;
+    if (snapshot_cursor < 0)
+        return GGUF_HEADER_ERR_BAD_PARAM;
+    if (snapshot_cursor > header_nbytes)
+        return GGUF_HEADER_ERR_TRUNCATED;
+
+    if (!GGUFHeaderCanReadSpan((U64)header_nbytes,
+                               (U64)snapshot_cursor,
+                               GGUF_HEADER_BYTES))
+        return GGUF_HEADER_ERR_TRUNCATED;
+
+    staged_cursor = snapshot_cursor;
+
+    status = GGUFHeaderParseChecked(header_bytes + staged_cursor,
+                                    (U64)(header_nbytes - staged_cursor),
+                                    &staged_header,
+                                    &staged_header_bytes);
+    if (status)
+        return status;
+
+    if (staged_header_bytes != GGUF_HEADER_BYTES)
+        return GGUF_HEADER_ERR_OVERFLOW;
+    if (staged_cursor > (0x7FFFFFFFFFFFFFFF - (I64)staged_header_bytes))
+        return GGUF_HEADER_ERR_OVERFLOW;
+
+    staged_cursor += (I64)staged_header_bytes;
+
+    out_header->magic = staged_header.magic;
+    out_header->version = staged_header.version;
+    out_header->tensor_count = staged_header.tensor_count;
+    out_header->metadata_kv_count = staged_header.metadata_kv_count;
+    *cursor = staged_cursor;
+
+    return GGUF_HEADER_OK;
+}
+
 // Checked no-partial GGUF header reader.
 //
 // Contract:
@@ -346,6 +405,100 @@ I32 GGUFHeaderReadCheckedNoPartial(U8 *header_bytes,
     out_header->tensor_count = staged_header.tensor_count;
     out_header->metadata_kv_count = staged_header.metadata_kv_count;
     *out_header_bytes = staged_header_bytes;
+    return GGUF_HEADER_OK;
+}
+
+// Version-aware GGUF header reader for stream parsers that track an explicit
+// cursor. Decodes v2/v3 header fields from `buf[*cursor..)` and advances
+// `*cursor` by exactly GGUF_HEADER_BYTES on success.
+// Contract:
+// - Input span decode is little-endian and fully bounds checked.
+// - `*cursor`, `*out_header`, and `*out_header_bytes` are committed only on
+//   full success (no partial writes on failure paths).
+I32 GGUFHeaderReadVersionedChecked(U8 *buf,
+                                   U64 buf_nbytes,
+                                   U64 *cursor,
+                                   GGUFHeader *out_header,
+                                   U64 *out_header_bytes)
+{
+    U64 cur;
+    U64 next_cursor;
+    U64 header_bytes;
+    U32 magic_u32;
+    U32 version_u32;
+    U64 tensor_count;
+    U64 metadata_kv_count;
+    GGUFHeader staged_header;
+    I32 status;
+
+    if (!buf || !cursor || !out_header || !out_header_bytes)
+        return GGUF_HEADER_ERR_NULL_PTR;
+
+    // Keep all parser indexing in positive I64 range.
+    if (buf_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_HEADER_ERR_OVERFLOW;
+
+    cur = *cursor;
+    if (cur > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_HEADER_ERR_OVERFLOW;
+    if (cur > buf_nbytes)
+        return GGUF_HEADER_ERR_BAD_PARAM;
+
+    if (!GGUFHeaderCanReadSpan(buf_nbytes, cur, GGUF_HEADER_BYTES))
+        return GGUF_HEADER_ERR_TRUNCATED;
+
+    status = GGUFReadU32LEChecked(buf, buf_nbytes, cur, &magic_u32);
+    if (status)
+        return status;
+
+    if (cur > (0xFFFFFFFFFFFFFFFF - 4))
+        return GGUF_HEADER_ERR_OVERFLOW;
+    cur += 4;
+
+    status = GGUFReadU32LEChecked(buf, buf_nbytes, cur, &version_u32);
+    if (status)
+        return status;
+
+    if (cur > (0xFFFFFFFFFFFFFFFF - 4))
+        return GGUF_HEADER_ERR_OVERFLOW;
+    cur += 4;
+
+    status = GGUFReadU64LEChecked(buf, buf_nbytes, cur, &tensor_count);
+    if (status)
+        return status;
+
+    if (cur > (0xFFFFFFFFFFFFFFFF - 8))
+        return GGUF_HEADER_ERR_OVERFLOW;
+    cur += 8;
+
+    status = GGUFReadU64LEChecked(buf, buf_nbytes, cur, &metadata_kv_count);
+    if (status)
+        return status;
+
+    if (cur > (0xFFFFFFFFFFFFFFFF - 8))
+        return GGUF_HEADER_ERR_OVERFLOW;
+    next_cursor = cur + 8;
+
+    staged_header.magic = magic_u32;
+    staged_header.version = version_u32;
+    staged_header.tensor_count = tensor_count;
+    staged_header.metadata_kv_count = metadata_kv_count;
+
+    status = GGUFHeaderValidateAndSizeChecked(&staged_header, &header_bytes);
+    if (status)
+        return status;
+
+    if (header_bytes != GGUF_HEADER_BYTES)
+        return GGUF_HEADER_ERR_BAD_PARAM;
+    if (next_cursor > buf_nbytes)
+        return GGUF_HEADER_ERR_TRUNCATED;
+
+    out_header->magic = staged_header.magic;
+    out_header->version = staged_header.version;
+    out_header->tensor_count = staged_header.tensor_count;
+    out_header->metadata_kv_count = staged_header.metadata_kv_count;
+    *out_header_bytes = header_bytes;
+    *cursor = next_cursor;
     return GGUF_HEADER_OK;
 }
 

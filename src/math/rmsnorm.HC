@@ -28,6 +28,70 @@ I32 FPQ16MulDivRoundedByPositiveIntFromQ16DenChecked(I64 a_q16,
                                                      I64 d_q16,
                                                      I64 *out_q16);
 
+I32 FPQ16RMSNormTryAddI64Checked(I64 lhs,
+                                 I64 rhs,
+                                 I64 *out_sum)
+{
+    if (!out_sum)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (rhs > 0)
+    {
+        if (lhs > I64_MAX_VALUE - rhs)
+            return FP_Q16_ERR_OVERFLOW;
+    }
+    else if (rhs < 0)
+    {
+        if (lhs < (-I64_MAX_VALUE - 1) - rhs)
+            return FP_Q16_ERR_OVERFLOW;
+    }
+
+    *out_sum = lhs + rhs;
+    return 0;
+}
+
+I32 FPQ16RMSNormTryMulI64Checked(I64 lhs,
+                                 I64 rhs,
+                                 I64 *out_prod)
+{
+    I64 product;
+
+    if (!out_prod)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (!lhs || !rhs)
+    {
+        *out_prod = 0;
+        return 0;
+    }
+
+    if (lhs == (-I64_MAX_VALUE - 1))
+    {
+        if (rhs != 1)
+        {
+            if (rhs != -1)
+                return FP_Q16_ERR_OVERFLOW;
+            return FP_Q16_ERR_OVERFLOW;
+        }
+    }
+    if (rhs == (-I64_MAX_VALUE - 1))
+    {
+        if (lhs != 1)
+        {
+            if (lhs != -1)
+                return FP_Q16_ERR_OVERFLOW;
+            return FP_Q16_ERR_OVERFLOW;
+        }
+    }
+
+    product = lhs * rhs;
+    if (product / rhs != lhs)
+        return FP_Q16_ERR_OVERFLOW;
+
+    *out_prod = product;
+    return 0;
+}
+
 // WS1-04 RMSNorm assumptions (Q16 tensors):
 // - `count` is the feature width for one normalized row/token/head slice.
 // - `input_q16`, `gamma_q16`, `output_q16` each contain at least `count`
@@ -123,6 +187,12 @@ I32 FPQ16RMSNormChecked(I64 *input_q16,
     I64 denom_q16;
     I64 norm_lane_q16;
     I64 weighted_lane_q16;
+    U64 input_span_start;
+    U64 input_span_end;
+    U64 gamma_span_start;
+    U64 gamma_span_end;
+    U64 output_span_start;
+    U64 output_span_end;
     I32 status;
 
     if (!input_q16 || !gamma_q16 || !output_q16)
@@ -563,6 +633,272 @@ I32 FPQ16RMSNormApplyInvDenomWeightedAutoCheckedWithPathOut(I64 *input_q16,
                                                     count,
                                                     inv_denom_q16,
                                                     den_q16);
+}
+
+// Checked batched row-wise RMSNorm kernel for Q16 buffers.
+//
+// Contract:
+// - each row contains `lane_count` contiguous Q16 lanes
+// - row bases advance by explicit row strides (in I64 lanes)
+// - capacity checks are strict: computed required cells must fit every tensor
+//
+// Math per row:
+//   inv = 1 / sqrt(mean(input_row^2) + eps)
+//   out_lane = round_q16(round_q16(input_lane * inv) * gamma_lane)
+//
+// Execution model is two-phase:
+// 1) preflight all rows/lane arithmetic with no writes
+// 2) commit all row outputs only after global preflight succeeds
+I32 FPQ16RMSNormRowsChecked(I64 *input_q16,
+                            I64 input_capacity,
+                            I64 input_row_stride,
+                            I64 *gamma_q16,
+                            I64 gamma_capacity,
+                            I64 gamma_row_stride,
+                            I64 *output_q16,
+                            I64 output_capacity,
+                            I64 output_row_stride,
+                            I64 row_count,
+                            I64 lane_count,
+                            I64 eps_q16)
+{
+    I64 last_row;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 required_input_cells;
+    I64 required_gamma_cells;
+    I64 required_output_cells;
+    I64 row_index;
+    I64 lane_index;
+    I64 input_row_base;
+    I64 gamma_row_base;
+    I64 output_row_base;
+    I64 next_input_row_base;
+    I64 next_gamma_row_base;
+    I64 next_output_row_base;
+    I64 inv_denom_q16;
+    I64 denom_q16;
+    I64 norm_lane_q16;
+    I64 weighted_lane_q16;
+    I32 status;
+
+    if (!input_q16 || !gamma_q16 || !output_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (input_capacity < 0 || gamma_capacity < 0 || output_capacity < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (input_row_stride < 0 || gamma_row_stride < 0 || output_row_stride < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (row_count < 0 || lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (eps_q16 < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (!row_count || !lane_count)
+        return 0;
+
+    if (input_row_stride < lane_count || gamma_row_stride < lane_count ||
+        output_row_stride < lane_count)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Alias safety: in-place rows are allowed only when row bases are identical.
+    if (input_q16 == output_q16 && input_row_stride != output_row_stride)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (gamma_q16 == output_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    last_row = row_count - 1;
+
+    status = FPQ16RMSNormTryMulI64Checked(last_row,
+                                          input_row_stride,
+                                          &required_input_cells);
+    if (status)
+        return status;
+    status = FPQ16RMSNormTryAddI64Checked(required_input_cells,
+                                          lane_count,
+                                          &required_input_cells);
+    if (status)
+        return status;
+
+    status = FPQ16RMSNormTryMulI64Checked(last_row,
+                                          gamma_row_stride,
+                                          &required_gamma_cells);
+    if (status)
+        return status;
+    status = FPQ16RMSNormTryAddI64Checked(required_gamma_cells,
+                                          lane_count,
+                                          &required_gamma_cells);
+    if (status)
+        return status;
+
+    status = FPQ16RMSNormTryMulI64Checked(last_row,
+                                          output_row_stride,
+                                          &required_output_cells);
+    if (status)
+        return status;
+    status = FPQ16RMSNormTryAddI64Checked(required_output_cells,
+                                          lane_count,
+                                          &required_output_cells);
+    if (status)
+        return status;
+
+    if (required_input_cells > input_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (required_gamma_cells > gamma_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (required_output_cells > output_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Guard pointer-span arithmetic for full required windows.
+    last_index = required_input_cells - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)input_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_index = required_gamma_cells - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)gamma_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    last_index = required_output_cells - 1;
+    if (last_index > (I64_MAX_VALUE >> 3))
+        return FP_Q16_ERR_OVERFLOW;
+    last_byte_offset = last_index << 3;
+    if ((U64)output_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+        return FP_Q16_ERR_OVERFLOW;
+
+    input_span_start = (U64)input_q16;
+    gamma_span_start = (U64)gamma_q16;
+    output_span_start = (U64)output_q16;
+
+    input_span_end = input_span_start + ((U64)required_input_cells << 3);
+    gamma_span_end = gamma_span_start + ((U64)required_gamma_cells << 3);
+    output_span_end = output_span_start + ((U64)required_output_cells << 3);
+
+    // Reject partial overlap between read and write windows. Exact alias is
+    // still handled by the explicit in-place contract above.
+    if (input_q16 != output_q16)
+    {
+        if (!(input_span_end <= output_span_start ||
+              output_span_end <= input_span_start))
+            return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    // `gamma` is read-only; any overlap with output would violate deterministic
+    // gamma sampling during commit, so keep this strictly disjoint.
+    if (!(gamma_span_end <= output_span_start ||
+          output_span_end <= gamma_span_start))
+        return FP_Q16_ERR_BAD_PARAM;
+
+    input_row_base = 0;
+    gamma_row_base = 0;
+    output_row_base = 0;
+
+    // Global preflight: prove all rows can normalize without overflow/domain
+    // failures before any output write occurs.
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        status = FPQ16RMSNormComputeInvDenomChecked(input_q16 + input_row_base,
+                                                    lane_count,
+                                                    eps_q16,
+                                                    &inv_denom_q16,
+                                                    &denom_q16);
+        if (status)
+            return status;
+
+        for (lane_index = 0; lane_index < lane_count; lane_index++)
+        {
+            status = FPQ16MulChecked(input_q16[input_row_base + lane_index],
+                                     inv_denom_q16,
+                                     &norm_lane_q16);
+            if (status)
+                return status;
+
+            status = FPQ16MulChecked(norm_lane_q16,
+                                     gamma_q16[gamma_row_base + lane_index],
+                                     &weighted_lane_q16);
+            if (status)
+                return status;
+        }
+
+        status = FPQ16RMSNormTryAddI64Checked(input_row_base,
+                                              input_row_stride,
+                                              &next_input_row_base);
+        if (status)
+            return status;
+        status = FPQ16RMSNormTryAddI64Checked(gamma_row_base,
+                                              gamma_row_stride,
+                                              &next_gamma_row_base);
+        if (status)
+            return status;
+        status = FPQ16RMSNormTryAddI64Checked(output_row_base,
+                                              output_row_stride,
+                                              &next_output_row_base);
+        if (status)
+            return status;
+
+        input_row_base = next_input_row_base;
+        gamma_row_base = next_gamma_row_base;
+        output_row_base = next_output_row_base;
+    }
+
+    input_row_base = 0;
+    gamma_row_base = 0;
+    output_row_base = 0;
+
+    for (row_index = 0; row_index < row_count; row_index++)
+    {
+        status = FPQ16RMSNormComputeInvDenomChecked(input_q16 + input_row_base,
+                                                    lane_count,
+                                                    eps_q16,
+                                                    &inv_denom_q16,
+                                                    &denom_q16);
+        if (status)
+            return status;
+
+        for (lane_index = 0; lane_index < lane_count; lane_index++)
+        {
+            status = FPQ16MulChecked(input_q16[input_row_base + lane_index],
+                                     inv_denom_q16,
+                                     &norm_lane_q16);
+            if (status)
+                return status;
+
+            status = FPQ16MulChecked(norm_lane_q16,
+                                     gamma_q16[gamma_row_base + lane_index],
+                                     &weighted_lane_q16);
+            if (status)
+                return status;
+
+            output_q16[output_row_base + lane_index] = weighted_lane_q16;
+        }
+
+        status = FPQ16RMSNormTryAddI64Checked(input_row_base,
+                                              input_row_stride,
+                                              &next_input_row_base);
+        if (status)
+            return status;
+        status = FPQ16RMSNormTryAddI64Checked(gamma_row_base,
+                                              gamma_row_stride,
+                                              &next_gamma_row_base);
+        if (status)
+            return status;
+        status = FPQ16RMSNormTryAddI64Checked(output_row_base,
+                                              output_row_stride,
+                                              &next_output_row_base);
+        if (status)
+            return status;
+
+        input_row_base = next_input_row_base;
+        gamma_row_base = next_gamma_row_base;
+        output_row_base = next_output_row_base;
+    }
+
+    return 0;
 }
 
 U0 FPQ16RMSNorm(I64 *input, I64 *weight, I64 *output, I64 count, I64 eps_q16)
