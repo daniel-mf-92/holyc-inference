@@ -11,6 +11,21 @@
 #define KV_I64_MAX_VALUE  0x7FFFFFFFFFFFFFFF
 #define KV_I64_MIN_VALUE -0x8000000000000000
 
+#define KV_CACHE_Q16_PERSIST_MODE_WRITE 0
+#define KV_CACHE_Q16_PERSIST_MODE_READ  1
+
+#define KV_CACHE_Q16_PERSIST_MAGIC         0x4B56435131364844
+#define KV_CACHE_Q16_PERSIST_VERSION       1
+#define KV_CACHE_Q16_PERSIST_HEADER_CELLS  8
+#define KV_CACHE_Q16_PERSIST_IDX_MAGIC     0
+#define KV_CACHE_Q16_PERSIST_IDX_VERSION   1
+#define KV_CACHE_Q16_PERSIST_IDX_LAYERS    2
+#define KV_CACHE_Q16_PERSIST_IDX_TOKENS    3
+#define KV_CACHE_Q16_PERSIST_IDX_HEADS     4
+#define KV_CACHE_Q16_PERSIST_IDX_HEAD_DIM  5
+#define KV_CACHE_Q16_PERSIST_IDX_USED      6
+#define KV_CACHE_Q16_PERSIST_IDX_TOTAL     7
+
 I32 KVTryAddI64Checked(I64 lhs, I64 rhs, I64 *out_sum)
 {
     if (!out_sum)
@@ -152,6 +167,156 @@ I32 KVCacheQ16ComputeLayerTokenSpanCellsChecked(
     return KVTryMulI64Checked(kv_heads,
                               head_dim,
                               out_span_cells);
+}
+
+// Persist or restore fixed-size KV cache geometry header with strict
+// no-partial-write semantics.
+//
+// Header layout (I64 cells):
+//   [0] magic
+//   [1] version
+//   [2] layer_count
+//   [3] token_capacity
+//   [4] kv_heads
+//   [5] head_dim
+//   [6] used_tokens
+//   [7] total_cells_per_cache
+//
+// `mode` controls direction:
+//   KV_CACHE_Q16_PERSIST_MODE_WRITE: validate tuple -> write header
+//   KV_CACHE_Q16_PERSIST_MODE_READ : validate header -> publish tuple
+I32 KVCacheQ16PersistHeaderCheckedNoPartial(
+    I64 *header_cells,
+    I64 header_capacity,
+    I64 mode,
+    I64 *inout_layer_count,
+    I64 *inout_token_capacity,
+    I64 *inout_kv_heads,
+    I64 *inout_head_dim,
+    I64 *inout_used_tokens,
+    I64 *inout_total_cells)
+{
+    I64 staged_layer_count;
+    I64 staged_token_capacity;
+    I64 staged_kv_heads;
+    I64 staged_head_dim;
+    I64 staged_used_tokens;
+    I64 staged_total_cells;
+    I64 computed_total_cells;
+    I64 staged_header[KV_CACHE_Q16_PERSIST_HEADER_CELLS];
+    I64 cell_idx;
+    I32 status;
+
+    if (!header_cells ||
+        !inout_layer_count ||
+        !inout_token_capacity ||
+        !inout_kv_heads ||
+        !inout_head_dim ||
+        !inout_used_tokens ||
+        !inout_total_cells)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (header_capacity < KV_CACHE_Q16_PERSIST_HEADER_CELLS)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (mode == KV_CACHE_Q16_PERSIST_MODE_WRITE)
+    {
+        staged_layer_count = *inout_layer_count;
+        staged_token_capacity = *inout_token_capacity;
+        staged_kv_heads = *inout_kv_heads;
+        staged_head_dim = *inout_head_dim;
+        staged_used_tokens = *inout_used_tokens;
+        staged_total_cells = *inout_total_cells;
+
+        if (staged_layer_count < 0 || staged_token_capacity < 0 ||
+            staged_kv_heads < 0 || staged_head_dim < 0 ||
+            staged_used_tokens < 0 || staged_total_cells < 0)
+            return KV_Q16_ERR_BAD_PARAM;
+
+        if (staged_used_tokens > staged_token_capacity)
+            return KV_Q16_ERR_BAD_PARAM;
+
+        status = KVCacheQ16ComputeTotalCellsChecked(staged_layer_count,
+                                                    staged_token_capacity,
+                                                    staged_kv_heads,
+                                                    staged_head_dim,
+                                                    &computed_total_cells);
+        if (status != KV_Q16_OK)
+            return status;
+
+        if (computed_total_cells != staged_total_cells)
+            return KV_Q16_ERR_BAD_PARAM;
+
+        staged_header[KV_CACHE_Q16_PERSIST_IDX_MAGIC] = KV_CACHE_Q16_PERSIST_MAGIC;
+        staged_header[KV_CACHE_Q16_PERSIST_IDX_VERSION] = KV_CACHE_Q16_PERSIST_VERSION;
+        staged_header[KV_CACHE_Q16_PERSIST_IDX_LAYERS] = staged_layer_count;
+        staged_header[KV_CACHE_Q16_PERSIST_IDX_TOKENS] = staged_token_capacity;
+        staged_header[KV_CACHE_Q16_PERSIST_IDX_HEADS] = staged_kv_heads;
+        staged_header[KV_CACHE_Q16_PERSIST_IDX_HEAD_DIM] = staged_head_dim;
+        staged_header[KV_CACHE_Q16_PERSIST_IDX_USED] = staged_used_tokens;
+        staged_header[KV_CACHE_Q16_PERSIST_IDX_TOTAL] = staged_total_cells;
+
+        cell_idx = 0;
+        while (cell_idx < KV_CACHE_Q16_PERSIST_HEADER_CELLS)
+        {
+            header_cells[cell_idx] = staged_header[cell_idx];
+            cell_idx++;
+        }
+
+        return KV_Q16_OK;
+    }
+
+    if (mode == KV_CACHE_Q16_PERSIST_MODE_READ)
+    {
+        cell_idx = 0;
+        while (cell_idx < KV_CACHE_Q16_PERSIST_HEADER_CELLS)
+        {
+            staged_header[cell_idx] = header_cells[cell_idx];
+            cell_idx++;
+        }
+
+        if (staged_header[KV_CACHE_Q16_PERSIST_IDX_MAGIC] != KV_CACHE_Q16_PERSIST_MAGIC)
+            return KV_Q16_ERR_BAD_PARAM;
+
+        if (staged_header[KV_CACHE_Q16_PERSIST_IDX_VERSION] != KV_CACHE_Q16_PERSIST_VERSION)
+            return KV_Q16_ERR_BAD_PARAM;
+
+        staged_layer_count = staged_header[KV_CACHE_Q16_PERSIST_IDX_LAYERS];
+        staged_token_capacity = staged_header[KV_CACHE_Q16_PERSIST_IDX_TOKENS];
+        staged_kv_heads = staged_header[KV_CACHE_Q16_PERSIST_IDX_HEADS];
+        staged_head_dim = staged_header[KV_CACHE_Q16_PERSIST_IDX_HEAD_DIM];
+        staged_used_tokens = staged_header[KV_CACHE_Q16_PERSIST_IDX_USED];
+        staged_total_cells = staged_header[KV_CACHE_Q16_PERSIST_IDX_TOTAL];
+
+        if (staged_layer_count < 0 || staged_token_capacity < 0 ||
+            staged_kv_heads < 0 || staged_head_dim < 0 ||
+            staged_used_tokens < 0 || staged_total_cells < 0)
+            return KV_Q16_ERR_BAD_PARAM;
+
+        if (staged_used_tokens > staged_token_capacity)
+            return KV_Q16_ERR_BAD_PARAM;
+
+        status = KVCacheQ16ComputeTotalCellsChecked(staged_layer_count,
+                                                    staged_token_capacity,
+                                                    staged_kv_heads,
+                                                    staged_head_dim,
+                                                    &computed_total_cells);
+        if (status != KV_Q16_OK)
+            return status;
+
+        if (computed_total_cells != staged_total_cells)
+            return KV_Q16_ERR_BAD_PARAM;
+
+        *inout_layer_count = staged_layer_count;
+        *inout_token_capacity = staged_token_capacity;
+        *inout_kv_heads = staged_kv_heads;
+        *inout_head_dim = staged_head_dim;
+        *inout_used_tokens = staged_used_tokens;
+        *inout_total_cells = staged_total_cells;
+        return KV_Q16_OK;
+    }
+
+    return KV_Q16_ERR_BAD_PARAM;
 }
 
 // Total Q16 cells needed for one cache slab (K or V):
