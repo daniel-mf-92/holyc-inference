@@ -7930,6 +7930,9 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredB
     I64 snapshot_q_rows_capacity;
     I64 snapshot_k_rows_capacity;
     I64 snapshot_out_scores_capacity;
+    I64 *snapshot_q_rows_ptr;
+    I64 *snapshot_k_rows_ptr;
+    I64 *snapshot_out_scores_ptr;
     I64 snapshot_query_row_count;
     I64 snapshot_token_count;
     I64 snapshot_head_dim;
@@ -7959,6 +7962,9 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialDefaultStrideNoAllocRequiredB
     snapshot_query_row_count = query_row_count;
     snapshot_token_count = token_count;
     snapshot_head_dim = head_dim;
+    snapshot_q_rows_ptr = q_rows_q16;
+    snapshot_k_rows_ptr = k_rows_q16;
+    snapshot_out_scores_ptr = out_scores_q32;
 
     // IQ-728 diagnostics-only mirror contract:
     // 1) Stage canonical diagnostics through the IQ-727 hardened commit-only
@@ -15353,6 +15359,13 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnl
     if (snapshot_k_rows_capacity != post_k_rows_capacity)
         return ATTN_Q16_ERR_BAD_PARAM;
     if (snapshot_out_scores_capacity != post_out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_q_rows_ptr != q_rows_q16)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_k_rows_ptr != k_rows_q16)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_scores_ptr != out_scores_q32)
         return ATTN_Q16_ERR_BAD_PARAM;
 
     if (staged_last_q_base_index != canonical_last_q_base_index)

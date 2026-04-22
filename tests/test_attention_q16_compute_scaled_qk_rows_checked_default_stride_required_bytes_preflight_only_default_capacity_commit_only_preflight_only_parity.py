@@ -110,6 +110,10 @@ def attention_q16_compute_scaled_qk_rows_checked_default_stride_required_bytes_p
     if query_row_count < 0 or token_count < 0 or head_dim < 0:
         return ATTN_Q16_ERR_BAD_PARAM
 
+    snapshot_q_rows_obj = q_rows_q16
+    snapshot_k_rows_obj = k_rows_q16
+    snapshot_out_scores_obj = out_scores_q32
+
     status, q_rows_capacity = _try_mul_i64(query_row_count, head_dim)
     if status != ATTN_Q16_OK:
         return status
@@ -169,6 +173,13 @@ def attention_q16_compute_scaled_qk_rows_checked_default_stride_required_bytes_p
     if snapshot_k_rows_capacity != post_k_rows_capacity:
         return ATTN_Q16_ERR_BAD_PARAM
     if snapshot_out_scores_capacity != post_out_scores_capacity:
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    if snapshot_q_rows_obj is not q_rows_q16:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if snapshot_k_rows_obj is not k_rows_q16:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if snapshot_out_scores_obj is not out_scores_q32:
         return ATTN_Q16_ERR_BAD_PARAM
 
     err_b_last_q = [0]
@@ -243,6 +254,9 @@ def test_source_contains_commit_only_preflight_only_parity_helper() -> None:
     assert "snapshot_query_row_count = query_row_count;" in body
     assert "snapshot_token_count = token_count;" in body
     assert "snapshot_head_dim = head_dim;" in body
+    assert "snapshot_q_rows_ptr = q_rows_q16;" in body
+    assert "snapshot_k_rows_ptr = k_rows_q16;" in body
+    assert "snapshot_out_scores_ptr = out_scores_q32;" in body
     assert (
         "AttentionQ16ComputeScaledQKRowsCheckedDefaultStride"
         "RequiredBytesPreflightOnlyDefaultCapacityCommitOnlyPreflightOnly"
