@@ -4682,3 +4682,382 @@ I32 KVCacheQ16ReadWriteTokenRoundTripCheckedNoPartialCommitOnlyPreflightOnlyRequ
     *out_v_base_index = staged_v_base_index;
     return KV_Q16_OK;
 }
+
+// Checked append preflight for one token in one layer.
+// Append index is deterministic: next_token_index = token_count.
+// This helper composes canonical write preflight and publishes only
+// append diagnostics (required cells + next token index).
+I32 KVCacheQ16AppendTokenCheckedNoPartialPreflight(
+    I64 *k_cache_q16,
+    I64 k_cache_capacity,
+    I64 *v_cache_q16,
+    I64 v_cache_capacity,
+    I64 layer_idx,
+    I64 token_count,
+    I64 layer_count,
+    I64 token_capacity,
+    I64 kv_heads,
+    I64 head_dim,
+    I64 *k_token_src_q16,
+    I64 k_token_src_capacity,
+    I64 *v_token_src_q16,
+    I64 v_token_src_capacity,
+    I64 *out_required_cells,
+    I64 *out_next_token_index)
+{
+    I64 staged_k_base_index;
+    I64 staged_v_base_index;
+    I64 staged_required_cells;
+    I64 snapshot_layer_idx;
+    I64 snapshot_token_count;
+    I64 snapshot_layer_count;
+    I64 snapshot_token_capacity;
+    I64 snapshot_kv_heads;
+    I64 snapshot_head_dim;
+    I64 snapshot_k_cache_capacity;
+    I64 snapshot_v_cache_capacity;
+    I64 snapshot_k_src_capacity;
+    I64 snapshot_v_src_capacity;
+    I32 status;
+
+    if (!out_required_cells || !out_next_token_index)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (out_required_cells == out_next_token_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (out_required_cells == k_cache_q16 ||
+        out_required_cells == v_cache_q16 ||
+        out_required_cells == k_token_src_q16 ||
+        out_required_cells == v_token_src_q16 ||
+        out_next_token_index == k_cache_q16 ||
+        out_next_token_index == v_cache_q16 ||
+        out_next_token_index == k_token_src_q16 ||
+        out_next_token_index == v_token_src_q16)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (token_count < 0 || token_capacity < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (token_count >= token_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    snapshot_layer_idx = layer_idx;
+    snapshot_token_count = token_count;
+    snapshot_layer_count = layer_count;
+    snapshot_token_capacity = token_capacity;
+    snapshot_kv_heads = kv_heads;
+    snapshot_head_dim = head_dim;
+    snapshot_k_cache_capacity = k_cache_capacity;
+    snapshot_v_cache_capacity = v_cache_capacity;
+    snapshot_k_src_capacity = k_token_src_capacity;
+    snapshot_v_src_capacity = v_token_src_capacity;
+
+    status = KVCacheQ16WriteTokenCheckedNoPartialPreflight(
+        k_cache_q16,
+        k_cache_capacity,
+        v_cache_q16,
+        v_cache_capacity,
+        layer_idx,
+        token_count,
+        layer_count,
+        token_capacity,
+        kv_heads,
+        head_dim,
+        k_token_src_q16,
+        k_token_src_capacity,
+        v_token_src_q16,
+        v_token_src_capacity,
+        &staged_k_base_index,
+        &staged_v_base_index,
+        &staged_required_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (snapshot_layer_idx != layer_idx ||
+        snapshot_token_count != token_count ||
+        snapshot_layer_count != layer_count ||
+        snapshot_token_capacity != token_capacity ||
+        snapshot_kv_heads != kv_heads ||
+        snapshot_head_dim != head_dim ||
+        snapshot_k_cache_capacity != k_cache_capacity ||
+        snapshot_v_cache_capacity != v_cache_capacity ||
+        snapshot_k_src_capacity != k_token_src_capacity ||
+        snapshot_v_src_capacity != v_token_src_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    *out_required_cells = staged_required_cells;
+    *out_next_token_index = token_count;
+    return KV_Q16_OK;
+}
+
+// Diagnostics-only append companion over write commit-only-preflight path.
+// Stages append geometry, derives required bytes, and publishes append tuple
+// only after immutable shape/capacity snapshot checks succeed.
+I32 KVCacheQ16AppendTokenCheckedNoPartialCommitOnlyPreflightOnly(
+    I64 *k_cache_q16,
+    I64 k_cache_capacity,
+    I64 *v_cache_q16,
+    I64 v_cache_capacity,
+    I64 layer_idx,
+    I64 token_count,
+    I64 layer_count,
+    I64 token_capacity,
+    I64 kv_heads,
+    I64 head_dim,
+    I64 *k_token_src_q16,
+    I64 k_token_src_capacity,
+    I64 *v_token_src_q16,
+    I64 v_token_src_capacity,
+    I64 *out_required_cells,
+    I64 *out_required_bytes,
+    I64 *out_next_token_index)
+{
+    I64 staged_required_cells;
+    I64 staged_required_bytes;
+    I64 staged_next_token_index;
+    I64 staged_k_base_index;
+    I64 staged_v_base_index;
+    I64 snapshot_layer_idx;
+    I64 snapshot_token_count;
+    I64 snapshot_layer_count;
+    I64 snapshot_token_capacity;
+    I64 snapshot_kv_heads;
+    I64 snapshot_head_dim;
+    I64 snapshot_k_cache_capacity;
+    I64 snapshot_v_cache_capacity;
+    I64 snapshot_k_src_capacity;
+    I64 snapshot_v_src_capacity;
+    I32 status;
+
+    if (!out_required_cells || !out_required_bytes || !out_next_token_index)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (out_required_cells == out_required_bytes ||
+        out_required_cells == out_next_token_index ||
+        out_required_bytes == out_next_token_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (out_required_cells == k_cache_q16 ||
+        out_required_cells == v_cache_q16 ||
+        out_required_cells == k_token_src_q16 ||
+        out_required_cells == v_token_src_q16 ||
+        out_required_bytes == k_cache_q16 ||
+        out_required_bytes == v_cache_q16 ||
+        out_required_bytes == k_token_src_q16 ||
+        out_required_bytes == v_token_src_q16 ||
+        out_next_token_index == k_cache_q16 ||
+        out_next_token_index == v_cache_q16 ||
+        out_next_token_index == k_token_src_q16 ||
+        out_next_token_index == v_token_src_q16)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (token_count < 0 || token_capacity < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (token_count >= token_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    snapshot_layer_idx = layer_idx;
+    snapshot_token_count = token_count;
+    snapshot_layer_count = layer_count;
+    snapshot_token_capacity = token_capacity;
+    snapshot_kv_heads = kv_heads;
+    snapshot_head_dim = head_dim;
+    snapshot_k_cache_capacity = k_cache_capacity;
+    snapshot_v_cache_capacity = v_cache_capacity;
+    snapshot_k_src_capacity = k_token_src_capacity;
+    snapshot_v_src_capacity = v_token_src_capacity;
+
+    status = KVCacheQ16WriteTokenCheckedNoPartialCommitOnlyPreflightOnly(
+        k_cache_q16,
+        k_cache_capacity,
+        v_cache_q16,
+        v_cache_capacity,
+        layer_idx,
+        token_count,
+        layer_count,
+        token_capacity,
+        kv_heads,
+        head_dim,
+        k_token_src_q16,
+        k_token_src_capacity,
+        v_token_src_q16,
+        v_token_src_capacity,
+        &staged_required_cells,
+        &staged_k_base_index,
+        &staged_v_base_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVTryMulI64Checked(staged_required_cells,
+                                sizeof(I64),
+                                &staged_required_bytes);
+    if (status != KV_Q16_OK)
+        return status;
+
+    staged_next_token_index = token_count;
+
+    if (snapshot_layer_idx != layer_idx ||
+        snapshot_token_count != token_count ||
+        snapshot_layer_count != layer_count ||
+        snapshot_token_capacity != token_capacity ||
+        snapshot_kv_heads != kv_heads ||
+        snapshot_head_dim != head_dim ||
+        snapshot_k_cache_capacity != k_cache_capacity ||
+        snapshot_v_cache_capacity != v_cache_capacity ||
+        snapshot_k_src_capacity != k_token_src_capacity ||
+        snapshot_v_src_capacity != v_token_src_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    *out_required_cells = staged_required_cells;
+    *out_required_bytes = staged_required_bytes;
+    *out_next_token_index = staged_next_token_index;
+    return KV_Q16_OK;
+}
+
+// IQ-1046 parity gate for append diagnostics.
+// Composes append commit-only-preflight and append preflight paths,
+// enforces strict parity on {required_cells,required_bytes,next_token_index},
+// and atomically publishes outputs only on exact tuple match.
+I32 KVCacheQ16AppendTokenCheckedNoPartialCommitOnlyPreflightOnlyParity(
+    I64 *k_cache_q16,
+    I64 k_cache_capacity,
+    I64 *v_cache_q16,
+    I64 v_cache_capacity,
+    I64 layer_idx,
+    I64 token_count,
+    I64 layer_count,
+    I64 token_capacity,
+    I64 kv_heads,
+    I64 head_dim,
+    I64 *k_token_src_q16,
+    I64 k_token_src_capacity,
+    I64 *v_token_src_q16,
+    I64 v_token_src_capacity,
+    I64 *out_required_cells,
+    I64 *out_required_bytes,
+    I64 *out_next_token_index)
+{
+    I64 staged_required_cells_commit;
+    I64 staged_required_bytes_commit;
+    I64 staged_next_token_index_commit;
+    I64 staged_required_cells_preflight;
+    I64 staged_required_bytes_preflight;
+    I64 staged_next_token_index_preflight;
+    I64 snapshot_layer_idx;
+    I64 snapshot_token_count;
+    I64 snapshot_layer_count;
+    I64 snapshot_token_capacity;
+    I64 snapshot_kv_heads;
+    I64 snapshot_head_dim;
+    I64 snapshot_k_cache_capacity;
+    I64 snapshot_v_cache_capacity;
+    I64 snapshot_k_src_capacity;
+    I64 snapshot_v_src_capacity;
+    I32 status;
+
+    if (!out_required_cells || !out_required_bytes || !out_next_token_index)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (out_required_cells == out_required_bytes ||
+        out_required_cells == out_next_token_index ||
+        out_required_bytes == out_next_token_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (out_required_cells == k_cache_q16 ||
+        out_required_cells == v_cache_q16 ||
+        out_required_cells == k_token_src_q16 ||
+        out_required_cells == v_token_src_q16 ||
+        out_required_bytes == k_cache_q16 ||
+        out_required_bytes == v_cache_q16 ||
+        out_required_bytes == k_token_src_q16 ||
+        out_required_bytes == v_token_src_q16 ||
+        out_next_token_index == k_cache_q16 ||
+        out_next_token_index == v_cache_q16 ||
+        out_next_token_index == k_token_src_q16 ||
+        out_next_token_index == v_token_src_q16)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    snapshot_layer_idx = layer_idx;
+    snapshot_token_count = token_count;
+    snapshot_layer_count = layer_count;
+    snapshot_token_capacity = token_capacity;
+    snapshot_kv_heads = kv_heads;
+    snapshot_head_dim = head_dim;
+    snapshot_k_cache_capacity = k_cache_capacity;
+    snapshot_v_cache_capacity = v_cache_capacity;
+    snapshot_k_src_capacity = k_token_src_capacity;
+    snapshot_v_src_capacity = v_token_src_capacity;
+
+    status = KVCacheQ16AppendTokenCheckedNoPartialCommitOnlyPreflightOnly(
+        k_cache_q16,
+        k_cache_capacity,
+        v_cache_q16,
+        v_cache_capacity,
+        layer_idx,
+        token_count,
+        layer_count,
+        token_capacity,
+        kv_heads,
+        head_dim,
+        k_token_src_q16,
+        k_token_src_capacity,
+        v_token_src_q16,
+        v_token_src_capacity,
+        &staged_required_cells_commit,
+        &staged_required_bytes_commit,
+        &staged_next_token_index_commit);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVCacheQ16AppendTokenCheckedNoPartialPreflight(
+        k_cache_q16,
+        k_cache_capacity,
+        v_cache_q16,
+        v_cache_capacity,
+        layer_idx,
+        token_count,
+        layer_count,
+        token_capacity,
+        kv_heads,
+        head_dim,
+        k_token_src_q16,
+        k_token_src_capacity,
+        v_token_src_q16,
+        v_token_src_capacity,
+        &staged_required_cells_preflight,
+        &staged_next_token_index_preflight);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVTryMulI64Checked(staged_required_cells_preflight,
+                                sizeof(I64),
+                                &staged_required_bytes_preflight);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (staged_required_cells_commit != staged_required_cells_preflight)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (staged_required_bytes_commit != staged_required_bytes_preflight)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (staged_next_token_index_commit != staged_next_token_index_preflight)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_layer_idx != layer_idx ||
+        snapshot_token_count != token_count ||
+        snapshot_layer_count != layer_count ||
+        snapshot_token_capacity != token_capacity ||
+        snapshot_kv_heads != kv_heads ||
+        snapshot_head_dim != head_dim ||
+        snapshot_k_cache_capacity != k_cache_capacity ||
+        snapshot_v_cache_capacity != v_cache_capacity ||
+        snapshot_k_src_capacity != k_token_src_capacity ||
+        snapshot_v_src_capacity != v_token_src_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    *out_required_cells = staged_required_cells_commit;
+    *out_required_bytes = staged_required_bytes_commit;
+    *out_next_token_index = staged_next_token_index_commit;
+    return KV_Q16_OK;
+}

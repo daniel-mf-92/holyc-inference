@@ -2196,7 +2196,7 @@ I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParit
 }
 
 
-// IQ-1033 diagnostics-only parity gate for dims commit+preflight wrappers.
+// IQ-1037 diagnostics-only parity gate for dims commit+preflight wrappers.
 //
 // Compose `...PreflightOnlyParityCommitOnlyPreflightOnly` and canonical
 // `...PreflightOnlyParityCommitOnly`, enforce immutable `{buf,size,cursor}`
