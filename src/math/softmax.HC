@@ -908,6 +908,141 @@ I32 SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnly(
     return FP_Q16_OK;
 }
 
+// IQ-1084 diagnostics-only parity gate for top-k softmax preflight geometry.
+//
+// Purpose:
+//   - Re-run canonical top-k preflight geometry in-line and require exact tuple
+//     parity with SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnly.
+//   - Detect stale or diverged staging logic before any caller-visible publish.
+//
+// Canonical tuple:
+//   {required_workspace_cells, selected_count, max_logit_q16}
+//
+// Contracts:
+//   - No partial writes: outputs are committed only after both staged and
+//     canonical paths succeed and parity is exact.
+//   - Immutable snapshots for pointers/geometry are revalidated before commit.
+I32 SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParity(
+    I64 *logits_q16,
+    I64 logits_count,
+    I64 top_k,
+    I64 workspace_capacity,
+    I64 *out_required_workspace_cells,
+    I64 *out_selected_count,
+    I64 *out_max_logit_q16)
+{
+    I64 i;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 window_delta_q16;
+
+    I64 staged_required_workspace_cells;
+    I64 staged_selected_count;
+    I64 staged_max_logit_q16;
+
+    I64 canonical_required_workspace_cells;
+    I64 canonical_selected_count;
+    I64 canonical_max_logit_q16;
+
+    I64 snapshot_logits_count;
+    I64 snapshot_top_k;
+    I64 snapshot_workspace_capacity;
+    I64 *snapshot_logits_q16;
+
+    I32 status;
+
+    if (!logits_q16 || !out_required_workspace_cells ||
+        !out_selected_count || !out_max_logit_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (out_required_workspace_cells == out_selected_count ||
+        out_required_workspace_cells == out_max_logit_q16 ||
+        out_selected_count == out_max_logit_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (logits_count < 0 || top_k < 0 || workspace_capacity < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (top_k > logits_count)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    snapshot_logits_q16 = logits_q16;
+    snapshot_logits_count = logits_count;
+    snapshot_top_k = top_k;
+    snapshot_workspace_capacity = workspace_capacity;
+
+    status = SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnly(
+        logits_q16,
+        logits_count,
+        top_k,
+        workspace_capacity,
+        &staged_required_workspace_cells,
+        &staged_selected_count,
+        &staged_max_logit_q16);
+    if (status)
+        return status;
+
+    canonical_required_workspace_cells = 0;
+    canonical_selected_count = 0;
+    canonical_max_logit_q16 = 0;
+
+    if (!logits_count)
+    {
+        canonical_required_workspace_cells = 0;
+        canonical_selected_count = 0;
+        canonical_max_logit_q16 = 0;
+    }
+    else
+    {
+        last_index = logits_count - 1;
+        if (last_index > (I64_MAX_VALUE >> 3))
+            return FP_Q16_ERR_OVERFLOW;
+        last_byte_offset = last_index << 3;
+        if ((U64)logits_q16 > (U64_MAX_VALUE - (U64)last_byte_offset))
+            return FP_Q16_ERR_OVERFLOW;
+
+        if (logits_count > (I64_MAX_VALUE - top_k))
+            return FP_Q16_ERR_OVERFLOW;
+        canonical_required_workspace_cells = logits_count + top_k;
+        if (canonical_required_workspace_cells > workspace_capacity)
+            return FP_Q16_ERR_BAD_PARAM;
+
+        canonical_selected_count = top_k;
+        canonical_max_logit_q16 = logits_q16[0];
+        for (i = 1; i < logits_count; i++)
+        {
+            if (logits_q16[i] > canonical_max_logit_q16)
+                canonical_max_logit_q16 = logits_q16[i];
+        }
+
+        for (i = 0; i < logits_count; i++)
+        {
+            if (logits_q16[i] < 0 &&
+                canonical_max_logit_q16 > (I64_MAX_VALUE + logits_q16[i]))
+                return FP_Q16_ERR_OVERFLOW;
+
+            window_delta_q16 = canonical_max_logit_q16 - logits_q16[i];
+            if (window_delta_q16 < 0)
+                return FP_Q16_ERR_BAD_PARAM;
+        }
+    }
+
+    if (snapshot_logits_q16 != logits_q16 ||
+        snapshot_logits_count != logits_count ||
+        snapshot_top_k != top_k ||
+        snapshot_workspace_capacity != workspace_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_workspace_cells != canonical_required_workspace_cells ||
+        staged_selected_count != canonical_selected_count ||
+        staged_max_logit_q16 != canonical_max_logit_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_required_workspace_cells = staged_required_workspace_cells;
+    *out_selected_count = staged_selected_count;
+    *out_max_logit_q16 = staged_max_logit_q16;
+    return FP_Q16_OK;
+}
+
 // Checked deterministic top-k selector that emits both logits and indices into
 // disjoint caller-owned output buffers.
 // Output contract:
