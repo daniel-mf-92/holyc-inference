@@ -51,6 +51,9 @@ def attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit
     if staged_scores_capacity < 0 or out_scores_capacity < 0:
         return ATTN_Q16_ERR_BAD_PARAM
 
+    snapshot_staged_scores_q32 = staged_scores_q32
+    snapshot_out_scores_q32 = out_scores_q32
+
     if query_row_count == 0 or token_count == 0:
         out_required_stage_cells[0] = 0
         out_required_out_cells[0] = 0
@@ -166,6 +169,10 @@ def attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit
         return ATTN_Q16_ERR_BAD_PARAM
     if staged_last_out_index[0] != expected_last_out_index:
         return ATTN_Q16_ERR_BAD_PARAM
+    if snapshot_staged_scores_q32 is not staged_scores_q32:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if snapshot_out_scores_q32 is not out_scores_q32:
+        return ATTN_Q16_ERR_BAD_PARAM
 
     out_required_stage_cells[0] = staged_required_stage_cells[0]
     out_required_stage_bytes[0] = recomputed_required_stage_bytes
@@ -236,6 +243,10 @@ def test_source_contains_required_bytes_wrapper() -> None:
     assert "AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnly(" in body
     assert "AttentionTryMulI64Checked(recomputed_required_stage_cells," in body
     assert "sizeof(I64)" in body
+    assert "snapshot_staged_scores_q32 = staged_scores_q32;" in body
+    assert "snapshot_out_scores_q32 = out_scores_q32;" in body
+    assert "if (snapshot_staged_scores_q32 != staged_scores_q32)" in body
+    assert "if (snapshot_out_scores_q32 != out_scores_q32)" in body
     assert "*out_required_stage_bytes = recomputed_required_stage_bytes;" in body
 
 

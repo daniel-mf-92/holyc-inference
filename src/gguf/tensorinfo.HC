@@ -586,7 +586,7 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnly(
     return GGUF_TENSOR_PARSE_OK;
 }
 
-// Diagnostics-only parity gate for tensor name tuple decoding.
+// IQ-1020 diagnostics-only parity gate for tensor name tuple decoding.
 //
 // Composes `...CommitOnlyPreflightOnly` and canonical `...CommitOnly`, then
 // publishes atomically only when immutable snapshots and tuple parity match:
