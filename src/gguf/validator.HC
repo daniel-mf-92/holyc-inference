@@ -705,3 +705,78 @@ I64 GGUFModelValidateTensorLayoutCheckedNoPartialCommitOnlyPreflightOnlyParityCo
     return GGUF_MODEL_VALIDATE_OK;
 }
 
+// IQ-1164
+// Integer-only rolling checksum over GGUF header bytes + tensor directory bytes.
+//
+// Design notes:
+// - Uses an FNV-1a style byte mixer (xor + multiply) as the rolling core.
+// - Injects absolute byte position into each mix step so reordered chunks diverge.
+// - Applies a final integer avalanche to spread local byte changes across all bits.
+// - Keeps no-partial-write semantics: `*out_checksum` is published only on success.
+I64 GGUFModelChecksumHeaderAndTensorDirectory(U8 *header_bytes,
+                                              U64 header_nbytes,
+                                              U8 *tensor_dir_bytes,
+                                              U64 tensor_dir_nbytes,
+                                              U64 seed,
+                                              U64 *out_checksum)
+{
+    U64 header_base;
+    U64 header_end;
+    U64 tensor_base;
+    U64 tensor_end;
+    U64 out_addr;
+    U64 state;
+    U64 i;
+    U64 abs_pos;
+    U64 len_mix;
+
+    if (!header_bytes || !tensor_dir_bytes || !out_checksum)
+        return GGUF_MODEL_VALIDATE_ERR_NULL_PTR;
+
+    header_base = (U64)header_bytes;
+    tensor_base = (U64)tensor_dir_bytes;
+    out_addr = (U64)out_checksum;
+
+    if (header_nbytes && !GGUFModelValidateTryAddU64(header_base, header_nbytes, &header_end))
+        return GGUF_MODEL_VALIDATE_ERR_OVERFLOW;
+    if (tensor_dir_nbytes && !GGUFModelValidateTryAddU64(tensor_base, tensor_dir_nbytes, &tensor_end))
+        return GGUF_MODEL_VALIDATE_ERR_OVERFLOW;
+
+    if ((header_nbytes && out_addr >= header_base && out_addr < header_end) ||
+        (tensor_dir_nbytes && out_addr >= tensor_base && out_addr < tensor_end))
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+
+    // Start from caller seed mixed with fixed offset-basis for deterministic domain separation.
+    state = seed ^ 0xCBF29CE484222325;
+    abs_pos = 0;
+
+    for (i = 0; i < header_nbytes; i++)
+    {
+        state ^= (U64)header_bytes[i] ^ (abs_pos << 8);
+        state *= 0x100000001B3;
+        abs_pos++;
+    }
+
+    for (i = 0; i < tensor_dir_nbytes; i++)
+    {
+        state ^= (U64)tensor_dir_bytes[i] ^ (abs_pos << 8);
+        state *= 0x100000001B3;
+        abs_pos++;
+    }
+
+    // Fold both span lengths into final state before avalanche so equal prefixes diverge.
+    len_mix = header_nbytes;
+    if (!GGUFModelValidateTryAddU64(len_mix, (tensor_dir_nbytes << 1), &len_mix))
+        return GGUF_MODEL_VALIDATE_ERR_OVERFLOW;
+    state ^= len_mix;
+
+    // Integer avalanche (Murmur-style constants) to distribute bit influence.
+    state ^= state >> 33;
+    state *= 0xFF51AFD7ED558CCD;
+    state ^= state >> 33;
+    state *= 0xC4CEB9FE1A85EC53;
+    state ^= state >> 33;
+
+    *out_checksum = state;
+    return GGUF_MODEL_VALIDATE_OK;
+}
