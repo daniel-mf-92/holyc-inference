@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Preflight-only harness for IQ-1081 parity commit/preflight wrapper."""
+"""Preflight-only diagnostics harness for InferenceForward...Parity...ParityCommitOnlyPreflightOnly (IQ-1096)."""
 
 from __future__ import annotations
 
@@ -14,15 +14,15 @@ from test_inference_forward_q16_checked_nopartial_commit_only_preflight_only_par
     MODEL_Q16_ERR_NULL_PTR,
     MODEL_Q16_OK,
 )
-from test_inference_forward_q16_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity import (
-    parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference,
+from test_inference_forward_q16_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only import (
+    parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference,
 )
-from test_inference_forward_q16_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only import (
-    parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference,
+from test_inference_forward_q16_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity import (
+    parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference,
 )
 
 
-def parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
+def parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
     *,
     embed_capacity: int,
     block_attn_capacity: int,
@@ -39,8 +39,8 @@ def parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_c
     out_required_workspace_cells: list[int] | None,
     out_required_block_tensor_cells: list[int] | None,
     out_required_logits_cells: list[int] | None,
-    commit_only_fn=parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference,
-    parity_fn=parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference,
+    commit_only_fn=parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference,
+    canonical_fn=parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference,
 ) -> int:
     if (
         out_dense_cells is None
@@ -60,12 +60,6 @@ def parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_c
     ):
         return MODEL_Q16_ERR_BAD_PARAM
 
-    snapshot_embed_capacity = embed_capacity
-    snapshot_block_attn_capacity = block_attn_capacity
-    snapshot_block_ffn_capacity = block_ffn_capacity
-    snapshot_gamma_attn_capacity = gamma_attn_capacity
-    snapshot_gamma_ffn_capacity = gamma_ffn_capacity
-    snapshot_final_norm_gamma_capacity = final_norm_gamma_capacity
     snapshot_row_count = row_count
     snapshot_lane_count = lane_count
     snapshot_block_count = block_count
@@ -107,7 +101,7 @@ def parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_c
     canonical_block = [0]
     canonical_logits = [0]
 
-    status = parity_fn(
+    status = canonical_fn(
         embed_capacity=embed_capacity,
         block_attn_capacity=block_attn_capacity,
         block_ffn_capacity=block_ffn_capacity,
@@ -128,13 +122,7 @@ def parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_c
         return status
 
     if (
-        snapshot_embed_capacity != embed_capacity
-        or snapshot_block_attn_capacity != block_attn_capacity
-        or snapshot_block_ffn_capacity != block_ffn_capacity
-        or snapshot_gamma_attn_capacity != gamma_attn_capacity
-        or snapshot_gamma_ffn_capacity != gamma_ffn_capacity
-        or snapshot_final_norm_gamma_capacity != final_norm_gamma_capacity
-        or snapshot_row_count != row_count
+        snapshot_row_count != row_count
         or snapshot_lane_count != lane_count
         or snapshot_block_count != block_count
         or snapshot_workspace_capacity != workspace_capacity
@@ -160,10 +148,12 @@ def parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_c
     ):
         return MODEL_Q16_ERR_BAD_PARAM
 
-    if staged_dense[0] < 0 or staged_workspace[0] < 0 or staged_block[0] < 0 or staged_logits[0] < 0:
-        return MODEL_Q16_ERR_BAD_PARAM
     if (
-        canonical_dense[0] < 0
+        staged_dense[0] < 0
+        or staged_workspace[0] < 0
+        or staged_block[0] < 0
+        or staged_logits[0] < 0
+        or canonical_dense[0] < 0
         or canonical_workspace[0] < 0
         or canonical_block[0] < 0
         or canonical_logits[0] < 0
@@ -186,43 +176,33 @@ def parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_c
     return MODEL_Q16_OK
 
 
-def test_source_contains_iq_1081_symbol() -> None:
+def test_source_contains_iq_1096_symbol() -> None:
     source = Path("src/model/model.HC").read_text(encoding="utf-8")
-    signature = (
-        "I32 InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnlyParity"
-        "CommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly("
-    )
+    signature = "I32 InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly("
     assert signature in source
     assert source.count(signature) == 1
     body = source[source.index(signature):]
     assert (
         "status =\n"
-        "        InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly("
+        "        InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly("
         in body
     )
     assert (
         "status =\n"
-        "        InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity("
+        "        InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity("
         in body
     )
     assert "if (staged_dense_cells < 0 ||" in body
     assert "if (staged_required_logits_cells != canonical_required_logits_cells)" in body
-    assert "snapshot_embed_capacity = embed_capacity;" in body
-    assert "snapshot_block_attn_capacity = block_attn_capacity;" in body
-    assert "snapshot_block_ffn_capacity = block_ffn_capacity;" in body
-    assert "snapshot_gamma_attn_capacity = gamma_attn_capacity;" in body
-    assert "snapshot_gamma_ffn_capacity = gamma_ffn_capacity;" in body
-    assert "snapshot_final_norm_gamma_capacity = final_norm_gamma_capacity;" in body
-    assert "if (snapshot_embed_capacity != embed_capacity ||" in body
 
 
 def test_known_vector_success() -> None:
-    out_dense = [961]
-    out_workspace = [962]
-    out_block = [963]
-    out_logits = [964]
+    out_dense = [9101]
+    out_workspace = [9102]
+    out_block = [9103]
+    out_logits = [9104]
 
-    status = parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
+    status = parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
         embed_capacity=96,
         block_attn_capacity=192,
         block_ffn_capacity=192,
@@ -247,24 +227,24 @@ def test_known_vector_success() -> None:
     assert out_logits == [24]
 
 
-def test_no_partial_publish_on_commit_only_mismatch() -> None:
-    out_dense = [1101]
-    out_workspace = [1102]
-    out_block = [1103]
-    out_logits = [1104]
+def test_no_partial_publish_on_staged_mismatch() -> None:
+    out_dense = [9201]
+    out_workspace = [9202]
+    out_block = [9203]
+    out_logits = [9204]
 
-    def _bad_commit_only(**kwargs: int) -> int:
+    def _bad_staged(**kwargs: int) -> int:
         out_dense_cells = kwargs["out_dense_cells"]
         out_required_workspace_cells = kwargs["out_required_workspace_cells"]
         out_required_block_tensor_cells = kwargs["out_required_block_tensor_cells"]
         out_required_logits_cells = kwargs["out_required_logits_cells"]
         out_dense_cells[0] = 24
-        out_required_workspace_cells[0] = 48
-        out_required_block_tensor_cells[0] = 95
+        out_required_workspace_cells[0] = 49
+        out_required_block_tensor_cells[0] = 96
         out_required_logits_cells[0] = 24
         return MODEL_Q16_OK
 
-    status = parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
+    status = parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
         embed_capacity=96,
         block_attn_capacity=192,
         block_ffn_capacity=192,
@@ -280,23 +260,23 @@ def test_no_partial_publish_on_commit_only_mismatch() -> None:
         out_required_workspace_cells=out_workspace,
         out_required_block_tensor_cells=out_block,
         out_required_logits_cells=out_logits,
-        commit_only_fn=_bad_commit_only,
+        commit_only_fn=_bad_staged,
     )
 
     assert status == MODEL_Q16_ERR_BAD_PARAM
-    assert out_dense == [1101]
-    assert out_workspace == [1102]
-    assert out_block == [1103]
-    assert out_logits == [1104]
+    assert out_dense == [9201]
+    assert out_workspace == [9202]
+    assert out_block == [9203]
+    assert out_logits == [9204]
 
 
-def test_no_partial_publish_on_parity_mismatch() -> None:
-    out_dense = [1201]
-    out_workspace = [1202]
-    out_block = [1203]
-    out_logits = [1204]
+def test_no_partial_publish_on_canonical_mismatch() -> None:
+    out_dense = [9301]
+    out_workspace = [9302]
+    out_block = [9303]
+    out_logits = [9304]
 
-    def _bad_parity(**kwargs: int) -> int:
+    def _bad_canonical(**kwargs: int) -> int:
         out_dense_cells = kwargs["out_dense_cells"]
         out_required_workspace_cells = kwargs["out_required_workspace_cells"]
         out_required_block_tensor_cells = kwargs["out_required_block_tensor_cells"]
@@ -304,10 +284,10 @@ def test_no_partial_publish_on_parity_mismatch() -> None:
         out_dense_cells[0] = 24
         out_required_workspace_cells[0] = 48
         out_required_block_tensor_cells[0] = 96
-        out_required_logits_cells[0] = 25
+        out_required_logits_cells[0] = 31
         return MODEL_Q16_OK
 
-    status = parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
+    status = parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
         embed_capacity=96,
         block_attn_capacity=192,
         block_ffn_capacity=192,
@@ -323,68 +303,23 @@ def test_no_partial_publish_on_parity_mismatch() -> None:
         out_required_workspace_cells=out_workspace,
         out_required_block_tensor_cells=out_block,
         out_required_logits_cells=out_logits,
-        parity_fn=_bad_parity,
+        canonical_fn=_bad_canonical,
     )
 
     assert status == MODEL_Q16_ERR_BAD_PARAM
-    assert out_dense == [1201]
-    assert out_workspace == [1202]
-    assert out_block == [1203]
-    assert out_logits == [1204]
+    assert out_dense == [9301]
+    assert out_workspace == [9302]
+    assert out_block == [9303]
+    assert out_logits == [9304]
 
 
-def test_null_output_pointer_rejected() -> None:
-    status = parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
-        embed_capacity=96,
-        block_attn_capacity=192,
-        block_ffn_capacity=192,
-        block_count=4,
-        gamma_attn_capacity=8,
-        gamma_ffn_capacity=8,
-        final_norm_gamma_capacity=8,
-        workspace_capacity=48,
-        logits_capacity=24,
-        row_count=3,
-        lane_count=8,
-        out_dense_cells=None,
-        out_required_workspace_cells=[1],
-        out_required_block_tensor_cells=[2],
-        out_required_logits_cells=[3],
-    )
+def test_randomized_geometry_vectors() -> None:
+    rng = random.Random(20260422_1096)
 
-    assert status == MODEL_Q16_ERR_NULL_PTR
-
-
-def test_alias_output_pointer_rejected() -> None:
-    shared = [777]
-    status = parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
-        embed_capacity=96,
-        block_attn_capacity=192,
-        block_ffn_capacity=192,
-        block_count=4,
-        gamma_attn_capacity=8,
-        gamma_ffn_capacity=8,
-        final_norm_gamma_capacity=8,
-        workspace_capacity=48,
-        logits_capacity=24,
-        row_count=3,
-        lane_count=8,
-        out_dense_cells=shared,
-        out_required_workspace_cells=shared,
-        out_required_block_tensor_cells=[2],
-        out_required_logits_cells=[3],
-    )
-
-    assert status == MODEL_Q16_ERR_BAD_PARAM
-
-
-def test_randomized_geometry_capacity_overflow_vectors() -> None:
-    rng = random.Random(20260422_1081)
-
-    for _ in range(1400):
-        row_count = rng.randint(0, 256)
-        lane_count = rng.randint(0, 256)
-        block_count = rng.randint(0, 64)
+    for _ in range(1600):
+        row_count = rng.randint(0, 224)
+        lane_count = rng.randint(0, 224)
+        block_count = rng.randint(0, 56)
 
         if row_count == 0 or lane_count == 0:
             dense = 0
@@ -397,7 +332,7 @@ def test_randomized_geometry_capacity_overflow_vectors() -> None:
             block_req = dense * block_count
             logits_req = dense
 
-        status = parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
+        status = parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
             embed_capacity=dense,
             block_attn_capacity=block_req,
             block_ffn_capacity=block_req,
@@ -417,16 +352,59 @@ def test_randomized_geometry_capacity_overflow_vectors() -> None:
         assert status == MODEL_Q16_OK
 
 
-if __name__ == "__main__":
-    test_source_contains_iq_1081_symbol()
-    test_known_vector_success()
-    test_no_partial_publish_on_commit_only_mismatch()
-    test_no_partial_publish_on_parity_mismatch()
-    test_null_output_pointer_rejected()
-    test_alias_output_pointer_rejected()
-    test_randomized_geometry_capacity_overflow_vectors()
-    print(
-        "inference_forward_q16_checked_nopartial_commit_only_preflight_only_parity_"
-        "commit_only_preflight_only_parity_commit_only_preflight_only_parity_"
-        "commit_only_preflight_only=ok"
+def test_alias_outputs_rejected() -> None:
+    shared = [0]
+    out_block = [0]
+    out_logits = [0]
+
+    status = parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
+        embed_capacity=16,
+        block_attn_capacity=16,
+        block_ffn_capacity=16,
+        block_count=1,
+        gamma_attn_capacity=4,
+        gamma_ffn_capacity=4,
+        final_norm_gamma_capacity=4,
+        workspace_capacity=32,
+        logits_capacity=16,
+        row_count=2,
+        lane_count=8,
+        out_dense_cells=shared,
+        out_required_workspace_cells=shared,
+        out_required_block_tensor_cells=out_block,
+        out_required_logits_cells=out_logits,
     )
+
+    assert status == MODEL_Q16_ERR_BAD_PARAM
+
+
+def test_null_outputs_rejected() -> None:
+    status = parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
+        embed_capacity=16,
+        block_attn_capacity=16,
+        block_ffn_capacity=16,
+        block_count=1,
+        gamma_attn_capacity=4,
+        gamma_ffn_capacity=4,
+        final_norm_gamma_capacity=4,
+        workspace_capacity=32,
+        logits_capacity=16,
+        row_count=2,
+        lane_count=8,
+        out_dense_cells=None,
+        out_required_workspace_cells=[0],
+        out_required_block_tensor_cells=[0],
+        out_required_logits_cells=[0],
+    )
+    assert status == MODEL_Q16_ERR_NULL_PTR
+
+
+if __name__ == "__main__":
+    test_source_contains_iq_1096_symbol()
+    test_known_vector_success()
+    test_no_partial_publish_on_staged_mismatch()
+    test_no_partial_publish_on_canonical_mismatch()
+    test_randomized_geometry_vectors()
+    test_alias_outputs_rejected()
+    test_null_outputs_rejected()
+    print("ok")

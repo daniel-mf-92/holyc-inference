@@ -1043,6 +1043,113 @@ I32 SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParity(
     return FP_Q16_OK;
 }
 
+// IQ-1086 diagnostics-only zero-write companion for parity/geometry preflight.
+//
+// Compose:
+//   1) `SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParity`
+//      as staged diagnostics tuple producer.
+//   2) Canonical geometry recomputation through
+//      `SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnly`.
+//
+// Publish contract:
+//   - Output tuple `{required_workspace_cells,selected_count,max_logit_q16}`
+//     is committed only when staged and canonical tuples match exactly.
+//   - All error paths preserve caller outputs (no partial writes).
+I32 SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+    I64 *logits_q16,
+    I64 logits_count,
+    I64 top_k,
+    I64 workspace_capacity,
+    I64 *out_required_workspace_cells,
+    I64 *out_selected_count,
+    I64 *out_max_logit_q16)
+{
+    I64 staged_required_workspace_cells;
+    I64 staged_selected_count;
+    I64 staged_max_logit_q16;
+
+    I64 canonical_required_workspace_cells;
+    I64 canonical_selected_count;
+    I64 canonical_max_logit_q16;
+
+    I64 *snapshot_logits_q16;
+    I64 snapshot_logits_count;
+    I64 snapshot_top_k;
+    I64 snapshot_workspace_capacity;
+
+    I64 *snapshot_out_required_workspace_cells;
+    I64 *snapshot_out_selected_count;
+    I64 *snapshot_out_max_logit_q16;
+
+    I32 status;
+
+    if (!logits_q16 || !out_required_workspace_cells ||
+        !out_selected_count || !out_max_logit_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (out_required_workspace_cells == out_selected_count ||
+        out_required_workspace_cells == out_max_logit_q16 ||
+        out_selected_count == out_max_logit_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (logits_count < 0 || top_k < 0 || workspace_capacity < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (top_k > logits_count)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    snapshot_logits_q16 = logits_q16;
+    snapshot_logits_count = logits_count;
+    snapshot_top_k = top_k;
+    snapshot_workspace_capacity = workspace_capacity;
+
+    snapshot_out_required_workspace_cells = out_required_workspace_cells;
+    snapshot_out_selected_count = out_selected_count;
+    snapshot_out_max_logit_q16 = out_max_logit_q16;
+
+    status = SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParity(
+        logits_q16,
+        logits_count,
+        top_k,
+        workspace_capacity,
+        &staged_required_workspace_cells,
+        &staged_selected_count,
+        &staged_max_logit_q16);
+    if (status)
+        return status;
+
+    status = SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnly(
+        logits_q16,
+        logits_count,
+        top_k,
+        workspace_capacity,
+        &canonical_required_workspace_cells,
+        &canonical_selected_count,
+        &canonical_max_logit_q16);
+    if (status)
+        return status;
+
+    if (snapshot_logits_q16 != logits_q16 ||
+        snapshot_logits_count != logits_count ||
+        snapshot_top_k != top_k ||
+        snapshot_workspace_capacity != workspace_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_out_required_workspace_cells != out_required_workspace_cells ||
+        snapshot_out_selected_count != out_selected_count ||
+        snapshot_out_max_logit_q16 != out_max_logit_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_workspace_cells != canonical_required_workspace_cells ||
+        staged_selected_count != canonical_selected_count ||
+        staged_max_logit_q16 != canonical_max_logit_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_required_workspace_cells = staged_required_workspace_cells;
+    *out_selected_count = staged_selected_count;
+    *out_max_logit_q16 = staged_max_logit_q16;
+    return FP_Q16_OK;
+}
+
 // Checked deterministic top-k selector that emits both logits and indices into
 // disjoint caller-owned output buffers.
 // Output contract:
