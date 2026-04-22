@@ -565,6 +565,339 @@ I32 Q8_0DotRowsQ16CheckedNoPartial(
     return Q8_0_OK;
 }
 
+// Commit-only wrapper for row-wise checked Q8_0 dots with strided output.
+//
+// Contracts:
+// - Uses canonical `Q8_0DotRowsQ16CheckedNoPartial` to stage contiguous rows.
+// - Publishes to caller `out_rows_q16[row * out_stride]` only after full success.
+// - Exposes required lhs/rhs block tuples for diagnostics preflight composition.
+I32 Q8_0DotRowsQ16CheckedNoPartialCommitOnly(
+    Q8_0Block *lhs_blocks,
+    I64 lhs_block_capacity,
+    I64 left_stride_blocks,
+    Q8_0Block *rhs_blocks,
+    I64 rhs_block_capacity,
+    I64 right_stride_blocks,
+    I64 rows,
+    I64 blocks_per_row,
+    I64 *out_rows_q16,
+    I64 out_stride,
+    I64 out_capacity,
+    I64 *required_left_blocks_out,
+    I64 *required_right_blocks_out)
+{
+    I64 row_index;
+    I64 last_row;
+    I64 left_last_row_base;
+    I64 right_last_row_base;
+    I64 required_left_blocks;
+    I64 required_right_blocks;
+    I64 out_last_index;
+    I64 required_out_cells;
+    I64 stage_bytes;
+    I64 *staged_rows_q16;
+    I32 status;
+
+    if (!lhs_blocks || !rhs_blocks || !out_rows_q16 ||
+        !required_left_blocks_out || !required_right_blocks_out)
+        return Q8_0_ERR_NULL_PTR;
+
+    *required_left_blocks_out = 0;
+    *required_right_blocks_out = 0;
+
+    if (lhs_block_capacity < 0 || rhs_block_capacity < 0 || out_capacity < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (left_stride_blocks < 0 || right_stride_blocks < 0 || out_stride < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (rows < 0 || blocks_per_row < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if (!rows)
+        return Q8_0_OK;
+
+    if (!out_stride)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    last_row = rows - 1;
+
+    if (!Q8_0TryMulI64NonNeg(last_row, out_stride, &out_last_index))
+        return Q8_0_ERR_OVERFLOW;
+    if (!Q8_0TryAddI64(out_last_index, 1, &required_out_cells))
+        return Q8_0_ERR_OVERFLOW;
+    if (required_out_cells > out_capacity)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if (!blocks_per_row)
+    {
+        for (row_index = 0; row_index < rows; ++row_index)
+            out_rows_q16[row_index * out_stride] = 0;
+        return Q8_0_OK;
+    }
+
+    if (!Q8_0TryMulI64NonNeg(last_row, left_stride_blocks, &left_last_row_base))
+        return Q8_0_ERR_OVERFLOW;
+    if (!Q8_0TryMulI64NonNeg(last_row, right_stride_blocks, &right_last_row_base))
+        return Q8_0_ERR_OVERFLOW;
+
+    if (!Q8_0TryAddI64(left_last_row_base, blocks_per_row, &required_left_blocks))
+        return Q8_0_ERR_OVERFLOW;
+    if (!Q8_0TryAddI64(right_last_row_base, blocks_per_row, &required_right_blocks))
+        return Q8_0_ERR_OVERFLOW;
+
+    if (required_left_blocks > lhs_block_capacity)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (required_right_blocks > rhs_block_capacity)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if (!Q8_0TryMulI64NonNeg(rows, sizeof(I64), &stage_bytes))
+        return Q8_0_ERR_OVERFLOW;
+
+    staged_rows_q16 = MAlloc(stage_bytes);
+    if (!staged_rows_q16)
+        return Q8_0_ERR_OVERFLOW;
+
+    status = Q8_0DotRowsQ16CheckedNoPartial(lhs_blocks,
+                                            lhs_block_capacity,
+                                            left_stride_blocks,
+                                            rhs_blocks,
+                                            rhs_block_capacity,
+                                            right_stride_blocks,
+                                            rows,
+                                            blocks_per_row,
+                                            staged_rows_q16,
+                                            rows);
+    if (status != Q8_0_OK)
+    {
+        Free(staged_rows_q16);
+        return status;
+    }
+
+    for (row_index = 0; row_index < rows; ++row_index)
+        out_rows_q16[row_index * out_stride] = staged_rows_q16[row_index];
+
+    *required_left_blocks_out = required_left_blocks;
+    *required_right_blocks_out = required_right_blocks;
+
+    Free(staged_rows_q16);
+    return Q8_0_OK;
+}
+
+// Diagnostics-only preflight wrapper over commit-only and canonical no-partial
+// row kernels.
+//
+// Contracts:
+// - Does not write any caller `out_rows_q16` lane.
+// - Revalidates immutable row/stride/pointer snapshots after staging.
+// - Requires exact tuple parity on `{required_left_blocks,required_right_blocks}`
+//   before publish.
+I32 Q8_0DotRowsQ16CheckedNoPartialCommitOnlyPreflightOnly(
+    Q8_0Block *lhs_blocks,
+    I64 lhs_block_capacity,
+    I64 left_stride_blocks,
+    Q8_0Block *rhs_blocks,
+    I64 rhs_block_capacity,
+    I64 right_stride_blocks,
+    I64 rows,
+    I64 blocks_per_row,
+    I64 *out_rows_q16,
+    I64 out_stride,
+    I64 out_capacity,
+    I64 *required_left_blocks_out,
+    I64 *required_right_blocks_out)
+{
+    Q8_0Block *snapshot_lhs_blocks;
+    I64 snapshot_lhs_capacity;
+    I64 snapshot_left_stride;
+    Q8_0Block *snapshot_rhs_blocks;
+    I64 snapshot_rhs_capacity;
+    I64 snapshot_right_stride;
+    I64 snapshot_rows;
+    I64 snapshot_blocks_per_row;
+    I64 *snapshot_out_rows;
+    I64 snapshot_out_stride;
+    I64 snapshot_out_capacity;
+    I64 last_row;
+    I64 out_last_index;
+    I64 required_out_cells;
+    I64 commit_stage_bytes;
+    I64 canonical_stage_bytes;
+    I64 *commit_stage_rows_q16;
+    I64 *canonical_rows_q16;
+    I64 staged_required_left_blocks;
+    I64 staged_required_right_blocks;
+    I64 canonical_required_left_blocks;
+    I64 canonical_required_right_blocks;
+    I64 row_index;
+    I64 canonical_row_q16;
+    I32 status;
+
+    if (!lhs_blocks || !rhs_blocks || !out_rows_q16 ||
+        !required_left_blocks_out || !required_right_blocks_out)
+        return Q8_0_ERR_NULL_PTR;
+
+    *required_left_blocks_out = 0;
+    *required_right_blocks_out = 0;
+
+    snapshot_lhs_blocks = lhs_blocks;
+    snapshot_lhs_capacity = lhs_block_capacity;
+    snapshot_left_stride = left_stride_blocks;
+    snapshot_rhs_blocks = rhs_blocks;
+    snapshot_rhs_capacity = rhs_block_capacity;
+    snapshot_right_stride = right_stride_blocks;
+    snapshot_rows = rows;
+    snapshot_blocks_per_row = blocks_per_row;
+    snapshot_out_rows = out_rows_q16;
+    snapshot_out_stride = out_stride;
+    snapshot_out_capacity = out_capacity;
+
+    if (rows < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if (!rows)
+        return Q8_0_OK;
+
+    if (out_stride <= 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    last_row = rows - 1;
+    if (!Q8_0TryMulI64NonNeg(last_row, out_stride, &out_last_index))
+        return Q8_0_ERR_OVERFLOW;
+    if (!Q8_0TryAddI64(out_last_index, 1, &required_out_cells))
+        return Q8_0_ERR_OVERFLOW;
+    if (required_out_cells > out_capacity)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if (!Q8_0TryMulI64NonNeg(required_out_cells, sizeof(I64), &commit_stage_bytes))
+        return Q8_0_ERR_OVERFLOW;
+    if (!Q8_0TryMulI64NonNeg(rows, sizeof(I64), &canonical_stage_bytes))
+        return Q8_0_ERR_OVERFLOW;
+
+    commit_stage_rows_q16 = MAlloc(commit_stage_bytes);
+    if (!commit_stage_rows_q16)
+        return Q8_0_ERR_OVERFLOW;
+
+    canonical_rows_q16 = MAlloc(canonical_stage_bytes);
+    if (!canonical_rows_q16)
+    {
+        Free(commit_stage_rows_q16);
+        return Q8_0_ERR_OVERFLOW;
+    }
+
+    status = Q8_0DotRowsQ16CheckedNoPartialCommitOnly(lhs_blocks,
+                                                      lhs_block_capacity,
+                                                      left_stride_blocks,
+                                                      rhs_blocks,
+                                                      rhs_block_capacity,
+                                                      right_stride_blocks,
+                                                      rows,
+                                                      blocks_per_row,
+                                                      commit_stage_rows_q16,
+                                                      out_stride,
+                                                      required_out_cells,
+                                                      &staged_required_left_blocks,
+                                                      &staged_required_right_blocks);
+    if (status != Q8_0_OK)
+    {
+        Free(canonical_rows_q16);
+        Free(commit_stage_rows_q16);
+        return status;
+    }
+
+    status = Q8_0DotRowsQ16CheckedNoPartial(lhs_blocks,
+                                            lhs_block_capacity,
+                                            left_stride_blocks,
+                                            rhs_blocks,
+                                            rhs_block_capacity,
+                                            right_stride_blocks,
+                                            rows,
+                                            blocks_per_row,
+                                            canonical_rows_q16,
+                                            rows);
+    if (status != Q8_0_OK)
+    {
+        Free(canonical_rows_q16);
+        Free(commit_stage_rows_q16);
+        return status;
+    }
+
+    if (snapshot_lhs_blocks != lhs_blocks ||
+        snapshot_lhs_capacity != lhs_block_capacity ||
+        snapshot_left_stride != left_stride_blocks ||
+        snapshot_rhs_blocks != rhs_blocks ||
+        snapshot_rhs_capacity != rhs_block_capacity ||
+        snapshot_right_stride != right_stride_blocks ||
+        snapshot_rows != rows ||
+        snapshot_blocks_per_row != blocks_per_row ||
+        snapshot_out_rows != out_rows_q16 ||
+        snapshot_out_stride != out_stride ||
+        snapshot_out_capacity != out_capacity)
+    {
+        Free(canonical_rows_q16);
+        Free(commit_stage_rows_q16);
+        return Q8_0_ERR_BAD_DST_LEN;
+    }
+
+    canonical_required_left_blocks = 0;
+    canonical_required_right_blocks = 0;
+    if (blocks_per_row)
+    {
+        if (!Q8_0TryMulI64NonNeg(last_row, left_stride_blocks, &canonical_required_left_blocks))
+        {
+            Free(canonical_rows_q16);
+            Free(commit_stage_rows_q16);
+            return Q8_0_ERR_OVERFLOW;
+        }
+        if (!Q8_0TryMulI64NonNeg(last_row, right_stride_blocks, &canonical_required_right_blocks))
+        {
+            Free(canonical_rows_q16);
+            Free(commit_stage_rows_q16);
+            return Q8_0_ERR_OVERFLOW;
+        }
+        if (!Q8_0TryAddI64(canonical_required_left_blocks,
+                           blocks_per_row,
+                           &canonical_required_left_blocks))
+        {
+            Free(canonical_rows_q16);
+            Free(commit_stage_rows_q16);
+            return Q8_0_ERR_OVERFLOW;
+        }
+        if (!Q8_0TryAddI64(canonical_required_right_blocks,
+                           blocks_per_row,
+                           &canonical_required_right_blocks))
+        {
+            Free(canonical_rows_q16);
+            Free(commit_stage_rows_q16);
+            return Q8_0_ERR_OVERFLOW;
+        }
+    }
+
+    if (staged_required_left_blocks != canonical_required_left_blocks ||
+        staged_required_right_blocks != canonical_required_right_blocks)
+    {
+        Free(canonical_rows_q16);
+        Free(commit_stage_rows_q16);
+        return Q8_0_ERR_OVERFLOW;
+    }
+
+    for (row_index = 0; row_index < rows; ++row_index)
+    {
+        canonical_row_q16 = canonical_rows_q16[row_index];
+        if (commit_stage_rows_q16[row_index * out_stride] != canonical_row_q16)
+        {
+            Free(canonical_rows_q16);
+            Free(commit_stage_rows_q16);
+            return Q8_0_ERR_OVERFLOW;
+        }
+    }
+
+    *required_left_blocks_out = staged_required_left_blocks;
+    *required_right_blocks_out = staged_required_right_blocks;
+
+    Free(canonical_rows_q16);
+    Free(commit_stage_rows_q16);
+    return Q8_0_OK;
+}
+
 I64 Q8_0DotQ32ToQ16(I64 dot_q32)
 {
     return Q8_0RoundShiftRightSigned(dot_q32, 16);
