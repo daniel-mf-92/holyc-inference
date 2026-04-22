@@ -213,3 +213,87 @@ I64 FPQ16LnRatio(I64 num_q16, I64 den_q16)
     ln_ratio_q16 = base_q16 + poly_delta_q16;
     return ln_ratio_q16;
 }
+
+// Checked no-partial array ln() helpers.
+// These helpers keep the scalar FPQ16Ln math path as the single source of
+// truth while adding explicit geometry contracts for bulk tensor lanes.
+
+#define INTLOG_STATUS_OK 0
+#define INTLOG_STATUS_BADPTR -1
+#define INTLOG_STATUS_BADCOUNT -2
+#define INTLOG_STATUS_OVERFLOW -3
+
+I32 FPQ16LnArrayCheckedNoPartialPreflight(I64 *input_q16,
+                                          I64 count,
+                                          I64 *out_q16,
+                                          I64 *required_bytes_out)
+{
+    I64 bytes;
+
+    if (!required_bytes_out)
+        return INTLOG_STATUS_BADPTR;
+
+    *required_bytes_out = 0;
+
+    if (count < 0)
+        return INTLOG_STATUS_BADCOUNT;
+    if (!input_q16 || !out_q16)
+        return INTLOG_STATUS_BADPTR;
+
+    // Each lane writes one Q16 I64 output cell.
+    if (count == 0)
+        bytes = 0;
+    else if (count > (I64_MAX_VALUE / 8))
+        return INTLOG_STATUS_OVERFLOW;
+    else
+        bytes = count * 8;
+
+    *required_bytes_out = bytes;
+    return INTLOG_STATUS_OK;
+}
+
+I32 FPQ16LnArrayCheckedNoPartial(I64 *input_q16,
+                                 I64 count,
+                                 I64 *out_q16,
+                                 I64 out_capacity_bytes)
+{
+    I64 required_bytes;
+    I64 i;
+    I32 status;
+
+    status = FPQ16LnArrayCheckedNoPartialPreflight(input_q16,
+                                                   count,
+                                                   out_q16,
+                                                   &required_bytes);
+    if (status != INTLOG_STATUS_OK)
+        return status;
+    if (out_capacity_bytes < required_bytes)
+        return INTLOG_STATUS_BADCOUNT;
+
+    // All preconditions are validated up-front, so the publish loop is
+    // deterministic and no-partial on hard failures.
+    for (i = 0; i < count; i++)
+        out_q16[i] = FPQ16Ln(input_q16[i]);
+
+    return INTLOG_STATUS_OK;
+}
+
+I32 FPQ16LnArrayCheckedNoPartialDefault(I64 *input_q16,
+                                        I64 count,
+                                        I64 *out_q16)
+{
+    I64 required_bytes;
+    I32 status;
+
+    status = FPQ16LnArrayCheckedNoPartialPreflight(input_q16,
+                                                   count,
+                                                   out_q16,
+                                                   &required_bytes);
+    if (status != INTLOG_STATUS_OK)
+        return status;
+
+    return FPQ16LnArrayCheckedNoPartial(input_q16,
+                                        count,
+                                        out_q16,
+                                        required_bytes);
+}

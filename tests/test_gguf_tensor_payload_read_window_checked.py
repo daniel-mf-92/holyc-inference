@@ -415,3 +415,60 @@ def test_randomized_owner_and_window_validation() -> None:
             assert out_abs_end[0] == expected_end
             assert out_span_start[0] == start - base
             assert out_span_end[0] == expected_end - base
+
+
+def test_owner_verification_with_non_identity_sorted_index_map() -> None:
+    starts = [0x7100, 0x7200, 0x7300]
+    ends = [0x7180, 0x7280, 0x7380]
+    sorted_idx = [1, 2, 0]
+    sorted_pos = [2, 0, 1]
+
+    out_abs_start = [0]
+    out_abs_end = [0]
+    out_span_start = [0]
+    out_span_end = [0]
+
+    err = tensor_payload_read_window_checked(
+        owner_tensor_index=2,
+        payload_abs_start=0x7210,
+        payload_nbytes=0x20,
+        tensor_abs_starts=starts,
+        tensor_abs_ends=ends,
+        sorted_tensor_indices=sorted_idx,
+        sorted_position_by_tensor=sorted_pos,
+        out_abs_start=out_abs_start,
+        out_abs_end=out_abs_end,
+        out_span_start_in_tensor=out_span_start,
+        out_span_end_in_tensor=out_span_end,
+    )
+
+    assert err == GGUF_TDBASE_OK
+    assert out_abs_start[0] == 0x7210
+    assert out_abs_end[0] == 0x7230
+    assert out_span_start[0] == 0x10
+    assert out_span_end[0] == 0x30
+
+    out_abs_start = [123]
+    out_abs_end = [456]
+    out_span_start = [789]
+    out_span_end = [999]
+
+    err = tensor_payload_read_window_checked(
+        owner_tensor_index=0,
+        payload_abs_start=0x7210,
+        payload_nbytes=0x20,
+        tensor_abs_starts=starts,
+        tensor_abs_ends=ends,
+        sorted_tensor_indices=sorted_idx,
+        sorted_position_by_tensor=sorted_pos,
+        out_abs_start=out_abs_start,
+        out_abs_end=out_abs_end,
+        out_span_start_in_tensor=out_span_start,
+        out_span_end_in_tensor=out_span_end,
+    )
+
+    assert err == GGUF_TDBASE_ERR_OUT_OF_BOUNDS
+    assert out_abs_start == [0]
+    assert out_abs_end == [0]
+    assert out_span_start == [0]
+    assert out_span_end == [0]
