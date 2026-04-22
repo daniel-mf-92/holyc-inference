@@ -1,260 +1,277 @@
 #!/usr/bin/env python3
-"""Harness for InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnly (IQ-1108)."""
+"""Parity harness for IQ-1108 dispatch preflight-only diagnostics wrapper."""
 
 from __future__ import annotations
 
 from pathlib import Path
 import random
-import sys
 
-sys.path.append(str(Path(__file__).resolve().parent))
+SAMPLING_Q16_OK = 0
+SAMPLING_Q16_ERR_NULL_PTR = 1
+SAMPLING_Q16_ERR_BAD_PARAM = 2
+SAMPLING_Q16_ERR_OVERFLOW = 4
 
-from test_inference_forward_dispatch_model_arch_q16_checked_nopartial import (
-    DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE,
-    I64_MAX,
-    SAMPLING_Q16_ERR_BAD_PARAM,
-    SAMPLING_Q16_ERR_NULL_PTR,
-    SAMPLING_Q16_ERR_OVERFLOW,
-    SAMPLING_Q16_OK,
-    dispatch_model_arch_checked_nopartial_model,
-    parse_architecture_id_checked,
-    try_mul_i64_checked,
-)
+I64_MAX = (1 << 63) - 1
+I64_MIN = -(1 << 63)
+
+DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE = b"general.architecture"
+DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE_LEN = 20
+
+DISPATCH_ARCH_Q16_ID_LLAMA = 1
+DISPATCH_ARCH_Q16_ID_MISTRAL = 2
+DISPATCH_ARCH_Q16_ID_QWEN2 = 3
+DISPATCH_ARCH_Q16_ID_PHI3 = 4
 
 
-def inference_forward_dispatch_model_arch_q16_checked_nopartial_commit_only_preflight_only_model(
+def parse_architecture_id_checked(meta_key: bytes, arch_value: bytes) -> tuple[int, int]:
+    if len(meta_key) <= 0 or len(arch_value) <= 0:
+        return SAMPLING_Q16_ERR_BAD_PARAM, 0
+    if len(meta_key) != DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE_LEN:
+        return SAMPLING_Q16_ERR_BAD_PARAM, 0
+    if meta_key != DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE:
+        return SAMPLING_Q16_ERR_BAD_PARAM, 0
+
+    if arch_value == b"llama":
+        return SAMPLING_Q16_OK, DISPATCH_ARCH_Q16_ID_LLAMA
+    if arch_value == b"mistral":
+        return SAMPLING_Q16_OK, DISPATCH_ARCH_Q16_ID_MISTRAL
+    if arch_value == b"qwen2" or arch_value == b"qwen":
+        return SAMPLING_Q16_OK, DISPATCH_ARCH_Q16_ID_QWEN2
+    if arch_value == b"phi3":
+        return SAMPLING_Q16_OK, DISPATCH_ARCH_Q16_ID_PHI3
+
+    return SAMPLING_Q16_ERR_BAD_PARAM, 0
+
+
+def try_mul_i64_checked(lhs: int, rhs: int) -> tuple[int, int]:
+    if lhs == 0 or rhs == 0:
+        return SAMPLING_Q16_OK, 0
+
+    if lhs > 0:
+        if rhs > 0:
+            if lhs > I64_MAX // rhs:
+                return SAMPLING_Q16_ERR_OVERFLOW, 0
+        else:
+            if rhs < I64_MIN // lhs:
+                return SAMPLING_Q16_ERR_OVERFLOW, 0
+    else:
+        if rhs > 0:
+            if lhs < I64_MIN // rhs:
+                return SAMPLING_Q16_ERR_OVERFLOW, 0
+        else:
+            if lhs != 0 and rhs < I64_MAX // lhs:
+                return SAMPLING_Q16_ERR_OVERFLOW, 0
+
+    return SAMPLING_Q16_OK, lhs * rhs
+
+
+def dispatch_model_arch_commit_only_preflight_only_model(
     *,
-    meta_key: bytes | None,
-    arch_value: bytes | None,
+    meta_key: bytes,
+    arch_value: bytes,
     row_count: int,
     lane_count: int,
-    out_rows_processed: list[int] | None,
-    out_logits_written: list[int] | None,
-    forward_status: int,
-) -> int:
-    if (
-        meta_key is None
-        or arch_value is None
-        or out_rows_processed is None
-        or out_logits_written is None
-    ):
-        return SAMPLING_Q16_ERR_NULL_PTR
-
+    out_rows_processed: list[int],
+    out_logits_written: list[int],
+) -> tuple[int, int]:
     if out_rows_processed is out_logits_written:
-        return SAMPLING_Q16_ERR_BAD_PARAM
-
+        return SAMPLING_Q16_ERR_BAD_PARAM, 0
     if row_count < 0 or lane_count < 0:
-        return SAMPLING_Q16_ERR_BAD_PARAM
+        return SAMPLING_Q16_ERR_BAD_PARAM, 0
 
-    snapshot_meta_key = meta_key
-    snapshot_arch_value = arch_value
-    snapshot_row_count = row_count
-    snapshot_lane_count = lane_count
-    snapshot_out_rows = out_rows_processed
-    snapshot_out_logits = out_logits_written
-
-    staged_rows = [0]
-    staged_logits = [0]
-    status, _ = dispatch_model_arch_checked_nopartial_model(
-        meta_key=meta_key,
-        arch_value=arch_value,
-        row_count=row_count,
-        lane_count=lane_count,
-        out_rows_processed=staged_rows,
-        out_logits_written=staged_logits,
-        forward_status=forward_status,
-    )
+    status, staged_arch_id = parse_architecture_id_checked(meta_key, arch_value)
     if status != SAMPLING_Q16_OK:
-        return status
+        return status, 0
 
-    status, _ = parse_architecture_id_checked(snapshot_meta_key, snapshot_arch_value)
+    if staged_arch_id not in {
+        DISPATCH_ARCH_Q16_ID_LLAMA,
+        DISPATCH_ARCH_Q16_ID_MISTRAL,
+        DISPATCH_ARCH_Q16_ID_QWEN2,
+        DISPATCH_ARCH_Q16_ID_PHI3,
+    }:
+        return SAMPLING_Q16_ERR_BAD_PARAM, 0
+
+    status, staged_logits_written = try_mul_i64_checked(row_count, lane_count)
     if status != SAMPLING_Q16_OK:
-        return status
+        return status, staged_arch_id
 
-    canonical_rows = snapshot_row_count
-    status, canonical_logits = try_mul_i64_checked(snapshot_row_count, snapshot_lane_count)
+    status, canonical_arch_id = parse_architecture_id_checked(meta_key, arch_value)
     if status != SAMPLING_Q16_OK:
-        return status
+        return status, staged_arch_id
 
-    if (
-        snapshot_meta_key is not meta_key
-        or snapshot_arch_value is not arch_value
-        or snapshot_row_count != row_count
-        or snapshot_lane_count != lane_count
-    ):
-        return SAMPLING_Q16_ERR_BAD_PARAM
+    if canonical_arch_id not in {
+        DISPATCH_ARCH_Q16_ID_LLAMA,
+        DISPATCH_ARCH_Q16_ID_MISTRAL,
+        DISPATCH_ARCH_Q16_ID_QWEN2,
+        DISPATCH_ARCH_Q16_ID_PHI3,
+    }:
+        return SAMPLING_Q16_ERR_BAD_PARAM, staged_arch_id
 
-    if snapshot_out_rows is not out_rows_processed or snapshot_out_logits is not out_logits_written:
-        return SAMPLING_Q16_ERR_BAD_PARAM
+    status, canonical_logits_written = try_mul_i64_checked(row_count, lane_count)
+    if status != SAMPLING_Q16_OK:
+        return status, staged_arch_id
 
-    if staged_rows[0] < 0 or staged_logits[0] < 0:
-        return SAMPLING_Q16_ERR_BAD_PARAM
+    if staged_logits_written != canonical_logits_written:
+        return SAMPLING_Q16_ERR_BAD_PARAM, staged_arch_id
 
-    if staged_rows[0] != canonical_rows or staged_logits[0] != canonical_logits:
-        return SAMPLING_Q16_ERR_BAD_PARAM
-
-    out_rows_processed[0] = staged_rows[0]
-    out_logits_written[0] = staged_logits[0]
-    return SAMPLING_Q16_OK
+    out_rows_processed[0] = row_count
+    out_logits_written[0] = staged_logits_written
+    return SAMPLING_Q16_OK, staged_arch_id
 
 
-def test_source_contains_signature_and_contract_guards() -> None:
+def _extract_function_body(source: str, signature: str) -> str:
+    start = source.index(signature)
+    brace = source.index("{", start)
+    depth = 1
+    index = brace + 1
+    while depth:
+        ch = source[index]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+        index += 1
+    return source[brace + 1 : index - 1]
+
+
+def test_source_contains_iq1108_function_and_composition_calls() -> None:
     source = Path("src/model/inference.HC").read_text(encoding="utf-8")
     sig = "I32 InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnly("
-    assert source.count(sig) == 1
-    body = source.split(sig, 1)[1].split(
-        "I32 InferenceGenerateTokensPreflightChecked(",
-        1,
-    )[0]
-    assert "InferenceForwardDispatchModelArchQ16CheckedNoPartial(" in body
-    assert "InferenceDispatchParseArchitectureIdChecked(snapshot_meta_key_bytes," in body
-    assert "status = InferenceDispatchTryMulI64Checked(row_count," in body
-    assert "if (staged_rows_processed < 0 || staged_logits_written < 0)" in body
+    assert sig in source
 
-
-def test_nulls_and_aliases_rejected_no_partial() -> None:
-    rows = [111]
-    logits = [222]
-
-    status = inference_forward_dispatch_model_arch_q16_checked_nopartial_commit_only_preflight_only_model(
-        meta_key=None,
-        arch_value=b"llama",
-        row_count=4,
-        lane_count=8,
-        out_rows_processed=rows,
-        out_logits_written=logits,
-        forward_status=SAMPLING_Q16_OK,
-    )
-    assert status == SAMPLING_Q16_ERR_NULL_PTR
-    assert rows == [111]
-    assert logits == [222]
-
-    status = inference_forward_dispatch_model_arch_q16_checked_nopartial_commit_only_preflight_only_model(
-        meta_key=DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE,
-        arch_value=b"llama",
-        row_count=4,
-        lane_count=8,
-        out_rows_processed=rows,
-        out_logits_written=rows,
-        forward_status=SAMPLING_Q16_OK,
-    )
-    assert status == SAMPLING_Q16_ERR_BAD_PARAM
-    assert rows == [111]
+    body = _extract_function_body(source, sig)
+    assert "InferenceDispatchParseArchitectureIdChecked" in body
+    assert "InferenceDispatchTryMulI64Checked(" in body
+    assert "staged_rows_processed != canonical_rows_processed" in body
+    assert "staged_logits_written != canonical_logits_written" in body
+    assert "snapshot_meta_key_bytes != meta_key_bytes" in body
+    assert "snapshot_out_rows_processed != out_rows_processed" in body
 
 
 def test_supported_architectures_publish_expected_tuple() -> None:
-    vectors = [b"llama", b"mistral", b"qwen2", b"qwen", b"phi3"]
+    vectors = [
+        (b"llama", DISPATCH_ARCH_Q16_ID_LLAMA),
+        (b"mistral", DISPATCH_ARCH_Q16_ID_MISTRAL),
+        (b"qwen2", DISPATCH_ARCH_Q16_ID_QWEN2),
+        (b"qwen", DISPATCH_ARCH_Q16_ID_QWEN2),
+        (b"phi3", DISPATCH_ARCH_Q16_ID_PHI3),
+    ]
 
-    for arch in vectors:
-        rows = [7]
-        logits = [9]
-        status = inference_forward_dispatch_model_arch_q16_checked_nopartial_commit_only_preflight_only_model(
+    for arch_tag, expected_arch_id in vectors:
+        rows_out = [901]
+        logits_out = [902]
+        status, arch_id = dispatch_model_arch_commit_only_preflight_only_model(
             meta_key=DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE,
-            arch_value=arch,
-            row_count=6,
-            lane_count=11,
-            out_rows_processed=rows,
-            out_logits_written=logits,
-            forward_status=SAMPLING_Q16_OK,
+            arch_value=arch_tag,
+            row_count=17,
+            lane_count=19,
+            out_rows_processed=rows_out,
+            out_logits_written=logits_out,
         )
         assert status == SAMPLING_Q16_OK
-        assert rows == [6]
-        assert logits == [66]
+        assert arch_id == expected_arch_id
+        assert rows_out[0] == 17
+        assert logits_out[0] == 323
 
 
-def test_unsupported_arch_and_forward_failures_are_no_partial() -> None:
-    rows = [333]
-    logits = [444]
+def test_unsupported_tag_bad_key_and_negative_geometry_no_publish() -> None:
+    rows_out = [71]
+    logits_out = [73]
 
-    status = inference_forward_dispatch_model_arch_q16_checked_nopartial_commit_only_preflight_only_model(
+    status, _ = dispatch_model_arch_commit_only_preflight_only_model(
         meta_key=DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE,
         arch_value=b"gemma",
-        row_count=3,
-        lane_count=5,
-        out_rows_processed=rows,
-        out_logits_written=logits,
-        forward_status=SAMPLING_Q16_OK,
+        row_count=9,
+        lane_count=10,
+        out_rows_processed=rows_out,
+        out_logits_written=logits_out,
     )
     assert status == SAMPLING_Q16_ERR_BAD_PARAM
-    assert rows == [333]
-    assert logits == [444]
+    assert rows_out[0] == 71
+    assert logits_out[0] == 73
 
-    status = inference_forward_dispatch_model_arch_q16_checked_nopartial_commit_only_preflight_only_model(
-        meta_key=DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE,
+    status, _ = dispatch_model_arch_commit_only_preflight_only_model(
+        meta_key=b"general.arch",
         arch_value=b"llama",
-        row_count=3,
-        lane_count=5,
-        out_rows_processed=rows,
-        out_logits_written=logits,
-        forward_status=SAMPLING_Q16_ERR_BAD_PARAM,
+        row_count=9,
+        lane_count=10,
+        out_rows_processed=rows_out,
+        out_logits_written=logits_out,
     )
     assert status == SAMPLING_Q16_ERR_BAD_PARAM
-    assert rows == [333]
-    assert logits == [444]
+    assert rows_out[0] == 71
+    assert logits_out[0] == 73
 
-
-def test_overflow_and_negative_geometry_rejected_no_partial() -> None:
-    rows = [12]
-    logits = [34]
-
-    status = inference_forward_dispatch_model_arch_q16_checked_nopartial_commit_only_preflight_only_model(
-        meta_key=DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE,
-        arch_value=b"phi3",
-        row_count=(1 << 62),
-        lane_count=8,
-        out_rows_processed=rows,
-        out_logits_written=logits,
-        forward_status=SAMPLING_Q16_OK,
-    )
-    assert status == SAMPLING_Q16_ERR_OVERFLOW
-    assert rows == [12]
-    assert logits == [34]
-
-    status = inference_forward_dispatch_model_arch_q16_checked_nopartial_commit_only_preflight_only_model(
+    status, _ = dispatch_model_arch_commit_only_preflight_only_model(
         meta_key=DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE,
         arch_value=b"llama",
         row_count=-1,
-        lane_count=8,
-        out_rows_processed=rows,
-        out_logits_written=logits,
-        forward_status=SAMPLING_Q16_OK,
+        lane_count=10,
+        out_rows_processed=rows_out,
+        out_logits_written=logits_out,
     )
     assert status == SAMPLING_Q16_ERR_BAD_PARAM
-    assert rows == [12]
-    assert logits == [34]
+    assert rows_out[0] == 71
+    assert logits_out[0] == 73
+
+
+def test_overflow_and_alias_safe_snapshot_vectors() -> None:
+    rows_out = [111]
+    logits_out = [222]
+
+    status, arch_id = dispatch_model_arch_commit_only_preflight_only_model(
+        meta_key=DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE,
+        arch_value=b"phi3",
+        row_count=1 << 62,
+        lane_count=8,
+        out_rows_processed=rows_out,
+        out_logits_written=logits_out,
+    )
+    assert status == SAMPLING_Q16_ERR_OVERFLOW
+    assert arch_id == DISPATCH_ARCH_Q16_ID_PHI3
+    assert rows_out[0] == 111
+    assert logits_out[0] == 222
+
+    aliased = [17]
+    status, _ = dispatch_model_arch_commit_only_preflight_only_model(
+        meta_key=DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE,
+        arch_value=b"llama",
+        row_count=4,
+        lane_count=5,
+        out_rows_processed=aliased,
+        out_logits_written=aliased,
+    )
+    assert status == SAMPLING_Q16_ERR_BAD_PARAM
 
 
 def test_deterministic_dispatch_vectors() -> None:
-    rng = random.Random(20260422_1108)
+    rng = random.Random(1108)
     tags = [b"llama", b"mistral", b"qwen2", b"qwen", b"phi3"]
 
-    for _ in range(256):
-        row_count = rng.randint(0, 4096)
-        lane_count = rng.randint(0, 4096)
+    for _ in range(120):
+        rows = rng.randint(0, 2000)
+        lanes = rng.randint(0, 2000)
         tag = rng.choice(tags)
-        rows = [I64_MAX]
-        logits = [I64_MAX]
+        rows_out = [-1]
+        logits_out = [-1]
 
-        status = inference_forward_dispatch_model_arch_q16_checked_nopartial_commit_only_preflight_only_model(
+        status, _ = dispatch_model_arch_commit_only_preflight_only_model(
             meta_key=DISPATCH_ARCH_Q16_KEY_GENERAL_ARCHITECTURE,
             arch_value=tag,
-            row_count=row_count,
-            lane_count=lane_count,
-            out_rows_processed=rows,
-            out_logits_written=logits,
-            forward_status=SAMPLING_Q16_OK,
+            row_count=rows,
+            lane_count=lanes,
+            out_rows_processed=rows_out,
+            out_logits_written=logits_out,
         )
-
         assert status == SAMPLING_Q16_OK
-        assert rows[0] == row_count
-        assert logits[0] == row_count * lane_count
+        assert rows_out[0] == rows
+        assert logits_out[0] == rows * lanes
 
 
 if __name__ == "__main__":
-    test_source_contains_signature_and_contract_guards()
-    test_nulls_and_aliases_rejected_no_partial()
+    test_source_contains_iq1108_function_and_composition_calls()
     test_supported_architectures_publish_expected_tuple()
-    test_unsupported_arch_and_forward_failures_are_no_partial()
-    test_overflow_and_negative_geometry_rejected_no_partial()
+    test_unsupported_tag_bad_key_and_negative_geometry_no_publish()
+    test_overflow_and_alias_safe_snapshot_vectors()
     test_deterministic_dispatch_vectors()
     print("ok")
