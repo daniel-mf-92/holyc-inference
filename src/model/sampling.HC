@@ -689,6 +689,97 @@ I32 SamplingQ16ApplyTemperatureChecked(I64 *logits_q16,
     return SAMPLING_Q16_OK;
 }
 
+// IQ-1167 integer-only temperature scale with reciprocal precompute.
+//
+// Math:
+//   reciprocal_q16 = round((1.0_q16 * 1.0_q16) / temperature_q16)
+//   out[i]         = round((logits[i] * reciprocal_q16) / 1.0_q16)
+//
+// Contracts:
+// - temperature_q16 must be strictly positive.
+// - lane_count lanes are read from logits_q16 and written to out_logits_q16.
+// - strict no-partial-write: output is published only after full staged success.
+I32 SamplingTemperatureScaleQ16CheckedNoPartial(I64 *logits_q16,
+                                                I64 logits_capacity,
+                                                I64 lane_count,
+                                                I64 temperature_q16,
+                                                I64 *out_logits_q16,
+                                                I64 out_capacity)
+{
+    I64 lane_index;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 reciprocal_q16;
+    I64 staged_bytes;
+    I64 staged_lane_q16;
+    I64 *staged_out_q16;
+    I32 status;
+
+    if (!logits_q16 || !out_logits_q16)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (logits_capacity < 0 || out_capacity < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (lane_count < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (temperature_q16 <= 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (!lane_count)
+        return SAMPLING_Q16_OK;
+
+    if (lane_count > logits_capacity || lane_count > out_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    last_index = lane_count - 1;
+    if (last_index > 0x0FFFFFFFFFFFFFFF)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)logits_q16 > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+        return SAMPLING_Q16_ERR_OVERFLOW;
+    if ((U64)out_logits_q16 > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    // Precompute reciprocal once so each lane does a multiply-by-reciprocal
+    // instead of repeated divide-by-temperature.
+    status = FPQ16MulDivRoundedChecked(SAMPLING_Q16_ONE,
+                                       SAMPLING_Q16_ONE,
+                                       temperature_q16,
+                                       &reciprocal_q16);
+    if (status)
+        return status;
+
+    if (lane_count > 0x0FFFFFFFFFFFFFFF)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    staged_bytes = lane_count << 3;
+    staged_out_q16 = MAlloc(staged_bytes);
+    if (!staged_out_q16)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    for (lane_index = 0; lane_index < lane_count; lane_index++)
+    {
+        status = FPQ16MulDivRoundedChecked(logits_q16[lane_index],
+                                           reciprocal_q16,
+                                           SAMPLING_Q16_ONE,
+                                           &staged_lane_q16);
+        if (status)
+        {
+            Free(staged_out_q16);
+            return status;
+        }
+
+        staged_out_q16[lane_index] = staged_lane_q16;
+    }
+
+    for (lane_index = 0; lane_index < lane_count; lane_index++)
+        out_logits_q16[lane_index] = staged_out_q16[lane_index];
+
+    Free(staged_out_q16);
+    return SAMPLING_Q16_OK;
+}
+
 // Checked deterministic top-k index selection for sampling.
 //
 // Purpose:
