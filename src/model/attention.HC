@@ -15196,6 +15196,9 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnl
     I64 q_rows_capacity;
     I64 k_rows_capacity;
     I64 out_scores_capacity;
+    I64 post_q_rows_capacity;
+    I64 post_k_rows_capacity;
+    I64 post_out_scores_capacity;
     I32 status;
 
     if (!out_last_q_base_index || !out_last_k_base_index ||
@@ -15275,6 +15278,11 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnl
     snapshot_k_rows_capacity = k_rows_capacity;
     snapshot_out_scores_capacity = out_scores_capacity;
 
+    // IQ-833 parity contract:
+    // 1) stage diagnostics from commit-only-preflight companion;
+    // 2) stage canonical diagnostics from default-capacity preflight;
+    // 3) recompute default capacities from immutable geometry snapshots;
+    // 4) require exact tuple parity, then atomically publish.
     status =
         AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnlyDefaultCapacityCommitOnlyPreflightOnly(
             q_rows_q16,
@@ -15292,6 +15300,24 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnl
             &staged_required_q_bytes,
             &staged_required_k_bytes,
             &staged_required_out_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       head_dim,
+                                       &post_q_rows_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(token_count,
+                                       head_dim,
+                                       &post_k_rows_capacity);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(query_row_count,
+                                       token_count,
+                                       &post_out_scores_capacity);
     if (status != ATTN_Q16_OK)
         return status;
 
@@ -15322,11 +15348,11 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnl
     if (snapshot_head_dim != head_dim)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    if (snapshot_q_rows_capacity != q_rows_capacity)
+    if (snapshot_q_rows_capacity != post_q_rows_capacity)
         return ATTN_Q16_ERR_BAD_PARAM;
-    if (snapshot_k_rows_capacity != k_rows_capacity)
+    if (snapshot_k_rows_capacity != post_k_rows_capacity)
         return ATTN_Q16_ERR_BAD_PARAM;
-    if (snapshot_out_scores_capacity != out_scores_capacity)
+    if (snapshot_out_scores_capacity != post_out_scores_capacity)
         return ATTN_Q16_ERR_BAD_PARAM;
 
     if (staged_last_q_base_index != canonical_last_q_base_index)

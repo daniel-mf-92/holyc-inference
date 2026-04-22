@@ -23,6 +23,17 @@ from test_attention_q16_compute_scaled_qk_rows_checked_default_stride_required_b
 )
 
 
+I64_MIN = -(1 << 63)
+I64_MAX = (1 << 63) - 1
+
+
+def _try_mul_i64(a: int, b: int) -> tuple[int, int | None]:
+    prod = a * b
+    if prod < I64_MIN or prod > I64_MAX:
+        return ATTN_Q16_ERR_OVERFLOW, None
+    return ATTN_Q16_OK, prod
+
+
 def attention_q16_compute_scaled_qk_rows_checked_default_stride_required_bytes_preflight_only_default_capacity_commit_only_preflight_only_parity(
     q_rows_q16,
     query_row_count: int,
@@ -99,6 +110,20 @@ def attention_q16_compute_scaled_qk_rows_checked_default_stride_required_bytes_p
     if query_row_count < 0 or token_count < 0 or head_dim < 0:
         return ATTN_Q16_ERR_BAD_PARAM
 
+    status, q_rows_capacity = _try_mul_i64(query_row_count, head_dim)
+    if status != ATTN_Q16_OK:
+        return status
+    status, k_rows_capacity = _try_mul_i64(token_count, head_dim)
+    if status != ATTN_Q16_OK:
+        return status
+    status, out_scores_capacity = _try_mul_i64(query_row_count, token_count)
+    if status != ATTN_Q16_OK:
+        return ATTN_Q16_ERR_OVERFLOW
+
+    snapshot_q_rows_capacity = q_rows_capacity
+    snapshot_k_rows_capacity = k_rows_capacity
+    snapshot_out_scores_capacity = out_scores_capacity
+
     err_a_last_q = [0]
     err_a_last_k = [0]
     err_a_last_out = [0]
@@ -128,6 +153,23 @@ def attention_q16_compute_scaled_qk_rows_checked_default_stride_required_bytes_p
     )
     if err != ATTN_Q16_OK:
         return err
+
+    status, post_q_rows_capacity = _try_mul_i64(query_row_count, head_dim)
+    if status != ATTN_Q16_OK:
+        return status
+    status, post_k_rows_capacity = _try_mul_i64(token_count, head_dim)
+    if status != ATTN_Q16_OK:
+        return status
+    status, post_out_scores_capacity = _try_mul_i64(query_row_count, token_count)
+    if status != ATTN_Q16_OK:
+        return status
+
+    if snapshot_q_rows_capacity != post_q_rows_capacity:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if snapshot_k_rows_capacity != post_k_rows_capacity:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if snapshot_out_scores_capacity != post_out_scores_capacity:
+        return ATTN_Q16_ERR_BAD_PARAM
 
     err_b_last_q = [0]
     err_b_last_k = [0]
