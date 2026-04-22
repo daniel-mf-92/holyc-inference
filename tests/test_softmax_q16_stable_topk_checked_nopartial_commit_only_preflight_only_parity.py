@@ -41,6 +41,13 @@ def softmax_q16_stable_topk_checked_nopartial_commit_only_preflight_only_parity(
         return FP_Q16_ERR_NULL_PTR
 
     if (
+        out_required_workspace_cells is logits_q16
+        or out_selected_count is logits_q16
+        or out_max_logit_q16 is logits_q16
+    ):
+        return FP_Q16_ERR_BAD_PARAM
+
+    if (
         out_required_workspace_cells is out_selected_count
         or out_required_workspace_cells is out_max_logit_q16
         or out_selected_count is out_max_logit_q16
@@ -137,6 +144,8 @@ def test_source_contains_iq_1084_signature_and_parity_path() -> None:
         1,
     )[0]
     assert "SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnly(" in body
+    assert "snapshot_out_required_workspace_cells = out_required_workspace_cells;" in body
+    assert "if (snapshot_out_required_workspace_cells != out_required_workspace_cells ||" in body
     assert "if (staged_required_workspace_cells != canonical_required_workspace_cells ||" in body
 
 
@@ -274,11 +283,123 @@ def test_pointer_span_overflow_guard() -> None:
     assert out_max == [9]
 
 
+def test_rejects_negative_staged_required_geometry() -> None:
+    logits = [11, -3, 4]
+    out_required = [0x1111]
+    out_selected = [0x2222]
+    out_max = [0x3333]
+
+    def bad_staged(*_args, **_kwargs):
+        _args[4][0] = -1
+        _args[5][0] = 0
+        _args[6][0] = 11
+        return FP_Q16_OK
+
+    err = softmax_q16_stable_topk_checked_nopartial_commit_only_preflight_only_parity(
+        logits,
+        logits_count=3,
+        top_k=2,
+        workspace_capacity=5,
+        out_required_workspace_cells=out_required,
+        out_selected_count=out_selected,
+        out_max_logit_q16=out_max,
+        staged_fn=bad_staged,
+    )
+
+    assert err == FP_Q16_ERR_BAD_PARAM
+    assert out_required == [0x1111]
+    assert out_selected == [0x2222]
+    assert out_max == [0x3333]
+
+
+def test_rejects_staged_selected_exceeding_required_geometry() -> None:
+    logits = [9, 8, 7, 6]
+    out_required = [0xAAAA]
+    out_selected = [0xBBBB]
+    out_max = [0xCCCC]
+
+    def bad_staged(*_args, **_kwargs):
+        _args[4][0] = 3
+        _args[5][0] = 4
+        _args[6][0] = 9
+        return FP_Q16_OK
+
+    err = softmax_q16_stable_topk_checked_nopartial_commit_only_preflight_only_parity(
+        logits,
+        logits_count=4,
+        top_k=2,
+        workspace_capacity=6,
+        out_required_workspace_cells=out_required,
+        out_selected_count=out_selected,
+        out_max_logit_q16=out_max,
+        staged_fn=bad_staged,
+    )
+
+    assert err == FP_Q16_ERR_BAD_PARAM
+    assert out_required == [0xAAAA]
+    assert out_selected == [0xBBBB]
+    assert out_max == [0xCCCC]
+
+
+def test_logits_output_alias_rejected() -> None:
+    logits = [11, 22, 33]
+
+    err = softmax_q16_stable_topk_checked_nopartial_commit_only_preflight_only_parity(
+        logits,
+        logits_count=3,
+        top_k=1,
+        workspace_capacity=4,
+        out_required_workspace_cells=logits,
+        out_selected_count=[0],
+        out_max_logit_q16=[0],
+    )
+
+    assert err == FP_Q16_ERR_BAD_PARAM
+
+
+def test_null_logits_pointer_rejected() -> None:
+    err = softmax_q16_stable_topk_checked_nopartial_commit_only_preflight_only_parity(
+        None,
+        logits_count=0,
+        top_k=0,
+        workspace_capacity=0,
+        out_required_workspace_cells=[0x1111],
+        out_selected_count=[0x2222],
+        out_max_logit_q16=[0x3333],
+    )
+
+    assert err == FP_Q16_ERR_NULL_PTR
+
+
+def test_null_output_pointer_rejected() -> None:
+    logits = [4, 3, 2, 1]
+    out_selected = [0xAAAA]
+    out_max = [0xBBBB]
+
+    err = softmax_q16_stable_topk_checked_nopartial_commit_only_preflight_only_parity(
+        logits,
+        logits_count=4,
+        top_k=2,
+        workspace_capacity=6,
+        out_required_workspace_cells=None,
+        out_selected_count=out_selected,
+        out_max_logit_q16=out_max,
+    )
+
+    assert err == FP_Q16_ERR_NULL_PTR
+    assert out_selected == [0xAAAA]
+    assert out_max == [0xBBBB]
+
 if __name__ == "__main__":
     test_source_contains_iq_1084_signature_and_parity_path()
     test_known_vector()
     test_error_no_partial_write()
     test_output_alias_rejected()
+    test_logits_output_alias_rejected()
+    test_null_logits_pointer_rejected()
+    test_null_output_pointer_rejected()
     test_fuzz_parity_vs_preflight_only()
     test_pointer_span_overflow_guard()
+    test_rejects_negative_staged_required_geometry()
+    test_rejects_staged_selected_exceeding_required_geometry()
     print("ok")

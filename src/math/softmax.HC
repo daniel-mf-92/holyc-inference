@@ -948,12 +948,20 @@ I32 SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParity(
     I64 snapshot_top_k;
     I64 snapshot_workspace_capacity;
     I64 *snapshot_logits_q16;
+    I64 *snapshot_out_required_workspace_cells;
+    I64 *snapshot_out_selected_count;
+    I64 *snapshot_out_max_logit_q16;
 
     I32 status;
 
     if (!logits_q16 || !out_required_workspace_cells ||
         !out_selected_count || !out_max_logit_q16)
         return FP_Q16_ERR_NULL_PTR;
+
+    if (out_required_workspace_cells == logits_q16 ||
+        out_selected_count == logits_q16 ||
+        out_max_logit_q16 == logits_q16)
+        return FP_Q16_ERR_BAD_PARAM;
 
     if (out_required_workspace_cells == out_selected_count ||
         out_required_workspace_cells == out_max_logit_q16 ||
@@ -969,6 +977,9 @@ I32 SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParity(
     snapshot_logits_count = logits_count;
     snapshot_top_k = top_k;
     snapshot_workspace_capacity = workspace_capacity;
+    snapshot_out_required_workspace_cells = out_required_workspace_cells;
+    snapshot_out_selected_count = out_selected_count;
+    snapshot_out_max_logit_q16 = out_max_logit_q16;
 
     status = SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnly(
         logits_q16,
@@ -980,6 +991,13 @@ I32 SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParity(
         &staged_max_logit_q16);
     if (status)
         return status;
+
+    // Harden staged diagnostics before canonical recompute: these fields are
+    // geometry counters and must never become negative or internally inverted.
+    if (staged_required_workspace_cells < 0 || staged_selected_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (staged_selected_count > staged_required_workspace_cells)
+        return FP_Q16_ERR_BAD_PARAM;
 
     canonical_required_workspace_cells = 0;
     canonical_selected_count = 0;
@@ -1030,6 +1048,11 @@ I32 SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParity(
         snapshot_logits_count != logits_count ||
         snapshot_top_k != top_k ||
         snapshot_workspace_capacity != workspace_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_out_required_workspace_cells != out_required_workspace_cells ||
+        snapshot_out_selected_count != out_selected_count ||
+        snapshot_out_max_logit_q16 != out_max_logit_q16)
         return FP_Q16_ERR_BAD_PARAM;
 
     if (staged_required_workspace_cells != canonical_required_workspace_cells ||
