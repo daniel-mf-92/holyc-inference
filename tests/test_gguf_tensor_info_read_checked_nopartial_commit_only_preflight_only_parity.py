@@ -559,7 +559,13 @@ def test_required_bytes_and_next_cursor_invariants_hold() -> None:
     for _ in range(350):
         name = "".join(chr(97 + rng.randint(0, 25)) for _ in range(rng.randint(0, 32)))
         n_dims = rng.randint(1, 8)
-        dims = [rng.randint(1, 1 << 15) for _ in range(n_dims)]
+        dims: list[int] = []
+        product = 1
+        for _ in range(n_dims):
+            max_dim = max(1, min(768, U64_MAX // product))
+            dim = rng.randint(1, max_dim)
+            dims.append(dim)
+            product *= dim
         ggml_type = rng.choice(tuple(KNOWN_TYPES))
         offset = rng.randint(0, 1 << 22)
 
