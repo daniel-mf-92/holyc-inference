@@ -3227,6 +3227,12 @@ I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnl
     I64 staged_required_logits;
     I64 staged_required_tokens;
     I64 staged_final_token_count;
+    I64 parity_required_logits;
+    I64 parity_required_tokens;
+    I64 parity_final_token_count;
+    I64 canonical_required_logits;
+    I64 canonical_required_tokens;
+    I64 canonical_final_token_count;
 
     I64 snapshot_step_logits_capacity;
     I64 snapshot_vocab_size;
@@ -3307,6 +3313,10 @@ I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnl
     staged_required_tokens = *out_required_tokens;
     staged_final_token_count = *out_final_token_count;
 
+    parity_required_logits = staged_required_logits;
+    parity_required_tokens = staged_required_tokens;
+    parity_final_token_count = staged_final_token_count;
+
     status = InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParity(
         step_logits_q16,
         step_logits_capacity,
@@ -3329,11 +3339,39 @@ I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnl
         workspace_topk_index_capacity,
         out_generated_tokens,
         generated_capacity,
-        &staged_required_logits,
-        &staged_required_tokens,
-        &staged_final_token_count);
+        &parity_required_logits,
+        &parity_required_tokens,
+        &parity_final_token_count);
     if (status)
         return status;
+
+    if (max_new_tokens < 0 || token_history_count < 0 || vocab_size < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (max_new_tokens)
+    {
+        if (vocab_size > 0x7FFFFFFFFFFFFFFF / max_new_tokens)
+            return SAMPLING_Q16_ERR_OVERFLOW;
+        canonical_required_logits = vocab_size * max_new_tokens;
+    }
+    else
+    {
+        canonical_required_logits = 0;
+    }
+
+    canonical_required_tokens = max_new_tokens;
+    canonical_final_token_count = token_history_count + max_new_tokens;
+    if (canonical_final_token_count < token_history_count)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    if (parity_required_logits != canonical_required_logits ||
+        parity_required_tokens != canonical_required_tokens ||
+        parity_final_token_count != canonical_final_token_count)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    staged_required_logits = parity_required_logits;
+    staged_required_tokens = parity_required_tokens;
+    staged_final_token_count = parity_final_token_count;
 
     if (snapshot_step_logits_capacity != step_logits_capacity ||
         snapshot_vocab_size != vocab_size ||
