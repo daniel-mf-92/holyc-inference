@@ -10,6 +10,8 @@
 #define Q8_0_DOT_BENCH_I64_MAX            0x7FFFFFFFFFFFFFFF
 #define Q8_0_DOT_BENCH_MAX_BLOCKS         64
 #define Q8_0_DOT_BENCH_MAX_ROWS           8
+#define Q8_0_DOT_BENCH_VALUES_PER_BLOCK   32
+#define Q8_0_DOT_BENCH_NS_PER_SECOND      1000000000
 
 class Q8_0DotBenchShape
 {
@@ -824,5 +826,205 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightO
     *out_max_blocks = staged_max_blocks;
     *out_max_rows = staged_max_rows;
     *out_max_row_matrix_blocks = staged_max_row_matrix_blocks;
+    return Q8_0_DOT_BENCH_OK;
+}
+
+// Deterministic default benchmark suite for Q8_0 dot kernels.
+//
+// This routine is intentionally timer-free. Instead of reading host counters,
+// it uses a fixed cycle model from canonical suite geometry and fixed vectors.
+//
+// Published outputs:
+// - total_ops            : total int8 MAC operations across the suite
+// - total_cycles         : modeled total cycles at caller cpu_hz
+// - cycles_per_op        : rounded integer cycles/op
+// - remainder_cycles     : total_cycles % total_ops
+// - suite_checksum       : deterministic checksum over fixed vectors+shapes
+//
+// No-partial contract: outputs are committed atomically only on success.
+I32 Q8_0DotBenchRunDefaultSuite(
+    I64 cpu_hz,
+    I64 *out_total_ops,
+    I64 *out_total_cycles,
+    I64 *out_cycles_per_op,
+    I64 *out_remainder_cycles,
+    I64 *out_suite_checksum)
+{
+    Q8_0DotBenchShape shapes[4];
+    I8 lhs_vec[Q8_0_DOT_BENCH_VALUES_PER_BLOCK];
+    I8 rhs_vec[Q8_0_DOT_BENCH_VALUES_PER_BLOCK];
+    I64 idx;
+    I64 shape_idx;
+    I64 vec_idx;
+
+    I64 shape_count;
+    I64 max_blocks;
+    I64 max_rows;
+    I64 max_row_matrix_blocks;
+
+    I64 total_ops_snapshot;
+    I64 total_cycles_snapshot;
+    I64 suite_checksum_snapshot;
+    I64 staged_cycles_per_op;
+    I64 staged_remainder_cycles;
+
+    I64 dot_calls;
+    I64 block_mac_ops;
+    I64 shape_ops;
+    I64 ns_per_dot;
+    I64 shape_ns;
+    I64 numer_ns_hz;
+    I64 rounded_numer_ns_hz;
+    I64 shape_cycles;
+    I64 vector_dot_q0;
+    I64 vector_dot_term;
+    I64 block_term;
+    I64 row_term;
+    I64 shape_signature;
+    I64 shape_checksum;
+    I32 status;
+
+    if (!out_total_ops || !out_total_cycles || !out_cycles_per_op ||
+        !out_remainder_cycles || !out_suite_checksum)
+        return Q8_0_DOT_BENCH_ERR_NULL_PTR;
+    if (cpu_hz <= 0)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    // Validate canonical suite tuple via deepest no-partial preflight chain.
+    status = Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+        cpu_hz,
+        &shape_count,
+        &max_blocks,
+        &max_rows,
+        &max_row_matrix_blocks);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    if (shape_count != 4 || max_blocks != 32 || max_rows != 8 ||
+        max_row_matrix_blocks != 256)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    // Canonical deterministic suite geometry.
+    shapes[0].block_count = 4;
+    shapes[0].row_count = 1;
+    shapes[0].row_stride_blocks = 4;
+    shapes[0].iters = 8192;
+
+    shapes[1].block_count = 8;
+    shapes[1].row_count = 2;
+    shapes[1].row_stride_blocks = 8;
+    shapes[1].iters = 4096;
+
+    shapes[2].block_count = 16;
+    shapes[2].row_count = 4;
+    shapes[2].row_stride_blocks = 16;
+    shapes[2].iters = 2048;
+
+    shapes[3].block_count = 32;
+    shapes[3].row_count = 8;
+    shapes[3].row_stride_blocks = 32;
+    shapes[3].iters = 1024;
+
+    // Fixed benchmark vectors for stable checksum and auditable math paths.
+    for (idx = 0; idx < Q8_0_DOT_BENCH_VALUES_PER_BLOCK; ++idx)
+    {
+        lhs_vec[idx] = (idx % 17) - 8;
+        rhs_vec[idx] = ((idx * 5 + 3) % 23) - 11;
+    }
+
+    total_ops_snapshot = 0;
+    total_cycles_snapshot = 0;
+    suite_checksum_snapshot = 0;
+
+    for (shape_idx = 0; shape_idx < shape_count; ++shape_idx)
+    {
+        if (shapes[shape_idx].row_stride_blocks < shapes[shape_idx].block_count)
+            return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+        // Number of dot calls in this shape.
+        status = Q8_0DotBenchTryMulI64(shapes[shape_idx].row_count,
+                                       shapes[shape_idx].iters,
+                                       &dot_calls);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+
+        // Integer MAC operations per dot: block_count * 32 signed-byte products.
+        status = Q8_0DotBenchTryMulI64(shapes[shape_idx].block_count,
+                                       Q8_0_DOT_BENCH_VALUES_PER_BLOCK,
+                                       &block_mac_ops);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+
+        status = Q8_0DotBenchTryMulI64(dot_calls, block_mac_ops, &shape_ops);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+
+        // Deterministic cycle model (integer-only):
+        // ns_per_dot = 600 + 24*block_count + 7*row_count
+        // shape_cycles = Round((dot_calls * ns_per_dot * cpu_hz) / 1e9)
+        status = Q8_0DotBenchTryMulI64(shapes[shape_idx].block_count, 24, &block_term);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+        status = Q8_0DotBenchTryMulI64(shapes[shape_idx].row_count, 7, &row_term);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+        status = Q8_0DotBenchTryAddI64(600, block_term, &ns_per_dot);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+        status = Q8_0DotBenchTryAddI64(ns_per_dot, row_term, &ns_per_dot);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+
+        status = Q8_0DotBenchTryMulI64(dot_calls, ns_per_dot, &shape_ns);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+        status = Q8_0DotBenchTryMulI64(shape_ns, cpu_hz, &numer_ns_hz);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+
+        status = Q8_0DotBenchTryAddI64(numer_ns_hz,
+                                       (Q8_0_DOT_BENCH_NS_PER_SECOND >> 1),
+                                       &rounded_numer_ns_hz);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+        shape_cycles = rounded_numer_ns_hz / Q8_0_DOT_BENCH_NS_PER_SECOND;
+
+        // Deterministic fixed-vector checksum.
+        vector_dot_q0 = 0;
+        for (vec_idx = 0; vec_idx < Q8_0_DOT_BENCH_VALUES_PER_BLOCK; ++vec_idx)
+            vector_dot_q0 += lhs_vec[vec_idx] * rhs_vec[(vec_idx + shape_idx) & 31];
+
+        vector_dot_term = vector_dot_q0 * (shape_idx + 1);
+        block_term = shapes[shape_idx].block_count * 257;
+        row_term = shapes[shape_idx].row_count * 17;
+        shape_signature = vector_dot_term + block_term + row_term + shapes[shape_idx].iters;
+
+        status = Q8_0DotBenchTryMulI64(shape_signature, dot_calls, &shape_checksum);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+
+        status = Q8_0DotBenchTryAddI64(total_ops_snapshot, shape_ops, &total_ops_snapshot);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+        status = Q8_0DotBenchTryAddI64(total_cycles_snapshot, shape_cycles, &total_cycles_snapshot);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+        status = Q8_0DotBenchTryAddI64(suite_checksum_snapshot, shape_checksum, &suite_checksum_snapshot);
+        if (status != Q8_0_DOT_BENCH_OK)
+            return status;
+    }
+
+    status = Q8_0DotBenchCyclesPerOpChecked(total_cycles_snapshot,
+                                            total_ops_snapshot,
+                                            &staged_cycles_per_op,
+                                            &staged_remainder_cycles);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    *out_total_ops = total_ops_snapshot;
+    *out_total_cycles = total_cycles_snapshot;
+    *out_cycles_per_op = staged_cycles_per_op;
+    *out_remainder_cycles = staged_remainder_cycles;
+    *out_suite_checksum = suite_checksum_snapshot;
     return Q8_0_DOT_BENCH_OK;
 }
