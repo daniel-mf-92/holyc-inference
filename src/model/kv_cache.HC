@@ -5217,3 +5217,150 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
     *out_last_cell_index = staged_last_cell_index;
     return KV_Q16_OK;
 }
+
+// IQ-1064 diagnostics-only parity gate for reserve-span geometry.
+// Contract:
+// 1) Stage canonical tuple via IQ-1061 helper.
+// 2) Recompute tuple from immutable geometry snapshot with checked integer math.
+// 3) Enforce strict tuple parity and publish atomically only on exact match.
+I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParity(
+    I64 layer_count,
+    I64 head_count,
+    I64 head_dim,
+    I64 token_start,
+    I64 token_count,
+    I64 cache_capacity,
+    I64 *out_required_cells,
+    I64 *out_required_bytes,
+    I64 *out_last_cell_index)
+{
+    I64 staged_required_cells;
+    I64 staged_required_bytes;
+    I64 staged_last_cell_index;
+
+    I64 recomputed_cells_per_token;
+    I64 recomputed_base_index;
+    I64 recomputed_required_cells;
+    I64 recomputed_required_bytes;
+    I64 recomputed_end_index;
+    I64 recomputed_last_cell_index;
+
+    I64 snapshot_layer_count;
+    I64 snapshot_head_count;
+    I64 snapshot_head_dim;
+    I64 snapshot_token_start;
+    I64 snapshot_token_count;
+    I64 snapshot_cache_capacity;
+    I32 status;
+
+    if (!out_required_cells || !out_required_bytes || !out_last_cell_index)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (out_required_cells == out_required_bytes ||
+        out_required_cells == out_last_cell_index ||
+        out_required_bytes == out_last_cell_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (layer_count < 0 || head_count < 0 || head_dim < 0 ||
+        token_start < 0 || token_count < 0 || cache_capacity < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    snapshot_layer_count = layer_count;
+    snapshot_head_count = head_count;
+    snapshot_head_dim = head_dim;
+    snapshot_token_start = token_start;
+    snapshot_token_count = token_count;
+    snapshot_cache_capacity = cache_capacity;
+
+    status =
+        KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytes(
+            layer_count,
+            head_count,
+            head_dim,
+            token_start,
+            token_count,
+            cache_capacity,
+            &staged_required_cells,
+            &staged_required_bytes,
+            &staged_last_cell_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    // cells_per_token = layer_count * head_count * head_dim
+    status = KVTryMulI64Checked(layer_count,
+                                head_count,
+                                &recomputed_cells_per_token);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVTryMulI64Checked(recomputed_cells_per_token,
+                                head_dim,
+                                &recomputed_cells_per_token);
+    if (status != KV_Q16_OK)
+        return status;
+
+    // base_index = token_start * cells_per_token
+    status = KVTryMulI64Checked(token_start,
+                                recomputed_cells_per_token,
+                                &recomputed_base_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (recomputed_base_index > cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    // required_cells = token_count * cells_per_token
+    status = KVTryMulI64Checked(token_count,
+                                recomputed_cells_per_token,
+                                &recomputed_required_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVTryAddI64Checked(recomputed_base_index,
+                                recomputed_required_cells,
+                                &recomputed_end_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (recomputed_end_index > cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    status = KVTryMulI64Checked(recomputed_required_cells,
+                                sizeof(I64),
+                                &recomputed_required_bytes);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (!recomputed_required_cells)
+    {
+        recomputed_last_cell_index = 0;
+    }
+    else
+    {
+        status = KVTryAddI64Checked(recomputed_end_index,
+                                    -1,
+                                    &recomputed_last_cell_index);
+        if (status != KV_Q16_OK)
+            return status;
+    }
+
+    if (snapshot_layer_count != layer_count ||
+        snapshot_head_count != head_count ||
+        snapshot_head_dim != head_dim ||
+        snapshot_token_start != token_start ||
+        snapshot_token_count != token_count ||
+        snapshot_cache_capacity != cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_cells != recomputed_required_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (staged_required_bytes != recomputed_required_bytes)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (staged_last_cell_index != recomputed_last_cell_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    *out_required_cells = staged_required_cells;
+    *out_required_bytes = staged_required_bytes;
+    *out_last_cell_index = staged_last_cell_index;
+    return KV_Q16_OK;
+}

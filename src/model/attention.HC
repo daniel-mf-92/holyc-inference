@@ -14823,7 +14823,7 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnl
     snapshot_token_count = token_count;
     snapshot_head_dim = head_dim;
 
-    // IQ-812 diagnostics-only companion contract:
+    // IQ-830 diagnostics-only companion contract:
     // 1) stage tuple from IQ-810 commit-only parity gate;
     // 2) recompute canonical geometry tuple from immutable inputs;
     // 3) enforce exact parity and immutable snapshot revalidation;

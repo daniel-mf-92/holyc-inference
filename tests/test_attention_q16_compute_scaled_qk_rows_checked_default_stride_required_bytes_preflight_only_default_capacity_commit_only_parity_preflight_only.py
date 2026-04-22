@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity harness for ...DefaultCapacityCommitOnlyParityPreflightOnly (IQ-812)."""
+"""Parity harness for ...DefaultCapacityCommitOnlyParityPreflightOnly (IQ-830)."""
 
 from __future__ import annotations
 
@@ -385,7 +385,7 @@ def test_error_paths_preserve_outputs() -> None:
 
 
 def test_randomized_vectors() -> None:
-    rng = random.Random(20260421_812)
+    rng = random.Random(20260422_830)
 
     for _ in range(1000):
         query_row_count = rng.randint(0, 40)

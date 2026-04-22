@@ -6630,7 +6630,8 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensDefaultCapacity(
     // IQ-821 default-capacity contract: one-byte pretokenization upper-bounds
     // output token count before merge passes, so prompt_nbytes is the
     // canonical no-alloc destination capacity while preserving strict
-    // no-partial cursor/token commit semantics in the delegated lens path.
+    // no-partial cursor/token commit semantics in the delegated lens path
+    // and exact parity with explicit checked composition diagnostics.
     derived_out_token_capacity = prompt_nbytes;
 
     snapshot_bytes = bytes;
@@ -7298,6 +7299,150 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytes(
         out_required_token_capacity,
         out_max_piece_len,
         out_required_merge_workspace_bytes);
+}
+
+// IQ-1054 commit-only diagnostics wrapper over no-write parity preflight.
+//
+// Contract:
+//   1) Stage tuple from `...CommitOnlyPreflightOnlyParity`.
+//   2) Recompute canonical tuple from `...CommitOnlyPreflightOnly`.
+//   3) Revalidate immutable `{bytes,byte_len,io_cursor}` snapshots.
+//   4) Publish `{required_tokens,required_token_bytes,next_cursor}` only
+//      after exact tuple parity succeeds.
+I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityCommitOnly(
+    U8 *bytes,
+    U64 byte_len,
+    U64 *io_cursor,
+    U64 prompt_nbytes,
+    I32 *rank_left_tokens,
+    I32 *rank_right_tokens,
+    U32 *rank_values,
+    I32 *rank_merged_tokens,
+    U64 rank_table_count,
+    U64 rank_table_capacity,
+    U64 *vocab_piece_lens,
+    U64 vocab_piece_count,
+    U64 vocab_piece_capacity,
+    U64 out_token_capacity,
+    U64 *out_required_token_capacity,
+    U64 *out_required_token_bytes,
+    U64 *out_next_cursor)
+{
+    U8 *out_required_token_capacity_ptr;
+    U8 *out_required_token_bytes_ptr;
+    U8 *out_next_cursor_ptr;
+
+    U8 *snapshot_bytes;
+    U64 snapshot_byte_len;
+    U64 snapshot_cursor;
+
+    U64 staged_required_token_capacity;
+    U64 staged_required_token_bytes;
+    U64 staged_next_cursor;
+
+    U64 canonical_required_token_capacity;
+    U64 canonical_max_piece_len;
+    U64 canonical_required_token_bytes;
+    U64 canonical_next_cursor;
+
+    I32 err;
+
+    if (!bytes || !io_cursor || !vocab_piece_lens ||
+        !out_required_token_capacity || !out_required_token_bytes ||
+        !out_next_cursor)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    out_required_token_capacity_ptr = (U8 *)out_required_token_capacity;
+    out_required_token_bytes_ptr = (U8 *)out_required_token_bytes;
+    out_next_cursor_ptr = (U8 *)out_next_cursor;
+    if (out_required_token_capacity_ptr == out_required_token_bytes_ptr ||
+        out_required_token_capacity_ptr == out_next_cursor_ptr ||
+        out_required_token_bytes_ptr == out_next_cursor_ptr)
+        return TOKENIZER_BPE_ERR_NULL_PTR;
+
+    if (byte_len > 0x7FFFFFFFFFFFFFFF ||
+        prompt_nbytes > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_count > 0x7FFFFFFFFFFFFFFF ||
+        rank_table_capacity > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_count > 0x7FFFFFFFFFFFFFFF ||
+        vocab_piece_capacity > 0x7FFFFFFFFFFFFFFF ||
+        out_token_capacity > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    snapshot_bytes = bytes;
+    snapshot_byte_len = byte_len;
+    snapshot_cursor = *io_cursor;
+
+    err = TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParity(
+        bytes,
+        byte_len,
+        io_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        vocab_piece_lens,
+        vocab_piece_count,
+        vocab_piece_capacity,
+        out_token_capacity,
+        &staged_required_token_capacity,
+        &staged_required_token_bytes,
+        &staged_next_cursor);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    err = TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnly(
+        bytes,
+        byte_len,
+        io_cursor,
+        prompt_nbytes,
+        rank_left_tokens,
+        rank_right_tokens,
+        rank_values,
+        rank_merged_tokens,
+        rank_table_count,
+        rank_table_capacity,
+        vocab_piece_lens,
+        vocab_piece_count,
+        vocab_piece_capacity,
+        out_token_capacity,
+        &canonical_required_token_capacity,
+        &canonical_max_piece_len);
+    if (err != TOKENIZER_BPE_OK)
+        return err;
+
+    if (canonical_required_token_capacity >
+        (0x7FFFFFFFFFFFFFFF / sizeof(I32)))
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+    canonical_required_token_bytes =
+        canonical_required_token_capacity * sizeof(I32);
+
+    if (snapshot_cursor > byte_len ||
+        prompt_nbytes > (byte_len - snapshot_cursor))
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS;
+    canonical_next_cursor = snapshot_cursor + prompt_nbytes;
+
+    if (staged_required_token_capacity != canonical_required_token_capacity ||
+        staged_required_token_bytes != canonical_required_token_bytes ||
+        staged_next_cursor != canonical_next_cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    if (snapshot_bytes != bytes || snapshot_byte_len != byte_len ||
+        snapshot_cursor != *io_cursor)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
+
+    // Avoid dead-store warning while still staging max-piece parity through
+    // canonical preflight (required by contract and future tuple growth).
+    if (canonical_max_piece_len > 0x7FFFFFFFFFFFFFFF)
+        return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    *out_required_token_capacity = canonical_required_token_capacity;
+    *out_required_token_bytes = canonical_required_token_bytes;
+    *out_next_cursor = canonical_next_cursor;
+    return TOKENIZER_BPE_OK;
 }
 
 I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyRequiredBytesCommitOnly(

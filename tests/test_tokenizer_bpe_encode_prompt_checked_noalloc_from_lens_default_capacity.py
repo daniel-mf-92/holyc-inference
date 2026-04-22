@@ -478,6 +478,69 @@ def test_null_overflow_and_no_partial() -> None:
     assert err == TOKENIZER_BPE_ERR_OVERFLOW
 
 
+def test_cursor_oob_rejects_without_partial_publish() -> None:
+    left, right, ranks, merged = _build_rank_tables()
+    payload = list("TempleOS".encode("utf-8"))
+    vocab_lens = [1, 2, 6]
+
+    cursor_a = [len(payload) + 1]
+    cursor_b = [len(payload) + 1]
+    out_a = [0xA1A1] * 32
+    out_b = [0xA1A1] * 32
+    count_a = [0xB2B2]
+    count_b = [0xB2B2]
+    req_a = [0xC3C3]
+    req_b = [0xC3C3]
+    max_a = [0xD4D4]
+    max_b = [0xD4D4]
+
+    err_a = tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_default_capacity(
+        payload,
+        len(payload),
+        cursor_a,
+        len(payload),
+        left,
+        right,
+        ranks,
+        merged,
+        len(ranks),
+        len(ranks),
+        vocab_lens,
+        len(vocab_lens),
+        len(vocab_lens),
+        out_a,
+        count_a,
+        req_a,
+        max_a,
+    )
+    err_b = explicit_checked_composition(
+        payload,
+        len(payload),
+        cursor_b,
+        len(payload),
+        left,
+        right,
+        ranks,
+        merged,
+        len(ranks),
+        len(ranks),
+        vocab_lens,
+        len(vocab_lens),
+        len(vocab_lens),
+        out_b,
+        count_b,
+        req_b,
+        max_b,
+    )
+
+    assert err_a == err_b == TOKENIZER_BPE_ERR_BAD_PARAM
+    assert cursor_a == cursor_b == [len(payload) + 1]
+    assert count_a == count_b == [0xB2B2]
+    assert req_a == req_b == [0xC3C3]
+    assert max_a == max_b == [0xD4D4]
+    assert out_a == out_b == [0xA1A1] * 32
+
+
 def test_randomized_parity() -> None:
     rng = random.Random(20260420_691)
 
@@ -563,5 +626,6 @@ if __name__ == "__main__":
     test_source_contains_lens_default_capacity_helpers()
     test_success_fixture_parity()
     test_null_overflow_and_no_partial()
+    test_cursor_oob_rejects_without_partial_publish()
     test_randomized_parity()
     print("ok")
