@@ -448,6 +448,123 @@ I32 Q8_0_DotRowsQ16MatrixVectorChecked(
         out_rows_q16);
 }
 
+// Row-wise checked Q8_0 dot over two strided block tensors with strict
+// no-partial output writes.
+//
+// Contract:
+// - Each row dot consumes `blocks_per_row` contiguous blocks from
+//   `lhs_blocks[row * lhs_row_stride_blocks + ...]` and
+//   `rhs_blocks[row * rhs_row_stride_blocks + ...]`.
+// - Full validation + staging occurs before any caller output lane is written.
+// - Any failure (shape/capacity/overflow/kernel) leaves `out_rows_q16`
+//   unchanged.
+I32 Q8_0DotRowsQ16CheckedNoPartial(
+    Q8_0Block *lhs_blocks,
+    I64 lhs_block_capacity,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_blocks,
+    I64 rhs_block_capacity,
+    I64 rhs_row_stride_blocks,
+    I64 row_count,
+    I64 blocks_per_row,
+    I64 *out_rows_q16,
+    I64 out_row_capacity)
+{
+    I64 row_index;
+    I64 last_row;
+    I64 lhs_last_row_base;
+    I64 rhs_last_row_base;
+    I64 required_lhs_blocks;
+    I64 required_rhs_blocks;
+    I64 lhs_row_base;
+    I64 rhs_row_base;
+    I64 row_dot_q16;
+    I64 stage_bytes;
+    I64 *staged_rows_q16;
+    I32 status;
+
+    if (!lhs_blocks || !rhs_blocks || !out_rows_q16)
+        return Q8_0_ERR_NULL_PTR;
+
+    if (lhs_block_capacity < 0 || rhs_block_capacity < 0 || out_row_capacity < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (lhs_row_stride_blocks < 0 || rhs_row_stride_blocks < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (row_count < 0 || blocks_per_row < 0)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (row_count > out_row_capacity)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if (!row_count)
+        return Q8_0_OK;
+
+    if (!blocks_per_row)
+    {
+        for (row_index = 0; row_index < row_count; ++row_index)
+            out_rows_q16[row_index] = 0;
+        return Q8_0_OK;
+    }
+
+    last_row = row_count - 1;
+
+    if (!Q8_0TryMulI64NonNeg(last_row, lhs_row_stride_blocks, &lhs_last_row_base))
+        return Q8_0_ERR_OVERFLOW;
+    if (!Q8_0TryMulI64NonNeg(last_row, rhs_row_stride_blocks, &rhs_last_row_base))
+        return Q8_0_ERR_OVERFLOW;
+
+    if (!Q8_0TryAddI64(lhs_last_row_base, blocks_per_row, &required_lhs_blocks))
+        return Q8_0_ERR_OVERFLOW;
+    if (!Q8_0TryAddI64(rhs_last_row_base, blocks_per_row, &required_rhs_blocks))
+        return Q8_0_ERR_OVERFLOW;
+
+    if (required_lhs_blocks > lhs_block_capacity)
+        return Q8_0_ERR_BAD_DST_LEN;
+    if (required_rhs_blocks > rhs_block_capacity)
+        return Q8_0_ERR_BAD_DST_LEN;
+
+    if (!Q8_0TryMulI64NonNeg(row_count, sizeof(I64), &stage_bytes))
+        return Q8_0_ERR_OVERFLOW;
+
+    staged_rows_q16 = MAlloc(stage_bytes);
+    if (!staged_rows_q16)
+        return Q8_0_ERR_OVERFLOW;
+
+    // Preflight+stage pass: compute every row dot into private staging first.
+    for (row_index = 0; row_index < row_count; ++row_index)
+    {
+        if (!Q8_0TryMulI64NonNeg(row_index, lhs_row_stride_blocks, &lhs_row_base))
+        {
+            Free(staged_rows_q16);
+            return Q8_0_ERR_OVERFLOW;
+        }
+        if (!Q8_0TryMulI64NonNeg(row_index, rhs_row_stride_blocks, &rhs_row_base))
+        {
+            Free(staged_rows_q16);
+            return Q8_0_ERR_OVERFLOW;
+        }
+
+        row_dot_q16 = 0;
+        status = Q8_0DotProductBlocksQ16AccumulateChecked(&lhs_blocks[lhs_row_base],
+                                                          &rhs_blocks[rhs_row_base],
+                                                          blocks_per_row,
+                                                          &row_dot_q16);
+        if (status != Q8_0_OK)
+        {
+            Free(staged_rows_q16);
+            return status;
+        }
+
+        staged_rows_q16[row_index] = row_dot_q16;
+    }
+
+    // Commit pass: publish staged rows only after full success.
+    for (row_index = 0; row_index < row_count; ++row_index)
+        out_rows_q16[row_index] = staged_rows_q16[row_index];
+
+    Free(staged_rows_q16);
+    return Q8_0_OK;
+}
+
 I64 Q8_0DotQ32ToQ16(I64 dot_q32)
 {
     return Q8_0RoundShiftRightSigned(dot_q32, 16);
