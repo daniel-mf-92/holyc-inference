@@ -308,8 +308,8 @@ def test_source_contains_iq_1097_symbol() -> None:
     assert sig in source
     assert len(re.findall(re.escape(sig), source)) == 1
     body = source.split(sig, 1)[1]
-    assert "InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in body
-    assert "InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnly(" in body
+    assert "InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in body
+    assert "InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(" in body
     assert "if (staged_preflight_required_logits != staged_commit_required_logits ||" in body
     assert "snapshot_out_final_token_count != out_final_token_count" in body
     assert "if (!step_logits_q16 || !token_history || !random_q16_values ||" in source
