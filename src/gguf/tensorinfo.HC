@@ -530,6 +530,11 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnly(
     }
 
     canonical_name_len = canonical_name.len;
+    if (canonical_name_len > GGUF_TENSOR_MAX_NAME_BYTES)
+    {
+        GGUFTensorFreeString(&canonical_name);
+        return GGUF_TENSOR_PARSE_ERR_BAD_NAME_LEN;
+    }
     if (!GGUFTensorTryAddU64(8, canonical_name_len, &canonical_required_bytes))
     {
         GGUFTensorFreeString(&canonical_name);
@@ -538,7 +543,17 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnly(
 
     // Keep explicit U64 span math so the byte window is auditable: name header
     // (8 bytes) + payload (name_len), then cursor + required_bytes.
+    if (canonical_next_cursor > size)
+    {
+        GGUFTensorFreeString(&canonical_name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
     if (!GGUFTensorTryAddU64(cursor, canonical_required_bytes, &computed_end))
+    {
+        GGUFTensorFreeString(&canonical_name);
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+    }
+    if (computed_end > size)
     {
         GGUFTensorFreeString(&canonical_name);
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
@@ -571,12 +586,6 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnly(
     return GGUF_TENSOR_PARSE_OK;
 }
 
-// Diagnostics-only no-write companion for tensor name tuple decoding.
-//
-// Composes `...CommitOnly`, then recomputes canonical
-// {name_len, required_bytes, next_cursor} from immutable {buf,size,cursor}
-// snapshots. Outputs are published atomically only when staged and canonical
-// tuples match exactly, preserving strict no-partial semantics.
 // Checked no-partial parser for `{n_dims, dims[], ggml_type, offset}`.
 // Uses explicit U64 staging math and publishes the tuple atomically only
 // after full span parity and type/dim validation succeed.
