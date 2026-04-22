@@ -2480,6 +2480,10 @@ I32 KVCacheQ16WriteTokenCheckedNoPartialCommitOnlyPreflightOnly(
     I64 snapshot_v_cache_capacity;
     I64 snapshot_k_src_capacity;
     I64 snapshot_v_src_capacity;
+    I64 *snapshot_k_cache_ptr;
+    I64 *snapshot_v_cache_ptr;
+    I64 *snapshot_k_src_ptr;
+    I64 *snapshot_v_src_ptr;
     I32 status;
 
     if (!out_required_span_cells || !out_k_base_index || !out_v_base_index)
@@ -2514,6 +2518,10 @@ I32 KVCacheQ16WriteTokenCheckedNoPartialCommitOnlyPreflightOnly(
     snapshot_v_cache_capacity = v_cache_capacity;
     snapshot_k_src_capacity = k_token_src_capacity;
     snapshot_v_src_capacity = v_token_src_capacity;
+    snapshot_k_cache_ptr = k_cache_q16;
+    snapshot_v_cache_ptr = v_cache_q16;
+    snapshot_k_src_ptr = k_token_src_q16;
+    snapshot_v_src_ptr = v_token_src_q16;
 
     status = KVCacheQ16WriteTokenCheckedNoPartialPreflight(
         k_cache_q16,
@@ -2545,7 +2553,11 @@ I32 KVCacheQ16WriteTokenCheckedNoPartialCommitOnlyPreflightOnly(
         snapshot_k_cache_capacity != k_cache_capacity ||
         snapshot_v_cache_capacity != v_cache_capacity ||
         snapshot_k_src_capacity != k_token_src_capacity ||
-        snapshot_v_src_capacity != v_token_src_capacity)
+        snapshot_v_src_capacity != v_token_src_capacity ||
+        snapshot_k_cache_ptr != k_cache_q16 ||
+        snapshot_v_cache_ptr != v_cache_q16 ||
+        snapshot_k_src_ptr != k_token_src_q16 ||
+        snapshot_v_src_ptr != v_token_src_q16)
         return KV_Q16_ERR_BAD_PARAM;
 
     *out_required_span_cells = staged_span_cells;
@@ -2592,6 +2604,10 @@ I32 KVCacheQ16WriteTokenCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytes(
     I64 snapshot_v_cache_capacity;
     I64 snapshot_k_src_capacity;
     I64 snapshot_v_src_capacity;
+    I64 *snapshot_k_cache_ptr;
+    I64 *snapshot_v_cache_ptr;
+    I64 *snapshot_k_src_ptr;
+    I64 *snapshot_v_src_ptr;
     I32 status;
 
     if (!out_required_span_cells || !out_required_token_bytes ||
@@ -2634,6 +2650,10 @@ I32 KVCacheQ16WriteTokenCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytes(
     snapshot_v_cache_capacity = v_cache_capacity;
     snapshot_k_src_capacity = k_token_src_capacity;
     snapshot_v_src_capacity = v_token_src_capacity;
+    snapshot_k_cache_ptr = k_cache_q16;
+    snapshot_v_cache_ptr = v_cache_q16;
+    snapshot_k_src_ptr = k_token_src_q16;
+    snapshot_v_src_ptr = v_token_src_q16;
 
     status = KVCacheQ16WriteTokenCheckedNoPartialCommitOnlyPreflightOnly(
         k_cache_q16,
@@ -2671,7 +2691,11 @@ I32 KVCacheQ16WriteTokenCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytes(
         snapshot_k_cache_capacity != k_cache_capacity ||
         snapshot_v_cache_capacity != v_cache_capacity ||
         snapshot_k_src_capacity != k_token_src_capacity ||
-        snapshot_v_src_capacity != v_token_src_capacity)
+        snapshot_v_src_capacity != v_token_src_capacity ||
+        snapshot_k_cache_ptr != k_cache_q16 ||
+        snapshot_v_cache_ptr != v_cache_q16 ||
+        snapshot_k_src_ptr != k_token_src_q16 ||
+        snapshot_v_src_ptr != v_token_src_q16)
         return KV_Q16_ERR_BAD_PARAM;
 
     *out_required_span_cells = staged_required_span_cells;
@@ -2719,6 +2743,10 @@ I32 KVCacheQ16WriteTokenCheckedNoPartialCommitOnlyRequiredBytes(
     I64 snapshot_v_cache_capacity;
     I64 snapshot_k_src_capacity;
     I64 snapshot_v_src_capacity;
+    I64 *snapshot_k_cache_ptr;
+    I64 *snapshot_v_cache_ptr;
+    I64 *snapshot_k_src_ptr;
+    I64 *snapshot_v_src_ptr;
     I32 status;
 
     if (!out_required_span_cells || !out_required_token_bytes ||
@@ -2761,6 +2789,10 @@ I32 KVCacheQ16WriteTokenCheckedNoPartialCommitOnlyRequiredBytes(
     snapshot_v_cache_capacity = v_cache_capacity;
     snapshot_k_src_capacity = k_token_src_capacity;
     snapshot_v_src_capacity = v_token_src_capacity;
+    snapshot_k_cache_ptr = k_cache_q16;
+    snapshot_v_cache_ptr = v_cache_q16;
+    snapshot_k_src_ptr = k_token_src_q16;
+    snapshot_v_src_ptr = v_token_src_q16;
 
     status = KVCacheQ16WriteTokenCheckedNoPartialCommitOnly(
         k_cache_q16,
@@ -2798,7 +2830,11 @@ I32 KVCacheQ16WriteTokenCheckedNoPartialCommitOnlyRequiredBytes(
         snapshot_k_cache_capacity != k_cache_capacity ||
         snapshot_v_cache_capacity != v_cache_capacity ||
         snapshot_k_src_capacity != k_token_src_capacity ||
-        snapshot_v_src_capacity != v_token_src_capacity)
+        snapshot_v_src_capacity != v_token_src_capacity ||
+        snapshot_k_cache_ptr != k_cache_q16 ||
+        snapshot_v_cache_ptr != v_cache_q16 ||
+        snapshot_k_src_ptr != k_token_src_q16 ||
+        snapshot_v_src_ptr != v_token_src_q16)
         return KV_Q16_ERR_BAD_PARAM;
 
     *out_required_span_cells = staged_required_span_cells;
