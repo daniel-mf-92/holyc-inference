@@ -15672,8 +15672,15 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
     I64 canonical_required_out_cells;
     I64 canonical_last_out_index;
 
+    I64 recomputed_required_stage_cells;
+    I64 recomputed_required_stage_bytes;
+    I64 recomputed_required_out_cells;
+    I64 recomputed_last_out_index;
+
     I64 snapshot_query_row_count;
     I64 snapshot_token_count;
+    I64 *snapshot_staged_scores_q32;
+    I64 *snapshot_out_scores_q32;
     I64 snapshot_staged_scores_capacity;
     I64 snapshot_out_scores_capacity;
     I32 status;
@@ -15700,14 +15707,17 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
 
     snapshot_query_row_count = query_row_count;
     snapshot_token_count = token_count;
+    snapshot_staged_scores_q32 = staged_scores_q32;
+    snapshot_out_scores_q32 = out_scores_q32;
     snapshot_staged_scores_capacity = staged_scores_capacity;
     snapshot_out_scores_capacity = out_scores_capacity;
 
-    // IQ-841 diagnostics-only preflight companion contract:
+    // IQ-1040 diagnostics-only preflight companion contract:
     // 1) stage diagnostics from parity-commit-only wrapper;
-    // 2) recompute canonical tuple from parity base helper;
-    // 3) enforce immutable snapshots and exact tuple parity;
-    // 4) publish outputs only after full parity success.
+    // 2) stage canonical tuple from parity base helper;
+    // 3) recompute tuple directly from immutable scalar snapshots;
+    // 4) enforce immutable snapshots and exact tuple parity;
+    // 5) publish outputs only after full parity success.
     status = AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnly(
         query_row_count,
         token_count,
@@ -15736,9 +15746,44 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
     if (status != ATTN_Q16_OK)
         return status;
 
+    // Direct integer recompute from immutable geometry snapshots.
+    // required_stage_cells = query_row_count * token_count
+    // required_stage_bytes = required_stage_cells * sizeof(I64)
+    // required_out_cells   = required_stage_cells
+    // last_out_index       = required_out_cells ? required_out_cells - 1 : 0
+    status = AttentionTryMulI64Checked(snapshot_query_row_count,
+                                       snapshot_token_count,
+                                       &recomputed_required_stage_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(recomputed_required_stage_cells,
+                                       sizeof(I64),
+                                       &recomputed_required_stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    recomputed_required_out_cells = recomputed_required_stage_cells;
+    if (recomputed_required_out_cells == 0)
+    {
+        recomputed_last_out_index = 0;
+    }
+    else
+    {
+        status = AttentionTryAddI64Checked(recomputed_required_out_cells,
+                                           -1,
+                                           &recomputed_last_out_index);
+        if (status != ATTN_Q16_OK)
+            return status;
+    }
+
     if (snapshot_query_row_count != query_row_count)
         return ATTN_Q16_ERR_BAD_PARAM;
     if (snapshot_token_count != token_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_staged_scores_q32 != staged_scores_q32)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_scores_q32 != out_scores_q32)
         return ATTN_Q16_ERR_BAD_PARAM;
     if (snapshot_staged_scores_capacity != staged_scores_capacity)
         return ATTN_Q16_ERR_BAD_PARAM;
@@ -15752,6 +15797,15 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
     if (staged_required_out_cells != canonical_required_out_cells)
         return ATTN_Q16_ERR_BAD_PARAM;
     if (staged_last_out_index != canonical_last_out_index)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_stage_cells != recomputed_required_stage_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_required_stage_bytes != recomputed_required_stage_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_required_out_cells != recomputed_required_out_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_last_out_index != recomputed_last_out_index)
         return ATTN_Q16_ERR_BAD_PARAM;
 
     *out_required_stage_cells = staged_required_stage_cells;
@@ -16094,6 +16148,117 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
     return ATTN_Q16_OK;
 }
 
+I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnlyPreflightOnlyParity(
+    I64 query_row_count,
+    I64 token_count,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_required_out_cells,
+    I64 *out_last_out_index)
+{
+    I64 preflight_required_stage_cells;
+    I64 preflight_required_stage_bytes;
+    I64 preflight_required_out_cells;
+    I64 preflight_last_out_index;
+
+    I64 commit_required_stage_cells;
+    I64 commit_required_stage_bytes;
+    I64 commit_required_out_cells;
+    I64 commit_last_out_index;
+
+    I64 snapshot_query_row_count;
+    I64 snapshot_token_count;
+    I64 snapshot_staged_scores_capacity;
+    I64 snapshot_out_scores_capacity;
+    I32 status;
+
+    if (!out_required_stage_cells || !out_required_stage_bytes ||
+        !out_required_out_cells || !out_last_out_index)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (out_required_stage_cells == out_required_stage_bytes ||
+        out_required_stage_cells == out_required_out_cells ||
+        out_required_stage_cells == out_last_out_index ||
+        out_required_stage_bytes == out_required_out_cells ||
+        out_required_stage_bytes == out_last_out_index ||
+        out_required_out_cells == out_last_out_index)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (!staged_scores_q32 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (query_row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_scores_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    snapshot_query_row_count = query_row_count;
+    snapshot_token_count = token_count;
+    snapshot_staged_scores_capacity = staged_scores_capacity;
+    snapshot_out_scores_capacity = out_scores_capacity;
+
+    // IQ-1041 strict parity gate contract:
+    // 1) stage tuple via canonical preflight companion;
+    // 2) stage tuple via canonical commit-only helper;
+    // 3) revalidate immutable geometry/capacity snapshots;
+    // 4) require exact tuple parity before atomic publish.
+    status = AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnlyPreflightOnly(
+        query_row_count,
+        token_count,
+        staged_scores_q32,
+        staged_scores_capacity,
+        out_scores_q32,
+        out_scores_capacity,
+        &preflight_required_stage_cells,
+        &preflight_required_stage_bytes,
+        &preflight_required_out_cells,
+        &preflight_last_out_index);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnly(
+        query_row_count,
+        token_count,
+        staged_scores_q32,
+        staged_scores_capacity,
+        out_scores_q32,
+        out_scores_capacity,
+        &commit_required_stage_cells,
+        &commit_required_stage_bytes,
+        &commit_required_out_cells,
+        &commit_last_out_index);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (snapshot_query_row_count != query_row_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_token_count != token_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_staged_scores_capacity != staged_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_scores_capacity != out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (preflight_required_stage_cells != commit_required_stage_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (preflight_required_stage_bytes != commit_required_stage_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (preflight_required_out_cells != commit_required_out_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (preflight_last_out_index != commit_last_out_index)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    *out_required_stage_cells = preflight_required_stage_cells;
+    *out_required_stage_bytes = preflight_required_stage_bytes;
+    *out_required_out_cells = preflight_required_out_cells;
+    *out_last_out_index = preflight_last_out_index;
+    return ATTN_Q16_OK;
+}
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnlyParityCommitOnly(
     I64 query_row_count,
     I64 token_count,
@@ -16196,6 +16361,117 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
     if (parity_required_out_cells != commit_required_out_cells)
         return ATTN_Q16_ERR_BAD_PARAM;
     if (parity_last_out_index != commit_last_out_index)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    *out_required_stage_cells = parity_required_stage_cells;
+    *out_required_stage_bytes = parity_required_stage_bytes;
+    *out_required_out_cells = parity_required_out_cells;
+    *out_last_out_index = parity_last_out_index;
+    return ATTN_Q16_OK;
+}
+
+I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnlyPreflightOnlyParityCommitOnly(
+    I64 query_row_count,
+    I64 token_count,
+    I64 *staged_scores_q32,
+    I64 staged_scores_capacity,
+    I64 *out_scores_q32,
+    I64 out_scores_capacity,
+    I64 *out_required_stage_cells,
+    I64 *out_required_stage_bytes,
+    I64 *out_required_out_cells,
+    I64 *out_last_out_index)
+{
+    I64 parity_required_stage_cells;
+    I64 parity_required_stage_bytes;
+    I64 parity_required_out_cells;
+    I64 parity_last_out_index;
+
+    I64 preflight_required_stage_cells;
+    I64 preflight_required_stage_bytes;
+    I64 preflight_required_out_cells;
+    I64 preflight_last_out_index;
+
+    I64 snapshot_query_row_count;
+    I64 snapshot_token_count;
+    I64 snapshot_staged_scores_capacity;
+    I64 snapshot_out_scores_capacity;
+    I32 status;
+
+    if (!out_required_stage_cells || !out_required_stage_bytes ||
+        !out_required_out_cells || !out_last_out_index)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (out_required_stage_cells == out_required_stage_bytes ||
+        out_required_stage_cells == out_required_out_cells ||
+        out_required_stage_cells == out_last_out_index ||
+        out_required_stage_bytes == out_required_out_cells ||
+        out_required_stage_bytes == out_last_out_index ||
+        out_required_out_cells == out_last_out_index)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (!staged_scores_q32 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (query_row_count < 0 || token_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (staged_scores_capacity < 0 || out_scores_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    snapshot_query_row_count = query_row_count;
+    snapshot_token_count = token_count;
+    snapshot_staged_scores_capacity = staged_scores_capacity;
+    snapshot_out_scores_capacity = out_scores_capacity;
+
+    // IQ-1042 strict commit-only diagnostics wrapper contract:
+    // 1) stage tuple via IQ-1041 preflight-only parity gate;
+    // 2) stage tuple via IQ-1040 no-write preflight companion;
+    // 3) revalidate immutable geometry/capacity snapshots;
+    // 4) require exact tuple parity before atomic publish.
+    status = AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnlyPreflightOnlyParity(
+        query_row_count,
+        token_count,
+        staged_scores_q32,
+        staged_scores_capacity,
+        out_scores_q32,
+        out_scores_capacity,
+        &parity_required_stage_cells,
+        &parity_required_stage_bytes,
+        &parity_required_out_cells,
+        &parity_last_out_index);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnlyPreflightOnly(
+        query_row_count,
+        token_count,
+        staged_scores_q32,
+        staged_scores_capacity,
+        out_scores_q32,
+        out_scores_capacity,
+        &preflight_required_stage_cells,
+        &preflight_required_stage_bytes,
+        &preflight_required_out_cells,
+        &preflight_last_out_index);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (snapshot_query_row_count != query_row_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_token_count != token_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_staged_scores_capacity != staged_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_scores_capacity != out_scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (parity_required_stage_cells != preflight_required_stage_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (parity_required_stage_bytes != preflight_required_stage_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (parity_required_out_cells != preflight_required_out_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (parity_last_out_index != preflight_last_out_index)
         return ATTN_Q16_ERR_BAD_PARAM;
 
     *out_required_stage_cells = parity_required_stage_cells;

@@ -200,6 +200,45 @@ Bool GGUFTensorTryMulU64(U64 a, U64 b, U64 *out)
     return TRUE;
 }
 
+Bool GGUFTensorByteSpanEnd(U8 *base, U64 bytes, U8 **out_end)
+{
+    U64 begin_addr;
+    U64 end_addr;
+
+    if (!base || !out_end)
+        return FALSE;
+
+    begin_addr = (U64)base;
+    if (!GGUFTensorTryAddU64(begin_addr, bytes, &end_addr))
+        return FALSE;
+
+    *out_end = (U8 *)end_addr;
+    return TRUE;
+}
+
+Bool GGUFTensorByteSpansOverlap(U8 *a_base,
+                                U64 a_bytes,
+                                U8 *b_base,
+                                U64 b_bytes)
+{
+    U8 *a_end;
+    U8 *b_end;
+
+    if (!a_base || !b_base)
+        return FALSE;
+    if (!a_bytes || !b_bytes)
+        return FALSE;
+
+    if (!GGUFTensorByteSpanEnd(a_base, a_bytes, &a_end))
+        return TRUE;
+    if (!GGUFTensorByteSpanEnd(b_base, b_bytes, &b_end))
+        return TRUE;
+
+    if (a_end <= b_base || b_end <= a_base)
+        return FALSE;
+    return TRUE;
+}
+
 U0 GGUFTensorZeroString(GGUFTensorString *s)
 {
     if (!s)
@@ -730,7 +769,7 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParity(
     return GGUF_TENSOR_PARSE_OK;
 }
 
-// IQ-1021 commit-only diagnostics wrapper for tensor name parity preflight.
+// IQ-1028 commit-only diagnostics wrapper for tensor name parity preflight.
 //
 // Stages tuple diagnostics via
 // `...CommitOnlyPreflightOnlyParity`, then revalidates immutable
@@ -771,9 +810,12 @@ I64 GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     out_required_bytes_ptr = (U8 *)out_required_bytes;
     out_next_cursor_ptr = (U8 *)out_next_cursor;
 
-    if (out_name_len_ptr == out_required_bytes_ptr ||
-        out_name_len_ptr == out_next_cursor_ptr ||
-        out_required_bytes_ptr == out_next_cursor_ptr)
+    if (GGUFTensorByteSpansOverlap(out_name_len_ptr, sizeof(U64),
+                                   out_required_bytes_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_name_len_ptr, sizeof(U64),
+                                   out_next_cursor_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_required_bytes_ptr, sizeof(U64),
+                                   out_next_cursor_ptr, sizeof(U64)))
         return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
 
     if (cursor > size)
@@ -3357,27 +3399,27 @@ I64 GGUFTensorInfoReadCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPre
     out_tensor_offset_ptr = (U8 *)out_tensor_offset;
     out_next_cursor_ptr = (U8 *)out_next_cursor;
 
-    if (out_name_len_ptr == out_dim_count_ptr ||
-        out_name_len_ptr == out_dims_cells_ptr ||
-        out_name_len_ptr == out_required_bytes_ptr ||
-        out_name_len_ptr == out_type_value_ptr ||
-        out_name_len_ptr == out_tensor_offset_ptr ||
-        out_name_len_ptr == out_next_cursor_ptr ||
-        out_dim_count_ptr == out_dims_cells_ptr ||
-        out_dim_count_ptr == out_required_bytes_ptr ||
-        out_dim_count_ptr == out_type_value_ptr ||
-        out_dim_count_ptr == out_tensor_offset_ptr ||
-        out_dim_count_ptr == out_next_cursor_ptr ||
-        out_dims_cells_ptr == out_required_bytes_ptr ||
-        out_dims_cells_ptr == out_type_value_ptr ||
-        out_dims_cells_ptr == out_tensor_offset_ptr ||
-        out_dims_cells_ptr == out_next_cursor_ptr ||
-        out_required_bytes_ptr == out_type_value_ptr ||
-        out_required_bytes_ptr == out_tensor_offset_ptr ||
-        out_required_bytes_ptr == out_next_cursor_ptr ||
-        out_type_value_ptr == out_tensor_offset_ptr ||
-        out_type_value_ptr == out_next_cursor_ptr ||
-        out_tensor_offset_ptr == out_next_cursor_ptr)
+    if (GGUFTensorByteSpansOverlap(out_name_len_ptr, sizeof(U64), out_dim_count_ptr, sizeof(U32)) ||
+        GGUFTensorByteSpansOverlap(out_name_len_ptr, sizeof(U64), out_dims_cells_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_name_len_ptr, sizeof(U64), out_required_bytes_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_name_len_ptr, sizeof(U64), out_type_value_ptr, sizeof(U32)) ||
+        GGUFTensorByteSpansOverlap(out_name_len_ptr, sizeof(U64), out_tensor_offset_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_name_len_ptr, sizeof(U64), out_next_cursor_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_dim_count_ptr, sizeof(U32), out_dims_cells_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_dim_count_ptr, sizeof(U32), out_required_bytes_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_dim_count_ptr, sizeof(U32), out_type_value_ptr, sizeof(U32)) ||
+        GGUFTensorByteSpansOverlap(out_dim_count_ptr, sizeof(U32), out_tensor_offset_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_dim_count_ptr, sizeof(U32), out_next_cursor_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_dims_cells_ptr, sizeof(U64), out_required_bytes_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_dims_cells_ptr, sizeof(U64), out_type_value_ptr, sizeof(U32)) ||
+        GGUFTensorByteSpansOverlap(out_dims_cells_ptr, sizeof(U64), out_tensor_offset_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_dims_cells_ptr, sizeof(U64), out_next_cursor_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_required_bytes_ptr, sizeof(U64), out_type_value_ptr, sizeof(U32)) ||
+        GGUFTensorByteSpansOverlap(out_required_bytes_ptr, sizeof(U64), out_tensor_offset_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_required_bytes_ptr, sizeof(U64), out_next_cursor_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_type_value_ptr, sizeof(U32), out_tensor_offset_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_type_value_ptr, sizeof(U32), out_next_cursor_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_tensor_offset_ptr, sizeof(U64), out_next_cursor_ptr, sizeof(U64)))
         return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
 
     if (cursor > size)

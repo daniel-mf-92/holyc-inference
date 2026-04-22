@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity harness for ...RequiredBytesParityCommitOnlyPreflightOnly (IQ-841)."""
+"""Parity harness for ...RequiredBytesParityCommitOnlyPreflightOnly (IQ-1040)."""
 
 from __future__ import annotations
 
@@ -62,6 +62,8 @@ def attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit
 
     snapshot_query_row_count = query_row_count
     snapshot_token_count = token_count
+    snapshot_staged_scores_q32 = staged_scores_q32
+    snapshot_out_scores_q32 = out_scores_q32
     snapshot_staged_scores_capacity = staged_scores_capacity
     snapshot_out_scores_capacity = out_scores_capacity
 
@@ -105,9 +107,21 @@ def attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit
     if err != ATTN_Q16_OK:
         return err
 
+    recomputed_required_stage_cells = snapshot_query_row_count * snapshot_token_count
+    recomputed_required_stage_bytes = recomputed_required_stage_cells * 8
+    recomputed_required_out_cells = recomputed_required_stage_cells
+    if recomputed_required_out_cells == 0:
+        recomputed_last_out_index = 0
+    else:
+        recomputed_last_out_index = recomputed_required_out_cells - 1
+
     if snapshot_query_row_count != query_row_count:
         return ATTN_Q16_ERR_BAD_PARAM
     if snapshot_token_count != token_count:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if snapshot_staged_scores_q32 is not staged_scores_q32:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if snapshot_out_scores_q32 is not out_scores_q32:
         return ATTN_Q16_ERR_BAD_PARAM
     if snapshot_staged_scores_capacity != staged_scores_capacity:
         return ATTN_Q16_ERR_BAD_PARAM
@@ -121,6 +135,15 @@ def attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit
     if staged_required_out_cells[0] != canonical_required_out_cells[0]:
         return ATTN_Q16_ERR_BAD_PARAM
     if staged_last_out_index[0] != canonical_last_out_index[0]:
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    if staged_required_stage_cells[0] != recomputed_required_stage_cells:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if staged_required_stage_bytes[0] != recomputed_required_stage_bytes:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if staged_required_out_cells[0] != recomputed_required_out_cells:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if staged_last_out_index[0] != recomputed_last_out_index:
         return ATTN_Q16_ERR_BAD_PARAM
 
     out_required_stage_cells[0] = staged_required_stage_cells[0]
@@ -214,8 +237,13 @@ def test_source_contains_required_bytes_parity_commit_only_preflight_only_wrappe
     )
     assert "snapshot_query_row_count = query_row_count;" in body
     assert "snapshot_token_count = token_count;" in body
+    assert "snapshot_staged_scores_q32 = staged_scores_q32;" in body
+    assert "snapshot_out_scores_q32 = out_scores_q32;" in body
     assert "snapshot_staged_scores_capacity = staged_scores_capacity;" in body
     assert "snapshot_out_scores_capacity = out_scores_capacity;" in body
+    assert "AttentionTryMulI64Checked(snapshot_query_row_count," in body
+    assert "AttentionTryMulI64Checked(recomputed_required_stage_cells," in body
+    assert "recomputed_required_out_cells = recomputed_required_stage_cells;" in body
 
 
 def test_known_vector_commit_only_preflight_only_outputs() -> None:

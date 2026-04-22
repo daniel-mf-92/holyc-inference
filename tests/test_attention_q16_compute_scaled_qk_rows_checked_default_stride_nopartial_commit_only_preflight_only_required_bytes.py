@@ -125,6 +125,9 @@ def attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit
     if staged_scores_capacity < 0 or out_scores_capacity < 0:
         return ATTN_Q16_ERR_BAD_PARAM
 
+    snapshot_staged_scores_q32 = staged_scores_q32
+    snapshot_out_scores_q32 = out_scores_q32
+
     staged_required_stage_cells = [0]
     staged_required_out_cells = [0]
     staged_last_out_index = [0]

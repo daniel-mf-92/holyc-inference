@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly (IQ-1021)."""
+"""Harness for GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly (IQ-1028)."""
 
 from __future__ import annotations
 
@@ -123,8 +123,11 @@ def test_source_contains_iq1021_signature_and_contract() -> None:
     assert sig in source
     body = source.rsplit(sig, 1)[1].split("\nI64 ", 1)[0]
 
-    assert "IQ-1021 commit-only diagnostics wrapper for tensor name parity preflight." in source
+    assert "IQ-1028 commit-only diagnostics wrapper for tensor name parity preflight." in source
     assert "status = GGUFTensorInfoReadNameCheckedNoPartialCommitOnlyPreflightOnlyParity(" in body
+    assert "Bool GGUFTensorByteSpansOverlap(U8 *a_base," in source
+    assert "GGUFTensorByteSpansOverlap(out_name_len_ptr, sizeof(U64)," in body
+    assert "out_required_bytes_ptr, sizeof(U64))" in body
     assert "if (staged_name_len > GGUF_TENSOR_MAX_NAME_BYTES)" in body
     assert "if (!GGUFTensorTryAddU64(8, staged_name_len, &canonical_required_bytes))" in body
     assert "if (staged_required_bytes != canonical_required_bytes)" in body

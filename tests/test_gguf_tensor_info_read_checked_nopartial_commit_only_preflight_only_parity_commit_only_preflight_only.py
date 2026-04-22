@@ -165,6 +165,10 @@ def test_source_contains_iq1019_signature_and_contract() -> None:
     assert "IQ-1019 diagnostics-only no-write companion" in source
     assert "GGUFTensorInfoReadCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(" in body
     assert "GGUFTensorInfoReadCheckedNoPartialCommitOnlyPreflightOnly(" in body
+    assert "Bool GGUFTensorByteSpanEnd(U8 *base, U64 bytes, U8 **out_end)" in source
+    assert "Bool GGUFTensorByteSpansOverlap(U8 *a_base," in source
+    assert "GGUFTensorByteSpansOverlap(out_name_len_ptr, sizeof(U64)," in body
+    assert "out_dim_count_ptr, sizeof(U32))" in body
     assert "if (snapshot_buf != buf || snapshot_size != size || snapshot_cursor != cursor)" in body
     assert "staged_commit_name_len != staged_preflight_name_len" in body
     assert "staged_commit_dim_count != staged_preflight_dim_count" in body
