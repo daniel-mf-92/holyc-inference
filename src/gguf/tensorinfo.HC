@@ -3518,27 +3518,27 @@ I64 GGUFTensorInfoReadCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPre
     out_tensor_offset_ptr = (U8 *)out_tensor_offset;
     out_next_cursor_ptr = (U8 *)out_next_cursor;
 
-    if (out_name_len_ptr == out_dim_count_ptr ||
-        out_name_len_ptr == out_dims_cells_ptr ||
-        out_name_len_ptr == out_required_bytes_ptr ||
-        out_name_len_ptr == out_type_value_ptr ||
-        out_name_len_ptr == out_tensor_offset_ptr ||
-        out_name_len_ptr == out_next_cursor_ptr ||
-        out_dim_count_ptr == out_dims_cells_ptr ||
-        out_dim_count_ptr == out_required_bytes_ptr ||
-        out_dim_count_ptr == out_type_value_ptr ||
-        out_dim_count_ptr == out_tensor_offset_ptr ||
-        out_dim_count_ptr == out_next_cursor_ptr ||
-        out_dims_cells_ptr == out_required_bytes_ptr ||
-        out_dims_cells_ptr == out_type_value_ptr ||
-        out_dims_cells_ptr == out_tensor_offset_ptr ||
-        out_dims_cells_ptr == out_next_cursor_ptr ||
-        out_required_bytes_ptr == out_type_value_ptr ||
-        out_required_bytes_ptr == out_tensor_offset_ptr ||
-        out_required_bytes_ptr == out_next_cursor_ptr ||
-        out_type_value_ptr == out_tensor_offset_ptr ||
-        out_type_value_ptr == out_next_cursor_ptr ||
-        out_tensor_offset_ptr == out_next_cursor_ptr)
+    if (GGUFTensorByteSpansOverlap(out_name_len_ptr, sizeof(U64), out_dim_count_ptr, sizeof(U32)) ||
+        GGUFTensorByteSpansOverlap(out_name_len_ptr, sizeof(U64), out_dims_cells_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_name_len_ptr, sizeof(U64), out_required_bytes_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_name_len_ptr, sizeof(U64), out_type_value_ptr, sizeof(U32)) ||
+        GGUFTensorByteSpansOverlap(out_name_len_ptr, sizeof(U64), out_tensor_offset_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_name_len_ptr, sizeof(U64), out_next_cursor_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_dim_count_ptr, sizeof(U32), out_dims_cells_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_dim_count_ptr, sizeof(U32), out_required_bytes_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_dim_count_ptr, sizeof(U32), out_type_value_ptr, sizeof(U32)) ||
+        GGUFTensorByteSpansOverlap(out_dim_count_ptr, sizeof(U32), out_tensor_offset_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_dim_count_ptr, sizeof(U32), out_next_cursor_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_dims_cells_ptr, sizeof(U64), out_required_bytes_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_dims_cells_ptr, sizeof(U64), out_type_value_ptr, sizeof(U32)) ||
+        GGUFTensorByteSpansOverlap(out_dims_cells_ptr, sizeof(U64), out_tensor_offset_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_dims_cells_ptr, sizeof(U64), out_next_cursor_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_required_bytes_ptr, sizeof(U64), out_type_value_ptr, sizeof(U32)) ||
+        GGUFTensorByteSpansOverlap(out_required_bytes_ptr, sizeof(U64), out_tensor_offset_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_required_bytes_ptr, sizeof(U64), out_next_cursor_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_type_value_ptr, sizeof(U32), out_tensor_offset_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_type_value_ptr, sizeof(U32), out_next_cursor_ptr, sizeof(U64)) ||
+        GGUFTensorByteSpansOverlap(out_tensor_offset_ptr, sizeof(U64), out_next_cursor_ptr, sizeof(U64)))
         return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
 
     if (cursor > size)

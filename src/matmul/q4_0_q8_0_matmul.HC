@@ -139,6 +139,23 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyPar
     I64 *out_required_out_bytes,
     I64 *out_tile_rows,
     I64 *out_tile_cols);
+I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
+    Q4_0Block *lhs_q4_blocks,
+    I64 lhs_q4_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_q8_col_blocks,
+    I64 rhs_q8_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_cells_q32,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_out_bytes,
+    I64 *out_tile_rows,
+    I64 *out_tile_cols);
 I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyParityCommitOnly(
     Q4_0Block *lhs_q4_blocks,
     I64 lhs_q4_block_capacity,
@@ -2153,6 +2170,189 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyPar
     *out_required_out_bytes = canonical_required_out_bytes;
     *out_tile_rows = canonical_tile_rows;
     *out_tile_cols = canonical_tile_cols;
+    return Q4_0_Q8_0_MATMUL_OK;
+}
+
+// IQ-1039 commit-only diagnostics wrapper for default-tiles parity-preflight gate.
+//
+// Compose `...PreflightOnlyParityCommitOnlyPreflightOnlyParity` and canonical
+// `...PreflightOnlyParityCommitOnlyPreflightOnly`, revalidate immutable
+// geometry/capacity snapshots plus required-bytes span parity, then atomically
+// publish only on strict tuple parity.
+I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
+    Q4_0Block *lhs_q4_blocks,
+    I64 lhs_q4_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_q8_col_blocks,
+    I64 rhs_q8_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_cells_q32,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells,
+    I64 *out_required_out_cells,
+    I64 *out_required_out_bytes,
+    I64 *out_tile_rows,
+    I64 *out_tile_cols)
+{
+    I64 snapshot_row_count;
+    I64 snapshot_col_count;
+    I64 snapshot_k_block_count;
+    I64 snapshot_out_capacity;
+    I64 snapshot_out_row_stride_cells;
+
+    I64 staged_parity_required_out_cells;
+    I64 staged_parity_required_out_bytes;
+    I64 staged_parity_tile_rows;
+    I64 staged_parity_tile_cols;
+    I64 staged_parity_expected_out_bytes;
+
+    I64 canonical_required_out_cells;
+    I64 canonical_required_out_bytes;
+    I64 canonical_tile_rows;
+    I64 canonical_tile_cols;
+    I64 canonical_expected_out_bytes;
+
+    I32 status;
+
+    // IQ-1039 commit-only parity wrapper:
+    // 1) Run IQ-1034 parity gate and IQ-1026 canonical preflight-only wrapper.
+    // 2) Re-check immutable geometry snapshots and integer span math
+    //    (`required_out_bytes == required_out_cells * sizeof(I64)`).
+    // 3) Publish tuple outputs only on strict parity, without touching output cells.
+    if (!out_required_out_cells || !out_required_out_bytes ||
+        !out_tile_rows || !out_tile_cols)
+        return Q4_0_Q8_0_MATMUL_ERR_NULL_PTR;
+
+    if (out_required_out_cells == out_required_out_bytes ||
+        out_required_out_cells == out_tile_rows ||
+        out_required_out_cells == out_tile_cols ||
+        out_required_out_bytes == out_tile_rows ||
+        out_required_out_bytes == out_tile_cols ||
+        out_tile_rows == out_tile_cols)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (out_required_out_cells == out_cells_q32 ||
+        out_required_out_bytes == out_cells_q32 ||
+        out_tile_rows == out_cells_q32 ||
+        out_tile_cols == out_cells_q32)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (out_required_out_cells == (I64 *)lhs_q4_blocks ||
+        out_required_out_cells == (I64 *)rhs_q8_col_blocks ||
+        out_required_out_bytes == (I64 *)lhs_q4_blocks ||
+        out_required_out_bytes == (I64 *)rhs_q8_col_blocks ||
+        out_tile_rows == (I64 *)lhs_q4_blocks ||
+        out_tile_rows == (I64 *)rhs_q8_col_blocks ||
+        out_tile_cols == (I64 *)lhs_q4_blocks ||
+        out_tile_cols == (I64 *)rhs_q8_col_blocks)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (Q4_0Q8_0MatMulDiagPtrOverlapsOutCellsRange(out_required_out_cells,
+                                                   out_cells_q32,
+                                                   out_cell_capacity) ||
+        Q4_0Q8_0MatMulDiagPtrOverlapsOutCellsRange(out_required_out_bytes,
+                                                   out_cells_q32,
+                                                   out_cell_capacity) ||
+        Q4_0Q8_0MatMulDiagPtrOverlapsOutCellsRange(out_tile_rows,
+                                                   out_cells_q32,
+                                                   out_cell_capacity) ||
+        Q4_0Q8_0MatMulDiagPtrOverlapsOutCellsRange(out_tile_cols,
+                                                   out_cells_q32,
+                                                   out_cell_capacity))
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    snapshot_row_count = row_count;
+    snapshot_col_count = col_count;
+    snapshot_k_block_count = k_block_count;
+    snapshot_out_capacity = out_cell_capacity;
+    snapshot_out_row_stride_cells = out_row_stride_cells;
+
+    staged_parity_required_out_cells = 0;
+    staged_parity_required_out_bytes = 0;
+    staged_parity_tile_rows = 0;
+    staged_parity_tile_cols = 0;
+    staged_parity_expected_out_bytes = 0;
+
+    canonical_required_out_cells = 0;
+    canonical_required_out_bytes = 0;
+    canonical_tile_rows = 0;
+    canonical_tile_cols = 0;
+    canonical_expected_out_bytes = 0;
+
+    status = MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+        lhs_q4_blocks,
+        lhs_q4_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_q8_col_blocks,
+        rhs_q8_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q32,
+        out_cell_capacity,
+        out_row_stride_cells,
+        &staged_parity_required_out_cells,
+        &staged_parity_required_out_bytes,
+        &staged_parity_tile_rows,
+        &staged_parity_tile_cols);
+    if (status != Q4_0_Q8_0_MATMUL_OK)
+        return status;
+
+    status = MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyParityCommitOnlyPreflightOnly(
+        lhs_q4_blocks,
+        lhs_q4_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_q8_col_blocks,
+        rhs_q8_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q32,
+        out_cell_capacity,
+        out_row_stride_cells,
+        &canonical_required_out_cells,
+        &canonical_required_out_bytes,
+        &canonical_tile_rows,
+        &canonical_tile_cols);
+    if (status != Q4_0_Q8_0_MATMUL_OK)
+        return status;
+
+    if (snapshot_row_count != row_count ||
+        snapshot_col_count != col_count ||
+        snapshot_k_block_count != k_block_count ||
+        snapshot_out_capacity != out_cell_capacity ||
+        snapshot_out_row_stride_cells != out_row_stride_cells)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(staged_parity_required_out_cells,
+                                       sizeof(I64),
+                                       &staged_parity_expected_out_bytes))
+        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+    if (staged_parity_required_out_bytes != staged_parity_expected_out_bytes)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (!Q4_0Q8_0MatMulTryMulI64NonNeg(canonical_required_out_cells,
+                                       sizeof(I64),
+                                       &canonical_expected_out_bytes))
+        return Q4_0_Q8_0_MATMUL_ERR_OVERFLOW;
+    if (canonical_required_out_bytes != canonical_expected_out_bytes)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (staged_parity_required_out_cells != canonical_required_out_cells ||
+        staged_parity_required_out_bytes != canonical_required_out_bytes ||
+        staged_parity_tile_rows != canonical_tile_rows ||
+        staged_parity_tile_cols != canonical_tile_cols)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    *out_required_out_cells = staged_parity_required_out_cells;
+    *out_required_out_bytes = staged_parity_required_out_bytes;
+    *out_tile_rows = staged_parity_tile_rows;
+    *out_tile_cols = staged_parity_tile_cols;
     return Q4_0_Q8_0_MATMUL_OK;
 }
 
