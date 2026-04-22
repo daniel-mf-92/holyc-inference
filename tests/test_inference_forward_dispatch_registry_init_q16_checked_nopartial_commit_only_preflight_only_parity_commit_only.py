@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 import random
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path("tests").resolve()))
 
 from test_inference_forward_dispatch_registry_init_q16_checked_nopartial_commit_only_preflight_only_parity import (
     DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT,
@@ -205,6 +208,112 @@ def test_duplicate_unsupported_capacity_and_success_no_partial() -> None:
     assert default_arch == [20]
 
 
+def registry_init_commit_only_explicit_composition(
+    *,
+    registry_slot_capacity: int,
+    out_registry_tags: list[bytes] | None,
+    out_registry_tag_lens: list[int] | None,
+    out_registry_arch_ids: list[int] | None,
+    out_registry_count: list[int] | None,
+    out_default_arch_id: list[int] | None,
+    inject_duplicate_tag: bool = False,
+    inject_unsupported_tag: bool = False,
+) -> int:
+    if (
+        out_registry_tags is None
+        or out_registry_tag_lens is None
+        or out_registry_arch_ids is None
+        or out_registry_count is None
+        or out_default_arch_id is None
+    ):
+        return SAMPLING_Q16_ERR_NULL_PTR
+    if registry_slot_capacity < DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT:
+        return SAMPLING_Q16_ERR_BAD_PARAM
+    if out_registry_count is out_default_arch_id:
+        return SAMPLING_Q16_ERR_BAD_PARAM
+
+    snap_capacity = registry_slot_capacity
+    snap_tags = out_registry_tags
+    snap_lens = out_registry_tag_lens
+    snap_ids = out_registry_arch_ids
+    snap_count = out_registry_count
+    snap_default = out_default_arch_id
+
+    staged_tags = [b"", b"", b"", b""]
+    staged_lens = [0, 0, 0, 0]
+    staged_ids = [0, 0, 0, 0]
+    staged_count = [0]
+    staged_default = [0]
+
+    canonical_tags = [b"", b"", b"", b""]
+    canonical_lens = [0, 0, 0, 0]
+    canonical_ids = [0, 0, 0, 0]
+    canonical_count = [0]
+    canonical_default = [0]
+
+    rc = registry_init_checked_nopartial_commit_only_preflight_only_parity_reference(
+        registry_slot_capacity=registry_slot_capacity,
+        out_registry_tags=staged_tags,
+        out_registry_tag_lens=staged_lens,
+        out_registry_arch_ids=staged_ids,
+        out_registry_count=staged_count,
+        out_default_arch_id=staged_default,
+        inject_duplicate_tag=inject_duplicate_tag,
+        inject_unsupported_tag=inject_unsupported_tag,
+    )
+    if rc != SAMPLING_Q16_OK:
+        return rc
+
+    rc = registry_init_checked_nopartial_commit_only_preflight_only_reference(
+        registry_slot_capacity=registry_slot_capacity,
+        out_registry_tags=canonical_tags,
+        out_registry_tag_lens=canonical_lens,
+        out_registry_arch_ids=canonical_ids,
+        out_registry_count=canonical_count,
+        out_default_arch_id=canonical_default,
+        inject_duplicate_tag=inject_duplicate_tag,
+        inject_unsupported_tag=inject_unsupported_tag,
+    )
+    if rc != SAMPLING_Q16_OK:
+        return rc
+
+    if snap_capacity != registry_slot_capacity:
+        return SAMPLING_Q16_ERR_BAD_PARAM
+    if snap_capacity < DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT:
+        return SAMPLING_Q16_ERR_BAD_PARAM
+
+    if (
+        snap_tags is not out_registry_tags
+        or snap_lens is not out_registry_tag_lens
+        or snap_ids is not out_registry_arch_ids
+        or snap_count is not out_registry_count
+        or snap_default is not out_default_arch_id
+    ):
+        return SAMPLING_Q16_ERR_BAD_PARAM
+
+    if staged_count[0] != canonical_count[0] or staged_default[0] != canonical_default[0]:
+        return SAMPLING_Q16_ERR_BAD_PARAM
+
+    for idx in range(DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT):
+        if staged_lens[idx] <= 0 or canonical_lens[idx] <= 0:
+            return SAMPLING_Q16_ERR_BAD_PARAM
+        if staged_lens[idx] != canonical_lens[idx]:
+            return SAMPLING_Q16_ERR_BAD_PARAM
+        if staged_ids[idx] != canonical_ids[idx]:
+            return SAMPLING_Q16_ERR_BAD_PARAM
+        if staged_tags[idx] != canonical_tags[idx]:
+            return SAMPLING_Q16_ERR_BAD_PARAM
+
+    for idx in range(DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT):
+        out_registry_tags[idx] = staged_tags[idx]
+        out_registry_tag_lens[idx] = staged_lens[idx]
+        out_registry_arch_ids[idx] = staged_ids[idx]
+
+    out_registry_count[0] = staged_count[0]
+    out_default_arch_id[0] = staged_default[0]
+    return SAMPLING_Q16_OK
+
+
 def test_randomized_equivalence_with_explicit_composition() -> None:
     rng = random.Random(20260422_1129)
 
@@ -236,7 +345,7 @@ def test_randomized_equivalence_with_explicit_composition() -> None:
         count_b = [22]
         default_b = [23]
 
-        err_ref = registry_init_checked_nopartial_commit_only_preflight_only_parity_commit_only_reference(
+        err_ref = registry_init_commit_only_explicit_composition(
             registry_slot_capacity=cap,
             out_registry_tags=tags_b,
             out_registry_tag_lens=lens_b,
