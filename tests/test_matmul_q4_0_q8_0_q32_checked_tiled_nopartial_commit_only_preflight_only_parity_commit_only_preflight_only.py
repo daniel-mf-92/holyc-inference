@@ -422,3 +422,122 @@ def test_overflow_vector_keeps_diagnostics_unpublished() -> None:
     assert req_bytes == [702]
     assert tile_rows == [703]
     assert tile_cols == [704]
+
+
+def test_randomized_no_publish_on_failure_contract() -> None:
+    rng = random.Random(2026042210053)
+
+    for i in range(900):
+        row_count = rng.randint(0, 12)
+        col_count = rng.randint(0, 12)
+        k_block_count = rng.randint(0, 8)
+
+        lhs_stride = k_block_count + rng.randint(0, 4)
+        rhs_stride = k_block_count + rng.randint(0, 4)
+        out_stride = col_count + rng.randint(0, 4)
+
+        lhs_capacity = row_count * lhs_stride
+        rhs_capacity = col_count * rhs_stride
+        out_capacity = row_count * out_stride
+
+        if rng.random() < 0.35:
+            lhs_capacity = max(0, lhs_capacity - rng.randint(1, 3))
+        if rng.random() < 0.35:
+            rhs_capacity = max(0, rhs_capacity - rng.randint(1, 3))
+        if rng.random() < 0.35:
+            out_capacity = max(0, out_capacity - rng.randint(1, 3))
+
+        tile_rows = rng.randint(1, 6)
+        tile_cols = rng.randint(1, 6)
+
+        local_rng = random.Random(2026042210053000 + i)
+        lhs = [make_q4_block(local_rng) for _ in range(max(1, row_count * max(1, lhs_stride)))]
+        rhs = [make_q8_block(local_rng) for _ in range(max(1, col_count * max(1, rhs_stride)))]
+        out = [0xEEEE] * max(1, row_count * max(1, out_stride))
+
+        req_cells = [0xA1]
+        req_bytes = [0xA2]
+        got_tile_rows = [0xA3]
+        got_tile_cols = [0xA4]
+
+        err = matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only(
+            lhs,
+            lhs_capacity,
+            row_count,
+            lhs_stride,
+            rhs,
+            rhs_capacity,
+            col_count,
+            rhs_stride,
+            k_block_count,
+            tile_rows,
+            tile_cols,
+            out,
+            out_capacity,
+            out_stride,
+            req_cells,
+            req_bytes,
+            got_tile_rows,
+            got_tile_cols,
+        )
+
+        if err != Q4_0_Q8_0_AVX2_OK:
+            assert req_cells == [0xA1]
+            assert req_bytes == [0xA2]
+            assert got_tile_rows == [0xA3]
+            assert got_tile_cols == [0xA4]
+
+
+def test_pointer_alias_rejections_for_diagnostics_outputs() -> None:
+    rng = random.Random(2026042210054)
+
+    lhs = [make_q4_block(rng) for _ in range(6)]
+    rhs = [make_q8_block(rng) for _ in range(6)]
+    out = [0] * 12
+
+    shared = [0x1234]
+    independent = [0x5678]
+
+    err = matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only(
+        lhs,
+        len(lhs),
+        2,
+        3,
+        rhs,
+        len(rhs),
+        2,
+        3,
+        2,
+        1,
+        1,
+        out,
+        len(out),
+        6,
+        shared,
+        shared,
+        independent,
+        [0x9ABC],
+    )
+    assert err == Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+
+    err = matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only(
+        lhs,
+        len(lhs),
+        2,
+        3,
+        rhs,
+        len(rhs),
+        2,
+        3,
+        2,
+        1,
+        1,
+        out,
+        len(out),
+        6,
+        shared,
+        independent,
+        shared,
+        [0x9ABC],
+    )
+    assert err == Q4_0_Q8_0_AVX2_ERR_BAD_LEN
