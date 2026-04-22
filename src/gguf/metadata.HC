@@ -6432,6 +6432,11 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnly(U8 *b
                                                                             U64 *out_next_cursor)
 {
     U64 cursor_snapshot;
+    U64 *cursor_ptr_snapshot;
+    U32 *out_arch_tag_ptr_snapshot;
+    U64 *out_tag_offset_ptr_snapshot;
+    U64 *out_tag_len_ptr_snapshot;
+    U64 *out_next_cursor_ptr_snapshot;
     U64 tag_end_stage;
     U64 tag_end_verify;
     U64 cursor_stage;
@@ -6453,6 +6458,20 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnly(U8 *b
         !out_tag_len || !out_next_cursor)
         return GGUF_META_TABLE_ERR_NULL_PTR;
 
+    if ((U8 *)cursor == (U8 *)out_arch_tag ||
+        (U8 *)cursor == (U8 *)out_tag_offset ||
+        (U8 *)cursor == (U8 *)out_tag_len ||
+        (U8 *)cursor == (U8 *)out_next_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if ((U8 *)out_arch_tag == (U8 *)out_tag_offset ||
+        (U8 *)out_arch_tag == (U8 *)out_tag_len ||
+        (U8 *)out_arch_tag == (U8 *)out_next_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if ((U8 *)out_tag_offset == (U8 *)out_tag_len ||
+        (U8 *)out_tag_offset == (U8 *)out_next_cursor ||
+        (U8 *)out_tag_len == (U8 *)out_next_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
     if (buf_nbytes > 0x7FFFFFFFFFFFFFFF)
         return GGUF_META_TABLE_ERR_OVERFLOW;
     if (table_end > 0x7FFFFFFFFFFFFFFF)
@@ -6471,6 +6490,11 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnly(U8 *b
         return GGUF_META_TABLE_ERR_BAD_PARAM;
 
     cursor_snapshot = *cursor;
+    cursor_ptr_snapshot = cursor;
+    out_arch_tag_ptr_snapshot = out_arch_tag;
+    out_tag_offset_ptr_snapshot = out_tag_offset;
+    out_tag_len_ptr_snapshot = out_tag_len;
+    out_next_cursor_ptr_snapshot = out_next_cursor;
 
     cursor_stage = cursor_snapshot;
     err = GGUFMetadataReadArchitectureTagCheckedNoPartial(buf,
@@ -6529,6 +6553,13 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnly(U8 *b
     if (tag_len_stage != tag_len_verify)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
     if (next_cursor_stage != next_cursor_verify)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (cursor_ptr_snapshot != cursor ||
+        out_arch_tag_ptr_snapshot != out_arch_tag ||
+        out_tag_offset_ptr_snapshot != out_tag_offset ||
+        out_tag_len_ptr_snapshot != out_tag_len ||
+        out_next_cursor_ptr_snapshot != out_next_cursor)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
 
     *out_arch_tag = arch_stage;

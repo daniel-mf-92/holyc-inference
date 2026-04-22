@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnly (IQ-1106)."""
+"""Harness for GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnly (IQ-1117)."""
 
 from __future__ import annotations
 
@@ -205,6 +205,22 @@ def gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_
     ):
         return GGUF_META_TABLE_ERR_NULL_PTR
 
+    if (
+        cursor_ref is out_arch_tag
+        or cursor_ref is out_tag_offset
+        or cursor_ref is out_tag_len
+        or cursor_ref is out_next_cursor
+    ):
+        return GGUF_META_TABLE_ERR_BAD_PARAM
+    if (
+        out_arch_tag is out_tag_offset
+        or out_arch_tag is out_tag_len
+        or out_arch_tag is out_next_cursor
+    ):
+        return GGUF_META_TABLE_ERR_BAD_PARAM
+    if out_tag_offset is out_tag_len or out_tag_offset is out_next_cursor or out_tag_len is out_next_cursor:
+        return GGUF_META_TABLE_ERR_BAD_PARAM
+
     if buf_nbytes > I64_MAX or table_end > I64_MAX or metadata_count > I64_MAX:
         return GGUF_META_TABLE_ERR_OVERFLOW
     if metadata_count > GGUF_MAX_METADATA_COUNT:
@@ -296,7 +312,7 @@ def gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_
     return GGUF_META_TABLE_OK
 
 
-def test_source_contains_iq_1106_symbol_and_parity_checks() -> None:
+def test_source_contains_iq_1117_symbol_and_parity_checks() -> None:
     source = Path("src/gguf/metadata.HC").read_text(encoding="utf-8")
     sig = "I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnly("
     assert source.count(sig) == 1
@@ -305,7 +321,35 @@ def test_source_contains_iq_1106_symbol_and_parity_checks() -> None:
     assert "cursor_snapshot = *cursor;" in body
     assert "if (tag_end_stage != next_cursor_stage)" in body
     assert "if (arch_stage != arch_verify)" in body
+    assert "if ((U8 *)cursor == (U8 *)out_arch_tag" in body
+    assert "if (cursor_ptr_snapshot != cursor ||" in body
     assert "*cursor = next_cursor_stage;" in body
+
+
+def test_pointer_alias_rejected_no_publish() -> None:
+    payload = _kv_string("general.architecture", "llama")
+    cursor = [0]
+    shared = [12345]
+    out_len = [33]
+    out_next = [44]
+
+    status = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_reference(
+        payload,
+        len(payload),
+        cursor,
+        len(payload),
+        1,
+        shared,
+        shared,
+        out_len,
+        out_next,
+    )
+
+    assert status == GGUF_META_TABLE_ERR_BAD_PARAM
+    assert cursor == [0]
+    assert shared == [12345]
+    assert out_len == [33]
+    assert out_next == [44]
 
 
 def test_success_matches_base_and_publishes_once() -> None:
@@ -476,7 +520,8 @@ def test_overflow_guard_rejects_large_metadata_count_no_publish() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_iq_1106_symbol_and_parity_checks()
+    test_source_contains_iq_1117_symbol_and_parity_checks()
+    test_pointer_alias_rejected_no_publish()
     test_success_matches_base_and_publishes_once()
     test_missing_key_returns_not_found_no_publish()
     test_duplicate_priority_rejected_no_publish()
