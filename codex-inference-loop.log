@@ -6,3 +6,9 @@ Loop already running (PID 41785; lock exists: /Users/danielmatthews-ferrero/Docu
 Already on 'main'
 Your branch is up to date with 'origin/main'.
 Loop already running (PID 36320; lock exists: /Users/danielmatthews-ferrero/Documents/local-codebases/holyc-inference/automation/.codex-loop.lock)
+Already on 'main'
+M	MASTER_TASKS.md
+M	src/model/model.HC
+M	tests/test_inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only.py
+Your branch is ahead of 'origin/main' by 1 commit.
+  (use "git push" to publish your local commits)
