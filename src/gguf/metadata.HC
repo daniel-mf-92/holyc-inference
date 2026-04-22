@@ -89,6 +89,18 @@ I32 GGUFMetadataCursorCanAdvanceChecked(U64 cursor,
                                         U64 table_end,
                                         U64 *out_next_cursor);
 
+I32 GGUFMetadataCursorAdvanceChecked(U64 *cursor,
+                                     U64 table_end,
+                                     U32 value_type,
+                                     U64 variable_payload_bytes,
+                                     U64 *out_span_start,
+                                     U64 *out_span_bytes,
+                                     U64 *out_span_end);
+
+I32 GGUFMetadataCursorTypedSpanBytesChecked(U32 value_type,
+                                            U64 variable_payload_bytes,
+                                            U64 *out_span_bytes);
+
 I32 GGUFMetadataReadU8Checked(U8 *buf,
                               U64 buf_nbytes,
                               U64 *cursor,
@@ -1301,6 +1313,158 @@ I32 GGUFMetadataArrayFixedPayloadBytesChecked(U64 elem_count,
 // Compose fixed-width metadata ARRAY payload-byte math and validated payload
 // span bounds in one checked helper for array decode entrypoints.
 // Contract: output pointers are written only on success.
+// Resolve byte width for fixed-width metadata value tags.
+// Variable-width tags (STRING/ARRAY) are rejected and must be routed through
+// cursor advance helpers that receive explicit payload-byte counts.
+I32 GGUFMetadataValueFixedWidthBytesChecked(U32 value_type,
+                                            U64 *out_width_bytes)
+{
+    U64 width_bytes;
+
+    if (!out_width_bytes)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    switch (value_type)
+    {
+        case GGUF_TYPE_UINT8:
+        case GGUF_TYPE_INT8:
+        case GGUF_TYPE_BOOL:
+            width_bytes = 1;
+            break;
+
+        case GGUF_TYPE_UINT16:
+        case GGUF_TYPE_INT16:
+            width_bytes = 2;
+            break;
+
+        case GGUF_TYPE_UINT32:
+        case GGUF_TYPE_INT32:
+        case GGUF_TYPE_FLOAT32:
+            width_bytes = 4;
+            break;
+
+        case GGUF_TYPE_UINT64:
+        case GGUF_TYPE_INT64:
+        case GGUF_TYPE_FLOAT64:
+            width_bytes = 8;
+            break;
+
+        case GGUF_TYPE_STRING:
+        case GGUF_TYPE_ARRAY:
+        default:
+            return GGUF_META_TABLE_ERR_BAD_PARAM;
+    }
+
+    *out_width_bytes = width_bytes;
+    return GGUF_META_TABLE_OK;
+}
+
+// Resolve one metadata value span width in bytes with typed accounting.
+// Fixed-width scalar tags return constant width.
+// STRING: 8-byte length prefix + payload bytes.
+// ARRAY:  4-byte elem_type + 8-byte elem_count + payload bytes.
+// Contract: writes `*out_span_bytes` only on success.
+I32 GGUFMetadataCursorTypedSpanBytesChecked(U32 value_type,
+                                            U64 variable_payload_bytes,
+                                            U64 *out_span_bytes)
+{
+    U64 fixed_width;
+    U64 span_bytes;
+    I32 err;
+
+    if (!out_span_bytes)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    if (variable_payload_bytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    switch (value_type)
+    {
+        case GGUF_TYPE_STRING:
+            // GGUF string encoding: U64 byte length + payload bytes.
+            span_bytes = 8;
+            if (variable_payload_bytes > (0x7FFFFFFFFFFFFFFF - span_bytes))
+                return GGUF_META_TABLE_ERR_OVERFLOW;
+            span_bytes += variable_payload_bytes;
+            break;
+
+        case GGUF_TYPE_ARRAY:
+            // GGUF array encoding: U32 elem_type + U64 elem_count + payload.
+            span_bytes = 12;
+            if (variable_payload_bytes > (0x7FFFFFFFFFFFFFFF - span_bytes))
+                return GGUF_META_TABLE_ERR_OVERFLOW;
+            span_bytes += variable_payload_bytes;
+            break;
+
+        default:
+            // Fixed-width scalar tags do not consume variable payload bytes.
+            // Reject non-zero payload to catch caller type/span mismatches.
+            if (variable_payload_bytes != 0)
+                return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+            err = GGUFMetadataValueFixedWidthBytesChecked(value_type,
+                                                          &fixed_width);
+            if (err != GGUF_META_TABLE_OK)
+                return err;
+            span_bytes = fixed_width;
+            break;
+    }
+
+    if (span_bytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    *out_span_bytes = span_bytes;
+    return GGUF_META_TABLE_OK;
+}
+
+// Advance metadata cursor by one typed value span with explicit no-wrap math.
+// For fixed-width scalar tags, width is resolved from value type.
+// For STRING, span bytes = 8-byte length prefix + payload bytes.
+// For ARRAY,  span bytes = 4-byte elem type + 8-byte elem count + payload bytes.
+// Contract: output pointers and `*cursor` are committed only on success.
+I32 GGUFMetadataCursorAdvanceChecked(U64 *cursor,
+                                     U64 table_end,
+                                     U32 value_type,
+                                     U64 variable_payload_bytes,
+                                     U64 *out_span_start,
+                                     U64 *out_span_bytes,
+                                     U64 *out_span_end)
+{
+    U64 cur;
+    U64 span_bytes;
+    U64 span_end;
+    I32 err;
+
+    if (!cursor || !out_span_start || !out_span_bytes || !out_span_end)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    if (table_end > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    cur = *cursor;
+    if (cur > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    err = GGUFMetadataCursorTypedSpanBytesChecked(value_type,
+                                                  variable_payload_bytes,
+                                                  &span_bytes);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    err = GGUFMetadataCursorCanAdvanceChecked(cur,
+                                              span_bytes,
+                                              table_end,
+                                              &span_end);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    *out_span_start = cur;
+    *out_span_bytes = span_bytes;
+    *out_span_end = span_end;
+    *cursor = span_end;
+    return GGUF_META_TABLE_OK;
+}
+
 I32 GGUFMetadataArrayPayloadSpanFromFixedTypeChecked(U32 elem_type,
                                                      U64 elem_count,
                                                      U64 payload_start,

@@ -13,7 +13,9 @@ CODEX_MAX_RETRIES="${CODEX_MAX_RETRIES:-10}"
 CODEX_RETRY_DELAY_SECONDS="${CODEX_RETRY_DELAY_SECONDS:-20}"
 MAX_ITERATIONS="${MAX_ITERATIONS:-0}"
 LOCK_DIR="${LOCK_DIR:-$REPO_DIR/automation/.codex-loop.lock}"
-LOCK_PID_FILE="$LOCK_DIR/pid"
+LOCK_FILE="${LOCK_FILE:-$LOCK_DIR/.flock}"
+LOCK_PID_FILE="${LOCK_PID_FILE:-$LOCK_DIR/pid}"
+LOCK_FD=""
 HEARTBEAT_FILE="${HEARTBEAT_FILE:-$LOG_DIR/loop.heartbeat}"
 LAST_RESULT_FILE="${LAST_RESULT_FILE:-$LOG_DIR/last-result.txt}"
 LAST_ITERATION_FILE="${LAST_ITERATION_FILE:-$LOG_DIR/last-iteration.txt}"
@@ -176,10 +178,38 @@ init_codex_runner
 build_endpoint_file_list
 
 acquire_lock() {
+  if command -v flock >/dev/null 2>&1; then
+    mkdir -p "$LOCK_DIR"
+    exec {LOCK_FD}>"$LOCK_FILE"
+
+    if ! flock -n "$LOCK_FD"; then
+      local existing_pid=""
+      if [[ -f "$LOCK_PID_FILE" ]]; then
+        existing_pid="$(cat "$LOCK_PID_FILE" 2>/dev/null || true)"
+      fi
+
+      if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+        echo "Loop already running (PID $existing_pid; lock: $LOCK_FILE)"
+      else
+        echo "Loop already running (lock busy: $LOCK_FILE)"
+      fi
+      exit 0
+    fi
+
+    echo "$$" > "$LOCK_PID_FILE"
+    return
+  fi
+
   if mkdir "$LOCK_DIR" 2>/dev/null; then
     echo "$$" > "$LOCK_PID_FILE"
     return
   fi
+
+  local waited=0
+  while [[ ! -f "$LOCK_PID_FILE" && "$waited" -lt 5 ]]; do
+    sleep 1
+    waited=$((waited + 1))
+  done
 
   local existing_pid=""
   if [[ -f "$LOCK_PID_FILE" ]]; then
@@ -204,7 +234,11 @@ cleanup_loop() {
     sleep 2
     kill -KILL "$active_codex_pid" 2>/dev/null || true
   fi
-  rm -rf "$LOCK_DIR" 2>/dev/null || true
+  rm -f "$LOCK_PID_FILE" 2>/dev/null || true
+  if [[ -n "$LOCK_FD" ]]; then
+    eval "exec ${LOCK_FD}>&-"
+    LOCK_FD=""
+  fi
 }
 trap cleanup_loop EXIT INT TERM
 
