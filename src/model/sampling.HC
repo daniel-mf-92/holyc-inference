@@ -1302,6 +1302,237 @@ I32 SamplingTopPSelectCutoffChecked(I64 *probs_q16,
     return SAMPLING_Q16_OK;
 }
 
+// Checked top-p nucleus selector with deterministic cutoff-tie handling.
+//
+// Inputs:
+//   - sorted_probs_q16: probabilities in non-increasing order, sum=1.0_q16.
+//   - sorted_token_ids: token ids aligned 1:1 with sorted_probs_q16 lanes.
+//
+// Selection rule:
+//   - Let cutoff be first lane where cumulative mass >= top_p_q16.
+//   - Include all lanes with prob > cutoff_prob.
+//   - For lanes with prob == cutoff_prob, include exactly as many as needed
+//     to reach (cutoff + 1) lanes, picking lowest token ids first.
+//
+// Deterministic tie-break policy:
+//   - Lower token id wins at cutoff probability boundary.
+//   - Equal token ids are rejected (input must represent unique tokens).
+//
+// No-partial contract:
+//   - out_selected_token_ids and out_selected_count are written only after
+//     full validation + staged deterministic selection completes.
+I32 SamplingTopPSelectCheckedNoPartial(I64 *sorted_probs_q16,
+                                       I64 *sorted_token_ids,
+                                       I64 lane_capacity,
+                                       I64 lane_count,
+                                       I64 top_p_q16,
+                                       I64 *out_selected_token_ids,
+                                       I64 out_selected_capacity,
+                                       I64 *out_selected_count)
+{
+    I64 lane_index;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 lane_prob_q16;
+    I64 lane_token_id;
+    I64 prev_prob_q16;
+    I64 cumulative_q16;
+    I64 prev_cumulative_q16;
+    I64 cutoff_index;
+    I64 required_count;
+    I64 cutoff_prob_q16;
+    I64 strict_count;
+    I64 tie_start;
+    I64 tie_end;
+    I64 tie_bucket_count;
+    I64 tie_needed;
+    I64 staged_bytes;
+    I64 used_bytes;
+    I64 pick_index;
+    I64 candidate_index;
+    I64 best_token_id;
+    I64 best_candidate_offset;
+    I64 token_id_candidate;
+    I64 *staged_selected_ids;
+    I64 *tie_used_flags;
+
+    if (!sorted_probs_q16 || !sorted_token_ids)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+    if (!out_selected_token_ids || !out_selected_count)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (lane_capacity < 0 || lane_count < 0 || out_selected_capacity < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (!lane_count)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (lane_count > lane_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (top_p_q16 <= 0 || top_p_q16 > SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    last_index = lane_count - 1;
+    if (last_index > 0x0FFFFFFFFFFFFFFF)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)sorted_probs_q16 > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+        return SAMPLING_Q16_ERR_OVERFLOW;
+    if ((U64)sorted_token_ids > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    cumulative_q16 = 0;
+    prev_cumulative_q16 = 0;
+    prev_prob_q16 = SAMPLING_Q16_ONE;
+    cutoff_index = -1;
+
+    for (lane_index = 0; lane_index < lane_count; lane_index++)
+    {
+        lane_prob_q16 = sorted_probs_q16[lane_index];
+        lane_token_id = sorted_token_ids[lane_index];
+
+        if (lane_prob_q16 < 0 || lane_prob_q16 > SAMPLING_Q16_ONE)
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+        if (lane_token_id < 0)
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+
+        if (lane_prob_q16 > prev_prob_q16)
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+
+        if (lane_prob_q16 > (0x7FFFFFFFFFFFFFFF - cumulative_q16))
+            return SAMPLING_Q16_ERR_OVERFLOW;
+        cumulative_q16 += lane_prob_q16;
+        if (cumulative_q16 < prev_cumulative_q16)
+            return SAMPLING_Q16_ERR_OVERFLOW;
+        if (cumulative_q16 > SAMPLING_Q16_ONE)
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+
+        if (cutoff_index < 0 && cumulative_q16 >= top_p_q16)
+            cutoff_index = lane_index;
+
+        prev_prob_q16 = lane_prob_q16;
+        prev_cumulative_q16 = cumulative_q16;
+    }
+
+    if (cumulative_q16 != SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (cutoff_index < 0)
+        cutoff_index = lane_count - 1;
+
+    if (cutoff_index > (0x7FFFFFFFFFFFFFFF - 1))
+        return SAMPLING_Q16_ERR_OVERFLOW;
+    required_count = cutoff_index + 1;
+
+    if (required_count > out_selected_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (required_count)
+    {
+        last_index = required_count - 1;
+        if (last_index > 0x0FFFFFFFFFFFFFFF)
+            return SAMPLING_Q16_ERR_OVERFLOW;
+
+        last_byte_offset = last_index << 3;
+        if ((U64)out_selected_token_ids > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+            return SAMPLING_Q16_ERR_OVERFLOW;
+    }
+
+    cutoff_prob_q16 = sorted_probs_q16[cutoff_index];
+    strict_count = 0;
+    while (strict_count < lane_count && sorted_probs_q16[strict_count] > cutoff_prob_q16)
+        strict_count++;
+
+    tie_start = strict_count;
+    tie_end = tie_start;
+    while (tie_end < lane_count && sorted_probs_q16[tie_end] == cutoff_prob_q16)
+        tie_end++;
+
+    if (tie_end < tie_start)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+    tie_bucket_count = tie_end - tie_start;
+
+    if (required_count < strict_count)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    tie_needed = required_count - strict_count;
+    if (tie_needed < 0 || tie_needed > tie_bucket_count)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (required_count > 0x0FFFFFFFFFFFFFFF)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+    staged_bytes = required_count << 3;
+
+    if (tie_bucket_count > 0x0FFFFFFFFFFFFFFF)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+    used_bytes = tie_bucket_count << 3;
+
+    staged_selected_ids = MAlloc(staged_bytes);
+    if (!staged_selected_ids)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    tie_used_flags = MAlloc(used_bytes);
+    if (!tie_used_flags)
+    {
+        Free(staged_selected_ids);
+        return SAMPLING_Q16_ERR_NULL_PTR;
+    }
+
+    for (lane_index = 0; lane_index < tie_bucket_count; lane_index++)
+        tie_used_flags[lane_index] = 0;
+
+    for (lane_index = 0; lane_index < strict_count; lane_index++)
+        staged_selected_ids[lane_index] = sorted_token_ids[lane_index];
+
+    for (pick_index = 0; pick_index < tie_needed; pick_index++)
+    {
+        best_token_id = 0x7FFFFFFFFFFFFFFF;
+        best_candidate_offset = -1;
+
+        for (candidate_index = 0; candidate_index < tie_bucket_count; candidate_index++)
+        {
+            if (tie_used_flags[candidate_index])
+                continue;
+
+            token_id_candidate = sorted_token_ids[tie_start + candidate_index];
+            if (token_id_candidate < 0)
+            {
+                Free(tie_used_flags);
+                Free(staged_selected_ids);
+                return SAMPLING_Q16_ERR_BAD_PARAM;
+            }
+
+            if (token_id_candidate < best_token_id)
+            {
+                best_token_id = token_id_candidate;
+                best_candidate_offset = candidate_index;
+            }
+            else if (token_id_candidate == best_token_id)
+            {
+                Free(tie_used_flags);
+                Free(staged_selected_ids);
+                return SAMPLING_Q16_ERR_BAD_PARAM;
+            }
+        }
+
+        if (best_candidate_offset < 0)
+        {
+            Free(tie_used_flags);
+            Free(staged_selected_ids);
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+        }
+
+        tie_used_flags[best_candidate_offset] = 1;
+        staged_selected_ids[strict_count + pick_index] = best_token_id;
+    }
+
+    for (lane_index = 0; lane_index < required_count; lane_index++)
+        out_selected_token_ids[lane_index] = staged_selected_ids[lane_index];
+    *out_selected_count = required_count;
+
+    Free(tie_used_flags);
+    Free(staged_selected_ids);
+    return SAMPLING_Q16_OK;
+}
+
 // Checked in-place repetition-penalty pass over logits using token history.
 //
 // Integer penalty rule (Q16):
