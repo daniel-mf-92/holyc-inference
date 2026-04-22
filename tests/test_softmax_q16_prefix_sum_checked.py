@@ -89,6 +89,7 @@ def test_source_contains_iq1134_function_and_correction_paths() -> None:
     assert "if (diff_q16 > 0)" in body
     assert "else if (diff_q16 < 0)" in body
     assert "for (i = lane_count - 1; i >= 0; i--)" in body
+    assert "// Preflight source lanes and total before any output write." in body
     assert "if (running_sum_q16 != FP_Q16_ONE)" in body
 
 
@@ -131,6 +132,22 @@ def test_negative_diff_reverse_borrow() -> None:
     assert total == FP_Q16_ONE
 
 
+def test_negative_diff_reverse_borrow_spills_across_multiple_tail_lanes() -> None:
+    probs = [50_000, 30_000, 1_000]
+    status, out, total = fpq16_softmax_prefix_sum_checked_reference(probs, len(probs))
+    assert status == FP_Q16_OK
+    assert out == [50_000, FP_Q16_ONE, FP_Q16_ONE]
+    assert total == FP_Q16_ONE
+
+
+def test_positive_diff_injects_entire_remainder_into_tail_lane_only() -> None:
+    probs = [10_000, 12_000, 13_000]
+    status, out, total = fpq16_softmax_prefix_sum_checked_reference(probs, len(probs))
+    assert status == FP_Q16_OK
+    assert out == [10_000, 22_000, FP_Q16_ONE]
+    assert total == FP_Q16_ONE
+
+
 def test_negative_input_and_sum_overflow_rejected() -> None:
     status, _, _ = fpq16_softmax_prefix_sum_checked_reference([1, -1], 2)
     assert status == FP_Q16_ERR_BAD_PARAM
@@ -162,6 +179,8 @@ def run() -> None:
     test_exact_one_passthrough()
     test_positive_diff_tail_injection()
     test_negative_diff_reverse_borrow()
+    test_negative_diff_reverse_borrow_spills_across_multiple_tail_lanes()
+    test_positive_diff_injects_entire_remainder_into_tail_lane_only()
     test_negative_input_and_sum_overflow_rejected()
     test_randomized_invariants()
     print("softmax_q16_prefix_sum_checked_reference_checks=ok")
