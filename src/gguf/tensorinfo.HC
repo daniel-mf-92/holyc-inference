@@ -1134,23 +1134,48 @@ I64 GGUFTensorInfoReadCheckedNoPartialCommitOnlyPreflightOnly(
     U64 dims_bytes;
     U64 computed_end;
     I64 status;
+    U8 *out_name_len_ptr;
+    U8 *out_dim_count_ptr;
+    U8 *out_dims_cells_ptr;
+    U8 *out_required_bytes_ptr;
+    U8 *out_type_value_ptr;
+    U8 *out_tensor_offset_ptr;
+    U8 *out_next_cursor_ptr;
 
     if (!buf || !out_name_len || !out_dim_count || !out_dims_cells)
         return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
     if (!out_required_bytes || !out_type_value || !out_tensor_offset || !out_next_cursor)
         return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
 
-    if (out_name_len == out_dims_cells ||
-        out_name_len == out_required_bytes ||
-        out_name_len == out_tensor_offset ||
-        out_name_len == out_next_cursor ||
-        out_dim_count == out_type_value ||
-        out_dims_cells == out_required_bytes ||
-        out_dims_cells == out_tensor_offset ||
-        out_dims_cells == out_next_cursor ||
-        out_required_bytes == out_tensor_offset ||
-        out_required_bytes == out_next_cursor ||
-        out_tensor_offset == out_next_cursor)
+    out_name_len_ptr = (U8 *)out_name_len;
+    out_dim_count_ptr = (U8 *)out_dim_count;
+    out_dims_cells_ptr = (U8 *)out_dims_cells;
+    out_required_bytes_ptr = (U8 *)out_required_bytes;
+    out_type_value_ptr = (U8 *)out_type_value;
+    out_tensor_offset_ptr = (U8 *)out_tensor_offset;
+    out_next_cursor_ptr = (U8 *)out_next_cursor;
+
+    if (out_name_len_ptr == out_dim_count_ptr ||
+        out_name_len_ptr == out_dims_cells_ptr ||
+        out_name_len_ptr == out_required_bytes_ptr ||
+        out_name_len_ptr == out_type_value_ptr ||
+        out_name_len_ptr == out_tensor_offset_ptr ||
+        out_name_len_ptr == out_next_cursor_ptr ||
+        out_dim_count_ptr == out_dims_cells_ptr ||
+        out_dim_count_ptr == out_required_bytes_ptr ||
+        out_dim_count_ptr == out_type_value_ptr ||
+        out_dim_count_ptr == out_tensor_offset_ptr ||
+        out_dim_count_ptr == out_next_cursor_ptr ||
+        out_dims_cells_ptr == out_required_bytes_ptr ||
+        out_dims_cells_ptr == out_type_value_ptr ||
+        out_dims_cells_ptr == out_tensor_offset_ptr ||
+        out_dims_cells_ptr == out_next_cursor_ptr ||
+        out_required_bytes_ptr == out_type_value_ptr ||
+        out_required_bytes_ptr == out_tensor_offset_ptr ||
+        out_required_bytes_ptr == out_next_cursor_ptr ||
+        out_type_value_ptr == out_tensor_offset_ptr ||
+        out_type_value_ptr == out_next_cursor_ptr ||
+        out_tensor_offset_ptr == out_next_cursor_ptr)
         return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
 
     if (cursor > size)
