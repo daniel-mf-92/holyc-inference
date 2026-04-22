@@ -993,6 +993,18 @@ I32 GGUFMetadataArrayReadF32BitsChecked(U8 *buf,
                                         U32 *out_bits,
                                         U64 out_bits_capacity);
 
+I32 GGUFMetadataValueSkipChecked(U8 *buf,
+                                 U64 buf_nbytes,
+                                 U64 *cursor,
+                                 U64 table_end,
+                                 U32 value_type);
+
+I32 GGUFMetadataSkipValuePayloadChecked(U8 *buf,
+                                        U64 buf_nbytes,
+                                        U64 *cursor,
+                                        U64 table_end,
+                                        U32 value_type);
+
 I32 GGUFMetadataArrayPayloadSpanValidateChecked(U64 payload_start,
                                                 U64 payload_bytes,
                                                 U64 table_end,
@@ -5750,24 +5762,33 @@ I32 GGUFMetadataArrayReadF32BitsChecked(U8 *buf,
     return GGUF_META_TABLE_OK;
 }
 
-// Checked metadata value payload skipper used by key-span scanners.
-// Contract: advances `*cursor` over exactly one payload for `value_type`
-// (the value tag itself is read by the caller), committing cursor only on full
-// success.
-I32 GGUFMetadataSkipValuePayloadChecked(U8 *buf,
-                                        U64 buf_nbytes,
-                                        U64 *cursor,
-                                        U64 table_end,
-                                        U32 value_type)
+// Checked metadata value skipper used by key-span scanners and metadata table
+// walkers. The caller has already consumed the `value_type` tag; this helper
+// advances `*cursor` over exactly one encoded value payload.
+//
+// Contract: strict no-partial cursor semantics. `*cursor` commits only after
+// complete value-span validation and skip succeed.
+I32 GGUFMetadataValueSkipChecked(U8 *buf,
+                                 U64 buf_nbytes,
+                                 U64 *cursor,
+                                 U64 table_end,
+                                 U32 value_type)
 {
     U64 cur;
+    U64 span_start;
+    U64 span_bytes;
+    U64 span_end;
     U64 next_cursor;
     U32 elem_type;
     U64 elem_count;
     U64 payload_bytes;
     U64 payload_end;
     U64 i;
+    U64 lane_start;
+    U64 lane_payload_cursor;
+    U64 lane_len_cursor;
     U64 str_len;
+    U64 arr_cursor;
     I32 err;
 
     if (!buf || !cursor)
@@ -5787,82 +5808,63 @@ I32 GGUFMetadataSkipValuePayloadChecked(U8 *buf,
         case GGUF_TYPE_UINT8:
         case GGUF_TYPE_INT8:
         case GGUF_TYPE_BOOL:
-            err = GGUFMetadataCursorCanAdvanceChecked(cur,
-                                                      1,
-                                                      table_end,
-                                                      &next_cursor);
-            if (err != GGUF_META_TABLE_OK)
-                return err;
-            if (next_cursor > buf_nbytes)
-                return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
-            *cursor = next_cursor;
-            return GGUF_META_TABLE_OK;
-
         case GGUF_TYPE_UINT16:
         case GGUF_TYPE_INT16:
-            err = GGUFMetadataCursorCanAdvanceChecked(cur,
-                                                      2,
-                                                      table_end,
-                                                      &next_cursor);
-            if (err != GGUF_META_TABLE_OK)
-                return err;
-            if (next_cursor > buf_nbytes)
-                return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
-            *cursor = next_cursor;
-            return GGUF_META_TABLE_OK;
-
         case GGUF_TYPE_UINT32:
         case GGUF_TYPE_INT32:
         case GGUF_TYPE_FLOAT32:
-            err = GGUFMetadataCursorCanAdvanceChecked(cur,
-                                                      4,
-                                                      table_end,
-                                                      &next_cursor);
-            if (err != GGUF_META_TABLE_OK)
-                return err;
-            if (next_cursor > buf_nbytes)
-                return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
-            *cursor = next_cursor;
-            return GGUF_META_TABLE_OK;
-
         case GGUF_TYPE_UINT64:
         case GGUF_TYPE_INT64:
         case GGUF_TYPE_FLOAT64:
-            err = GGUFMetadataCursorCanAdvanceChecked(cur,
-                                                      8,
-                                                      table_end,
-                                                      &next_cursor);
+            err = GGUFMetadataCursorAdvanceChecked(&cur,
+                                                   table_end,
+                                                   value_type,
+                                                   0,
+                                                   &span_start,
+                                                   &span_bytes,
+                                                   &span_end);
             if (err != GGUF_META_TABLE_OK)
                 return err;
-            if (next_cursor > buf_nbytes)
+            if (span_end > buf_nbytes)
                 return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
-            *cursor = next_cursor;
+            *cursor = span_end;
             return GGUF_META_TABLE_OK;
 
         case GGUF_TYPE_STRING:
+            lane_start = cur;
+            lane_len_cursor = lane_start;
+
             err = GGUFMetadataReadStringLenU64Checked(buf,
                                                       buf_nbytes,
-                                                      &cur,
+                                                      &lane_len_cursor,
                                                       table_end,
                                                       &str_len);
             if (err != GGUF_META_TABLE_OK)
                 return err;
 
-            err = GGUFMetadataCursorCanAdvanceChecked(cur,
-                                                      str_len,
-                                                      table_end,
-                                                      &next_cursor);
+            err = GGUFMetadataCursorAdvanceChecked(&lane_start,
+                                                   table_end,
+                                                   GGUF_TYPE_STRING,
+                                                   str_len,
+                                                   &span_start,
+                                                   &span_bytes,
+                                                   &span_end);
             if (err != GGUF_META_TABLE_OK)
                 return err;
-            if (next_cursor > buf_nbytes)
+            if (lane_len_cursor > span_end)
+                return GGUF_META_TABLE_ERR_OVERFLOW;
+            if (lane_len_cursor + str_len != span_end)
+                return GGUF_META_TABLE_ERR_OVERFLOW;
+            if (span_end > buf_nbytes)
                 return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
-            *cursor = next_cursor;
+            *cursor = span_end;
             return GGUF_META_TABLE_OK;
 
         case GGUF_TYPE_ARRAY:
+            arr_cursor = cur;
             err = GGUFMetadataReadArrayHeaderChecked(buf,
                                                      buf_nbytes,
-                                                     &cur,
+                                                     &arr_cursor,
                                                      table_end,
                                                      &elem_type,
                                                      &elem_count);
@@ -5884,42 +5886,85 @@ I32 GGUFMetadataSkipValuePayloadChecked(U8 *buf,
                 case GGUF_TYPE_BOOL:
                     err = GGUFMetadataArrayPayloadSpanFromFixedTypeAtCursorChecked(elem_type,
                                                                                     elem_count,
-                                                                                    &cur,
+                                                                                    &arr_cursor,
                                                                                     table_end,
                                                                                     buf_nbytes,
                                                                                     &payload_bytes,
                                                                                     &payload_end);
                     if (err != GGUF_META_TABLE_OK)
                         return err;
-                    if (payload_end < cur)
+                    if (payload_end < arr_cursor)
                         return GGUF_META_TABLE_ERR_OVERFLOW;
-                    if (payload_bytes != payload_end - cur)
+                    if (payload_bytes != payload_end - arr_cursor)
                         return GGUF_META_TABLE_ERR_OVERFLOW;
-                    *cursor = payload_end;
+
+                    err = GGUFMetadataCursorAdvanceChecked(&cur,
+                                                           table_end,
+                                                           GGUF_TYPE_ARRAY,
+                                                           payload_bytes,
+                                                           &span_start,
+                                                           &span_bytes,
+                                                           &span_end);
+                    if (err != GGUF_META_TABLE_OK)
+                        return err;
+                    if (span_end != payload_end)
+                        return GGUF_META_TABLE_ERR_OVERFLOW;
+                    if (span_end > buf_nbytes)
+                        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+                    *cursor = span_end;
                     return GGUF_META_TABLE_OK;
 
                 case GGUF_TYPE_STRING:
+                    lane_payload_cursor = arr_cursor;
                     for (i = 0; i < elem_count; ++i)
                     {
+                        lane_start = lane_payload_cursor;
+                        lane_len_cursor = lane_payload_cursor;
+
                         err = GGUFMetadataReadStringLenU64Checked(buf,
                                                                   buf_nbytes,
-                                                                  &cur,
+                                                                  &lane_len_cursor,
                                                                   table_end,
                                                                   &str_len);
                         if (err != GGUF_META_TABLE_OK)
                             return err;
 
-                        err = GGUFMetadataCursorCanAdvanceChecked(cur,
-                                                                  str_len,
-                                                                  table_end,
-                                                                  &next_cursor);
+                        err = GGUFMetadataCursorAdvanceChecked(&lane_start,
+                                                               table_end,
+                                                               GGUF_TYPE_STRING,
+                                                               str_len,
+                                                               &span_start,
+                                                               &span_bytes,
+                                                               &span_end);
                         if (err != GGUF_META_TABLE_OK)
                             return err;
-                        if (next_cursor > buf_nbytes)
+                        if (lane_len_cursor > span_end)
+                            return GGUF_META_TABLE_ERR_OVERFLOW;
+                        if (lane_len_cursor + str_len != span_end)
+                            return GGUF_META_TABLE_ERR_OVERFLOW;
+                        if (span_end > buf_nbytes)
                             return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
-                        cur = next_cursor;
+                        lane_payload_cursor = span_end;
                     }
-                    *cursor = cur;
+
+                    if (lane_payload_cursor < arr_cursor)
+                        return GGUF_META_TABLE_ERR_OVERFLOW;
+                    payload_bytes = lane_payload_cursor - arr_cursor;
+
+                    err = GGUFMetadataCursorAdvanceChecked(&cur,
+                                                           table_end,
+                                                           GGUF_TYPE_ARRAY,
+                                                           payload_bytes,
+                                                           &span_start,
+                                                           &span_bytes,
+                                                           &span_end);
+                    if (err != GGUF_META_TABLE_OK)
+                        return err;
+                    if (span_end != lane_payload_cursor)
+                        return GGUF_META_TABLE_ERR_OVERFLOW;
+                    if (span_end > buf_nbytes)
+                        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+                    *cursor = span_end;
                     return GGUF_META_TABLE_OK;
             }
 
@@ -5927,6 +5972,21 @@ I32 GGUFMetadataSkipValuePayloadChecked(U8 *buf,
     }
 
     return GGUF_META_TABLE_ERR_BAD_PARAM;
+}
+
+// Backward-compatible alias retained while callers migrate to
+// GGUFMetadataValueSkipChecked.
+I32 GGUFMetadataSkipValuePayloadChecked(U8 *buf,
+                                        U64 buf_nbytes,
+                                        U64 *cursor,
+                                        U64 table_end,
+                                        U32 value_type)
+{
+    return GGUFMetadataValueSkipChecked(buf,
+                                        buf_nbytes,
+                                        cursor,
+                                        table_end,
+                                        value_type);
 }
 
 // Scan bounded metadata KVs for one exact key and return key/value span
@@ -6051,7 +6111,7 @@ I32 GGUFMetadataFindKeySpanCheckedNoPartial(U8 *buf,
         if (!GGUFMetaTypeSupported(value_type))
             return GGUF_META_TABLE_ERR_BAD_PARAM;
 
-        err = GGUFMetadataSkipValuePayloadChecked(buf,
+        err = GGUFMetadataValueSkipChecked(buf,
                                                   buf_nbytes,
                                                   &scan_cursor,
                                                   table_end,
@@ -6323,7 +6383,7 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartial(U8 *buf,
                                                   &priority);
         if (err == GGUF_META_PARSE_ERR_NOT_FOUND)
         {
-            err = GGUFMetadataSkipValuePayloadChecked(buf,
+            err = GGUFMetadataValueSkipChecked(buf,
                                                       buf_nbytes,
                                                       &scan_cursor,
                                                       table_end,
@@ -6560,7 +6620,7 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartial(U8 *buf,
 
         if (!key_match)
         {
-            err = GGUFMetadataSkipValuePayloadChecked(buf,
+            err = GGUFMetadataValueSkipChecked(buf,
                                                       buf_nbytes,
                                                       &scan_cursor,
                                                       table_end,
