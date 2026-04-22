@@ -54,6 +54,18 @@ def attention_q16_compute_scaled_qk_rows_checked_default_stride_nopartial_commit
     if staged_scores_q32 is None or out_scores_q32 is None:
         return ATTN_Q16_ERR_NULL_PTR
 
+    if (
+        out_required_stage_cells is staged_scores_q32
+        or out_required_stage_cells is out_scores_q32
+        or out_required_stage_bytes is staged_scores_q32
+        or out_required_stage_bytes is out_scores_q32
+        or out_required_out_cells is staged_scores_q32
+        or out_required_out_cells is out_scores_q32
+        or out_last_out_index is staged_scores_q32
+        or out_last_out_index is out_scores_q32
+    ):
+        return ATTN_Q16_ERR_BAD_PARAM
+
     if query_row_count < 0 or token_count < 0:
         return ATTN_Q16_ERR_BAD_PARAM
     if staged_scores_capacity < 0 or out_scores_capacity < 0:
