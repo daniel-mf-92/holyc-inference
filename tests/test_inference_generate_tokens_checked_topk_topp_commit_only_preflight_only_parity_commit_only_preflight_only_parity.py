@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity-preflight harness for InferenceGenerateTokens...ParityCommitOnlyPreflightOnly (IQ-1076)."""
+"""Parity harness for InferenceGenerateTokens...ParityCommitOnlyPreflightOnlyParity (IQ-1079)."""
 
 from __future__ import annotations
 
@@ -10,21 +10,20 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent))
 
 from test_inference_generate_tokens_checked_topk_default import SAMPLING_Q16_ONE
-from test_inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity import (
-    inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_reference,
-)
 from test_inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only import (
     inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_reference,
+)
+from test_inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only import (
+    inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_reference,
 )
 from test_inference_generate_tokens_preflight_checked import (
     SAMPLING_Q16_ERR_BAD_PARAM,
     SAMPLING_Q16_ERR_NULL_PTR,
-    SAMPLING_Q16_ERR_OVERFLOW,
     SAMPLING_Q16_OK,
 )
 
 
-def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
+def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference(
     *,
     step_logits_q16: list[int] | None,
     step_logits_capacity: int,
@@ -50,8 +49,8 @@ def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parit
     out_required_logits: list[int] | None,
     out_required_tokens: list[int] | None,
     out_final_token_count: list[int] | None,
+    preflight_only_fn=inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_reference,
     commit_only_fn=inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_reference,
-    parity_fn=inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_reference,
 ) -> int:
     if (
         out_required_logits is None
@@ -65,26 +64,6 @@ def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parit
         or out_required_logits is out_final_token_count
         or out_required_tokens is out_final_token_count
     ):
-        return SAMPLING_Q16_ERR_BAD_PARAM
-
-    if (
-        step_logits_q16 is None
-        or token_history is None
-        or random_q16_values is None
-        or workspace_stage_logits_q16 is None
-        or workspace_topk_logits_q16 is None
-        or workspace_topk_indices is None
-        or out_generated_tokens is None
-    ):
-        return SAMPLING_Q16_ERR_NULL_PTR
-
-    if temperature_q16 <= 0:
-        return SAMPLING_Q16_ERR_BAD_PARAM
-    if repetition_penalty_q16 < SAMPLING_Q16_ONE:
-        return SAMPLING_Q16_ERR_BAD_PARAM
-    if top_k <= 0 or top_k > vocab_size:
-        return SAMPLING_Q16_ERR_BAD_PARAM
-    if top_p_q16 <= 0 or top_p_q16 > SAMPLING_Q16_ONE:
         return SAMPLING_Q16_ERR_BAD_PARAM
 
     snapshot_step_logits_capacity = step_logits_capacity
@@ -113,13 +92,42 @@ def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parit
     snapshot_out_required_tokens = out_required_tokens
     snapshot_out_final_token_count = out_final_token_count
 
-    staged_required_logits = [out_required_logits[0]]
-    staged_required_tokens = [out_required_tokens[0]]
-    staged_final_token_count = [out_final_token_count[0]]
+    staged_preflight_required_logits = [0]
+    staged_preflight_required_tokens = [0]
+    staged_preflight_final_token_count = [0]
 
-    canonical_required_logits = [out_required_logits[0]]
-    canonical_required_tokens = [out_required_tokens[0]]
-    canonical_final_token_count = [out_final_token_count[0]]
+    staged_commit_required_logits = [0]
+    staged_commit_required_tokens = [0]
+    staged_commit_final_token_count = [0]
+
+    status = preflight_only_fn(
+        step_logits_q16=step_logits_q16,
+        step_logits_capacity=step_logits_capacity,
+        vocab_size=vocab_size,
+        max_new_tokens=max_new_tokens,
+        token_history=token_history,
+        token_history_capacity=token_history_capacity,
+        token_history_count=token_history_count,
+        temperature_q16=temperature_q16,
+        top_k=top_k,
+        top_p_q16=top_p_q16,
+        repetition_penalty_q16=repetition_penalty_q16,
+        random_q16_values=random_q16_values,
+        random_q16_capacity=random_q16_capacity,
+        workspace_stage_logits_q16=workspace_stage_logits_q16,
+        workspace_stage_logits_capacity=workspace_stage_logits_capacity,
+        workspace_topk_logits_q16=workspace_topk_logits_q16,
+        workspace_topk_logits_capacity=workspace_topk_logits_capacity,
+        workspace_topk_indices=workspace_topk_indices,
+        workspace_topk_index_capacity=workspace_topk_index_capacity,
+        out_generated_tokens=out_generated_tokens,
+        generated_capacity=generated_capacity,
+        out_required_logits=staged_preflight_required_logits,
+        out_required_tokens=staged_preflight_required_tokens,
+        out_final_token_count=staged_preflight_final_token_count,
+    )
+    if status != SAMPLING_Q16_OK:
+        return status
 
     status = commit_only_fn(
         step_logits_q16=step_logits_q16,
@@ -143,38 +151,9 @@ def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parit
         workspace_topk_index_capacity=workspace_topk_index_capacity,
         out_generated_tokens=out_generated_tokens,
         generated_capacity=generated_capacity,
-        out_required_logits=staged_required_logits,
-        out_required_tokens=staged_required_tokens,
-        out_final_token_count=staged_final_token_count,
-    )
-    if status != SAMPLING_Q16_OK:
-        return status
-
-    status = parity_fn(
-        step_logits_q16=step_logits_q16,
-        step_logits_capacity=step_logits_capacity,
-        vocab_size=vocab_size,
-        max_new_tokens=max_new_tokens,
-        token_history=token_history,
-        token_history_capacity=token_history_capacity,
-        token_history_count=token_history_count,
-        temperature_q16=temperature_q16,
-        top_k=top_k,
-        top_p_q16=top_p_q16,
-        repetition_penalty_q16=repetition_penalty_q16,
-        random_q16_values=random_q16_values,
-        random_q16_capacity=random_q16_capacity,
-        workspace_stage_logits_q16=workspace_stage_logits_q16,
-        workspace_stage_logits_capacity=workspace_stage_logits_capacity,
-        workspace_topk_logits_q16=workspace_topk_logits_q16,
-        workspace_topk_logits_capacity=workspace_topk_logits_capacity,
-        workspace_topk_indices=workspace_topk_indices,
-        workspace_topk_index_capacity=workspace_topk_index_capacity,
-        out_generated_tokens=out_generated_tokens,
-        generated_capacity=generated_capacity,
-        out_required_logits=canonical_required_logits,
-        out_required_tokens=canonical_required_tokens,
-        out_final_token_count=canonical_final_token_count,
+        out_required_logits=staged_commit_required_logits,
+        out_required_tokens=staged_commit_required_tokens,
+        out_final_token_count=staged_commit_final_token_count,
     )
     if status != SAMPLING_Q16_OK:
         return status
@@ -212,66 +191,58 @@ def inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parit
         return SAMPLING_Q16_ERR_BAD_PARAM
 
     if (
-        out_required_logits is out_required_tokens
-        or out_required_logits is out_final_token_count
-        or out_required_tokens is out_final_token_count
+        staged_preflight_required_logits[0] != staged_commit_required_logits[0]
+        or staged_preflight_required_tokens[0] != staged_commit_required_tokens[0]
+        or staged_preflight_final_token_count[0] != staged_commit_final_token_count[0]
     ):
         return SAMPLING_Q16_ERR_BAD_PARAM
 
-    if staged_required_logits[0] != canonical_required_logits[0]:
-        return SAMPLING_Q16_ERR_BAD_PARAM
-    if staged_required_tokens[0] != canonical_required_tokens[0]:
-        return SAMPLING_Q16_ERR_BAD_PARAM
-    if staged_final_token_count[0] != canonical_final_token_count[0]:
-        return SAMPLING_Q16_ERR_BAD_PARAM
-
-    out_required_logits[0] = staged_required_logits[0]
-    out_required_tokens[0] = staged_required_tokens[0]
-    out_final_token_count[0] = staged_final_token_count[0]
+    out_required_logits[0] = staged_preflight_required_logits[0]
+    out_required_tokens[0] = staged_preflight_required_tokens[0]
+    out_final_token_count[0] = staged_preflight_final_token_count[0]
     return SAMPLING_Q16_OK
 
 
-def test_source_contains_iq_1076_symbol() -> None:
+def test_source_contains_iq_1079_symbol() -> None:
     source = Path("src/model/sampling.HC").read_text(encoding="utf-8")
     signature = (
         "I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnly"
-        "ParityCommitOnlyPreflightOnly("
+        "ParityCommitOnlyPreflightOnlyParity("
     )
     assert signature in source
     body = source[source.index(signature):]
+    assert "status = InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in body
     assert "status = InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParityCommitOnly(" in body
-    assert "status = InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParity(" in body
-    assert "if (staged_commit_required_logits != staged_parity_required_logits ||" in body
-    assert "if (staged_commit_required_logits != recomputed_required_logits ||" in body
+    assert "if (staged_preflight_required_logits != staged_commit_required_logits ||" in body
     assert "snapshot_out_final_token_count != out_final_token_count" in body
 
 
 def test_known_vector_success() -> None:
-    out_required_logits = [41]
-    out_required_tokens = [42]
-    out_final_token_count = [43]
+    out_required_logits = [11]
+    out_required_tokens = [12]
+    out_final_token_count = [13]
 
     status = (
-        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
-            step_logits_q16=[0] * 128,
-            step_logits_capacity=128,
-            vocab_size=32,
+        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference(
+            step_logits_q16=[0] * 64,
+            step_logits_capacity=64,
+            vocab_size=16,
             max_new_tokens=4,
-            token_history=[1] * 20,
-            token_history_capacity=20,
-            token_history_count=16,
+            token_history=[0] * 16,
+            token_history_capacity=16,
+            token_history_count=8,
             temperature_q16=SAMPLING_Q16_ONE,
             top_k=16,
             top_p_q16=SAMPLING_Q16_ONE,
             repetition_penalty_q16=SAMPLING_Q16_ONE,
             random_q16_values=[0, 1, 2, 3],
             random_q16_capacity=4,
-            workspace_stage_logits_q16=[0] * 32,
-            workspace_stage_logits_capacity=32,
-            workspace_topk_logits_q16=[0] * 32,
-            workspace_topk_logits_capacity=32,
-            workspace_topk_indices=[0] * 32,
-            workspace_topk_index_capacity=32,
+            workspace_stage_logits_q16=[0] * 16,
+            workspace_stage_logits_capacity=16,
+            workspace_topk_logits_q16=[0] * 16,
+            workspace_topk_logits_capacity=16,
+            workspace_topk_indices=[0] * 16,
+            workspace_topk_index_capacity=16,
             out_generated_tokens=[0] * 4,
             generated_capacity=4,
             out_required_logits=out_required_logits,
@@ -281,9 +252,9 @@ def test_known_vector_success() -> None:
     )
 
     assert status == SAMPLING_Q16_OK
-    assert out_required_logits == [128]
+    assert out_required_logits == [64]
     assert out_required_tokens == [4]
-    assert out_final_token_count == [20]
+    assert out_final_token_count == [12]
 
 
 def test_bad_param_no_publish() -> None:
@@ -292,7 +263,7 @@ def test_bad_param_no_publish() -> None:
     out_final_token_count = [103]
 
     status = (
-        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
+        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference(
             step_logits_q16=[0] * 16,
             step_logits_capacity=16,
             vocab_size=8,
@@ -326,30 +297,28 @@ def test_bad_param_no_publish() -> None:
     assert out_final_token_count == [103]
 
 
-def test_commit_mismatch_no_publish() -> None:
+def test_no_publish_when_commit_tuple_mismatch() -> None:
     out_required_logits = [201]
     out_required_tokens = [202]
     out_final_token_count = [203]
 
-    def _bad_commit(**kwargs: int) -> int:
-        status = inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_reference(
-            **kwargs
-        )
-        if status == SAMPLING_Q16_OK:
-            kwargs["out_required_tokens"][0] += 1
-        return status
+    def _bad_commit(**_kwargs: int) -> int:
+        _kwargs["out_required_logits"][0] += 1
+        _kwargs["out_required_tokens"][0] += 2
+        _kwargs["out_final_token_count"][0] += 3
+        return SAMPLING_Q16_OK
 
     status = (
-        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
+        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference(
             step_logits_q16=[0] * 64,
             step_logits_capacity=64,
             vocab_size=16,
             max_new_tokens=4,
-            token_history=[0] * 12,
-            token_history_capacity=12,
+            token_history=[0] * 16,
+            token_history_capacity=16,
             token_history_count=8,
             temperature_q16=SAMPLING_Q16_ONE,
-            top_k=8,
+            top_k=16,
             top_p_q16=SAMPLING_Q16_ONE,
             repetition_penalty_q16=SAMPLING_Q16_ONE,
             random_q16_values=[0, 1, 2, 3],
@@ -375,96 +344,66 @@ def test_commit_mismatch_no_publish() -> None:
     assert out_final_token_count == [203]
 
 
-def test_parity_overflow_no_publish() -> None:
-    out_required_logits = [301]
-    out_required_tokens = [302]
-    out_final_token_count = [303]
+def test_fuzz_geometry_parity() -> None:
+    rng = random.Random(1079)
 
-    status = (
-        inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
-            step_logits_q16=[0],
-            step_logits_capacity=0,
-            vocab_size=0x7FFFFFFFFFFFFFFF,
-            max_new_tokens=2,
-            token_history=[0] * 3,
-            token_history_capacity=3,
-            token_history_count=1,
-            temperature_q16=SAMPLING_Q16_ONE,
-            top_k=1,
-            top_p_q16=SAMPLING_Q16_ONE,
-            repetition_penalty_q16=SAMPLING_Q16_ONE,
-            random_q16_values=[0, 0],
-            random_q16_capacity=2,
-            workspace_stage_logits_q16=[0, 0],
-            workspace_stage_logits_capacity=2,
-            workspace_topk_logits_q16=[0, 0],
-            workspace_topk_logits_capacity=2,
-            workspace_topk_indices=[0, 0],
-            workspace_topk_index_capacity=2,
-            out_generated_tokens=[0, 0],
-            generated_capacity=2,
-            out_required_logits=out_required_logits,
-            out_required_tokens=out_required_tokens,
-            out_final_token_count=out_final_token_count,
-        )
-    )
+    for _ in range(150):
+        vocab_size = rng.randint(1, 48)
+        max_new_tokens = rng.randint(0, 16)
+        token_history_count = rng.randint(0, 24)
+        token_history_capacity = token_history_count + max_new_tokens
 
-    assert status == SAMPLING_Q16_ERR_OVERFLOW
-    assert out_required_logits == [301]
-    assert out_required_tokens == [302]
-    assert out_final_token_count == [303]
+        step_logits_capacity = vocab_size * max_new_tokens
+        workspace_capacity = vocab_size
+        random_q16_capacity = max_new_tokens
+        generated_capacity = max_new_tokens
+        top_k = rng.randint(1, vocab_size)
 
-
-def test_randomized_adversarial_prompt_capacity_termination_vectors() -> None:
-    rng = random.Random(20260422_1076)
-
-    for _ in range(900):
-        vocab_size = rng.randint(1, 256)
-        max_new_tokens = rng.randint(0, 64)
-        token_history_count = rng.randint(0, 64)
-
-        required_logits = vocab_size * max_new_tokens
-        required_history_capacity = token_history_count + max_new_tokens
+        out_required_logits = [777]
+        out_required_tokens = [778]
+        out_final_token_count = [779]
 
         status = (
-            inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_reference(
-                step_logits_q16=[0] * required_logits,
-                step_logits_capacity=required_logits,
+            inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference(
+                step_logits_q16=[0] * max(1, step_logits_capacity),
+                step_logits_capacity=step_logits_capacity,
                 vocab_size=vocab_size,
                 max_new_tokens=max_new_tokens,
-                token_history=[0] * required_history_capacity,
-                token_history_capacity=required_history_capacity,
+                token_history=[0] * max(1, token_history_capacity),
+                token_history_capacity=token_history_capacity,
                 token_history_count=token_history_count,
-                temperature_q16=rng.randint(1, SAMPLING_Q16_ONE * 4),
-                top_k=rng.randint(1, vocab_size),
-                top_p_q16=rng.randint(1, SAMPLING_Q16_ONE),
-                repetition_penalty_q16=rng.randint(SAMPLING_Q16_ONE, SAMPLING_Q16_ONE * 2),
-                random_q16_values=[0] * max_new_tokens,
-                random_q16_capacity=max_new_tokens,
-                workspace_stage_logits_q16=[0] * vocab_size,
-                workspace_stage_logits_capacity=vocab_size,
-                workspace_topk_logits_q16=[0] * vocab_size,
-                workspace_topk_logits_capacity=vocab_size,
-                workspace_topk_indices=[0] * vocab_size,
-                workspace_topk_index_capacity=vocab_size,
-                out_generated_tokens=[0] * max_new_tokens,
-                generated_capacity=max_new_tokens,
-                out_required_logits=[-1],
-                out_required_tokens=[-1],
-                out_final_token_count=[-1],
+                temperature_q16=SAMPLING_Q16_ONE,
+                top_k=top_k,
+                top_p_q16=SAMPLING_Q16_ONE,
+                repetition_penalty_q16=SAMPLING_Q16_ONE,
+                random_q16_values=[0] * max(1, random_q16_capacity),
+                random_q16_capacity=random_q16_capacity,
+                workspace_stage_logits_q16=[0] * max(1, workspace_capacity),
+                workspace_stage_logits_capacity=workspace_capacity,
+                workspace_topk_logits_q16=[0] * max(1, workspace_capacity),
+                workspace_topk_logits_capacity=workspace_capacity,
+                workspace_topk_indices=[0] * max(1, workspace_capacity),
+                workspace_topk_index_capacity=workspace_capacity,
+                out_generated_tokens=[0] * max(1, generated_capacity),
+                generated_capacity=generated_capacity,
+                out_required_logits=out_required_logits,
+                out_required_tokens=out_required_tokens,
+                out_final_token_count=out_final_token_count,
             )
         )
+
         assert status == SAMPLING_Q16_OK
+        assert out_required_logits == [step_logits_capacity]
+        assert out_required_tokens == [max_new_tokens]
+        assert out_final_token_count == [token_history_count + max_new_tokens]
 
 
 if __name__ == "__main__":
-    test_source_contains_iq_1076_symbol()
+    test_source_contains_iq_1079_symbol()
     test_known_vector_success()
     test_bad_param_no_publish()
-    test_commit_mismatch_no_publish()
-    test_parity_overflow_no_publish()
-    test_randomized_adversarial_prompt_capacity_termination_vectors()
+    test_no_publish_when_commit_tuple_mismatch()
+    test_fuzz_geometry_parity()
     print(
-        "inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_"
-        "parity_commit_only_preflight_only=ok"
+        "inference_generate_tokens_checked_topk_topp_commit_only_preflight_only_parity_commit_only_preflight_only_parity=ok"
     )
