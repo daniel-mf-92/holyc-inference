@@ -91,6 +91,18 @@ def matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_default_tiles_prefl
         return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
 
     if (
+        out_required_out_cells is lhs_q4_blocks
+        or out_required_out_cells is rhs_q8_col_blocks
+        or out_required_out_bytes is lhs_q4_blocks
+        or out_required_out_bytes is rhs_q8_col_blocks
+        or out_tile_rows is lhs_q4_blocks
+        or out_tile_rows is rhs_q8_col_blocks
+        or out_tile_cols is lhs_q4_blocks
+        or out_tile_cols is rhs_q8_col_blocks
+    ):
+        return Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+
+    if (
         diag_ptr_overlaps_out_cells_range(out_required_out_cells, out_cells_q32, out_cell_capacity)
         or diag_ptr_overlaps_out_cells_range(out_required_out_bytes, out_cells_q32, out_cell_capacity)
         or diag_ptr_overlaps_out_cells_range(out_tile_rows, out_cells_q32, out_cell_capacity)
@@ -186,7 +198,21 @@ def test_source_contains_iq1016_signature_and_commit_only_contract() -> None:
     source = pathlib.Path("src/matmul/q4_0_q8_0_matmul.HC").read_text(encoding="utf-8")
     sig = "I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyParityCommitOnly("
     assert sig in source
-    assert source.count(sig) >= 2
+    scan_start = 0
+    definition_count = 0
+    while True:
+        sig_index = source.find(sig, scan_start)
+        if sig_index < 0:
+            break
+
+        body_start = source.find("{", sig_index)
+        proto_end = source.find(");", sig_index)
+        if body_start >= 0 and (proto_end < 0 or body_start < proto_end):
+            definition_count += 1
+
+        scan_start = sig_index + len(sig)
+
+    assert definition_count == 1
     body = source.rsplit(sig, 1)[1].split("\nI32 ", 1)[0]
 
     assert "MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyParity(" in body
@@ -199,6 +225,8 @@ def test_source_contains_iq1016_signature_and_commit_only_contract() -> None:
     assert "if (!Q4_0Q8_0MatMulTryMulI64NonNeg(staged_required_out_cells," in body
     assert "if (staged_required_out_bytes != staged_expected_out_bytes)" in body
     assert "if (staged_tile_rows <= 0 || staged_tile_cols <= 0)" in body
+    assert "out_required_out_cells == (I64 *)lhs_q4_blocks" in body
+    assert "out_required_out_cells == (I64 *)rhs_q8_col_blocks" in body
     assert "*out_required_out_cells = canonical_required_out_cells;" in body
     assert "*out_required_out_bytes = canonical_required_out_bytes;" in body
     assert "*out_tile_rows = canonical_tile_rows;" in body
@@ -241,6 +269,68 @@ def test_overflow_vector_preserves_no_partial_commit() -> None:
     assert tile_cols == [0x4444]
 
 
+
+
+def test_lhs_rhs_alias_guards() -> None:
+    rng = random.Random(2026042210169)
+
+    row_count = 3
+    col_count = 3
+    k_block_count = 2
+    lhs_stride = 2
+    rhs_stride = 2
+    out_stride = 4
+
+    lhs = [make_q4_block(rng) for _ in range(row_count * lhs_stride)]
+    rhs = [make_q8_block(rng) for _ in range(col_count * rhs_stride)]
+    out = [0x5151] * (row_count * out_stride)
+
+    req_bytes = [0x2222]
+    tile_rows = [0x3333]
+    tile_cols = [0x4444]
+
+    err = matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_default_tiles_preflight_only_parity_commit_only(
+        lhs,
+        len(lhs),
+        row_count,
+        lhs_stride,
+        rhs,
+        len(rhs),
+        col_count,
+        rhs_stride,
+        k_block_count,
+        out,
+        len(out),
+        out_stride,
+        lhs,
+        req_bytes,
+        tile_rows,
+        tile_cols,
+    )
+    assert err == Q4_0_Q8_0_AVX2_ERR_BAD_LEN
+
+    req_cells = [0x1111]
+    tile_rows2 = [0x3333]
+    tile_cols2 = [0x4444]
+    err = matmul_q4_0_q8_0_q32_checked_tiled_nopartial_commit_only_default_tiles_preflight_only_parity_commit_only(
+        lhs,
+        len(lhs),
+        row_count,
+        lhs_stride,
+        rhs,
+        len(rhs),
+        col_count,
+        rhs_stride,
+        k_block_count,
+        out,
+        len(out),
+        out_stride,
+        req_cells,
+        rhs,
+        tile_rows2,
+        tile_cols2,
+    )
+    assert err == Q4_0_Q8_0_AVX2_ERR_BAD_LEN
 def test_known_vector_success_and_alias_guard() -> None:
     rng = random.Random(2026042210161)
 
@@ -413,6 +503,7 @@ def test_randomized_parity_vs_explicit_composition() -> None:
 if __name__ == "__main__":
     test_source_contains_iq1016_signature_and_commit_only_contract()
     test_overflow_vector_preserves_no_partial_commit()
+    test_lhs_rhs_alias_guards()
     test_known_vector_success_and_alias_guard()
     test_randomized_parity_vs_explicit_composition()
     print("ok")

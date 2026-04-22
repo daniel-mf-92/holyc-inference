@@ -164,6 +164,16 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyPar
         out_tile_cols == out_cells_q32)
         return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
 
+    if (out_required_out_cells == (I64 *)lhs_q4_blocks ||
+        out_required_out_cells == (I64 *)rhs_q8_col_blocks ||
+        out_required_out_bytes == (I64 *)lhs_q4_blocks ||
+        out_required_out_bytes == (I64 *)rhs_q8_col_blocks ||
+        out_tile_rows == (I64 *)lhs_q4_blocks ||
+        out_tile_rows == (I64 *)rhs_q8_col_blocks ||
+        out_tile_cols == (I64 *)lhs_q4_blocks ||
+        out_tile_cols == (I64 *)rhs_q8_col_blocks)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
     if (Q4_0Q8_0MatMulDiagPtrOverlapsOutCellsRange(out_required_out_cells,
                                                    out_cells_q32,
                                                    out_cell_capacity) ||
@@ -1872,6 +1882,16 @@ I32 MatMulQ4_0Q8_0Q32CheckedTiledNoPartialCommitOnlyDefaultTilesPreflightOnlyPar
         out_required_out_bytes == out_cells_q32 ||
         out_tile_rows == out_cells_q32 ||
         out_tile_cols == out_cells_q32)
+        return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (out_required_out_cells == (I64 *)lhs_q4_blocks ||
+        out_required_out_cells == (I64 *)rhs_q8_col_blocks ||
+        out_required_out_bytes == (I64 *)lhs_q4_blocks ||
+        out_required_out_bytes == (I64 *)rhs_q8_col_blocks ||
+        out_tile_rows == (I64 *)lhs_q4_blocks ||
+        out_tile_rows == (I64 *)rhs_q8_col_blocks ||
+        out_tile_cols == (I64 *)lhs_q4_blocks ||
+        out_tile_cols == (I64 *)rhs_q8_col_blocks)
         return Q4_0_Q8_0_MATMUL_ERR_BAD_DST_LEN;
 
     if (Q4_0Q8_0MatMulDiagPtrOverlapsOutCellsRange(out_required_out_cells,
