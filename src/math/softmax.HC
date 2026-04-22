@@ -624,6 +624,76 @@ I32 FPQ16SoftmaxPrefixSumChecked(I64 *probs_q16,
     return FP_Q16_OK;
 }
 
+// Checked no-partial wrapper over FPQ16SoftmaxPrefixSumChecked.
+//
+// Purpose:
+// - Build exact-one cumulative distribution for top-p scans while guaranteeing
+//   caller-visible outputs are all-or-nothing.
+//
+// Contracts:
+// - probs_q16, prefix_sums_q16, out_total_q16 are non-null.
+// - lane_count, probs_capacity, prefix_capacity are >= 0.
+// - Immutable snapshot `{lane_count,probs_capacity,prefix_capacity}` must hold
+//   from preflight through commit.
+// - count/capacity checks are in I64 lanes (not bytes).
+//
+// No-partial guarantee:
+// - Uses caller-provided `prefix_sums_q16` as staging for canonical prefix sums,
+//   then commits to `out_total_q16` only after successful revalidation.
+// - On any failure path, `out_total_q16` is not modified.
+I32 FPQ16SoftmaxPrefixSumCheckedNoPartial(I64 *probs_q16,
+                                          I64 lane_count,
+                                          I64 probs_capacity,
+                                          I64 *prefix_sums_q16,
+                                          I64 prefix_capacity,
+                                          I64 *out_total_q16)
+{
+    I64 snapshot_lane_count;
+    I64 snapshot_probs_capacity;
+    I64 snapshot_prefix_capacity;
+    I64 required_probs;
+    I64 required_prefix;
+    I64 staged_total_q16;
+    I32 status;
+
+    if (!probs_q16 || !prefix_sums_q16 || !out_total_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (probs_capacity < 0 || prefix_capacity < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    snapshot_lane_count = lane_count;
+    snapshot_probs_capacity = probs_capacity;
+    snapshot_prefix_capacity = prefix_capacity;
+
+    required_probs = snapshot_lane_count;
+    required_prefix = snapshot_lane_count;
+
+    if (required_probs > snapshot_probs_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (required_prefix > snapshot_prefix_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Build canonical prefix sums into staged output lanes.
+    status = FPQ16SoftmaxPrefixSumChecked(probs_q16,
+                                          snapshot_lane_count,
+                                          prefix_sums_q16,
+                                          &staged_total_q16);
+    if (status)
+        return status;
+
+    // Revalidate immutable geometry snapshot before publishing total.
+    if (snapshot_lane_count != lane_count ||
+        snapshot_probs_capacity != probs_capacity ||
+        snapshot_prefix_capacity != prefix_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    // Commit: publish staged exact-one total only after full success.
+    *out_total_q16 = staged_total_q16;
+    return FP_Q16_OK;
+}
+
 // Checked composed helper for alias-permitted split-phase softmax.
 // Pipeline:
 //   1) exp_lanes_q16 <- exp(preclamped_logits_q16)
