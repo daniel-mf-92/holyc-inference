@@ -321,6 +321,51 @@ I32 FPQ16LnArrayCheckedNoPartialCommitOnly(I64 *input_q16,
     return INTLOG_STATUS_OK;
 }
 
+// Diagnostics-only preflight wrapper for commit-only ln() array path.
+//
+// Contracts:
+//   - Does not write out_q16 lanes.
+//   - Publishes required bytes only when geometry/capacity checks pass.
+//   - Verifies required-byte geometry parity against canonical lane sizing.
+I32 FPQ16LnArrayCheckedNoPartialCommitOnlyPreflightOnly(I64 *input_q16,
+                                                        I64 count,
+                                                        I64 *out_q16,
+                                                        I64 out_capacity_bytes,
+                                                        I64 *required_bytes_out)
+{
+    I64 preflight_required_bytes;
+    I64 geometry_required_bytes;
+    I32 status;
+
+    if (!required_bytes_out)
+        return INTLOG_STATUS_BADPTR;
+
+    *required_bytes_out = 0;
+
+    status = FPQ16LnArrayCheckedNoPartialPreflight(input_q16,
+                                                   count,
+                                                   out_q16,
+                                                   &preflight_required_bytes);
+    if (status != INTLOG_STATUS_OK)
+        return status;
+
+    if (out_capacity_bytes < preflight_required_bytes)
+        return INTLOG_STATUS_BADCOUNT;
+
+    if (!count)
+        geometry_required_bytes = 0;
+    else if (count > (I64_MAX_VALUE / 8))
+        return INTLOG_STATUS_OVERFLOW;
+    else
+        geometry_required_bytes = count * 8;
+
+    if (geometry_required_bytes != preflight_required_bytes)
+        return INTLOG_STATUS_OVERFLOW;
+
+    *required_bytes_out = preflight_required_bytes;
+    return INTLOG_STATUS_OK;
+}
+
 I32 FPQ16LnArrayCheckedNoPartialDefault(I64 *input_q16,
                                         I64 count,
                                         I64 *out_q16)
