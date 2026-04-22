@@ -903,6 +903,18 @@ I32 GGUFMetadataFindKeySpanCheckedNoPartial(U8 *buf,
                                             U32 *out_value_type,
                                             U64 *out_next_cursor);
 
+I32 GGUFMetadataFindKeySpanCheckedNoPartialCommitOnlyPreflightOnly(U8 *buf,
+                                                                   U64 buf_nbytes,
+                                                                   U64 *cursor,
+                                                                   U64 table_end,
+                                                                   U64 metadata_count,
+                                                                   U8 *target_key_bytes,
+                                                                   U64 target_key_len,
+                                                                   U64 *out_key_offset,
+                                                                   U64 *out_key_len,
+                                                                   U32 *out_value_type,
+                                                                   U64 *out_next_cursor);
+
 I32 GGUFMetadataReadArchitectureTagCheckedNoPartial(U8 *buf,
                                                     U64 buf_nbytes,
                                                     U64 *cursor,
@@ -6007,6 +6019,18 @@ I32 GGUFMetadataKeyArchitecturePriority(U8 *buf,
 //   3) model.architecture
 //
 // No-partial contract: outputs and `*cursor` publish only on success.
+I32 GGUFMetadataFindKeySpanCheckedNoPartialCommitOnlyPreflightOnly(U8 *buf,
+                                                                   U64 buf_nbytes,
+                                                                   U64 *cursor,
+                                                                   U64 table_end,
+                                                                   U64 metadata_count,
+                                                                   U8 *target_key_bytes,
+                                                                   U64 target_key_len,
+                                                                   U64 *out_key_offset,
+                                                                   U64 *out_key_len,
+                                                                   U32 *out_value_type,
+                                                                   U64 *out_next_cursor);
+
 I32 GGUFMetadataReadArchitectureTagCheckedNoPartial(U8 *buf,
                                                     U64 buf_nbytes,
                                                     U64 *cursor,
@@ -6183,6 +6207,18 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartial(U8 *buf,
 // - *cursor advances to out_next_cursor
 //
 // No-partial contract: any failure path leaves outputs and *cursor unchanged.
+I32 GGUFMetadataFindKeySpanCheckedNoPartialCommitOnlyPreflightOnly(U8 *buf,
+                                                                   U64 buf_nbytes,
+                                                                   U64 *cursor,
+                                                                   U64 table_end,
+                                                                   U64 metadata_count,
+                                                                   U8 *target_key_bytes,
+                                                                   U64 target_key_len,
+                                                                   U64 *out_key_offset,
+                                                                   U64 *out_key_len,
+                                                                   U32 *out_value_type,
+                                                                   U64 *out_next_cursor);
+
 I32 GGUFMetadataReadArchitectureTagCheckedNoPartial(U8 *buf,
                                                     U64 buf_nbytes,
                                                     U64 *cursor,

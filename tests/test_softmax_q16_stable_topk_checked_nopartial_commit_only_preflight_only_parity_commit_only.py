@@ -113,6 +113,29 @@ def softmax_q16_stable_topk_checked_nopartial_commit_only_preflight_only_parity_
         return FP_Q16_ERR_BAD_PARAM
 
     if (
+        staged_required[0] < 0
+        or staged_selected[0] < 0
+        or canonical_required[0] < 0
+        or canonical_selected[0] < 0
+    ):
+        return FP_Q16_ERR_BAD_PARAM
+
+    if staged_selected[0] > staged_required[0] or canonical_selected[0] > canonical_required[0]:
+        return FP_Q16_ERR_BAD_PARAM
+
+    if staged_selected[0] > snapshot_top_k or canonical_selected[0] > snapshot_top_k:
+        return FP_Q16_ERR_BAD_PARAM
+
+    if staged_required[0] < snapshot_logits_count or canonical_required[0] < snapshot_logits_count:
+        return FP_Q16_ERR_BAD_PARAM
+
+    if (
+        staged_required[0] > snapshot_workspace_capacity
+        or canonical_required[0] > snapshot_workspace_capacity
+    ):
+        return FP_Q16_ERR_BAD_PARAM
+
+    if (
         staged_required[0] != canonical_required[0]
         or staged_selected[0] != canonical_selected[0]
         or staged_max[0] != canonical_max[0]

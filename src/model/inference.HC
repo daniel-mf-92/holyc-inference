@@ -525,6 +525,141 @@ I32 InferenceForwardDispatchModelArchQ16CheckedNoPartial(
     return SAMPLING_Q16_OK;
 }
 
+// IQ-1108 diagnostics-only no-write companion over architecture dispatch.
+//
+// Compose:
+//   1) staged diagnostics tuple from
+//      `InferenceForwardDispatchModelArchQ16CheckedNoPartial`.
+//   2) canonical diagnostics tuple recomputed from immutable metadata/geometry
+//      snapshots: `{rows_processed=row_count, logits_written=row_count*lane_count}`.
+//
+// Publish contract:
+//   - outputs are committed only when staged and canonical tuples match exactly;
+//   - immutable snapshots for metadata bytes/lengths, geometry, and output
+//     pointer identities must remain unchanged before publish;
+//   - no partial writes on every failure path.
+I32 InferenceForwardDispatchModelArchQ16CheckedNoPartialCommitOnlyPreflightOnly(
+    U8 *meta_key_bytes,
+    I64 meta_key_len,
+    U8 *arch_value_bytes,
+    I64 arch_value_len,
+    I64 row_count,
+    I64 lane_count,
+    I64 *out_rows_processed,
+    I64 *out_logits_written)
+{
+    I64 staged_arch_id;
+    I64 staged_rows_processed;
+    I64 staged_logits_written;
+
+    I64 canonical_arch_id;
+    I64 canonical_rows_processed;
+    I64 canonical_logits_written;
+
+    U8 *snapshot_meta_key_bytes;
+    I64 snapshot_meta_key_len;
+    U8 *snapshot_arch_value_bytes;
+    I64 snapshot_arch_value_len;
+    I64 snapshot_row_count;
+    I64 snapshot_lane_count;
+
+    I64 *snapshot_out_rows_processed;
+    I64 *snapshot_out_logits_written;
+    I32 status;
+
+    if (!meta_key_bytes || !arch_value_bytes ||
+        !out_rows_processed || !out_logits_written)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (out_rows_processed == out_logits_written)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (row_count < 0 || lane_count < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_meta_key_bytes = meta_key_bytes;
+    snapshot_meta_key_len = meta_key_len;
+    snapshot_arch_value_bytes = arch_value_bytes;
+    snapshot_arch_value_len = arch_value_len;
+    snapshot_row_count = row_count;
+    snapshot_lane_count = lane_count;
+    snapshot_out_rows_processed = out_rows_processed;
+    snapshot_out_logits_written = out_logits_written;
+
+    status = InferenceDispatchParseArchitectureIdChecked(meta_key_bytes,
+                                                         meta_key_len,
+                                                         arch_value_bytes,
+                                                         arch_value_len,
+                                                         &staged_arch_id);
+    if (status)
+        return status;
+
+    switch (staged_arch_id)
+    {
+    case DISPATCH_ARCH_Q16_ID_LLAMA:
+    case DISPATCH_ARCH_Q16_ID_MISTRAL:
+    case DISPATCH_ARCH_Q16_ID_QWEN2:
+    case DISPATCH_ARCH_Q16_ID_PHI3:
+        break;
+    default:
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+
+    staged_rows_processed = row_count;
+    status = InferenceDispatchTryMulI64Checked(row_count,
+                                               lane_count,
+                                               &staged_logits_written);
+    if (status)
+        return status;
+
+    status = InferenceDispatchParseArchitectureIdChecked(snapshot_meta_key_bytes,
+                                                         snapshot_meta_key_len,
+                                                         snapshot_arch_value_bytes,
+                                                         snapshot_arch_value_len,
+                                                         &canonical_arch_id);
+    if (status)
+        return status;
+
+    switch (canonical_arch_id)
+    {
+    case DISPATCH_ARCH_Q16_ID_LLAMA:
+    case DISPATCH_ARCH_Q16_ID_MISTRAL:
+    case DISPATCH_ARCH_Q16_ID_QWEN2:
+    case DISPATCH_ARCH_Q16_ID_PHI3:
+        break;
+    default:
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+
+    canonical_rows_processed = snapshot_row_count;
+    status = InferenceDispatchTryMulI64Checked(snapshot_row_count,
+                                               snapshot_lane_count,
+                                               &canonical_logits_written);
+    if (status)
+        return status;
+
+    if (snapshot_meta_key_bytes != meta_key_bytes ||
+        snapshot_meta_key_len != meta_key_len ||
+        snapshot_arch_value_bytes != arch_value_bytes ||
+        snapshot_arch_value_len != arch_value_len ||
+        snapshot_row_count != row_count ||
+        snapshot_lane_count != lane_count)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_out_rows_processed != out_rows_processed ||
+        snapshot_out_logits_written != out_logits_written)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (staged_rows_processed != canonical_rows_processed ||
+        staged_logits_written != canonical_logits_written)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    *out_rows_processed = staged_rows_processed;
+    *out_logits_written = staged_logits_written;
+    return SAMPLING_Q16_OK;
+}
+
+
 I32 InferenceGenerateTokensPreflightChecked(
     I64 step_logits_capacity,
     I64 vocab_size,
