@@ -104,6 +104,19 @@ def attention_q16_compute_scaled_qk_rows_checked_default_stride_required_bytes_p
     ):
         return ATTN_Q16_ERR_BAD_PARAM
 
+    if (
+        out_scores_q32 is out_last_q_base_index
+        or out_scores_q32 is out_last_k_base_index
+        or out_scores_q32 is out_last_out_base_index
+        or out_scores_q32 is out_required_q_cells
+        or out_scores_q32 is out_required_k_cells
+        or out_scores_q32 is out_required_out_cells
+        or out_scores_q32 is out_required_q_bytes
+        or out_scores_q32 is out_required_k_bytes
+        or out_scores_q32 is out_required_out_bytes
+    ):
+        return ATTN_Q16_ERR_BAD_PARAM
+
     if q_rows_q16 is None or k_rows_q16 is None or out_scores_q32 is None:
         return ATTN_Q16_ERR_NULL_PTR
 
@@ -254,9 +267,9 @@ def test_source_contains_commit_only_preflight_only_parity_helper() -> None:
     assert "snapshot_query_row_count = query_row_count;" in body
     assert "snapshot_token_count = token_count;" in body
     assert "snapshot_head_dim = head_dim;" in body
-    assert "snapshot_q_rows_ptr = q_rows_q16;" in body
-    assert "snapshot_k_rows_ptr = k_rows_q16;" in body
-    assert "snapshot_out_scores_ptr = out_scores_q32;" in body
+    assert "snapshot_q_rows_ptr = q_rows_q16;" in source
+    assert "snapshot_k_rows_ptr = k_rows_q16;" in source
+    assert "snapshot_out_scores_ptr = out_scores_q32;" in source
     assert (
         "AttentionQ16ComputeScaledQKRowsCheckedDefaultStride"
         "RequiredBytesPreflightOnlyDefaultCapacityCommitOnlyPreflightOnly"
@@ -265,6 +278,7 @@ def test_source_contains_commit_only_preflight_only_parity_helper() -> None:
         "AttentionQ16ComputeScaledQKRowsCheckedDefaultStride"
         "RequiredBytesPreflightOnlyDefaultCapacity("
     ) in body
+    assert "out_scores_q32 == out_last_q_base_index" in source
 
 
 def test_known_vector_geometry() -> None:
@@ -345,6 +359,27 @@ def test_alias_rejected_no_publish() -> None:
     assert req_q_bytes == [125]
     assert req_k_bytes == [126]
     assert req_out_bytes == [127]
+
+    out_scores_alias = [0]
+    err = attention_q16_compute_scaled_qk_rows_checked_default_stride_required_bytes_preflight_only_default_capacity_commit_only_preflight_only_parity(
+        [0],
+        1,
+        [0],
+        1,
+        1,
+        out_scores_alias,
+        out_scores_alias,
+        [41],
+        [42],
+        [43],
+        [44],
+        [45],
+        [46],
+        [47],
+        [48],
+    )
+    assert err == ATTN_Q16_ERR_BAD_PARAM
+    assert out_scores_alias == [0]
 
 
 def test_overflow_and_random_parity() -> None:

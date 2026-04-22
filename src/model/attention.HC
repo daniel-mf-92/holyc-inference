@@ -14226,6 +14226,17 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideRequiredBytesPreflightOnl
         out_required_k_bytes == out_required_out_bytes)
         return ATTN_Q16_ERR_BAD_PARAM;
 
+    if (out_scores_q32 == out_last_q_base_index ||
+        out_scores_q32 == out_last_k_base_index ||
+        out_scores_q32 == out_last_out_base_index ||
+        out_scores_q32 == out_required_q_cells ||
+        out_scores_q32 == out_required_k_cells ||
+        out_scores_q32 == out_required_out_cells ||
+        out_scores_q32 == out_required_q_bytes ||
+        out_scores_q32 == out_required_k_bytes ||
+        out_scores_q32 == out_required_out_bytes)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
     if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
         return ATTN_Q16_ERR_NULL_PTR;
 

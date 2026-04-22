@@ -2522,6 +2522,9 @@ I64 GGUFTensorInfoReadDimsTypeOffsetCheckedNoPartialCommitOnlyPreflightOnlyParit
         canonical_computed_end > size)
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
 
+    if (staged_parity_computed_end != canonical_computed_end)
+        return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
+
     if (snapshot_buf != buf || snapshot_size != size || snapshot_cursor != cursor)
         return GGUF_TENSOR_PARSE_ERR_TRUNCATED;
 
