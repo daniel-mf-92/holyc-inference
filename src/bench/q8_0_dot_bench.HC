@@ -59,3 +59,47 @@ I32 Q8_0DotBenchCyclesPerOpChecked(
     *out_remainder_cycles = staged_remainder_cycles;
     return Q8_0_DOT_BENCH_OK;
 }
+
+I32 Q8_0DotBenchOpsPerCycleQ16Checked(
+    I64 total_ops,
+    I64 total_cycles,
+    I64 *out_ops_per_cycle_q16,
+    I64 *out_remainder_ops_q16)
+{
+    I64 total_ops_q16;
+    I64 half_cycles;
+    I64 rounded_numer;
+    I64 staged_ops_per_cycle_q16;
+    I64 staged_remainder_ops_q16;
+    I32 status;
+
+    if (!out_ops_per_cycle_q16 || !out_remainder_ops_q16)
+        return Q8_0_DOT_BENCH_ERR_NULL_PTR;
+
+    // Counters are monotonic and non-negative.
+    if (total_ops < 0 || total_cycles < 0)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+    if (!total_cycles)
+        return Q8_0_DOT_BENCH_ERR_DIV_BY_ZERO;
+
+    // Convert integer ops to Q16 domain with checked shift.
+    if (total_ops > (Q8_0_DOT_BENCH_I64_MAX >> 16))
+        return Q8_0_DOT_BENCH_ERR_OVERFLOW;
+    total_ops_q16 = total_ops << 16;
+
+    // Deterministic integer-only rounding:
+    // ops_per_cycle_q16 = Round((total_ops_q16 / total_cycles))
+    //                   = (total_ops_q16 + floor(total_cycles / 2)) / total_cycles
+    half_cycles = total_cycles >> 1;
+    status = Q8_0DotBenchTryAddI64(total_ops_q16, half_cycles, &rounded_numer);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    staged_ops_per_cycle_q16 = rounded_numer / total_cycles;
+    staged_remainder_ops_q16 = total_ops_q16 % total_cycles;
+
+    // No-partial diagnostics publish: commit both outputs atomically at end.
+    *out_ops_per_cycle_q16 = staged_ops_per_cycle_q16;
+    *out_remainder_ops_q16 = staged_remainder_ops_q16;
+    return Q8_0_DOT_BENCH_OK;
+}
