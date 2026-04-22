@@ -11662,6 +11662,8 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
     I64 recomputed_required_stage_cells;
     I64 recomputed_required_stage_bytes;
     I64 expected_last_out_index;
+    I64 *snapshot_staged_scores_q32;
+    I64 *snapshot_out_scores_q32;
     I64 snapshot_query_row_count;
     I64 snapshot_token_count;
     I64 snapshot_staged_scores_capacity;
@@ -11690,13 +11692,15 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
 
     snapshot_query_row_count = query_row_count;
     snapshot_token_count = token_count;
+    snapshot_staged_scores_q32 = staged_scores_q32;
+    snapshot_out_scores_q32 = out_scores_q32;
     snapshot_staged_scores_capacity = staged_scores_capacity;
     snapshot_out_scores_capacity = out_scores_capacity;
 
     // IQ-817 required-bytes diagnostics contract:
     // 1) stage canonical default-stride commit-only preflight tuple;
     // 2) derive checked `required_stage_bytes = required_stage_cells*sizeof(I64)`;
-    // 3) revalidate immutable geometry snapshots and tuple invariants;
+    // 3) revalidate immutable geometry snapshots/pointers + tuple invariants;
     // 4) atomically publish diagnostics only after full success.
     status =
         AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPreflightOnly(
@@ -11740,6 +11744,10 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedDefaultStrideNoPartialCommitOnlyPrefli
     if (snapshot_query_row_count != query_row_count)
         return ATTN_Q16_ERR_BAD_PARAM;
     if (snapshot_token_count != token_count)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_staged_scores_q32 != staged_scores_q32)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (snapshot_out_scores_q32 != out_scores_q32)
         return ATTN_Q16_ERR_BAD_PARAM;
     if (snapshot_staged_scores_capacity != staged_scores_capacity)
         return ATTN_Q16_ERR_BAD_PARAM;
