@@ -366,6 +366,108 @@ I32 FPQ16LnArrayCheckedNoPartialCommitOnlyPreflightOnly(I64 *input_q16,
     return INTLOG_STATUS_OK;
 }
 
+// Diagnostics-only parity gate over
+// FPQ16LnArrayCheckedNoPartialCommitOnlyPreflightOnly and canonical
+// FPQ16LnArrayCheckedNoPartial staged on scratch.
+//
+// Contract:
+// - Does not publish any lane to caller out_q16.
+// - Revalidates immutable {input_q16,count,out_q16,out_capacity_bytes} snapshots.
+// - Requires exact tuple parity on {required_bytes} before publish.
+I32 FPQ16LnArrayCheckedNoPartialCommitOnlyPreflightOnlyParity(I64 *input_q16,
+                                                              I64 count,
+                                                              I64 *out_q16,
+                                                              I64 out_capacity_bytes,
+                                                              I64 *required_bytes_out)
+{
+    I64 *snapshot_input_q16;
+    I64 snapshot_count;
+    I64 *snapshot_out_q16;
+    I64 snapshot_out_capacity_bytes;
+    I64 staged_required_bytes;
+    I64 canonical_required_bytes;
+    I64 *scratch_out_q16;
+    I64 i;
+    I32 status;
+
+    if (!required_bytes_out)
+        return INTLOG_STATUS_BADPTR;
+
+    *required_bytes_out = 0;
+
+    snapshot_input_q16 = input_q16;
+    snapshot_count = count;
+    snapshot_out_q16 = out_q16;
+    snapshot_out_capacity_bytes = out_capacity_bytes;
+
+    status = FPQ16LnArrayCheckedNoPartialCommitOnlyPreflightOnly(input_q16,
+                                                                 count,
+                                                                 out_q16,
+                                                                 out_capacity_bytes,
+                                                                 &staged_required_bytes);
+    if (status != INTLOG_STATUS_OK)
+        return status;
+
+    if (snapshot_input_q16 != input_q16 ||
+        snapshot_count != count ||
+        snapshot_out_q16 != out_q16 ||
+        snapshot_out_capacity_bytes != out_capacity_bytes)
+        return INTLOG_STATUS_BADCOUNT;
+
+    if (!count)
+        canonical_required_bytes = 0;
+    else if (count > (I64_MAX_VALUE / 8))
+        return INTLOG_STATUS_OVERFLOW;
+    else
+        canonical_required_bytes = count * 8;
+
+    if (staged_required_bytes != canonical_required_bytes)
+        return INTLOG_STATUS_OVERFLOW;
+
+    if (!count)
+    {
+        *required_bytes_out = staged_required_bytes;
+        return INTLOG_STATUS_OK;
+    }
+
+    scratch_out_q16 = MAlloc(canonical_required_bytes);
+    if (!scratch_out_q16)
+        return INTLOG_STATUS_BADPTR;
+
+    status = FPQ16LnArrayCheckedNoPartial(input_q16,
+                                          count,
+                                          scratch_out_q16,
+                                          canonical_required_bytes);
+    if (status != INTLOG_STATUS_OK)
+    {
+        Free(scratch_out_q16);
+        return status;
+    }
+
+    if (snapshot_input_q16 != input_q16 ||
+        snapshot_count != count ||
+        snapshot_out_q16 != out_q16 ||
+        snapshot_out_capacity_bytes != out_capacity_bytes)
+    {
+        Free(scratch_out_q16);
+        return INTLOG_STATUS_BADCOUNT;
+    }
+
+    // Canonical lane parity: every scratch lane must match scalar FPQ16Ln.
+    for (i = 0; i < count; i++)
+    {
+        if (scratch_out_q16[i] != FPQ16Ln(input_q16[i]))
+        {
+            Free(scratch_out_q16);
+            return INTLOG_STATUS_DOMAIN;
+        }
+    }
+
+    Free(scratch_out_q16);
+    *required_bytes_out = staged_required_bytes;
+    return INTLOG_STATUS_OK;
+}
+
 I32 FPQ16LnArrayCheckedNoPartialDefault(I64 *input_q16,
                                         I64 count,
                                         I64 *out_q16)
