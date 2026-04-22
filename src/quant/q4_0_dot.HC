@@ -20,6 +20,7 @@
 #define Q4_0_OK               0
 #define Q4_0_ERR_NULL_PTR     1
 #define Q4_0_ERR_BAD_DST_LEN  2
+#define Q4_0_ERR_OVERFLOW     3
 
 class Q4_0Block
 {
@@ -239,6 +240,65 @@ I32 Q4_0DotRowsQ16MatrixVector(Q4_0Block *matrix_blocks, I64 row_count, I64 row_
         out_rows_q16[row_index] = row_dot_q16;
     }
 
+    return Q4_0_OK;
+}
+
+Bool Q4_0TryAddI64(I64 lhs, I64 rhs, I64 *out_sum)
+{
+    if (!out_sum)
+        return FALSE;
+
+    if (rhs > 0 && lhs > (0x7FFFFFFFFFFFFFFF - rhs))
+        return FALSE;
+    if (rhs < 0 && lhs < ((-0x7FFFFFFFFFFFFFFF - 1) - rhs))
+        return FALSE;
+
+    *out_sum = lhs + rhs;
+    return TRUE;
+}
+
+// Checked no-partial block dot helper.
+// - Accumulates per-block Q32 contributions with explicit signed overflow guard.
+// - Produces deterministic Q16 output by rounding exactly once from total Q32.
+// Contract: `*out_dot_q32` and `*out_dot_q16` are written only on success.
+I32 Q4_0DotBlocksQ32CheckedNoPartial(Q4_0Block *lhs,
+                                     Q4_0Block *rhs,
+                                     I64 block_count,
+                                     I64 *out_dot_q32,
+                                     I64 *out_dot_q16)
+{
+    I64 block_index;
+    I64 block_dot_q32;
+    I64 staged_total_q32;
+    I64 next_total_q32;
+    I64 staged_total_q16;
+    I32 status;
+
+    if (!lhs || !rhs || !out_dot_q32 || !out_dot_q16)
+        return Q4_0_ERR_NULL_PTR;
+    if (block_count < 0)
+        return Q4_0_ERR_BAD_DST_LEN;
+
+    staged_total_q32 = 0;
+    for (block_index = 0; block_index < block_count; ++block_index)
+    {
+        status = Q4_0DotProductBlockQ32(&lhs[block_index],
+                                        &rhs[block_index],
+                                        &block_dot_q32);
+        if (status != Q4_0_OK)
+            return status;
+
+        if (!Q4_0TryAddI64(staged_total_q32, block_dot_q32, &next_total_q32))
+            return Q4_0_ERR_OVERFLOW;
+
+        staged_total_q32 = next_total_q32;
+    }
+
+    // Deterministic hand-off: one rounded Q32->Q16 downshift at the end.
+    staged_total_q16 = Q4_0DotQ32ToQ16(staged_total_q32);
+
+    *out_dot_q32 = staged_total_q32;
+    *out_dot_q16 = staged_total_q16;
     return Q4_0_OK;
 }
 

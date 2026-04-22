@@ -297,3 +297,78 @@ I32 FPQ16LnArrayCheckedNoPartialDefault(I64 *input_q16,
                                         out_q16,
                                         required_bytes);
 }
+
+I32 FPQ16Log2ArrayCheckedNoPartialPreflight(I64 *input_q16,
+                                            I64 count,
+                                            I64 *out_q16,
+                                            I64 *required_bytes_out)
+{
+    I64 bytes;
+
+    if (!required_bytes_out)
+        return INTLOG_STATUS_BADPTR;
+
+    *required_bytes_out = 0;
+
+    if (count < 0)
+        return INTLOG_STATUS_BADCOUNT;
+    if (!input_q16 || !out_q16)
+        return INTLOG_STATUS_BADPTR;
+
+    // Each lane writes one Q16 I64 output cell.
+    if (count == 0)
+        bytes = 0;
+    else if (count > (I64_MAX_VALUE / 8))
+        return INTLOG_STATUS_OVERFLOW;
+    else
+        bytes = count * 8;
+
+    *required_bytes_out = bytes;
+    return INTLOG_STATUS_OK;
+}
+
+I32 FPQ16Log2ArrayCheckedNoPartial(I64 *input_q16,
+                                   I64 count,
+                                   I64 *out_q16,
+                                   I64 out_capacity_bytes)
+{
+    I64 required_bytes;
+    I64 i;
+    I32 status;
+
+    status = FPQ16Log2ArrayCheckedNoPartialPreflight(input_q16,
+                                                     count,
+                                                     out_q16,
+                                                     &required_bytes);
+    if (status != INTLOG_STATUS_OK)
+        return status;
+    if (out_capacity_bytes < required_bytes)
+        return INTLOG_STATUS_BADCOUNT;
+
+    // All preconditions are validated up-front, so the publish loop is
+    // deterministic and no-partial on hard failures.
+    for (i = 0; i < count; i++)
+        out_q16[i] = FPQ16Log2(input_q16[i]);
+
+    return INTLOG_STATUS_OK;
+}
+
+I32 FPQ16Log2ArrayCheckedNoPartialDefault(I64 *input_q16,
+                                          I64 count,
+                                          I64 *out_q16)
+{
+    I64 required_bytes;
+    I32 status;
+
+    status = FPQ16Log2ArrayCheckedNoPartialPreflight(input_q16,
+                                                     count,
+                                                     out_q16,
+                                                     &required_bytes);
+    if (status != INTLOG_STATUS_OK)
+        return status;
+
+    return FPQ16Log2ArrayCheckedNoPartial(input_q16,
+                                          count,
+                                          out_q16,
+                                          required_bytes);
+}
