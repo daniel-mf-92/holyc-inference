@@ -1280,11 +1280,13 @@ I32 InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPr
 // IQ-1062 diagnostics-only no-write companion over IQ-1060 commit-only wrapper.
 //
 // Compose:
-// - staged tuple via `...ParityCommitOnlyPreflightOnlyParityCommitOnly`;
-// - canonical tuple via `...ParityCommitOnlyPreflightOnlyParity`.
+// - `...ParityCommitOnlyPreflightOnlyParityCommitOnly` (commit-only diagnostics)
+// - canonical `...ParityCommitOnlyPreflightOnlyParity` (parity diagnostics)
 //
-// Publish output only when immutable shape snapshots and strict tuple parity
-// both hold. On any mismatch, return error with no partial writes.
+// Integer tuple contract is preserved exactly: we stage
+// `{dense_cells,required_workspace_cells,required_block_tensor_cells,required_logits_cells}`
+// from both paths and publish only when every cell matches. This makes every
+// forward-shape arithmetic decision auditable before any caller-visible write.
 I32 InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
     I64 embed_capacity,
     I64 block_attn_capacity,
@@ -1407,6 +1409,16 @@ I32 InferenceForwardQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPr
         out_required_workspace_cells == out_required_block_tensor_cells ||
         out_required_workspace_cells == out_required_logits_cells ||
         out_required_block_tensor_cells == out_required_logits_cells)
+        return MODEL_Q16_ERR_BAD_PARAM;
+
+    if (staged_dense_cells < 0 ||
+        staged_required_workspace_cells < 0 ||
+        staged_required_block_tensor_cells < 0 ||
+        staged_required_logits_cells < 0 ||
+        canonical_dense_cells < 0 ||
+        canonical_required_workspace_cells < 0 ||
+        canonical_required_block_tensor_cells < 0 ||
+        canonical_required_logits_cells < 0)
         return MODEL_Q16_ERR_BAD_PARAM;
 
     if (staged_dense_cells != canonical_dense_cells)
