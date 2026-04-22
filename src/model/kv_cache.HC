@@ -5502,13 +5502,14 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
     return KV_Q16_OK;
 }
 
-// IQ-1071 diagnostics-only zero-write companion over IQ-1070 commit-only parity.
+// IQ-1071 canonical preflight companion for required-bytes reserve-span parity.
 //
-// This helper stages tuple outputs from the commit-only parity wrapper,
-// recomputes the canonical tuple via IQ-1064 parity preflight path, validates
-// immutable geometry/output-pointer snapshots, and atomically publishes only on
-// exact parity success.
-I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnlyPreflightOnly(
+// Compose:
+// 1) stage tuple from `...RequiredBytesParity`;
+// 2) recompute canonical tuple from immutable geometry snapshots;
+// 3) enforce strict tuple parity + snapshot immutability;
+// 4) atomically publish outputs only on exact match.
+I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParityPreflightOnly(
     I64 layer_count,
     I64 head_count,
     I64 head_dim,
@@ -5523,9 +5524,12 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
     I64 staged_required_bytes;
     I64 staged_last_cell_index;
 
-    I64 canonical_required_cells;
-    I64 canonical_required_bytes;
-    I64 canonical_last_cell_index;
+    I64 recomputed_cells_per_token;
+    I64 recomputed_base_index;
+    I64 recomputed_required_cells;
+    I64 recomputed_required_bytes;
+    I64 recomputed_end_index;
+    I64 recomputed_last_cell_index;
 
     I64 snapshot_layer_count;
     I64 snapshot_head_count;
@@ -5537,7 +5541,6 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
     I64 *snapshot_out_required_cells;
     I64 *snapshot_out_required_bytes;
     I64 *snapshot_out_last_cell_index;
-
     I32 status;
 
     if (!out_required_cells || !out_required_bytes || !out_last_cell_index)
@@ -5563,7 +5566,7 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
     snapshot_out_required_bytes = out_required_bytes;
     snapshot_out_last_cell_index = out_last_cell_index;
 
-    status = KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnly(
+    status = KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParity(
         layer_count,
         head_count,
         head_dim,
@@ -5576,18 +5579,64 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
     if (status != KV_Q16_OK)
         return status;
 
-    status = KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParity(
-        layer_count,
-        head_count,
-        head_dim,
-        token_start,
-        token_count,
-        cache_capacity,
-        &canonical_required_cells,
-        &canonical_required_bytes,
-        &canonical_last_cell_index);
+    // Canonical recompute from immutable scalar snapshots.
+    // cells_per_token = layer_count * head_count * head_dim
+    status = KVTryMulI64Checked(snapshot_layer_count,
+                                snapshot_head_count,
+                                &recomputed_cells_per_token);
     if (status != KV_Q16_OK)
         return status;
+
+    status = KVTryMulI64Checked(recomputed_cells_per_token,
+                                snapshot_head_dim,
+                                &recomputed_cells_per_token);
+    if (status != KV_Q16_OK)
+        return status;
+
+    // base_index = token_start * cells_per_token
+    status = KVTryMulI64Checked(snapshot_token_start,
+                                recomputed_cells_per_token,
+                                &recomputed_base_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (recomputed_base_index > snapshot_cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    // required_cells = token_count * cells_per_token
+    status = KVTryMulI64Checked(snapshot_token_count,
+                                recomputed_cells_per_token,
+                                &recomputed_required_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVTryAddI64Checked(recomputed_base_index,
+                                recomputed_required_cells,
+                                &recomputed_end_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (recomputed_end_index > snapshot_cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    status = KVTryMulI64Checked(recomputed_required_cells,
+                                sizeof(I64),
+                                &recomputed_required_bytes);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (!recomputed_required_cells)
+    {
+        recomputed_last_cell_index = 0;
+    }
+    else
+    {
+        status = KVTryAddI64Checked(recomputed_end_index,
+                                    -1,
+                                    &recomputed_last_cell_index);
+        if (status != KV_Q16_OK)
+            return status;
+    }
 
     if (snapshot_layer_count != layer_count ||
         snapshot_head_count != head_count ||
@@ -5608,8 +5657,8 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
         return KV_Q16_ERR_BAD_PARAM;
 
     if (staged_required_cells < 0 || staged_required_bytes < 0 ||
-        staged_last_cell_index < 0 || canonical_required_cells < 0 ||
-        canonical_required_bytes < 0 || canonical_last_cell_index < 0)
+        staged_last_cell_index < 0 || recomputed_required_cells < 0 ||
+        recomputed_required_bytes < 0 || recomputed_last_cell_index < 0)
         return KV_Q16_ERR_BAD_PARAM;
 
     if ((staged_required_bytes % sizeof(I64)) != 0)
@@ -5617,21 +5666,21 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
     if ((staged_required_bytes / sizeof(I64)) != staged_required_cells)
         return KV_Q16_ERR_BAD_PARAM;
 
-    if ((canonical_required_bytes % sizeof(I64)) != 0)
+    if ((recomputed_required_bytes % sizeof(I64)) != 0)
         return KV_Q16_ERR_BAD_PARAM;
-    if ((canonical_required_bytes / sizeof(I64)) != canonical_required_cells)
+    if ((recomputed_required_bytes / sizeof(I64)) != recomputed_required_cells)
         return KV_Q16_ERR_BAD_PARAM;
 
     if (!staged_required_cells && staged_last_cell_index)
         return KV_Q16_ERR_BAD_PARAM;
-    if (!canonical_required_cells && canonical_last_cell_index)
+    if (!recomputed_required_cells && recomputed_last_cell_index)
         return KV_Q16_ERR_BAD_PARAM;
 
-    if (staged_required_cells != canonical_required_cells)
+    if (staged_required_cells != recomputed_required_cells)
         return KV_Q16_ERR_BAD_PARAM;
-    if (staged_required_bytes != canonical_required_bytes)
+    if (staged_required_bytes != recomputed_required_bytes)
         return KV_Q16_ERR_BAD_PARAM;
-    if (staged_last_cell_index != canonical_last_cell_index)
+    if (staged_last_cell_index != recomputed_last_cell_index)
         return KV_Q16_ERR_BAD_PARAM;
 
     *out_required_cells = staged_required_cells;
@@ -5643,13 +5692,10 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
 // IQ-1071 diagnostics-only zero-write companion over IQ-1070 commit wrapper.
 //
 // Compose:
-// 1) Staged tuple via
-//    `...RequiredBytesParityCommitOnly` (commit-only diagnostics wrapper).
-// 2) Canonical tuple via
-//    `...RequiredBytesParity` (no-write parity gate over immutable geometry).
-//
-// Publish is atomic: outputs are committed only after immutable snapshot and
-// strict tuple parity checks succeed.
+// 1) stage tuple via `...RequiredBytesParityCommitOnly`;
+// 2) stage canonical tuple via `...RequiredBytesParityPreflightOnly`;
+// 3) recompute canonical tuple from immutable snapshots;
+// 4) publish atomically only after strict three-way parity success.
 I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParityCommitOnlyPreflightOnly(
     I64 layer_count,
     I64 head_count,
@@ -5669,6 +5715,13 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
     I64 canonical_required_bytes;
     I64 canonical_last_cell_index;
 
+    I64 recomputed_cells_per_token;
+    I64 recomputed_base_index;
+    I64 recomputed_required_cells;
+    I64 recomputed_required_bytes;
+    I64 recomputed_end_index;
+    I64 recomputed_last_cell_index;
+
     I64 snapshot_layer_count;
     I64 snapshot_head_count;
     I64 snapshot_head_dim;
@@ -5679,7 +5732,6 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
     I64 *snapshot_out_required_cells;
     I64 *snapshot_out_required_bytes;
     I64 *snapshot_out_last_cell_index;
-
     I32 status;
 
     if (!out_required_cells || !out_required_bytes || !out_last_cell_index)
@@ -5720,7 +5772,7 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
         return status;
 
     status =
-        KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParity(
+        KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredBytesParityPreflightOnly(
             layer_count,
             head_count,
             head_dim,
@@ -5732,6 +5784,62 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
             &canonical_last_cell_index);
     if (status != KV_Q16_OK)
         return status;
+
+    // Direct integer recompute from immutable geometry snapshot.
+    status = KVTryMulI64Checked(snapshot_layer_count,
+                                snapshot_head_count,
+                                &recomputed_cells_per_token);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVTryMulI64Checked(recomputed_cells_per_token,
+                                snapshot_head_dim,
+                                &recomputed_cells_per_token);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVTryMulI64Checked(snapshot_token_start,
+                                recomputed_cells_per_token,
+                                &recomputed_base_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (recomputed_base_index > snapshot_cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    status = KVTryMulI64Checked(snapshot_token_count,
+                                recomputed_cells_per_token,
+                                &recomputed_required_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVTryAddI64Checked(recomputed_base_index,
+                                recomputed_required_cells,
+                                &recomputed_end_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (recomputed_end_index > snapshot_cache_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    status = KVTryMulI64Checked(recomputed_required_cells,
+                                sizeof(I64),
+                                &recomputed_required_bytes);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (!recomputed_required_cells)
+    {
+        recomputed_last_cell_index = 0;
+    }
+    else
+    {
+        status = KVTryAddI64Checked(recomputed_end_index,
+                                    -1,
+                                    &recomputed_last_cell_index);
+        if (status != KV_Q16_OK)
+            return status;
+    }
 
     if (snapshot_layer_count != layer_count ||
         snapshot_head_count != head_count ||
@@ -5753,7 +5861,9 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
 
     if (staged_required_cells < 0 || staged_required_bytes < 0 ||
         staged_last_cell_index < 0 || canonical_required_cells < 0 ||
-        canonical_required_bytes < 0 || canonical_last_cell_index < 0)
+        canonical_required_bytes < 0 || canonical_last_cell_index < 0 ||
+        recomputed_required_cells < 0 || recomputed_required_bytes < 0 ||
+        recomputed_last_cell_index < 0)
         return KV_Q16_ERR_BAD_PARAM;
 
     if ((staged_required_bytes % sizeof(I64)) != 0)
@@ -5766,9 +5876,16 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
     if ((canonical_required_bytes / sizeof(I64)) != canonical_required_cells)
         return KV_Q16_ERR_BAD_PARAM;
 
+    if ((recomputed_required_bytes % sizeof(I64)) != 0)
+        return KV_Q16_ERR_BAD_PARAM;
+    if ((recomputed_required_bytes / sizeof(I64)) != recomputed_required_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+
     if (!staged_required_cells && staged_last_cell_index)
         return KV_Q16_ERR_BAD_PARAM;
     if (!canonical_required_cells && canonical_last_cell_index)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (!recomputed_required_cells && recomputed_last_cell_index)
         return KV_Q16_ERR_BAD_PARAM;
 
     if (staged_required_cells != canonical_required_cells)
@@ -5776,6 +5893,13 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
     if (staged_required_bytes != canonical_required_bytes)
         return KV_Q16_ERR_BAD_PARAM;
     if (staged_last_cell_index != canonical_last_cell_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_cells != recomputed_required_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (staged_required_bytes != recomputed_required_bytes)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (staged_last_cell_index != recomputed_last_cell_index)
         return KV_Q16_ERR_BAD_PARAM;
 
     *out_required_cells = staged_required_cells;
