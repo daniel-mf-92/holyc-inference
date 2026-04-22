@@ -912,6 +912,16 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartial(U8 *buf,
                                                     U64 *out_tag_len,
                                                     U64 *out_next_cursor);
 
+I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParity(U8 *buf,
+                                                                                   U64 buf_nbytes,
+                                                                                   U64 *cursor,
+                                                                                   U64 table_end,
+                                                                                   U64 metadata_count,
+                                                                                   U32 *out_arch_tag,
+                                                                                   U64 *out_tag_offset,
+                                                                                   U64 *out_tag_len,
+                                                                                   U64 *out_next_cursor);
+
 I32 GGUFMetadataReadArrayHeaderChecked(U8 *buf,
                                        U64 buf_nbytes,
                                        U64 *cursor,
@@ -6386,6 +6396,8 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnly(U8 *b
                                                                             U64 *out_next_cursor)
 {
     U64 cursor_snapshot;
+    U64 tag_end_stage;
+    U64 tag_end_verify;
     U64 cursor_stage;
     U64 cursor_verify;
 
@@ -6417,6 +6429,8 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnly(U8 *b
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
     if (*cursor > 0x7FFFFFFFFFFFFFFF)
         return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (*cursor > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
     if (*cursor > table_end)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
 
@@ -6436,6 +6450,16 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnly(U8 *b
         return err;
     if (cursor_stage != next_cursor_stage)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_off_stage > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (tag_len_stage > buf_nbytes - tag_off_stage)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    tag_end_stage = tag_off_stage + tag_len_stage;
+    if (tag_end_stage > table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (tag_end_stage != next_cursor_stage)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
 
     cursor_verify = cursor_snapshot;
     err = GGUFMetadataReadArchitectureTagCheckedNoPartial(buf,
@@ -6450,6 +6474,16 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnly(U8 *b
     if (err != GGUF_META_TABLE_OK)
         return err;
     if (cursor_verify != next_cursor_verify)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_off_verify > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (tag_len_verify > buf_nbytes - tag_off_verify)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    tag_end_verify = tag_off_verify + tag_len_verify;
+    if (tag_end_verify > table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (tag_end_verify != next_cursor_verify)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
 
     if (arch_stage != arch_verify)
@@ -6466,6 +6500,105 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnly(U8 *b
     *out_tag_len = tag_len_stage;
     *out_next_cursor = next_cursor_stage;
     *cursor = next_cursor_stage;
+    return GGUF_META_TABLE_OK;
+}
+
+// Diagnostics-only parity gate over preflight-only and canonical architecture
+// readers. Publishes outputs atomically only when both paths agree exactly.
+//
+// No-partial contract: any failure preserves caller cursor + output tuples.
+I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParity(U8 *buf,
+                                                                                   U64 buf_nbytes,
+                                                                                   U64 *cursor,
+                                                                                   U64 table_end,
+                                                                                   U64 metadata_count,
+                                                                                   U32 *out_arch_tag,
+                                                                                   U64 *out_tag_offset,
+                                                                                   U64 *out_tag_len,
+                                                                                   U64 *out_next_cursor)
+{
+    U64 cursor_snapshot;
+    U64 cursor_preflight;
+    U64 cursor_canonical;
+
+    U32 arch_preflight;
+    U64 tag_off_preflight;
+    U64 tag_len_preflight;
+    U64 next_cursor_preflight;
+
+    U32 arch_canonical;
+    U64 tag_off_canonical;
+    U64 tag_len_canonical;
+    U64 next_cursor_canonical;
+
+    I32 err;
+
+    if (!buf || !cursor || !out_arch_tag || !out_tag_offset ||
+        !out_tag_len || !out_next_cursor)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    if (buf_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (table_end > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (metadata_count > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (metadata_count > GGUF_MAX_METADATA_COUNT)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (table_end > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (*cursor > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (*cursor > table_end)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    cursor_snapshot = *cursor;
+
+    cursor_preflight = cursor_snapshot;
+    err = GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnly(
+        buf,
+        buf_nbytes,
+        &cursor_preflight,
+        table_end,
+        metadata_count,
+        &arch_preflight,
+        &tag_off_preflight,
+        &tag_len_preflight,
+        &next_cursor_preflight);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+    if (cursor_preflight != next_cursor_preflight)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    cursor_canonical = cursor_snapshot;
+    err = GGUFMetadataReadArchitectureTagCheckedNoPartial(buf,
+                                                          buf_nbytes,
+                                                          &cursor_canonical,
+                                                          table_end,
+                                                          metadata_count,
+                                                          &arch_canonical,
+                                                          &tag_off_canonical,
+                                                          &tag_len_canonical,
+                                                          &next_cursor_canonical);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+    if (cursor_canonical != next_cursor_canonical)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (arch_preflight != arch_canonical)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_off_preflight != tag_off_canonical)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_len_preflight != tag_len_canonical)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (next_cursor_preflight != next_cursor_canonical)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    *out_arch_tag = arch_preflight;
+    *out_tag_offset = tag_off_preflight;
+    *out_tag_len = tag_len_preflight;
+    *out_next_cursor = next_cursor_preflight;
+    *cursor = next_cursor_preflight;
     return GGUF_META_TABLE_OK;
 }
 

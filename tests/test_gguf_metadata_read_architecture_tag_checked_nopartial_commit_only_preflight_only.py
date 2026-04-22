@@ -213,6 +213,8 @@ def gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
     if cursor_ref[0] > I64_MAX:
         return GGUF_META_TABLE_ERR_OVERFLOW
+    if cursor_ref[0] > buf_nbytes:
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
     if cursor_ref[0] > table_end:
         return GGUF_META_TABLE_ERR_BAD_PARAM
 
@@ -238,6 +240,15 @@ def gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_
         return err
     if stage_cursor[0] != stage_next[0]:
         return GGUF_META_TABLE_ERR_BAD_PARAM
+    if stage_off[0] > buf_nbytes:
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
+    if stage_len[0] > buf_nbytes - stage_off[0]:
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
+    stage_end = stage_off[0] + stage_len[0]
+    if stage_end > table_end:
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
+    if stage_end != stage_next[0]:
+        return GGUF_META_TABLE_ERR_BAD_PARAM
 
     verify_cursor = [snapshot]
     verify_arch = [0]
@@ -258,6 +269,15 @@ def gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_
     if err != GGUF_META_TABLE_OK:
         return err
     if verify_cursor[0] != verify_next[0]:
+        return GGUF_META_TABLE_ERR_BAD_PARAM
+    if verify_off[0] > buf_nbytes:
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
+    if verify_len[0] > buf_nbytes - verify_off[0]:
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
+    verify_end = verify_off[0] + verify_len[0]
+    if verify_end > table_end:
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
+    if verify_end != verify_next[0]:
         return GGUF_META_TABLE_ERR_BAD_PARAM
 
     if (
@@ -283,6 +303,7 @@ def test_source_contains_iq_1106_symbol_and_parity_checks() -> None:
     body = source.split(sig, 1)[1].split("Bool GGUFMetaCanRead(", 1)[0]
     assert "GGUFMetadataReadArchitectureTagCheckedNoPartial(buf" in body
     assert "cursor_snapshot = *cursor;" in body
+    assert "if (tag_end_stage != next_cursor_stage)" in body
     assert "if (arch_stage != arch_verify)" in body
     assert "*cursor = next_cursor_stage;" in body
 
