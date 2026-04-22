@@ -1176,6 +1176,12 @@ I32 SoftmaxQ16StableTopKCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyP
         canonical_selected_count > canonical_required_workspace_cells)
         return FP_Q16_ERR_BAD_PARAM;
 
+    // Both staged and canonical requirements must remain within the immutable
+    // caller workspace budget snapshot.
+    if (staged_required_workspace_cells > snapshot_workspace_capacity ||
+        canonical_required_workspace_cells > snapshot_workspace_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
     if (staged_required_workspace_cells != canonical_required_workspace_cells ||
         staged_selected_count != canonical_selected_count ||
         staged_max_logit_q16 != canonical_max_logit_q16)
