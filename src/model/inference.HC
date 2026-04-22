@@ -426,6 +426,17 @@ I32 InferenceForwardDispatchRegistryInitQ16CheckedNoPartialCommitOnlyPreflightOn
         staged_default_arch_id != canonical_default_arch_id)
         return SAMPLING_Q16_ERR_BAD_PARAM;
 
+    // Keep tuple contract fully explicit and auditable: both staged and
+    // canonical paths must resolve to the exact fixed registry cardinality and
+    // default architecture ID.
+    if (staged_registry_count != DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT ||
+        canonical_registry_count != DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (staged_default_arch_id != DISPATCH_ARCH_Q16_ID_LLAMA ||
+        canonical_default_arch_id != DISPATCH_ARCH_Q16_ID_LLAMA)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
     for (slot_index = 0;
          slot_index < DISPATCH_ARCH_Q16_REGISTRY_SLOT_COUNT;
          slot_index++)
