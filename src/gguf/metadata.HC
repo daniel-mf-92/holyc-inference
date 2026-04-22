@@ -6387,7 +6387,7 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartial(U8 *buf,
         if (found)
             return GGUF_META_TABLE_ERR_BAD_PARAM;
         if (value_type != GGUF_TYPE_STRING)
-            return GGUF_META_TABLE_ERR_BAD_PARAM;
+            return GGUF_META_TABLE_ERR_TYPE_MISMATCH;
 
         err = GGUFMetadataReadStringLenU64Checked(buf,
                                                   buf_nbytes,
@@ -6694,6 +6694,10 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParity
     if (tag_end_preflight > table_end)
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
     if (tag_end_preflight != next_cursor_preflight)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (next_cursor_preflight < cursor_snapshot)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_off_preflight < cursor_snapshot)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
     if (next_cursor_preflight > buf_nbytes)
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
@@ -7120,6 +7124,10 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParity
     if (tag_end_parity_commit > table_end)
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
     if (tag_end_parity_commit != next_cursor_parity_commit)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (next_cursor_parity_commit < cursor_snapshot)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (tag_off_parity_commit < cursor_snapshot)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
     if (next_cursor_parity_commit > buf_nbytes)
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
