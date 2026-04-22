@@ -6839,6 +6839,8 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParity
 
     if (cursor_staged != next_cursor_staged)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (arch_staged < GGUF_ARCH_TAG_LLAMA || arch_staged > GGUF_ARCH_TAG_PHI3)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
     if (tag_off_staged > buf_nbytes)
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
     if (tag_len_staged > buf_nbytes - tag_off_staged)
@@ -6868,6 +6870,9 @@ I32 GGUFMetadataReadArchitectureTagCheckedNoPartialCommitOnlyPreflightOnlyParity
         return err;
 
     if (cursor_canonical != next_cursor_canonical)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (arch_canonical < GGUF_ARCH_TAG_LLAMA ||
+        arch_canonical > GGUF_ARCH_TAG_PHI3)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
     if (tag_off_canonical > buf_nbytes)
         return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
