@@ -15,6 +15,7 @@ from test_tokenizer_bpe_encode_prompt_checked import (
     TOKENIZER_BPE_ERR_NULL_PTR,
     TOKENIZER_BPE_ERR_OVERFLOW,
     TOKENIZER_BPE_OK,
+    TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS,
 )
 from test_tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only import (
     tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_only,
@@ -96,6 +97,7 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
     staged_required = [0]
     staged_required_bytes = [0]
     staged_next_cursor = [0]
+    staged_max_piece = [0]
     err = staged_fn(
         data,
         byte_len,
@@ -114,6 +116,7 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
         staged_required,
         staged_required_bytes,
         staged_next_cursor,
+        staged_max_piece,
     )
     if err != TOKENIZER_BPE_OK:
         return err
@@ -146,7 +149,7 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
     canonical_required_bytes = canonical_required[0] * 4
 
     if snapshot_cursor > byte_len or prompt_nbytes > (byte_len - snapshot_cursor):
-        return TOKENIZER_BPE_ERR_BAD_PARAM
+        return TOKENIZER_UTF8_ERR_OUT_OF_BOUNDS
     canonical_next_cursor = snapshot_cursor + prompt_nbytes
 
     if (
@@ -175,6 +178,9 @@ def tokenizer_bpe_encode_prompt_checked_noalloc_from_lens_commit_only_preflight_
         or staged_required_bytes[0] != canonical_required_bytes
         or staged_next_cursor[0] != canonical_next_cursor
     ):
+        return TOKENIZER_BPE_ERR_BAD_PARAM
+
+    if staged_max_piece[0] != canonical_max_piece[0]:
         return TOKENIZER_BPE_ERR_BAD_PARAM
 
     if canonical_max_piece[0] > I64_MAX:
@@ -309,10 +315,16 @@ def test_tuple_mismatch_rejected() -> None:
     vocab_lens = [1, 2, 3, 5]
 
     def bad_staged(*args, **kwargs):
-        out_req, out_bytes, out_next = args[-3], args[-2], args[-1]
+        out_req, out_bytes, out_next, out_max_piece = (
+            args[-4],
+            args[-3],
+            args[-2],
+            args[-1],
+        )
         out_req[0] = 7
         out_bytes[0] = 28
         out_next[0] = 4
+        out_max_piece[0] = 1
         return TOKENIZER_BPE_OK
 
     req = [1]

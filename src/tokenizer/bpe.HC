@@ -7348,6 +7348,7 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityC
     U64 staged_required_token_bytes;
     U64 staged_next_cursor;
     U64 staged_max_piece_len;
+    U64 staged_max_piece_len;
 
     U64 staged_canonical_required_token_capacity;
     U64 staged_canonical_max_piece_len;
@@ -8188,7 +8189,8 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityC
             out_token_capacity,
             &staged_required_token_capacity,
             &staged_required_token_bytes,
-            &staged_next_cursor);
+            &staged_next_cursor,
+            &staged_max_piece_len);
     if (err != TOKENIZER_BPE_OK)
         return err;
 
@@ -8284,6 +8286,9 @@ I32 TokenizerBPEEncodePromptCheckedNoAllocFromLensCommitOnlyPreflightOnlyParityC
 
     if (canonical_preflight_max_piece_len > 0x7FFFFFFFFFFFFFFF)
         return TOKENIZER_BPE_ERR_OVERFLOW;
+
+    if (staged_max_piece_len != canonical_preflight_max_piece_len)
+        return TOKENIZER_BPE_ERR_BAD_PARAM;
 
     *out_required_token_capacity = staged_required_token_capacity;
     *out_required_token_bytes = staged_required_token_bytes;
