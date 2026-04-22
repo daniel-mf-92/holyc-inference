@@ -429,6 +429,39 @@ def test_metadata_count_overflow_rejected_without_publish() -> None:
     assert out_next == [8]
 
 
+def test_table_end_beyond_buffer_rejected_without_publish() -> None:
+    buf = _make_blob(
+        [
+            (b"general.architecture", GGUF_TYPE_STRING, b"llama"),
+        ]
+    )
+
+    cursor = [0]
+    out_arch = [41]
+    out_off = [42]
+    out_len = [43]
+    out_next = [44]
+
+    rc = gguf_metadata_read_architecture_tag_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_reference(
+        buf=buf,
+        buf_nbytes=len(buf),
+        cursor_ref=cursor,
+        table_end=len(buf) + 1,
+        metadata_count=1,
+        out_arch_tag_ref=out_arch,
+        out_tag_offset_ref=out_off,
+        out_tag_len_ref=out_len,
+        out_next_cursor_ref=out_next,
+    )
+
+    assert rc == GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
+    assert cursor == [0]
+    assert out_arch == [41]
+    assert out_off == [42]
+    assert out_len == [43]
+    assert out_next == [44]
+
+
 def test_nonzero_cursor_respects_window_and_monotonic_publish() -> None:
     prefix = _encode_kv(b"irrelevant", GGUF_TYPE_STRING, b"noop")
     target = _encode_kv(b"general.architecture", GGUF_TYPE_STRING, b"mistral")
@@ -468,6 +501,7 @@ def run() -> None:
     test_source_contains_iq1126_function_and_chain()
     test_pointer_alias_rejected_without_publish()
     test_metadata_count_overflow_rejected_without_publish()
+    test_table_end_beyond_buffer_rejected_without_publish()
     test_nonzero_cursor_respects_window_and_monotonic_publish()
     print(
         "gguf_metadata_read_architecture_tag_checked_nopartial_"

@@ -577,4 +577,131 @@ I64 GGUFModelValidateTensorLayoutCheckedNoPartialCommitOnlyPreflightOnlyParityCo
     return GGUF_MODEL_VALIDATE_OK;
 }
 
+// IQ-1127 diagnostics-only zero-write companion over tensor-layout
+// parity-commit wrapper.
+//
+// Contract:
+// - Stage tuple through `...ParityCommitOnly` into local scratch outputs.
+// - Recompute canonical tuple through `...PreflightOnlyParity`.
+// - Enforce immutable input/output snapshots and strict tuple parity.
+// - Publish atomically only after exact tuple agreement.
+I64 GGUFModelValidateTensorLayoutCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+    U32 *tensor_types,
+    U64 *tensor_offsets,
+    U64 *tensor_n_dims,
+    U64 *tensor_dims_flat,
+    U64 tensor_count,
+    U64 dims_stride,
+    U64 data_region_nbytes,
+    U64 *out_validated_tensor_count,
+    U64 *out_total_payload_bytes)
+{
+    U32 *snapshot_tensor_types;
+    U64 *snapshot_tensor_offsets;
+    U64 *snapshot_tensor_n_dims;
+    U64 *snapshot_tensor_dims_flat;
+    U64 snapshot_tensor_count;
+    U64 snapshot_dims_stride;
+    U64 snapshot_data_region_nbytes;
+    U64 *snapshot_out_validated_tensor_count;
+    U64 *snapshot_out_total_payload_bytes;
+
+    U64 staged_validated_tensor_count;
+    U64 staged_total_payload_bytes;
+    U64 canonical_validated_tensor_count;
+    U64 canonical_total_payload_bytes;
+
+    I64 status;
+
+    if (!tensor_types || !tensor_offsets || !tensor_n_dims || !tensor_dims_flat ||
+        !out_validated_tensor_count || !out_total_payload_bytes)
+        return GGUF_MODEL_VALIDATE_ERR_NULL_PTR;
+
+    if (out_validated_tensor_count == out_total_payload_bytes)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+    if ((U8 *)out_validated_tensor_count == (U8 *)tensor_types ||
+        (U8 *)out_validated_tensor_count == (U8 *)tensor_offsets ||
+        (U8 *)out_validated_tensor_count == (U8 *)tensor_n_dims ||
+        (U8 *)out_validated_tensor_count == (U8 *)tensor_dims_flat ||
+        (U8 *)out_total_payload_bytes == (U8 *)tensor_types ||
+        (U8 *)out_total_payload_bytes == (U8 *)tensor_offsets ||
+        (U8 *)out_total_payload_bytes == (U8 *)tensor_n_dims ||
+        (U8 *)out_total_payload_bytes == (U8 *)tensor_dims_flat)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+
+    if (tensor_count > GGUF_MODEL_VALIDATE_MAX_TENSORS)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+    if (dims_stride == 0 || dims_stride > GGUF_MODEL_VALIDATE_MAX_DIMS)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+
+    snapshot_tensor_types = tensor_types;
+    snapshot_tensor_offsets = tensor_offsets;
+    snapshot_tensor_n_dims = tensor_n_dims;
+    snapshot_tensor_dims_flat = tensor_dims_flat;
+    snapshot_tensor_count = tensor_count;
+    snapshot_dims_stride = dims_stride;
+    snapshot_data_region_nbytes = data_region_nbytes;
+    snapshot_out_validated_tensor_count = out_validated_tensor_count;
+    snapshot_out_total_payload_bytes = out_total_payload_bytes;
+
+    status = GGUFModelValidateTensorLayoutCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(
+        tensor_types,
+        tensor_offsets,
+        tensor_n_dims,
+        tensor_dims_flat,
+        tensor_count,
+        dims_stride,
+        data_region_nbytes,
+        &staged_validated_tensor_count,
+        &staged_total_payload_bytes);
+    if (status != GGUF_MODEL_VALIDATE_OK)
+        return status;
+
+    status = GGUFModelValidateTensorLayoutCheckedNoPartialCommitOnlyPreflightOnlyParity(
+        tensor_types,
+        tensor_offsets,
+        tensor_n_dims,
+        tensor_dims_flat,
+        tensor_count,
+        dims_stride,
+        data_region_nbytes,
+        &canonical_validated_tensor_count,
+        &canonical_total_payload_bytes);
+    if (status != GGUF_MODEL_VALIDATE_OK)
+        return status;
+
+    if (snapshot_tensor_types != tensor_types ||
+        snapshot_tensor_offsets != tensor_offsets ||
+        snapshot_tensor_n_dims != tensor_n_dims ||
+        snapshot_tensor_dims_flat != tensor_dims_flat)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+
+    if (snapshot_tensor_count != tensor_count ||
+        snapshot_dims_stride != dims_stride ||
+        snapshot_data_region_nbytes != data_region_nbytes)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+
+    if (snapshot_out_validated_tensor_count != out_validated_tensor_count ||
+        snapshot_out_total_payload_bytes != out_total_payload_bytes)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+
+    if (staged_validated_tensor_count != canonical_validated_tensor_count ||
+        staged_total_payload_bytes != canonical_total_payload_bytes)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+
+    if (staged_validated_tensor_count > tensor_count)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+    if (canonical_validated_tensor_count > tensor_count)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+    if (tensor_count > 0 && staged_validated_tensor_count != tensor_count)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+    if (tensor_count > 0 && canonical_validated_tensor_count != tensor_count)
+        return GGUF_MODEL_VALIDATE_ERR_BAD_PARAM;
+    if (staged_total_payload_bytes > data_region_nbytes)
+        return GGUF_MODEL_VALIDATE_ERR_OUT_OF_BOUNDS;
+
+    *out_validated_tensor_count = staged_validated_tensor_count;
+    *out_total_payload_bytes = staged_total_payload_bytes;
+    return GGUF_MODEL_VALIDATE_OK;
+}
 
