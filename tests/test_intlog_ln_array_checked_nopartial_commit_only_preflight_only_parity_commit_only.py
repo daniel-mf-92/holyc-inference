@@ -32,12 +32,16 @@ def fpq16_ln_array_checked_nopartial_commit_only_preflight_only_parity_commit_on
     if required_bytes_out is None:
         return INTLOG_STATUS_BADPTR
 
+    if required_bytes_out is input_q16 or required_bytes_out is out_q16:
+        return INTLOG_STATUS_BADCOUNT
+
     required_bytes_out[0] = 0
 
     snapshot_input = input_q16
     snapshot_count = count
     snapshot_out = out_q16
     snapshot_capacity = out_capacity_bytes
+    snapshot_required_ptr = required_bytes_out
 
     staged_required = [0]
     status = fpq16_ln_array_checked_nopartial_commit_only_preflight_only_parity(
@@ -55,6 +59,7 @@ def fpq16_ln_array_checked_nopartial_commit_only_preflight_only_parity_commit_on
         or snapshot_count != count
         or snapshot_out is not out_q16
         or snapshot_capacity != out_capacity_bytes
+        or required_bytes_out is not snapshot_required_ptr
     ):
         return INTLOG_STATUS_BADCOUNT
 
@@ -68,11 +73,15 @@ def fpq16_ln_array_checked_nopartial_commit_only_preflight_only_parity_commit_on
     if staged_required[0] != canonical_required:
         return INTLOG_STATUS_OVERFLOW
 
+    if staged_required[0] < 0 or canonical_required < 0:
+        return INTLOG_STATUS_OVERFLOW
+
     if (
         snapshot_input is not input_q16
         or snapshot_count != count
         or snapshot_out is not out_q16
         or snapshot_capacity != out_capacity_bytes
+        or required_bytes_out is not snapshot_required_ptr
     ):
         return INTLOG_STATUS_BADCOUNT
 
@@ -90,6 +99,7 @@ def test_source_contains_iq1161_signature_and_commit_only_contract() -> None:
     body = src.split(sig, 1)[1].split("I32 FPQ16LnArrayCheckedNoPartialDefault(", 1)[0]
 
     assert "if (!required_bytes_out)" in body
+    assert "if (required_bytes_out == input_q16 ||" in body
     assert "*required_bytes_out = 0;" in body
     assert (
         "status = FPQ16LnArrayCheckedNoPartialCommitOnlyPreflightOnlyParity(input_q16,"
@@ -97,6 +107,7 @@ def test_source_contains_iq1161_signature_and_commit_only_contract() -> None:
     )
     assert "if (staged_required_bytes != canonical_required_bytes)" in body
     assert "*required_bytes_out = staged_required_bytes;" in body
+    assert "if (staged_required_bytes < 0 || canonical_required_bytes < 0)" in body
     assert "Final immutable snapshot revalidation immediately before publish" in body
     assert "out_q16[i] =" not in body
 
@@ -136,6 +147,31 @@ def test_null_required_pointer_and_preflight_failures_keep_state() -> None:
     assert st == INTLOG_STATUS_BADCOUNT
     assert need[0] == 0
     assert out == [444, 555, 666]
+
+
+def test_required_bytes_out_alias_rejected() -> None:
+    inp = [FP_Q16_ONE, FP_Q16_ONE * 2]
+    out = [111, 222]
+
+    st = fpq16_ln_array_checked_nopartial_commit_only_preflight_only_parity_commit_only(
+        inp,
+        2,
+        out,
+        16,
+        inp,
+    )
+    assert st == INTLOG_STATUS_BADCOUNT
+    assert inp == [FP_Q16_ONE, FP_Q16_ONE * 2]
+
+    st = fpq16_ln_array_checked_nopartial_commit_only_preflight_only_parity_commit_only(
+        inp,
+        2,
+        out,
+        16,
+        out,
+    )
+    assert st == INTLOG_STATUS_BADCOUNT
+    assert out == [111, 222]
 
 
 def test_capacity_failure_and_success_atomic_publish() -> None:
@@ -198,6 +234,7 @@ def test_randomized_required_bytes_parity() -> None:
 def run() -> None:
     test_source_contains_iq1161_signature_and_commit_only_contract()
     test_null_required_pointer_and_preflight_failures_keep_state()
+    test_required_bytes_out_alias_rejected()
     test_capacity_failure_and_success_atomic_publish()
     test_randomized_required_bytes_parity()
     print(

@@ -486,6 +486,7 @@ I32 FPQ16LnArrayCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(I64 *inp
     I64 snapshot_count;
     I64 *snapshot_out_q16;
     I64 snapshot_out_capacity_bytes;
+    I64 *snapshot_required_bytes_out;
     I64 staged_required_bytes;
     I64 canonical_required_bytes;
     I32 status;
@@ -493,12 +494,18 @@ I32 FPQ16LnArrayCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(I64 *inp
     if (!required_bytes_out)
         return INTLOG_STATUS_BADPTR;
 
+    // Commit-only diagnostics output must not alias lane buffers.
+    if (required_bytes_out == input_q16 ||
+        required_bytes_out == out_q16)
+        return INTLOG_STATUS_BADCOUNT;
+
     *required_bytes_out = 0;
 
     snapshot_input_q16 = input_q16;
     snapshot_count = count;
     snapshot_out_q16 = out_q16;
     snapshot_out_capacity_bytes = out_capacity_bytes;
+    snapshot_required_bytes_out = required_bytes_out;
 
     status = FPQ16LnArrayCheckedNoPartialCommitOnlyPreflightOnlyParity(input_q16,
                                                                         count,
@@ -511,7 +518,8 @@ I32 FPQ16LnArrayCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(I64 *inp
     if (snapshot_input_q16 != input_q16 ||
         snapshot_count != count ||
         snapshot_out_q16 != out_q16 ||
-        snapshot_out_capacity_bytes != out_capacity_bytes)
+        snapshot_out_capacity_bytes != out_capacity_bytes ||
+        snapshot_required_bytes_out != required_bytes_out)
         return INTLOG_STATUS_BADCOUNT;
 
     if (!count)
@@ -524,11 +532,15 @@ I32 FPQ16LnArrayCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(I64 *inp
     if (staged_required_bytes != canonical_required_bytes)
         return INTLOG_STATUS_OVERFLOW;
 
+    if (staged_required_bytes < 0 || canonical_required_bytes < 0)
+        return INTLOG_STATUS_OVERFLOW;
+
     // Final immutable snapshot revalidation immediately before publish.
     if (snapshot_input_q16 != input_q16 ||
         snapshot_count != count ||
         snapshot_out_q16 != out_q16 ||
-        snapshot_out_capacity_bytes != out_capacity_bytes)
+        snapshot_out_capacity_bytes != out_capacity_bytes ||
+        snapshot_required_bytes_out != required_bytes_out)
         return INTLOG_STATUS_BADCOUNT;
 
     *required_bytes_out = staged_required_bytes;
