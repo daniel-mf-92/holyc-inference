@@ -191,7 +191,7 @@ def test_source_contains_topk_topp_commit_only_preflight_only_parity() -> None:
     assert "snapshot_out_final_token_count = out_final_token_count;" in source
     assert "if (snapshot_step_logits_q16 != step_logits_q16 ||" in source
     assert "snapshot_out_final_token_count != out_final_token_count)" in source
-    assert "if (required_random_capacity != commit_required_tokens)" in source
+    assert "if (required_generated_capacity != commit_required_tokens)" in source
 
 
 def test_known_vector_success() -> None:
