@@ -1158,7 +1158,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-1265 Add Trinity policy drift checker script `automation/check-trinity-policy-sync.sh` with machine-readable output (WS16-10)
 - [x] IQ-1266 Implement continuous batching scheduler in `src/runtime/batch_scheduler.HC` with harness `tests/test_runtime_batch_scheduler.py` (WS9-33, WS13-03)
 - [x] IQ-1267 Implement prefix cache manager in `src/runtime/prefix_cache.HC` with harness `tests/test_runtime_prefix_cache.py` (WS9-34)
-- [ ] IQ-1268 Implement speculative decode coordinator in `src/model/spec_decode.HC` with harness `tests/test_model_spec_decode.py` (WS9-36, WS13-04)
+- [x] IQ-1268 Implement speculative decode coordinator in `src/model/spec_decode.HC` with harness `tests/test_model_spec_decode.py` (WS9-36, WS13-04)
 - [ ] IQ-1269 Implement quantization profile selector in `src/runtime/quant_profile.HC` with harness `tests/test_runtime_quant_profile.py` (WS9-37)
 - [ ] IQ-1270 Add secure-on perf matrix harness `automation/perf-matrix.sh` + `tests/test_perf_secure_vs_dev_matrix.py` (WS9-39)
 - [x] IQ-1271 Implement attestation evidence emitter in `src/runtime/attestation_manifest.HC` with harness `tests/test_runtime_attestation_manifest.py` (WS16-11)
@@ -2849,3 +2849,4 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - 2026-04-23: IQ-1267 done — added `src/runtime/prefix_cache.HC` + `tests/test_runtime_prefix_cache.py`; validated `python3 tests/test_runtime_prefix_cache.py && ./.venv/bin/python -m pytest -q tests/test_runtime_prefix_cache.py` (3 passed).
 
 - 2026-04-23: IQ-1278 completed (`RoPEQ16RotateHeadByPositionApplyPairCheckedNoPartialCommitOnly` + parity harness).
+- 2026-04-23: IQ-1268 done — added `src/model/spec_decode.HC` + `tests/test_model_spec_decode.py`; validated `python3 tests/test_model_spec_decode.py && ./.venv/bin/python -m pytest -q tests/test_model_spec_decode.py` (6 passed).
