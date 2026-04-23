@@ -75,7 +75,7 @@ def parity_commit_only_preflight_only(
         return Q8_0_DOT_BENCH_ERR_BAD_PARAM
 
     snapshot_cpu_hz = cpu_hz
-    snapshot_out_total_ops = out_total_ops[0]
+    snapshot_out_shape_count = out_total_ops[0]
     snapshot_out_total_cycles = out_total_cycles[0]
     snapshot_out_cycles_per_op = out_cycles_per_op[0]
     snapshot_out_remainder_cycles = out_remainder_cycles[0]
@@ -90,7 +90,7 @@ def parity_commit_only_preflight_only(
 
     if (
         snapshot_cpu_hz != cpu_hz
-        or snapshot_out_total_ops != out_total_ops[0]
+        or snapshot_out_shape_count != out_total_ops[0]
         or snapshot_out_total_cycles != out_total_cycles[0]
         or snapshot_out_cycles_per_op != out_cycles_per_op[0]
         or snapshot_out_remainder_cycles != out_remainder_cycles[0]
@@ -114,9 +114,9 @@ def test_source_contains_iq1303_function_and_guards() -> None:
     assert "if (!out_total_ops || !out_total_cycles || !out_cycles_per_op ||" in body
     assert "if (out_total_ops == out_total_cycles ||" in body
     assert "snapshot_cpu_hz = cpu_hz;" in body
-    assert "snapshot_out_total_ops = *out_total_ops;" in body
-    assert "status = Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnly(" in body
-    assert "status = Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParity(" in body
+    assert "snapshot_out_shape_count = *out_total_ops;" in body
+    assert "status = Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnly(" in body
+    assert "status = Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in body
     assert "if (parity_commit_total_ops != parity_preflight_total_ops ||" in body
     assert "return Q8_0_DOT_BENCH_OK;" in body
 
