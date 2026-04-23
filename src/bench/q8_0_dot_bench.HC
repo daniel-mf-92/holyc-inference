@@ -224,6 +224,65 @@ I32 Q8_0DotBenchRunDefaultSuiteCyclesPerTokenQ16Checked(
     return Q8_0_DOT_BENCH_OK;
 }
 
+I32 Q8_0DotBenchEstimateTokPerSecQ16Checked(
+    I64 cpu_hz,
+    I64 cycles_per_token_q16,
+    I64 *out_tok_per_sec_q16)
+{
+    I64 reciprocal_numer_q48;
+    I64 half_cycles_per_token_q16;
+    I64 rounded_reciprocal_numer_q48;
+    I64 reciprocal_tok_per_cycle_q32;
+    I64 tok_per_sec_q32;
+    I64 rounded_tok_per_sec_q32;
+    I64 staged_tok_per_sec_q16;
+    I32 status;
+
+    if (!out_tok_per_sec_q16)
+        return Q8_0_DOT_BENCH_ERR_NULL_PTR;
+
+    // CPU frequency is strictly positive. Negative Q16 cycles/token is invalid.
+    if (cpu_hz <= 0 || cycles_per_token_q16 < 0)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+    if (!cycles_per_token_q16)
+        return Q8_0_DOT_BENCH_ERR_DIV_BY_ZERO;
+
+    // Reciprocal scaling in fixed-point:
+    // reciprocal_tok_per_cycle_q32 = Round((1.0_q48 / cycles_per_token_q16))
+    // where 1.0_q48 = 2^48 and cycles_per_token_q16 encodes cycles/token.
+    // This keeps enough precision for low tok/s regimes without floating point.
+    reciprocal_numer_q48 = 281474976710656; // 1 << 48
+    half_cycles_per_token_q16 = cycles_per_token_q16 >> 1;
+    status = Q8_0DotBenchTryAddI64(reciprocal_numer_q48,
+                                   half_cycles_per_token_q16,
+                                   &rounded_reciprocal_numer_q48);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    reciprocal_tok_per_cycle_q32 = rounded_reciprocal_numer_q48 /
+                                   cycles_per_token_q16;
+
+    // tok_per_sec_q16 = Round((cpu_hz * reciprocal_tok_per_cycle_q32) / 2^16)
+    // using checked multiply and checked rounding bias add.
+    status = Q8_0DotBenchTryMulI64(cpu_hz,
+                                   reciprocal_tok_per_cycle_q32,
+                                   &tok_per_sec_q32);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    status = Q8_0DotBenchTryAddI64(tok_per_sec_q32,
+                                   32768,
+                                   &rounded_tok_per_sec_q32);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    staged_tok_per_sec_q16 = rounded_tok_per_sec_q32 >> 16;
+
+    // No-partial diagnostics publish.
+    *out_tok_per_sec_q16 = staged_tok_per_sec_q16;
+    return Q8_0_DOT_BENCH_OK;
+}
+
 // Diagnostics-only planner for deterministic Q8_0 default bench shapes.
 //
 // This helper does not allocate buffers or run kernels. It only validates the
