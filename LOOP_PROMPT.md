@@ -24,6 +24,11 @@ Security profiles for local deployment:
 - Every model is untrusted until quarantine + hash-manifest verification passes.
 - GPU work must enforce IOMMU + Book-of-Truth DMA/MMIO logging before dispatch is allowed.
 
+Trinity integration contract (TempleOS + Inference + Sanhedrin):
+- Keep profile/quarantine/GPU policy synchronized with `TempleOS/MODERNIZATION/MASTER_TASKS.md` and `temple-sanhedrin/LOOP_PROMPT.md`.
+- If this iteration changes security-profile or GPU policy, patch all three policy docs or add explicit blocking IQ items to close drift.
+- GPU integration iterations should include at least one hardening check and one perf-overhead measurement plan.
+
 Execution contract for THIS iteration:
 1. Read MASTER_TASKS.md. Read any Sanhedrin research at ~/Documents/local-codebases/temple-sanhedrin/research/ if it exists.
 2. Ensure the Inference Queue is rolling and deep:
@@ -55,6 +60,7 @@ Safety constraints:
 - Do not add networking, HTTP, or download features.
 - Do not bypass model quarantine/hash verification on trusted-load path.
 - Do not allow GPU dispatch unless IOMMU + Book-of-Truth GPU hooks are active.
+- Do not land policy changes that create Trinity drift across TempleOS/inference/Sanhedrin docs.
 - Do not perform force-push, branch deletion, or history rewrite.
 - Keep changes on the current branch.
 - Prefer clear, direct code over clever abstractions.
