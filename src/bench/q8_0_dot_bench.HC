@@ -182,6 +182,48 @@ I32 Q8_0DotBenchRunDefaultSuiteOpsPerSecondQ16Checked(
     return Q8_0_DOT_BENCH_OK;
 }
 
+I32 Q8_0DotBenchRunDefaultSuiteCyclesPerTokenQ16Checked(
+    I64 total_cycles,
+    I64 total_tokens,
+    I64 *out_cycles_per_token_q16)
+{
+    I64 total_cycles_q16;
+    I64 half_tokens;
+    I64 rounded_numer;
+    I64 staged_cycles_per_token_q16;
+    I32 status;
+
+    if (!out_cycles_per_token_q16)
+        return Q8_0_DOT_BENCH_ERR_NULL_PTR;
+
+    // Bench counters are monotonic and non-negative.
+    if (total_cycles < 0 || total_tokens < 0)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+    if (!total_tokens)
+        return Q8_0_DOT_BENCH_ERR_DIV_BY_ZERO;
+
+    // Lift cycles into Q16 domain with checked left shift.
+    if (total_cycles > (Q8_0_DOT_BENCH_I64_MAX >> 16))
+        return Q8_0_DOT_BENCH_ERR_OVERFLOW;
+    total_cycles_q16 = total_cycles << 16;
+
+    // Deterministic integer-only rounding:
+    // cycles_per_token_q16 = Round(total_cycles_q16 / total_tokens)
+    //                      = (total_cycles_q16 + floor(total_tokens / 2)) / total_tokens
+    half_tokens = total_tokens >> 1;
+    status = Q8_0DotBenchTryAddI64(total_cycles_q16,
+                                   half_tokens,
+                                   &rounded_numer);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    staged_cycles_per_token_q16 = rounded_numer / total_tokens;
+
+    // No-partial diagnostics publish.
+    *out_cycles_per_token_q16 = staged_cycles_per_token_q16;
+    return Q8_0_DOT_BENCH_OK;
+}
+
 // Diagnostics-only planner for deterministic Q8_0 default bench shapes.
 //
 // This helper does not allocate buffers or run kernels. It only validates the
