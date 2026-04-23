@@ -4,12 +4,15 @@
 from __future__ import annotations
 
 import random
+from pathlib import Path
 
 GGUF_META_TABLE_OK = 0
 GGUF_META_TABLE_ERR_NULL_PTR = 1
 GGUF_META_TABLE_ERR_BAD_PARAM = 2
 GGUF_META_TABLE_ERR_OVERFLOW = 3
 GGUF_META_TABLE_ERR_OUT_OF_BOUNDS = 4
+
+GGUF_TYPE_BOOL = 7
 
 I64_MAX = (1 << 63) - 1
 
@@ -35,29 +38,60 @@ def gguf_metadata_cursor_can_advance_checked(
     return GGUF_META_TABLE_OK, next_cursor
 
 
-def gguf_metadata_read_u8_checked(
-    buf: list[int] | None,
-    buf_nbytes: int,
+def gguf_metadata_cursor_typed_span_bytes_checked(
+    value_type: int,
+    variable_payload_bytes: int,
+) -> tuple[int, int | None]:
+    if variable_payload_bytes > I64_MAX:
+        return GGUF_META_TABLE_ERR_OVERFLOW, None
+
+    if value_type == GGUF_TYPE_BOOL:
+        return GGUF_META_TABLE_OK, 1
+
+    return GGUF_META_TABLE_ERR_BAD_PARAM, None
+
+
+def gguf_metadata_cursor_advance_checked(
     cursor_ref: list[int] | None,
     table_end: int,
-    out_value_ref: list[int] | None,
+    value_type: int,
+    variable_payload_bytes: int,
+    out_span_start_ref: list[int] | None,
+    out_span_bytes_ref: list[int] | None,
+    out_span_end_ref: list[int] | None,
 ) -> int:
-    if buf is None or cursor_ref is None or out_value_ref is None:
+    if (
+        cursor_ref is None
+        or out_span_start_ref is None
+        or out_span_bytes_ref is None
+        or out_span_end_ref is None
+    ):
         return GGUF_META_TABLE_ERR_NULL_PTR
-    if buf_nbytes > I64_MAX:
+
+    if table_end > I64_MAX:
         return GGUF_META_TABLE_ERR_OVERFLOW
 
     cur = cursor_ref[0]
-    err, next_cursor = gguf_metadata_cursor_can_advance_checked(cur, 1, table_end)
+    if cur > I64_MAX:
+        return GGUF_META_TABLE_ERR_OVERFLOW
+
+    err, span_bytes = gguf_metadata_cursor_typed_span_bytes_checked(
+        value_type,
+        variable_payload_bytes,
+    )
     if err != GGUF_META_TABLE_OK:
         return err
 
-    assert next_cursor is not None
-    if next_cursor > buf_nbytes:
-        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
+    assert span_bytes is not None
+    err, span_end = gguf_metadata_cursor_can_advance_checked(cur, span_bytes, table_end)
+    if err != GGUF_META_TABLE_OK:
+        return err
 
-    out_value_ref[0] = buf[cur]
-    cursor_ref[0] = next_cursor
+    assert span_end is not None
+    out_span_start_ref[0] = cur
+    out_span_bytes_ref[0] = span_bytes
+    out_span_end_ref[0] = span_end
+    cursor_ref[0] = span_end
     return GGUF_META_TABLE_OK
 
 
@@ -71,18 +105,44 @@ def gguf_metadata_read_bool_checked(
     if buf is None or cursor_ref is None or out_value_ref is None:
         return GGUF_META_TABLE_ERR_NULL_PTR
 
-    cur = [cursor_ref[0]]
-    raw = [0]
+    if buf_nbytes > I64_MAX:
+        return GGUF_META_TABLE_ERR_OVERFLOW
+    if table_end > I64_MAX:
+        return GGUF_META_TABLE_ERR_OVERFLOW
 
-    err = gguf_metadata_read_u8_checked(buf, buf_nbytes, cur, table_end, raw)
+    cur = [cursor_ref[0]]
+    if cur[0] > I64_MAX:
+        return GGUF_META_TABLE_ERR_OVERFLOW
+
+    span_start = [0]
+    span_bytes = [0]
+    span_end = [0]
+
+    err = gguf_metadata_cursor_advance_checked(
+        cur,
+        table_end,
+        GGUF_TYPE_BOOL,
+        0,
+        span_start,
+        span_bytes,
+        span_end,
+    )
     if err != GGUF_META_TABLE_OK:
         return err
 
-    if raw[0] > 1:
+    if span_start[0] > I64_MAX:
+        return GGUF_META_TABLE_ERR_OVERFLOW
+    if span_bytes[0] != 1:
+        return GGUF_META_TABLE_ERR_BAD_PARAM
+    if span_end[0] > buf_nbytes:
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
+
+    raw = buf[span_start[0]]
+    if raw > 1:
         return GGUF_META_TABLE_ERR_BAD_PARAM
 
-    out_value_ref[0] = raw[0] != 0
-    cursor_ref[0] = cur[0]
+    out_value_ref[0] = raw != 0
+    cursor_ref[0] = span_end[0]
     return GGUF_META_TABLE_OK
 
 
@@ -113,12 +173,11 @@ def test_null_ptr_and_no_partial_write() -> None:
 def test_bounds_and_short_read_do_not_mutate() -> None:
     out = [False]
 
-    for table_end in range(0, 1):
-        cursor = [0]
-        err = gguf_metadata_read_bool_checked([1], 1, cursor, table_end, out)
-        assert err in (GGUF_META_TABLE_ERR_OUT_OF_BOUNDS, GGUF_META_TABLE_ERR_BAD_PARAM)
-        assert cursor[0] == 0
-        assert out[0] is False
+    cursor = [0]
+    err = gguf_metadata_read_bool_checked([1], 1, cursor, 0, out)
+    assert err == GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
+    assert cursor[0] == 0
+    assert out[0] is False
 
     cursor = [1]
     out = [True]
@@ -128,7 +187,7 @@ def test_bounds_and_short_read_do_not_mutate() -> None:
     assert out[0] is True
 
 
-def test_overflow_guards_passthrough_from_shared_reader() -> None:
+def test_overflow_guards_passthrough_from_typed_span_path() -> None:
     buf = [0, 1, 0, 1]
 
     cursor = [0]
@@ -179,6 +238,31 @@ def test_reads_canonical_bool_values() -> None:
     assert cursor[0] == 3
 
 
+def test_cursor_greater_than_table_end_is_bad_param_and_no_partial() -> None:
+    cursor = [5]
+    out = [True]
+    err = gguf_metadata_read_bool_checked([0] * 8, 8, cursor, 4, out)
+    assert err == GGUF_META_TABLE_ERR_BAD_PARAM
+    assert cursor[0] == 5
+    assert out[0] is True
+
+
+def test_cursor_advances_exactly_one_on_success() -> None:
+    rng = random.Random(20260423_1245)
+
+    for _ in range(1000):
+        n = rng.randint(1, 64)
+        buf = [rng.randint(0, 1) for _ in range(n)]
+        cursor0 = rng.randint(0, n - 1)
+        cursor = [cursor0]
+        out = [False]
+
+        err = gguf_metadata_read_bool_checked(buf, n, cursor, n, out)
+        assert err == GGUF_META_TABLE_OK
+        assert cursor[0] == cursor0 + 1
+        assert out[0] == (buf[cursor0] == 1)
+
+
 def test_randomized_parity() -> None:
     rng = random.Random(20260417_199)
 
@@ -208,13 +292,33 @@ def test_randomized_parity() -> None:
             assert cursor[0] == cursor0
 
 
+def test_holyc_uses_typed_bool_span_contract() -> None:
+    source = Path("src/gguf/metadata.HC").read_text(encoding="utf-8")
+
+    sig = "I32 GGUFMetadataReadBoolChecked(U8 *buf,"
+    start = source.rfind(sig)
+    assert start >= 0
+
+    next_sig = source.find("I32 GGUFMetadataReadBoolPairChecked(U8 *buf,", start)
+    assert next_sig > start
+
+    body = source[start:next_sig]
+    assert "GGUFMetadataCursorAdvanceChecked" in body
+    assert "GGUF_TYPE_BOOL" in body
+    assert "span_bytes != 1" in body
+    assert "raw_u8 > 1" in body
+
+
 def run() -> None:
     test_null_ptr_and_no_partial_write()
     test_bounds_and_short_read_do_not_mutate()
-    test_overflow_guards_passthrough_from_shared_reader()
+    test_overflow_guards_passthrough_from_typed_span_path()
     test_rejects_non_canonical_bool_values()
     test_reads_canonical_bool_values()
+    test_cursor_greater_than_table_end_is_bad_param_and_no_partial()
+    test_cursor_advances_exactly_one_on_success()
     test_randomized_parity()
+    test_holyc_uses_typed_bool_span_contract()
     print("gguf_metadata_read_bool_checked_reference_checks=ok")
 
 

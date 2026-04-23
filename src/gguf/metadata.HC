@@ -5041,30 +5041,52 @@ I32 GGUFMetadataReadBoolChecked(U8 *buf,
                                 Bool *out_value)
 {
     U64 cur;
+    U64 span_start;
+    U64 span_bytes;
+    U64 span_end;
     U8 raw_u8;
     I32 err;
 
     if (!buf || !cursor || !out_value)
         return GGUF_META_TABLE_ERR_NULL_PTR;
 
-    cur = *cursor;
+    if (buf_nbytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (table_end > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
 
-    // Decode through the shared checked byte reader so bool decode inherits
-    // canonical cursor/bounds/no-partial-write behavior.
-    err = GGUFMetadataReadU8Checked(buf,
-                                    buf_nbytes,
-                                    &cur,
-                                    table_end,
-                                    &raw_u8);
+    cur = *cursor;
+    if (cur > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+
+    // Advance through the canonical typed-span helper using BOOL scalar width
+    // so cursor movement parity is identical with value-skipping/parser paths.
+    err = GGUFMetadataCursorAdvanceChecked(&cur,
+                                           table_end,
+                                           GGUF_TYPE_BOOL,
+                                           0,
+                                           &span_start,
+                                           &span_bytes,
+                                           &span_end);
     if (err != GGUF_META_TABLE_OK)
         return err;
+
+    if (span_start > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_META_TABLE_ERR_OVERFLOW;
+    if (span_bytes != 1)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (span_end > buf_nbytes)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    // Decode exactly one payload byte from the validated BOOL value span.
+    raw_u8 = buf[span_start];
 
     // GGUF bool payloads are strict 0/1 in one byte.
     if (raw_u8 > 1)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
 
     *out_value = (raw_u8 != 0);
-    *cursor = cur;
+    *cursor = span_end;
     return GGUF_META_TABLE_OK;
 }
 
