@@ -2317,6 +2317,87 @@ I32 SamplingSelectNextTokenChecked(I64 *logits_q16,
     return SAMPLING_Q16_OK;
 }
 
+// IQ-1217 no-partial selector wrapper.
+//
+// Runs the canonical integer-only sampling pipeline end-to-end:
+// repetition penalty -> temperature -> top-k -> softmax -> top-p sample.
+// Publishes `{token_id, token_probability_q16}` atomically only on success.
+I32 SamplingSelectNextTokenCheckedNoPartial(I64 *logits_q16,
+                                            I64 logits_capacity,
+                                            I64 vocab_size,
+                                            I64 *token_history,
+                                            I64 token_history_capacity,
+                                            I64 token_history_count,
+                                            I64 temperature_q16,
+                                            I64 top_k,
+                                            I64 top_p_q16,
+                                            I64 repetition_penalty_q16,
+                                            I64 random_q16,
+                                            I64 *stage_logits_q16,
+                                            I64 stage_logits_capacity,
+                                            I64 *topk_probs_q16,
+                                            I64 topk_probs_capacity,
+                                            I64 *topk_indices,
+                                            I64 topk_index_capacity,
+                                            I64 *out_token_id,
+                                            I64 *out_token_prob_q16)
+{
+    I64 sampled_rank;
+    I64 staged_token_id;
+    I64 staged_token_prob_q16;
+    Bool found_rank;
+    I32 status;
+
+    if (!out_token_id || !out_token_prob_q16)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+    if (out_token_id == out_token_prob_q16)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    staged_token_id = -1;
+    staged_token_prob_q16 = -1;
+
+    status = SamplingSelectNextTokenChecked(logits_q16,
+                                            logits_capacity,
+                                            vocab_size,
+                                            token_history,
+                                            token_history_capacity,
+                                            token_history_count,
+                                            temperature_q16,
+                                            top_k,
+                                            top_p_q16,
+                                            repetition_penalty_q16,
+                                            random_q16,
+                                            stage_logits_q16,
+                                            stage_logits_capacity,
+                                            topk_probs_q16,
+                                            topk_probs_capacity,
+                                            topk_indices,
+                                            topk_index_capacity,
+                                            &staged_token_id);
+    if (status)
+        return status;
+
+    found_rank = FALSE;
+    for (sampled_rank = 0; sampled_rank < top_k; sampled_rank++)
+    {
+        if (topk_indices[sampled_rank] != staged_token_id)
+            continue;
+
+        staged_token_prob_q16 = topk_probs_q16[sampled_rank];
+        found_rank = TRUE;
+        break;
+    }
+
+    if (!found_rank)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (staged_token_prob_q16 < 0 || staged_token_prob_q16 > SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    *out_token_id = staged_token_id;
+    *out_token_prob_q16 = staged_token_prob_q16;
+    return SAMPLING_Q16_OK;
+}
+
 // Execute exactly one generation step from logits to one sampled token id.
 //
 // This is the canonical WS7 step-level entrypoint with explicit stage-coded
