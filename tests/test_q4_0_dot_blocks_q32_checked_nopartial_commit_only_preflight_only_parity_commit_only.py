@@ -268,7 +268,7 @@ def test_overflow_no_publish() -> None:
 def test_success_publishes_tuple_once() -> None:
     out_q32 = [101]
     out_q16 = [202]
-    block_dots = [5 << 16, -(2 << 15), 99, -(4 << 16), 1 << 16]
+    block_dots = [5 << 16, -(2 << 16), 99, -(4 << 16), 1 << 16]
 
     err = q4_0_dot_blocks_q32_checked_nopartial_commit_only_preflight_only_parity_commit_only(
         block_dots,
