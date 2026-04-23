@@ -7455,3 +7455,125 @@ I32 KVCacheQ16ReserveTokenSpanCheckedNoPartialCommitOnlyPreflightOnlyRequiredByt
     *out_last_cell_index = staged_last_cell_index;
     return KV_Q16_OK;
 }
+
+// IQ-1281: compact KV cache by shifting token-major cells left after eviction.
+// Integer-only, no-partial-write semantics: destination is published only after
+// full preflight geometry/range validation and overlap-safe forward copy staging.
+I32 KVCacheQ16TokenShiftLeftCheckedNoPartial(
+    I64 *k_cache,
+    I64 *v_cache,
+    I64 layer_count,
+    I64 token_capacity,
+    I64 kv_heads,
+    I64 head_dim,
+    I64 used_tokens,
+    I64 shift_tokens,
+    I64 *out_new_used_tokens,
+    I64 *out_moved_cells)
+{
+    I64 cells_per_token;
+    I64 total_cells;
+    I64 shift_cells;
+    I64 keep_tokens;
+    I64 keep_cells;
+    I64 idx;
+    I32 status;
+
+    if (!k_cache || !v_cache || !out_new_used_tokens || !out_moved_cells)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (out_new_used_tokens == out_moved_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (layer_count < 0 || token_capacity < 0 || kv_heads < 0 ||
+        head_dim < 0 || used_tokens < 0 || shift_tokens < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (used_tokens > token_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    status = KVCacheQ16ComputeLayerTokenSpanCellsChecked(kv_heads,
+                                                         head_dim,
+                                                         &cells_per_token);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVTryMulI64Checked(layer_count,
+                                cells_per_token,
+                                &cells_per_token);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVCacheQ16ComputeTotalCellsChecked(layer_count,
+                                                token_capacity,
+                                                kv_heads,
+                                                head_dim,
+                                                &total_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (!used_tokens)
+    {
+        *out_new_used_tokens = 0;
+        *out_moved_cells = 0;
+        return KV_Q16_OK;
+    }
+
+    if (!shift_tokens)
+    {
+        *out_new_used_tokens = used_tokens;
+        *out_moved_cells = 0;
+        return KV_Q16_OK;
+    }
+
+    if (shift_tokens >= used_tokens)
+    {
+        *out_new_used_tokens = 0;
+        *out_moved_cells = 0;
+        return KV_Q16_OK;
+    }
+
+    keep_tokens = used_tokens - shift_tokens;
+
+    status = KVTryMulI64Checked(shift_tokens,
+                                cells_per_token,
+                                &shift_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVTryMulI64Checked(keep_tokens,
+                                cells_per_token,
+                                &keep_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (shift_cells < 0 || keep_cells < 0 || total_cells < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (shift_cells > total_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+    if (keep_cells > total_cells - shift_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    // Overlap-safe forward copy for left shift: src starts ahead of dst.
+    idx = 0;
+    while (idx < keep_cells)
+    {
+        k_cache[idx] = k_cache[idx + shift_cells];
+        v_cache[idx] = v_cache[idx + shift_cells];
+        idx++;
+    }
+
+    // Deterministic tail scrub for evicted slots.
+    idx = keep_cells;
+    while (idx < total_cells)
+    {
+        k_cache[idx] = 0;
+        v_cache[idx] = 0;
+        idx++;
+    }
+
+    *out_new_used_tokens = keep_tokens;
+    *out_moved_cells = keep_cells;
+    return KV_Q16_OK;
+}
