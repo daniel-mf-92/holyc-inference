@@ -26,6 +26,8 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - **Security profiles** — `secure-local` is the default deployment profile; `dev-local` is explicit opt-in for local experimentation only.
 - **Model files are untrusted inputs** — every model must pass quarantine + hash-manifest verification before trusted load.
 - **GPU is conditional** — GPU acceleration is forbidden unless IOMMU enforcement + Book-of-Truth GPU telemetry are active.
+- **Split-plane trust model** — this runtime is the high-throughput worker plane; trust decisions remain in TempleOS control plane via attestation + policy-digest handshake.
+- **Performance with security ON** — throughput claims must include `secure-local` measurements with audit hooks enabled, not only relaxed `dev-local` numbers.
 - **AVX2 inline asm for hot paths** — HolyC supports inline x86 assembly. Use it for
   quantized dot products, matmul kernels, and attention score computation.
 - **No external dependencies** — no libc, no libm, no pthreads. Math functions (exp,
@@ -152,6 +154,14 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] WS9-30 KV-cache residency manager for GPU partition with strict isolation from kernel/log pages
 - [ ] WS9-31 GPU security/perf matrix runner (batch of prompt lengths + quant levels + audit-on/off)
 - [ ] WS9-32 Fail-closed runtime gate: any missing isolation/audit prerequisite forces CPU-only fallback
+- [ ] WS9-33 Implement continuous batching scheduler for concurrent local sessions with bounded fairness
+- [ ] WS9-34 Add prefix/prompt cache with deterministic invalidation + audit metadata
+- [ ] WS9-35 Add chunked prefill + decode microbatch planner to improve throughput under memory pressure
+- [ ] WS9-36 Add speculative decoding coordinator (draft/target) with deterministic rollback rules
+- [ ] WS9-37 Add quantization profile selector per model/hardware/security profile (`secure-local` vs `dev-local`)
+- [ ] WS9-38 Add offline autotuning profile store for kernel/block-size choices with signed profile hashes
+- [ ] WS9-39 Add secure-on throughput SLO harness (`tok/s`, p50, p95) across representative prompt shapes
+- [ ] WS9-40 Add fail-closed fast-path switch: disable aggressive kernels if audit parity checks fail
 
 ### WS10 — Multi-Architecture Model Support
 - [ ] WS10-01 Abstract forward pass interface — model-agnostic layer dispatch
@@ -205,6 +215,8 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] WS16-08 Add release gate: no `secure-local` artifact without passing WS16-03/04/05 and WS9 critical guards
 - [ ] WS16-09 Emit policy digest/checksum for Sanhedrin parity auditing (`InferencePolicyDigest;`)
 - [ ] WS16-10 Add Trinity policy drift gate that blocks release when TempleOS/inference/Sanhedrin policy docs diverge
+- [ ] WS16-11 Emit attestation evidence bundle for each trusted runtime session (`InferenceAttestationStatus;`)
+- [ ] WS16-12 Add key-release handshake verifier that requires TempleOS-signed approval + attestation + policy digest parity
 
 ### WS13 — Advanced Inference Features
 - [ ] WS13-01 Multi-turn conversation context management
@@ -1144,6 +1156,13 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] IQ-1263 Implement deterministic dispatch transcript recorder in `src/gpu/dispatch_transcript.HC` with harness `tests/test_gpu_dispatch_transcript.py` (WS9-29)
 - [ ] IQ-1264 Implement policy digest emitter `InferencePolicyDigest;` in `src/runtime/policy_digest.HC` with harness `tests/test_runtime_policy_digest.py` (WS16-09)
 - [ ] IQ-1265 Add Trinity policy drift checker script `automation/check-trinity-policy-sync.sh` with machine-readable output (WS16-10)
+- [ ] IQ-1266 Implement continuous batching scheduler in `src/runtime/batch_scheduler.HC` with harness `tests/test_runtime_batch_scheduler.py` (WS9-33, WS13-03)
+- [ ] IQ-1267 Implement prefix cache manager in `src/runtime/prefix_cache.HC` with harness `tests/test_runtime_prefix_cache.py` (WS9-34)
+- [ ] IQ-1268 Implement speculative decode coordinator in `src/model/spec_decode.HC` with harness `tests/test_model_spec_decode.py` (WS9-36, WS13-04)
+- [ ] IQ-1269 Implement quantization profile selector in `src/runtime/quant_profile.HC` with harness `tests/test_runtime_quant_profile.py` (WS9-37)
+- [ ] IQ-1270 Add secure-on perf matrix harness `automation/perf-matrix.sh` + `tests/test_perf_secure_vs_dev_matrix.py` (WS9-39)
+- [ ] IQ-1271 Implement attestation evidence emitter in `src/runtime/attestation_manifest.HC` with harness `tests/test_runtime_attestation_manifest.py` (WS16-11)
+- [ ] IQ-1272 Implement key-release handshake verifier in `src/runtime/key_release_gate.HC` with harness `tests/test_runtime_key_release_gate.py` (WS16-12)
 - [x] IQ-1251 Implement HolyC `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly` in `src/gguf/metadata.HC` as diagnostics zero-write companion over `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly` and canonical `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParity`, enforcing immutable `{buf_nbytes,cursor,table_end,value_type}` snapshots plus strict tuple parity `{next_cursor}` before atomic diagnostics publish; add harness `tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only.py` across null/bounds/type/array-span parity vectors (WS2-02, WS2-05)
 - [ ] IQ-1252 Implement HolyC `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity` in `src/gguf/metadata.HC` as strict diagnostics parity gate over `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly` and canonical `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly`, enforcing immutable `{buf_nbytes,cursor,table_end,value_type}` snapshots plus exact tuple parity `{next_cursor}` before atomic diagnostics publish; add harness `tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity.py` across null/bounds/type/array-span vectors (WS2-02, WS2-05)
 - [ ] IQ-1259 Implement HolyC `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly` in `src/gguf/metadata.HC` as commit-only diagnostics wrapper over `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity`, enforcing immutable `{buf_nbytes,cursor,table_end,value_type}` snapshots and atomic publish of `{next_cursor}` only on strict parity success; add harness `tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only.py` across null/bounds/type/array-span parity vectors (WS2-02, WS2-05)

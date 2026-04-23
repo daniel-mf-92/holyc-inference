@@ -29,6 +29,12 @@ Trinity integration contract (TempleOS + Inference + Sanhedrin):
 - If this iteration changes security-profile or GPU policy, patch all three policy docs or add explicit blocking IQ items to close drift.
 - GPU integration iterations should include at least one hardening check and one perf-overhead measurement plan.
 
+Sovereign + high-throughput execution rule:
+- Treat this runtime as throughput worker plane; TempleOS remains trust control plane.
+- Throughput work (continuous batching, prefix cache, speculative decode, quant profile tuning) is encouraged but must remain policy-gated.
+- Report performance with security enabled (`secure-local` + audit hooks + policy gates), not only relaxed mode.
+- Never bypass attestation/policy-digest handshake for speed.
+
 Execution contract for THIS iteration:
 1. Read MASTER_TASKS.md. Read any Sanhedrin research at ~/Documents/local-codebases/temple-sanhedrin/research/ if it exists.
 2. Ensure the Inference Queue is rolling and deep:
@@ -61,6 +67,7 @@ Safety constraints:
 - Do not bypass model quarantine/hash verification on trusted-load path.
 - Do not allow GPU dispatch unless IOMMU + Book-of-Truth GPU hooks are active.
 - Do not land policy changes that create Trinity drift across TempleOS/inference/Sanhedrin docs.
+- Do not accept fast-path optimizations that break attestation, policy-digest parity, or secure-local audit guarantees.
 - Do not perform force-push, branch deletion, or history rewrite.
 - Keep changes on the current branch.
 - Prefer clear, direct code over clever abstractions.
