@@ -801,6 +801,115 @@ I32 KVCacheInitQ16CheckedNoAllocCommitOnlyPreflightOnlyParity(
     return KV_Q16_OK;
 }
 
+// Commit-only parity gate over preflight-only parity and preflight-only init.
+// Captures immutable geometry/capacity snapshots, derives both tuples in staged
+// locals, and publishes {used_tokens,layer_span_cells,total_cells} only when
+// both paths agree exactly.
+I32 KVCacheInitQ16CheckedNoAllocCommitOnlyPreflightOnlyParityCommitOnly(
+    I64 *k_cache_q16,
+    I64 k_cache_capacity,
+    I64 *v_cache_q16,
+    I64 v_cache_capacity,
+    I64 layer_count,
+    I64 token_capacity,
+    I64 kv_heads,
+    I64 head_dim,
+    I64 *out_used_tokens,
+    I64 *out_layer_span_cells,
+    I64 *out_total_cells)
+{
+    I64 snapshot_k_cache_capacity;
+    I64 snapshot_v_cache_capacity;
+    I64 snapshot_layer_count;
+    I64 snapshot_token_capacity;
+    I64 snapshot_kv_heads;
+    I64 snapshot_head_dim;
+    I64 staged_parity_used_tokens;
+    I64 staged_parity_layer_span_cells;
+    I64 staged_parity_total_cells;
+    I64 staged_preflight_used_tokens;
+    I64 staged_preflight_layer_span_cells;
+    I64 staged_preflight_total_cells;
+    I32 status;
+
+    if (!k_cache_q16 || !v_cache_q16 ||
+        !out_used_tokens || !out_layer_span_cells || !out_total_cells)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (k_cache_q16 == v_cache_q16)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (out_used_tokens == out_layer_span_cells ||
+        out_used_tokens == out_total_cells ||
+        out_layer_span_cells == out_total_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (out_used_tokens == k_cache_q16 || out_used_tokens == v_cache_q16 ||
+        out_layer_span_cells == k_cache_q16 || out_layer_span_cells == v_cache_q16 ||
+        out_total_cells == k_cache_q16 || out_total_cells == v_cache_q16)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (k_cache_capacity < 0 || v_cache_capacity < 0 ||
+        layer_count < 0 || token_capacity < 0 ||
+        kv_heads < 0 || head_dim < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    snapshot_k_cache_capacity = k_cache_capacity;
+    snapshot_v_cache_capacity = v_cache_capacity;
+    snapshot_layer_count = layer_count;
+    snapshot_token_capacity = token_capacity;
+    snapshot_kv_heads = kv_heads;
+    snapshot_head_dim = head_dim;
+
+    status = KVCacheInitQ16CheckedNoAllocCommitOnlyPreflightOnlyParity(
+        k_cache_q16,
+        k_cache_capacity,
+        v_cache_q16,
+        v_cache_capacity,
+        layer_count,
+        token_capacity,
+        kv_heads,
+        head_dim,
+        &staged_parity_used_tokens,
+        &staged_parity_layer_span_cells,
+        &staged_parity_total_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVCacheInitQ16CheckedNoAllocCommitOnlyPreflightOnly(
+        k_cache_q16,
+        k_cache_capacity,
+        v_cache_q16,
+        v_cache_capacity,
+        layer_count,
+        token_capacity,
+        kv_heads,
+        head_dim,
+        &staged_preflight_used_tokens,
+        &staged_preflight_layer_span_cells,
+        &staged_preflight_total_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (snapshot_k_cache_capacity != k_cache_capacity ||
+        snapshot_v_cache_capacity != v_cache_capacity ||
+        snapshot_layer_count != layer_count ||
+        snapshot_token_capacity != token_capacity ||
+        snapshot_kv_heads != kv_heads ||
+        snapshot_head_dim != head_dim)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (staged_parity_used_tokens != staged_preflight_used_tokens ||
+        staged_parity_layer_span_cells != staged_preflight_layer_span_cells ||
+        staged_parity_total_cells != staged_preflight_total_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    *out_used_tokens = staged_parity_used_tokens;
+    *out_layer_span_cells = staged_parity_layer_span_cells;
+    *out_total_cells = staged_parity_total_cells;
+    return KV_Q16_OK;
+}
+
 // Base index in Q16 cells for one token inside one layer slab:
 // layer_span_cells = token_capacity * (kv_heads * head_dim)
 // token_base_in_layer = token_idx * (kv_heads * head_dim)
