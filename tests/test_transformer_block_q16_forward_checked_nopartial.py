@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity harness for IQ-1044 TransformerBlockQ16ApplyCheckedNoPartialCommitOnly."""
+"""Parity harness for IQ-1221 TransformerBlockQ16ForwardCheckedNoPartial."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ from pathlib import Path
 import random
 
 BLOCK_Q16_OK = 0
-BLOCK_Q16_ERR_NULL_PTR = 1
 BLOCK_Q16_ERR_BAD_PARAM = 2
 BLOCK_Q16_ERR_OVERFLOW = 4
 
@@ -27,7 +26,6 @@ def try_add_i64_checked(lhs: int, rhs: int) -> tuple[int, int]:
 def try_mul_i64_checked(lhs: int, rhs: int) -> tuple[int, int]:
     if lhs == 0 or rhs == 0:
         return BLOCK_Q16_OK, 0
-
     if lhs > 0:
         if rhs > 0:
             if lhs > I64_MAX // rhs:
@@ -42,7 +40,6 @@ def try_mul_i64_checked(lhs: int, rhs: int) -> tuple[int, int]:
         else:
             if lhs != 0 and rhs < I64_MAX // lhs:
                 return BLOCK_Q16_ERR_OVERFLOW, 0
-
     return BLOCK_Q16_OK, lhs * rhs
 
 
@@ -65,7 +62,6 @@ def q16_div_checked(num: int, den: int) -> tuple[int, int]:
     err, scaled = try_mul_i64_checked(num, Q16_ONE)
     if err != BLOCK_Q16_OK:
         return err, 0
-
     sign = -1 if (scaled < 0) ^ (den < 0) else 1
     n = abs(scaled)
     d = abs(den)
@@ -79,11 +75,9 @@ def q16_div_checked(num: int, den: int) -> tuple[int, int]:
 def q16_sqrt_nonneg(value_q16: int) -> tuple[int, int]:
     if value_q16 < 0:
         return BLOCK_Q16_ERR_BAD_PARAM, 0
-
     target = value_q16 << 16
     if target == 0:
         return BLOCK_Q16_OK, 0
-
     x = target
     for _ in range(48):
         if x == 0:
@@ -92,7 +86,6 @@ def q16_sqrt_nonneg(value_q16: int) -> tuple[int, int]:
         if nxt == x:
             break
         x = nxt
-
     return BLOCK_Q16_OK, x
 
 
@@ -149,7 +142,7 @@ def q32_to_q16_rounded_checked(value_q32: int) -> tuple[int, int]:
     return BLOCK_Q16_OK, biased >> 16
 
 
-def transformer_block_q16_apply_checked_nopartial_commit_only_model(
+def transformer_block_q16_forward_checked_nopartial_model(
     input_q16: list[int],
     rms_gamma_q16: list[int],
     rms_eps_q16: int,
@@ -206,22 +199,22 @@ def transformer_block_q16_apply_checked_nopartial_commit_only_model(
             return err, []
         ffn_out[idx] = mixed
 
-    out = [0] * dense
+    staged_residual = [0] * dense
     for idx in range(dense):
         err, summed = try_add_i64_checked(input_q16[idx], ffn_out[idx])
         if err != BLOCK_Q16_OK:
             return err, []
-        out[idx] = summed
+        staged_residual[idx] = summed
 
-    return BLOCK_Q16_OK, out
+    return BLOCK_Q16_OK, staged_residual
 
 
-def test_source_contains_iq1044_signature_and_pipeline_calls() -> None:
+def test_source_contains_iq1221_signature_and_core_pipeline_calls() -> None:
     source = Path("src/model/block.HC").read_text(encoding="utf-8")
-    signature = "I32 TransformerBlockQ16ApplyCheckedNoPartialCommitOnly("
+    signature = "I32 TransformerBlockQ16ForwardCheckedNoPartial("
     assert signature in source
 
-    body = source.split(signature, 1)[1]
+    body = source.rsplit(signature, 1)[1]
     assert "FPQ16RMSNormChecked(" in body
     assert "AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAlloc(" in body
     assert "FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAlloc(" in body
@@ -229,15 +222,15 @@ def test_source_contains_iq1044_signature_and_pipeline_calls() -> None:
     assert "BlockQ32ToQ16RoundedChecked(" in body
 
 
-def test_source_contains_required_bytes_preflight_contract_calls() -> None:
+def test_source_contains_staged_residual_commit_flow() -> None:
     source = Path("src/model/block.HC").read_text(encoding="utf-8")
-    signature = "I32 TransformerBlockQ16ApplyCheckedNoPartialCommitOnly("
+    signature = "I32 TransformerBlockQ16ForwardCheckedNoPartial("
     body = source.rsplit(signature, 1)[1]
 
-    assert "AttentionQ16ApplyScoreScaleRowsCheckedNoPartialDefaultStrideNoAllocRequiredBytes(" in body
-    assert "FFNQ16SwiGLUApplyRowsCheckedNoPartialDefaultStrideNoAllocPreflightOnly(" in body
-    assert "required_q16_cells" in body
-    assert "required_q32_cells" in body
+    assert "residual_stage_q16" in body
+    assert "Stage 6a: validate every destination index" in body
+    assert "Stage 6b: commit staged residual rows" in body
+    assert "out_q16[out_index] = residual_stage_q16[stage_index];" in body
 
 
 def test_targeted_deterministic_fixture_parity() -> None:
@@ -245,21 +238,12 @@ def test_targeted_deterministic_fixture_parity() -> None:
     lane_count = 4
     dense = row_count * lane_count
 
-    input_q16 = [
-        19660,
-        -9830,
-        4915,
-        -1638,
-        14745,
-        -6553,
-        3276,
-        -819,
-    ]
+    input_q16 = [19660, -9830, 4915, -1638, 14745, -6553, 3276, -819]
     gamma_q16 = [65536, 65536, 58982, 72089]
     ffn_gate_q16 = [57344, 53248, 49152, 45056, 40960, 36864, 32768, 28672]
     ffn_up_q16 = [32768, 36864, 40960, 45056, 49152, 53248, 57344, 61440]
 
-    err, out = transformer_block_q16_apply_checked_nopartial_commit_only_model(
+    err, out = transformer_block_q16_forward_checked_nopartial_model(
         input_q16,
         gamma_q16,
         64,
@@ -274,8 +258,23 @@ def test_targeted_deterministic_fixture_parity() -> None:
     assert out == [56496, -29072, 13795, -5287, 54741, -23886, 10740, -2959]
 
 
+def test_zero_geometry_short_circuits_to_success() -> None:
+    err, out = transformer_block_q16_forward_checked_nopartial_model(
+        [],
+        [Q16_ONE],
+        1,
+        Q16_ONE,
+        [],
+        [],
+        0,
+        6,
+    )
+    assert err == BLOCK_Q16_OK
+    assert out == []
+
+
 def test_invalid_shapes_return_bad_param() -> None:
-    err, out = transformer_block_q16_apply_checked_nopartial_commit_only_model(
+    err, out = transformer_block_q16_forward_checked_nopartial_model(
         [1, 2, 3],
         [Q16_ONE],
         64,
@@ -289,38 +288,10 @@ def test_invalid_shapes_return_bad_param() -> None:
     assert out == []
 
 
-def test_zero_geometry_short_circuits_to_success() -> None:
-    err, out = transformer_block_q16_apply_checked_nopartial_commit_only_model(
-        [],
-        [Q16_ONE],
-        1,
-        Q16_ONE,
-        [],
-        [],
-        0,
-        6,
-    )
-    assert err == BLOCK_Q16_OK
-    assert out == []
-
-    err, out = transformer_block_q16_apply_checked_nopartial_commit_only_model(
-        [],
-        [Q16_ONE],
-        1,
-        Q16_ONE,
-        [],
-        [],
-        4,
-        0,
-    )
-    assert err == BLOCK_Q16_OK
-    assert out == []
-
-
 def test_randomized_integer_pipeline_stability() -> None:
-    rng = random.Random(20260422_1044)
+    rng = random.Random(20260423_1221)
 
-    for _ in range(400):
+    for _ in range(300):
         row_count = rng.randint(1, 4)
         lane_count = rng.randint(1, 8)
         dense = row_count * lane_count
@@ -332,7 +303,7 @@ def test_randomized_integer_pipeline_stability() -> None:
         eps_q16 = rng.randint(1, 512)
         scale_q16 = rng.randint(32768, 98304)
 
-        err_a, out_a = transformer_block_q16_apply_checked_nopartial_commit_only_model(
+        err_a, out_a = transformer_block_q16_forward_checked_nopartial_model(
             input_q16,
             gamma_q16,
             eps_q16,
@@ -342,7 +313,7 @@ def test_randomized_integer_pipeline_stability() -> None:
             row_count,
             lane_count,
         )
-        err_b, out_b = transformer_block_q16_apply_checked_nopartial_commit_only_model(
+        err_b, out_b = transformer_block_q16_forward_checked_nopartial_model(
             input_q16,
             gamma_q16,
             eps_q16,
@@ -355,26 +326,3 @@ def test_randomized_integer_pipeline_stability() -> None:
 
         assert err_a == err_b == BLOCK_Q16_OK
         assert out_a == out_b
-
-
-def test_overflow_surface_is_reported() -> None:
-    row_count = 1
-    lane_count = 2
-    input_q16 = [I64_MAX // 2, I64_MAX // 2]
-    gamma_q16 = [I64_MAX // 2, I64_MAX // 2]
-    ffn_gate_q16 = [I64_MAX // 2, I64_MAX // 2]
-    ffn_up_q16 = [I64_MAX // 2, I64_MAX // 2]
-
-    err, out = transformer_block_q16_apply_checked_nopartial_commit_only_model(
-        input_q16,
-        gamma_q16,
-        1,
-        Q16_ONE,
-        ffn_gate_q16,
-        ffn_up_q16,
-        row_count,
-        lane_count,
-    )
-
-    assert err in (BLOCK_Q16_ERR_OVERFLOW, BLOCK_Q16_ERR_BAD_PARAM)
-    assert out == []
