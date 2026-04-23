@@ -1160,7 +1160,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-1267 Implement prefix cache manager in `src/runtime/prefix_cache.HC` with harness `tests/test_runtime_prefix_cache.py` (WS9-34)
 - [x] IQ-1268 Implement speculative decode coordinator in `src/model/spec_decode.HC` with harness `tests/test_model_spec_decode.py` (WS9-36, WS13-04)
 - [x] IQ-1269 Implement quantization profile selector in `src/runtime/quant_profile.HC` with harness `tests/test_runtime_quant_profile.py` (WS9-37)
-- [ ] IQ-1270 Add secure-on perf matrix harness `automation/perf-matrix.sh` + `tests/test_perf_secure_vs_dev_matrix.py` (WS9-39)
+- [x] IQ-1270 Add secure-on perf matrix harness `automation/perf-matrix.sh` + `tests/test_perf_secure_vs_dev_matrix.py` (WS9-39)
 - [x] IQ-1271 Implement attestation evidence emitter in `src/runtime/attestation_manifest.HC` with harness `tests/test_runtime_attestation_manifest.py` (WS16-11)
 - [ ] IQ-1272 Implement key-release handshake verifier in `src/runtime/key_release_gate.HC` with harness `tests/test_runtime_key_release_gate.py` (WS16-12)
 - [x] IQ-1273 Implement HolyC `KVCacheInitQ16CheckedNoAllocCommitOnlyPreflightOnlyParity` in `src/model/kv_cache.HC` as strict parity diagnostics gate over `KVCacheInitQ16CheckedNoAllocCommitOnlyPreflightOnly` and canonical `KVCacheInitQ16CheckedNoAllocCommitOnly`, enforcing immutable `{k_cache_capacity,v_cache_capacity,layer_count,token_capacity,kv_heads,head_dim}` snapshots plus exact tuple parity `{used_tokens,layer_span_cells,total_cells}` before atomic publish; add harness `tests/test_kv_cache_init_q16_checked_noalloc_commit_only_preflight_only_parity.py` across null/alias, overflow, and deterministic parity vectors (WS5-06, WS5-07)
