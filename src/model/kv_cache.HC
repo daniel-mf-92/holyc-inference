@@ -5597,6 +5597,199 @@ I32 KVCacheQ16AppendTokenCheckedNoPartialCommitOnlyPreflightOnlyParity(
     return KV_Q16_OK;
 }
 
+// Compose checked append reservation with checked token write for
+// autoregressive decode loops. The function guarantees no-partial behavior:
+// (1) reserve diagnostics are staged first, (2) write commit runs only after
+// all validation passes, (3) outputs publish atomically at the end.
+I32 KVCacheQ16ReserveAndWriteTokenChecked(
+    I64 *k_cache_q16,
+    I64 k_cache_capacity,
+    I64 *v_cache_q16,
+    I64 v_cache_capacity,
+    I64 layer_idx,
+    I64 token_count,
+    I64 layer_count,
+    I64 token_capacity,
+    I64 kv_heads,
+    I64 head_dim,
+    I64 *k_token_src_q16,
+    I64 k_token_src_capacity,
+    I64 *v_token_src_q16,
+    I64 v_token_src_capacity,
+    I64 *out_required_cells,
+    I64 *out_required_bytes,
+    I64 *out_written_token_index,
+    I64 *out_next_token_count)
+{
+    I64 staged_required_cells;
+    I64 staged_required_bytes;
+    I64 staged_written_token_index;
+    I64 staged_span_cells;
+    I64 staged_k_base_index;
+    I64 staged_v_base_index;
+    I64 staged_next_token_count;
+    I64 snapshot_layer_idx;
+    I64 snapshot_token_count;
+    I64 snapshot_layer_count;
+    I64 snapshot_token_capacity;
+    I64 snapshot_kv_heads;
+    I64 snapshot_head_dim;
+    I64 snapshot_k_cache_capacity;
+    I64 snapshot_v_cache_capacity;
+    I64 snapshot_k_src_capacity;
+    I64 snapshot_v_src_capacity;
+    I64 *snapshot_k_cache_ptr;
+    I64 *snapshot_v_cache_ptr;
+    I64 *snapshot_k_src_ptr;
+    I64 *snapshot_v_src_ptr;
+    I64 *snapshot_out_required_cells;
+    I64 *snapshot_out_required_bytes;
+    I64 *snapshot_out_written_token_index;
+    I64 *snapshot_out_next_token_count;
+    I32 status;
+
+    if (!out_required_cells || !out_required_bytes ||
+        !out_written_token_index || !out_next_token_count)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (out_required_cells == out_required_bytes ||
+        out_required_cells == out_written_token_index ||
+        out_required_cells == out_next_token_count ||
+        out_required_bytes == out_written_token_index ||
+        out_required_bytes == out_next_token_count ||
+        out_written_token_index == out_next_token_count)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (out_required_cells == k_cache_q16 ||
+        out_required_cells == v_cache_q16 ||
+        out_required_cells == k_token_src_q16 ||
+        out_required_cells == v_token_src_q16 ||
+        out_required_bytes == k_cache_q16 ||
+        out_required_bytes == v_cache_q16 ||
+        out_required_bytes == k_token_src_q16 ||
+        out_required_bytes == v_token_src_q16 ||
+        out_written_token_index == k_cache_q16 ||
+        out_written_token_index == v_cache_q16 ||
+        out_written_token_index == k_token_src_q16 ||
+        out_written_token_index == v_token_src_q16 ||
+        out_next_token_count == k_cache_q16 ||
+        out_next_token_count == v_cache_q16 ||
+        out_next_token_count == k_token_src_q16 ||
+        out_next_token_count == v_token_src_q16)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (token_count < 0 || token_capacity < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (token_count >= token_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    snapshot_layer_idx = layer_idx;
+    snapshot_token_count = token_count;
+    snapshot_layer_count = layer_count;
+    snapshot_token_capacity = token_capacity;
+    snapshot_kv_heads = kv_heads;
+    snapshot_head_dim = head_dim;
+    snapshot_k_cache_capacity = k_cache_capacity;
+    snapshot_v_cache_capacity = v_cache_capacity;
+    snapshot_k_src_capacity = k_token_src_capacity;
+    snapshot_v_src_capacity = v_token_src_capacity;
+    snapshot_k_cache_ptr = k_cache_q16;
+    snapshot_v_cache_ptr = v_cache_q16;
+    snapshot_k_src_ptr = k_token_src_q16;
+    snapshot_v_src_ptr = v_token_src_q16;
+    snapshot_out_required_cells = out_required_cells;
+    snapshot_out_required_bytes = out_required_bytes;
+    snapshot_out_written_token_index = out_written_token_index;
+    snapshot_out_next_token_count = out_next_token_count;
+
+    // Reserve stage: validates geometry/capacity and computes append tuple.
+    status = KVCacheQ16AppendTokenCheckedNoPartialCommitOnlyPreflightOnly(
+        k_cache_q16,
+        k_cache_capacity,
+        v_cache_q16,
+        v_cache_capacity,
+        layer_idx,
+        token_count,
+        layer_count,
+        token_capacity,
+        kv_heads,
+        head_dim,
+        k_token_src_q16,
+        k_token_src_capacity,
+        v_token_src_q16,
+        v_token_src_capacity,
+        &staged_required_cells,
+        &staged_required_bytes,
+        &staged_written_token_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    // Commit stage: write source token into K/V caches at reserved index.
+    status = KVCacheQ16WriteTokenCheckedNoPartialCommitOnly(
+        k_cache_q16,
+        k_cache_capacity,
+        v_cache_q16,
+        v_cache_capacity,
+        layer_idx,
+        staged_written_token_index,
+        layer_count,
+        token_capacity,
+        kv_heads,
+        head_dim,
+        k_token_src_q16,
+        k_token_src_capacity,
+        v_token_src_q16,
+        v_token_src_capacity,
+        &staged_span_cells,
+        &staged_k_base_index,
+        &staged_v_base_index);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (staged_span_cells != staged_required_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (staged_k_base_index != staged_v_base_index)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    // Decode loops consume one slot after successful write.
+    status = KVTryAddI64Checked(staged_written_token_index,
+                                1,
+                                &staged_next_token_count);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (staged_next_token_count > token_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_layer_idx != layer_idx ||
+        snapshot_token_count != token_count ||
+        snapshot_layer_count != layer_count ||
+        snapshot_token_capacity != token_capacity ||
+        snapshot_kv_heads != kv_heads ||
+        snapshot_head_dim != head_dim ||
+        snapshot_k_cache_capacity != k_cache_capacity ||
+        snapshot_v_cache_capacity != v_cache_capacity ||
+        snapshot_k_src_capacity != k_token_src_capacity ||
+        snapshot_v_src_capacity != v_token_src_capacity ||
+        snapshot_k_cache_ptr != k_cache_q16 ||
+        snapshot_v_cache_ptr != v_cache_q16 ||
+        snapshot_k_src_ptr != k_token_src_q16 ||
+        snapshot_v_src_ptr != v_token_src_q16 ||
+        snapshot_out_required_cells != out_required_cells ||
+        snapshot_out_required_bytes != out_required_bytes ||
+        snapshot_out_written_token_index != out_written_token_index ||
+        snapshot_out_next_token_count != out_next_token_count)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    *out_required_cells = staged_required_cells;
+    *out_required_bytes = staged_required_bytes;
+    *out_written_token_index = staged_written_token_index;
+    *out_next_token_count = staged_next_token_count;
+    return KV_Q16_OK;
+}
+
 // IQ-1061 diagnostics-only reserve helper for token-span geometry.
 // Computes checked reservation requirements without touching cache buffers.
 // Outputs are atomically published only after full invariant validation.
