@@ -531,6 +531,70 @@ I32 Q8_0MatMulTileSchedulerCheckedNoPartialCommitOnly(
     return Q8_0_MATMUL_OK;
 }
 
+// Diagnostics-only preflight companion for commit-only tile scheduler tuple.
+//
+// Contract:
+// - Reuse canonical commit-only wrapper to derive deterministic
+//   `{tile_count,last_row_end,last_col_end}` from immutable scheduler shape.
+// - Publish diagnostics tuple atomically only after strict snapshot parity.
+// - Keep no-partial semantics: on any failure, output tuple is unchanged.
+I32 Q8_0MatMulTileSchedulerCheckedNoPartialCommitOnlyPreflightOnly(
+    I64 row_count,
+    I64 col_count,
+    I64 tile_rows,
+    I64 tile_cols,
+    I64 span_capacity,
+    I64 *out_tile_count,
+    I64 *out_last_row_end,
+    I64 *out_last_col_end)
+{
+    I64 snapshot_row_count;
+    I64 snapshot_col_count;
+    I64 snapshot_tile_rows;
+    I64 snapshot_tile_cols;
+    I64 snapshot_span_capacity;
+    I64 staged_tile_count;
+    I64 staged_last_row_end;
+    I64 staged_last_col_end;
+    I32 status;
+
+    if (!out_tile_count || !out_last_row_end || !out_last_col_end)
+        return Q8_0_MATMUL_ERR_NULL_PTR;
+
+    if (row_count < 0 || col_count < 0 || span_capacity < 0)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    snapshot_row_count = row_count;
+    snapshot_col_count = col_count;
+    snapshot_tile_rows = tile_rows;
+    snapshot_tile_cols = tile_cols;
+    snapshot_span_capacity = span_capacity;
+
+    status = Q8_0MatMulTileSchedulerCheckedNoPartialCommitOnly(row_count,
+                                                               col_count,
+                                                               tile_rows,
+                                                               tile_cols,
+                                                               span_capacity,
+                                                               &staged_tile_count,
+                                                               &staged_last_row_end,
+                                                               &staged_last_col_end);
+    if (status != Q8_0_MATMUL_OK)
+        return status;
+
+    if (snapshot_row_count != row_count ||
+        snapshot_col_count != col_count ||
+        snapshot_tile_rows != tile_rows ||
+        snapshot_tile_cols != tile_cols ||
+        snapshot_span_capacity != span_capacity)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    // Atomic publish region: diagnostics tuple only.
+    *out_tile_count = staged_tile_count;
+    *out_last_row_end = staged_last_row_end;
+    *out_last_col_end = staged_last_col_end;
+    return Q8_0_MATMUL_OK;
+}
+
 // Shared stride/K-span invariants for tiled Q8_0 matmul call-sites.
 // This centralizes the active-K and output-row-stride checks used by
 // scalar and AVX2 entrypoints so BAD_LEN surfaces stay identical.
