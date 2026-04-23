@@ -655,7 +655,7 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnly(
 // - Enforce immutable caller snapshots for input/output destinations.
 // - Rebuild canonical deterministic tuple and require exact parity match.
 // - Atomically publish diagnostics tuple only after full parity success.
-I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnly(
+I32 Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
     I64 cpu_hz,
     I64 *out_shape_count,
     I64 *out_max_blocks,
@@ -740,7 +740,7 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightO
 // - Enforce immutable caller snapshots for cpu_hz and output destinations.
 // - Require exact tuple parity {shape_count,max_blocks,max_rows,max_row_matrix_blocks}.
 // - Publish diagnostics tuple atomically only when full parity succeeds.
-I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParity(
+I32 Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
     I64 cpu_hz,
     I64 *out_shape_count,
     I64 *out_max_blocks,
@@ -820,7 +820,7 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightO
 // - Revalidate immutable caller snapshots for cpu_hz and output destinations.
 // - Enforce strict tuple parity against deepest preflight-only companion.
 // - Publish diagnostics tuple atomically only after full parity success.
-I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
+I32 Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
     I64 cpu_hz,
     I64 *out_shape_count,
     I64 *out_max_blocks,
@@ -854,7 +854,7 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightO
     snapshot_out_max_rows = out_max_rows;
     snapshot_out_max_row_matrix_blocks = out_max_row_matrix_blocks;
 
-    status = Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParity(
+    status = Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
         cpu_hz,
         &staged_shape_count,
         &staged_max_blocks,
@@ -936,7 +936,7 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightO
     snapshot_out_max_rows = out_max_rows;
     snapshot_out_max_row_matrix_blocks = out_max_row_matrix_blocks;
 
-    status = Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
+    status = Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
         cpu_hz,
         &staged_shape_count,
         &staged_max_blocks,
@@ -945,7 +945,7 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightO
     if (status != Q8_0_DOT_BENCH_OK)
         return status;
 
-    status = Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParity(
+    status = Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
         cpu_hz,
         &parity_shape_count,
         &parity_max_blocks,
@@ -984,7 +984,7 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightO
 //   out_max_rows,out_max_row_matrix_blocks} before publish.
 // - Require exact tuple parity {shape_count,max_blocks,max_rows,
 //   max_row_matrix_blocks} and publish atomically only on success.
-I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+I32 Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
     I64 cpu_hz,
     I64 *out_shape_count,
     I64 *out_max_blocks,
@@ -1018,7 +1018,7 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightO
     snapshot_out_max_rows = out_max_rows;
     snapshot_out_max_row_matrix_blocks = out_max_row_matrix_blocks;
 
-    status = Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+    status = Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
         cpu_hz,
         &staged_shape_count,
         &staged_max_blocks,
@@ -1027,7 +1027,7 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightO
     if (status != Q8_0_DOT_BENCH_OK)
         return status;
 
-    status = Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
+    status = Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
         cpu_hz,
         &parity_shape_count,
         &parity_max_blocks,
@@ -1066,7 +1066,7 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightO
 //   out_max_rows,out_max_row_matrix_blocks} before publish.
 // - Require exact tuple parity {shape_count,max_blocks,max_rows,
 //   max_row_matrix_blocks} and publish atomically only on success.
-I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
+I32 Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
     I64 cpu_hz,
     I64 *out_shape_count,
     I64 *out_max_blocks,
@@ -1100,7 +1100,7 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightO
     snapshot_out_max_rows = out_max_rows;
     snapshot_out_max_row_matrix_blocks = out_max_row_matrix_blocks;
 
-    status = Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+    status = Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
         cpu_hz,
         &staged_shape_count,
         &staged_max_blocks,
@@ -1148,7 +1148,7 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightO
 //   out_max_rows,out_max_row_matrix_blocks} before publish.
 // - Require exact tuple parity {shape_count,max_blocks,max_rows,
 //   max_row_matrix_blocks} and publish atomically only on success.
-I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+I32 Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
     I64 cpu_hz,
     I64 *out_shape_count,
     I64 *out_max_blocks,
@@ -1182,7 +1182,7 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightO
     snapshot_out_max_rows = out_max_rows;
     snapshot_out_max_row_matrix_blocks = out_max_row_matrix_blocks;
 
-    status = Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+    status = Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
         cpu_hz,
         &staged_shape_count,
         &staged_max_blocks,
@@ -1264,7 +1264,7 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightO
     snapshot_out_max_rows = out_max_rows;
     snapshot_out_max_row_matrix_blocks = out_max_row_matrix_blocks;
 
-    status = Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+    status = Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
         cpu_hz,
         &staged_shape_count,
         &staged_max_blocks,
@@ -1273,7 +1273,7 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightO
     if (status != Q8_0_DOT_BENCH_OK)
         return status;
 
-    status = Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
+    status = Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
         cpu_hz,
         &parity_shape_count,
         &parity_max_blocks,
