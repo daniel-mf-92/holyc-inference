@@ -624,3 +624,237 @@ I32 PrefixCacheLookupBestPrefixCheckedNoPartialCommitOnlyPreflightOnlyParityComm
     *out_best_tokens = parity_best_tokens;
     return PREFIX_CACHE_OK;
 }
+
+I32 PrefixCacheInsertOrUpdateCheckedNoPartialCommitOnly(PrefixCache *cache,
+                                                         I64 prefix_hash,
+                                                         I64 prefix_tokens,
+                                                         I64 kv_start_token,
+                                                         I64 kv_token_count,
+                                                         I64 access_tick,
+                                                         I64 *out_entry_index,
+                                                         I64 *out_inserted_new)
+{
+    I64 snapshot_count;
+    I64 snapshot_capacity;
+    I64 snapshot_access_tick;
+    I64 entry_index;
+    I64 inserted_new;
+    I32 status;
+
+    if (!cache || !cache->entries || !out_entry_index || !out_inserted_new)
+        return PREFIX_CACHE_ERR_NULL_PTR;
+
+    if (out_entry_index == out_inserted_new)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->capacity <= 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (access_tick < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    status = PrefixCacheValidateTupleChecked(prefix_hash,
+                                             prefix_tokens,
+                                             kv_start_token,
+                                             kv_token_count);
+    if (status != PREFIX_CACHE_OK)
+        return status;
+
+    snapshot_count = cache->count;
+    snapshot_capacity = cache->capacity;
+    snapshot_access_tick = access_tick;
+
+    status = PrefixCacheInsertOrUpdateChecked(cache,
+                                              prefix_hash,
+                                              prefix_tokens,
+                                              kv_start_token,
+                                              kv_token_count,
+                                              access_tick,
+                                              &entry_index,
+                                              &inserted_new);
+    if (status != PREFIX_CACHE_OK)
+        return status;
+
+    if (cache->capacity != snapshot_capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->count < 0 || cache->count > cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (inserted_new == 0)
+    {
+        if (cache->count != snapshot_count)
+            return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+    else
+    {
+        if (cache->count != snapshot_count &&
+            cache->count != snapshot_count + 1)
+            return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+
+    if (access_tick != snapshot_access_tick)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    *out_entry_index = entry_index;
+    *out_inserted_new = inserted_new;
+    return PREFIX_CACHE_OK;
+}
+
+I32 PrefixCacheInsertOrUpdateCheckedNoPartialCommitOnlyPreflightOnly(PrefixCache *cache,
+                                                                      I64 prefix_hash,
+                                                                      I64 prefix_tokens,
+                                                                      I64 kv_start_token,
+                                                                      I64 kv_token_count,
+                                                                      I64 access_tick,
+                                                                      I64 *out_entry_index,
+                                                                      I64 *out_inserted_new)
+{
+    I64 preflight_entry_index;
+    I64 preflight_inserted_new;
+    I64 canonical_entry_index;
+    I64 canonical_inserted_new;
+    I64 snapshot_capacity;
+    I64 snapshot_access_tick;
+    I32 status_preflight;
+    I32 status_canonical;
+
+    if (!cache || !cache->entries || !out_entry_index || !out_inserted_new)
+        return PREFIX_CACHE_ERR_NULL_PTR;
+
+    if (out_entry_index == out_inserted_new)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->capacity <= 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (access_tick < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (PrefixCacheValidateTupleChecked(prefix_hash,
+                                        prefix_tokens,
+                                        kv_start_token,
+                                        kv_token_count) != PREFIX_CACHE_OK)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    snapshot_capacity = cache->capacity;
+    snapshot_access_tick = access_tick;
+
+    status_preflight = PrefixCacheInsertOrUpdateCheckedNoPartialCommitOnly(cache,
+                                                                            prefix_hash,
+                                                                            prefix_tokens,
+                                                                            kv_start_token,
+                                                                            kv_token_count,
+                                                                            access_tick,
+                                                                            &preflight_entry_index,
+                                                                            &preflight_inserted_new);
+    if (status_preflight != PREFIX_CACHE_OK)
+        return status_preflight;
+
+    status_canonical = PrefixCacheInsertOrUpdateChecked(cache,
+                                                        prefix_hash,
+                                                        prefix_tokens,
+                                                        kv_start_token,
+                                                        kv_token_count,
+                                                        access_tick,
+                                                        &canonical_entry_index,
+                                                        &canonical_inserted_new);
+    if (status_canonical != PREFIX_CACHE_OK)
+        return status_canonical;
+
+    if (preflight_entry_index != canonical_entry_index ||
+        preflight_inserted_new != canonical_inserted_new)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->capacity != snapshot_capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->count < 0 || cache->count > cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (access_tick != snapshot_access_tick)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    *out_entry_index = preflight_entry_index;
+    *out_inserted_new = preflight_inserted_new;
+    return PREFIX_CACHE_OK;
+}
+
+I32 PrefixCacheInsertOrUpdateCheckedNoPartialCommitOnlyPreflightOnlyParity(PrefixCache *cache,
+                                                                            I64 prefix_hash,
+                                                                            I64 prefix_tokens,
+                                                                            I64 kv_start_token,
+                                                                            I64 kv_token_count,
+                                                                            I64 access_tick,
+                                                                            I64 *out_entry_index,
+                                                                            I64 *out_inserted_new)
+{
+    I64 parity_entry_index;
+    I64 parity_inserted_new;
+    I64 canonical_entry_index;
+    I64 canonical_inserted_new;
+    I64 snapshot_capacity;
+    I64 snapshot_access_tick;
+    I32 status_parity;
+    I32 status_canonical;
+
+    if (!cache || !cache->entries || !out_entry_index || !out_inserted_new)
+        return PREFIX_CACHE_ERR_NULL_PTR;
+
+    if (out_entry_index == out_inserted_new)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->capacity <= 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (access_tick < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (PrefixCacheValidateTupleChecked(prefix_hash,
+                                        prefix_tokens,
+                                        kv_start_token,
+                                        kv_token_count) != PREFIX_CACHE_OK)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    snapshot_capacity = cache->capacity;
+    snapshot_access_tick = access_tick;
+
+    status_parity = PrefixCacheInsertOrUpdateCheckedNoPartialCommitOnlyPreflightOnly(cache,
+                                                                                       prefix_hash,
+                                                                                       prefix_tokens,
+                                                                                       kv_start_token,
+                                                                                       kv_token_count,
+                                                                                       access_tick,
+                                                                                       &parity_entry_index,
+                                                                                       &parity_inserted_new);
+    if (status_parity != PREFIX_CACHE_OK)
+        return status_parity;
+
+    status_canonical = PrefixCacheInsertOrUpdateCheckedNoPartialCommitOnly(cache,
+                                                                            prefix_hash,
+                                                                            prefix_tokens,
+                                                                            kv_start_token,
+                                                                            kv_token_count,
+                                                                            access_tick,
+                                                                            &canonical_entry_index,
+                                                                            &canonical_inserted_new);
+    if (status_canonical != PREFIX_CACHE_OK)
+        return status_canonical;
+
+    if (parity_entry_index != canonical_entry_index ||
+        parity_inserted_new != canonical_inserted_new)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->capacity != snapshot_capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->count < 0 || cache->count > cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (access_tick != snapshot_access_tick)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    *out_entry_index = parity_entry_index;
+    *out_inserted_new = parity_inserted_new;
+    return PREFIX_CACHE_OK;
+}
