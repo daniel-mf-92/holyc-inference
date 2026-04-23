@@ -173,3 +173,48 @@ I32 FPQ16SqrtCheckedNoPartialCommitOnlyPreflightOnlyParity(I64 x_q16,
     *required_out_cells_out = staged_required_out_cells;
     return FP_Q16_OK;
 }
+
+// Commit-only diagnostics wrapper over
+// FPQ16SqrtCheckedNoPartialCommitOnlyPreflightOnlyParity.
+//
+// Stages delegated diagnostics into a local scalar, revalidates immutable
+// `{x_q16}` snapshots, and atomically publishes only canonical
+// `{required_out_cells=1}` on strict parity success.
+//
+// Contract:
+// - `required_out_cells_out` must be non-null.
+// - Returns the same status domain as delegated checked sqrt diagnostics.
+// - Performs no diagnostics publish on failure.
+I32 FPQ16SqrtCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(
+    I64 x_q16,
+    I64 *required_out_cells_out)
+{
+    I64 snapshot_x_q16;
+    I64 staged_required_out_cells;
+    I64 canonical_required_out_cells;
+    I32 status;
+
+    if (!required_out_cells_out)
+        return FP_Q16_ERR_NULL_PTR;
+
+    snapshot_x_q16 = x_q16;
+
+    status = FPQ16SqrtCheckedNoPartialCommitOnlyPreflightOnlyParity(
+        x_q16,
+        &staged_required_out_cells);
+    if (status != FP_Q16_OK)
+        return status;
+
+    if (snapshot_x_q16 != x_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    canonical_required_out_cells = 1;
+    if (staged_required_out_cells != canonical_required_out_cells)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (canonical_required_out_cells != 1)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *required_out_cells_out = staged_required_out_cells;
+    return FP_Q16_OK;
+}
