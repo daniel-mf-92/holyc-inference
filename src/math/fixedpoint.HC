@@ -501,6 +501,45 @@ I32 FPQ16DivChecked(I64 num_q16,
                                         out_q16);
 }
 
+// Commit-only checked Q16 divide wrapper.
+//
+// This stages FPQ16DivChecked into a local scalar first, then performs
+// immutable snapshot parity checks over {numerator_q16, denominator_q16}
+// before a single atomic publish into *out_q16.
+//
+// Contract:
+// - out_q16 must be non-null.
+// - Returns exactly the same status domain as FPQ16DivChecked.
+// - On any failure this performs no out_q16 write.
+I32 FPQ16DivCheckedNoPartialCommitOnly(I64 numerator_q16,
+                                       I64 denominator_q16,
+                                       I64 *out_q16)
+{
+    I64 snapshot_numerator_q16;
+    I64 snapshot_denominator_q16;
+    I64 staged_out_q16;
+    I32 status;
+
+    if (!out_q16)
+        return FP_Q16_ERR_NULL_PTR;
+
+    snapshot_numerator_q16 = numerator_q16;
+    snapshot_denominator_q16 = denominator_q16;
+
+    status = FPQ16DivChecked(numerator_q16,
+                             denominator_q16,
+                             &staged_out_q16);
+    if (status)
+        return status;
+
+    if (snapshot_numerator_q16 != numerator_q16 ||
+        snapshot_denominator_q16 != denominator_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_q16 = staged_out_q16;
+    return FP_Q16_OK;
+}
+
 // Checked elementwise Q16 multiply helper for inference vector paths.
 // Contracts:
 //   - count >= 0
