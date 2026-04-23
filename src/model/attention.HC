@@ -2055,6 +2055,17 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedPreflightOnly(
     I64 *out_required_k_cells,
     I64 *out_required_out_cells);
 
+I32 AttentionQ16ComputeHeadScoresCheckedNoPartial(
+    I64 *q_head_row_q16,
+    I64 q_head_row_capacity,
+    I64 *k_head_rows_q16,
+    I64 k_head_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 score_scale_q16,
+    I64 *out_head_scores_q32,
+    I64 out_head_scores_capacity);
+
 I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialPreflightOnly(
     I64 *q_rows_q16,
     I64 q_rows_capacity,
@@ -6293,6 +6304,35 @@ I32 AttentionQ16ComputeScaledQKRowCheckedNoPartialDefaultStride(
         out_scores_q32,
         out_scores_capacity,
         default_out_score_stride);
+}
+
+I32 AttentionQ16ComputeHeadScoresCheckedNoPartial(
+    I64 *q_head_row_q16,
+    I64 q_head_row_capacity,
+    I64 *k_head_rows_q16,
+    I64 k_head_rows_capacity,
+    I64 token_count,
+    I64 head_dim,
+    I64 score_scale_q16,
+    I64 *out_head_scores_q32,
+    I64 out_head_scores_capacity)
+{
+    // WS5 single-head score contract:
+    // - query row is one head (head_dim Q16 lanes)
+    // - key rows are token-major and tightly packed by head_dim
+    // - outputs are staged then committed with no-partial semantics
+    // Delegate to the checked default-stride row kernel so all overflow-safe
+    // dot accumulation and staged commit behavior remains centralized.
+    return AttentionQ16ComputeScaledQKRowCheckedNoPartialDefaultStride(
+        q_head_row_q16,
+        q_head_row_capacity,
+        k_head_rows_q16,
+        k_head_rows_capacity,
+        token_count,
+        head_dim,
+        score_scale_q16,
+        out_head_scores_q32,
+        out_head_scores_capacity);
 }
 
 I32 AttentionQ16ComputeScaledQKRowsCheckedPreflightOnly(

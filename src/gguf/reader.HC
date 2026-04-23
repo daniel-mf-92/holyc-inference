@@ -1292,3 +1292,153 @@ I32 GGUFReadTensorDataQ8_0CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     *out_bytes_read = staged_bytes_read_i64;
     return GGUF_READER_OK;
 }
+
+
+I32 GGUFReaderLoadTensorSliceQ8_0Checked(
+    U8 *gguf_bytes,
+    U64 gguf_nbytes,
+    U64 tensor_data_base,
+    GGUFReaderTensorInfoQ4_0 *tensor_info,
+    U64 slice_block_start,
+    U64 slice_block_count,
+    U8 *out_q8_0_blocks,
+    U64 out_q8_0_blocks_capacity,
+    I64 *out_blocks_read,
+    I64 *out_bytes_read,
+    U64 *out_slice_payload_offset)
+{
+    U32 i;
+    U32 staged_n_dims;
+    U32 staged_ggml_type;
+    U64 staged_dims[4];
+    U64 staged_offset;
+    U64 staged_total_elements;
+    U64 staged_total_blocks;
+    U64 staged_tensor_bytes;
+    U64 staged_slice_end_block;
+    U64 staged_slice_byte_offset;
+    U64 staged_slice_bytes;
+    U64 staged_tensor_payload_start;
+    U64 staged_tensor_payload_end;
+    U64 staged_slice_payload_start;
+    U64 staged_slice_payload_end;
+    U64 staged_out_end;
+    I64 staged_blocks_read_i64;
+    I64 staged_bytes_read_i64;
+    U64 copy_idx;
+
+    if (!gguf_bytes || !tensor_info || !out_q8_0_blocks ||
+        !out_blocks_read || !out_bytes_read || !out_slice_payload_offset)
+        return GGUF_READER_ERR_NULL_PTR;
+
+    // Snapshot immutable tensor geometry and offsets so every bounds/range
+    // decision and final diagnostics publish comes from one consistent view.
+    staged_n_dims = tensor_info->n_dims;
+    staged_ggml_type = tensor_info->ggml_type;
+    staged_offset = tensor_info->offset;
+    for (i = 0; i < 4; ++i)
+        staged_dims[i] = tensor_info->dims[i];
+
+    if (!staged_n_dims || staged_n_dims > 4)
+        return GGUF_READER_ERR_BAD_DIM;
+    if (staged_ggml_type != GGUF_READER_GGML_TYPE_Q8_0)
+        return GGUF_READER_ERR_BAD_TYPE;
+
+    staged_total_elements = 1;
+    for (i = 0; i < staged_n_dims; ++i)
+    {
+        if (!staged_dims[i])
+            return GGUF_READER_ERR_BAD_DIM;
+        if (!GGUFReaderTryMulU64(staged_total_elements,
+                                 staged_dims[i],
+                                 &staged_total_elements))
+            return GGUF_READER_ERR_OVERFLOW;
+    }
+
+    // Q8_0 block math is integer-only: 32 quantized elements per block,
+    // 34-byte packed block payload (2-byte d + 32 signed quants).
+    if (staged_total_elements % GGUF_READER_Q8_0_BLOCK_SIZE)
+        return GGUF_READER_ERR_BAD_DIM;
+
+    staged_total_blocks = staged_total_elements / GGUF_READER_Q8_0_BLOCK_SIZE;
+    if (slice_block_start > staged_total_blocks)
+        return GGUF_READER_ERR_BAD_PARAM;
+    if (!GGUFReaderTryAddU64(slice_block_start,
+                             slice_block_count,
+                             &staged_slice_end_block))
+        return GGUF_READER_ERR_OVERFLOW;
+    if (staged_slice_end_block > staged_total_blocks)
+        return GGUF_READER_ERR_BAD_PARAM;
+
+    if (!GGUFReaderTryMulU64(staged_total_blocks,
+                             GGUF_READER_Q8_0_BLOCK_BYTES,
+                             &staged_tensor_bytes))
+        return GGUF_READER_ERR_OVERFLOW;
+    if (!GGUFReaderTryMulU64(slice_block_start,
+                             GGUF_READER_Q8_0_BLOCK_BYTES,
+                             &staged_slice_byte_offset))
+        return GGUF_READER_ERR_OVERFLOW;
+    if (!GGUFReaderTryMulU64(slice_block_count,
+                             GGUF_READER_Q8_0_BLOCK_BYTES,
+                             &staged_slice_bytes))
+        return GGUF_READER_ERR_OVERFLOW;
+
+    if (!GGUFReaderTryAddU64(tensor_data_base,
+                             staged_offset,
+                             &staged_tensor_payload_start))
+        return GGUF_READER_ERR_OVERFLOW;
+    if (!GGUFReaderTryAddU64(staged_tensor_payload_start,
+                             staged_tensor_bytes,
+                             &staged_tensor_payload_end))
+        return GGUF_READER_ERR_OVERFLOW;
+
+    if (staged_tensor_payload_start > gguf_nbytes)
+        return GGUF_READER_ERR_TRUNCATED;
+    if (staged_tensor_payload_end > gguf_nbytes)
+        return GGUF_READER_ERR_TRUNCATED;
+
+    if (!GGUFReaderTryAddU64(staged_tensor_payload_start,
+                             staged_slice_byte_offset,
+                             &staged_slice_payload_start))
+        return GGUF_READER_ERR_OVERFLOW;
+    if (!GGUFReaderTryAddU64(staged_slice_payload_start,
+                             staged_slice_bytes,
+                             &staged_slice_payload_end))
+        return GGUF_READER_ERR_OVERFLOW;
+
+    if (staged_slice_payload_start > staged_tensor_payload_end)
+        return GGUF_READER_ERR_BAD_PARAM;
+    if (staged_slice_payload_end > staged_tensor_payload_end)
+        return GGUF_READER_ERR_BAD_PARAM;
+
+    if (!GGUFReaderTryAddU64(0,
+                             staged_slice_bytes,
+                             &staged_out_end))
+        return GGUF_READER_ERR_OVERFLOW;
+    if (staged_out_end > out_q8_0_blocks_capacity)
+        return GGUF_READER_ERR_BAD_CAPACITY;
+
+    if (!GGUFReaderTensorInfoQ8_0MatchesSnapshot(tensor_info,
+                                                 staged_n_dims,
+                                                 staged_ggml_type,
+                                                 staged_offset,
+                                                 staged_dims))
+        return GGUF_READER_ERR_BAD_PARAM;
+
+    if (slice_block_count > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_READER_ERR_OVERFLOW;
+    if (staged_slice_bytes > 0x7FFFFFFFFFFFFFFF)
+        return GGUF_READER_ERR_OVERFLOW;
+
+    staged_blocks_read_i64 = (I64)slice_block_count;
+    staged_bytes_read_i64 = (I64)staged_slice_bytes;
+
+    // No-partial publish: full preflight above, then one contiguous copy.
+    for (copy_idx = 0; copy_idx < staged_slice_bytes; ++copy_idx)
+        out_q8_0_blocks[copy_idx] = gguf_bytes[staged_slice_payload_start + copy_idx];
+
+    *out_blocks_read = staged_blocks_read_i64;
+    *out_bytes_read = staged_bytes_read_i64;
+    *out_slice_payload_offset = staged_slice_payload_start;
+    return GGUF_READER_OK;
+}
