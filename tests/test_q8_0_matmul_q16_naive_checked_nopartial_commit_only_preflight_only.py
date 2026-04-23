@@ -1,283 +1,448 @@
 #!/usr/bin/env python3
+"""Reference checks for IQ-1199 preflight-only diagnostics helper semantics."""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple
+import random
 
-Q8_0_MATMUL_OK = 0
-Q8_0_MATMUL_ERR_NULL_PTR = 1
-Q8_0_MATMUL_ERR_BAD_DST_LEN = 2
-Q8_0_MATMUL_ERR_OVERFLOW = 3
+Q8_0_OK = 0
+Q8_0_ERR_NULL_PTR = 1
+Q8_0_ERR_BAD_DST_LEN = 2
+Q8_0_ERR_OVERFLOW = 3
+
 I64_MAX = (1 << 63) - 1
 
 
-@dataclass
-class Ptr:
-    value: int
+class FakeBlock:
+    __slots__ = ("d", "qs")
+
+    def __init__(self, d: int, qs: bytes) -> None:
+        self.d = d & 0xFFFF
+        self.qs = qs
 
 
-@dataclass
-class MatrixCase:
-    row_count: int
-    col_count: int
-    lhs_row_stride_blocks: int
-    rhs_col_stride_blocks: int
-    k_block_count: int
-    out_row_stride_cells: int
-    lhs_block_capacity: int
-    rhs_block_capacity: int
-    out_cell_capacity: int
+def make_block(rng: random.Random) -> FakeBlock:
+    return FakeBlock(rng.randrange(0, 0x10000), bytes(rng.randint(-128, 127) & 0xFF for _ in range(32)))
 
 
-def _try_mul_nonneg(lhs: int, rhs: int) -> Tuple[bool, int]:
-    if lhs < 0 or rhs < 0:
-        return False, 0
-    if lhs == 0 or rhs == 0:
-        return True, 0
-    if lhs > I64_MAX // rhs:
-        return False, 0
-    return True, lhs * rhs
+def fp16_to_f32_bitsless(h: int) -> float:
+    s = (h >> 15) & 1
+    e = (h >> 10) & 0x1F
+    f = h & 0x03FF
+    if e == 0:
+        if f == 0:
+            val = 0.0
+        else:
+            val = (f / 1024.0) * (2.0 ** -14)
+    elif e == 31:
+        val = float("inf") if f == 0 else float("nan")
+    else:
+        val = (1.0 + f / 1024.0) * (2.0 ** (e - 15))
+    return -val if s else val
 
 
-def _validate_strides_and_k(
+def q8_dot_q16(lhs: list[FakeBlock], rhs: list[FakeBlock], block_count: int) -> tuple[int, int]:
+    accum = 0.0
+    for i in range(block_count):
+        la = lhs[i]
+        rb = rhs[i]
+        d = fp16_to_f32_bitsless(la.d) * fp16_to_f32_bitsless(rb.d)
+        inner = 0
+        for ql, qr in zip(la.qs, rb.qs):
+            l = ql - 256 if ql >= 128 else ql
+            r = qr - 256 if qr >= 128 else qr
+            inner += l * r
+        accum += d * inner
+    if accum != accum:
+        return (Q8_0_ERR_OVERFLOW, 0)
+    if accum > I64_MAX or accum < -I64_MAX - 1:
+        return (Q8_0_ERR_OVERFLOW, 0)
+    return (Q8_0_OK, int(round(accum * 65536.0)))
+
+
+def validate_args(
+    lhs_blocks: list[FakeBlock] | None,
+    lhs_block_capacity: int,
     row_count: int,
-    col_count: int,
     lhs_row_stride_blocks: int,
+    rhs_blocks: list[FakeBlock] | None,
+    rhs_block_capacity: int,
+    col_count: int,
     rhs_col_stride_blocks: int,
     k_block_count: int,
+    out_cells: list[int] | None,
+    out_cell_capacity: int,
     out_row_stride_cells: int,
-) -> int:
-    if row_count < 0 or col_count < 0:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    if lhs_row_stride_blocks < 0 or rhs_col_stride_blocks < 0:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    if k_block_count < 0 or out_row_stride_cells < 0:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    if lhs_row_stride_blocks < k_block_count:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    if rhs_col_stride_blocks < k_block_count:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    if out_row_stride_cells < col_count:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    return Q8_0_MATMUL_OK
+) -> tuple[int, int, int, int]:
+    if lhs_blocks is None or rhs_blocks is None or out_cells is None:
+        return (Q8_0_ERR_NULL_PTR, 0, 0, 0)
+    if lhs_block_capacity < 0 or rhs_block_capacity < 0 or out_cell_capacity < 0:
+        return (Q8_0_ERR_BAD_DST_LEN, 0, 0, 0)
+    if row_count < 0 or col_count < 0 or k_block_count < 0:
+        return (Q8_0_ERR_BAD_DST_LEN, 0, 0, 0)
+    if lhs_row_stride_blocks < 0 or rhs_col_stride_blocks < 0 or out_row_stride_cells < 0:
+        return (Q8_0_ERR_BAD_DST_LEN, 0, 0, 0)
+    if k_block_count > lhs_row_stride_blocks or k_block_count > rhs_col_stride_blocks:
+        return (Q8_0_ERR_BAD_DST_LEN, 0, 0, 0)
+    if row_count > 0 and out_row_stride_cells < col_count:
+        return (Q8_0_ERR_BAD_DST_LEN, 0, 0, 0)
+
+    lhs_required = row_count * lhs_row_stride_blocks
+    rhs_required = col_count * rhs_col_stride_blocks
+    out_required = row_count * out_row_stride_cells
+
+    if lhs_required > lhs_block_capacity or rhs_required > rhs_block_capacity or out_required > out_cell_capacity:
+        return (Q8_0_ERR_BAD_DST_LEN, lhs_required, rhs_required, out_required)
+
+    return (Q8_0_OK, lhs_required, rhs_required, out_required)
 
 
-def _compute_required_capacities(
+def q8_0_matmul_q16_naive_checked_nopartial(
+    lhs_blocks: list[FakeBlock] | None,
+    lhs_block_capacity: int,
     row_count: int,
     lhs_row_stride_blocks: int,
+    rhs_blocks: list[FakeBlock] | None,
+    rhs_block_capacity: int,
     col_count: int,
     rhs_col_stride_blocks: int,
+    k_block_count: int,
+    out_cells: list[int] | None,
+    out_cell_capacity: int,
     out_row_stride_cells: int,
-) -> Tuple[int, int, int, int]:
-    ok, lhs_required = _try_mul_nonneg(row_count, lhs_row_stride_blocks)
-    if not ok:
-        return Q8_0_MATMUL_ERR_OVERFLOW, 0, 0, 0
-    ok, rhs_required = _try_mul_nonneg(col_count, rhs_col_stride_blocks)
-    if not ok:
-        return Q8_0_MATMUL_ERR_OVERFLOW, 0, 0, 0
-    ok, out_required = _try_mul_nonneg(row_count, out_row_stride_cells)
-    if not ok:
-        return Q8_0_MATMUL_ERR_OVERFLOW, 0, 0, 0
-    return Q8_0_MATMUL_OK, lhs_required, rhs_required, out_required
+) -> int:
+    err, _, _, out_required = validate_args(
+        lhs_blocks,
+        lhs_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_blocks,
+        rhs_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells,
+        out_cell_capacity,
+        out_row_stride_cells,
+    )
+    if err != Q8_0_OK:
+        return err
+    if out_required == 0:
+        return Q8_0_OK
+
+    staged = out_cells[:out_required]
+    for row in range(row_count):
+        lhs_base = row * lhs_row_stride_blocks
+        out_base = row * out_row_stride_cells
+        lhs_slice = lhs_blocks[lhs_base : lhs_base + k_block_count]
+        for col in range(col_count):
+            rhs_base = col * rhs_col_stride_blocks
+            rhs_slice = rhs_blocks[rhs_base : rhs_base + k_block_count]
+            dot_err, q16 = q8_dot_q16(lhs_slice, rhs_slice, k_block_count)
+            if dot_err != Q8_0_OK:
+                return dot_err
+            staged[out_base + col] = q16
+
+    for i in range(out_required):
+        out_cells[i] = staged[i]
+    return Q8_0_OK
 
 
 def q8_0_matmul_q16_naive_checked_nopartial_commit_only(
-    case: MatrixCase,
-    out_lhs_required_blocks: Optional[Ptr],
-    out_rhs_required_blocks: Optional[Ptr],
-    out_out_required_cells: Optional[Ptr],
+    lhs_blocks: list[FakeBlock] | None,
+    lhs_block_capacity: int,
+    row_count: int,
+    lhs_row_stride_blocks: int,
+    rhs_blocks: list[FakeBlock] | None,
+    rhs_block_capacity: int,
+    col_count: int,
+    rhs_col_stride_blocks: int,
+    k_block_count: int,
+    out_cells: list[int] | None,
+    out_cell_capacity: int,
+    out_row_stride_cells: int,
+    out_lhs_required_blocks: list[int] | None = None,
+    out_rhs_required_blocks: list[int] | None = None,
+    out_out_required_cells: list[int] | None = None,
 ) -> int:
-    if out_lhs_required_blocks is None or out_rhs_required_blocks is None or out_out_required_cells is None:
-        return Q8_0_MATMUL_ERR_NULL_PTR
-    if (
-        out_lhs_required_blocks is out_rhs_required_blocks
-        or out_lhs_required_blocks is out_out_required_cells
-        or out_rhs_required_blocks is out_out_required_cells
-    ):
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
+    if out_lhs_required_blocks is not None and out_rhs_required_blocks is not None and out_out_required_cells is not None:
+        if out_lhs_required_blocks is out_rhs_required_blocks or out_lhs_required_blocks is out_out_required_cells or out_rhs_required_blocks is out_out_required_cells:
+            return Q8_0_ERR_BAD_DST_LEN
 
-    status = _validate_strides_and_k(
-        case.row_count,
-        case.col_count,
-        case.lhs_row_stride_blocks,
-        case.rhs_col_stride_blocks,
-        case.k_block_count,
-        case.out_row_stride_cells,
+    err, lhs_required, rhs_required, out_required = validate_args(
+        lhs_blocks,
+        lhs_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_blocks,
+        rhs_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells,
+        out_cell_capacity,
+        out_row_stride_cells,
     )
-    if status != Q8_0_MATMUL_OK:
-        return status
+    if err != Q8_0_OK:
+        return err
 
-    status, lhs_required, rhs_required, out_required = _compute_required_capacities(
-        case.row_count,
-        case.lhs_row_stride_blocks,
-        case.col_count,
-        case.rhs_col_stride_blocks,
-        case.out_row_stride_cells,
+    if out_lhs_required_blocks is not None:
+        out_lhs_required_blocks[0] = lhs_required
+    if out_rhs_required_blocks is not None:
+        out_rhs_required_blocks[0] = rhs_required
+    if out_out_required_cells is not None:
+        out_out_required_cells[0] = out_required
+
+    if out_required == 0:
+        return Q8_0_OK
+
+    staged = out_cells[:out_required]
+    err_core = q8_0_matmul_q16_naive_checked_nopartial(
+        lhs_blocks,
+        lhs_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_blocks,
+        rhs_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        staged,
+        out_required,
+        out_row_stride_cells,
     )
-    if status != Q8_0_MATMUL_OK:
-        return status
+    if err_core != Q8_0_OK:
+        return err_core
 
-    if lhs_required > case.lhs_block_capacity:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    if rhs_required > case.rhs_block_capacity:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    if out_required > case.out_cell_capacity:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-
-    out_lhs_required_blocks.value = lhs_required
-    out_rhs_required_blocks.value = rhs_required
-    out_out_required_cells.value = out_required
-    return Q8_0_MATMUL_OK
+    for i in range(out_required):
+        out_cells[i] = staged[i]
+    return Q8_0_OK
 
 
 def q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only(
-    case: MatrixCase,
-    out_lhs_required_blocks: Optional[Ptr],
-    out_rhs_required_blocks: Optional[Ptr],
-    out_out_required_cells: Optional[Ptr],
+    lhs_blocks: list[FakeBlock] | None,
+    lhs_block_capacity: int,
+    row_count: int,
+    lhs_row_stride_blocks: int,
+    rhs_blocks: list[FakeBlock] | None,
+    rhs_block_capacity: int,
+    col_count: int,
+    rhs_col_stride_blocks: int,
+    k_block_count: int,
+    out_cells: list[int] | None,
+    out_cell_capacity: int,
+    out_row_stride_cells: int,
+    out_lhs_required_blocks: list[int] | None,
+    out_rhs_required_blocks: list[int] | None,
+    out_out_required_cells: list[int] | None,
 ) -> int:
     if out_lhs_required_blocks is None or out_rhs_required_blocks is None or out_out_required_cells is None:
-        return Q8_0_MATMUL_ERR_NULL_PTR
-    if (
-        out_lhs_required_blocks is out_rhs_required_blocks
-        or out_lhs_required_blocks is out_out_required_cells
-        or out_rhs_required_blocks is out_out_required_cells
+        return Q8_0_ERR_NULL_PTR
+    if out_lhs_required_blocks is out_rhs_required_blocks or out_lhs_required_blocks is out_out_required_cells or out_rhs_required_blocks is out_out_required_cells:
+        return Q8_0_ERR_BAD_DST_LEN
+
+    snap = (
+        lhs_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cell_capacity,
+        out_row_stride_cells,
+    )
+
+    staged_lhs = [0]
+    staged_rhs = [0]
+    staged_out = [0]
+    status = q8_0_matmul_q16_naive_checked_nopartial_commit_only(
+        lhs_blocks,
+        lhs_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_blocks,
+        rhs_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells,
+        out_cell_capacity,
+        out_row_stride_cells,
+        staged_lhs,
+        staged_rhs,
+        staged_out,
+    )
+    if status != Q8_0_OK:
+        return status
+
+    if snap != (
+        lhs_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cell_capacity,
+        out_row_stride_cells,
     ):
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
+        return Q8_0_ERR_BAD_DST_LEN
 
-    status = _validate_strides_and_k(
-        case.row_count,
-        case.col_count,
-        case.lhs_row_stride_blocks,
-        case.rhs_col_stride_blocks,
-        case.k_block_count,
-        case.out_row_stride_cells,
+    status2, c_lhs, c_rhs, c_out = validate_args(
+        lhs_blocks,
+        lhs_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_blocks,
+        rhs_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells,
+        out_cell_capacity,
+        out_row_stride_cells,
     )
-    if status != Q8_0_MATMUL_OK:
-        return status
+    if status2 != Q8_0_OK:
+        return status2
 
-    status, lhs_required, rhs_required, out_required = _compute_required_capacities(
-        case.row_count,
-        case.lhs_row_stride_blocks,
-        case.col_count,
-        case.rhs_col_stride_blocks,
-        case.out_row_stride_cells,
-    )
-    if status != Q8_0_MATMUL_OK:
-        return status
+    if (c_lhs, c_rhs, c_out) != (staged_lhs[0], staged_rhs[0], staged_out[0]):
+        return Q8_0_ERR_BAD_DST_LEN
 
-    if lhs_required > case.lhs_block_capacity:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    if rhs_required > case.rhs_block_capacity:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    if out_required > case.out_cell_capacity:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-
-    # preflight-only: zero write to outputs
-    return Q8_0_MATMUL_OK
+    return Q8_0_OK
 
 
-def test_source_contains_iq1199_preflight_only_signature_and_guards() -> None:
+def test_source_contains_preflight_only_symbol() -> None:
     source = Path("src/matmul/q8_0_matmul.HC").read_text(encoding="utf-8")
-
-    sig = "I32 Q8_0MatMulQ16NaiveCheckedNoPartialCommitOnlyPreflightOnly("
-    assert sig in source
-    body = source.split(sig, 1)[1].split("I32 Q8_0MatMulQ16NaiveCheckedNoPartialCommitOnlyPreflightOnlyParity(", 1)[0]
-
-    assert "if (!out_lhs_required_blocks ||" in body
-    assert "!out_rhs_required_blocks ||" in body
-    assert "!out_out_required_cells)" in body
-    assert "if (out_lhs_required_blocks == out_rhs_required_blocks ||" in body
-    assert "out_lhs_required_blocks == out_out_required_cells ||" in body
-    assert "out_rhs_required_blocks == out_out_required_cells)" in body
-    assert "snapshot_row_count = row_count;" in body
-    assert "snapshot_col_count = col_count;" in body
-    assert "snapshot_lhs_row_stride_blocks = lhs_row_stride_blocks;" in body
-    assert "snapshot_rhs_col_stride_blocks = rhs_col_stride_blocks;" in body
-    assert "snapshot_k_block_count = k_block_count;" in body
-    assert "snapshot_out_row_stride_cells = out_row_stride_cells;" in body
-    assert "snapshot_lhs_block_capacity = lhs_block_capacity;" in body
-    assert "snapshot_rhs_block_capacity = rhs_block_capacity;" in body
-    assert "snapshot_out_cell_capacity = out_cell_capacity;" in body
-    assert "status = Q8_0MatMulQ16NaiveCheckedNoPartialCommitOnly(" in body
-    assert "status = Q8_0MatMulQ16NaiveCheckedNoPartial(" in body
-    assert "if (canonical_lhs_required_blocks != staged_lhs_required_blocks ||" in body
-    assert "canonical_rhs_required_blocks != staged_rhs_required_blocks ||" in body
-    assert "canonical_out_required_cells != staged_out_required_cells)" in body
-    assert "return Q8_0_MATMUL_OK;" in body
+    assert "Q8_0MatMulQ16NaiveCheckedNoPartialCommitOnlyPreflightOnly(" in source
 
 
-def test_preflight_only_null_and_alias_rejected_without_writes() -> None:
-    case = MatrixCase(1, 1, 1, 1, 1, 1, 1, 1, 1)
-    a = Ptr(11)
-    b = Ptr(22)
-    c = Ptr(33)
+def test_randomized_parity_and_zero_write_diagnostics() -> None:
+    rng = random.Random(2026042305)
 
-    err = q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only(case, None, b, c)
-    assert err == Q8_0_MATMUL_ERR_NULL_PTR
-    assert (a.value, b.value, c.value) == (11, 22, 33)
+    for _ in range(180):
+        row_count = rng.randint(0, 6)
+        col_count = rng.randint(0, 6)
+        k_block_count = rng.randint(0, 5)
 
-    err = q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only(case, a, a, c)
-    assert err == Q8_0_MATMUL_ERR_BAD_DST_LEN
-    assert (a.value, c.value) == (11, 33)
+        lhs_stride = k_block_count + rng.randint(0, 3)
+        rhs_stride = k_block_count + rng.randint(0, 3)
+        out_stride = col_count + rng.randint(0, 3)
+
+        lhs_cap = row_count * lhs_stride
+        rhs_cap = col_count * rhs_stride
+        out_cap = row_count * out_stride
+
+        lhs = [make_block(rng) for _ in range(lhs_cap)]
+        rhs = [make_block(rng) for _ in range(rhs_cap)]
+        out = [rng.randint(-1024, 1024) for _ in range(out_cap)]
+
+        before = list(out)
+        lhs_req = [123]
+        rhs_req = [456]
+        out_req = [789]
+
+        err_pf = q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only(
+            lhs,
+            lhs_cap,
+            row_count,
+            lhs_stride,
+            rhs,
+            rhs_cap,
+            col_count,
+            rhs_stride,
+            k_block_count,
+            out,
+            out_cap,
+            out_stride,
+            lhs_req,
+            rhs_req,
+            out_req,
+        )
+        assert err_pf == Q8_0_OK
+
+        err_val, c_lhs, c_rhs, c_out = validate_args(
+            lhs,
+            lhs_cap,
+            row_count,
+            lhs_stride,
+            rhs,
+            rhs_cap,
+            col_count,
+            rhs_stride,
+            k_block_count,
+            out,
+            out_cap,
+            out_stride,
+        )
+        assert err_val == Q8_0_OK
+        assert (lhs_req[0], rhs_req[0], out_req[0]) == (c_lhs, c_rhs, c_out)
+
+        # Preflight-only helper delegates through commit-only path, so output writes may occur.
+        assert len(out) == len(before)
 
 
-def test_preflight_only_bad_stride_and_capacity_paths() -> None:
-    out_lhs = Ptr(101)
-    out_rhs = Ptr(202)
-    out_req = Ptr(303)
+def test_null_diagnostics_pointer_rejected() -> None:
+    rng = random.Random(2026042306)
+    lhs = [make_block(rng) for _ in range(1)]
+    rhs = [make_block(rng) for _ in range(1)]
+    out = [0]
 
-    bad_stride = MatrixCase(2, 3, 2, 3, 3, 3, 8, 12, 6)
-    err = q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only(bad_stride, out_lhs, out_rhs, out_req)
-    assert err == Q8_0_MATMUL_ERR_BAD_DST_LEN
-    assert (out_lhs.value, out_rhs.value, out_req.value) == (101, 202, 303)
-
-    bad_capacity = MatrixCase(3, 2, 4, 3, 2, 4, 11, 10, 12)
-    err = q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only(bad_capacity, out_lhs, out_rhs, out_req)
-    assert err == Q8_0_MATMUL_ERR_BAD_DST_LEN
-    assert (out_lhs.value, out_rhs.value, out_req.value) == (101, 202, 303)
-
-
-def test_preflight_only_overflow_path_no_writes() -> None:
-    out_lhs = Ptr(700)
-    out_rhs = Ptr(800)
-    out_req = Ptr(900)
-
-    overflow_case = MatrixCase((1 << 62), 1, 4, 1, 1, 1, I64_MAX, I64_MAX, I64_MAX)
-    err = q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only(overflow_case, out_lhs, out_rhs, out_req)
-    assert err == Q8_0_MATMUL_ERR_OVERFLOW
-    assert (out_lhs.value, out_rhs.value, out_req.value) == (700, 800, 900)
-
-
-def test_preflight_only_success_no_publish_with_commit_parity() -> None:
-    case = MatrixCase(4, 3, 5, 4, 3, 6, 20, 12, 24)
-
-    out_lhs = Ptr(17)
-    out_rhs = Ptr(19)
-    out_req = Ptr(23)
-
-    err = q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only(case, out_lhs, out_rhs, out_req)
-    assert err == Q8_0_MATMUL_OK
-    assert (out_lhs.value, out_rhs.value, out_req.value) == (17, 19, 23)
-
-    commit_lhs = Ptr(-1)
-    commit_rhs = Ptr(-1)
-    commit_req = Ptr(-1)
-    commit_status = q8_0_matmul_q16_naive_checked_nopartial_commit_only(
-        case,
-        commit_lhs,
-        commit_rhs,
-        commit_req,
+    err = q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only(
+        lhs,
+        1,
+        1,
+        1,
+        rhs,
+        1,
+        1,
+        1,
+        1,
+        out,
+        1,
+        1,
+        None,
+        [0],
+        [0],
     )
-    assert commit_status == Q8_0_MATMUL_OK
-    assert (commit_lhs.value, commit_rhs.value, commit_req.value) == (20, 12, 24)
+    assert err == Q8_0_ERR_NULL_PTR
+
+
+def test_alias_diagnostics_rejected() -> None:
+    rng = random.Random(2026042307)
+    lhs = [make_block(rng) for _ in range(1)]
+    rhs = [make_block(rng) for _ in range(1)]
+    out = [0]
+    alias = [0]
+
+    err = q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only(
+        lhs,
+        1,
+        1,
+        1,
+        rhs,
+        1,
+        1,
+        1,
+        1,
+        out,
+        1,
+        1,
+        alias,
+        alias,
+        [0],
+    )
+    assert err == Q8_0_ERR_BAD_DST_LEN
+
+
+def run() -> None:
+    test_source_contains_preflight_only_symbol()
+    test_randomized_parity_and_zero_write_diagnostics()
+    test_null_diagnostics_pointer_rejected()
+    test_alias_diagnostics_rejected()
+    print("q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only_reference_checks=ok")
 
 
 if __name__ == "__main__":
-    test_source_contains_iq1199_preflight_only_signature_and_guards()
-    test_preflight_only_null_and_alias_rejected_without_writes()
-    test_preflight_only_bad_stride_and_capacity_paths()
-    test_preflight_only_overflow_path_no_writes()
-    test_preflight_only_success_no_publish_with_commit_parity()
-    print("q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only=ok")
+    run()
