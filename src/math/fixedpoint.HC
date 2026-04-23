@@ -540,6 +540,51 @@ I32 FPQ16DivCheckedNoPartialCommitOnly(I64 numerator_q16,
     return FP_Q16_OK;
 }
 
+// Diagnostics-only preflight companion for FPQ16DivCheckedNoPartialCommitOnly.
+//
+// This runs the canonical commit-only divider into a local staging lane to
+// preserve DOMAIN/OVERFLOW semantics, then publishes only the canonical scalar
+// requirement metadata `{required_out_cells=1}` when immutable input snapshots
+// still match.
+//
+// Contract:
+// - out_required_out_cells must be non-null.
+// - Returns exactly the same status domain as FPQ16DivCheckedNoPartialCommitOnly.
+// - Performs no publish on failure.
+I32 FPQ16DivCheckedNoPartialCommitOnlyPreflightOnly(I64 numerator_q16,
+                                                    I64 denominator_q16,
+                                                    I64 *out_required_out_cells)
+{
+    I64 snapshot_numerator_q16;
+    I64 snapshot_denominator_q16;
+    I64 required_out_cells;
+    I64 staged_out_q16;
+    I32 status;
+
+    if (!out_required_out_cells)
+        return FP_Q16_ERR_NULL_PTR;
+
+    snapshot_numerator_q16 = numerator_q16;
+    snapshot_denominator_q16 = denominator_q16;
+    required_out_cells = 1;
+
+    status = FPQ16DivCheckedNoPartialCommitOnly(numerator_q16,
+                                                 denominator_q16,
+                                                 &staged_out_q16);
+    if (status)
+        return status;
+
+    if (snapshot_numerator_q16 != numerator_q16 ||
+        snapshot_denominator_q16 != denominator_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (required_out_cells != 1)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_required_out_cells = required_out_cells;
+    return FP_Q16_OK;
+}
+
 // Checked elementwise Q16 multiply helper for inference vector paths.
 // Contracts:
 //   - count >= 0
