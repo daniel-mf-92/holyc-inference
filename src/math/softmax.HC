@@ -1004,6 +1004,68 @@ I32 FPQ16SoftmaxPrefixSumCheckedCommitOnlyPreflightOnly(I64 *probs_q16,
     return FP_Q16_OK;
 }
 
+// Parity diagnostics wrapper over:
+//   1) FPQ16SoftmaxPrefixSumCheckedCommitOnlyPreflightOnly
+//   2) FPQ16SoftmaxPrefixSumCheckedCommitOnly
+//
+// Purpose:
+// - Enforce immutable `{lane_count}` and output-pointer snapshots.
+// - Require exact tuple parity `{total_q16,last_prefix_q16}` before publish.
+I32 FPQ16SoftmaxPrefixSumCheckedCommitOnlyPreflightOnlyParity(I64 *probs_q16,
+                                                              I64 lane_count,
+                                                              I64 *prefix_sums_q16,
+                                                              I64 *out_total_q16,
+                                                              I64 *out_last_prefix_q16)
+{
+    I64 snapshot_lane_count;
+    I64 *snapshot_out_total_q16;
+    I64 *snapshot_out_last_prefix_q16;
+    I64 staged_total_q16;
+    I64 staged_last_prefix_q16;
+    I64 canonical_total_q16;
+    I64 canonical_last_prefix_q16;
+    I32 status;
+
+    if (!probs_q16 || !prefix_sums_q16 || !out_total_q16 || !out_last_prefix_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    snapshot_lane_count = lane_count;
+    snapshot_out_total_q16 = out_total_q16;
+    snapshot_out_last_prefix_q16 = out_last_prefix_q16;
+
+    status = FPQ16SoftmaxPrefixSumCheckedCommitOnlyPreflightOnly(
+        probs_q16,
+        snapshot_lane_count,
+        prefix_sums_q16,
+        &staged_total_q16,
+        &staged_last_prefix_q16);
+    if (status)
+        return status;
+
+    status = FPQ16SoftmaxPrefixSumCheckedCommitOnly(probs_q16,
+                                                    snapshot_lane_count,
+                                                    prefix_sums_q16,
+                                                    &canonical_total_q16,
+                                                    &canonical_last_prefix_q16);
+    if (status)
+        return status;
+
+    if (snapshot_lane_count != lane_count ||
+        snapshot_out_total_q16 != out_total_q16 ||
+        snapshot_out_last_prefix_q16 != out_last_prefix_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (staged_total_q16 != canonical_total_q16 ||
+        staged_last_prefix_q16 != canonical_last_prefix_q16)
+        return FP_Q16_ERR_OVERFLOW;
+
+    *out_total_q16 = staged_total_q16;
+    *out_last_prefix_q16 = staged_last_prefix_q16;
+    return FP_Q16_OK;
+}
+
 // Checked composed helper for alias-permitted split-phase softmax.
 // Pipeline:
 //   1) exp_lanes_q16 <- exp(preclamped_logits_q16)
