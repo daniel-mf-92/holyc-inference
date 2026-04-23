@@ -1317,6 +1317,78 @@ I32 RoPEQ16RotateHeadByPositionApplyPairCheckedNoPartial(I64 *head_cells_q16,
                                                        position);
 }
 
+// Commit-only wrapper over no-partial pair-rotation.
+//
+// Contract:
+//   - Caller provides output slots for commit diagnostics.
+//   - Inputs are snapshotted before execution and checked unchanged after the
+//     canonical no-partial rotate path returns.
+//   - Publish to outputs is atomic-on-success only: output slots are written
+//     iff status is ROPE_Q16_OK and snapshot parity holds.
+I32 RoPEQ16RotateHeadByPositionApplyPairCheckedNoPartialCommitOnly(I64 *head_cells_q16,
+                                                                   I64 head_cell_capacity,
+                                                                   I64 head_base_index,
+                                                                   I64 head_dim,
+                                                                   I64 pair_stride_cells,
+                                                                   I64 freq_base_q16,
+                                                                   I64 position,
+                                                                   I64 *out_commit_pair_count,
+                                                                   I64 *out_commit_status)
+{
+    I64 snapshot_head_cell_capacity;
+    I64 snapshot_head_base_index;
+    I64 snapshot_head_dim;
+    I64 snapshot_pair_stride_cells;
+    I64 snapshot_freq_base_q16;
+    I64 snapshot_position;
+    I64 pair_count;
+    I32 status;
+
+    if (!head_cells_q16)
+        return ROPE_Q16_ERR_NULL_PTR;
+    if (!out_commit_pair_count)
+        return ROPE_Q16_ERR_NULL_PTR;
+    if (!out_commit_status)
+        return ROPE_Q16_ERR_NULL_PTR;
+    if (head_dim < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    snapshot_head_cell_capacity = head_cell_capacity;
+    snapshot_head_base_index = head_base_index;
+    snapshot_head_dim = head_dim;
+    snapshot_pair_stride_cells = pair_stride_cells;
+    snapshot_freq_base_q16 = freq_base_q16;
+    snapshot_position = position;
+
+    status = RoPEQ16RotateHeadByPositionApplyPairCheckedNoPartial(head_cells_q16,
+                                                                  head_cell_capacity,
+                                                                  head_base_index,
+                                                                  head_dim,
+                                                                  pair_stride_cells,
+                                                                  freq_base_q16,
+                                                                  position);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    if (head_cell_capacity != snapshot_head_cell_capacity)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (head_base_index != snapshot_head_base_index)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (head_dim != snapshot_head_dim)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (pair_stride_cells != snapshot_pair_stride_cells)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (freq_base_q16 != snapshot_freq_base_q16)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (position != snapshot_position)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    pair_count = head_dim >> 1;
+    *out_commit_pair_count = pair_count;
+    *out_commit_status = ROPE_Q16_OK;
+    return ROPE_Q16_OK;
+}
+
 // Compute one head base index inside a contiguous head range:
 //   head_base = range_base_index + head_index * head_stride_cells
 //
