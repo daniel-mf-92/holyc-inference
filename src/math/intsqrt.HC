@@ -475,3 +475,53 @@ I32 FPQ16SqrtCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnl
     *required_out_cells_out = staged_required_out_cells;
     return FP_Q16_OK;
 }
+
+// Commit-only diagnostics wrapper over
+// FPQ16SqrtCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity.
+//
+// Stages delegated diagnostics into local scratch, revalidates immutable
+// `{x_q16}` snapshot parity, then cross-checks exact tuple parity against the
+// canonical diagnostics-only companion before atomically publishing output.
+//
+// Contract:
+// - `required_out_cells_out` must be non-null.
+// - Does not publish diagnostics on failure (commit-only behavior).
+// - Enforces strict tuple parity `{required_out_cells=1}` before publish.
+I32 FPQ16SqrtCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
+    I64 x_q16,
+    I64 *required_out_cells_out)
+{
+    I64 snapshot_x_q16;
+    I64 staged_required_out_cells;
+    I64 canonical_required_out_cells;
+    I32 status;
+
+    if (!required_out_cells_out)
+        return FP_Q16_ERR_NULL_PTR;
+
+    snapshot_x_q16 = x_q16;
+
+    status = FPQ16SqrtCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+        x_q16,
+        &staged_required_out_cells);
+    if (status != FP_Q16_OK)
+        return status;
+
+    if (snapshot_x_q16 != x_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    status = FPQ16SqrtCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+        x_q16,
+        &canonical_required_out_cells);
+    if (status != FP_Q16_OK)
+        return status;
+
+    if (staged_required_out_cells != canonical_required_out_cells)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (canonical_required_out_cells != 1)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *required_out_cells_out = staged_required_out_cells;
+    return FP_Q16_OK;
+}
