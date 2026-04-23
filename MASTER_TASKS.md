@@ -1159,7 +1159,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-1266 Implement continuous batching scheduler in `src/runtime/batch_scheduler.HC` with harness `tests/test_runtime_batch_scheduler.py` (WS9-33, WS13-03)
 - [x] IQ-1267 Implement prefix cache manager in `src/runtime/prefix_cache.HC` with harness `tests/test_runtime_prefix_cache.py` (WS9-34)
 - [x] IQ-1268 Implement speculative decode coordinator in `src/model/spec_decode.HC` with harness `tests/test_model_spec_decode.py` (WS9-36, WS13-04)
-- [ ] IQ-1269 Implement quantization profile selector in `src/runtime/quant_profile.HC` with harness `tests/test_runtime_quant_profile.py` (WS9-37)
+- [x] IQ-1269 Implement quantization profile selector in `src/runtime/quant_profile.HC` with harness `tests/test_runtime_quant_profile.py` (WS9-37)
 - [ ] IQ-1270 Add secure-on perf matrix harness `automation/perf-matrix.sh` + `tests/test_perf_secure_vs_dev_matrix.py` (WS9-39)
 - [x] IQ-1271 Implement attestation evidence emitter in `src/runtime/attestation_manifest.HC` with harness `tests/test_runtime_attestation_manifest.py` (WS16-11)
 - [ ] IQ-1272 Implement key-release handshake verifier in `src/runtime/key_release_gate.HC` with harness `tests/test_runtime_key_release_gate.py` (WS16-12)
@@ -2850,3 +2850,4 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 
 - 2026-04-23: IQ-1278 completed (`RoPEQ16RotateHeadByPositionApplyPairCheckedNoPartialCommitOnly` + parity harness).
 - 2026-04-23: IQ-1268 done — added `src/model/spec_decode.HC` + `tests/test_model_spec_decode.py`; validated `python3 tests/test_model_spec_decode.py && ./.venv/bin/python -m pytest -q tests/test_model_spec_decode.py` (6 passed).
+- 2026-04-23: IQ-1269 complete — added HolyC quant profile selector + host parity harness.
