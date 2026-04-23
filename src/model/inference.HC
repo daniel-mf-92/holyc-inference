@@ -48,6 +48,25 @@ I32 InferenceForwardQ16CheckedNoPartial(
     I64 row_count,
     I64 lane_count);
 
+I32 GenerationStepChecked(I64 *logits_q16,
+                          I64 logits_capacity,
+                          I64 vocab_size,
+                          I64 *token_history,
+                          I64 token_history_capacity,
+                          I64 token_history_count,
+                          I64 temperature_q16,
+                          I64 top_k,
+                          I64 top_p_q16,
+                          I64 repetition_penalty_q16,
+                          I64 random_q16,
+                          I64 *workspace_stage_logits_q16,
+                          I64 workspace_stage_logits_capacity,
+                          I64 *workspace_topk_logits_q16,
+                          I64 workspace_topk_logits_capacity,
+                          I64 *workspace_topk_indices,
+                          I64 workspace_topk_index_capacity,
+                          I64 *out_token_id);
+
 I32 InferenceDispatchTryMulI64Checked(I64 lhs, I64 rhs, I64 *out_prod)
 {
     if (!out_prod)
@@ -2050,5 +2069,236 @@ I32 InferenceGenerateTokensCheckedTopKTopPCommitOnlyPreflightOnlyParity(
     *out_required_logits = commit_required_logits;
     *out_required_tokens = commit_required_tokens;
     *out_final_token_count = commit_final_token_count;
+    return SAMPLING_Q16_OK;
+}
+
+// IQ-1222 no-partial top-k/top-p generation loop wrapper for WS7.
+//
+// Contract:
+// - Stage caller history into a private workspace before decode starts.
+// - For each step, decode from immutable per-step logits row and stage token id
+//   into private generated/history workspaces.
+// - Commit exactly one complete step atomically to caller history/output after
+//   successful decode of that step.
+// - On failure, the current step has no partial publish. Prior committed steps
+//   remain visible by design (step-atomic, not whole-loop atomic).
+I32 InferenceGenerateTokensCheckedTopKTopPNoPartial(
+    I64 *step_logits_q16,
+    I64 step_logits_capacity,
+    I64 vocab_size,
+    I64 max_new_tokens,
+    I64 *token_history,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 temperature_q16,
+    I64 top_k,
+    I64 top_p_q16,
+    I64 repetition_penalty_q16,
+    I64 *random_q16_values,
+    I64 random_q16_capacity,
+    I64 *workspace_stage_logits_q16,
+    I64 workspace_stage_logits_capacity,
+    I64 *workspace_topk_logits_q16,
+    I64 workspace_topk_logits_capacity,
+    I64 *workspace_topk_indices,
+    I64 workspace_topk_index_capacity,
+    I64 *workspace_history_stage,
+    I64 workspace_history_stage_capacity,
+    I64 *workspace_generated_stage,
+    I64 workspace_generated_stage_capacity,
+    I64 *out_generated_tokens,
+    I64 generated_capacity,
+    I64 *out_generated_count)
+{
+    I64 required_step_logits_cells;
+    I64 required_history_capacity;
+    I64 required_stage_logits_capacity;
+    I64 required_topk_capacity;
+    I64 required_random_capacity;
+    I64 required_generated_capacity;
+
+    I64 snapshot_step_logits_capacity;
+    I64 snapshot_vocab_size;
+    I64 snapshot_max_new_tokens;
+    I64 snapshot_token_history_capacity;
+    I64 snapshot_token_history_count;
+    I64 snapshot_temperature_q16;
+    I64 snapshot_top_k;
+    I64 snapshot_top_p_q16;
+    I64 snapshot_repetition_penalty_q16;
+    I64 snapshot_random_q16_capacity;
+    I64 snapshot_workspace_stage_logits_capacity;
+    I64 snapshot_workspace_topk_logits_capacity;
+    I64 snapshot_workspace_topk_index_capacity;
+    I64 snapshot_workspace_history_stage_capacity;
+    I64 snapshot_workspace_generated_stage_capacity;
+    I64 snapshot_generated_capacity;
+
+    I64 *snapshot_step_logits_q16;
+    I64 *snapshot_token_history;
+    I64 *snapshot_random_q16_values;
+    I64 *snapshot_workspace_stage_logits_q16;
+    I64 *snapshot_workspace_topk_logits_q16;
+    I64 *snapshot_workspace_topk_indices;
+    I64 *snapshot_workspace_history_stage;
+    I64 *snapshot_workspace_generated_stage;
+    I64 *snapshot_out_generated_tokens;
+    I64 *snapshot_out_generated_count;
+
+    I64 history_index;
+    I64 step_index;
+    I64 logits_row_offset;
+    I64 logits_row_end;
+    I64 sampled_token_id;
+    I32 status;
+
+    if (!step_logits_q16 || !token_history || !random_q16_values ||
+        !workspace_stage_logits_q16 || !workspace_topk_logits_q16 ||
+        !workspace_topk_indices || !workspace_history_stage ||
+        !workspace_generated_stage || !out_generated_tokens ||
+        !out_generated_count)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (out_generated_count == out_generated_tokens)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_step_logits_capacity = step_logits_capacity;
+    snapshot_vocab_size = vocab_size;
+    snapshot_max_new_tokens = max_new_tokens;
+    snapshot_token_history_capacity = token_history_capacity;
+    snapshot_token_history_count = token_history_count;
+    snapshot_temperature_q16 = temperature_q16;
+    snapshot_top_k = top_k;
+    snapshot_top_p_q16 = top_p_q16;
+    snapshot_repetition_penalty_q16 = repetition_penalty_q16;
+    snapshot_random_q16_capacity = random_q16_capacity;
+    snapshot_workspace_stage_logits_capacity = workspace_stage_logits_capacity;
+    snapshot_workspace_topk_logits_capacity = workspace_topk_logits_capacity;
+    snapshot_workspace_topk_index_capacity = workspace_topk_index_capacity;
+    snapshot_workspace_history_stage_capacity = workspace_history_stage_capacity;
+    snapshot_workspace_generated_stage_capacity = workspace_generated_stage_capacity;
+    snapshot_generated_capacity = generated_capacity;
+
+    snapshot_step_logits_q16 = step_logits_q16;
+    snapshot_token_history = token_history;
+    snapshot_random_q16_values = random_q16_values;
+    snapshot_workspace_stage_logits_q16 = workspace_stage_logits_q16;
+    snapshot_workspace_topk_logits_q16 = workspace_topk_logits_q16;
+    snapshot_workspace_topk_indices = workspace_topk_indices;
+    snapshot_workspace_history_stage = workspace_history_stage;
+    snapshot_workspace_generated_stage = workspace_generated_stage;
+    snapshot_out_generated_tokens = out_generated_tokens;
+    snapshot_out_generated_count = out_generated_count;
+
+    status = InferenceGenerateTokensPreflightChecked(
+        step_logits_capacity,
+        vocab_size,
+        max_new_tokens,
+        token_history_capacity,
+        token_history_count,
+        workspace_stage_logits_capacity,
+        workspace_topk_logits_capacity,
+        workspace_topk_index_capacity,
+        random_q16_capacity,
+        generated_capacity,
+        &required_step_logits_cells,
+        &required_history_capacity,
+        &required_stage_logits_capacity,
+        &required_topk_capacity,
+        &required_random_capacity,
+        &required_generated_capacity);
+    if (status)
+        return status;
+
+    if (required_history_capacity > workspace_history_stage_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (required_generated_capacity > workspace_generated_stage_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_step_logits_capacity != step_logits_capacity ||
+        snapshot_vocab_size != vocab_size ||
+        snapshot_max_new_tokens != max_new_tokens ||
+        snapshot_token_history_capacity != token_history_capacity ||
+        snapshot_token_history_count != token_history_count ||
+        snapshot_temperature_q16 != temperature_q16 ||
+        snapshot_top_k != top_k ||
+        snapshot_top_p_q16 != top_p_q16 ||
+        snapshot_repetition_penalty_q16 != repetition_penalty_q16 ||
+        snapshot_random_q16_capacity != random_q16_capacity ||
+        snapshot_workspace_stage_logits_capacity != workspace_stage_logits_capacity ||
+        snapshot_workspace_topk_logits_capacity != workspace_topk_logits_capacity ||
+        snapshot_workspace_topk_index_capacity != workspace_topk_index_capacity ||
+        snapshot_workspace_history_stage_capacity != workspace_history_stage_capacity ||
+        snapshot_workspace_generated_stage_capacity != workspace_generated_stage_capacity ||
+        snapshot_generated_capacity != generated_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_step_logits_q16 != step_logits_q16 ||
+        snapshot_token_history != token_history ||
+        snapshot_random_q16_values != random_q16_values ||
+        snapshot_workspace_stage_logits_q16 != workspace_stage_logits_q16 ||
+        snapshot_workspace_topk_logits_q16 != workspace_topk_logits_q16 ||
+        snapshot_workspace_topk_indices != workspace_topk_indices ||
+        snapshot_workspace_history_stage != workspace_history_stage ||
+        snapshot_workspace_generated_stage != workspace_generated_stage ||
+        snapshot_out_generated_tokens != out_generated_tokens ||
+        snapshot_out_generated_count != out_generated_count)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    // Stage current history first so decode never mutates caller history before
+    // a full step succeeds.
+    for (history_index = 0; history_index < token_history_count; history_index++)
+        workspace_history_stage[history_index] = token_history[history_index];
+
+    for (step_index = 0; step_index < max_new_tokens; step_index++)
+    {
+        status = InferenceDispatchTryMulI64Checked(step_index,
+                                                   vocab_size,
+                                                   &logits_row_offset);
+        if (status)
+            return status;
+
+        status = InferenceDispatchTryMulI64Checked(step_index + 1,
+                                                   vocab_size,
+                                                   &logits_row_end);
+        if (status)
+            return status;
+
+        if (logits_row_end > step_logits_capacity)
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+
+        status = GenerationStepChecked(
+            step_logits_q16 + logits_row_offset,
+            vocab_size,
+            vocab_size,
+            workspace_history_stage,
+            required_history_capacity,
+            token_history_count + step_index,
+            temperature_q16,
+            top_k,
+            top_p_q16,
+            repetition_penalty_q16,
+            random_q16_values[step_index],
+            workspace_stage_logits_q16,
+            required_stage_logits_capacity,
+            workspace_topk_logits_q16,
+            required_topk_capacity,
+            workspace_topk_indices,
+            required_topk_capacity,
+            &sampled_token_id);
+        if (status)
+            return status;
+
+        workspace_generated_stage[step_index] = sampled_token_id;
+        workspace_history_stage[token_history_count + step_index] = sampled_token_id;
+
+        // Per-step atomic commit: publish history tail + generated token + count
+        // only after the whole decode stage completed.
+        token_history[token_history_count + step_index] =
+            workspace_history_stage[token_history_count + step_index];
+        out_generated_tokens[step_index] = workspace_generated_stage[step_index];
+        *out_generated_count = step_index + 1;
+    }
+
     return SAMPLING_Q16_OK;
 }
