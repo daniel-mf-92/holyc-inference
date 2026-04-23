@@ -576,3 +576,55 @@ I32 FPQ16SqrtCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnl
     *required_out_cells_out = staged_required_out_cells;
     return FP_Q16_OK;
 }
+
+// Strict diagnostics parity gate over
+// FPQ16SqrtCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly
+// and FPQ16SqrtCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly.
+//
+// Stages delegated diagnostics into local scratch, revalidates immutable
+// `{x_q16}` snapshot parity, then cross-checks strict tuple parity against the
+// canonical commit-only diagnostics path before atomically publishing output.
+//
+// Contract:
+// - `required_out_cells_out` must be non-null.
+// - Does not publish diagnostics on failure (zero-write output behavior).
+// - Enforces strict tuple parity `{required_out_cells=1}` before publish.
+I32 FPQ16SqrtCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+    I64 x_q16,
+    I64 *required_out_cells_out)
+{
+    I64 snapshot_x_q16;
+    I64 staged_required_out_cells;
+    I64 canonical_required_out_cells;
+    I32 status;
+
+    if (!required_out_cells_out)
+        return FP_Q16_ERR_NULL_PTR;
+
+    *required_out_cells_out = 0;
+    snapshot_x_q16 = x_q16;
+
+    status = FPQ16SqrtCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+        x_q16,
+        &staged_required_out_cells);
+    if (status != FP_Q16_OK)
+        return status;
+
+    if (snapshot_x_q16 != x_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    status = FPQ16SqrtCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
+        x_q16,
+        &canonical_required_out_cells);
+    if (status != FP_Q16_OK)
+        return status;
+
+    if (staged_required_out_cells != canonical_required_out_cells)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (canonical_required_out_cells != 1)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *required_out_cells_out = staged_required_out_cells;
+    return FP_Q16_OK;
+}
