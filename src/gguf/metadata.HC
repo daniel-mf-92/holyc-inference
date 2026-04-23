@@ -6046,6 +6046,86 @@ I32 GGUFMetadataValueSkipCheckedNoPartialCommitOnly(U8 *buf,
     return GGUF_META_TABLE_OK;
 }
 
+// Diagnostics zero-write companion over
+// GGUFMetadataValueSkipCheckedNoPartialCommitOnly and canonical
+// GGUFMetadataValueSkipChecked.
+//
+// Contract:
+// - Capture immutable snapshot tuple
+//   {buf_nbytes,cursor,table_end,value_type}.
+// - Stage commit-only path and canonical path independently.
+// - Require strict tuple parity over {next_cursor} before publish.
+// - Atomically publish diagnostics only on success.
+I32 GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnly(U8 *buf,
+                                                                 U64 buf_nbytes,
+                                                                 U64 *cursor,
+                                                                 U64 table_end,
+                                                                 U32 value_type,
+                                                                 U64 *out_next_cursor)
+{
+    U64 snapshot_buf_nbytes;
+    U64 snapshot_table_end;
+    U64 snapshot_cursor;
+    U32 snapshot_value_type;
+
+    U64 staged_commit_cursor;
+    U64 staged_commit_next_cursor;
+    U64 staged_canonical_cursor;
+
+    I32 err;
+
+    if (!buf || !cursor || !out_next_cursor)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    snapshot_buf_nbytes = buf_nbytes;
+    snapshot_table_end = table_end;
+    snapshot_cursor = *cursor;
+    snapshot_value_type = value_type;
+
+    staged_commit_cursor = snapshot_cursor;
+    staged_commit_next_cursor = 0;
+    err = GGUFMetadataValueSkipCheckedNoPartialCommitOnly(buf,
+                                                          buf_nbytes,
+                                                          &staged_commit_cursor,
+                                                          table_end,
+                                                          value_type,
+                                                          &staged_commit_next_cursor);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    if (staged_commit_cursor != staged_commit_next_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (staged_commit_next_cursor > buf_nbytes ||
+        staged_commit_next_cursor > table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    staged_canonical_cursor = snapshot_cursor;
+    err = GGUFMetadataValueSkipChecked(buf,
+                                       buf_nbytes,
+                                       &staged_canonical_cursor,
+                                       table_end,
+                                       value_type);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    if (staged_canonical_cursor > buf_nbytes ||
+        staged_canonical_cursor > table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    if (staged_commit_next_cursor != staged_canonical_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (snapshot_buf_nbytes != buf_nbytes ||
+        snapshot_table_end != table_end ||
+        snapshot_value_type != value_type ||
+        snapshot_cursor != *cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    *out_next_cursor = staged_commit_next_cursor;
+    *cursor = staged_commit_next_cursor;
+    return GGUF_META_TABLE_OK;
+}
+
 // Backward-compatible alias retained while callers migrate to
 // GGUFMetadataValueSkipChecked.
 I32 GGUFMetadataSkipValuePayloadChecked(U8 *buf,
