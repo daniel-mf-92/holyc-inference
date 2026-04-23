@@ -2264,6 +2264,198 @@ I32 InferenceGenerateStepCheckedTopKTopPNoPartial(
     return SAMPLING_Q16_OK;
 }
 
+// IQ-1227 diagnostics preflight-only companion for one-step decode staging.
+//
+// Contract:
+// - Derive exact one-step staging requirements from canonical tokens preflight.
+// - Enforce immutable snapshot parity across all step-call inputs.
+// - Publish only `{required_step_logits_cells,required_history_capacity,`
+//   `required_stage_logits_capacity,required_topk_capacity}`.
+// - Zero-write publish semantics: no caller history/output token mutation.
+I32 InferenceGenerateStepCheckedTopKTopPNoPartialCommitOnlyPreflightOnly(
+    I64 *logits_q16,
+    I64 logits_capacity,
+    I64 vocab_size,
+    I64 *token_history,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 temperature_q16,
+    I64 top_k,
+    I64 top_p_q16,
+    I64 repetition_penalty_q16,
+    I64 random_q16,
+    I64 *workspace_stage_logits_q16,
+    I64 workspace_stage_logits_capacity,
+    I64 *workspace_topk_logits_q16,
+    I64 workspace_topk_logits_capacity,
+    I64 *workspace_topk_indices,
+    I64 workspace_topk_index_capacity,
+    I64 *workspace_history_stage,
+    I64 workspace_history_stage_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_history_capacity,
+    I64 *out_required_stage_logits_capacity,
+    I64 *out_required_topk_capacity)
+{
+    I64 required_step_logits_cells;
+    I64 required_history_capacity;
+    I64 required_stage_logits_capacity;
+    I64 required_topk_capacity;
+    I64 required_random_capacity;
+    I64 required_generated_capacity;
+    I64 canonical_required_history_capacity;
+
+    I64 snapshot_logits_capacity;
+    I64 snapshot_vocab_size;
+    I64 snapshot_token_history_capacity;
+    I64 snapshot_token_history_count;
+    I64 snapshot_temperature_q16;
+    I64 snapshot_top_k;
+    I64 snapshot_top_p_q16;
+    I64 snapshot_repetition_penalty_q16;
+    I64 snapshot_random_q16;
+    I64 snapshot_workspace_stage_logits_capacity;
+    I64 snapshot_workspace_topk_logits_capacity;
+    I64 snapshot_workspace_topk_index_capacity;
+    I64 snapshot_workspace_history_stage_capacity;
+
+    I64 *snapshot_logits_q16;
+    I64 *snapshot_token_history;
+    I64 *snapshot_workspace_stage_logits_q16;
+    I64 *snapshot_workspace_topk_logits_q16;
+    I64 *snapshot_workspace_topk_indices;
+    I64 *snapshot_workspace_history_stage;
+    I64 *snapshot_out_required_step_logits_cells;
+    I64 *snapshot_out_required_history_capacity;
+    I64 *snapshot_out_required_stage_logits_capacity;
+    I64 *snapshot_out_required_topk_capacity;
+
+    I32 status;
+
+    if (!out_required_step_logits_cells || !out_required_history_capacity ||
+        !out_required_stage_logits_capacity || !out_required_topk_capacity)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (out_required_step_logits_cells == out_required_history_capacity ||
+        out_required_step_logits_cells == out_required_stage_logits_capacity ||
+        out_required_step_logits_cells == out_required_topk_capacity ||
+        out_required_history_capacity == out_required_stage_logits_capacity ||
+        out_required_history_capacity == out_required_topk_capacity ||
+        out_required_stage_logits_capacity == out_required_topk_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (!logits_q16 || !token_history || !workspace_stage_logits_q16 ||
+        !workspace_topk_logits_q16 || !workspace_topk_indices ||
+        !workspace_history_stage)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (temperature_q16 <= 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (repetition_penalty_q16 < SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (top_k <= 0 || top_k > vocab_size)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (top_p_q16 <= 0 || top_p_q16 > SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_logits_capacity = logits_capacity;
+    snapshot_vocab_size = vocab_size;
+    snapshot_token_history_capacity = token_history_capacity;
+    snapshot_token_history_count = token_history_count;
+    snapshot_temperature_q16 = temperature_q16;
+    snapshot_top_k = top_k;
+    snapshot_top_p_q16 = top_p_q16;
+    snapshot_repetition_penalty_q16 = repetition_penalty_q16;
+    snapshot_random_q16 = random_q16;
+    snapshot_workspace_stage_logits_capacity = workspace_stage_logits_capacity;
+    snapshot_workspace_topk_logits_capacity = workspace_topk_logits_capacity;
+    snapshot_workspace_topk_index_capacity = workspace_topk_index_capacity;
+    snapshot_workspace_history_stage_capacity = workspace_history_stage_capacity;
+
+    snapshot_logits_q16 = logits_q16;
+    snapshot_token_history = token_history;
+    snapshot_workspace_stage_logits_q16 = workspace_stage_logits_q16;
+    snapshot_workspace_topk_logits_q16 = workspace_topk_logits_q16;
+    snapshot_workspace_topk_indices = workspace_topk_indices;
+    snapshot_workspace_history_stage = workspace_history_stage;
+    snapshot_out_required_step_logits_cells = out_required_step_logits_cells;
+    snapshot_out_required_history_capacity = out_required_history_capacity;
+    snapshot_out_required_stage_logits_capacity = out_required_stage_logits_capacity;
+    snapshot_out_required_topk_capacity = out_required_topk_capacity;
+
+    status = InferenceGenerateTokensPreflightChecked(
+        logits_capacity,
+        vocab_size,
+        1,
+        token_history_capacity,
+        token_history_count,
+        workspace_stage_logits_capacity,
+        workspace_topk_logits_capacity,
+        workspace_topk_index_capacity,
+        1,
+        1,
+        &required_step_logits_cells,
+        &required_history_capacity,
+        &required_stage_logits_capacity,
+        &required_topk_capacity,
+        &required_random_capacity,
+        &required_generated_capacity);
+    if (status)
+        return status;
+
+    if (required_history_capacity > workspace_history_stage_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (required_random_capacity != 1 || required_generated_capacity != 1)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (required_step_logits_cells != vocab_size)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (required_stage_logits_capacity != vocab_size)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (required_topk_capacity != vocab_size)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (token_history_count == 0x7FFFFFFFFFFFFFFF)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+    canonical_required_history_capacity = token_history_count + 1;
+    if (required_history_capacity != canonical_required_history_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_logits_capacity != logits_capacity ||
+        snapshot_vocab_size != vocab_size ||
+        snapshot_token_history_capacity != token_history_capacity ||
+        snapshot_token_history_count != token_history_count ||
+        snapshot_temperature_q16 != temperature_q16 ||
+        snapshot_top_k != top_k ||
+        snapshot_top_p_q16 != top_p_q16 ||
+        snapshot_repetition_penalty_q16 != repetition_penalty_q16 ||
+        snapshot_random_q16 != random_q16 ||
+        snapshot_workspace_stage_logits_capacity != workspace_stage_logits_capacity ||
+        snapshot_workspace_topk_logits_capacity != workspace_topk_logits_capacity ||
+        snapshot_workspace_topk_index_capacity != workspace_topk_index_capacity ||
+        snapshot_workspace_history_stage_capacity != workspace_history_stage_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_logits_q16 != logits_q16 ||
+        snapshot_token_history != token_history ||
+        snapshot_workspace_stage_logits_q16 != workspace_stage_logits_q16 ||
+        snapshot_workspace_topk_logits_q16 != workspace_topk_logits_q16 ||
+        snapshot_workspace_topk_indices != workspace_topk_indices ||
+        snapshot_workspace_history_stage != workspace_history_stage ||
+        snapshot_out_required_step_logits_cells != out_required_step_logits_cells ||
+        snapshot_out_required_history_capacity != out_required_history_capacity ||
+        snapshot_out_required_stage_logits_capacity != out_required_stage_logits_capacity ||
+        snapshot_out_required_topk_capacity != out_required_topk_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    *out_required_step_logits_cells = required_step_logits_cells;
+    *out_required_history_capacity = required_history_capacity;
+    *out_required_stage_logits_capacity = required_stage_logits_capacity;
+    *out_required_topk_capacity = required_topk_capacity;
+    return SAMPLING_Q16_OK;
+}
+
 // IQ-1222 no-partial top-k/top-p generation loop wrapper for WS7.
 //
 // Contract:
