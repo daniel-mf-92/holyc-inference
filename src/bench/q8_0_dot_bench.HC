@@ -1739,6 +1739,102 @@ I32 Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnly(
 // - Enforce exact tuple parity:
 //   {total_ops,total_cycles,cycles_per_op,remainder_cycles,suite_checksum}.
 // - Enforce output-pointer snapshot stability and atomically publish only on success.
+
+I32 Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnly(
+    I64 cpu_hz,
+    I64 *out_total_ops,
+    I64 *out_total_cycles,
+    I64 *out_cycles_per_op,
+    I64 *out_remainder_cycles,
+    I64 *out_suite_checksum)
+{
+    I64 snapshot_cpu_hz;
+    I64 *snapshot_out_total_ops;
+    I64 *snapshot_out_total_cycles;
+    I64 *snapshot_out_cycles_per_op;
+    I64 *snapshot_out_remainder_cycles;
+    I64 *snapshot_out_suite_checksum;
+
+    I64 parity_total_ops;
+    I64 parity_total_cycles;
+    I64 parity_cycles_per_op;
+    I64 parity_remainder_cycles;
+    I64 parity_suite_checksum;
+
+    I64 commit_total_ops;
+    I64 commit_total_cycles;
+    I64 commit_cycles_per_op;
+    I64 commit_remainder_cycles;
+    I64 commit_suite_checksum;
+    I32 status;
+
+    if (!out_total_ops || !out_total_cycles || !out_cycles_per_op ||
+        !out_remainder_cycles || !out_suite_checksum)
+        return Q8_0_DOT_BENCH_ERR_NULL_PTR;
+
+    if (out_total_ops == out_total_cycles ||
+        out_total_ops == out_cycles_per_op ||
+        out_total_ops == out_remainder_cycles ||
+        out_total_ops == out_suite_checksum ||
+        out_total_cycles == out_cycles_per_op ||
+        out_total_cycles == out_remainder_cycles ||
+        out_total_cycles == out_suite_checksum ||
+        out_cycles_per_op == out_remainder_cycles ||
+        out_cycles_per_op == out_suite_checksum ||
+        out_remainder_cycles == out_suite_checksum)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    snapshot_cpu_hz = cpu_hz;
+    snapshot_out_total_ops = out_total_ops;
+    snapshot_out_total_cycles = out_total_cycles;
+    snapshot_out_cycles_per_op = out_cycles_per_op;
+    snapshot_out_remainder_cycles = out_remainder_cycles;
+    snapshot_out_suite_checksum = out_suite_checksum;
+
+    status = Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParity(
+        cpu_hz,
+        &parity_total_ops,
+        &parity_total_cycles,
+        &parity_cycles_per_op,
+        &parity_remainder_cycles,
+        &parity_suite_checksum);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    status = Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnly(
+        cpu_hz,
+        &commit_total_ops,
+        &commit_total_cycles,
+        &commit_cycles_per_op,
+        &commit_remainder_cycles,
+        &commit_suite_checksum);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    if (snapshot_cpu_hz != cpu_hz)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+    if (snapshot_out_total_ops != out_total_ops ||
+        snapshot_out_total_cycles != out_total_cycles ||
+        snapshot_out_cycles_per_op != out_cycles_per_op ||
+        snapshot_out_remainder_cycles != out_remainder_cycles ||
+        snapshot_out_suite_checksum != out_suite_checksum)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    if (parity_total_ops != commit_total_ops ||
+        parity_total_cycles != commit_total_cycles ||
+        parity_cycles_per_op != commit_cycles_per_op ||
+        parity_remainder_cycles != commit_remainder_cycles ||
+        parity_suite_checksum != commit_suite_checksum)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    *out_total_ops = parity_total_ops;
+    *out_total_cycles = parity_total_cycles;
+    *out_cycles_per_op = parity_cycles_per_op;
+    *out_remainder_cycles = parity_remainder_cycles;
+    *out_suite_checksum = parity_suite_checksum;
+    return Q8_0_DOT_BENCH_OK;
+}
+
 I32 Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParity(
     I64 cpu_hz,
     I64 *out_total_ops,
