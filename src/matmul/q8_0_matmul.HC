@@ -595,6 +595,88 @@ I32 Q8_0MatMulTileSchedulerCheckedNoPartialCommitOnlyPreflightOnly(
     return Q8_0_MATMUL_OK;
 }
 
+// Strict parity gate over diagnostics preflight and commit-only wrappers.
+//
+// Contract:
+// - Run both diagnostics preflight and commit-only wrappers from immutable
+//   geometry/capacity snapshots.
+// - Require exact tuple parity on
+//   `{tile_count,last_row_end,last_col_end}`.
+// - Publish caller tuple atomically only after strict parity success.
+// - On any failure, caller tuple remains unchanged.
+I32 Q8_0MatMulTileSchedulerCheckedNoPartialCommitOnlyPreflightOnlyParity(
+    I64 row_count,
+    I64 col_count,
+    I64 tile_rows,
+    I64 tile_cols,
+    I64 span_capacity,
+    I64 *out_tile_count,
+    I64 *out_last_row_end,
+    I64 *out_last_col_end)
+{
+    I64 snapshot_row_count;
+    I64 snapshot_col_count;
+    I64 snapshot_tile_rows;
+    I64 snapshot_tile_cols;
+    I64 snapshot_span_capacity;
+    I64 staged_pre_tile_count;
+    I64 staged_pre_last_row_end;
+    I64 staged_pre_last_col_end;
+    I64 staged_commit_tile_count;
+    I64 staged_commit_last_row_end;
+    I64 staged_commit_last_col_end;
+    I32 status;
+
+    if (!out_tile_count || !out_last_row_end || !out_last_col_end)
+        return Q8_0_MATMUL_ERR_NULL_PTR;
+
+    snapshot_row_count = row_count;
+    snapshot_col_count = col_count;
+    snapshot_tile_rows = tile_rows;
+    snapshot_tile_cols = tile_cols;
+    snapshot_span_capacity = span_capacity;
+
+    status = Q8_0MatMulTileSchedulerCheckedNoPartialCommitOnlyPreflightOnly(row_count,
+                                                                             col_count,
+                                                                             tile_rows,
+                                                                             tile_cols,
+                                                                             span_capacity,
+                                                                             &staged_pre_tile_count,
+                                                                             &staged_pre_last_row_end,
+                                                                             &staged_pre_last_col_end);
+    if (status != Q8_0_MATMUL_OK)
+        return status;
+
+    status = Q8_0MatMulTileSchedulerCheckedNoPartialCommitOnly(row_count,
+                                                               col_count,
+                                                               tile_rows,
+                                                               tile_cols,
+                                                               span_capacity,
+                                                               &staged_commit_tile_count,
+                                                               &staged_commit_last_row_end,
+                                                               &staged_commit_last_col_end);
+    if (status != Q8_0_MATMUL_OK)
+        return status;
+
+    if (snapshot_row_count != row_count ||
+        snapshot_col_count != col_count ||
+        snapshot_tile_rows != tile_rows ||
+        snapshot_tile_cols != tile_cols ||
+        snapshot_span_capacity != span_capacity)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (staged_pre_tile_count != staged_commit_tile_count ||
+        staged_pre_last_row_end != staged_commit_last_row_end ||
+        staged_pre_last_col_end != staged_commit_last_col_end)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    // Atomic publish region: parity tuple only.
+    *out_tile_count = staged_commit_tile_count;
+    *out_last_row_end = staged_commit_last_row_end;
+    *out_last_col_end = staged_commit_last_col_end;
+    return Q8_0_MATMUL_OK;
+}
+
 // Shared stride/K-span invariants for tiled Q8_0 matmul call-sites.
 // This centralizes the active-K and output-row-stride checks used by
 // scalar and AVX2 entrypoints so BAD_LEN surfaces stay identical.
