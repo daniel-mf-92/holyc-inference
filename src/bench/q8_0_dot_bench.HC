@@ -137,6 +137,51 @@ I32 Q8_0DotBenchOpsPerCycleQ16Checked(
     return Q8_0_DOT_BENCH_OK;
 }
 
+I32 Q8_0DotBenchRunDefaultSuiteOpsPerSecondQ16Checked(
+    I64 total_ops,
+    I64 total_cycles,
+    I64 cpu_hz,
+    I64 *out_ops_per_second_q16)
+{
+    I64 ops_hz_numer;
+    I64 ops_hz_numer_q16;
+    I64 half_cycles;
+    I64 rounded_numer;
+    I64 staged_ops_per_second_q16;
+    I32 status;
+
+    if (!out_ops_per_second_q16)
+        return Q8_0_DOT_BENCH_ERR_NULL_PTR;
+
+    // Bench totals and CPU frequency are monotonic and non-negative.
+    if (total_ops < 0 || total_cycles < 0 || cpu_hz <= 0)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+    if (!total_cycles)
+        return Q8_0_DOT_BENCH_ERR_DIV_BY_ZERO;
+
+    // ops/sec = (total_ops * cpu_hz) / total_cycles.
+    // Preserve Q16 precision with deterministic round-to-nearest integer math:
+    // ops_per_second_q16 = Round(((total_ops * cpu_hz) << 16) / total_cycles)
+    status = Q8_0DotBenchTryMulI64(total_ops, cpu_hz, &ops_hz_numer);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    if (ops_hz_numer > (Q8_0_DOT_BENCH_I64_MAX >> 16))
+        return Q8_0_DOT_BENCH_ERR_OVERFLOW;
+    ops_hz_numer_q16 = ops_hz_numer << 16;
+
+    half_cycles = total_cycles >> 1;
+    status = Q8_0DotBenchTryAddI64(ops_hz_numer_q16, half_cycles, &rounded_numer);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    staged_ops_per_second_q16 = rounded_numer / total_cycles;
+
+    // No-partial diagnostics publish.
+    *out_ops_per_second_q16 = staged_ops_per_second_q16;
+    return Q8_0_DOT_BENCH_OK;
+}
+
 // Diagnostics-only planner for deterministic Q8_0 default bench shapes.
 //
 // This helper does not allocate buffers or run kernels. It only validates the
