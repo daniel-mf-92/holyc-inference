@@ -1927,6 +1927,213 @@ I32 SamplingApplyRepetitionPenaltyCheckedNoPartialCommitOnly(
     return SAMPLING_Q16_OK;
 }
 
+// IQ-1216 diagnostics-only preflight companion over commit-only repetition
+// penalty path.
+//
+// Behavior:
+// - runs both commit-only and canonical no-partial wrappers into private staged
+//   buffers so caller-visible outputs stay untouched;
+// - enforces immutable snapshot parity across every scalar/pointer input;
+// - requires exact staged logit-lane parity before publishing diagnostics tuple
+//   `{required_logits_cells,unique_penalized_tokens,last_penalized_token_id}`.
+I32 SamplingApplyRepetitionPenaltyCheckedNoPartialCommitOnlyPreflightOnly(
+    I64 *logits_q16,
+    I64 logits_capacity,
+    I64 vocab_size,
+    I64 *token_history,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 penalty_q16,
+    I64 out_capacity,
+    I64 *out_required_logits_cells,
+    I64 *out_unique_penalized_tokens,
+    I64 *out_last_penalized_token_id)
+{
+    I64 lane_index;
+    I64 history_index;
+    I64 prior_index;
+    I64 token_id;
+    I64 staged_bytes;
+    I64 required_logits_cells;
+    I64 unique_penalized_tokens;
+    I64 last_penalized_token_id;
+    I64 *staged_commit_logits_q16;
+    I64 *staged_canonical_logits_q16;
+    I64 *snapshot_logits_q16;
+    I64 snapshot_logits_capacity;
+    I64 snapshot_vocab_size;
+    I64 *snapshot_token_history;
+    I64 snapshot_token_history_capacity;
+    I64 snapshot_token_history_count;
+    I64 snapshot_penalty_q16;
+    I64 snapshot_out_capacity;
+    I32 status;
+    Bool already_seen;
+
+    if (!out_required_logits_cells || !out_unique_penalized_tokens ||
+        !out_last_penalized_token_id)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (out_required_logits_cells == out_unique_penalized_tokens ||
+        out_required_logits_cells == out_last_penalized_token_id ||
+        out_unique_penalized_tokens == out_last_penalized_token_id)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (!logits_q16)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+    if (token_history_count > 0 && !token_history)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (logits_capacity < 0 || vocab_size < 0 || out_capacity < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (token_history_capacity < 0 || token_history_count < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (vocab_size > logits_capacity || vocab_size > out_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (token_history_count > token_history_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (penalty_q16 < SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_logits_q16 = logits_q16;
+    snapshot_logits_capacity = logits_capacity;
+    snapshot_vocab_size = vocab_size;
+    snapshot_token_history = token_history;
+    snapshot_token_history_capacity = token_history_capacity;
+    snapshot_token_history_count = token_history_count;
+    snapshot_penalty_q16 = penalty_q16;
+    snapshot_out_capacity = out_capacity;
+
+    staged_commit_logits_q16 = 0;
+    staged_canonical_logits_q16 = 0;
+
+    if (vocab_size)
+    {
+        if (vocab_size > 0x0FFFFFFFFFFFFFFF)
+            return SAMPLING_Q16_ERR_OVERFLOW;
+
+        staged_bytes = vocab_size << 3;
+        staged_commit_logits_q16 = MAlloc(staged_bytes);
+        if (!staged_commit_logits_q16)
+            return SAMPLING_Q16_ERR_NULL_PTR;
+
+        staged_canonical_logits_q16 = MAlloc(staged_bytes);
+        if (!staged_canonical_logits_q16)
+        {
+            Free(staged_commit_logits_q16);
+            return SAMPLING_Q16_ERR_NULL_PTR;
+        }
+    }
+
+    status = SamplingApplyRepetitionPenaltyCheckedNoPartialCommitOnly(
+        logits_q16,
+        logits_capacity,
+        vocab_size,
+        token_history,
+        token_history_capacity,
+        token_history_count,
+        penalty_q16,
+        staged_commit_logits_q16,
+        out_capacity);
+    if (status)
+    {
+        if (staged_canonical_logits_q16)
+            Free(staged_canonical_logits_q16);
+        if (staged_commit_logits_q16)
+            Free(staged_commit_logits_q16);
+        return status;
+    }
+
+    status = SamplingApplyRepetitionPenaltyCheckedNoPartial(
+        logits_q16,
+        logits_capacity,
+        vocab_size,
+        token_history,
+        token_history_capacity,
+        token_history_count,
+        penalty_q16,
+        staged_canonical_logits_q16,
+        out_capacity);
+    if (status)
+    {
+        if (staged_canonical_logits_q16)
+            Free(staged_canonical_logits_q16);
+        if (staged_commit_logits_q16)
+            Free(staged_commit_logits_q16);
+        return status;
+    }
+
+    if (snapshot_logits_q16 != logits_q16 ||
+        snapshot_logits_capacity != logits_capacity ||
+        snapshot_vocab_size != vocab_size ||
+        snapshot_token_history != token_history ||
+        snapshot_token_history_capacity != token_history_capacity ||
+        snapshot_token_history_count != token_history_count ||
+        snapshot_penalty_q16 != penalty_q16 ||
+        snapshot_out_capacity != out_capacity)
+    {
+        if (staged_canonical_logits_q16)
+            Free(staged_canonical_logits_q16);
+        if (staged_commit_logits_q16)
+            Free(staged_commit_logits_q16);
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+
+    for (lane_index = 0; lane_index < vocab_size; lane_index++)
+    {
+        if (staged_commit_logits_q16[lane_index] !=
+            staged_canonical_logits_q16[lane_index])
+        {
+            Free(staged_canonical_logits_q16);
+            Free(staged_commit_logits_q16);
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+        }
+    }
+
+    // Diagnostic tuple summarizes required output geometry and deterministic
+    // unique-history coverage of penalized token lanes.
+    required_logits_cells = vocab_size;
+    unique_penalized_tokens = 0;
+    last_penalized_token_id = -1;
+
+    for (history_index = 0; history_index < token_history_count; history_index++)
+    {
+        token_id = token_history[history_index];
+        if (token_id < 0 || token_id >= vocab_size)
+        {
+            Free(staged_canonical_logits_q16);
+            Free(staged_commit_logits_q16);
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+        }
+
+        already_seen = FALSE;
+        for (prior_index = 0; prior_index < history_index; prior_index++)
+        {
+            if (token_history[prior_index] == token_id)
+            {
+                already_seen = TRUE;
+                break;
+            }
+        }
+
+        if (already_seen)
+            continue;
+
+        unique_penalized_tokens++;
+        last_penalized_token_id = token_id;
+    }
+
+    *out_required_logits_cells = required_logits_cells;
+    *out_unique_penalized_tokens = unique_penalized_tokens;
+    *out_last_penalized_token_id = last_penalized_token_id;
+
+    if (staged_canonical_logits_q16)
+        Free(staged_canonical_logits_q16);
+    if (staged_commit_logits_q16)
+        Free(staged_commit_logits_q16);
+    return SAMPLING_Q16_OK;
+}
+
 // Checked composed next-token selector from integer logits.
 //
 // Pipeline (all integer-only, no allocation):
