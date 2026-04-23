@@ -1683,6 +1683,141 @@ I32 SamplingApplyRepetitionPenaltyChecked(I64 *logits_q16,
     return SAMPLING_Q16_OK;
 }
 
+// IQ-1214 no-partial repetition penalty wrapper.
+//
+// Purpose:
+//   Preserve immutable caller logits while applying canonical integer-only
+//   repetition penalty on a staged scratch buffer, then atomically publish.
+//
+// Math rule (identical to SamplingApplyRepetitionPenaltyChecked):
+//   positive logits -> divide by penalty_q16
+//   negative logits -> multiply by penalty_q16
+//
+// Safety contract:
+//   - immutable snapshot guards revalidated before final publish;
+//   - no partial writes to out_logits_q16 on all failures.
+I32 SamplingApplyRepetitionPenaltyCheckedNoPartial(I64 *logits_q16,
+                                                   I64 logits_capacity,
+                                                   I64 vocab_size,
+                                                   I64 *token_history,
+                                                   I64 token_history_capacity,
+                                                   I64 token_history_count,
+                                                   I64 penalty_q16,
+                                                   I64 *out_logits_q16,
+                                                   I64 out_capacity)
+{
+    I64 lane_index;
+    I64 last_index;
+    I64 last_byte_offset;
+    I64 staged_bytes;
+    I64 *staged_logits_q16;
+    I64 *snapshot_logits_q16;
+    I64 snapshot_logits_capacity;
+    I64 snapshot_vocab_size;
+    I64 *snapshot_token_history;
+    I64 snapshot_token_history_capacity;
+    I64 snapshot_token_history_count;
+    I64 snapshot_penalty_q16;
+    I64 *snapshot_out_logits_q16;
+    I64 snapshot_out_capacity;
+    I32 status;
+
+    if (!logits_q16 || !out_logits_q16)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+    if (token_history_count > 0 && !token_history)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (logits_capacity < 0 || vocab_size < 0 || out_capacity < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (token_history_capacity < 0 || token_history_count < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (vocab_size > logits_capacity || vocab_size > out_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (token_history_count > token_history_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (penalty_q16 < SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (!vocab_size)
+        return SAMPLING_Q16_OK;
+
+    last_index = vocab_size - 1;
+    if (last_index > 0x0FFFFFFFFFFFFFFF)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    last_byte_offset = last_index << 3;
+    if ((U64)logits_q16 > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+        return SAMPLING_Q16_ERR_OVERFLOW;
+    if ((U64)out_logits_q16 > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    if (token_history_count)
+    {
+        last_index = token_history_count - 1;
+        if (last_index > 0x0FFFFFFFFFFFFFFF)
+            return SAMPLING_Q16_ERR_OVERFLOW;
+
+        last_byte_offset = last_index << 3;
+        if ((U64)token_history > (0xFFFFFFFFFFFFFFFF - (U64)last_byte_offset))
+            return SAMPLING_Q16_ERR_OVERFLOW;
+    }
+
+    if (vocab_size > 0x0FFFFFFFFFFFFFFF)
+        return SAMPLING_Q16_ERR_OVERFLOW;
+
+    staged_bytes = vocab_size << 3;
+    staged_logits_q16 = MAlloc(staged_bytes);
+    if (!staged_logits_q16)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    for (lane_index = 0; lane_index < vocab_size; lane_index++)
+        staged_logits_q16[lane_index] = logits_q16[lane_index];
+
+    snapshot_logits_q16 = logits_q16;
+    snapshot_logits_capacity = logits_capacity;
+    snapshot_vocab_size = vocab_size;
+    snapshot_token_history = token_history;
+    snapshot_token_history_capacity = token_history_capacity;
+    snapshot_token_history_count = token_history_count;
+    snapshot_penalty_q16 = penalty_q16;
+    snapshot_out_logits_q16 = out_logits_q16;
+    snapshot_out_capacity = out_capacity;
+
+    status = SamplingApplyRepetitionPenaltyChecked(staged_logits_q16,
+                                                   vocab_size,
+                                                   vocab_size,
+                                                   token_history,
+                                                   token_history_capacity,
+                                                   token_history_count,
+                                                   penalty_q16);
+    if (status)
+    {
+        Free(staged_logits_q16);
+        return status;
+    }
+
+    // Revalidate immutable call-site snapshot immediately before publish.
+    if (snapshot_logits_q16 != logits_q16 ||
+        snapshot_logits_capacity != logits_capacity ||
+        snapshot_vocab_size != vocab_size ||
+        snapshot_token_history != token_history ||
+        snapshot_token_history_capacity != token_history_capacity ||
+        snapshot_token_history_count != token_history_count ||
+        snapshot_penalty_q16 != penalty_q16 ||
+        snapshot_out_logits_q16 != out_logits_q16 ||
+        snapshot_out_capacity != out_capacity)
+    {
+        Free(staged_logits_q16);
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+
+    for (lane_index = 0; lane_index < vocab_size; lane_index++)
+        out_logits_q16[lane_index] = staged_logits_q16[lane_index];
+
+    Free(staged_logits_q16);
+    return SAMPLING_Q16_OK;
+}
+
 // Checked composed next-token selector from integer logits.
 //
 // Pipeline (all integer-only, no allocation):
