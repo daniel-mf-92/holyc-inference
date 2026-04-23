@@ -34,6 +34,38 @@ class PrefixCache
     I64 count;
 };
 
+I32 InferencePromptPrefixHashQ64Checked(U8 *tokens,
+                                        I64 token_count,
+                                        I64 *out_prefix_hash)
+{
+    I64 idx;
+    I64 hash;
+    I64 value;
+
+    if (!tokens || !out_prefix_hash)
+        return PREFIX_CACHE_ERR_NULL_PTR;
+
+    if (token_count < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    hash = 1469598103934665603;
+    idx = 0;
+    while (idx < token_count)
+    {
+        value = tokens[idx];
+        hash = hash ^ value;
+        hash = hash * 1099511628211;
+        idx++;
+    }
+
+    hash = hash ^ token_count;
+    hash = hash * 1099511628211;
+    hash = hash & 0x7FFFFFFFFFFFFFFF;
+
+    *out_prefix_hash = hash;
+    return PREFIX_CACHE_OK;
+}
+
 I32 PrefixCacheInitChecked(PrefixCache *cache,
                            PrefixCacheEntry *entry_buffer,
                            I64 entry_capacity)
