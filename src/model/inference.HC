@@ -2903,6 +2903,232 @@ I32 InferenceGenerateStepCheckedTopKTopPNoPartialCommitOnlyPreflightOnlyParityCo
     return SAMPLING_Q16_OK;
 }
 
+// IQ-1233 diagnostics zero-write companion over one-step commit/parity wrappers.
+//
+// Contract:
+// - Stage diagnostics tuple via
+//   `InferenceGenerateStepCheckedTopKTopPNoPartialCommitOnlyPreflightOnlyParityCommitOnly`.
+// - Independently stage diagnostics tuple via
+//   `InferenceGenerateStepCheckedTopKTopPNoPartialCommitOnlyPreflightOnlyParity`.
+// - Enforce immutable step snapshots
+//   `{logits_capacity,vocab_size,token_history_capacity,token_history_count,`
+//   `temperature_q16,top_k,top_p_q16,repetition_penalty_q16,random_q16,`
+//   `workspace_stage_logits_capacity,workspace_topk_logits_capacity,`
+//   `workspace_topk_index_capacity,workspace_history_stage_capacity}`.
+// - Require strict tuple parity for
+//   `{required_step_logits_cells,required_history_capacity,`
+//   `required_stage_logits_capacity,required_topk_capacity}` before publish.
+// - Zero-write publish semantics: outputs mutate only after all checks succeed.
+I32 InferenceGenerateStepCheckedTopKTopPNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+    I64 *logits_q16,
+    I64 logits_capacity,
+    I64 vocab_size,
+    I64 *token_history,
+    I64 token_history_capacity,
+    I64 token_history_count,
+    I64 temperature_q16,
+    I64 top_k,
+    I64 top_p_q16,
+    I64 repetition_penalty_q16,
+    I64 random_q16,
+    I64 *workspace_stage_logits_q16,
+    I64 workspace_stage_logits_capacity,
+    I64 *workspace_topk_logits_q16,
+    I64 workspace_topk_logits_capacity,
+    I64 *workspace_topk_indices,
+    I64 workspace_topk_index_capacity,
+    I64 *workspace_history_stage,
+    I64 workspace_history_stage_capacity,
+    I64 *out_required_step_logits_cells,
+    I64 *out_required_history_capacity,
+    I64 *out_required_stage_logits_capacity,
+    I64 *out_required_topk_capacity)
+{
+    I64 staged_commit_required_step_logits_cells;
+    I64 staged_commit_required_history_capacity;
+    I64 staged_commit_required_stage_logits_capacity;
+    I64 staged_commit_required_topk_capacity;
+
+    I64 staged_parity_required_step_logits_cells;
+    I64 staged_parity_required_history_capacity;
+    I64 staged_parity_required_stage_logits_capacity;
+    I64 staged_parity_required_topk_capacity;
+
+    I64 snapshot_logits_capacity;
+    I64 snapshot_vocab_size;
+    I64 snapshot_token_history_capacity;
+    I64 snapshot_token_history_count;
+    I64 snapshot_temperature_q16;
+    I64 snapshot_top_k;
+    I64 snapshot_top_p_q16;
+    I64 snapshot_repetition_penalty_q16;
+    I64 snapshot_random_q16;
+    I64 snapshot_workspace_stage_logits_capacity;
+    I64 snapshot_workspace_topk_logits_capacity;
+    I64 snapshot_workspace_topk_index_capacity;
+    I64 snapshot_workspace_history_stage_capacity;
+
+    I64 *snapshot_logits_q16;
+    I64 *snapshot_token_history;
+    I64 *snapshot_workspace_stage_logits_q16;
+    I64 *snapshot_workspace_topk_logits_q16;
+    I64 *snapshot_workspace_topk_indices;
+    I64 *snapshot_workspace_history_stage;
+    I64 *snapshot_out_required_step_logits_cells;
+    I64 *snapshot_out_required_history_capacity;
+    I64 *snapshot_out_required_stage_logits_capacity;
+    I64 *snapshot_out_required_topk_capacity;
+
+    I32 status;
+
+    if (!out_required_step_logits_cells || !out_required_history_capacity ||
+        !out_required_stage_logits_capacity || !out_required_topk_capacity)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (out_required_step_logits_cells == out_required_history_capacity ||
+        out_required_step_logits_cells == out_required_stage_logits_capacity ||
+        out_required_step_logits_cells == out_required_topk_capacity ||
+        out_required_history_capacity == out_required_stage_logits_capacity ||
+        out_required_history_capacity == out_required_topk_capacity ||
+        out_required_stage_logits_capacity == out_required_topk_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (!logits_q16 || !token_history || !workspace_stage_logits_q16 ||
+        !workspace_topk_logits_q16 || !workspace_topk_indices ||
+        !workspace_history_stage)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (temperature_q16 <= 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (repetition_penalty_q16 < SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (top_k <= 0 || top_k > vocab_size)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (top_p_q16 <= 0 || top_p_q16 > SAMPLING_Q16_ONE)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_logits_capacity = logits_capacity;
+    snapshot_vocab_size = vocab_size;
+    snapshot_token_history_capacity = token_history_capacity;
+    snapshot_token_history_count = token_history_count;
+    snapshot_temperature_q16 = temperature_q16;
+    snapshot_top_k = top_k;
+    snapshot_top_p_q16 = top_p_q16;
+    snapshot_repetition_penalty_q16 = repetition_penalty_q16;
+    snapshot_random_q16 = random_q16;
+    snapshot_workspace_stage_logits_capacity = workspace_stage_logits_capacity;
+    snapshot_workspace_topk_logits_capacity = workspace_topk_logits_capacity;
+    snapshot_workspace_topk_index_capacity = workspace_topk_index_capacity;
+    snapshot_workspace_history_stage_capacity = workspace_history_stage_capacity;
+
+    snapshot_logits_q16 = logits_q16;
+    snapshot_token_history = token_history;
+    snapshot_workspace_stage_logits_q16 = workspace_stage_logits_q16;
+    snapshot_workspace_topk_logits_q16 = workspace_topk_logits_q16;
+    snapshot_workspace_topk_indices = workspace_topk_indices;
+    snapshot_workspace_history_stage = workspace_history_stage;
+    snapshot_out_required_step_logits_cells = out_required_step_logits_cells;
+    snapshot_out_required_history_capacity = out_required_history_capacity;
+    snapshot_out_required_stage_logits_capacity = out_required_stage_logits_capacity;
+    snapshot_out_required_topk_capacity = out_required_topk_capacity;
+
+    status = InferenceGenerateStepCheckedTopKTopPNoPartialCommitOnlyPreflightOnlyParityCommitOnly(
+        logits_q16,
+        logits_capacity,
+        vocab_size,
+        token_history,
+        token_history_capacity,
+        token_history_count,
+        temperature_q16,
+        top_k,
+        top_p_q16,
+        repetition_penalty_q16,
+        random_q16,
+        workspace_stage_logits_q16,
+        workspace_stage_logits_capacity,
+        workspace_topk_logits_q16,
+        workspace_topk_logits_capacity,
+        workspace_topk_indices,
+        workspace_topk_index_capacity,
+        workspace_history_stage,
+        workspace_history_stage_capacity,
+        &staged_commit_required_step_logits_cells,
+        &staged_commit_required_history_capacity,
+        &staged_commit_required_stage_logits_capacity,
+        &staged_commit_required_topk_capacity);
+    if (status)
+        return status;
+
+    status = InferenceGenerateStepCheckedTopKTopPNoPartialCommitOnlyPreflightOnlyParity(
+        logits_q16,
+        logits_capacity,
+        vocab_size,
+        token_history,
+        token_history_capacity,
+        token_history_count,
+        temperature_q16,
+        top_k,
+        top_p_q16,
+        repetition_penalty_q16,
+        random_q16,
+        workspace_stage_logits_q16,
+        workspace_stage_logits_capacity,
+        workspace_topk_logits_q16,
+        workspace_topk_logits_capacity,
+        workspace_topk_indices,
+        workspace_topk_index_capacity,
+        workspace_history_stage,
+        workspace_history_stage_capacity,
+        &staged_parity_required_step_logits_cells,
+        &staged_parity_required_history_capacity,
+        &staged_parity_required_stage_logits_capacity,
+        &staged_parity_required_topk_capacity);
+    if (status)
+        return status;
+
+    if (snapshot_logits_capacity != logits_capacity ||
+        snapshot_vocab_size != vocab_size ||
+        snapshot_token_history_capacity != token_history_capacity ||
+        snapshot_token_history_count != token_history_count ||
+        snapshot_temperature_q16 != temperature_q16 ||
+        snapshot_top_k != top_k ||
+        snapshot_top_p_q16 != top_p_q16 ||
+        snapshot_repetition_penalty_q16 != repetition_penalty_q16 ||
+        snapshot_random_q16 != random_q16 ||
+        snapshot_workspace_stage_logits_capacity != workspace_stage_logits_capacity ||
+        snapshot_workspace_topk_logits_capacity != workspace_topk_logits_capacity ||
+        snapshot_workspace_topk_index_capacity != workspace_topk_index_capacity ||
+        snapshot_workspace_history_stage_capacity != workspace_history_stage_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_logits_q16 != logits_q16 ||
+        snapshot_token_history != token_history ||
+        snapshot_workspace_stage_logits_q16 != workspace_stage_logits_q16 ||
+        snapshot_workspace_topk_logits_q16 != workspace_topk_logits_q16 ||
+        snapshot_workspace_topk_indices != workspace_topk_indices ||
+        snapshot_workspace_history_stage != workspace_history_stage ||
+        snapshot_out_required_step_logits_cells != out_required_step_logits_cells ||
+        snapshot_out_required_history_capacity != out_required_history_capacity ||
+        snapshot_out_required_stage_logits_capacity != out_required_stage_logits_capacity ||
+        snapshot_out_required_topk_capacity != out_required_topk_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (staged_commit_required_step_logits_cells != staged_parity_required_step_logits_cells)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (staged_commit_required_history_capacity != staged_parity_required_history_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (staged_commit_required_stage_logits_capacity != staged_parity_required_stage_logits_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+    if (staged_commit_required_topk_capacity != staged_parity_required_topk_capacity)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    *out_required_step_logits_cells = staged_commit_required_step_logits_cells;
+    *out_required_history_capacity = staged_commit_required_history_capacity;
+    *out_required_stage_logits_capacity = staged_commit_required_stage_logits_capacity;
+    *out_required_topk_capacity = staged_commit_required_topk_capacity;
+    return SAMPLING_Q16_OK;
+}
+
 // IQ-1222 no-partial top-k/top-p generation loop wrapper for WS7.
 //
 // Contract:
