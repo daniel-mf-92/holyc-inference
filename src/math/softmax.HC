@@ -694,6 +694,114 @@ I32 FPQ16SoftmaxPrefixSumCheckedNoPartial(I64 *probs_q16,
     return FP_Q16_OK;
 }
 
+// Commit-only diagnostics wrapper over FPQ16SoftmaxPrefixSumCheckedNoPartial.
+//
+// Purpose:
+// - Reuse no-partial prefix construction for the committed caller prefix lanes.
+// - Recompute canonical prefix totals independently and require strict parity
+//   before publishing summary tuple outputs.
+// - Publish `{total_q16,last_prefix_q16}` atomically only on full success.
+//
+// Contracts:
+// - Enforces immutable snapshot `{lane_count,probs_capacity,prefix_capacity}`.
+// - Enforces pointer snapshot stability for all input/output pointers.
+I32 FPQ16SoftmaxPrefixSumCheckedNoPartialCommitOnly(I64 *probs_q16,
+                                                    I64 lane_count,
+                                                    I64 probs_capacity,
+                                                    I64 *prefix_sums_q16,
+                                                    I64 prefix_capacity,
+                                                    I64 *out_total_q16,
+                                                    I64 *out_last_prefix_q16)
+{
+    I64 *snapshot_probs_q16;
+    I64 snapshot_lane_count;
+    I64 snapshot_probs_capacity;
+    I64 *snapshot_prefix_sums_q16;
+    I64 snapshot_prefix_capacity;
+    I64 *snapshot_out_total_q16;
+    I64 *snapshot_out_last_prefix_q16;
+    I64 required_prefix_bytes;
+    I64 *recomputed_prefix_q16;
+    I64 staged_total_q16;
+    I64 staged_last_prefix_q16;
+    I64 recomputed_total_q16;
+    I64 recomputed_last_prefix_q16;
+    I32 status;
+
+    if (!probs_q16 || !prefix_sums_q16 || !out_total_q16 || !out_last_prefix_q16)
+        return FP_Q16_ERR_NULL_PTR;
+    if (lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (probs_capacity < 0 || prefix_capacity < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    snapshot_probs_q16 = probs_q16;
+    snapshot_lane_count = lane_count;
+    snapshot_probs_capacity = probs_capacity;
+    snapshot_prefix_sums_q16 = prefix_sums_q16;
+    snapshot_prefix_capacity = prefix_capacity;
+    snapshot_out_total_q16 = out_total_q16;
+    snapshot_out_last_prefix_q16 = out_last_prefix_q16;
+
+    status = FPQ16SoftmaxPrefixSumCheckedNoPartial(snapshot_probs_q16,
+                                                   snapshot_lane_count,
+                                                   snapshot_probs_capacity,
+                                                   snapshot_prefix_sums_q16,
+                                                   snapshot_prefix_capacity,
+                                                   &staged_total_q16);
+    if (status)
+        return status;
+
+    if (snapshot_lane_count)
+        staged_last_prefix_q16 = snapshot_prefix_sums_q16[snapshot_lane_count - 1];
+    else
+        staged_last_prefix_q16 = 0;
+
+    recomputed_total_q16 = 0;
+    recomputed_last_prefix_q16 = 0;
+
+    if (snapshot_lane_count)
+    {
+        if (snapshot_lane_count > (I64_MAX_VALUE >> 3))
+            return FP_Q16_ERR_OVERFLOW;
+
+        required_prefix_bytes = snapshot_lane_count << 3;
+        recomputed_prefix_q16 = MAlloc(required_prefix_bytes);
+        if (!recomputed_prefix_q16)
+            return FP_Q16_ERR_OVERFLOW;
+
+        status = FPQ16SoftmaxPrefixSumChecked(snapshot_probs_q16,
+                                              snapshot_lane_count,
+                                              recomputed_prefix_q16,
+                                              &recomputed_total_q16);
+        if (status)
+        {
+            Free(recomputed_prefix_q16);
+            return status;
+        }
+
+        recomputed_last_prefix_q16 = recomputed_prefix_q16[snapshot_lane_count - 1];
+        Free(recomputed_prefix_q16);
+    }
+
+    if (snapshot_probs_q16 != probs_q16 ||
+        snapshot_lane_count != lane_count ||
+        snapshot_probs_capacity != probs_capacity ||
+        snapshot_prefix_sums_q16 != prefix_sums_q16 ||
+        snapshot_prefix_capacity != prefix_capacity ||
+        snapshot_out_total_q16 != out_total_q16 ||
+        snapshot_out_last_prefix_q16 != out_last_prefix_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (staged_total_q16 != recomputed_total_q16 ||
+        staged_last_prefix_q16 != recomputed_last_prefix_q16)
+        return FP_Q16_ERR_OVERFLOW;
+
+    *out_total_q16 = staged_total_q16;
+    *out_last_prefix_q16 = staged_last_prefix_q16;
+    return FP_Q16_OK;
+}
+
 // Commit-only wrapper over FPQ16SoftmaxPrefixSumChecked.
 //
 // Purpose:
