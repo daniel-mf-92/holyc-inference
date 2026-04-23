@@ -84,3 +84,45 @@ I32 FPQ16SqrtCheckedNoPartialCommitOnly(I64 x_q16,
     *out_q16 = staged_out_q16;
     return FP_Q16_OK;
 }
+
+// Diagnostics-only checked preflight for commit-only Q16 square-root path.
+//
+// Contract:
+// - `required_out_cells_out` must be non-null.
+// - Does not publish `out_q16` lanes to caller; stages output on local scratch.
+// - Enforces immutable `{x_q16}` snapshot parity across staged call.
+// - Enforces strict tuple parity `{required_out_cells=1}` before publish.
+I32 FPQ16SqrtCheckedNoPartialCommitOnlyPreflightOnly(I64 x_q16,
+                                                     I64 *required_out_cells_out)
+{
+    I64 snapshot_x_q16;
+    I64 staged_out_q16;
+    I64 staged_required_out_cells;
+    I64 canonical_out_q16;
+    I32 status;
+
+    if (!required_out_cells_out)
+        return FP_Q16_ERR_NULL_PTR;
+
+    *required_out_cells_out = 0;
+    snapshot_x_q16 = x_q16;
+
+    status = FPQ16SqrtCheckedNoPartialCommitOnly(x_q16,
+                                                 &staged_out_q16);
+    if (status != FP_Q16_OK)
+        return status;
+
+    if (snapshot_x_q16 != x_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    canonical_out_q16 = FPQ16Sqrt(x_q16);
+    if (canonical_out_q16 != staged_out_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    staged_required_out_cells = 1;
+    if (staged_required_out_cells != 1)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *required_out_cells_out = staged_required_out_cells;
+    return FP_Q16_OK;
+}
