@@ -643,6 +643,56 @@ I32 FPQ16DivCheckedNoPartialCommitOnlyPreflightOnlyParity(I64 numerator_q16,
     return FP_Q16_OK;
 }
 
+// Commit-only diagnostics wrapper over
+// FPQ16DivCheckedNoPartialCommitOnlyPreflightOnlyParity.
+//
+// This stages delegated diagnostics into a local scalar, revalidates immutable
+// `{numerator_q16,denominator_q16}` snapshots, and atomically publishes only
+// canonical `{required_out_cells=1}` on strict parity success.
+//
+// Contract:
+// - out_required_out_cells must be non-null.
+// - Returns same status domain as delegated diagnostics divide helpers.
+// - Performs no diagnostics publish on failure.
+I32 FPQ16DivCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(I64 numerator_q16,
+                                                                    I64 denominator_q16,
+                                                                    I64 *out_required_out_cells)
+{
+    I64 snapshot_numerator_q16;
+    I64 snapshot_denominator_q16;
+    I64 staged_required_out_cells;
+    I64 recomputed_required_out_cells;
+    I32 status;
+
+    if (!out_required_out_cells)
+        return FP_Q16_ERR_NULL_PTR;
+
+    snapshot_numerator_q16 = numerator_q16;
+    snapshot_denominator_q16 = denominator_q16;
+
+    status = FPQ16DivCheckedNoPartialCommitOnlyPreflightOnlyParity(
+        numerator_q16,
+        denominator_q16,
+        &staged_required_out_cells);
+    if (status)
+        return status;
+
+    if (snapshot_numerator_q16 != numerator_q16 ||
+        snapshot_denominator_q16 != denominator_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    recomputed_required_out_cells = 1;
+
+    if (staged_required_out_cells != recomputed_required_out_cells)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (recomputed_required_out_cells != 1)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_required_out_cells = staged_required_out_cells;
+    return FP_Q16_OK;
+}
+
 // Checked elementwise Q16 multiply helper for inference vector paths.
 // Contracts:
 //   - count >= 0
