@@ -92,6 +92,87 @@ I32 FPQ16RMSNormTryMulI64Checked(I64 lhs,
     return 0;
 }
 
+I32 FPQ16RMSNormRowsComputeRequiredCellsChecked(I64 row_count,
+                                                I64 lane_count,
+                                                I64 input_row_stride,
+                                                I64 gamma_row_stride,
+                                                I64 output_row_stride,
+                                                I64 *required_input_cells_out,
+                                                I64 *required_gamma_cells_out,
+                                                I64 *required_output_cells_out)
+{
+    I64 last_row;
+    I64 required_input_cells;
+    I64 required_gamma_cells;
+    I64 required_output_cells;
+    I32 status;
+
+    if (!required_input_cells_out ||
+        !required_gamma_cells_out ||
+        !required_output_cells_out)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (row_count < 0 || lane_count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (input_row_stride < 0 ||
+        gamma_row_stride < 0 ||
+        output_row_stride < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (!row_count || !lane_count)
+    {
+        *required_input_cells_out = 0;
+        *required_gamma_cells_out = 0;
+        *required_output_cells_out = 0;
+        return 0;
+    }
+
+    if (input_row_stride < lane_count ||
+        gamma_row_stride < lane_count ||
+        output_row_stride < lane_count)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    last_row = row_count - 1;
+
+    status = FPQ16RMSNormTryMulI64Checked(last_row,
+                                          input_row_stride,
+                                          &required_input_cells);
+    if (status)
+        return status;
+    status = FPQ16RMSNormTryAddI64Checked(required_input_cells,
+                                          lane_count,
+                                          &required_input_cells);
+    if (status)
+        return status;
+
+    status = FPQ16RMSNormTryMulI64Checked(last_row,
+                                          gamma_row_stride,
+                                          &required_gamma_cells);
+    if (status)
+        return status;
+    status = FPQ16RMSNormTryAddI64Checked(required_gamma_cells,
+                                          lane_count,
+                                          &required_gamma_cells);
+    if (status)
+        return status;
+
+    status = FPQ16RMSNormTryMulI64Checked(last_row,
+                                          output_row_stride,
+                                          &required_output_cells);
+    if (status)
+        return status;
+    status = FPQ16RMSNormTryAddI64Checked(required_output_cells,
+                                          lane_count,
+                                          &required_output_cells);
+    if (status)
+        return status;
+
+    *required_input_cells_out = required_input_cells;
+    *required_gamma_cells_out = required_gamma_cells;
+    *required_output_cells_out = required_output_cells;
+    return 0;
+}
+
 // WS1-04 RMSNorm assumptions (Q16 tensors):
 // - `count` is the feature width for one normalized row/token/head slice.
 // - `input_q16`, `gamma_q16`, `output_q16` each contain at least `count`
@@ -1078,6 +1159,133 @@ I32 FPQ16RMSNormRowsCheckedNoPartial(I64 *input_q16,
     }
 
     Free(staged_output_q16);
+    return 0;
+}
+
+// Commit-only diagnostics wrapper over FPQ16RMSNormRowsCheckedNoPartial.
+//
+// Contract:
+// - computes canonical no-partial row RMSNorm into caller output
+// - snapshots immutable geometry/capacity/stride/pointer tuple
+// - atomically publishes only `{required_input_cells,required_gamma_cells,
+//   required_output_cells}` after strict tuple parity
+// - leaves diagnostics outputs untouched on all failure paths
+I32 FPQ16RMSNormRowsCheckedNoPartialCommitOnly(I64 *input_q16,
+                                               I64 input_capacity,
+                                               I64 input_row_stride,
+                                               I64 *gamma_q16,
+                                               I64 gamma_capacity,
+                                               I64 gamma_row_stride,
+                                               I64 *output_q16,
+                                               I64 output_capacity,
+                                               I64 output_row_stride,
+                                               I64 row_count,
+                                               I64 lane_count,
+                                               I64 eps_q16,
+                                               I64 *required_input_cells_out,
+                                               I64 *required_gamma_cells_out,
+                                               I64 *required_output_cells_out)
+{
+    I64 snapshot_row_count;
+    I64 snapshot_lane_count;
+    I64 snapshot_input_capacity;
+    I64 snapshot_gamma_capacity;
+    I64 snapshot_output_capacity;
+    I64 snapshot_input_row_stride;
+    I64 snapshot_gamma_row_stride;
+    I64 snapshot_output_row_stride;
+    I64 *snapshot_input_ptr;
+    I64 *snapshot_gamma_ptr;
+    I64 *snapshot_output_ptr;
+    I64 snapshot_required_input_cells;
+    I64 snapshot_required_gamma_cells;
+    I64 snapshot_required_output_cells;
+    I64 parity_required_input_cells;
+    I64 parity_required_gamma_cells;
+    I64 parity_required_output_cells;
+    I32 status;
+
+    if (!input_q16 || !gamma_q16 || !output_q16 ||
+        !required_input_cells_out ||
+        !required_gamma_cells_out ||
+        !required_output_cells_out)
+        return FP_Q16_ERR_NULL_PTR;
+
+    snapshot_row_count = row_count;
+    snapshot_lane_count = lane_count;
+    snapshot_input_capacity = input_capacity;
+    snapshot_gamma_capacity = gamma_capacity;
+    snapshot_output_capacity = output_capacity;
+    snapshot_input_row_stride = input_row_stride;
+    snapshot_gamma_row_stride = gamma_row_stride;
+    snapshot_output_row_stride = output_row_stride;
+    snapshot_input_ptr = input_q16;
+    snapshot_gamma_ptr = gamma_q16;
+    snapshot_output_ptr = output_q16;
+
+    status = FPQ16RMSNormRowsComputeRequiredCellsChecked(snapshot_row_count,
+                                                         snapshot_lane_count,
+                                                         snapshot_input_row_stride,
+                                                         snapshot_gamma_row_stride,
+                                                         snapshot_output_row_stride,
+                                                         &snapshot_required_input_cells,
+                                                         &snapshot_required_gamma_cells,
+                                                         &snapshot_required_output_cells);
+    if (status)
+        return status;
+
+    if (snapshot_required_input_cells > snapshot_input_capacity ||
+        snapshot_required_gamma_cells > snapshot_gamma_capacity ||
+        snapshot_required_output_cells > snapshot_output_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    status = FPQ16RMSNormRowsCheckedNoPartial(input_q16,
+                                              input_capacity,
+                                              input_row_stride,
+                                              gamma_q16,
+                                              gamma_capacity,
+                                              gamma_row_stride,
+                                              output_q16,
+                                              output_capacity,
+                                              output_row_stride,
+                                              row_count,
+                                              lane_count,
+                                              eps_q16);
+    if (status)
+        return status;
+
+    if (snapshot_row_count != row_count ||
+        snapshot_lane_count != lane_count ||
+        snapshot_input_capacity != input_capacity ||
+        snapshot_gamma_capacity != gamma_capacity ||
+        snapshot_output_capacity != output_capacity ||
+        snapshot_input_row_stride != input_row_stride ||
+        snapshot_gamma_row_stride != gamma_row_stride ||
+        snapshot_output_row_stride != output_row_stride ||
+        snapshot_input_ptr != input_q16 ||
+        snapshot_gamma_ptr != gamma_q16 ||
+        snapshot_output_ptr != output_q16)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    status = FPQ16RMSNormRowsComputeRequiredCellsChecked(row_count,
+                                                         lane_count,
+                                                         input_row_stride,
+                                                         gamma_row_stride,
+                                                         output_row_stride,
+                                                         &parity_required_input_cells,
+                                                         &parity_required_gamma_cells,
+                                                         &parity_required_output_cells);
+    if (status)
+        return status;
+
+    if (parity_required_input_cells != snapshot_required_input_cells ||
+        parity_required_gamma_cells != snapshot_required_gamma_cells ||
+        parity_required_output_cells != snapshot_required_output_cells)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *required_input_cells_out = snapshot_required_input_cells;
+    *required_gamma_cells_out = snapshot_required_gamma_cells;
+    *required_output_cells_out = snapshot_required_output_cells;
     return 0;
 }
 
