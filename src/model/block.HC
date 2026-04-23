@@ -1648,6 +1648,131 @@ I32 TransformerBlockQ16ApplyCheckedNoPartialCommitOnly(
 // 5) Compute residual sums into `residual_stage_q16`
 // 6) Commit staged residual rows into caller `out_q16` only after full
 //    destination index validation succeeds
+//
+// IQ-1223 preflight companion computes exact workspace geometry for the
+// checked no-partial forward path.
+//
+// Published tuple (cells/bytes):
+// - dense_cells        = row_count * lane_count
+// - required_q16_cells = dense_cells * 4
+//     (norm_rows, attn_rows, ffn_rows, residual_stage)
+// - required_q32_cells = dense_cells * 3
+//     (attn_in, attn_out, attn_stage)
+// - required_q16_bytes = required_q16_cells * sizeof(I64)
+// - required_q32_bytes = required_q32_cells * sizeof(I64)
+I32 TransformerBlockQ16ForwardCheckedNoPartialPreflightOnly(
+    I64 row_count,
+    I64 lane_count,
+    I64 input_capacity,
+    I64 rms_gamma_capacity,
+    I64 ffn_gate_capacity,
+    I64 ffn_up_capacity,
+    I64 workspace_q16_capacity,
+    I64 workspace_q32_capacity,
+    I64 out_capacity,
+    I64 *out_dense_cells,
+    I64 *out_required_q16_cells,
+    I64 *out_required_q32_cells,
+    I64 *out_required_q16_bytes,
+    I64 *out_required_q32_bytes)
+{
+    I64 staged_dense_cells;
+    I64 staged_required_q16_cells;
+    I64 staged_required_q32_cells;
+    I64 staged_required_q16_bytes;
+    I64 staged_required_q32_bytes;
+    I32 status;
+
+    if (!out_dense_cells || !out_required_q16_cells || !out_required_q32_cells ||
+        !out_required_q16_bytes || !out_required_q32_bytes)
+        return BLOCK_Q16_ERR_NULL_PTR;
+
+    if (out_dense_cells == out_required_q16_cells ||
+        out_dense_cells == out_required_q32_cells ||
+        out_dense_cells == out_required_q16_bytes ||
+        out_dense_cells == out_required_q32_bytes ||
+        out_required_q16_cells == out_required_q32_cells ||
+        out_required_q16_cells == out_required_q16_bytes ||
+        out_required_q16_cells == out_required_q32_bytes ||
+        out_required_q32_cells == out_required_q16_bytes ||
+        out_required_q32_cells == out_required_q32_bytes ||
+        out_required_q16_bytes == out_required_q32_bytes)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    if (row_count < 0 || lane_count < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (input_capacity < 0 || rms_gamma_capacity < 0 ||
+        ffn_gate_capacity < 0 || ffn_up_capacity < 0 ||
+        workspace_q16_capacity < 0 || workspace_q32_capacity < 0 ||
+        out_capacity < 0)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    if (!row_count || !lane_count)
+    {
+        *out_dense_cells = 0;
+        *out_required_q16_cells = 0;
+        *out_required_q32_cells = 0;
+        *out_required_q16_bytes = 0;
+        *out_required_q32_bytes = 0;
+        return BLOCK_Q16_OK;
+    }
+
+    status = BlockTryMulI64Checked(row_count,
+                                   lane_count,
+                                   &staged_dense_cells);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(staged_dense_cells,
+                                   4,
+                                   &staged_required_q16_cells);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(staged_dense_cells,
+                                   3,
+                                   &staged_required_q32_cells);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(staged_required_q16_cells,
+                                   sizeof(I64),
+                                   &staged_required_q16_bytes);
+    if (status)
+        return status;
+
+    status = BlockTryMulI64Checked(staged_required_q32_cells,
+                                   sizeof(I64),
+                                   &staged_required_q32_bytes);
+    if (status)
+        return status;
+
+    if (staged_dense_cells > input_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (staged_dense_cells > ffn_gate_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (staged_dense_cells > ffn_up_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (staged_dense_cells > out_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (lane_count > rms_gamma_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (staged_required_q16_cells > workspace_q16_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+    if (staged_required_q32_cells > workspace_q32_capacity)
+        return BLOCK_Q16_ERR_BAD_PARAM;
+
+    if (staged_required_q16_bytes <= 0 || staged_required_q32_bytes <= 0)
+        return BLOCK_Q16_ERR_OVERFLOW;
+
+    *out_dense_cells = staged_dense_cells;
+    *out_required_q16_cells = staged_required_q16_cells;
+    *out_required_q32_cells = staged_required_q32_cells;
+    *out_required_q16_bytes = staged_required_q16_bytes;
+    *out_required_q32_bytes = staged_required_q32_bytes;
+    return BLOCK_Q16_OK;
+}
+
 I32 TransformerBlockQ16ForwardCheckedNoPartial(
     I64 *input_q16,
     I64 input_capacity,
@@ -1717,62 +1842,23 @@ I32 TransformerBlockQ16ForwardCheckedNoPartial(
     if (out_q16 == input_q16 || out_q16 == workspace_q16 || out_q16 == workspace_q32)
         return BLOCK_Q16_ERR_BAD_PARAM;
 
-    status = BlockTryMulI64Checked(row_count,
-                                   lane_count,
-                                   &dense_cells);
+    status = TransformerBlockQ16ForwardCheckedNoPartialPreflightOnly(
+        row_count,
+        lane_count,
+        input_capacity,
+        rms_gamma_capacity,
+        ffn_gate_capacity,
+        ffn_up_capacity,
+        workspace_q16_capacity,
+        workspace_q32_capacity,
+        out_capacity,
+        &dense_cells,
+        &required_q16_cells,
+        &required_q32_cells,
+        &required_q16_bytes,
+        &required_q32_bytes);
     if (status)
         return status;
-
-    if (dense_cells > input_capacity)
-        return BLOCK_Q16_ERR_BAD_PARAM;
-    if (dense_cells > ffn_gate_capacity)
-        return BLOCK_Q16_ERR_BAD_PARAM;
-    if (dense_cells > ffn_up_capacity)
-        return BLOCK_Q16_ERR_BAD_PARAM;
-    if (dense_cells > out_capacity)
-        return BLOCK_Q16_ERR_BAD_PARAM;
-    if (lane_count > rms_gamma_capacity)
-        return BLOCK_Q16_ERR_BAD_PARAM;
-
-    // Q16 workspace slabs:
-    // - norm rows
-    // - attention rows (Q16 after rounded projection)
-    // - FFN rows
-    // - staged residual rows (commit source for out_q16)
-    status = BlockTryMulI64Checked(dense_cells,
-                                   4,
-                                   &required_q16_cells);
-    if (status)
-        return status;
-
-    // Q32 workspace slabs:
-    // - attention input (lifted Q16)
-    // - attention output
-    // - attention staging scratch
-    status = BlockTryMulI64Checked(dense_cells,
-                                   3,
-                                   &required_q32_cells);
-    if (status)
-        return status;
-
-    status = BlockTryMulI64Checked(required_q16_cells,
-                                   sizeof(I64),
-                                   &required_q16_bytes);
-    if (status)
-        return status;
-    status = BlockTryMulI64Checked(required_q32_cells,
-                                   sizeof(I64),
-                                   &required_q32_bytes);
-    if (status)
-        return status;
-
-    if (required_q16_cells > workspace_q16_capacity)
-        return BLOCK_Q16_ERR_BAD_PARAM;
-    if (required_q32_cells > workspace_q32_capacity)
-        return BLOCK_Q16_ERR_BAD_PARAM;
-
-    if (required_q16_bytes <= 0 || required_q32_bytes <= 0)
-        return BLOCK_Q16_ERR_OVERFLOW;
 
     if (GGUFTensorByteSpansOverlap((U8 *)workspace_q16,
                                    required_q16_bytes,
