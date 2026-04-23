@@ -993,6 +993,88 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightO
     return Q8_0_DOT_BENCH_OK;
 }
 
+// Diagnostics zero-write companion over deepest commit/parity preflight pair.
+//
+// Contracts:
+// - Recompute canonical tuple through deepest commit-only diagnostics companion.
+// - Recompute tuple through deepest strict parity diagnostics companion.
+// - Enforce immutable snapshots {cpu_hz,out_shape_count,out_max_blocks,
+//   out_max_rows,out_max_row_matrix_blocks} before publish.
+// - Require exact tuple parity {shape_count,max_blocks,max_rows,
+//   max_row_matrix_blocks} and publish atomically only on success.
+I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+    I64 cpu_hz,
+    I64 *out_shape_count,
+    I64 *out_max_blocks,
+    I64 *out_max_rows,
+    I64 *out_max_row_matrix_blocks)
+{
+    I64 snapshot_cpu_hz;
+    I64 *snapshot_out_shape_count;
+    I64 *snapshot_out_max_blocks;
+    I64 *snapshot_out_max_rows;
+    I64 *snapshot_out_max_row_matrix_blocks;
+
+    I64 staged_shape_count;
+    I64 staged_max_blocks;
+    I64 staged_max_rows;
+    I64 staged_max_row_matrix_blocks;
+
+    I64 parity_shape_count;
+    I64 parity_max_blocks;
+    I64 parity_max_rows;
+    I64 parity_max_row_matrix_blocks;
+    I32 status;
+
+    if (!out_shape_count || !out_max_blocks || !out_max_rows ||
+        !out_max_row_matrix_blocks)
+        return Q8_0_DOT_BENCH_ERR_NULL_PTR;
+
+    snapshot_cpu_hz = cpu_hz;
+    snapshot_out_shape_count = out_shape_count;
+    snapshot_out_max_blocks = out_max_blocks;
+    snapshot_out_max_rows = out_max_rows;
+    snapshot_out_max_row_matrix_blocks = out_max_row_matrix_blocks;
+
+    status = Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
+        cpu_hz,
+        &staged_shape_count,
+        &staged_max_blocks,
+        &staged_max_rows,
+        &staged_max_row_matrix_blocks);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    status = Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+        cpu_hz,
+        &parity_shape_count,
+        &parity_max_blocks,
+        &parity_max_rows,
+        &parity_max_row_matrix_blocks);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    if (snapshot_cpu_hz != cpu_hz)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+    if (snapshot_out_shape_count != out_shape_count ||
+        snapshot_out_max_blocks != out_max_blocks ||
+        snapshot_out_max_rows != out_max_rows ||
+        snapshot_out_max_row_matrix_blocks != out_max_row_matrix_blocks)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    if (staged_shape_count != parity_shape_count ||
+        staged_max_blocks != parity_max_blocks ||
+        staged_max_rows != parity_max_rows ||
+        staged_max_row_matrix_blocks != parity_max_row_matrix_blocks)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    *out_shape_count = staged_shape_count;
+    *out_max_blocks = staged_max_blocks;
+    *out_max_rows = staged_max_rows;
+    *out_max_row_matrix_blocks = staged_max_row_matrix_blocks;
+    return Q8_0_DOT_BENCH_OK;
+}
+
 // Deterministic default benchmark suite for Q8_0 dot kernels.
 //
 // This routine is intentionally timer-free. Instead of reading host counters,
