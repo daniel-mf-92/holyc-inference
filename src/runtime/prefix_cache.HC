@@ -555,3 +555,72 @@ I32 PrefixCacheLookupBestPrefixCheckedNoPartialCommitOnlyPreflightOnlyParity(Pre
     *out_best_tokens = preflight_best_tokens;
     return PREFIX_CACHE_OK;
 }
+
+I32 PrefixCacheLookupBestPrefixCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(PrefixCache *cache,
+                                                                                         I64 query_hash,
+                                                                                         I64 max_prompt_tokens,
+                                                                                         I64 *out_best_index,
+                                                                                         I64 *out_best_tokens)
+{
+    I64 snapshot_entry_count;
+    I64 snapshot_max_prompt_tokens;
+    I64 snapshot_query_hash;
+    I64 parity_best_index;
+    I64 parity_best_tokens;
+    I64 canonical_best_index;
+    I64 canonical_best_tokens;
+    I32 status_parity;
+    I32 status_canonical;
+
+    if (!cache || !cache->entries || !out_best_index || !out_best_tokens)
+        return PREFIX_CACHE_ERR_NULL_PTR;
+
+    if (out_best_index == out_best_tokens)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->capacity <= 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (query_hash < 0 || max_prompt_tokens < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    snapshot_entry_count = cache->count;
+    snapshot_max_prompt_tokens = max_prompt_tokens;
+    snapshot_query_hash = query_hash;
+
+    status_parity = PrefixCacheLookupBestPrefixCheckedNoPartialCommitOnlyPreflightOnlyParity(cache,
+                                                                                               query_hash,
+                                                                                               max_prompt_tokens,
+                                                                                               &parity_best_index,
+                                                                                               &parity_best_tokens);
+    if (status_parity != PREFIX_CACHE_OK)
+        return status_parity;
+
+    status_canonical = PrefixCacheLookupBestPrefixCheckedNoPartialCommitOnly(cache,
+                                                                              query_hash,
+                                                                              max_prompt_tokens,
+                                                                              &canonical_best_index,
+                                                                              &canonical_best_tokens);
+    if (status_canonical != PREFIX_CACHE_OK)
+        return status_canonical;
+
+    if (parity_best_index != canonical_best_index ||
+        parity_best_tokens != canonical_best_tokens)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->count != snapshot_entry_count ||
+        cache->count < 0 ||
+        cache->count > cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (max_prompt_tokens != snapshot_max_prompt_tokens ||
+        max_prompt_tokens < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (query_hash != snapshot_query_hash)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    *out_best_index = parity_best_index;
+    *out_best_tokens = parity_best_tokens;
+    return PREFIX_CACHE_OK;
+}
