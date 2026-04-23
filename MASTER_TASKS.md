@@ -22,6 +22,10 @@ from a locally-loaded language model, with every token logged to the Book of Tru
   Prove correctness before scaling to 7B.
 - **Book of Truth integration** — every inference call, every token, every tensor op
   checkpoint is loggable by the Book of Truth ledger (WS13 in TempleOS MASTER_TASKS).
+
+- **Security profiles** — `secure-local` is the default deployment profile; `dev-local` is explicit opt-in for local experimentation only.
+- **Model files are untrusted inputs** — every model must pass quarantine + hash-manifest verification before trusted load.
+- **GPU is conditional** — GPU acceleration is forbidden unless IOMMU enforcement + Book-of-Truth GPU telemetry are active.
 - **AVX2 inline asm for hot paths** — HolyC supports inline x86 assembly. Use it for
   quantized dot products, matmul kernels, and attention score computation.
 - **No external dependencies** — no libc, no libm, no pthreads. Math functions (exp,
@@ -130,6 +134,17 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] WS9-13 Benchmark: GPU vs CPU inference speed for TinyLlama 1.1B Q4_0
 - [ ] WS9-14 Fallback: if no IOMMU available, GPU disabled entirely — CPU-only mode, no exceptions
 
+- [ ] WS9-15 GPU device allowlist + deny-by-default policy (vendor/device IDs)
+- [ ] WS9-16 DMA bounce-buffer strategy with explicit immutable buffer ownership states
+- [ ] WS9-17 IOMMU mapping lifecycle audit: map/update/unmap hooks with Book-of-Truth event IDs
+- [ ] WS9-18 GPU command-stream verifier: bounds/type checks before MMIO submission
+- [ ] WS9-19 GPU hang containment policy: bounded retries, fenced reset path, deterministic CPU fallback
+- [ ] WS9-20 GPU fault-injection suite: bad DMA map, MMIO timeout, malformed command descriptors
+- [ ] WS9-21 Security-overhead benchmark: tok/s impact with full IOMMU+audit hooks enabled
+- [ ] WS9-22 Secure profile policy gate: forbid GPU in `secure-local` until WS9-02/08/17/18 pass
+- [ ] WS9-23 Attestation record for GPU path (driver hash, BAR layout, IOMMU mode) logged to Book of Truth
+- [ ] WS9-24 Offline reproducibility checks for GPU kernel blobs/dispatch metadata
+
 ### WS10 — Multi-Architecture Model Support
 - [ ] WS10-01 Abstract forward pass interface — model-agnostic layer dispatch
 - [ ] WS10-02 Mistral architecture support (sliding window attention, different GQA config)
@@ -169,6 +184,17 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] WS15-04 OpenAI-compatible local API (CLI-based, serial-port accessible, no HTTP)
 - [ ] WS15-05 Model card parser: extract metadata from Hugging Face model cards for display
 - [ ] WS15-06 Benchmark suite: compare tok/s against llama.cpp, Ollama, LM Studio for same model
+
+
+### WS16 — Secure-Local / Dev-Local Deployment Profiles
+- [ ] WS16-01 Implement profile config parser with `secure-local` default at boot
+- [ ] WS16-02 Implement model quarantine directory layout and promotion workflow
+- [ ] WS16-03 Implement trusted model manifest loader + SHA256 verifier in HolyC
+- [ ] WS16-04 Add deterministic evaluation gate (prompt/seed/logit-window parity) for profile promotion
+- [ ] WS16-05 Add parser hardening gate (malformed corpus + fuzz replay) before trusted-load eligibility
+- [ ] WS16-06 Add profile transition audit events to Book of Truth (`profile_enter`, `profile_promote`, `profile_block`)
+- [ ] WS16-07 Add Sanhedrin-readable policy snapshot output (`InferencePolicyStatus;`)
+- [ ] WS16-08 Add release gate: no `secure-local` artifact without passing WS16-03/04/05 and WS9 critical guards
 
 ### WS13 — Advanced Inference Features
 - [ ] WS13-01 Multi-turn conversation context management
@@ -1093,10 +1119,21 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-1248 Implement HolyC `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnly` in `src/gguf/metadata.HC` as diagnostics zero-write companion over `GGUFMetadataValueSkipCheckedNoPartialCommitOnly` and canonical `GGUFMetadataValueSkipChecked`, enforcing immutable `{buf_nbytes,cursor,table_end,value_type}` snapshots plus strict tuple parity `{next_cursor}` before atomic diagnostics publish; add harness `tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only.py` across null/bounds/type/array-span parity vectors (WS2-02, WS2-05)
 - [x] IQ-1249 Implement HolyC `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParity` in `src/gguf/metadata.HC` as strict diagnostics parity gate over `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnly` and `GGUFMetadataValueSkipCheckedNoPartialCommitOnly`, enforcing immutable `{buf_nbytes,cursor,table_end,value_type}` snapshots plus exact tuple parity `{next_cursor}` before atomic diagnostics publish; add harness `tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity.py` across null/bounds/type/array-span parity vectors (WS2-02, WS2-05)
 - [x] IQ-1250 Implement HolyC `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly` in `src/gguf/metadata.HC` as commit-only diagnostics wrapper over `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParity`, enforcing immutable `{buf_nbytes,cursor,table_end,value_type}` snapshots and atomic publish of `{next_cursor}` only on strict tuple parity; add harness `tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity_commit_only.py` across null/bounds/type/array-span parity vectors (WS2-02, WS2-05)
-- [ ] IQ-1251 Implement HolyC `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly` in `src/gguf/metadata.HC` as diagnostics zero-write companion over `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly` and canonical `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParity`, enforcing immutable `{buf_nbytes,cursor,table_end,value_type}` snapshots plus strict tuple parity `{next_cursor}` before atomic diagnostics publish; add harness `tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only.py` across null/bounds/type/array-span parity vectors (WS2-02, WS2-05)
+
+- [ ] IQ-1251 Implement HolyC profile-state runtime (`secure-local` default, `dev-local` explicit) in `src/runtime/profile.HC` with CLI `InferenceProfileStatus;` and harness `tests/test_runtime_profile_status.py` (WS16-01, WS16-07)
+- [ ] IQ-1252 Implement trusted model manifest parser + SHA256 verifier in `src/model/trust_manifest.HC` with no-partial-write semantics and harness `tests/test_model_trust_manifest_sha256.py` (WS16-03)
+- [ ] IQ-1253 Implement model quarantine promotion helper in `src/model/quarantine.HC` (`import` -> `verify` -> `promote`) with harness `tests/test_model_quarantine_promote.py` (WS16-02)
+- [ ] IQ-1254 Implement GPU policy gate helper `GPUPolicyAllowDispatchChecked` in `src/gpu/policy.HC` enforcing IOMMU + profile guards and harness `tests/test_gpu_policy_allow_dispatch_checked.py` (WS9-02, WS9-22)
+- [ ] IQ-1255 Implement Book-of-Truth GPU event bridge in `src/gpu/book_of_truth_bridge.HC` for DMA/MMIO/dispatch events and harness `tests/test_gpu_book_of_truth_event_bridge.py` (WS9-08, WS9-17)
+- [ ] IQ-1256 Implement GPU command-stream preflight verifier in `src/gpu/command_verify.HC` (descriptor bounds/type checks) with harness `tests/test_gpu_command_verify.py` (WS9-18)
+- [ ] IQ-1257 Add GPU fault-injection host harness `tests/test_gpu_fault_injection_suite.py` covering timeout/bad-map/malformed-descriptor vectors (WS9-20)
+- [ ] IQ-1258 Add secure-local release gate script `automation/inference-secure-gate.sh` enforcing WS16 + WS9 critical checks with machine-readable output (WS16-08, WS9-22)
+- [x] IQ-1251 Implement HolyC `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly` in `src/gguf/metadata.HC` as diagnostics zero-write companion over `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly` and canonical `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParity`, enforcing immutable `{buf_nbytes,cursor,table_end,value_type}` snapshots plus strict tuple parity `{next_cursor}` before atomic diagnostics publish; add harness `tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only.py` across null/bounds/type/array-span parity vectors (WS2-02, WS2-05)
 - [ ] IQ-1252 Implement HolyC `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity` in `src/gguf/metadata.HC` as strict diagnostics parity gate over `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly` and canonical `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly`, enforcing immutable `{buf_nbytes,cursor,table_end,value_type}` snapshots plus exact tuple parity `{next_cursor}` before atomic diagnostics publish; add harness `tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity.py` across null/bounds/type/array-span vectors (WS2-02, WS2-05)
+- [ ] IQ-1259 Implement HolyC `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly` in `src/gguf/metadata.HC` as commit-only diagnostics wrapper over `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity`, enforcing immutable `{buf_nbytes,cursor,table_end,value_type}` snapshots and atomic publish of `{next_cursor}` only on strict parity success; add harness `tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only.py` across null/bounds/type/array-span parity vectors (WS2-02, WS2-05)
 
 ## Progress Ledger
+- 2026-04-23: IQ-1251 done — added harness `tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only.py` for `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly` in `src/gguf/metadata.HC`; validated `python3 tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only.py && ./.venv/bin/python -m pytest -q tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only.py tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity_commit_only.py tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity.py` (18 passed).
 - 2026-04-23: IQ-1250 done — added `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly` in `src/gguf/metadata.HC` and harness `tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity_commit_only.py`; validated `python3 tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity_commit_only.py && ./.venv/bin/python -m pytest -q tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity_commit_only.py tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity.py tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only.py` (20 passed).
 - 2026-04-23: IQ-1249 done — added `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParity` in `src/gguf/metadata.HC` and harness `tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity.py`; validated `python3 tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity.py && ./.venv/bin/python -m pytest -q tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity.py tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only.py tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only.py tests/test_gguf_metadata_value_skip_checked.py` (28 passed).
 - 2026-04-23: IQ-1248 done — added `GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnly` in `src/gguf/metadata.HC` and harness `tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only.py`; validated `python3 tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only.py && ./.venv/bin/python -m pytest -q tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only.py tests/test_gguf_metadata_value_skip_checked_nopartial_commit_only.py tests/test_gguf_metadata_value_skip_checked.py` (22 passed).
