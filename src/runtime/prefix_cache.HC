@@ -13,6 +13,10 @@
 #define PREFIX_CACHE_ERR_BAD_PARAM 2
 #define PREFIX_CACHE_ERR_FULL      3
 #define PREFIX_CACHE_ERR_NOT_FOUND 4
+#define PREFIX_CACHE_ERR_POLICY    5
+
+#define PREFIX_CACHE_PROFILE_SECURE_LOCAL 1
+#define PREFIX_CACHE_PROFILE_DEV_LOCAL    2
 
 #define PREFIX_CACHE_FRESH_EMPTY 0
 #define PREFIX_CACHE_FRESH_VALID 1
@@ -218,6 +222,66 @@ I32 PrefixCacheLookupChecked(PrefixCache *cache,
     *out_kv_start_token = cache->entries[found_index].kv_start_token;
     *out_kv_token_count = cache->entries[found_index].kv_token_count;
     *out_entry_index = found_index;
+    return PREFIX_CACHE_OK;
+}
+
+I32 PrefixCacheReplayGuardChecked(PrefixCache *cache,
+                                  I64 entry_index,
+                                  I64 access_tick,
+                                  I64 profile_id,
+                                  I64 *out_previous_tick,
+                                  I64 *out_applied_tick,
+                                  I64 *out_guard_passed)
+{
+    I64 previous_tick;
+    I64 staged_applied_tick;
+    I64 staged_guard_passed;
+
+    if (!cache || !cache->entries ||
+        !out_previous_tick || !out_applied_tick || !out_guard_passed)
+        return PREFIX_CACHE_ERR_NULL_PTR;
+
+    if (out_previous_tick == out_applied_tick ||
+        out_previous_tick == out_guard_passed ||
+        out_applied_tick == out_guard_passed)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->capacity <= 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->count < 0 || cache->count > cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (entry_index < 0 || entry_index >= cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->entries[entry_index].valid != PREFIX_CACHE_FRESH_VALID)
+        return PREFIX_CACHE_ERR_NOT_FOUND;
+
+    if (access_tick < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (profile_id != PREFIX_CACHE_PROFILE_SECURE_LOCAL &&
+        profile_id != PREFIX_CACHE_PROFILE_DEV_LOCAL)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    previous_tick = cache->entries[entry_index].last_used_tick;
+    if (previous_tick < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    // secure-local policy: ticks must be monotonic to prevent replay rollback.
+    if (profile_id == PREFIX_CACHE_PROFILE_SECURE_LOCAL &&
+        access_tick < previous_tick)
+        return PREFIX_CACHE_ERR_POLICY;
+
+    staged_applied_tick = access_tick;
+    staged_guard_passed = 1;
+
+    cache->entries[entry_index].last_used_tick = staged_applied_tick;
+
+    *out_previous_tick = previous_tick;
+    *out_applied_tick = staged_applied_tick;
+    *out_guard_passed = staged_guard_passed;
     return PREFIX_CACHE_OK;
 }
 
