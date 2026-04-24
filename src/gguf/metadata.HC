@@ -6168,7 +6168,9 @@ I32 GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParity(U8 *buf,
     U32 snapshot_value_type;
 
     U64 staged_preflight_cursor;
-    U64 staged_preflight_next_cursor;
+    U64 staged_preflight_out_next_cursor;
+    U64 staged_canonical_cursor;
+    U64 staged_canonical_next_cursor;
     U64 staged_commit_cursor;
     U64 staged_commit_next_cursor;
 
@@ -6954,6 +6956,120 @@ I32 GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly
         snapshot_out_next_cursor != *out_next_cursor)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
 
+    return GGUF_META_TABLE_OK;
+}
+
+// Strict diagnostics parity gate over
+// GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly
+// and
+// GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly.
+//
+// Contract:
+// - Snapshot immutable tuple {buf_nbytes,cursor,table_end,value_type}.
+// - Stage preflight-only diagnostics and commit-only diagnostics from snapshot cursor.
+// - Require strict tuple parity over {next_cursor} before atomic publish.
+I32 GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(U8 *buf,
+                                                                                                                                                               U64 buf_nbytes,
+                                                                                                                                                               U64 *cursor,
+                                                                                                                                                               U64 table_end,
+                                                                                                                                                               U32 value_type,
+                                                                                                                                                               U64 *out_next_cursor)
+{
+    U64 snapshot_buf_nbytes;
+    U64 snapshot_table_end;
+    U64 snapshot_cursor;
+    U32 snapshot_value_type;
+
+    U64 staged_preflight_cursor;
+    U64 staged_preflight_next_cursor;
+    U64 staged_commit_cursor;
+    U64 staged_commit_next_cursor;
+
+    I32 err;
+
+    if (!buf || !cursor || !out_next_cursor)
+        return GGUF_META_TABLE_ERR_NULL_PTR;
+
+    snapshot_buf_nbytes = buf_nbytes;
+    snapshot_table_end = table_end;
+    snapshot_cursor = *cursor;
+    snapshot_value_type = value_type;
+
+    if (snapshot_cursor > snapshot_buf_nbytes ||
+        snapshot_cursor > snapshot_table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    staged_preflight_cursor = snapshot_cursor;
+    staged_preflight_out_next_cursor = 0;
+    err = GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+        buf,
+        buf_nbytes,
+        &staged_preflight_cursor,
+        table_end,
+        value_type,
+        &staged_preflight_out_next_cursor);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    if (*cursor != snapshot_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (staged_preflight_cursor != snapshot_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    staged_canonical_cursor = snapshot_cursor;
+    staged_canonical_next_cursor = 0;
+    err = GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+        buf,
+        buf_nbytes,
+        &staged_canonical_cursor,
+        table_end,
+        value_type,
+        &staged_canonical_next_cursor);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    if (*cursor != snapshot_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (staged_canonical_cursor != staged_canonical_next_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (staged_canonical_next_cursor > buf_nbytes ||
+        staged_canonical_next_cursor > table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    staged_commit_cursor = snapshot_cursor;
+    staged_commit_next_cursor = 0;
+    err = GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
+        buf,
+        buf_nbytes,
+        &staged_commit_cursor,
+        table_end,
+        value_type,
+        &staged_commit_next_cursor);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    if (*cursor != snapshot_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (staged_commit_cursor != staged_commit_next_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+    if (staged_commit_next_cursor > buf_nbytes ||
+        staged_commit_next_cursor > table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    if (staged_canonical_next_cursor != staged_commit_next_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    if (snapshot_buf_nbytes != buf_nbytes ||
+        snapshot_table_end != table_end ||
+        snapshot_value_type != value_type ||
+        snapshot_cursor != *cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
+
+    *out_next_cursor = staged_commit_next_cursor;
+    *cursor = staged_commit_next_cursor;
     return GGUF_META_TABLE_OK;
 }
 
