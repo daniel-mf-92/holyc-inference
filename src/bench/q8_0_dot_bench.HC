@@ -3553,6 +3553,8 @@ I32 Q8_0DotBenchRunDefaultSuiteTelemetryDigestQ64CheckedNoPartialCommitOnlyPrefl
     if (total_ops < 0 || total_cycles < 0 || cycles_per_op < 0 ||
         remainder_cycles < 0 || suite_checksum < 0 || cpu_hz <= 0)
         return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+    if (total_ops < remainder_cycles)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
 
     snapshot_total_ops = total_ops;
     snapshot_total_cycles = total_cycles;

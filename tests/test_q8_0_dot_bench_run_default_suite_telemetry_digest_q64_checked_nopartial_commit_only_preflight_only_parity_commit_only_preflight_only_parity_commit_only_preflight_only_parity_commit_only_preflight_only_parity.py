@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Strict parity diagnostics gate checks for IQ-1361 telemetry digest wrapper."""
+"""Strict parity diagnostics gate checks for IQ-1363 telemetry digest wrapper."""
 
 from __future__ import annotations
 
@@ -306,7 +306,7 @@ def telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity_com
     return ERR_OK
 
 
-def test_source_contains_iq1361_function_and_guards() -> None:
+def test_source_contains_iq1363_function_and_guards() -> None:
     source = Path("src/bench/q8_0_dot_bench.HC").read_text(encoding="utf-8")
     sig = (
         "I32 Q8_0DotBenchRunDefaultSuiteTelemetryDigestQ64CheckedNoPartial"
@@ -325,6 +325,7 @@ def test_source_contains_iq1361_function_and_guards() -> None:
     assert "if (commit_digest_q64 != parity_digest_q64)" in body
     assert "if (parity_digest_q64 != canonical_digest_q64)" in body
     assert "*out_digest_q64 = parity_digest_q64;" in body
+    assert "if (total_ops < remainder_cycles)" in body
 
 
 def test_happy_path_publishes_digest() -> None:
@@ -413,11 +414,27 @@ def test_null_ptr() -> None:
     assert status == ERR_NULL_PTR
 
 
+def test_remainder_exceeds_total_ops_rejected() -> None:
+    out = [0x55]
+    status = telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity(
+        total_ops=31,
+        total_cycles=1_024,
+        cycles_per_op=33,
+        remainder_cycles=32,
+        suite_checksum=4,
+        cpu_hz=2_100_000_000,
+        out_ptr=out,
+    )
+    assert status == ERR_BAD_PARAM
+    assert out[0] == 0x55
+
+
 if __name__ == "__main__":
-    test_source_contains_iq1361_function_and_guards()
+    test_source_contains_iq1363_function_and_guards()
     test_happy_path_publishes_digest()
     test_commit_parity_mismatch_rejects()
     test_parity_canonical_mismatch_rejects()
     test_preflight_write_rejected()
     test_null_ptr()
+    test_remainder_exceeds_total_ops_rejected()
     print("ok")
