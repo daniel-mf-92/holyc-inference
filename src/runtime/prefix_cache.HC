@@ -1718,6 +1718,182 @@ I32 PrefixCacheExportAuditRowsCheckedNoPartial(PrefixCache *cache,
     return PREFIX_CACHE_OK;
 }
 
+I32 PrefixCacheExportAuditRowsCheckedNoPartialCommitOnly(PrefixCache *cache,
+                                                         I64 *row_buffer,
+                                                         I64 row_capacity,
+                                                         I64 *out_rows_written)
+{
+    I64 snapshot_capacity;
+    I64 snapshot_count;
+    I64 snapshot_row_capacity;
+    I64 preflight_rows_written;
+    I64 canonical_rows_written;
+    I64 alloc_word_count;
+    I64 compare_word_count;
+    I64 idx;
+    I64 *preflight_rows;
+    I64 *canonical_rows;
+    I32 status_preflight;
+    I32 status_canonical;
+
+    if (!cache || !cache->entries || !out_rows_written)
+        return PREFIX_CACHE_ERR_NULL_PTR;
+
+    if (cache->capacity <= 0 || row_capacity < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->count < 0 || cache->count > cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    snapshot_capacity = cache->capacity;
+    snapshot_count = cache->count;
+    snapshot_row_capacity = row_capacity;
+
+    preflight_rows = NULL;
+    canonical_rows = NULL;
+    if (row_capacity > 0)
+    {
+        if (row_capacity > (0x7FFFFFFFFFFFFFFF / PREFIX_CACHE_AUDIT_TUPLE_WIDTH))
+            return PREFIX_CACHE_ERR_BAD_PARAM;
+
+        alloc_word_count = row_capacity * PREFIX_CACHE_AUDIT_TUPLE_WIDTH;
+        if (alloc_word_count > (0x7FFFFFFFFFFFFFFF / sizeof(I64)))
+            return PREFIX_CACHE_ERR_BAD_PARAM;
+
+        preflight_rows = MAlloc(alloc_word_count * sizeof(I64));
+        if (!preflight_rows)
+            return PREFIX_CACHE_ERR_BAD_PARAM;
+
+        canonical_rows = MAlloc(alloc_word_count * sizeof(I64));
+        if (!canonical_rows)
+        {
+            Free(preflight_rows);
+            return PREFIX_CACHE_ERR_BAD_PARAM;
+        }
+    }
+
+    status_preflight = PrefixCacheExportAuditRowsCheckedNoPartial(cache,
+                                                                  preflight_rows,
+                                                                  row_capacity,
+                                                                  &preflight_rows_written);
+    if (status_preflight != PREFIX_CACHE_OK)
+    {
+        if (canonical_rows)
+            Free(canonical_rows);
+        if (preflight_rows)
+            Free(preflight_rows);
+        return status_preflight;
+    }
+
+    if (cache->capacity != snapshot_capacity ||
+        cache->count != snapshot_count ||
+        cache->count < 0 ||
+        cache->count > cache->capacity ||
+        row_capacity != snapshot_row_capacity)
+    {
+        if (canonical_rows)
+            Free(canonical_rows);
+        if (preflight_rows)
+            Free(preflight_rows);
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+
+    status_canonical = PrefixCacheExportAuditRowsChecked(cache,
+                                                         canonical_rows,
+                                                         row_capacity,
+                                                         &canonical_rows_written);
+    if (status_canonical != PREFIX_CACHE_OK)
+    {
+        if (canonical_rows)
+            Free(canonical_rows);
+        if (preflight_rows)
+            Free(preflight_rows);
+        return status_canonical;
+    }
+
+    if (cache->capacity != snapshot_capacity ||
+        cache->count != snapshot_count ||
+        cache->count < 0 ||
+        cache->count > cache->capacity ||
+        row_capacity != snapshot_row_capacity)
+    {
+        if (canonical_rows)
+            Free(canonical_rows);
+        if (preflight_rows)
+            Free(preflight_rows);
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+
+    if (preflight_rows_written != canonical_rows_written)
+    {
+        if (canonical_rows)
+            Free(canonical_rows);
+        if (preflight_rows)
+            Free(preflight_rows);
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+
+    if (preflight_rows_written < 0 || preflight_rows_written > row_capacity)
+    {
+        if (canonical_rows)
+            Free(canonical_rows);
+        if (preflight_rows)
+            Free(preflight_rows);
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+
+    if (preflight_rows_written > 0)
+    {
+        if (!row_buffer)
+        {
+            if (canonical_rows)
+                Free(canonical_rows);
+            if (preflight_rows)
+                Free(preflight_rows);
+            return PREFIX_CACHE_ERR_NULL_PTR;
+        }
+
+        if (preflight_rows_written > (0x7FFFFFFFFFFFFFFF / PREFIX_CACHE_AUDIT_TUPLE_WIDTH))
+        {
+            if (canonical_rows)
+                Free(canonical_rows);
+            if (preflight_rows)
+                Free(preflight_rows);
+            return PREFIX_CACHE_ERR_BAD_PARAM;
+        }
+
+        compare_word_count = preflight_rows_written * PREFIX_CACHE_AUDIT_TUPLE_WIDTH;
+        idx = 0;
+        while (idx < compare_word_count)
+        {
+            if (preflight_rows[idx] != canonical_rows[idx])
+            {
+                if (canonical_rows)
+                    Free(canonical_rows);
+                if (preflight_rows)
+                    Free(preflight_rows);
+                return PREFIX_CACHE_ERR_BAD_PARAM;
+            }
+            idx++;
+        }
+
+        idx = 0;
+        while (idx < compare_word_count)
+        {
+            row_buffer[idx] = preflight_rows[idx];
+            idx++;
+        }
+    }
+
+    if (canonical_rows)
+        Free(canonical_rows);
+    if (preflight_rows)
+        Free(preflight_rows);
+
+    *out_rows_written = preflight_rows_written;
+    return PREFIX_CACHE_OK;
+}
+
 I32 PrefixCacheLookupBestPrefixCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(PrefixCache *cache,
                                                                                          I64 query_hash,
                                                                                          I64 max_prompt_tokens,
