@@ -35,6 +35,7 @@ def telemetry_digest_q64_checked(
     suite_checksum: int,
     cpu_hz: int,
 ) -> tuple[int, int | None]:
+    digest_mod61 = (1 << 61) - 1
     if (
         total_ops < 0
         or total_cycles < 0
@@ -79,9 +80,11 @@ def telemetry_digest_q64_checked(
         status, digest = try_add_i64(digest, folded)
         if status != ERR_OK:
             return status, None
-        status, digest = try_mul_i64(digest, 1099511628211)
+        digest %= digest_mod61
+        status, digest = try_mul_i64(digest, 3)
         if status != ERR_OK:
             return status, None
+        digest %= digest_mod61
 
     return ERR_OK, digest
 
@@ -156,7 +159,7 @@ def test_overflow_paths() -> None:
     )
     assert status == ERR_OVERFLOW
 
-    # Force multiply overflow in digest mixing phase.
+    # Large-but-valid telemetry tuple stays bounded by mod-61 mixer.
     status, _ = telemetry_digest_q64_checked(
         total_ops=I64_MAX // 6,
         total_cycles=I64_MAX // 10,
@@ -165,4 +168,4 @@ def test_overflow_paths() -> None:
         suite_checksum=I64_MAX // 26,
         cpu_hz=1,
     )
-    assert status == ERR_OVERFLOW
+    assert status == ERR_OK
