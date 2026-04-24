@@ -3560,6 +3560,182 @@ I32 PrefixCacheInvalidateRangeCheckedNoPartialCommitOnlyPreflightOnlyParityCommi
     return PREFIX_CACHE_OK;
 }
 
+I32 PrefixCacheInvalidateRangeCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(PrefixCache *cache,
+                                                                                                                                      I64 invalidate_start_token,
+                                                                                                                                      I64 invalidate_token_count,
+                                                                                                                                      I64 *out_removed_count)
+{
+    I64 idx;
+    I64 snapshot_capacity;
+    I64 snapshot_count;
+    I64 snapshot_invalidate_start_token;
+    I64 snapshot_invalidate_token_count;
+    I64 snapshot_entry_count;
+    I64 *snapshot_out_removed_count;
+    I64 snapshot_out_removed_value;
+    I64 snapshot_alloc_bytes;
+    PrefixCacheEntry *snapshot_entries;
+    I64 parity_removed_count;
+    I64 parity_remaining_count;
+    I64 commit_removed_count;
+    I64 commit_remaining_count;
+    I32 status_parity;
+    I32 status_commit;
+
+    if (!cache || !cache->entries || !out_removed_count)
+        return PREFIX_CACHE_ERR_NULL_PTR;
+
+    if (cache->capacity <= 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->count < 0 || cache->count > cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (invalidate_start_token < 0 || invalidate_token_count < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    snapshot_capacity = cache->capacity;
+    snapshot_count = cache->count;
+    snapshot_invalidate_start_token = invalidate_start_token;
+    snapshot_invalidate_token_count = invalidate_token_count;
+    snapshot_entry_count = cache->count;
+    snapshot_out_removed_count = out_removed_count;
+    snapshot_out_removed_value = *out_removed_count;
+
+    snapshot_alloc_bytes = snapshot_capacity * sizeof(PrefixCacheEntry);
+    if (snapshot_alloc_bytes / sizeof(PrefixCacheEntry) != snapshot_capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    snapshot_entries = MAlloc(snapshot_alloc_bytes);
+    if (!snapshot_entries)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    idx = 0;
+    while (idx < snapshot_capacity)
+    {
+        snapshot_entries[idx] = cache->entries[idx];
+        idx++;
+    }
+
+    status_parity = PrefixCacheInvalidateRangeCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(cache,
+                                                                                                                                                 invalidate_start_token,
+                                                                                                                                                 invalidate_token_count,
+                                                                                                                                                 out_removed_count);
+    if (status_parity != PREFIX_CACHE_OK)
+    {
+        Free(snapshot_entries);
+        return status_parity;
+    }
+
+    if (cache->capacity != snapshot_capacity ||
+        cache->count < 0 ||
+        cache->count > cache->capacity)
+    {
+        Free(snapshot_entries);
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+
+    if (invalidate_start_token != snapshot_invalidate_start_token ||
+        invalidate_token_count != snapshot_invalidate_token_count)
+    {
+        Free(snapshot_entries);
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+
+    if (out_removed_count != snapshot_out_removed_count ||
+        *out_removed_count != snapshot_out_removed_value)
+    {
+        Free(snapshot_entries);
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+
+    parity_remaining_count = cache->count;
+    parity_removed_count = snapshot_entry_count - parity_remaining_count;
+    if (parity_removed_count < 0 ||
+        parity_remaining_count < 0 ||
+        parity_removed_count > snapshot_entry_count ||
+        parity_remaining_count > snapshot_entry_count)
+    {
+        Free(snapshot_entries);
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+
+    if (parity_removed_count + parity_remaining_count != snapshot_entry_count)
+    {
+        Free(snapshot_entries);
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+
+    // Replay commit-only path from immutable snapshot and publish only if
+    // diagnostics and commit tuples match exactly.
+    idx = 0;
+    while (idx < snapshot_capacity)
+    {
+        cache->entries[idx] = snapshot_entries[idx];
+        idx++;
+    }
+    cache->count = snapshot_count;
+
+    status_commit = PrefixCacheInvalidateRangeCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(cache,
+                                                                                                                                invalidate_start_token,
+                                                                                                                                invalidate_token_count,
+                                                                                                                                &commit_removed_count);
+    if (status_commit != PREFIX_CACHE_OK)
+    {
+        Free(snapshot_entries);
+        return status_commit;
+    }
+
+    if (cache->capacity != snapshot_capacity ||
+        cache->count < 0 ||
+        cache->count > cache->capacity)
+    {
+        Free(snapshot_entries);
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+
+    if (invalidate_start_token != snapshot_invalidate_start_token ||
+        invalidate_token_count != snapshot_invalidate_token_count)
+    {
+        Free(snapshot_entries);
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+
+    if (out_removed_count != snapshot_out_removed_count ||
+        *out_removed_count != snapshot_out_removed_value)
+    {
+        Free(snapshot_entries);
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+
+    commit_remaining_count = cache->count;
+    if (commit_removed_count < 0 ||
+        commit_remaining_count < 0 ||
+        commit_removed_count > snapshot_entry_count ||
+        commit_remaining_count > snapshot_entry_count)
+    {
+        Free(snapshot_entries);
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+
+    if (commit_removed_count + commit_remaining_count != snapshot_entry_count)
+    {
+        Free(snapshot_entries);
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+
+    if (parity_removed_count != commit_removed_count ||
+        parity_remaining_count != commit_remaining_count)
+    {
+        Free(snapshot_entries);
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+
+    Free(snapshot_entries);
+    *out_removed_count = parity_removed_count;
+    return PREFIX_CACHE_OK;
+}
+
 I64 PrefixCacheAuditTupleDigestQ64(I64 entry_index,
                                    I64 prefix_hash,
                                    I64 prefix_tokens,
