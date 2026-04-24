@@ -399,6 +399,76 @@ I64 GGUFTensorInfoValidateDimsCheckedCommitOnly(U32 n_dims,
     return GGUF_TENSOR_PARSE_OK;
 }
 
+// Diagnostics-only preflight wrapper for commit-only dim/type validation.
+//
+// Runs `GGUFTensorInfoValidateDimsCheckedCommitOnly` and canonical
+// `GGUFTensorInfoValidateDimsChecked` against immutable snapshots, then
+// publishes `{n_elements,block_elems}` only when strict tuple parity holds.
+I64 GGUFTensorInfoValidateDimsCheckedCommitOnlyPreflightOnly(U32 n_dims,
+                                                             U64 *dims,
+                                                             U32 ggml_type,
+                                                             U64 *out_n_elements,
+                                                             U64 *out_block_elems)
+{
+    U32 snapshot_n_dims;
+    U64 *snapshot_dims_ptr;
+    U32 snapshot_ggml_type;
+    U64 staged_n_elements;
+    U64 staged_block_elems;
+    U64 canonical_n_elements;
+    U64 canonical_block_elems;
+    I64 status;
+
+    if (!dims || !out_n_elements || !out_block_elems)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+    if (out_n_elements == out_block_elems)
+        return GGUF_TENSOR_PARSE_ERR_NULL_PTR;
+
+    snapshot_n_dims = n_dims;
+    snapshot_dims_ptr = dims;
+    snapshot_ggml_type = ggml_type;
+
+    staged_n_elements = 0;
+    staged_block_elems = 0;
+    status = GGUFTensorInfoValidateDimsCheckedCommitOnly(snapshot_n_dims,
+                                                         snapshot_dims_ptr,
+                                                         snapshot_ggml_type,
+                                                         &staged_n_elements,
+                                                         &staged_block_elems);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+
+    canonical_n_elements = 0;
+    canonical_block_elems = 0;
+    status = GGUFTensorInfoValidateDimsChecked(snapshot_n_dims,
+                                               snapshot_dims_ptr,
+                                               snapshot_ggml_type,
+                                               &canonical_n_elements);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+
+    status = GGUFTensorTypeBlockElemsChecked(snapshot_ggml_type,
+                                             &canonical_block_elems);
+    if (status != GGUF_TENSOR_PARSE_OK)
+        return status;
+    if (!canonical_block_elems)
+        return GGUF_TENSOR_PARSE_ERR_BAD_TYPE;
+    if (canonical_n_elements % canonical_block_elems)
+        return GGUF_TENSOR_PARSE_ERR_BAD_DIM_SIZE;
+
+    if (snapshot_n_dims != n_dims ||
+        snapshot_dims_ptr != dims ||
+        snapshot_ggml_type != ggml_type)
+        return GGUF_TENSOR_PARSE_ERR_BAD_DIMS;
+    if (staged_n_elements != canonical_n_elements ||
+        staged_block_elems != canonical_block_elems)
+        return GGUF_TENSOR_PARSE_ERR_BAD_DIMS;
+
+    *out_n_elements = staged_n_elements;
+    *out_block_elems = staged_block_elems;
+    return GGUF_TENSOR_PARSE_OK;
+}
+
 // Diagnostics parity gate for commit-only dim validation.
 //
 // Runs `GGUFTensorInfoValidateDimsCheckedCommitOnly` and canonical
