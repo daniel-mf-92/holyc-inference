@@ -2081,6 +2081,53 @@ I32 Q8_0DotBenchRunDefaultSuiteCyclesPerTokenQ16CheckedNoPartialCommitOnly(
     return Q8_0_DOT_BENCH_OK;
 }
 
+I32 Q8_0DotBenchRunDefaultSuiteCyclesPerTokenQ16CheckedNoPartialCommitOnlyPreflightOnly(
+    I64 total_cycles,
+    I64 total_ops,
+    I64 *out_cycles_per_token_q16)
+{
+    I64 snapshot_total_cycles;
+    I64 snapshot_total_ops;
+    I64 *snapshot_out_cycles_per_token_q16;
+
+    I64 staged_commit_value;
+    I64 staged_canonical_value;
+    I32 status;
+
+    if (!out_cycles_per_token_q16)
+        return Q8_0_DOT_BENCH_ERR_NULL_PTR;
+
+    snapshot_total_cycles = total_cycles;
+    snapshot_total_ops = total_ops;
+    snapshot_out_cycles_per_token_q16 = out_cycles_per_token_q16;
+
+    status = Q8_0DotBenchRunDefaultSuiteCyclesPerTokenQ16CheckedNoPartialCommitOnly(
+        total_cycles,
+        total_ops,
+        &staged_commit_value);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    status = Q8_0DotBenchRunDefaultSuiteCyclesPerTokenQ16Checked(
+        total_cycles,
+        total_ops,
+        &staged_canonical_value);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    if (snapshot_total_cycles != total_cycles ||
+        snapshot_total_ops != total_ops)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+    if (snapshot_out_cycles_per_token_q16 != out_cycles_per_token_q16)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    if (staged_commit_value != staged_canonical_value)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    // Preflight-only path is diagnostics only; caller output remains untouched.
+    return Q8_0_DOT_BENCH_OK;
+}
+
 I32 Q8_0DotBenchRunDefaultSuiteOpsPerSecondQ16CheckedNoPartialCommitOnlyPreflightOnly(
     I64 total_ops,
     I64 total_cycles,
