@@ -988,6 +988,10 @@ I32 PrefixCacheInsertOrUpdateCheckedNoPartialCommitOnly(PrefixCache *cache,
                                                          I64 *out_entry_index,
                                                          I64 *out_inserted_new)
 {
+    I64 snapshot_prefix_hash;
+    I64 snapshot_prefix_tokens;
+    I64 snapshot_kv_start_token;
+    I64 snapshot_kv_token_count;
     I64 snapshot_count;
     I64 snapshot_capacity;
     I64 snapshot_access_tick;
@@ -1014,6 +1018,10 @@ I32 PrefixCacheInsertOrUpdateCheckedNoPartialCommitOnly(PrefixCache *cache,
     if (status != PREFIX_CACHE_OK)
         return status;
 
+    snapshot_prefix_hash = prefix_hash;
+    snapshot_prefix_tokens = prefix_tokens;
+    snapshot_kv_start_token = kv_start_token;
+    snapshot_kv_token_count = kv_token_count;
     snapshot_count = cache->count;
     snapshot_capacity = cache->capacity;
     snapshot_access_tick = access_tick;
@@ -1035,6 +1043,12 @@ I32 PrefixCacheInsertOrUpdateCheckedNoPartialCommitOnly(PrefixCache *cache,
     if (cache->count < 0 || cache->count > cache->capacity)
         return PREFIX_CACHE_ERR_BAD_PARAM;
 
+    if (prefix_hash != snapshot_prefix_hash ||
+        prefix_tokens != snapshot_prefix_tokens ||
+        kv_start_token != snapshot_kv_start_token ||
+        kv_token_count != snapshot_kv_token_count)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
     if (inserted_new == 0)
     {
         if (cache->count != snapshot_count)
@@ -1048,6 +1062,12 @@ I32 PrefixCacheInsertOrUpdateCheckedNoPartialCommitOnly(PrefixCache *cache,
     }
 
     if (access_tick != snapshot_access_tick)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (entry_index < 0 || entry_index >= cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (inserted_new != 0 && inserted_new != 1)
         return PREFIX_CACHE_ERR_BAD_PARAM;
 
     *out_entry_index = entry_index;
