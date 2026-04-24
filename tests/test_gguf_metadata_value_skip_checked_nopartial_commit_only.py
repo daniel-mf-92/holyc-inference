@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for GGUFMetadataValueSkipCheckedNoPartialCommitOnly (IQ-1247)."""
+"""Harness for GGUFMetadataValueSkipCheckedNoPartialCommitOnly (IQ-1195)."""
 
 from __future__ import annotations
 
@@ -40,16 +40,35 @@ def gguf_metadata_value_skip_checked_nopartial_commit_only_reference(
     snapshot_cursor = cursor_ref[0]
     snapshot_value_type = value_type
 
-    staged_cursor = [snapshot_cursor]
+    staged_commit_cursor = [snapshot_cursor]
     err = gguf_metadata_value_skip_checked_reference(
         buf=buf,
         buf_nbytes=buf_nbytes,
-        cursor_ref=staged_cursor,
+        cursor_ref=staged_commit_cursor,
         table_end=table_end,
         value_type=value_type,
     )
     if err != GGUF_META_TABLE_OK:
         return err
+
+    if staged_commit_cursor[0] > buf_nbytes or staged_commit_cursor[0] > table_end:
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
+
+    staged_parity_cursor = [snapshot_cursor]
+    err = gguf_metadata_value_skip_checked_reference(
+        buf=buf,
+        buf_nbytes=buf_nbytes,
+        cursor_ref=staged_parity_cursor,
+        table_end=table_end,
+        value_type=value_type,
+    )
+    if err != GGUF_META_TABLE_OK:
+        return err
+
+    if staged_parity_cursor[0] > buf_nbytes or staged_parity_cursor[0] > table_end:
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS
+    if staged_commit_cursor[0] != staged_parity_cursor[0]:
+        return GGUF_META_TABLE_ERR_BAD_PARAM
 
     if (
         snapshot_buf_nbytes != buf_nbytes
@@ -59,12 +78,12 @@ def gguf_metadata_value_skip_checked_nopartial_commit_only_reference(
     ):
         return GGUF_META_TABLE_ERR_BAD_PARAM
 
-    out_next_cursor_ref[0] = staged_cursor[0]
-    cursor_ref[0] = staged_cursor[0]
+    out_next_cursor_ref[0] = staged_commit_cursor[0]
+    cursor_ref[0] = staged_commit_cursor[0]
     return GGUF_META_TABLE_OK
 
 
-def test_source_contains_iq1247_function() -> None:
+def test_source_contains_iq1195_function() -> None:
     source = Path("src/gguf/metadata.HC").read_text(encoding="utf-8")
 
     sig = "I32 GGUFMetadataValueSkipCheckedNoPartialCommitOnly(U8 *buf,"
@@ -81,11 +100,12 @@ def test_source_contains_iq1247_function() -> None:
     assert sig_def in source
 
     body = source.split(sig_def, 1)[1].split("// Backward-compatible alias retained", 1)[0]
-    assert "GGUFMetadataValueSkipChecked(buf," in body
+    assert body.count("GGUFMetadataValueSkipChecked(buf,") >= 2
     assert "snapshot_buf_nbytes = buf_nbytes;" in body
     assert "snapshot_cursor = *cursor;" in body
-    assert "*out_next_cursor = staged_next_cursor;" in body
-    assert "*cursor = staged_next_cursor;" in body
+    assert "if (staged_commit_cursor != staged_parity_cursor)" in body
+    assert "*out_next_cursor = staged_commit_cursor;" in body
+    assert "*cursor = staged_commit_cursor;" in body
 
 
 def test_scalar_commit_success_and_atomic_publish() -> None:

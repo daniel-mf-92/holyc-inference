@@ -6015,7 +6015,8 @@ I32 GGUFMetadataValueSkipCheckedNoPartialCommitOnly(U8 *buf,
     U64 snapshot_table_end;
     U64 snapshot_cursor;
     U32 snapshot_value_type;
-    U64 staged_next_cursor;
+    U64 staged_commit_cursor;
+    U64 staged_parity_cursor;
     I32 err;
 
     if (!buf || !cursor || !out_next_cursor)
@@ -6026,14 +6027,33 @@ I32 GGUFMetadataValueSkipCheckedNoPartialCommitOnly(U8 *buf,
     snapshot_cursor = *cursor;
     snapshot_value_type = value_type;
 
-    staged_next_cursor = snapshot_cursor;
+    staged_commit_cursor = snapshot_cursor;
     err = GGUFMetadataValueSkipChecked(buf,
                                        buf_nbytes,
-                                       &staged_next_cursor,
+                                       &staged_commit_cursor,
                                        table_end,
                                        value_type);
     if (err != GGUF_META_TABLE_OK)
         return err;
+
+    if (staged_commit_cursor > buf_nbytes ||
+        staged_commit_cursor > table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
+    staged_parity_cursor = snapshot_cursor;
+    err = GGUFMetadataValueSkipChecked(buf,
+                                       buf_nbytes,
+                                       &staged_parity_cursor,
+                                       table_end,
+                                       value_type);
+    if (err != GGUF_META_TABLE_OK)
+        return err;
+
+    if (staged_parity_cursor > buf_nbytes ||
+        staged_parity_cursor > table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+    if (staged_commit_cursor != staged_parity_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
 
     if (snapshot_buf_nbytes != buf_nbytes ||
         snapshot_table_end != table_end ||
@@ -6041,8 +6061,8 @@ I32 GGUFMetadataValueSkipCheckedNoPartialCommitOnly(U8 *buf,
         snapshot_cursor != *cursor)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
 
-    *out_next_cursor = staged_next_cursor;
-    *cursor = staged_next_cursor;
+    *out_next_cursor = staged_commit_cursor;
+    *cursor = staged_commit_cursor;
     return GGUF_META_TABLE_OK;
 }
 
