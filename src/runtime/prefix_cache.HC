@@ -17,6 +17,10 @@
 #define PREFIX_CACHE_FRESH_EMPTY 0
 #define PREFIX_CACHE_FRESH_VALID 1
 
+#define PREFIX_CACHE_HASH_FNV_OFFSET_BASIS 1469598103934665603
+#define PREFIX_CACHE_HASH_FNV_PRIME        1099511628211
+#define PREFIX_CACHE_HASH_DOMAIN_TAG       0x5052454649584841
+
 class PrefixCacheEntry
 {
     I64 valid;
@@ -39,8 +43,9 @@ I32 InferencePromptPrefixHashQ64Checked(U8 *tokens,
                                         I64 *out_prefix_hash)
 {
     I64 idx;
-    I64 hash;
-    I64 value;
+    U64 hash_u64;
+    U64 token_lane;
+    U64 token_count_u64;
 
     if (!tokens || !out_prefix_hash)
         return PREFIX_CACHE_ERR_NULL_PTR;
@@ -48,21 +53,34 @@ I32 InferencePromptPrefixHashQ64Checked(U8 *tokens,
     if (token_count < 0)
         return PREFIX_CACHE_ERR_BAD_PARAM;
 
-    hash = 1469598103934665603;
+    // Deterministic 64-bit FNV-1a stream seeded with a domain tag so
+    // prompt-prefix hashes cannot alias other runtime digests by construction.
+    hash_u64 = PREFIX_CACHE_HASH_FNV_OFFSET_BASIS;
+    hash_u64 ^= (U64)PREFIX_CACHE_HASH_DOMAIN_TAG;
+    hash_u64 *= (U64)PREFIX_CACHE_HASH_FNV_PRIME;
+
     idx = 0;
     while (idx < token_count)
     {
-        value = tokens[idx];
-        hash = hash ^ value;
-        hash = hash * 1099511628211;
+        token_lane = (U64)tokens[idx];
+        hash_u64 ^= token_lane;
+        hash_u64 *= (U64)PREFIX_CACHE_HASH_FNV_PRIME;
         idx++;
     }
 
-    hash = hash ^ token_count;
-    hash = hash * 1099511628211;
-    hash = hash & 0x7FFFFFFFFFFFFFFF;
+    // Length-mix uses low/high halves + full count lane with a delimiter byte.
+    // This keeps integer-only behavior and avoids signed-overflow semantics.
+    token_count_u64 = (U64)token_count;
+    hash_u64 ^= (U64)0xFF;
+    hash_u64 *= (U64)PREFIX_CACHE_HASH_FNV_PRIME;
+    hash_u64 ^= (token_count_u64 & (U64)0xFFFFFFFF);
+    hash_u64 *= (U64)PREFIX_CACHE_HASH_FNV_PRIME;
+    hash_u64 ^= (token_count_u64 >> 32);
+    hash_u64 *= (U64)PREFIX_CACHE_HASH_FNV_PRIME;
+    hash_u64 ^= token_count_u64;
+    hash_u64 *= (U64)PREFIX_CACHE_HASH_FNV_PRIME;
 
-    *out_prefix_hash = hash;
+    *out_prefix_hash = (I64)(hash_u64 & (U64)0x7FFFFFFFFFFFFFFF);
     return PREFIX_CACHE_OK;
 }
 
