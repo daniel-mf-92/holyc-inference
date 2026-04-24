@@ -337,6 +337,8 @@ I32 KVCacheQ16PersistHeaderCheckedNoPartialCommitOnly(
     I64 *inout_used_tokens,
     I64 *inout_total_cells)
 {
+    I64 snapshot_header[KV_CACHE_Q16_PERSIST_HEADER_CELLS];
+    I64 staged_header[KV_CACHE_Q16_PERSIST_HEADER_CELLS];
     I64 snapshot_layer_count;
     I64 snapshot_token_capacity;
     I64 snapshot_kv_heads;
@@ -349,6 +351,7 @@ I32 KVCacheQ16PersistHeaderCheckedNoPartialCommitOnly(
     I64 staged_head_dim;
     I64 staged_used_tokens;
     I64 staged_total_cells;
+    I64 cell_idx;
     I32 status;
 
     if (!header_cells ||
@@ -367,6 +370,14 @@ I32 KVCacheQ16PersistHeaderCheckedNoPartialCommitOnly(
     snapshot_used_tokens = *inout_used_tokens;
     snapshot_total_cells = *inout_total_cells;
 
+    cell_idx = 0;
+    while (cell_idx < KV_CACHE_Q16_PERSIST_HEADER_CELLS)
+    {
+        snapshot_header[cell_idx] = header_cells[cell_idx];
+        staged_header[cell_idx] = snapshot_header[cell_idx];
+        cell_idx++;
+    }
+
     staged_layer_count = snapshot_layer_count;
     staged_token_capacity = snapshot_token_capacity;
     staged_kv_heads = snapshot_kv_heads;
@@ -374,7 +385,7 @@ I32 KVCacheQ16PersistHeaderCheckedNoPartialCommitOnly(
     staged_used_tokens = snapshot_used_tokens;
     staged_total_cells = snapshot_total_cells;
 
-    status = KVCacheQ16PersistHeaderCheckedNoPartial(header_cells,
+    status = KVCacheQ16PersistHeaderCheckedNoPartial(staged_header,
                                                      header_capacity,
                                                      mode,
                                                      &staged_layer_count,
@@ -385,6 +396,29 @@ I32 KVCacheQ16PersistHeaderCheckedNoPartialCommitOnly(
                                                      &staged_total_cells);
     if (status != KV_Q16_OK)
         return status;
+
+    if (snapshot_layer_count != *inout_layer_count ||
+        snapshot_token_capacity != *inout_token_capacity ||
+        snapshot_kv_heads != *inout_kv_heads ||
+        snapshot_head_dim != *inout_head_dim ||
+        snapshot_used_tokens != *inout_used_tokens ||
+        snapshot_total_cells != *inout_total_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    cell_idx = 0;
+    while (cell_idx < KV_CACHE_Q16_PERSIST_HEADER_CELLS)
+    {
+        if (header_cells[cell_idx] != snapshot_header[cell_idx])
+            return KV_Q16_ERR_BAD_PARAM;
+        cell_idx++;
+    }
+
+    cell_idx = 0;
+    while (cell_idx < KV_CACHE_Q16_PERSIST_HEADER_CELLS)
+    {
+        header_cells[cell_idx] = staged_header[cell_idx];
+        cell_idx++;
+    }
 
     *inout_layer_count = staged_layer_count;
     *inout_token_capacity = staged_token_capacity;
