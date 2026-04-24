@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Tests for preflight-only wrapper over commit-only tok/sec Q16 estimator."""
 
+from pathlib import Path
+
 Q8_0_DOT_BENCH_OK = 0
 Q8_0_DOT_BENCH_ERR_NULL_PTR = 1
 Q8_0_DOT_BENCH_ERR_BAD_PARAM = 2
@@ -75,8 +77,37 @@ def preflight_only(cpu_hz: int, cycles_per_token_q16: int, out_value: int):
     return Q8_0_DOT_BENCH_OK, out_value
 
 
+def _extract_function_body(source: str, signature: str) -> str:
+    start = source.index(signature)
+    brace = source.index("{", start)
+    depth = 0
+    for i in range(brace, len(source)):
+        ch = source[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return source[brace + 1 : i]
+    raise AssertionError("unterminated function body")
+
+
 def test_null_ptr_contract_modeled():
     assert Q8_0_DOT_BENCH_ERR_NULL_PTR == 1
+
+
+def test_source_enforces_zero_write_and_staged_parity_contract():
+    source = Path("src/bench/q8_0_dot_bench.HC").read_text(encoding="utf-8")
+    signature = (
+        "I32 Q8_0DotBenchEstimateTokPerSecQ16CheckedNoPartialCommitOnlyPreflightOnly("
+    )
+    body = _extract_function_body(source, signature)
+
+    assert "Q8_0DotBenchEstimateTokPerSecQ16Checked(" in body
+    assert "Q8_0DotBenchEstimateTokPerSecQ16CheckedNoPartialCommitOnly(" in body
+    assert body.count("*out_tok_per_sec_q16 != snapshot_out_value") >= 2
+    assert "staged_direct_tok_per_sec_q16 != staged_commit_tok_per_sec_q16" in body
+    assert "*out_tok_per_sec_q16 =" not in body
 
 
 def test_preflight_zero_write_on_success():
@@ -124,6 +155,7 @@ def test_preflight_matches_canonical_and_commit_paths():
 
 if __name__ == "__main__":
     test_null_ptr_contract_modeled()
+    test_source_enforces_zero_write_and_staged_parity_contract()
     test_preflight_zero_write_on_success()
     test_bad_params_div_zero_overflow_keep_output_unchanged()
     test_preflight_matches_canonical_and_commit_paths()

@@ -359,6 +359,8 @@ I32 Q8_0DotBenchEstimateTokPerSecQ16CheckedNoPartialCommitOnlyPreflightOnly(
         &staged_direct_tok_per_sec_q16);
     if (status != Q8_0_DOT_BENCH_OK)
         return status;
+    if (*out_tok_per_sec_q16 != snapshot_out_value)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
 
     status = Q8_0DotBenchEstimateTokPerSecQ16CheckedNoPartialCommitOnly(
         cpu_hz,
@@ -366,6 +368,8 @@ I32 Q8_0DotBenchEstimateTokPerSecQ16CheckedNoPartialCommitOnlyPreflightOnly(
         &staged_commit_tok_per_sec_q16);
     if (status != Q8_0_DOT_BENCH_OK)
         return status;
+    if (*out_tok_per_sec_q16 != snapshot_out_value)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
 
     if (snapshot_cpu_hz != cpu_hz ||
         snapshot_cycles_per_token_q16 != cycles_per_token_q16)
