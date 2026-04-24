@@ -1081,6 +1081,108 @@ I32 PrefixCacheExportAuditRowsChecked(PrefixCache *cache,
     return PREFIX_CACHE_OK;
 }
 
+I32 PrefixCacheExportAuditRowsCheckedNoPartial(PrefixCache *cache,
+                                               I64 *row_buffer,
+                                               I64 row_capacity,
+                                               I64 *out_rows_written)
+{
+    I64 idx;
+    I64 valid_rows;
+    I64 snapshot_capacity;
+    I64 snapshot_count;
+    I64 snapshot_row_capacity;
+    I64 write_row;
+    I64 row_base;
+    PrefixCacheEntry *entry;
+    I64 digest_q64;
+
+    if (!cache || !cache->entries || !out_rows_written)
+        return PREFIX_CACHE_ERR_NULL_PTR;
+
+    if (cache->capacity <= 0 || row_capacity < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->count < 0 || cache->count > cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    snapshot_capacity = cache->capacity;
+    snapshot_count = cache->count;
+    snapshot_row_capacity = row_capacity;
+
+    // Preflight all live tuples and capacity before any row write, so
+    // diagnostics callers can rely on strict no-partial semantics.
+    valid_rows = 0;
+    idx = 0;
+    while (idx < cache->capacity)
+    {
+        entry = &cache->entries[idx];
+        if (entry->valid == PREFIX_CACHE_FRESH_VALID)
+        {
+            if (entry->prefix_hash < 0 ||
+                entry->prefix_tokens < 0 ||
+                entry->kv_start_token < 0 ||
+                entry->kv_token_count < 0 ||
+                entry->last_used_tick < 0)
+                return PREFIX_CACHE_ERR_BAD_PARAM;
+
+            if (entry->kv_start_token + entry->kv_token_count < entry->kv_start_token)
+                return PREFIX_CACHE_ERR_BAD_PARAM;
+
+            valid_rows++;
+            if (valid_rows < 0)
+                return PREFIX_CACHE_ERR_BAD_PARAM;
+        }
+        idx++;
+    }
+
+    if (valid_rows != cache->count)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (valid_rows > row_capacity)
+        return PREFIX_CACHE_ERR_FULL;
+
+    if (valid_rows > 0 && !row_buffer)
+        return PREFIX_CACHE_ERR_NULL_PTR;
+
+    if (cache->capacity != snapshot_capacity ||
+        cache->count != snapshot_count ||
+        row_capacity != snapshot_row_capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    write_row = 0;
+    idx = 0;
+    while (idx < cache->capacity)
+    {
+        entry = &cache->entries[idx];
+        if (entry->valid == PREFIX_CACHE_FRESH_VALID)
+        {
+            if (write_row > (0x7FFFFFFFFFFFFFFF / PREFIX_CACHE_AUDIT_TUPLE_WIDTH))
+                return PREFIX_CACHE_ERR_BAD_PARAM;
+
+            row_base = write_row * PREFIX_CACHE_AUDIT_TUPLE_WIDTH;
+            digest_q64 = PrefixCacheAuditTupleDigestQ64(idx,
+                                                        entry->prefix_hash,
+                                                        entry->prefix_tokens,
+                                                        entry->kv_start_token,
+                                                        entry->kv_token_count,
+                                                        entry->last_used_tick);
+
+            row_buffer[row_base + 0] = idx;
+            row_buffer[row_base + 1] = entry->prefix_hash;
+            row_buffer[row_base + 2] = entry->prefix_tokens;
+            row_buffer[row_base + 3] = entry->kv_start_token;
+            row_buffer[row_base + 4] = entry->kv_token_count;
+            row_buffer[row_base + 5] = entry->last_used_tick;
+            row_buffer[row_base + 6] = digest_q64;
+            write_row++;
+        }
+        idx++;
+    }
+
+    *out_rows_written = write_row;
+    return PREFIX_CACHE_OK;
+}
+
 I32 PrefixCacheLookupBestPrefixCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(PrefixCache *cache,
                                                                                          I64 query_hash,
                                                                                          I64 max_prompt_tokens,
