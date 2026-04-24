@@ -1980,3 +1980,149 @@ I32 Q8_0MatMulQ16NaiveCheckedNoPartialCommitOnlyPreflightOnlyParity(
 
     return Q8_0_MATMUL_OK;
 }
+
+I32 Q8_0MatMulQ16NaiveCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(
+    Q8_0Block *lhs_blocks,
+    I64 lhs_block_capacity,
+    I64 row_count,
+    I64 lhs_row_stride_blocks,
+    Q8_0Block *rhs_col_blocks,
+    I64 rhs_block_capacity,
+    I64 col_count,
+    I64 rhs_col_stride_blocks,
+    I64 k_block_count,
+    I64 *out_cells_q16,
+    I64 out_cell_capacity,
+    I64 out_row_stride_cells,
+    I64 *out_lhs_required_blocks,
+    I64 *out_rhs_required_blocks,
+    I64 *out_out_required_cells)
+{
+    I64 snapshot_lhs_block_capacity;
+    I64 snapshot_row_count;
+    I64 snapshot_lhs_row_stride_blocks;
+    I64 snapshot_rhs_block_capacity;
+    I64 snapshot_col_count;
+    I64 snapshot_rhs_col_stride_blocks;
+    I64 snapshot_k_block_count;
+    I64 snapshot_out_cell_capacity;
+    I64 snapshot_out_row_stride_cells;
+    Q8_0Block *snapshot_lhs_blocks;
+    Q8_0Block *snapshot_rhs_col_blocks;
+    I64 *snapshot_out_cells_q16;
+    I64 *snapshot_out_lhs_required_blocks;
+    I64 *snapshot_out_rhs_required_blocks;
+    I64 *snapshot_out_out_required_cells;
+    I64 staged_lhs_required_blocks;
+    I64 staged_rhs_required_blocks;
+    I64 staged_out_required_cells;
+    I64 canonical_lhs_required_blocks;
+    I64 canonical_rhs_required_blocks;
+    I64 canonical_out_required_cells;
+    I32 parity_status;
+    I32 commit_status;
+
+    if (!out_lhs_required_blocks ||
+        !out_rhs_required_blocks ||
+        !out_out_required_cells)
+        return Q8_0_MATMUL_ERR_NULL_PTR;
+
+    if (out_lhs_required_blocks == out_rhs_required_blocks ||
+        out_lhs_required_blocks == out_out_required_cells ||
+        out_rhs_required_blocks == out_out_required_cells)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    snapshot_lhs_blocks = lhs_blocks;
+    snapshot_lhs_block_capacity = lhs_block_capacity;
+    snapshot_row_count = row_count;
+    snapshot_lhs_row_stride_blocks = lhs_row_stride_blocks;
+    snapshot_rhs_col_blocks = rhs_col_blocks;
+    snapshot_rhs_block_capacity = rhs_block_capacity;
+    snapshot_col_count = col_count;
+    snapshot_rhs_col_stride_blocks = rhs_col_stride_blocks;
+    snapshot_k_block_count = k_block_count;
+    snapshot_out_cells_q16 = out_cells_q16;
+    snapshot_out_cell_capacity = out_cell_capacity;
+    snapshot_out_row_stride_cells = out_row_stride_cells;
+    snapshot_out_lhs_required_blocks = out_lhs_required_blocks;
+    snapshot_out_rhs_required_blocks = out_rhs_required_blocks;
+    snapshot_out_out_required_cells = out_out_required_cells;
+
+    parity_status = Q8_0MatMulQ16NaiveCheckedNoPartialCommitOnlyPreflightOnlyParity(
+        lhs_blocks,
+        lhs_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_col_blocks,
+        rhs_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q16,
+        out_cell_capacity,
+        out_row_stride_cells,
+        &staged_lhs_required_blocks,
+        &staged_rhs_required_blocks,
+        &staged_out_required_cells);
+
+    commit_status = Q8_0MatMulQ16NaiveCheckedNoPartialCommitOnly(
+        lhs_blocks,
+        lhs_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_col_blocks,
+        rhs_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q16,
+        out_cell_capacity,
+        out_row_stride_cells);
+
+    if (snapshot_lhs_blocks != lhs_blocks ||
+        snapshot_lhs_block_capacity != lhs_block_capacity ||
+        snapshot_row_count != row_count ||
+        snapshot_lhs_row_stride_blocks != lhs_row_stride_blocks ||
+        snapshot_rhs_col_blocks != rhs_col_blocks ||
+        snapshot_rhs_block_capacity != rhs_block_capacity ||
+        snapshot_col_count != col_count ||
+        snapshot_rhs_col_stride_blocks != rhs_col_stride_blocks ||
+        snapshot_k_block_count != k_block_count ||
+        snapshot_out_cells_q16 != out_cells_q16 ||
+        snapshot_out_cell_capacity != out_cell_capacity ||
+        snapshot_out_row_stride_cells != out_row_stride_cells ||
+        snapshot_out_lhs_required_blocks != out_lhs_required_blocks ||
+        snapshot_out_rhs_required_blocks != out_rhs_required_blocks ||
+        snapshot_out_out_required_cells != out_out_required_cells)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (parity_status != commit_status)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (commit_status != Q8_0_MATMUL_OK)
+        return commit_status;
+
+    canonical_lhs_required_blocks = 0;
+    canonical_rhs_required_blocks = 0;
+    canonical_out_required_cells = 0;
+    if (Q8_0MatMulTiledComputeRequiredCapacitiesChecked(row_count,
+                                                        lhs_row_stride_blocks,
+                                                        col_count,
+                                                        rhs_col_stride_blocks,
+                                                        out_row_stride_cells,
+                                                        &canonical_lhs_required_blocks,
+                                                        &canonical_rhs_required_blocks,
+                                                        &canonical_out_required_cells) != Q8_0_MATMUL_OK)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    if (staged_lhs_required_blocks != canonical_lhs_required_blocks ||
+        staged_rhs_required_blocks != canonical_rhs_required_blocks ||
+        staged_out_required_cells != canonical_out_required_cells)
+        return Q8_0_MATMUL_ERR_BAD_DST_LEN;
+
+    *out_lhs_required_blocks = staged_lhs_required_blocks;
+    *out_rhs_required_blocks = staged_rhs_required_blocks;
+    *out_out_required_cells = staged_out_required_cells;
+
+    return Q8_0_MATMUL_OK;
+}
