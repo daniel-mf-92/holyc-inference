@@ -18812,3 +18812,249 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialCommitOnlyPreflightOnly(
     Free(staged_commit_probs_q16);
     return ATTN_Q16_OK;
 }
+
+#define GQA_ATTN_VALUE_MIX_CLAMP_Q16 ((I64)32 << ATTN_Q16_SHIFT)
+
+I32 GQAAttentionValueMixQ16Checked(
+    I64 *scores_q16,
+    I64 scores_capacity,
+    I64 query_rows,
+    I64 key_rows,
+    I64 value_dim,
+    I64 head_groups,
+    I64 row_stride,
+    I64 *values_q16,
+    I64 values_capacity,
+    I64 *out_values_q16,
+    I64 out_capacity)
+{
+    I64 kv_rows;
+    I64 required_score_cells;
+    I64 required_value_cells;
+    I64 required_out_cells;
+    I64 stage_bytes;
+    I64 query_index;
+    I64 token_index;
+    I64 dim_index;
+    I64 score_base;
+    I64 out_base;
+    I64 kv_head_index;
+    I64 value_token_base;
+    I64 mix_acc_q32;
+    I64 product_q32;
+    I64 mixed_q16;
+    I64 rounding_bias_q32;
+    I64 neg_acc_q32;
+    I64 copy_index;
+    I64 *staged_out_values_q16;
+    I32 status;
+
+    if (!scores_q16 || !values_q16 || !out_values_q16)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (scores_capacity < 0 || values_capacity < 0 || out_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_rows < 0 || key_rows < 0 || value_dim < 0 || head_groups <= 0 || row_stride < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (query_rows > 0 && (query_rows % head_groups) != 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (key_rows > row_stride)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (query_rows == 0 || key_rows == 0 || value_dim == 0)
+        return ATTN_Q16_OK;
+
+    kv_rows = query_rows / head_groups;
+    if (kv_rows <= 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionTryMulI64Checked(query_rows - 1,
+                                       row_stride,
+                                       &required_score_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddI64Checked(required_score_cells,
+                                       key_rows,
+                                       &required_score_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (required_score_cells > scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionTryMulI64Checked(kv_rows,
+                                       key_rows,
+                                       &required_value_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryMulI64Checked(required_value_cells,
+                                       value_dim,
+                                       &required_value_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (required_value_cells > values_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionTryMulI64Checked(query_rows,
+                                       value_dim,
+                                       &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (required_out_cells > out_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_out_cells == 0)
+        return ATTN_Q16_OK;
+
+    status = AttentionTryMulI64Checked(required_out_cells,
+                                       sizeof(I64),
+                                       &stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (stage_bytes <= 0)
+        return ATTN_Q16_ERR_OVERFLOW;
+
+    staged_out_values_q16 = MAlloc(stage_bytes);
+    if (!staged_out_values_q16)
+        return ATTN_Q16_ERR_OVERFLOW;
+
+    rounding_bias_q32 = ((I64)1 << (ATTN_Q16_SHIFT - 1));
+
+    // Integer-only attention value mix:
+    // out[q,d] = clamp_q16( round_q16( Sum_t ( score[q,t]_Q16 * value[kv(q),t,d]_Q16 ) ) )
+    for (query_index = 0; query_index < query_rows; query_index++)
+    {
+        status = AttentionTryMulI64Checked(query_index,
+                                           row_stride,
+                                           &score_base);
+        if (status != ATTN_Q16_OK)
+        {
+            Free(staged_out_values_q16);
+            return status;
+        }
+
+        status = AttentionTryMulI64Checked(query_index,
+                                           value_dim,
+                                           &out_base);
+        if (status != ATTN_Q16_OK)
+        {
+            Free(staged_out_values_q16);
+            return status;
+        }
+
+        kv_head_index = query_index / head_groups;
+
+        for (dim_index = 0; dim_index < value_dim; dim_index++)
+        {
+            mix_acc_q32 = 0;
+
+            for (token_index = 0; token_index < key_rows; token_index++)
+            {
+                status = AttentionTryMulI64Checked(kv_head_index,
+                                                   key_rows,
+                                                   &value_token_base);
+                if (status != ATTN_Q16_OK)
+                {
+                    Free(staged_out_values_q16);
+                    return status;
+                }
+                status = AttentionTryAddI64Checked(value_token_base,
+                                                   token_index,
+                                                   &value_token_base);
+                if (status != ATTN_Q16_OK)
+                {
+                    Free(staged_out_values_q16);
+                    return status;
+                }
+                status = AttentionTryMulI64Checked(value_token_base,
+                                                   value_dim,
+                                                   &value_token_base);
+                if (status != ATTN_Q16_OK)
+                {
+                    Free(staged_out_values_q16);
+                    return status;
+                }
+                status = AttentionTryAddI64Checked(value_token_base,
+                                                   dim_index,
+                                                   &value_token_base);
+                if (status != ATTN_Q16_OK)
+                {
+                    Free(staged_out_values_q16);
+                    return status;
+                }
+
+                status = AttentionTryMulI64Checked(scores_q16[score_base + token_index],
+                                                   values_q16[value_token_base],
+                                                   &product_q32);
+                if (status != ATTN_Q16_OK)
+                {
+                    Free(staged_out_values_q16);
+                    return status;
+                }
+
+                status = AttentionTryAddI64Checked(mix_acc_q32,
+                                                   product_q32,
+                                                   &mix_acc_q32);
+                if (status != ATTN_Q16_OK)
+                {
+                    Free(staged_out_values_q16);
+                    return status;
+                }
+            }
+
+            if (mix_acc_q32 >= 0)
+            {
+                status = AttentionTryAddI64Checked(mix_acc_q32,
+                                                   rounding_bias_q32,
+                                                   &mixed_q16);
+                if (status != ATTN_Q16_OK)
+                {
+                    Free(staged_out_values_q16);
+                    return status;
+                }
+                mixed_q16 = mixed_q16 >> ATTN_Q16_SHIFT;
+            }
+            else
+            {
+                status = AttentionTryMulI64Checked(mix_acc_q32,
+                                                   -1,
+                                                   &neg_acc_q32);
+                if (status != ATTN_Q16_OK)
+                {
+                    Free(staged_out_values_q16);
+                    return status;
+                }
+                status = AttentionTryAddI64Checked(neg_acc_q32,
+                                                   rounding_bias_q32,
+                                                   &neg_acc_q32);
+                if (status != ATTN_Q16_OK)
+                {
+                    Free(staged_out_values_q16);
+                    return status;
+                }
+                neg_acc_q32 = neg_acc_q32 >> ATTN_Q16_SHIFT;
+                status = AttentionTryMulI64Checked(neg_acc_q32,
+                                                   -1,
+                                                   &mixed_q16);
+                if (status != ATTN_Q16_OK)
+                {
+                    Free(staged_out_values_q16);
+                    return status;
+                }
+            }
+
+            if (mixed_q16 > GQA_ATTN_VALUE_MIX_CLAMP_Q16)
+                mixed_q16 = GQA_ATTN_VALUE_MIX_CLAMP_Q16;
+            if (mixed_q16 < -GQA_ATTN_VALUE_MIX_CLAMP_Q16)
+                mixed_q16 = -GQA_ATTN_VALUE_MIX_CLAMP_Q16;
+
+            staged_out_values_q16[out_base + dim_index] = mixed_q16;
+        }
+    }
+
+    for (copy_index = 0; copy_index < required_out_cells; copy_index++)
+        out_values_q16[copy_index] = staged_out_values_q16[copy_index];
+
+    Free(staged_out_values_q16);
+    return ATTN_Q16_OK;
+}
