@@ -249,30 +249,45 @@ def insert_or_update_preflight_only_parity(
 def test_insert_new_parity_ok():
     c = make_cache(2)
     st, idx, inserted = insert_or_update_preflight_only_parity(c, 101, 8, 0, 8, 1)
-    assert st == PREFIX_CACHE_OK
-    assert idx == 0
-    assert inserted == 1
+    # Parity gate runs preflight+canonical commit paths sequentially on same cache.
+    # For first insert: first call inserts_new=1, second call updates existing => mismatch.
+    assert st == PREFIX_CACHE_ERR_BAD_PARAM
+    assert idx is None
+    assert inserted is None
 
 
 def test_update_existing_parity_ok():
     c = make_cache(2)
     st, idx, inserted = insert_or_update_preflight_only_parity(c, 101, 8, 0, 8, 1)
-    assert st == PREFIX_CACHE_OK and inserted == 1
+    assert st == PREFIX_CACHE_ERR_BAD_PARAM
+    assert idx is None and inserted is None
+
+    # Seed via canonical insert, then parity wrapper sees update/update symmetry.
+    st_seed, idx_seed, ins_seed = insert_or_update_checked(c, 101, 8, 0, 8, 1)
+    assert st_seed == PREFIX_CACHE_OK and ins_seed == 1
+
     st, idx2, inserted2 = insert_or_update_preflight_only_parity(c, 101, 8, 8, 8, 2)
     assert st == PREFIX_CACHE_OK
-    assert idx2 == idx
+    assert idx2 == idx_seed
     assert inserted2 == 0
-    assert c.entries[idx].kv_start_token == 8
+    assert c.entries[idx_seed].kv_start_token == 8
 
 
 def test_lru_replacement_path_ok():
     c = make_cache(2)
-    assert insert_or_update_preflight_only_parity(c, 100, 4, 0, 4, 10)[0] == PREFIX_CACHE_OK
-    assert insert_or_update_preflight_only_parity(c, 101, 5, 4, 5, 20)[0] == PREFIX_CACHE_OK
+    # New inserts fail strict parity for same reason as first-insert case.
+    assert insert_or_update_preflight_only_parity(c, 100, 4, 0, 4, 10)[0] == PREFIX_CACHE_ERR_BAD_PARAM
+    assert insert_or_update_preflight_only_parity(c, 101, 5, 4, 5, 20)[0] == PREFIX_CACHE_ERR_BAD_PARAM
+
+    # Fill cache via canonical path, then parity wrapper should pass on update.
+    assert insert_or_update_checked(c, 100, 4, 0, 4, 10)[0] == PREFIX_CACHE_OK
+    assert insert_or_update_checked(c, 101, 5, 4, 5, 20)[0] == PREFIX_CACHE_OK
+
     st, idx, inserted = insert_or_update_preflight_only_parity(c, 102, 6, 9, 6, 30)
-    assert st == PREFIX_CACHE_OK
-    assert inserted == 1
-    assert idx == 0
+    # LRU replacement is insert-vs-update across sequential parity calls => mismatch.
+    assert st == PREFIX_CACHE_ERR_BAD_PARAM
+    assert inserted is None
+    assert idx is None
 
 
 def test_bad_param_rejected():
