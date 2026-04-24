@@ -662,6 +662,78 @@ I32 PrefixCacheLookupBestPrefixCheckedNoPartialCommitOnlyPreflightOnlyParity(Pre
     return PREFIX_CACHE_OK;
 }
 
+I32 PrefixCacheInvalidateRangeChecked(PrefixCache *cache,
+                                      I64 invalidate_start_token,
+                                      I64 invalidate_token_count,
+                                      I64 *out_removed_count)
+{
+    I64 idx;
+    I64 live_count;
+    I64 removed_count;
+    I64 invalidate_end_exclusive;
+    I64 entry_start_token;
+    I64 entry_token_count;
+    I64 entry_end_exclusive;
+
+    if (!cache || !cache->entries || !out_removed_count)
+        return PREFIX_CACHE_ERR_NULL_PTR;
+
+    if (cache->capacity <= 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (invalidate_start_token < 0 || invalidate_token_count < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    // Overflow-safe half-open range [start, end).
+    invalidate_end_exclusive = invalidate_start_token + invalidate_token_count;
+    if (invalidate_end_exclusive < invalidate_start_token)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    live_count = 0;
+    removed_count = 0;
+
+    idx = 0;
+    while (idx < cache->capacity)
+    {
+        if (cache->entries[idx].valid == PREFIX_CACHE_FRESH_VALID)
+        {
+            entry_start_token = cache->entries[idx].kv_start_token;
+            entry_token_count = cache->entries[idx].kv_token_count;
+            if (entry_start_token < 0 || entry_token_count < 0)
+                return PREFIX_CACHE_ERR_BAD_PARAM;
+
+            entry_end_exclusive = entry_start_token + entry_token_count;
+            if (entry_end_exclusive < entry_start_token)
+                return PREFIX_CACHE_ERR_BAD_PARAM;
+
+            // Overlap test for half-open windows:
+            // [entry_start, entry_end) intersects [invalidate_start, invalidate_end)
+            if (entry_token_count > 0 &&
+                invalidate_token_count > 0 &&
+                invalidate_start_token < entry_end_exclusive &&
+                entry_start_token < invalidate_end_exclusive)
+            {
+                cache->entries[idx].valid = PREFIX_CACHE_FRESH_EMPTY;
+                cache->entries[idx].prefix_hash = 0;
+                cache->entries[idx].prefix_tokens = 0;
+                cache->entries[idx].kv_start_token = 0;
+                cache->entries[idx].kv_token_count = 0;
+                cache->entries[idx].last_used_tick = 0;
+                removed_count++;
+            }
+            else
+            {
+                live_count++;
+            }
+        }
+        idx++;
+    }
+
+    cache->count = live_count;
+    *out_removed_count = removed_count;
+    return PREFIX_CACHE_OK;
+}
+
 I32 PrefixCacheLookupBestPrefixCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(PrefixCache *cache,
                                                                                          I64 query_hash,
                                                                                          I64 max_prompt_tokens,
