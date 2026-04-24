@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Host-side harness for IQ-1345 PrefixCacheReplayGuardCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly."""
+"""Host-side harness for IQ-1352 PrefixCacheReplayGuardCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly."""
 
 import sys
 from pathlib import Path
@@ -52,6 +52,8 @@ def replay_guard_commit_only_preflight_only_parity_commit_only_preflight_only_pa
     snapshot_profile_id = profile_id
     snapshot_capacity = cache.capacity
     snapshot_count = cache.count
+    snapshot_entries_obj = cache.entries
+    snapshot_entry_valid = cache.entries[entry_index].valid
     snapshot_previous_tick = cache.entries[entry_index].last_used_tick
 
     parity_out = [0, 0, 0]
@@ -71,6 +73,10 @@ def replay_guard_commit_only_preflight_only_parity_commit_only_preflight_only_pa
     if cache.capacity != snapshot_capacity:
         return PREFIX_CACHE_ERR_BAD_PARAM
     if cache.count != snapshot_count or cache.count < 0 or cache.count > cache.capacity:
+        return PREFIX_CACHE_ERR_BAD_PARAM
+    if cache.entries is not snapshot_entries_obj:
+        return PREFIX_CACHE_ERR_BAD_PARAM
+    if cache.entries[entry_index].valid != snapshot_entry_valid:
         return PREFIX_CACHE_ERR_BAD_PARAM
     if (
         entry_index != snapshot_entry_index
@@ -102,6 +108,10 @@ def replay_guard_commit_only_preflight_only_parity_commit_only_preflight_only_pa
     if cache.capacity != snapshot_capacity:
         return PREFIX_CACHE_ERR_BAD_PARAM
     if cache.count != snapshot_count or cache.count < 0 or cache.count > cache.capacity:
+        return PREFIX_CACHE_ERR_BAD_PARAM
+    if cache.entries is not snapshot_entries_obj:
+        return PREFIX_CACHE_ERR_BAD_PARAM
+    if cache.entries[entry_index].valid != snapshot_entry_valid:
         return PREFIX_CACHE_ERR_BAD_PARAM
     if (
         entry_index != snapshot_entry_index
@@ -260,6 +270,45 @@ def test_commit_only_hardening_rejects_bad_vectors():
     )
 
 
+def test_commit_only_hardening_rejects_entry_valid_mutation_between_branches():
+    cache = _cache_with_tick(64)
+    out = [7, 8, 9]
+
+    original_parity = replay_guard_commit_only_preflight_only_parity_commit_only_preflight_only_parity
+
+    def mutating_parity(cache_obj, entry_index, access_tick, profile_id, outputs, slot_previous, slot_applied, slot_guard):
+        status = original_parity(
+            cache_obj,
+            entry_index,
+            access_tick,
+            profile_id,
+            outputs,
+            slot_previous,
+            slot_applied,
+            slot_guard,
+        )
+        if status == PREFIX_CACHE_OK:
+            cache_obj.entries[entry_index].valid = 0
+        return status
+
+    globals()["replay_guard_commit_only_preflight_only_parity_commit_only_preflight_only_parity"] = mutating_parity
+    try:
+        status = replay_guard_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only(
+            cache,
+            entry_index=1,
+            access_tick=80,
+            profile_id=PREFIX_CACHE_PROFILE_SECURE_LOCAL,
+            outputs=out,
+            slot_previous=0,
+            slot_applied=1,
+            slot_guard=2,
+        )
+        assert status == PREFIX_CACHE_ERR_BAD_PARAM
+        assert out == [7, 8, 9]
+    finally:
+        globals()["replay_guard_commit_only_preflight_only_parity_commit_only_preflight_only_parity"] = original_parity
+
+
 def test_holyc_function_body_and_contract_markers_present():
     source = Path("src/runtime/prefix_cache.HC").read_text(encoding="utf-8")
     sig = "I32 PrefixCacheReplayGuardCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(PrefixCache *cache,"
@@ -268,6 +317,8 @@ def test_holyc_function_body_and_contract_markers_present():
     assert "status_parity = PrefixCacheReplayGuardCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(cache," in body
     assert "cache->entries[entry_index].last_used_tick = snapshot_previous_tick;" in body
     assert "status_commit = PrefixCacheReplayGuardCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(cache," in body
+    assert "if (cache->entries != snapshot_entries_ptr)" in body
+    assert "if (cache->entries[entry_index].valid != snapshot_entry_valid)" in body
     assert "if (parity_previous_tick != commit_previous_tick ||" in body
     assert "*out_previous_tick = parity_previous_tick;" in body
     assert "*out_guard_passed = parity_guard_passed;" in body
@@ -278,5 +329,6 @@ if __name__ == "__main__":
     test_commit_only_hardening_dev_local_allows_rollback()
     test_commit_only_hardening_secure_local_policy_failure_keeps_output_slots_unchanged()
     test_commit_only_hardening_rejects_bad_vectors()
+    test_commit_only_hardening_rejects_entry_valid_mutation_between_branches()
     test_holyc_function_body_and_contract_markers_present()
     print("ok")
