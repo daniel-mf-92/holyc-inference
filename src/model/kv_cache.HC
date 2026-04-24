@@ -1169,6 +1169,9 @@ I32 KVCacheInitQ16CheckedNoAllocCommitOnlyPreflightOnlyParityCommitOnly(
         staged_parity_total_cells != staged_preflight_total_cells)
         return KV_Q16_ERR_BAD_PARAM;
 
+    if (staged_parity_used_tokens != 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
     *out_used_tokens = staged_parity_used_tokens;
     *out_layer_span_cells = staged_parity_layer_span_cells;
     *out_total_cells = staged_parity_total_cells;
