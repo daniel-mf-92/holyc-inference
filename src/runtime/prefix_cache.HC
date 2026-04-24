@@ -1389,6 +1389,8 @@ I32 PrefixCacheReplayGuardCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     I64 snapshot_profile_id;
     I64 snapshot_capacity;
     I64 snapshot_count;
+    PrefixCacheEntry *snapshot_entries_ptr;
+    I64 snapshot_entry_valid;
     I64 snapshot_previous_tick;
     I64 snapshot_out_previous_tick;
     I64 snapshot_out_applied_tick;
@@ -1435,6 +1437,8 @@ I32 PrefixCacheReplayGuardCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     snapshot_profile_id = profile_id;
     snapshot_capacity = cache->capacity;
     snapshot_count = cache->count;
+    snapshot_entries_ptr = cache->entries;
+    snapshot_entry_valid = cache->entries[entry_index].valid;
     snapshot_previous_tick = cache->entries[entry_index].last_used_tick;
     snapshot_out_previous_tick = *out_previous_tick;
     snapshot_out_applied_tick = *out_applied_tick;
@@ -1459,6 +1463,12 @@ I32 PrefixCacheReplayGuardCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     if (cache->count != snapshot_count ||
         cache->count < 0 ||
         cache->count > cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->entries != snapshot_entries_ptr)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->entries[entry_index].valid != snapshot_entry_valid)
         return PREFIX_CACHE_ERR_BAD_PARAM;
 
     if (entry_index != snapshot_entry_index ||
@@ -1506,6 +1516,12 @@ I32 PrefixCacheReplayGuardCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnl
     if (cache->count != snapshot_count ||
         cache->count < 0 ||
         cache->count > cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->entries != snapshot_entries_ptr)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->entries[entry_index].valid != snapshot_entry_valid)
         return PREFIX_CACHE_ERR_BAD_PARAM;
 
     if (entry_index != snapshot_entry_index ||

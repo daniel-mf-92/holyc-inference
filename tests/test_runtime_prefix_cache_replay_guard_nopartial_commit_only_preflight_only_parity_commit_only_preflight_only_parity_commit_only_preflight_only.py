@@ -148,6 +148,25 @@ def replay_guard_commit_only_preflight_only_parity_commit_only_preflight_only_pa
     return PREFIX_CACHE_OK
 
 
+def _extract_function_body(source: str, signature: str) -> str:
+    start = source.find(signature)
+    assert start != -1
+    brace_start = source.find("{", start)
+    assert brace_start != -1
+    depth = 0
+    idx = brace_start
+    while idx < len(source):
+        ch = source[idx]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return source[brace_start : idx + 1]
+        idx += 1
+    raise AssertionError("unmatched braces for function body")
+
+
 def test_zero_write_preflight_only_secure_local_monotonic_roundtrip():
     cache = _cache_with_tick(700)
     out = [11, 12, 13]
@@ -290,13 +309,17 @@ def test_holyc_function_body_and_zero_write_contract_markers_present():
     source = Path("src/runtime/prefix_cache.HC").read_text(encoding="utf-8")
     sig = "I32 PrefixCacheReplayGuardCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(PrefixCache *cache,"
     assert sig in source
-    body = source.split(sig, 1)[1]
+    body = _extract_function_body(source, sig)
     assert "snapshot_out_previous_tick = *out_previous_tick;" in body
     assert "snapshot_out_applied_tick = *out_applied_tick;" in body
     assert "snapshot_out_guard_passed = *out_guard_passed;" in body
+    assert "snapshot_entries_ptr = cache->entries;" in body
+    assert "snapshot_entry_valid = cache->entries[entry_index].valid;" in body
     assert "status_commit = PrefixCacheReplayGuardCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(cache," in body
     assert "cache->entries[entry_index].last_used_tick = snapshot_previous_tick;" in body
     assert "status_parity = PrefixCacheReplayGuardCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(cache," in body
+    assert "if (cache->entries != snapshot_entries_ptr)" in body
+    assert "if (cache->entries[entry_index].valid != snapshot_entry_valid)" in body
     assert "if (*out_previous_tick != snapshot_out_previous_tick ||" in body
     assert "if (commit_previous_tick != parity_previous_tick ||" in body
     assert "return PREFIX_CACHE_OK;" in body
