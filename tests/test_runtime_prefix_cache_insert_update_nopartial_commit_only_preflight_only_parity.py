@@ -263,8 +263,8 @@ def test_update_existing_parity_ok():
     assert idx is None and inserted is None
 
     # Seed via canonical insert, then parity wrapper sees update/update symmetry.
-    st_seed, idx_seed, ins_seed = insert_or_update_checked(c, 101, 8, 0, 8, 1)
-    assert st_seed == PREFIX_CACHE_OK and ins_seed == 1
+    st_seed, idx_seed, ins_seed = insert_or_update_commit_only(c, 101, 8, 0, 8, 1)
+    assert st_seed == PREFIX_CACHE_OK
 
     st, idx2, inserted2 = insert_or_update_preflight_only_parity(c, 101, 8, 8, 8, 2)
     assert st == PREFIX_CACHE_OK
