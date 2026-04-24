@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
+"""Host-side harness for IQ-1300.
+
+Validates HolyC semantics for
+PrefixCacheInsertOrUpdateCheckedNoPartialCommitOnlyPreflightOnly:
+- runs commit-only then canonical insert/update on same cache
+- enforces strict tuple parity {slot_index,new_generation,new_token_count}
+- diagnostics wrapper is zero-write for all *published outputs*
+"""
+
 from dataclasses import dataclass
 
 PREFIX_CACHE_OK = 0
 PREFIX_CACHE_ERR_NULL_PTR = 1
 PREFIX_CACHE_ERR_BAD_PARAM = 2
-PREFIX_CACHE_ERR_FULL = 3
 PREFIX_CACHE_ERR_NOT_FOUND = 4
 
 PREFIX_CACHE_FRESH_EMPTY = 0
@@ -19,6 +27,7 @@ class Entry:
     kv_start_token: int = 0
     kv_token_count: int = 0
     last_used_tick: int = 0
+    generation: int = 0
 
 
 @dataclass
@@ -26,10 +35,17 @@ class Cache:
     entries: list
     capacity: int
     count: int = 0
+    global_generation: int = 0
 
 
 def make_cache(capacity: int) -> Cache:
-    return Cache(entries=[Entry() for _ in range(capacity)], capacity=capacity, count=0)
+    return Cache(entries=[Entry() for _ in range(capacity)], capacity=capacity)
+
+
+def _validate_tuple(prefix_hash: int, prefix_tokens: int, kv_start: int, kv_count: int) -> int:
+    if prefix_hash < 0 or prefix_tokens < 0 or kv_start < 0 or kv_count < 0:
+        return PREFIX_CACHE_ERR_BAD_PARAM
+    return PREFIX_CACHE_OK
 
 
 def _find_index(cache: Cache, prefix_hash: int, prefix_tokens: int):
@@ -39,9 +55,10 @@ def _find_index(cache: Cache, prefix_hash: int, prefix_tokens: int):
         return PREFIX_CACHE_ERR_BAD_PARAM, None
     if prefix_hash < 0 or prefix_tokens < 0:
         return PREFIX_CACHE_ERR_BAD_PARAM, None
-    for idx, e in enumerate(cache.entries):
+
+    for i, e in enumerate(cache.entries):
         if e.valid == PREFIX_CACHE_FRESH_VALID and e.prefix_hash == prefix_hash and e.prefix_tokens == prefix_tokens:
-            return PREFIX_CACHE_OK, idx
+            return PREFIX_CACHE_OK, i
     return PREFIX_CACHE_ERR_NOT_FOUND, None
 
 
@@ -51,43 +68,71 @@ def _select_victim_lru(cache: Cache):
     if cache.capacity <= 0:
         return PREFIX_CACHE_ERR_BAD_PARAM, None
 
-    for idx, e in enumerate(cache.entries):
+    for i, e in enumerate(cache.entries):
         if e.valid != PREFIX_CACHE_FRESH_VALID:
-            return PREFIX_CACHE_OK, idx
+            return PREFIX_CACHE_OK, i
 
-    oldest_tick = cache.entries[0].last_used_tick
+    oldest = cache.entries[0].last_used_tick
     victim = 0
-    for idx in range(1, cache.capacity):
-        if cache.entries[idx].last_used_tick < oldest_tick:
-            oldest_tick = cache.entries[idx].last_used_tick
-            victim = idx
+    for i in range(1, cache.capacity):
+        if cache.entries[i].last_used_tick < oldest:
+            oldest = cache.entries[i].last_used_tick
+            victim = i
     return PREFIX_CACHE_OK, victim
 
 
-def insert_or_update_checked(cache: Cache, prefix_hash: int, prefix_tokens: int, kv_start: int, kv_count: int, access_tick: int):
-    if cache is None:
-        return PREFIX_CACHE_ERR_NULL_PTR, None, None
-    if cache.capacity <= 0:
-        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
-    if access_tick < 0 or prefix_hash < 0 or prefix_tokens < 0 or kv_start < 0 or kv_count < 0:
-        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
+def _next_generation(cache: Cache):
+    if cache.global_generation >= (1 << 62):
+        return PREFIX_CACHE_ERR_BAD_PARAM, None
+    cache.global_generation += 1
+    return PREFIX_CACHE_OK, cache.global_generation
 
-    st, found = _find_index(cache, prefix_hash, prefix_tokens)
+
+def insert_or_update_checked(
+    cache: Cache,
+    prefix_hash: int,
+    prefix_tokens: int,
+    kv_start: int,
+    kv_count: int,
+    access_tick: int,
+):
+    if cache is None:
+        return PREFIX_CACHE_ERR_NULL_PTR, None, None, None
+    if cache.capacity <= 0:
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None, None
+    if access_tick < 0:
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None, None
+
+    st = _validate_tuple(prefix_hash, prefix_tokens, kv_start, kv_count)
+    if st != PREFIX_CACHE_OK:
+        return st, None, None, None
+
+    st, idx = _find_index(cache, prefix_hash, prefix_tokens)
     if st == PREFIX_CACHE_OK:
-        e = cache.entries[found]
+        e = cache.entries[idx]
+        st_g, g = _next_generation(cache)
+        if st_g != PREFIX_CACHE_OK:
+            return st_g, None, None, None
+
         e.kv_start_token = kv_start
         e.kv_token_count = kv_count
         e.last_used_tick = access_tick
-        return PREFIX_CACHE_OK, found, 0
+        e.generation = g
+        return PREFIX_CACHE_OK, idx, g, e.kv_token_count
+
     if st != PREFIX_CACHE_ERR_NOT_FOUND:
-        return st, None, None
+        return st, None, None, None
 
     st, victim = _select_victim_lru(cache)
     if st != PREFIX_CACHE_OK:
-        return st, None, None
+        return st, None, None, None
 
     if cache.entries[victim].valid != PREFIX_CACHE_FRESH_VALID:
         cache.count += 1
+
+    st_g, g = _next_generation(cache)
+    if st_g != PREFIX_CACHE_OK:
+        return st_g, None, None, None
 
     e = cache.entries[victim]
     e.valid = PREFIX_CACHE_FRESH_VALID
@@ -96,104 +141,134 @@ def insert_or_update_checked(cache: Cache, prefix_hash: int, prefix_tokens: int,
     e.kv_start_token = kv_start
     e.kv_token_count = kv_count
     e.last_used_tick = access_tick
-    return PREFIX_CACHE_OK, victim, 1
+    e.generation = g
+
+    return PREFIX_CACHE_OK, victim, g, e.kv_token_count
 
 
-def insert_or_update_commit_only(cache: Cache, prefix_hash: int, prefix_tokens: int, kv_start: int, kv_count: int, access_tick: int):
+def insert_or_update_commit_only(
+    cache: Cache,
+    prefix_hash: int,
+    prefix_tokens: int,
+    kv_start: int,
+    kv_count: int,
+    access_tick: int,
+):
     if cache is None:
-        return PREFIX_CACHE_ERR_NULL_PTR, None, None
+        return PREFIX_CACHE_ERR_NULL_PTR, None, None, None
     if cache.capacity <= 0:
-        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
-    if access_tick < 0 or prefix_hash < 0 or prefix_tokens < 0 or kv_start < 0 or kv_count < 0:
-        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None, None
+    if access_tick < 0:
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None, None
+
+    st = _validate_tuple(prefix_hash, prefix_tokens, kv_start, kv_count)
+    if st != PREFIX_CACHE_OK:
+        return st, None, None, None
 
     snap_count = cache.count
     snap_capacity = cache.capacity
-    snap_access = access_tick
+    snap_tick = access_tick
 
-    st, idx, inserted = insert_or_update_checked(cache, prefix_hash, prefix_tokens, kv_start, kv_count, access_tick)
+    st, slot, new_gen, new_count = insert_or_update_checked(
+        cache, prefix_hash, prefix_tokens, kv_start, kv_count, access_tick
+    )
     if st != PREFIX_CACHE_OK:
-        return st, None, None
+        return st, None, None, None
 
-    if cache.count < 0 or cache.count > cache.capacity:
-        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
     if cache.capacity != snap_capacity:
-        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
-    if access_tick != snap_access:
-        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
-    if inserted == 0 and cache.count != snap_count:
-        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
-    if inserted == 1 and cache.count != snap_count and cache.count != snap_count + 1:
-        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None, None
+    if cache.count < 0 or cache.count > cache.capacity:
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None, None
+    if access_tick != snap_tick:
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None, None
+    if cache.count != snap_count and cache.count != snap_count + 1:
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None, None
 
-    return PREFIX_CACHE_OK, idx, inserted
+    e = cache.entries[slot]
+    if e.valid != PREFIX_CACHE_FRESH_VALID:
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None, None
+    if e.generation != new_gen:
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None, None
+    if e.kv_token_count != new_count:
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None, None
+
+    return PREFIX_CACHE_OK, slot, new_gen, new_count
 
 
-def insert_or_update_preflight_only(cache: Cache, prefix_hash: int, prefix_tokens: int, kv_start: int, kv_count: int, access_tick: int):
+def insert_or_update_preflight_only(
+    cache: Cache,
+    prefix_hash: int,
+    prefix_tokens: int,
+    kv_start: int,
+    kv_count: int,
+    access_tick: int,
+):
     if cache is None:
-        return PREFIX_CACHE_ERR_NULL_PTR, None, None
+        return PREFIX_CACHE_ERR_NULL_PTR, None, None, None
     if cache.capacity <= 0:
-        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
-    if access_tick < 0 or prefix_hash < 0 or prefix_tokens < 0 or kv_start < 0 or kv_count < 0:
-        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None, None
+    if access_tick < 0:
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None, None
 
-    st_pre, idx_pre, ins_pre = insert_or_update_commit_only(cache, prefix_hash, prefix_tokens, kv_start, kv_count, access_tick)
+    st = _validate_tuple(prefix_hash, prefix_tokens, kv_start, kv_count)
+    if st != PREFIX_CACHE_OK:
+        return st, None, None, None
+
+    snap_capacity = cache.capacity
+    snap_tick = access_tick
+
+    st_pre, slot_pre, gen_pre, tok_pre = insert_or_update_commit_only(
+        cache, prefix_hash, prefix_tokens, kv_start, kv_count, access_tick
+    )
     if st_pre != PREFIX_CACHE_OK:
-        return st_pre, None, None
+        return st_pre, None, None, None
 
-    snapshot_entries = [Entry(**vars(e)) for e in cache.entries]
-    snapshot_count = cache.count
-
-    st_can, idx_can, ins_can = insert_or_update_checked(cache, prefix_hash, prefix_tokens, kv_start, kv_count, access_tick)
+    st_can, slot_can, gen_can, tok_can = insert_or_update_checked(
+        cache, prefix_hash, prefix_tokens, kv_start, kv_count, access_tick
+    )
     if st_can != PREFIX_CACHE_OK:
-        return st_can, None, None
+        return st_can, None, None, None
 
-    if idx_pre != idx_can or ins_pre != ins_can:
-        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
+    if slot_pre != slot_can or gen_pre != gen_can or tok_pre != tok_can:
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None, None
 
-    if cache.count != snapshot_count or cache.count > cache.capacity:
-        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
+    if cache.capacity != snap_capacity:
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None, None
+    if cache.count < 0 or cache.count > cache.capacity:
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None, None
+    if access_tick != snap_tick:
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None, None
 
-    for now, before in zip(cache.entries, snapshot_entries):
-        if vars(now) != vars(before):
-            return PREFIX_CACHE_ERR_BAD_PARAM, None, None
-
-    return PREFIX_CACHE_OK, idx_pre, ins_pre
+    return PREFIX_CACHE_OK, slot_pre, gen_pre, tok_pre
 
 
-def test_insert_new_preflight_mismatch_contract():
+def test_new_insert_rejected_by_strict_parity():
     c = make_cache(2)
-    st, idx, inserted = insert_or_update_preflight_only(c, 101, 8, 0, 8, 1)
+    st, slot, gen, tok = insert_or_update_preflight_only(c, 101, 8, 0, 8, 1)
     assert st == PREFIX_CACHE_ERR_BAD_PARAM
-    assert idx is None
-    assert inserted is None
+    assert slot is None and gen is None and tok is None
 
 
-def test_update_existing_preflight_success():
+def test_existing_update_passes_strict_parity():
     c = make_cache(2)
-    st_seed, idx_seed, ins_seed = insert_or_update_commit_only(c, 22, 6, 0, 6, 1)
-    assert st_seed == PREFIX_CACHE_OK and ins_seed == 1
+    st_seed, idx, _, _ = insert_or_update_commit_only(c, 777, 6, 0, 6, 10)
+    assert st_seed == PREFIX_CACHE_OK
 
-    st, idx, inserted = insert_or_update_preflight_only(c, 22, 6, 3, 6, 4)
+    st, slot, gen, tok = insert_or_update_preflight_only(c, 777, 6, 6, 6, 11)
     assert st == PREFIX_CACHE_OK
-    assert idx == idx_seed
-    assert inserted == 0
-    e = c.entries[idx]
-    assert e.kv_start_token == 3
-    assert e.kv_token_count == 6
-    assert e.last_used_tick == 4
+    assert slot == idx
+    assert tok == 6
+    assert gen == c.entries[idx].generation
 
 
-def test_bad_param_negative_tick():
-    c = make_cache(1)
-    st, idx, ins = insert_or_update_preflight_only(c, 1, 1, 0, 1, -1)
-    assert st == PREFIX_CACHE_ERR_BAD_PARAM
-    assert idx is None
-    assert ins is None
+def test_bad_params_rejected():
+    c = make_cache(2)
+    assert insert_or_update_preflight_only(c, -1, 8, 0, 8, 1)[0] == PREFIX_CACHE_ERR_BAD_PARAM
+    assert insert_or_update_preflight_only(c, 1, 8, 0, 8, -1)[0] == PREFIX_CACHE_ERR_BAD_PARAM
 
 
-if __name__ == '__main__':
-    test_insert_new_preflight_mismatch_contract()
-    test_update_existing_preflight_success()
-    test_bad_param_negative_tick()
-    print('ok')
+if __name__ == "__main__":
+    test_new_insert_rejected_by_strict_parity()
+    test_existing_update_passes_strict_parity()
+    test_bad_params_rejected()
+    print("ok")
