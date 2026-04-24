@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Strict parity diagnostics gate checks for IQ-1334 telemetry digest wrapper."""
+"""Strict parity diagnostics gate checks for IQ-1346 telemetry digest wrapper."""
 
 from __future__ import annotations
 
@@ -92,7 +92,7 @@ def telemetry_digest_q64_checked(
     return ERR_OK, digest
 
 
-def telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity_commit_only(
+def telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only(
     total_ops: int,
     total_cycles: int,
     cycles_per_op: int,
@@ -117,6 +117,8 @@ def telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity_com
         return status
     if force_digest is not None:
         digest = force_digest
+    if digest is None:
+        return ERR_BAD_PARAM
     out_ptr[0] = digest
     return ERR_OK
 
@@ -152,6 +154,37 @@ def telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity_com
     return ERR_OK
 
 
+def telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity(
+    total_ops: int,
+    total_cycles: int,
+    cycles_per_op: int,
+    remainder_cycles: int,
+    suite_checksum: int,
+    cpu_hz: int,
+    out_ptr: list[int] | None,
+    *,
+    force_digest: int | None = None,
+) -> int:
+    if out_ptr is None:
+        return ERR_NULL_PTR
+    status, digest = telemetry_digest_q64_checked(
+        total_ops,
+        total_cycles,
+        cycles_per_op,
+        remainder_cycles,
+        suite_checksum,
+        cpu_hz,
+    )
+    if status != ERR_OK:
+        return status
+    if force_digest is not None:
+        digest = force_digest
+    if digest is None:
+        return ERR_BAD_PARAM
+    out_ptr[0] = digest
+    return ERR_OK
+
+
 def telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity(
     total_ops: int,
     total_cycles: int,
@@ -162,6 +195,7 @@ def telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity_com
     out_ptr: list[int] | None,
     *,
     force_commit_digest: int | None = None,
+    force_parity_digest: int | None = None,
     force_preflight_write: bool = False,
 ) -> int:
     if out_ptr is None:
@@ -185,6 +219,7 @@ def telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity_com
         suite_checksum,
         cpu_hz,
     )
+    out_snapshot = out_ptr[0]
 
     preflight_probe = [2459565876494606882]
     status = telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only(
@@ -201,7 +236,7 @@ def telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity_com
         return status
 
     commit_digest = [0]
-    status = telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity_commit_only(
+    status = telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only(
         total_ops,
         total_cycles,
         cycles_per_op,
@@ -210,6 +245,20 @@ def telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity_com
         cpu_hz,
         commit_digest,
         force_digest=force_commit_digest,
+    )
+    if status != ERR_OK:
+        return status
+
+    parity_digest = [0]
+    status = telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity(
+        total_ops,
+        total_cycles,
+        cycles_per_op,
+        remainder_cycles,
+        suite_checksum,
+        cpu_hz,
+        parity_digest,
+        force_digest=force_parity_digest,
     )
     if status != ERR_OK:
         return status
@@ -234,16 +283,21 @@ def telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity_com
         cpu_hz,
     ):
         return ERR_BAD_PARAM
-    if preflight_probe[0] != 2459565876494606882:
-        return ERR_BAD_PARAM
-    if commit_digest[0] != canonical_digest:
+    if out_ptr[0] != out_snapshot:
         return ERR_BAD_PARAM
 
-    out_ptr[0] = canonical_digest
+    if preflight_probe[0] != 2459565876494606882:
+        return ERR_BAD_PARAM
+    if commit_digest[0] != parity_digest[0]:
+        return ERR_BAD_PARAM
+    if parity_digest[0] != canonical_digest:
+        return ERR_BAD_PARAM
+
+    out_ptr[0] = parity_digest[0]
     return ERR_OK
 
 
-def test_source_contains_iq1334_function_and_guards() -> None:
+def test_source_contains_iq1346_function_and_guards() -> None:
     source = Path("src/bench/q8_0_dot_bench.HC").read_text(encoding="utf-8")
     sig = (
         "I32 Q8_0DotBenchRunDefaultSuiteTelemetryDigestQ64CheckedNoPartial"
@@ -251,18 +305,19 @@ def test_source_contains_iq1334_function_and_guards() -> None:
     )
     assert sig in source
     body = source.split(sig, 1)[1]
-    assert "if (!out_digest_q64)" in body
-    assert "preflight_probe_digest_q64 = 2459565876494606882;" in body
+    assert "snapshot_out_digest_value = *out_digest_q64;" in body
     assert "status = Q8_0DotBenchRunDefaultSuiteTelemetryDigestQ64CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in body
-    assert "status = Q8_0DotBenchRunDefaultSuiteTelemetryDigestQ64CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(" in body
+    assert "status = Q8_0DotBenchRunDefaultSuiteTelemetryDigestQ64CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(" in body
+    assert "status = Q8_0DotBenchRunDefaultSuiteTelemetryDigestQ64CheckedNoPartialCommitOnlyPreflightOnlyParity(" in body
     assert "status = Q8_0DotBenchRunDefaultSuiteTelemetryDigestQ64Checked(" in body
-    assert "if (preflight_probe_digest_q64 != 2459565876494606882)" in body
-    assert "if (preflight_digest_q64 != commit_digest_q64)" in body
-    assert "*out_digest_q64 = preflight_digest_q64;" in body
+    assert "if (snapshot_out_digest_value != *out_digest_q64)" in body
+    assert "if (commit_digest_q64 != parity_digest_q64)" in body
+    assert "if (parity_digest_q64 != canonical_digest_q64)" in body
+    assert "*out_digest_q64 = parity_digest_q64;" in body
 
 
 def test_happy_path_publishes_digest() -> None:
-    out = [0xABCDEF]
+    out = [0xCAFE]
     status = telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity(
         total_ops=6144,
         total_cycles=159744,
@@ -292,6 +347,22 @@ def test_commit_parity_mismatch_rejects() -> None:
     )
     assert status == ERR_BAD_PARAM
     assert out[0] == 0x1234
+
+
+def test_parity_canonical_mismatch_rejects() -> None:
+    out = [0x9876]
+    status = telemetry_digest_q64_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity(
+        total_ops=4096,
+        total_cycles=114688,
+        cycles_per_op=28,
+        remainder_cycles=0,
+        suite_checksum=0x44,
+        cpu_hz=2_500_000_000,
+        out_ptr=out,
+        force_parity_digest=99,
+    )
+    assert status == ERR_BAD_PARAM
+    assert out[0] == 0x9876
 
 
 def test_preflight_write_rejected() -> None:
@@ -324,9 +395,10 @@ def test_null_ptr() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_iq1334_function_and_guards()
+    test_source_contains_iq1346_function_and_guards()
     test_happy_path_publishes_digest()
     test_commit_parity_mismatch_rejects()
+    test_parity_canonical_mismatch_rejects()
     test_preflight_write_rejected()
     test_null_ptr()
     print("ok")
