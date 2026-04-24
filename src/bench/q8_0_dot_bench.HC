@@ -283,6 +283,105 @@ I32 Q8_0DotBenchEstimateTokPerSecQ16Checked(
     return Q8_0_DOT_BENCH_OK;
 }
 
+// Commit-only wrapper over canonical tok/sec estimator.
+//
+// Contracts:
+// - Snapshot immutable tuple {cpu_hz,cycles_per_token_q16,out_tok_per_sec_q16}.
+// - Compute staged result through canonical checked estimator.
+// - Revalidate immutable snapshots before publish.
+// - Publish atomically on success; preserve caller output on failure.
+I32 Q8_0DotBenchEstimateTokPerSecQ16CheckedNoPartialCommitOnly(
+    I64 cpu_hz,
+    I64 cycles_per_token_q16,
+    I64 *out_tok_per_sec_q16)
+{
+    I64 snapshot_cpu_hz;
+    I64 snapshot_cycles_per_token_q16;
+    I64 *snapshot_out_tok_per_sec_q16;
+    I64 staged_tok_per_sec_q16;
+    I32 status;
+
+    if (!out_tok_per_sec_q16)
+        return Q8_0_DOT_BENCH_ERR_NULL_PTR;
+
+    snapshot_cpu_hz = cpu_hz;
+    snapshot_cycles_per_token_q16 = cycles_per_token_q16;
+    snapshot_out_tok_per_sec_q16 = out_tok_per_sec_q16;
+
+    status = Q8_0DotBenchEstimateTokPerSecQ16Checked(
+        cpu_hz,
+        cycles_per_token_q16,
+        &staged_tok_per_sec_q16);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    if (snapshot_cpu_hz != cpu_hz ||
+        snapshot_cycles_per_token_q16 != cycles_per_token_q16)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+    if (snapshot_out_tok_per_sec_q16 != out_tok_per_sec_q16)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    *out_tok_per_sec_q16 = staged_tok_per_sec_q16;
+    return Q8_0_DOT_BENCH_OK;
+}
+
+// Diagnostics zero-write wrapper over commit-only tok/sec estimator.
+//
+// Contracts:
+// - Snapshot immutable tuple {cpu_hz,cycles_per_token_q16,out_tok_per_sec_q16}.
+// - Recompute staged result via canonical and commit-only paths.
+// - Require strict parity between canonical and commit-only staged outputs.
+// - Preserve caller output value (zero-write diagnostics behavior).
+I32 Q8_0DotBenchEstimateTokPerSecQ16CheckedNoPartialCommitOnlyPreflightOnly(
+    I64 cpu_hz,
+    I64 cycles_per_token_q16,
+    I64 *out_tok_per_sec_q16)
+{
+    I64 snapshot_cpu_hz;
+    I64 snapshot_cycles_per_token_q16;
+    I64 *snapshot_out_tok_per_sec_q16;
+    I64 snapshot_out_value;
+    I64 staged_direct_tok_per_sec_q16;
+    I64 staged_commit_tok_per_sec_q16;
+    I32 status;
+
+    if (!out_tok_per_sec_q16)
+        return Q8_0_DOT_BENCH_ERR_NULL_PTR;
+
+    snapshot_cpu_hz = cpu_hz;
+    snapshot_cycles_per_token_q16 = cycles_per_token_q16;
+    snapshot_out_tok_per_sec_q16 = out_tok_per_sec_q16;
+    snapshot_out_value = *out_tok_per_sec_q16;
+
+    status = Q8_0DotBenchEstimateTokPerSecQ16Checked(
+        cpu_hz,
+        cycles_per_token_q16,
+        &staged_direct_tok_per_sec_q16);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    status = Q8_0DotBenchEstimateTokPerSecQ16CheckedNoPartialCommitOnly(
+        cpu_hz,
+        cycles_per_token_q16,
+        &staged_commit_tok_per_sec_q16);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    if (snapshot_cpu_hz != cpu_hz ||
+        snapshot_cycles_per_token_q16 != cycles_per_token_q16)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+    if (snapshot_out_tok_per_sec_q16 != out_tok_per_sec_q16)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    if (staged_direct_tok_per_sec_q16 != staged_commit_tok_per_sec_q16)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    if (*out_tok_per_sec_q16 != snapshot_out_value)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    return Q8_0_DOT_BENCH_OK;
+}
+
 // Diagnostics-only planner for deterministic Q8_0 default bench shapes.
 //
 // This helper does not allocate buffers or run kernels. It only validates the
