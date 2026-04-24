@@ -319,3 +319,50 @@ I32 InferenceAttestationManifestEmitChecked(InferenceAttestationManifest *manife
 
     return ATTEST_MANIFEST_OK;
 }
+
+
+class InferencePolicyDigestBindPayload
+{
+    U64 policy_digest_q64;
+    U64 telemetry_digest_q64;
+    U64 total_ops;
+    U64 total_cycles;
+    U64 profile_id;
+    U64 attestation_nonce;
+    U64 bound_digest_q64;
+};
+
+I32 Q8_0DotBenchRunDefaultSuitePolicyDigestBindChecked(InferencePolicyDigestBindPayload *payload)
+{
+    U64 state;
+    U64 x;
+
+    if (!payload)
+        return ATTEST_MANIFEST_ERR_NULL_PTR;
+
+    if (!payload->profile_id)
+        return ATTEST_MANIFEST_ERR_BAD_PARAM;
+
+    state = 1469598103934665603ULL;
+
+    x = payload->policy_digest_q64;
+    state = (state ^ x) * 1099511628211ULL;
+
+    x = payload->telemetry_digest_q64;
+    state = (state ^ x) * 1099511628211ULL;
+
+    x = payload->total_ops;
+    state = (state ^ x) * 1099511628211ULL;
+
+    x = payload->total_cycles;
+    state = (state ^ x) * 1099511628211ULL;
+
+    x = payload->profile_id;
+    state = (state ^ x) * 1099511628211ULL;
+
+    x = payload->attestation_nonce;
+    state = (state ^ x) * 1099511628211ULL;
+
+    payload->bound_digest_q64 = state;
+    return ATTEST_MANIFEST_OK;
+}
