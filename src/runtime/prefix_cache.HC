@@ -285,6 +285,93 @@ I32 PrefixCacheReplayGuardChecked(PrefixCache *cache,
     return PREFIX_CACHE_OK;
 }
 
+I32 PrefixCacheReplayGuardCheckedNoPartialCommitOnly(PrefixCache *cache,
+                                                     I64 entry_index,
+                                                     I64 access_tick,
+                                                     I64 profile_id,
+                                                     I64 *out_previous_tick,
+                                                     I64 *out_applied_tick,
+                                                     I64 *out_guard_passed)
+{
+    I64 snapshot_entry_index;
+    I64 snapshot_access_tick;
+    I64 snapshot_profile_id;
+    I64 snapshot_capacity;
+    I64 snapshot_count;
+    I64 staged_previous_tick;
+    I64 staged_applied_tick;
+    I64 staged_guard_passed;
+    I32 status;
+
+    if (!cache || !cache->entries ||
+        !out_previous_tick || !out_applied_tick || !out_guard_passed)
+        return PREFIX_CACHE_ERR_NULL_PTR;
+
+    if (out_previous_tick == out_applied_tick ||
+        out_previous_tick == out_guard_passed ||
+        out_applied_tick == out_guard_passed)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->capacity <= 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->count < 0 || cache->count > cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    snapshot_entry_index = entry_index;
+    snapshot_access_tick = access_tick;
+    snapshot_profile_id = profile_id;
+    snapshot_capacity = cache->capacity;
+    snapshot_count = cache->count;
+
+    status = PrefixCacheReplayGuardChecked(cache,
+                                           entry_index,
+                                           access_tick,
+                                           profile_id,
+                                           &staged_previous_tick,
+                                           &staged_applied_tick,
+                                           &staged_guard_passed);
+    if (status != PREFIX_CACHE_OK)
+        return status;
+
+    if (cache->capacity != snapshot_capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->count != snapshot_count ||
+        cache->count < 0 ||
+        cache->count > cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (entry_index != snapshot_entry_index ||
+        access_tick != snapshot_access_tick ||
+        profile_id != snapshot_profile_id)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (entry_index < 0 || entry_index >= cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->entries[entry_index].valid != PREFIX_CACHE_FRESH_VALID)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (staged_previous_tick < 0 ||
+        staged_applied_tick < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (staged_applied_tick != access_tick)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->entries[entry_index].last_used_tick != staged_applied_tick)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (staged_guard_passed != 0 && staged_guard_passed != 1)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    *out_previous_tick = staged_previous_tick;
+    *out_applied_tick = staged_applied_tick;
+    *out_guard_passed = staged_guard_passed;
+    return PREFIX_CACHE_OK;
+}
+
 I32 PrefixCacheLookupBestPrefixChecked(PrefixCache *cache,
                                        I64 query_hash,
                                        I64 max_prompt_tokens,
