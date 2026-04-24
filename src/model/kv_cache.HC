@@ -7757,3 +7757,256 @@ I32 KVCacheQ16TokenShiftLeftCheckedNoPartialCommitOnly(
     *out_moved_cells = staged_moved_cells;
     return KV_Q16_OK;
 }
+
+// IQ-1283: diagnostics-only zero-write companion for token-shift commit wrappers.
+// Stages commit-only and canonical shift paths onto scratch cache copies, checks
+// immutable input snapshots and strict tuple parity, then atomically publishes
+// {new_used_tokens,moved_cells} without mutating caller cache slabs.
+I32 KVCacheQ16TokenShiftLeftCheckedNoPartialCommitOnlyPreflightOnly(
+    I64 *k_cache,
+    I64 *v_cache,
+    I64 layer_count,
+    I64 token_capacity,
+    I64 kv_heads,
+    I64 head_dim,
+    I64 used_tokens,
+    I64 shift_tokens,
+    I64 *out_new_used_tokens,
+    I64 *out_moved_cells)
+{
+    I64 snapshot_used_tokens;
+    I64 snapshot_shift_tokens;
+    I64 snapshot_layer_count;
+    I64 snapshot_token_capacity;
+    I64 snapshot_kv_heads;
+    I64 snapshot_head_dim;
+    I64 *snapshot_k_cache;
+    I64 *snapshot_v_cache;
+    I64 total_cells;
+    I64 stage_bytes;
+    I64 idx;
+    I64 staged_commit_new_used_tokens;
+    I64 staged_commit_moved_cells;
+    I64 staged_canonical_new_used_tokens;
+    I64 staged_canonical_moved_cells;
+    I64 *staged_commit_k_cache;
+    I64 *staged_commit_v_cache;
+    I64 *staged_canonical_k_cache;
+    I64 *staged_canonical_v_cache;
+    I32 status;
+
+    if (!k_cache || !v_cache || !out_new_used_tokens || !out_moved_cells)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (k_cache == v_cache)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (out_new_used_tokens == out_moved_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (out_new_used_tokens == k_cache ||
+        out_new_used_tokens == v_cache ||
+        out_moved_cells == k_cache ||
+        out_moved_cells == v_cache)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (layer_count < 0 || token_capacity < 0 || kv_heads < 0 ||
+        head_dim < 0 || used_tokens < 0 || shift_tokens < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (used_tokens > token_capacity)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    snapshot_used_tokens = used_tokens;
+    snapshot_shift_tokens = shift_tokens;
+    snapshot_layer_count = layer_count;
+    snapshot_token_capacity = token_capacity;
+    snapshot_kv_heads = kv_heads;
+    snapshot_head_dim = head_dim;
+    snapshot_k_cache = k_cache;
+    snapshot_v_cache = v_cache;
+
+    status = KVCacheQ16ComputeTotalCellsChecked(layer_count,
+                                                token_capacity,
+                                                kv_heads,
+                                                head_dim,
+                                                &total_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (total_cells < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (!total_cells)
+    {
+        status = KVCacheQ16TokenShiftLeftCheckedNoPartialCommitOnly(
+            k_cache,
+            v_cache,
+            layer_count,
+            token_capacity,
+            kv_heads,
+            head_dim,
+            used_tokens,
+            shift_tokens,
+            &staged_commit_new_used_tokens,
+            &staged_commit_moved_cells);
+        if (status != KV_Q16_OK)
+            return status;
+
+        status = KVCacheQ16TokenShiftLeftCheckedNoPartial(
+            k_cache,
+            v_cache,
+            layer_count,
+            token_capacity,
+            kv_heads,
+            head_dim,
+            used_tokens,
+            shift_tokens,
+            &staged_canonical_new_used_tokens,
+            &staged_canonical_moved_cells);
+        if (status != KV_Q16_OK)
+            return status;
+
+        if (staged_commit_new_used_tokens != staged_canonical_new_used_tokens ||
+            staged_commit_moved_cells != staged_canonical_moved_cells)
+            return KV_Q16_ERR_BAD_PARAM;
+
+        *out_new_used_tokens = staged_commit_new_used_tokens;
+        *out_moved_cells = staged_commit_moved_cells;
+        return KV_Q16_OK;
+    }
+
+    status = KVTryMulI64Checked(total_cells,
+                                sizeof(I64),
+                                &stage_bytes);
+    if (status != KV_Q16_OK)
+        return status;
+
+    staged_commit_k_cache = MAlloc(stage_bytes);
+    if (!staged_commit_k_cache)
+        return KV_Q16_ERR_OVERFLOW;
+
+    staged_commit_v_cache = MAlloc(stage_bytes);
+    if (!staged_commit_v_cache)
+    {
+        Free(staged_commit_k_cache);
+        return KV_Q16_ERR_OVERFLOW;
+    }
+
+    staged_canonical_k_cache = MAlloc(stage_bytes);
+    if (!staged_canonical_k_cache)
+    {
+        Free(staged_commit_v_cache);
+        Free(staged_commit_k_cache);
+        return KV_Q16_ERR_OVERFLOW;
+    }
+
+    staged_canonical_v_cache = MAlloc(stage_bytes);
+    if (!staged_canonical_v_cache)
+    {
+        Free(staged_canonical_k_cache);
+        Free(staged_commit_v_cache);
+        Free(staged_commit_k_cache);
+        return KV_Q16_ERR_OVERFLOW;
+    }
+
+    idx = 0;
+    while (idx < total_cells)
+    {
+        staged_commit_k_cache[idx] = k_cache[idx];
+        staged_commit_v_cache[idx] = v_cache[idx];
+        staged_canonical_k_cache[idx] = k_cache[idx];
+        staged_canonical_v_cache[idx] = v_cache[idx];
+        idx++;
+    }
+
+    status = KVCacheQ16TokenShiftLeftCheckedNoPartialCommitOnly(
+        staged_commit_k_cache,
+        staged_commit_v_cache,
+        layer_count,
+        token_capacity,
+        kv_heads,
+        head_dim,
+        used_tokens,
+        shift_tokens,
+        &staged_commit_new_used_tokens,
+        &staged_commit_moved_cells);
+    if (status != KV_Q16_OK)
+    {
+        Free(staged_canonical_v_cache);
+        Free(staged_canonical_k_cache);
+        Free(staged_commit_v_cache);
+        Free(staged_commit_k_cache);
+        return status;
+    }
+
+    status = KVCacheQ16TokenShiftLeftCheckedNoPartial(
+        staged_canonical_k_cache,
+        staged_canonical_v_cache,
+        layer_count,
+        token_capacity,
+        kv_heads,
+        head_dim,
+        used_tokens,
+        shift_tokens,
+        &staged_canonical_new_used_tokens,
+        &staged_canonical_moved_cells);
+    if (status != KV_Q16_OK)
+    {
+        Free(staged_canonical_v_cache);
+        Free(staged_canonical_k_cache);
+        Free(staged_commit_v_cache);
+        Free(staged_commit_k_cache);
+        return status;
+    }
+
+    if (snapshot_used_tokens != used_tokens ||
+        snapshot_shift_tokens != shift_tokens ||
+        snapshot_layer_count != layer_count ||
+        snapshot_token_capacity != token_capacity ||
+        snapshot_kv_heads != kv_heads ||
+        snapshot_head_dim != head_dim ||
+        snapshot_k_cache != k_cache ||
+        snapshot_v_cache != v_cache)
+    {
+        Free(staged_canonical_v_cache);
+        Free(staged_canonical_k_cache);
+        Free(staged_commit_v_cache);
+        Free(staged_commit_k_cache);
+        return KV_Q16_ERR_BAD_PARAM;
+    }
+
+    if (staged_commit_new_used_tokens != staged_canonical_new_used_tokens ||
+        staged_commit_moved_cells != staged_canonical_moved_cells)
+    {
+        Free(staged_canonical_v_cache);
+        Free(staged_canonical_k_cache);
+        Free(staged_commit_v_cache);
+        Free(staged_commit_k_cache);
+        return KV_Q16_ERR_BAD_PARAM;
+    }
+
+    idx = 0;
+    while (idx < total_cells)
+    {
+        if (staged_commit_k_cache[idx] != staged_canonical_k_cache[idx] ||
+            staged_commit_v_cache[idx] != staged_canonical_v_cache[idx])
+        {
+            Free(staged_canonical_v_cache);
+            Free(staged_canonical_k_cache);
+            Free(staged_commit_v_cache);
+            Free(staged_commit_k_cache);
+            return KV_Q16_ERR_BAD_PARAM;
+        }
+        idx++;
+    }
+
+    *out_new_used_tokens = staged_commit_new_used_tokens;
+    *out_moved_cells = staged_commit_moved_cells;
+
+    Free(staged_canonical_v_cache);
+    Free(staged_canonical_k_cache);
+    Free(staged_commit_v_cache);
+    Free(staged_commit_k_cache);
+    return KV_Q16_OK;
+}
