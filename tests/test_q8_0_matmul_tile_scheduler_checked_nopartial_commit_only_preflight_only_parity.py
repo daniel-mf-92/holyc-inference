@@ -9,8 +9,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from test_q8_0_matmul_tile_scheduler_checked import (
+    I64_MAX,
     Q8_0_MATMUL_ERR_BAD_DST_LEN,
     Q8_0_MATMUL_ERR_NULL_PTR,
+    Q8_0_MATMUL_ERR_OVERFLOW,
     Q8_0_MATMUL_OK,
 )
 from test_q8_0_matmul_tile_scheduler_checked_nopartial_commit_only import (
@@ -21,7 +23,7 @@ from test_q8_0_matmul_tile_scheduler_checked_nopartial_commit_only_preflight_onl
 )
 
 
-# Mirrors HolyC parity wrapper in src/matmul/q8_0_matmul.HC.
+# Mirrors HolyC parity gate in src/matmul/q8_0_matmul.HC.
 def q8_0_matmul_tile_scheduler_checked_nopartial_commit_only_preflight_only_parity(
     row_count: int,
     col_count: int,
@@ -37,34 +39,34 @@ def q8_0_matmul_tile_scheduler_checked_nopartial_commit_only_preflight_only_pari
 
     snap = (row_count, col_count, tile_rows, tile_cols, span_capacity)
 
-    staged_pre_tile_count = [0]
-    staged_pre_last_row_end = [0]
-    staged_pre_last_col_end = [0]
+    pre_tile_count = [0]
+    pre_last_row_end = [0]
+    pre_last_col_end = [0]
     err = q8_0_matmul_tile_scheduler_checked_nopartial_commit_only_preflight_only(
         row_count,
         col_count,
         tile_rows,
         tile_cols,
         span_capacity,
-        staged_pre_tile_count,
-        staged_pre_last_row_end,
-        staged_pre_last_col_end,
+        pre_tile_count,
+        pre_last_row_end,
+        pre_last_col_end,
     )
     if err != Q8_0_MATMUL_OK:
         return err
 
-    staged_commit_tile_count = [0]
-    staged_commit_last_row_end = [0]
-    staged_commit_last_col_end = [0]
+    commit_tile_count = [0]
+    commit_last_row_end = [0]
+    commit_last_col_end = [0]
     err = q8_0_matmul_tile_scheduler_checked_nopartial_commit_only(
         row_count,
         col_count,
         tile_rows,
         tile_cols,
         span_capacity,
-        staged_commit_tile_count,
-        staged_commit_last_row_end,
-        staged_commit_last_col_end,
+        commit_tile_count,
+        commit_last_row_end,
+        commit_last_col_end,
     )
     if err != Q8_0_MATMUL_OK:
         return err
@@ -73,15 +75,15 @@ def q8_0_matmul_tile_scheduler_checked_nopartial_commit_only_preflight_only_pari
         return Q8_0_MATMUL_ERR_BAD_DST_LEN
 
     if (
-        staged_pre_tile_count[0] != staged_commit_tile_count[0]
-        or staged_pre_last_row_end[0] != staged_commit_last_row_end[0]
-        or staged_pre_last_col_end[0] != staged_commit_last_col_end[0]
+        pre_tile_count[0] != commit_tile_count[0]
+        or pre_last_row_end[0] != commit_last_row_end[0]
+        or pre_last_col_end[0] != commit_last_col_end[0]
     ):
         return Q8_0_MATMUL_ERR_BAD_DST_LEN
 
-    out_tile_count[0] = staged_commit_tile_count[0]
-    out_last_row_end[0] = staged_commit_last_row_end[0]
-    out_last_col_end[0] = staged_commit_last_col_end[0]
+    out_tile_count[0] = commit_tile_count[0]
+    out_last_row_end[0] = commit_last_row_end[0]
+    out_last_col_end[0] = commit_last_col_end[0]
     return Q8_0_MATMUL_OK
 
 
@@ -91,9 +93,9 @@ def test_source_contains_parity_symbol() -> None:
 
 
 def test_tail_tile_parity_outputs() -> None:
-    out_tile_count = [71]
-    out_last_row_end = [81]
-    out_last_col_end = [91]
+    out_tile_count = [17]
+    out_last_row_end = [18]
+    out_last_col_end = [19]
 
     err = q8_0_matmul_tile_scheduler_checked_nopartial_commit_only_preflight_only_parity(
         5,
@@ -111,49 +113,7 @@ def test_tail_tile_parity_outputs() -> None:
     assert out_last_col_end[0] == 7
 
 
-def test_zero_capacity_empty_axes_publish_zero_tuple() -> None:
-    out_tile_count = [12]
-    out_last_row_end = [13]
-    out_last_col_end = [14]
-
-    err = q8_0_matmul_tile_scheduler_checked_nopartial_commit_only_preflight_only_parity(
-        0,
-        0,
-        2,
-        2,
-        0,
-        out_tile_count,
-        out_last_row_end,
-        out_last_col_end,
-    )
-    assert err == Q8_0_MATMUL_OK
-    assert out_tile_count[0] == 0
-    assert out_last_row_end[0] == 0
-    assert out_last_col_end[0] == 0
-
-
-def test_bad_capacity_keeps_outputs_unchanged() -> None:
-    out_tile_count = [111]
-    out_last_row_end = [222]
-    out_last_col_end = [333]
-
-    err = q8_0_matmul_tile_scheduler_checked_nopartial_commit_only_preflight_only_parity(
-        5,
-        7,
-        4,
-        3,
-        0,
-        out_tile_count,
-        out_last_row_end,
-        out_last_col_end,
-    )
-    assert err == Q8_0_MATMUL_ERR_BAD_DST_LEN
-    assert out_tile_count == [111]
-    assert out_last_row_end == [222]
-    assert out_last_col_end == [333]
-
-
-def test_null_output_contract() -> None:
+def test_null_and_overflow_contracts_keep_outputs() -> None:
     err = q8_0_matmul_tile_scheduler_checked_nopartial_commit_only_preflight_only_parity(
         1,
         1,
@@ -166,13 +126,67 @@ def test_null_output_contract() -> None:
     )
     assert err == Q8_0_MATMUL_ERR_NULL_PTR
 
+    out_tile_count = [111]
+    out_last_row_end = [222]
+    out_last_col_end = [333]
+
+    err = q8_0_matmul_tile_scheduler_checked_nopartial_commit_only_preflight_only_parity(
+        0,
+        0,
+        1,
+        1,
+        I64_MAX,
+        out_tile_count,
+        out_last_row_end,
+        out_last_col_end,
+    )
+    assert err == Q8_0_MATMUL_ERR_OVERFLOW
+    assert out_tile_count == [111]
+    assert out_last_row_end == [222]
+    assert out_last_col_end == [333]
+
+
+def test_bad_capacity_and_bad_tile_shape_keep_outputs() -> None:
+    out_tile_count = [41]
+    out_last_row_end = [42]
+    out_last_col_end = [43]
+
+    err = q8_0_matmul_tile_scheduler_checked_nopartial_commit_only_preflight_only_parity(
+        5,
+        7,
+        4,
+        3,
+        0,
+        out_tile_count,
+        out_last_row_end,
+        out_last_col_end,
+    )
+    assert err == Q8_0_MATMUL_ERR_BAD_DST_LEN
+    assert out_tile_count == [41]
+    assert out_last_row_end == [42]
+    assert out_last_col_end == [43]
+
+    err = q8_0_matmul_tile_scheduler_checked_nopartial_commit_only_preflight_only_parity(
+        5,
+        7,
+        0,
+        3,
+        6,
+        out_tile_count,
+        out_last_row_end,
+        out_last_col_end,
+    )
+    assert err == Q8_0_MATMUL_ERR_BAD_DST_LEN
+    assert out_tile_count == [41]
+    assert out_last_row_end == [42]
+    assert out_last_col_end == [43]
+
 
 def run() -> None:
     test_source_contains_parity_symbol()
     test_tail_tile_parity_outputs()
-    test_zero_capacity_empty_axes_publish_zero_tuple()
-    test_bad_capacity_keeps_outputs_unchanged()
-    test_null_output_contract()
+    test_null_and_overflow_contracts_keep_outputs()
+    test_bad_capacity_and_bad_tile_shape_keep_outputs()
     print("q8_0_matmul_tile_scheduler_checked_nopartial_commit_only_preflight_only_parity_reference_checks=ok")
 
 
