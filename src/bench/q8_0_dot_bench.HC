@@ -2081,6 +2081,38 @@ I32 Q8_0DotBenchRunDefaultSuiteCyclesPerTokenQ16CheckedNoPartialCommitOnly(
     return Q8_0_DOT_BENCH_OK;
 }
 
+I32 Q8_0DotBenchRunDefaultSuiteCyclesPerTokenQ16CheckedNoPartialCommitOnly(
+    I64 total_cycles,
+    I64 total_tokens,
+    I64 *out_cycles_per_token_q16)
+{
+    I64 staged_cycles_per_token_q16;
+    I64 total_cycles_snapshot;
+    I64 total_tokens_snapshot;
+    I32 status;
+
+    if (!out_cycles_per_token_q16)
+        return Q8_0_DOT_BENCH_ERR_NULL_PTR;
+
+    total_cycles_snapshot = total_cycles;
+    total_tokens_snapshot = total_tokens;
+
+    status = Q8_0DotBenchRunDefaultSuiteCyclesPerTokenQ16Checked(
+        total_cycles,
+        total_tokens,
+        &staged_cycles_per_token_q16);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    if (total_cycles != total_cycles_snapshot)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+    if (total_tokens != total_tokens_snapshot)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    *out_cycles_per_token_q16 = staged_cycles_per_token_q16;
+    return Q8_0_DOT_BENCH_OK;
+}
+
 I32 Q8_0DotBenchRunDefaultSuiteCyclesPerTokenQ16CheckedNoPartialCommitOnlyPreflightOnly(
     I64 total_cycles,
     I64 total_ops,
