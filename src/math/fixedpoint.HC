@@ -1109,6 +1109,240 @@ I32 FPQ16MulShiftRoundCheckedNoPartialArrayCommitOnly(I64 *lhs_values,
     return FP_Q16_OK;
 }
 
+// Diagnostics-only zero-write companion over
+// FPQ16MulShiftRoundCheckedNoPartialArrayCommitOnly and
+// FPQ16MulShiftRoundCheckedNoPartialArray.
+//
+// Runs delegated helpers on private staged output buffers, preserving caller
+// out_values lanes while enforcing immutable scalar snapshots and strict tuple
+// parity for {required_lhs,required_rhs,required_out} before publish.
+I32 FPQ16MulShiftRoundCheckedNoPartialArrayCommitOnlyPreflightOnly(I64 *lhs_values,
+                                                                   I64 lhs_capacity,
+                                                                   I64 *rhs_values,
+                                                                   I64 rhs_capacity,
+                                                                   I64 *out_values,
+                                                                   I64 out_capacity,
+                                                                   I64 count,
+                                                                   I64 shift,
+                                                                   I64 *out_required_lhs,
+                                                                   I64 *out_required_rhs,
+                                                                   I64 *out_required_out)
+{
+    I64 *snapshot_lhs_values;
+    I64 *snapshot_rhs_values;
+    I64 *snapshot_out_values;
+    I64 snapshot_lhs_capacity;
+    I64 snapshot_rhs_capacity;
+    I64 snapshot_out_capacity;
+    I64 snapshot_count;
+    I64 snapshot_shift;
+    I64 staged_commit_required_lhs;
+    I64 staged_commit_required_rhs;
+    I64 staged_commit_required_out;
+    I64 staged_canonical_required_lhs;
+    I64 staged_canonical_required_rhs;
+    I64 staged_canonical_required_out;
+    I64 *staged_commit_out_values;
+    I64 *staged_canonical_out_values;
+    I64 i;
+    U64 stage_bytes;
+    U64 lhs_base;
+    U64 lhs_end;
+    U64 rhs_base;
+    U64 rhs_end;
+    U64 out_base;
+    U64 out_end;
+    U64 req_lhs_base;
+    U64 req_lhs_end;
+    U64 req_rhs_base;
+    U64 req_rhs_end;
+    U64 req_out_base;
+    U64 req_out_end;
+    I32 status;
+
+    if (!lhs_values || !rhs_values || !out_values ||
+        !out_required_lhs || !out_required_rhs || !out_required_out)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (lhs_capacity < 0 || rhs_capacity < 0 || out_capacity < 0 || count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_required_lhs == out_required_rhs ||
+        out_required_lhs == out_required_out ||
+        out_required_rhs == out_required_out)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_required_lhs == lhs_values || out_required_lhs == rhs_values ||
+        out_required_lhs == out_values || out_required_rhs == lhs_values ||
+        out_required_rhs == rhs_values || out_required_rhs == out_values ||
+        out_required_out == lhs_values || out_required_out == rhs_values ||
+        out_required_out == out_values)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (count > lhs_capacity || count > rhs_capacity || count > out_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (count)
+    {
+        status = FPArrayI64SpanChecked(lhs_values, count, &lhs_base, &lhs_end);
+        if (status)
+            return status;
+        status = FPArrayI64SpanChecked(rhs_values, count, &rhs_base, &rhs_end);
+        if (status)
+            return status;
+        status = FPArrayI64SpanChecked(out_values, count, &out_base, &out_end);
+        if (status)
+            return status;
+
+        req_lhs_base = (U64)out_required_lhs;
+        req_rhs_base = (U64)out_required_rhs;
+        req_out_base = (U64)out_required_out;
+
+        if (req_lhs_base > (U64_MAX_VALUE - 7) ||
+            req_rhs_base > (U64_MAX_VALUE - 7) ||
+            req_out_base > (U64_MAX_VALUE - 7))
+            return FP_Q16_ERR_OVERFLOW;
+
+        req_lhs_end = req_lhs_base + 8;
+        req_rhs_end = req_rhs_base + 8;
+        req_out_end = req_out_base + 8;
+
+        if (FPAddressRangesOverlap(req_lhs_base, req_lhs_end, lhs_base, lhs_end) ||
+            FPAddressRangesOverlap(req_lhs_base, req_lhs_end, rhs_base, rhs_end) ||
+            FPAddressRangesOverlap(req_lhs_base, req_lhs_end, out_base, out_end) ||
+            FPAddressRangesOverlap(req_rhs_base, req_rhs_end, lhs_base, lhs_end) ||
+            FPAddressRangesOverlap(req_rhs_base, req_rhs_end, rhs_base, rhs_end) ||
+            FPAddressRangesOverlap(req_rhs_base, req_rhs_end, out_base, out_end) ||
+            FPAddressRangesOverlap(req_out_base, req_out_end, lhs_base, lhs_end) ||
+            FPAddressRangesOverlap(req_out_base, req_out_end, rhs_base, rhs_end) ||
+            FPAddressRangesOverlap(req_out_base, req_out_end, out_base, out_end) ||
+            FPAddressRangesOverlap(req_lhs_base, req_lhs_end, req_rhs_base, req_rhs_end) ||
+            FPAddressRangesOverlap(req_lhs_base, req_lhs_end, req_out_base, req_out_end) ||
+            FPAddressRangesOverlap(req_rhs_base, req_rhs_end, req_out_base, req_out_end))
+            return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    snapshot_lhs_values = lhs_values;
+    snapshot_rhs_values = rhs_values;
+    snapshot_out_values = out_values;
+    snapshot_lhs_capacity = lhs_capacity;
+    snapshot_rhs_capacity = rhs_capacity;
+    snapshot_out_capacity = out_capacity;
+    snapshot_count = count;
+    snapshot_shift = shift;
+
+    staged_commit_out_values = out_values;
+    staged_canonical_out_values = out_values;
+
+    if (count)
+    {
+        if (count > (I64_MAX_VALUE >> 3))
+            return FP_Q16_ERR_OVERFLOW;
+
+        stage_bytes = ((U64)count) << 3;
+
+        staged_commit_out_values = MAlloc(stage_bytes);
+        if (!staged_commit_out_values)
+            return FP_Q16_ERR_OVERFLOW;
+
+        staged_canonical_out_values = MAlloc(stage_bytes);
+        if (!staged_canonical_out_values)
+        {
+            Free(staged_commit_out_values);
+            return FP_Q16_ERR_OVERFLOW;
+        }
+
+        for (i = 0; i < count; i++)
+        {
+            staged_commit_out_values[i] = out_values[i];
+            staged_canonical_out_values[i] = out_values[i];
+        }
+    }
+
+    status = FPQ16MulShiftRoundCheckedNoPartialArrayCommitOnly(lhs_values,
+                                                               lhs_capacity,
+                                                               rhs_values,
+                                                               rhs_capacity,
+                                                               staged_commit_out_values,
+                                                               out_capacity,
+                                                               count,
+                                                               shift,
+                                                               &staged_commit_required_lhs,
+                                                               &staged_commit_required_rhs,
+                                                               &staged_commit_required_out);
+    if (status != FP_Q16_OK)
+    {
+        if (count)
+        {
+            Free(staged_canonical_out_values);
+            Free(staged_commit_out_values);
+        }
+        return status;
+    }
+
+    status = FPQ16MulShiftRoundCheckedNoPartialArray(lhs_values,
+                                                     lhs_capacity,
+                                                     rhs_values,
+                                                     rhs_capacity,
+                                                     staged_canonical_out_values,
+                                                     out_capacity,
+                                                     count,
+                                                     shift);
+    if (status != FP_Q16_OK)
+    {
+        if (count)
+        {
+            Free(staged_canonical_out_values);
+            Free(staged_commit_out_values);
+        }
+        return status;
+    }
+
+    if (snapshot_lhs_values != lhs_values ||
+        snapshot_rhs_values != rhs_values ||
+        snapshot_out_values != out_values ||
+        snapshot_lhs_capacity != lhs_capacity ||
+        snapshot_rhs_capacity != rhs_capacity ||
+        snapshot_out_capacity != out_capacity ||
+        snapshot_count != count ||
+        snapshot_shift != shift)
+    {
+        if (count)
+        {
+            Free(staged_canonical_out_values);
+            Free(staged_commit_out_values);
+        }
+        return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    staged_canonical_required_lhs = snapshot_count;
+    staged_canonical_required_rhs = snapshot_count;
+    staged_canonical_required_out = snapshot_count;
+
+    if (staged_commit_required_lhs != staged_canonical_required_lhs ||
+        staged_commit_required_rhs != staged_canonical_required_rhs ||
+        staged_commit_required_out != staged_canonical_required_out)
+    {
+        if (count)
+        {
+            Free(staged_canonical_out_values);
+            Free(staged_commit_out_values);
+        }
+        return FP_Q16_ERR_BAD_PARAM;
+    }
+
+    if (count)
+    {
+        Free(staged_canonical_out_values);
+        Free(staged_commit_out_values);
+    }
+
+    *out_required_lhs = staged_commit_required_lhs;
+    *out_required_rhs = staged_commit_required_rhs;
+    *out_required_out = staged_commit_required_out;
+    return FP_Q16_OK;
+}
+
 // Geometry diagnostics helper for FPQ16MulCheckedNoPartialArray.
 //
 // Returns canonical lane requirements without touching out_q16:
