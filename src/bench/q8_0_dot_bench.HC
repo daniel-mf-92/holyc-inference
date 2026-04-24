@@ -3327,3 +3327,81 @@ I32 Q8_0DotBenchRunDefaultSuiteTelemetryDigestQ64CheckedNoPartialCommitOnlyPrefl
     *out_digest_q64 = parity_digest_q64;
     return Q8_0_DOT_BENCH_OK;
 }
+
+I32 Q8_0DotBenchRunDefaultSuiteTelemetryDigestQ64CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
+    I64 total_ops,
+    I64 total_cycles,
+    I64 cycles_per_op,
+    I64 remainder_cycles,
+    I64 suite_checksum,
+    I64 cpu_hz,
+    I64 *out_digest_q64)
+{
+    I64 snapshot_total_ops;
+    I64 snapshot_total_cycles;
+    I64 snapshot_cycles_per_op;
+    I64 snapshot_remainder_cycles;
+    I64 snapshot_suite_checksum;
+    I64 snapshot_cpu_hz;
+    I64 *snapshot_out_digest_q64;
+
+    I64 preflight_probe_digest_q64;
+    I64 parity_digest_q64;
+    I32 status;
+
+    if (!out_digest_q64)
+        return Q8_0_DOT_BENCH_ERR_NULL_PTR;
+
+    if (total_ops < 0 || total_cycles < 0 || cycles_per_op < 0 ||
+        remainder_cycles < 0 || suite_checksum < 0 || cpu_hz <= 0)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    snapshot_total_ops = total_ops;
+    snapshot_total_cycles = total_cycles;
+    snapshot_cycles_per_op = cycles_per_op;
+    snapshot_remainder_cycles = remainder_cycles;
+    snapshot_suite_checksum = suite_checksum;
+    snapshot_cpu_hz = cpu_hz;
+    snapshot_out_digest_q64 = out_digest_q64;
+
+    preflight_probe_digest_q64 = 3689348814741910323;
+    status = Q8_0DotBenchRunDefaultSuiteTelemetryDigestQ64CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+        total_ops,
+        total_cycles,
+        cycles_per_op,
+        remainder_cycles,
+        suite_checksum,
+        cpu_hz,
+        &preflight_probe_digest_q64);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    status = Q8_0DotBenchRunDefaultSuiteTelemetryDigestQ64CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+        total_ops,
+        total_cycles,
+        cycles_per_op,
+        remainder_cycles,
+        suite_checksum,
+        cpu_hz,
+        &parity_digest_q64);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    if (snapshot_total_ops != total_ops ||
+        snapshot_total_cycles != total_cycles ||
+        snapshot_cycles_per_op != cycles_per_op ||
+        snapshot_remainder_cycles != remainder_cycles ||
+        snapshot_suite_checksum != suite_checksum ||
+        snapshot_cpu_hz != cpu_hz)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+    if (snapshot_out_digest_q64 != out_digest_q64)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    // Preflight-only probe must stay untouched and parity wrapper decides digest truth.
+    if (preflight_probe_digest_q64 != 3689348814741910323)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    // Commit-only publish: single caller-visible write after strict preflight parity.
+    *out_digest_q64 = parity_digest_q64;
+    return Q8_0_DOT_BENCH_OK;
+}
