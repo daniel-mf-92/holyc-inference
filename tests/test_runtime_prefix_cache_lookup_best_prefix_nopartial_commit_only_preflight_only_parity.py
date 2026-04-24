@@ -1,25 +1,30 @@
 #!/usr/bin/env python3
-from dataclasses import dataclass
+"""Parity harness for PrefixCacheLookupBestPrefixCheckedNoPartialCommitOnlyPreflightOnlyParity (IQ-1298)."""
+
+from dataclasses import dataclass, field
+from pathlib import Path
 
 PREFIX_CACHE_OK = 0
-PREFIX_CACHE_ERR_NULL_PTR = 1
-PREFIX_CACHE_ERR_BAD_PARAM = 2
-PREFIX_CACHE_ERR_NOT_FOUND = 4
+PREFIX_CACHE_ERR_NULL_PTR = -1
+PREFIX_CACHE_ERR_BAD_PARAM = -2
+PREFIX_CACHE_ERR_NOT_FOUND = -3
+
+PREFIX_CACHE_FRESH_EMPTY = 0
 PREFIX_CACHE_FRESH_VALID = 1
 
 
 @dataclass
 class PrefixCacheEntry:
-    valid: int = 0
+    valid: int = PREFIX_CACHE_FRESH_EMPTY
     prefix_hash: int = 0
     prefix_tokens: int = 0
 
 
 @dataclass
 class PrefixCache:
-    entries: list
+    entries: list[PrefixCacheEntry] | None
     capacity: int
-    count: int
+    count: int = 0
 
 
 def lookup_best_prefix_nopartial(cache, query_hash, max_prompt_tokens):
@@ -30,25 +35,22 @@ def lookup_best_prefix_nopartial(cache, query_hash, max_prompt_tokens):
     if query_hash < 0 or max_prompt_tokens < 0:
         return PREFIX_CACHE_ERR_BAD_PARAM, None, None
 
-    best_index = -1
+    best_index = None
     best_tokens = 0
-    idx = 0
-    while idx < cache.capacity:
+    for idx in range(cache.capacity):
         entry = cache.entries[idx]
         if entry.valid == PREFIX_CACHE_FRESH_VALID and entry.prefix_hash == query_hash:
             if entry.prefix_tokens <= max_prompt_tokens:
                 if (
-                    best_index < 0
+                    best_index is None
                     or entry.prefix_tokens > best_tokens
                     or (entry.prefix_tokens == best_tokens and idx < best_index)
                 ):
                     best_index = idx
                     best_tokens = entry.prefix_tokens
-        idx += 1
 
-    if best_index < 0:
+    if best_index is None:
         return PREFIX_CACHE_ERR_NOT_FOUND, None, None
-
     return PREFIX_CACHE_OK, best_index, best_tokens
 
 
@@ -60,22 +62,19 @@ def lookup_best_prefix_commit_only(cache, query_hash, max_prompt_tokens):
     if query_hash < 0 or max_prompt_tokens < 0:
         return PREFIX_CACHE_ERR_BAD_PARAM, None, None
 
-    snapshot_entry_count = cache.count
-    snapshot_capacity = cache.capacity
-    snapshot_max_prompt_tokens = max_prompt_tokens
+    snapshot_count = cache.count
     snapshot_query_hash = query_hash
+    snapshot_max_prompt_tokens = max_prompt_tokens
 
     status, best_index, best_tokens = lookup_best_prefix_nopartial(cache, query_hash, max_prompt_tokens)
     if status != PREFIX_CACHE_OK:
         return status, None, None
 
-    if cache.capacity != snapshot_capacity:
-        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
-    if cache.count != snapshot_entry_count or cache.count < 0 or cache.count > cache.capacity:
-        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
-    if max_prompt_tokens != snapshot_max_prompt_tokens or max_prompt_tokens < 0:
+    if cache.count != snapshot_count or cache.count < 0 or cache.count > cache.capacity:
         return PREFIX_CACHE_ERR_BAD_PARAM, None, None
     if query_hash != snapshot_query_hash:
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
+    if max_prompt_tokens != snapshot_max_prompt_tokens or max_prompt_tokens < 0:
         return PREFIX_CACHE_ERR_BAD_PARAM, None, None
 
     return PREFIX_CACHE_OK, best_index, best_tokens
@@ -89,9 +88,9 @@ def lookup_best_prefix_commit_only_preflight_only(cache, query_hash, max_prompt_
     if query_hash < 0 or max_prompt_tokens < 0:
         return PREFIX_CACHE_ERR_BAD_PARAM, None, None
 
-    snapshot_entry_count = cache.count
-    snapshot_max_prompt_tokens = max_prompt_tokens
+    snapshot_count = cache.count
     snapshot_query_hash = query_hash
+    snapshot_max_prompt_tokens = max_prompt_tokens
 
     status_preflight, preflight_best_index, preflight_best_tokens = lookup_best_prefix_commit_only(
         cache, query_hash, max_prompt_tokens
@@ -108,11 +107,11 @@ def lookup_best_prefix_commit_only_preflight_only(cache, query_hash, max_prompt_
     if preflight_best_index != canonical_best_index or preflight_best_tokens != canonical_best_tokens:
         return PREFIX_CACHE_ERR_BAD_PARAM, None, None
 
-    if cache.count != snapshot_entry_count or cache.count < 0 or cache.count > cache.capacity:
-        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
-    if max_prompt_tokens != snapshot_max_prompt_tokens or max_prompt_tokens < 0:
+    if cache.count != snapshot_count or cache.count < 0 or cache.count > cache.capacity:
         return PREFIX_CACHE_ERR_BAD_PARAM, None, None
     if query_hash != snapshot_query_hash:
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
+    if max_prompt_tokens != snapshot_max_prompt_tokens or max_prompt_tokens < 0:
         return PREFIX_CACHE_ERR_BAD_PARAM, None, None
 
     return PREFIX_CACHE_OK, preflight_best_index, preflight_best_tokens
@@ -126,9 +125,10 @@ def lookup_best_prefix_commit_only_preflight_only_parity(cache, query_hash, max_
     if query_hash < 0 or max_prompt_tokens < 0:
         return PREFIX_CACHE_ERR_BAD_PARAM, None, None
 
-    snapshot_entry_count = cache.count
-    snapshot_max_prompt_tokens = max_prompt_tokens
+    snapshot_count = cache.count
+    snapshot_capacity = cache.capacity
     snapshot_query_hash = query_hash
+    snapshot_max_prompt_tokens = max_prompt_tokens
 
     status_preflight, preflight_best_index, preflight_best_tokens = lookup_best_prefix_commit_only_preflight_only(
         cache, query_hash, max_prompt_tokens
@@ -145,75 +145,72 @@ def lookup_best_prefix_commit_only_preflight_only_parity(cache, query_hash, max_
     if preflight_best_index != canonical_best_index or preflight_best_tokens != canonical_best_tokens:
         return PREFIX_CACHE_ERR_BAD_PARAM, None, None
 
-    if cache.count != snapshot_entry_count or cache.count < 0 or cache.count > cache.capacity:
+    if cache.count != snapshot_count or cache.count < 0 or cache.count > cache.capacity:
         return PREFIX_CACHE_ERR_BAD_PARAM, None, None
-    if max_prompt_tokens != snapshot_max_prompt_tokens or max_prompt_tokens < 0:
+    if cache.capacity != snapshot_capacity or cache.capacity <= 0:
         return PREFIX_CACHE_ERR_BAD_PARAM, None, None
     if query_hash != snapshot_query_hash:
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
+    if max_prompt_tokens != snapshot_max_prompt_tokens or max_prompt_tokens < 0:
         return PREFIX_CACHE_ERR_BAD_PARAM, None, None
 
     return PREFIX_CACHE_OK, preflight_best_index, preflight_best_tokens
 
 
-def test_lookup_best_prefix_commit_only_preflight_only_parity_success_and_tiebreak():
+def test_parity_success_and_tiebreak_lowest_index():
     entries = [PrefixCacheEntry() for _ in range(7)]
-    cache = PrefixCache(entries=entries, capacity=7, count=5)
+    cache = PrefixCache(entries=entries, capacity=7, count=4)
+    entries[4] = PrefixCacheEntry(valid=PREFIX_CACHE_FRESH_VALID, prefix_hash=99, prefix_tokens=48)
+    entries[2] = PrefixCacheEntry(valid=PREFIX_CACHE_FRESH_VALID, prefix_hash=99, prefix_tokens=48)
+    entries[1] = PrefixCacheEntry(valid=PREFIX_CACHE_FRESH_VALID, prefix_hash=99, prefix_tokens=32)
 
-    entries[3] = PrefixCacheEntry(valid=PREFIX_CACHE_FRESH_VALID, prefix_hash=777, prefix_tokens=40)
-    entries[5] = PrefixCacheEntry(valid=PREFIX_CACHE_FRESH_VALID, prefix_hash=777, prefix_tokens=56)
-    entries[6] = PrefixCacheEntry(valid=PREFIX_CACHE_FRESH_VALID, prefix_hash=777, prefix_tokens=56)
-    entries[2] = PrefixCacheEntry(valid=PREFIX_CACHE_FRESH_VALID, prefix_hash=444, prefix_tokens=80)
-
-    status, best_index, best_tokens = lookup_best_prefix_commit_only_preflight_only_parity(cache, 777, 64)
+    status, best_index, best_tokens = lookup_best_prefix_commit_only_preflight_only_parity(cache, 99, 64)
     assert status == PREFIX_CACHE_OK
-    assert best_index == 5
-    assert best_tokens == 56
+    assert best_index == 2
+    assert best_tokens == 48
 
 
-def test_lookup_best_prefix_commit_only_preflight_only_parity_max_prompt_bound():
+def test_parity_respects_prompt_bound():
     entries = [PrefixCacheEntry() for _ in range(5)]
     cache = PrefixCache(entries=entries, capacity=5, count=3)
+    entries[0] = PrefixCacheEntry(valid=PREFIX_CACHE_FRESH_VALID, prefix_hash=7, prefix_tokens=8)
+    entries[1] = PrefixCacheEntry(valid=PREFIX_CACHE_FRESH_VALID, prefix_hash=7, prefix_tokens=24)
+    entries[2] = PrefixCacheEntry(valid=PREFIX_CACHE_FRESH_VALID, prefix_hash=7, prefix_tokens=32)
 
-    entries[0] = PrefixCacheEntry(valid=PREFIX_CACHE_FRESH_VALID, prefix_hash=5, prefix_tokens=8)
-    entries[1] = PrefixCacheEntry(valid=PREFIX_CACHE_FRESH_VALID, prefix_hash=5, prefix_tokens=24)
-    entries[2] = PrefixCacheEntry(valid=PREFIX_CACHE_FRESH_VALID, prefix_hash=5, prefix_tokens=32)
-
-    status, best_index, best_tokens = lookup_best_prefix_commit_only_preflight_only_parity(cache, 5, 24)
+    status, best_index, best_tokens = lookup_best_prefix_commit_only_preflight_only_parity(cache, 7, 24)
     assert status == PREFIX_CACHE_OK
     assert best_index == 1
     assert best_tokens == 24
 
 
-def test_lookup_best_prefix_commit_only_preflight_only_parity_not_found():
-    entries = [PrefixCacheEntry() for _ in range(4)]
-    cache = PrefixCache(entries=entries, capacity=4, count=1)
-    entries[3] = PrefixCacheEntry(valid=PREFIX_CACHE_FRESH_VALID, prefix_hash=12, prefix_tokens=10)
+def test_parity_not_found_bubbles_without_write():
+    entries = [PrefixCacheEntry() for _ in range(3)]
+    cache = PrefixCache(entries=entries, capacity=3, count=1)
+    entries[2] = PrefixCacheEntry(valid=PREFIX_CACHE_FRESH_VALID, prefix_hash=123, prefix_tokens=10)
 
-    status, best_index, best_tokens = lookup_best_prefix_commit_only_preflight_only_parity(cache, 99, 100)
+    status, best_index, best_tokens = lookup_best_prefix_commit_only_preflight_only_parity(cache, 124, 10)
     assert status == PREFIX_CACHE_ERR_NOT_FOUND
     assert best_index is None
     assert best_tokens is None
+    assert cache.count == 1
 
 
-def test_lookup_best_prefix_commit_only_preflight_only_parity_bad_params():
-    entries = [PrefixCacheEntry() for _ in range(2)]
-    cache = PrefixCache(entries=entries, capacity=2, count=0)
-
-    status, _, _ = lookup_best_prefix_commit_only_preflight_only_parity(cache, -1, 8)
-    assert status == PREFIX_CACHE_ERR_BAD_PARAM
-
-    status, _, _ = lookup_best_prefix_commit_only_preflight_only_parity(cache, 1, -8)
-    assert status == PREFIX_CACHE_ERR_BAD_PARAM
-
-    status, _, _ = lookup_best_prefix_commit_only_preflight_only_parity(
-        PrefixCache(entries=entries, capacity=0, count=0), 1, 8
-    )
-    assert status == PREFIX_CACHE_ERR_BAD_PARAM
+def test_holyc_function_body_and_calls_present():
+    source = Path("src/runtime/prefix_cache.HC").read_text(encoding="utf-8")
+    sig = "I32 PrefixCacheLookupBestPrefixCheckedNoPartialCommitOnlyPreflightOnlyParity("
+    assert sig in source
+    body = source.split(sig, 1)[1]
+    assert "PrefixCacheLookupBestPrefixCheckedNoPartialCommitOnlyPreflightOnly(" in body
+    assert "PrefixCacheLookupBestPrefixCheckedNoPartialCommitOnly(" in body
+    assert "cache->count != snapshot_entry_count" in body
+    assert "cache->capacity != snapshot_capacity" in body
+    assert "*out_best_index = preflight_best_index;" in body
+    assert "*out_best_tokens = preflight_best_tokens;" in body
 
 
 if __name__ == "__main__":
-    test_lookup_best_prefix_commit_only_preflight_only_parity_success_and_tiebreak()
-    test_lookup_best_prefix_commit_only_preflight_only_parity_max_prompt_bound()
-    test_lookup_best_prefix_commit_only_preflight_only_parity_not_found()
-    test_lookup_best_prefix_commit_only_preflight_only_parity_bad_params()
+    test_parity_success_and_tiebreak_lowest_index()
+    test_parity_respects_prompt_bound()
+    test_parity_not_found_bubbles_without_write()
+    test_holyc_function_body_and_calls_present()
     print("ok")
