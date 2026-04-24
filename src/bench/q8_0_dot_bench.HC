@@ -2053,6 +2053,34 @@ I32 Q8_0DotBenchRunDefaultSuiteOpsPerSecondQ16CheckedNoPartialCommitOnly(
 // - Keep immutable snapshots for params + output destination.
 // - Require strict parity with canonical integer-only helper.
 // - Never mutate caller output on error (preflight-only semantics).
+I32 Q8_0DotBenchRunDefaultSuiteCyclesPerTokenQ16CheckedNoPartialCommitOnly(
+    I64 total_cycles,
+    I64 total_ops,
+    I64 *out_cycles_per_token_q16)
+{
+    I64 out_snapshot;
+    I64 staged_cycles_per_token_q16;
+    I32 status;
+
+    if (!out_cycles_per_token_q16)
+        return Q8_0_DOT_BENCH_ERR_NULL_PTR;
+
+    out_snapshot = *out_cycles_per_token_q16;
+
+    status = Q8_0DotBenchRunDefaultSuiteCyclesPerTokenQ16Checked(
+        total_cycles,
+        total_ops,
+        &staged_cycles_per_token_q16);
+    if (status != Q8_0_DOT_BENCH_OK)
+    {
+        *out_cycles_per_token_q16 = out_snapshot;
+        return status;
+    }
+
+    *out_cycles_per_token_q16 = staged_cycles_per_token_q16;
+    return Q8_0_DOT_BENCH_OK;
+}
+
 I32 Q8_0DotBenchRunDefaultSuiteOpsPerSecondQ16CheckedNoPartialCommitOnlyPreflightOnly(
     I64 total_ops,
     I64 total_cycles,
