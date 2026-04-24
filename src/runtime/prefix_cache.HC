@@ -219,6 +219,62 @@ I32 PrefixCacheLookupChecked(PrefixCache *cache,
     return PREFIX_CACHE_OK;
 }
 
+I32 PrefixCacheLookupBestPrefixChecked(PrefixCache *cache,
+                                       I64 query_hash,
+                                       I64 max_prompt_tokens,
+                                       I64 *out_best_index,
+                                       I64 *out_best_tokens)
+{
+    I64 idx;
+    I64 best_index;
+    I64 best_tokens;
+    I64 prefix_tokens;
+
+    if (!cache || !cache->entries || !out_best_index || !out_best_tokens)
+        return PREFIX_CACHE_ERR_NULL_PTR;
+
+    if (out_best_index == out_best_tokens)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->capacity <= 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (query_hash < 0 || max_prompt_tokens < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    best_index = -1;
+    best_tokens = 0;
+
+    idx = 0;
+    while (idx < cache->capacity)
+    {
+        if (cache->entries[idx].valid == PREFIX_CACHE_FRESH_VALID &&
+            cache->entries[idx].prefix_hash == query_hash)
+        {
+            prefix_tokens = cache->entries[idx].prefix_tokens;
+            if (prefix_tokens <= max_prompt_tokens)
+            {
+                // Stable tie-break: identical prefix lengths prefer lowest slot.
+                if (best_index < 0 ||
+                    prefix_tokens > best_tokens ||
+                    (prefix_tokens == best_tokens && idx < best_index))
+                {
+                    best_index = idx;
+                    best_tokens = prefix_tokens;
+                }
+            }
+        }
+        idx++;
+    }
+
+    if (best_index < 0)
+        return PREFIX_CACHE_ERR_NOT_FOUND;
+
+    *out_best_index = best_index;
+    *out_best_tokens = best_tokens;
+    return PREFIX_CACHE_OK;
+}
+
 I32 PrefixCacheSelectVictimIndexLRUChecked(PrefixCache *cache,
                                            I64 *out_victim_index)
 {
@@ -333,53 +389,11 @@ I32 PrefixCacheLookupBestPrefixCheckedNoPartial(PrefixCache *cache,
                                                 I64 *out_best_index,
                                                 I64 *out_best_tokens)
 {
-    I64 idx;
-    I64 best_index;
-    I64 best_tokens;
-    I64 prefix_tokens;
-
-    if (!cache || !cache->entries || !out_best_index || !out_best_tokens)
-        return PREFIX_CACHE_ERR_NULL_PTR;
-
-    if (out_best_index == out_best_tokens)
-        return PREFIX_CACHE_ERR_BAD_PARAM;
-
-    if (cache->capacity <= 0)
-        return PREFIX_CACHE_ERR_BAD_PARAM;
-
-    if (query_hash < 0 || max_prompt_tokens < 0)
-        return PREFIX_CACHE_ERR_BAD_PARAM;
-
-    best_index = -1;
-    best_tokens = 0;
-
-    idx = 0;
-    while (idx < cache->capacity)
-    {
-        if (cache->entries[idx].valid == PREFIX_CACHE_FRESH_VALID &&
-            cache->entries[idx].prefix_hash == query_hash)
-        {
-            prefix_tokens = cache->entries[idx].prefix_tokens;
-            if (prefix_tokens <= max_prompt_tokens)
-            {
-                if (best_index < 0 ||
-                    prefix_tokens > best_tokens ||
-                    (prefix_tokens == best_tokens && idx < best_index))
-                {
-                    best_index = idx;
-                    best_tokens = prefix_tokens;
-                }
-            }
-        }
-        idx++;
-    }
-
-    if (best_index < 0)
-        return PREFIX_CACHE_ERR_NOT_FOUND;
-
-    *out_best_index = best_index;
-    *out_best_tokens = best_tokens;
-    return PREFIX_CACHE_OK;
+    return PrefixCacheLookupBestPrefixChecked(cache,
+                                              query_hash,
+                                              max_prompt_tokens,
+                                              out_best_index,
+                                              out_best_tokens);
 }
 
 I32 PrefixCacheLookupBestPrefixCheckedNoPartialCommitOnly(PrefixCache *cache,
