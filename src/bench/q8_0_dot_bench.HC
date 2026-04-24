@@ -747,88 +747,100 @@ I32 Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnly(
     return Q8_0_DOT_BENCH_OK;
 }
 
-// Diagnostics zero-write companion over commit-only strict parity gate.
+// Diagnostics zero-write companion over commit-only parity gate.
 //
 // Contracts:
-// - Recompute tuple through CommitOnlyParityCommitOnly path into staged locals.
-// - Enforce immutable caller snapshots for input/output destinations.
-// - Rebuild canonical deterministic tuple and require exact parity match.
-// - Atomically publish diagnostics tuple only after full parity success.
+// - Run commit-only parity and parity-only diagnostics paths into staged locals.
+// - Enforce immutable caller snapshots for cpu_hz and output destination values.
+// - Require exact tuple parity on
+//   {total_ops,total_cycles,cycles_per_op,remainder_cycles,suite_checksum}.
+// - Preflight-only semantics: never publish caller outputs.
 I32 Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
     I64 cpu_hz,
-    I64 *out_shape_count,
-    I64 *out_max_blocks,
-    I64 *out_max_rows,
-    I64 *out_max_row_matrix_blocks)
+    I64 *out_total_ops,
+    I64 *out_total_cycles,
+    I64 *out_cycles_per_op,
+    I64 *out_remainder_cycles,
+    I64 *out_suite_checksum)
 {
     I64 snapshot_cpu_hz;
-    I64 *snapshot_out_shape_count;
-    I64 *snapshot_out_max_blocks;
-    I64 *snapshot_out_max_rows;
-    I64 *snapshot_out_max_row_matrix_blocks;
+    I64 snapshot_out_shape_count;
+    I64 snapshot_out_total_cycles;
+    I64 snapshot_out_cycles_per_op;
+    I64 snapshot_out_remainder_cycles;
+    I64 snapshot_out_suite_checksum;
 
-    I64 commit_shape_count;
-    I64 commit_max_blocks;
-    I64 commit_max_rows;
-    I64 commit_max_row_matrix_blocks;
+    I64 parity_preflight_total_ops;
+    I64 parity_preflight_total_cycles;
+    I64 parity_preflight_cycles_per_op;
+    I64 parity_preflight_remainder_cycles;
+    I64 parity_preflight_suite_checksum;
 
-    I64 canonical_shape_count;
-    I64 canonical_max_blocks;
-    I64 canonical_max_rows;
-    I64 canonical_max_row_matrix_blocks;
+    I64 parity_commit_total_ops;
+    I64 parity_commit_total_cycles;
+    I64 parity_commit_cycles_per_op;
+    I64 parity_commit_remainder_cycles;
+    I64 parity_commit_suite_checksum;
     I32 status;
 
-    if (!out_shape_count || !out_max_blocks || !out_max_rows ||
-        !out_max_row_matrix_blocks)
+    if (!out_total_ops || !out_total_cycles || !out_cycles_per_op ||
+        !out_remainder_cycles || !out_suite_checksum)
         return Q8_0_DOT_BENCH_ERR_NULL_PTR;
 
+    if (out_total_ops == out_total_cycles ||
+        out_total_ops == out_cycles_per_op ||
+        out_total_ops == out_remainder_cycles ||
+        out_total_ops == out_suite_checksum ||
+        out_total_cycles == out_cycles_per_op ||
+        out_total_cycles == out_remainder_cycles ||
+        out_total_cycles == out_suite_checksum ||
+        out_cycles_per_op == out_remainder_cycles ||
+        out_cycles_per_op == out_suite_checksum ||
+        out_remainder_cycles == out_suite_checksum)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
     snapshot_cpu_hz = cpu_hz;
-    snapshot_out_shape_count = out_shape_count;
-    snapshot_out_max_blocks = out_max_blocks;
-    snapshot_out_max_rows = out_max_rows;
-    snapshot_out_max_row_matrix_blocks = out_max_row_matrix_blocks;
+    snapshot_out_shape_count = *out_total_ops;
+    snapshot_out_total_cycles = *out_total_cycles;
+    snapshot_out_cycles_per_op = *out_cycles_per_op;
+    snapshot_out_remainder_cycles = *out_remainder_cycles;
+    snapshot_out_suite_checksum = *out_suite_checksum;
 
-    commit_shape_count = *out_shape_count;
-    commit_max_blocks = *out_max_blocks;
-    commit_max_rows = *out_max_rows;
-    commit_max_row_matrix_blocks = *out_max_row_matrix_blocks;
-
-    status = Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnly(
+    status = Q8_0DotBenchRunDefaultSuitePreflightOnlyCommitOnlyParityCommitOnlyPreflightOnly(
         cpu_hz,
-        &commit_shape_count,
-        &commit_max_blocks,
-        &commit_max_rows,
-        &commit_max_row_matrix_blocks);
+        &parity_preflight_total_ops,
+        &parity_preflight_total_cycles,
+        &parity_preflight_cycles_per_op,
+        &parity_preflight_remainder_cycles,
+        &parity_preflight_suite_checksum);
     if (status != Q8_0_DOT_BENCH_OK)
         return status;
 
-    if (snapshot_cpu_hz != cpu_hz)
-        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
-    if (snapshot_out_shape_count != out_shape_count ||
-        snapshot_out_max_blocks != out_max_blocks ||
-        snapshot_out_max_rows != out_max_rows ||
-        snapshot_out_max_row_matrix_blocks != out_max_row_matrix_blocks)
-        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
-
-    canonical_shape_count = 4;
-    canonical_max_blocks = 32;
-    canonical_max_rows = 8;
-    status = Q8_0DotBenchTryMulI64(canonical_max_rows,
-                                   canonical_max_blocks,
-                                   &canonical_max_row_matrix_blocks);
+    status = Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+        cpu_hz,
+        &parity_commit_total_ops,
+        &parity_commit_total_cycles,
+        &parity_commit_cycles_per_op,
+        &parity_commit_remainder_cycles,
+        &parity_commit_suite_checksum);
     if (status != Q8_0_DOT_BENCH_OK)
         return status;
 
-    if (commit_shape_count != canonical_shape_count ||
-        commit_max_blocks != canonical_max_blocks ||
-        commit_max_rows != canonical_max_rows ||
-        commit_max_row_matrix_blocks != canonical_max_row_matrix_blocks)
+    if (snapshot_cpu_hz != cpu_hz ||
+        snapshot_out_shape_count != *out_total_ops ||
+        snapshot_out_total_cycles != *out_total_cycles ||
+        snapshot_out_cycles_per_op != *out_cycles_per_op ||
+        snapshot_out_remainder_cycles != *out_remainder_cycles ||
+        snapshot_out_suite_checksum != *out_suite_checksum)
         return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
 
-    *out_shape_count = commit_shape_count;
-    *out_max_blocks = commit_max_blocks;
-    *out_max_rows = commit_max_rows;
-    *out_max_row_matrix_blocks = commit_max_row_matrix_blocks;
+    if (parity_commit_total_ops != parity_preflight_total_ops ||
+        parity_commit_total_cycles != parity_preflight_total_cycles ||
+        parity_commit_cycles_per_op != parity_preflight_cycles_per_op ||
+        parity_commit_remainder_cycles != parity_preflight_remainder_cycles ||
+        parity_commit_suite_checksum != parity_preflight_suite_checksum)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
     return Q8_0_DOT_BENCH_OK;
 }
 
