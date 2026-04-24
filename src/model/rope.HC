@@ -1672,6 +1672,92 @@ I32 RoPEQ16RotateHeadByPositionApplyPairCheckedNoPartialCommitOnlyPreflightOnlyP
     return ROPE_Q16_OK;
 }
 
+// Commit-only parity gate over preflight-only parity diagnostics.
+//
+// Contract:
+//   - Delegates to preflight-only parity with staged outputs.
+//   - Enforces immutable rotation tuple snapshots before publish:
+//       {head_cell_capacity, head_base_index, head_dim, pair_stride_cells,
+//        freq_base_q16, position}.
+//   - Publishes commit tuple atomically only after strict parity:
+//       {commit_pair_count=head_dim>>1, commit_status=ROPE_Q16_OK}.
+I32 RoPEQ16RotateHeadByPositionApplyPairCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(I64 *head_cells_q16,
+                                                                                                 I64 head_cell_capacity,
+                                                                                                 I64 head_base_index,
+                                                                                                 I64 head_dim,
+                                                                                                 I64 pair_stride_cells,
+                                                                                                 I64 freq_base_q16,
+                                                                                                 I64 position,
+                                                                                                 I64 *out_commit_pair_count,
+                                                                                                 I64 *out_commit_status)
+{
+    I64 snapshot_head_cell_capacity;
+    I64 snapshot_head_base_index;
+    I64 snapshot_head_dim;
+    I64 snapshot_pair_stride_cells;
+    I64 snapshot_freq_base_q16;
+    I64 snapshot_position;
+    I64 pair_count;
+    I64 staged_pair_count;
+    I64 staged_commit_status;
+    I64 staged_commit_pair_count;
+    I32 status;
+
+    if (!head_cells_q16)
+        return ROPE_Q16_ERR_NULL_PTR;
+    if (!out_commit_pair_count)
+        return ROPE_Q16_ERR_NULL_PTR;
+    if (!out_commit_status)
+        return ROPE_Q16_ERR_NULL_PTR;
+    if (head_dim < 0)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    snapshot_head_cell_capacity = head_cell_capacity;
+    snapshot_head_base_index = head_base_index;
+    snapshot_head_dim = head_dim;
+    snapshot_pair_stride_cells = pair_stride_cells;
+    snapshot_freq_base_q16 = freq_base_q16;
+    snapshot_position = position;
+
+    status = RoPEQ16RotateHeadByPositionApplyPairCheckedNoPartialCommitOnlyPreflightOnlyParity(head_cells_q16,
+                                                                                                 head_cell_capacity,
+                                                                                                 head_base_index,
+                                                                                                 head_dim,
+                                                                                                 pair_stride_cells,
+                                                                                                 freq_base_q16,
+                                                                                                 position,
+                                                                                                 &staged_pair_count,
+                                                                                                 &staged_commit_status,
+                                                                                                 &staged_commit_pair_count);
+    if (status != ROPE_Q16_OK)
+        return status;
+
+    if (head_cell_capacity != snapshot_head_cell_capacity)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (head_base_index != snapshot_head_base_index)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (head_dim != snapshot_head_dim)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (pair_stride_cells != snapshot_pair_stride_cells)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (freq_base_q16 != snapshot_freq_base_q16)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (position != snapshot_position)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    pair_count = head_dim >> 1;
+    if (staged_pair_count != pair_count)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (staged_commit_status != ROPE_Q16_OK)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (staged_commit_pair_count != pair_count)
+        return ROPE_Q16_ERR_BAD_PARAM;
+
+    *out_commit_pair_count = staged_commit_pair_count;
+    *out_commit_status = staged_commit_status;
+    return ROPE_Q16_OK;
+}
+
 // Compute one head base index inside a contiguous head range:
 //   head_base = range_base_index + head_index * head_stride_cells
 //
