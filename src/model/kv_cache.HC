@@ -319,6 +319,82 @@ I32 KVCacheQ16PersistHeaderCheckedNoPartial(
     return KV_Q16_ERR_BAD_PARAM;
 }
 
+// Commit-only wrapper over KV header persist/read path.
+//
+// Contract:
+// - Inputs are captured into immutable snapshots first.
+// - Canonical helper computes fully before any observable publish.
+// - On success, result tuple is atomically published to caller outputs.
+// - On failure, caller tuple remains unchanged (no-partial semantics).
+I32 KVCacheQ16PersistHeaderCheckedNoPartialCommitOnly(
+    I64 *header_cells,
+    I64 header_capacity,
+    I64 mode,
+    I64 *inout_layer_count,
+    I64 *inout_token_capacity,
+    I64 *inout_kv_heads,
+    I64 *inout_head_dim,
+    I64 *inout_used_tokens,
+    I64 *inout_total_cells)
+{
+    I64 snapshot_layer_count;
+    I64 snapshot_token_capacity;
+    I64 snapshot_kv_heads;
+    I64 snapshot_head_dim;
+    I64 snapshot_used_tokens;
+    I64 snapshot_total_cells;
+    I64 staged_layer_count;
+    I64 staged_token_capacity;
+    I64 staged_kv_heads;
+    I64 staged_head_dim;
+    I64 staged_used_tokens;
+    I64 staged_total_cells;
+    I32 status;
+
+    if (!header_cells ||
+        !inout_layer_count ||
+        !inout_token_capacity ||
+        !inout_kv_heads ||
+        !inout_head_dim ||
+        !inout_used_tokens ||
+        !inout_total_cells)
+        return KV_Q16_ERR_NULL_PTR;
+
+    snapshot_layer_count = *inout_layer_count;
+    snapshot_token_capacity = *inout_token_capacity;
+    snapshot_kv_heads = *inout_kv_heads;
+    snapshot_head_dim = *inout_head_dim;
+    snapshot_used_tokens = *inout_used_tokens;
+    snapshot_total_cells = *inout_total_cells;
+
+    staged_layer_count = snapshot_layer_count;
+    staged_token_capacity = snapshot_token_capacity;
+    staged_kv_heads = snapshot_kv_heads;
+    staged_head_dim = snapshot_head_dim;
+    staged_used_tokens = snapshot_used_tokens;
+    staged_total_cells = snapshot_total_cells;
+
+    status = KVCacheQ16PersistHeaderCheckedNoPartial(header_cells,
+                                                     header_capacity,
+                                                     mode,
+                                                     &staged_layer_count,
+                                                     &staged_token_capacity,
+                                                     &staged_kv_heads,
+                                                     &staged_head_dim,
+                                                     &staged_used_tokens,
+                                                     &staged_total_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    *inout_layer_count = staged_layer_count;
+    *inout_token_capacity = staged_token_capacity;
+    *inout_kv_heads = staged_kv_heads;
+    *inout_head_dim = staged_head_dim;
+    *inout_used_tokens = staged_used_tokens;
+    *inout_total_cells = staged_total_cells;
+    return KV_Q16_OK;
+}
+
 // Total Q16 cells needed for one cache slab (K or V):
 // total_cells = layer_count * token_capacity * kv_heads * head_dim
 // The computation is staged through checked helpers to keep overflow
@@ -7655,4 +7731,3 @@ I32 KVCacheQ16TokenShiftLeftCheckedNoPartialCommitOnly(
     *out_moved_cells = staged_moved_cells;
     return KV_Q16_OK;
 }
-
