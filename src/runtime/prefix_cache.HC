@@ -879,6 +879,98 @@ I32 PrefixCacheInvalidateRangeChecked(PrefixCache *cache,
     return PREFIX_CACHE_OK;
 }
 
+I32 PrefixCacheInvalidateRangeCheckedNoPartialCommitOnly(PrefixCache *cache,
+                                                         I64 invalidate_start_token,
+                                                         I64 invalidate_token_count,
+                                                         I64 *out_removed_count)
+{
+    I64 idx;
+    I64 snapshot_capacity;
+    I64 snapshot_count;
+    I64 invalidate_end_exclusive;
+    I64 entry_start_token;
+    I64 entry_token_count;
+    I64 entry_end_exclusive;
+    I64 staged_live_count;
+    I64 staged_removed_count;
+    I64 canonical_removed_count;
+    I32 status;
+
+    if (!cache || !cache->entries || !out_removed_count)
+        return PREFIX_CACHE_ERR_NULL_PTR;
+
+    if (cache->capacity <= 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->count < 0 || cache->count > cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (invalidate_start_token < 0 || invalidate_token_count < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    invalidate_end_exclusive = invalidate_start_token + invalidate_token_count;
+    if (invalidate_end_exclusive < invalidate_start_token)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    snapshot_capacity = cache->capacity;
+    snapshot_count = cache->count;
+
+    // Preflight all entry ranges before invoking the mutating path so any
+    // parameter/layout error exits with zero state changes.
+    staged_live_count = 0;
+    staged_removed_count = 0;
+    idx = 0;
+    while (idx < cache->capacity)
+    {
+        if (cache->entries[idx].valid == PREFIX_CACHE_FRESH_VALID)
+        {
+            entry_start_token = cache->entries[idx].kv_start_token;
+            entry_token_count = cache->entries[idx].kv_token_count;
+            if (entry_start_token < 0 || entry_token_count < 0)
+                return PREFIX_CACHE_ERR_BAD_PARAM;
+
+            entry_end_exclusive = entry_start_token + entry_token_count;
+            if (entry_end_exclusive < entry_start_token)
+                return PREFIX_CACHE_ERR_BAD_PARAM;
+
+            if (entry_token_count > 0 &&
+                invalidate_token_count > 0 &&
+                invalidate_start_token < entry_end_exclusive &&
+                entry_start_token < invalidate_end_exclusive)
+                staged_removed_count++;
+            else
+                staged_live_count++;
+        }
+        idx++;
+    }
+
+    status = PrefixCacheInvalidateRangeChecked(cache,
+                                               invalidate_start_token,
+                                               invalidate_token_count,
+                                               &canonical_removed_count);
+    if (status != PREFIX_CACHE_OK)
+        return status;
+
+    if (cache->capacity != snapshot_capacity ||
+        cache->count < 0 ||
+        cache->count > cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (invalidate_start_token < 0 ||
+        invalidate_token_count < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->count != staged_live_count ||
+        canonical_removed_count != staged_removed_count)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->count > snapshot_count)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    *out_removed_count = staged_removed_count;
+    return PREFIX_CACHE_OK;
+}
+
 I64 PrefixCacheAuditTupleDigestQ64(I64 entry_index,
                                    I64 prefix_hash,
                                    I64 prefix_tokens,
