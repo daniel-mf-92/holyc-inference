@@ -17,10 +17,9 @@ def _load(name: str, filename: str):
     return mod
 
 
-ref_core = _load("q8_0_matmul_core", "test_q8_0_matmul_q16_naive_checked_nopartial.py")
-ref_parity = _load(
-    "q8_0_matmul_parity",
-    "test_q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only_parity.py",
+ref_core = _load(
+    "q8_0_matmul_core",
+    "test_q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only.py",
 )
 
 Q8_0_OK = ref_core.Q8_0_OK
@@ -80,7 +79,7 @@ def q8_0_matmul_q16_nopartial_commit_only_preflight_only_parity_commit_only(
     staged_parity_lhs = [0x4444444444444444]
     staged_parity_rhs = [0x5555555555555555]
     staged_parity_out = [0x6666666666666666]
-    parity_status = ref_parity.q8_0_matmul_q16_nopartial_commit_only_preflight_only_parity(
+    parity_status = ref_core.q8_0_matmul_q16_nopartial_commit_only_preflight_only(
         lhs_blocks,
         lhs_block_capacity,
         row_count,
@@ -98,9 +97,6 @@ def q8_0_matmul_q16_nopartial_commit_only_preflight_only_parity_commit_only(
         staged_parity_out,
     )
 
-    staged_commit_lhs = [0x1111111111111111]
-    staged_commit_rhs = [0x2222222222222222]
-    staged_commit_out = [0x3333333333333333]
     commit_status = ref_core.q8_0_matmul_q16_nopartial_commit_only(
         lhs_blocks,
         lhs_block_capacity,
@@ -114,9 +110,6 @@ def q8_0_matmul_q16_nopartial_commit_only_preflight_only_parity_commit_only(
         out_cells_q16,
         out_cell_capacity,
         out_row_stride_cells,
-        staged_commit_lhs,
-        staged_commit_rhs,
-        staged_commit_out,
     )
 
     if snapshot != (
@@ -144,16 +137,26 @@ def q8_0_matmul_q16_nopartial_commit_only_preflight_only_parity_commit_only(
     if commit_status != Q8_0_OK:
         return commit_status
 
+    err, canonical_lhs_required, canonical_rhs_required, canonical_out_required = ref_core.compute_required_capacities_checked(
+        row_count,
+        lhs_row_stride_blocks,
+        col_count,
+        rhs_col_stride_blocks,
+        out_row_stride_cells,
+    )
+    if err != Q8_0_OK:
+        return Q8_0_ERR_BAD_DST_LEN
+
     if (
-        staged_commit_lhs[0] != staged_parity_lhs[0]
-        or staged_commit_rhs[0] != staged_parity_rhs[0]
-        or staged_commit_out[0] != staged_parity_out[0]
+        canonical_lhs_required != staged_parity_lhs[0]
+        or canonical_rhs_required != staged_parity_rhs[0]
+        or canonical_out_required != staged_parity_out[0]
     ):
         return Q8_0_ERR_BAD_DST_LEN
 
-    out_lhs_required_blocks[0] = staged_commit_lhs[0]
-    out_rhs_required_blocks[0] = staged_commit_rhs[0]
-    out_out_required_cells[0] = staged_commit_out[0]
+    out_lhs_required_blocks[0] = staged_parity_lhs[0]
+    out_rhs_required_blocks[0] = staged_parity_rhs[0]
+    out_out_required_cells[0] = staged_parity_out[0]
     return Q8_0_OK
 
 
@@ -197,16 +200,14 @@ def _make_valid_case():
 def test_success_parity_and_atomic_publish() -> None:
     case = _make_valid_case()
 
-    expected_lhs = [0xABCDEF0011223344]
-    expected_rhs = [0xABCDEF0011223345]
-    expected_out = [0xABCDEF0011223346]
-    status_expected = ref_core.q8_0_matmul_q16_nopartial_commit_only(
-        **case,
-        out_lhs_required_blocks=expected_lhs,
-        out_rhs_required_blocks=expected_rhs,
-        out_out_required_cells=expected_out,
+    err, expected_lhs_required, expected_rhs_required, expected_out_required = ref_core.compute_required_capacities_checked(
+        case["row_count"],
+        case["lhs_row_stride_blocks"],
+        case["col_count"],
+        case["rhs_col_stride_blocks"],
+        case["out_row_stride_cells"],
     )
-    assert status_expected == Q8_0_OK
+    assert err == Q8_0_OK
 
     out_lhs = [0x1111111111111111]
     out_rhs = [0x2222222222222222]
@@ -219,9 +220,9 @@ def test_success_parity_and_atomic_publish() -> None:
     )
 
     assert status == Q8_0_OK
-    assert out_lhs[0] == expected_lhs[0]
-    assert out_rhs[0] == expected_rhs[0]
-    assert out_out[0] == expected_out[0]
+    assert out_lhs[0] == expected_lhs_required
+    assert out_rhs[0] == expected_rhs_required
+    assert out_out[0] == expected_out_required
 
 
 def test_error_passthrough_and_no_partial_publish() -> None:
