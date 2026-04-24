@@ -1,225 +1,259 @@
-from dataclasses import dataclass
+#!/usr/bin/env python3
+"""Parity harness for IQ-1277 commit-only parity gate wrapper."""
 
-Q8_0_MATMUL_OK = 0
-Q8_0_MATMUL_ERR_NULL_PTR = 1
-Q8_0_MATMUL_ERR_BAD_DST_LEN = 2
-Q8_0_MATMUL_ERR_OVERFLOW = 3
-Q8_0_MATMUL_I64_MAX = 0x7FFFFFFFFFFFFFFF
+from __future__ import annotations
 
+from pathlib import Path
+import sys
 
-class Ptr:
-    def __init__(self, value=None):
-        self.value = value
+sys.path.append(str(Path(__file__).resolve().parent))
+import test_q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only as ref
 
-
-@dataclass
-class MatrixCase:
-    row_count: int
-    col_count: int
-    k_block_count: int
-    lhs_row_stride_blocks: int
-    rhs_col_stride_blocks: int
-    out_row_stride_cells: int
-    lhs_block_capacity: int
-    rhs_block_capacity: int
-    out_cell_capacity: int
+Q8_0_OK = ref.Q8_0_OK
+Q8_0_ERR_NULL_PTR = ref.Q8_0_ERR_NULL_PTR
+Q8_0_ERR_BAD_DST_LEN = ref.Q8_0_ERR_BAD_DST_LEN
+Q8_0_ERR_OVERFLOW = ref.Q8_0_ERR_OVERFLOW
 
 
-def _try_mul_nonneg(lhs: int, rhs: int):
-    if lhs < 0 or rhs < 0:
-        return False, 0
-    if lhs == 0 or rhs == 0:
-        return True, 0
-    if lhs > Q8_0_MATMUL_I64_MAX // rhs:
-        return False, 0
-    return True, lhs * rhs
+def q8_0_matmul_q16_nopartial_commit_only_preflight_only_parity_commit_only(
+    lhs_blocks,
+    lhs_block_capacity,
+    row_count,
+    lhs_row_stride_blocks,
+    rhs_col_blocks,
+    rhs_block_capacity,
+    col_count,
+    rhs_col_stride_blocks,
+    k_block_count,
+    out_cells_q16,
+    out_cell_capacity,
+    out_row_stride_cells,
+    out_lhs_required_blocks,
+    out_rhs_required_blocks,
+    out_out_required_cells,
+):
+    if out_lhs_required_blocks is None or out_rhs_required_blocks is None or out_out_required_cells is None:
+        return Q8_0_ERR_NULL_PTR
 
-
-def _validate(case: MatrixCase) -> int:
-    if case.row_count < 0 or case.col_count < 0:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    if case.k_block_count < 0:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    if case.lhs_row_stride_blocks < 0 or case.rhs_col_stride_blocks < 0:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    if case.out_row_stride_cells < 0:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    if case.lhs_block_capacity < 0 or case.rhs_block_capacity < 0 or case.out_cell_capacity < 0:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    if case.lhs_row_stride_blocks < case.k_block_count:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    if case.rhs_col_stride_blocks < case.k_block_count:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    if case.out_row_stride_cells < case.col_count:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    return Q8_0_MATMUL_OK
-
-
-def _required(case: MatrixCase):
-    ok, lhs_req = _try_mul_nonneg(case.row_count, case.lhs_row_stride_blocks)
-    if not ok:
-        return Q8_0_MATMUL_ERR_OVERFLOW, None
-    ok, rhs_req = _try_mul_nonneg(case.col_count, case.rhs_col_stride_blocks)
-    if not ok:
-        return Q8_0_MATMUL_ERR_OVERFLOW, None
-    ok, out_req = _try_mul_nonneg(case.row_count, case.out_row_stride_cells)
-    if not ok:
-        return Q8_0_MATMUL_ERR_OVERFLOW, None
-    return Q8_0_MATMUL_OK, (lhs_req, rhs_req, out_req)
-
-
-def commit_only(case: MatrixCase):
-    st = _validate(case)
-    if st != Q8_0_MATMUL_OK:
-        return st, None
-    st, req = _required(case)
-    if st != Q8_0_MATMUL_OK:
-        return st, None
-    lhs_req, rhs_req, out_req = req
-    if lhs_req > case.lhs_block_capacity:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN, None
-    if rhs_req > case.rhs_block_capacity:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN, None
-    if out_req > case.out_cell_capacity:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN, None
-    return Q8_0_MATMUL_OK, req
-
-
-def preflight_only_parity(case: MatrixCase, out_lhs: Ptr, out_rhs: Ptr, out_out: Ptr):
-    if out_lhs is None or out_rhs is None or out_out is None:
-        return Q8_0_MATMUL_ERR_NULL_PTR
-    if out_lhs is out_rhs or out_lhs is out_out or out_rhs is out_out:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-
-    st_commit, diag_commit = commit_only(case)
-    st_can, req = _required(case) if _validate(case) == Q8_0_MATMUL_OK else (_validate(case), None)
-
-    if st_can != st_commit:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    if st_commit != Q8_0_MATMUL_OK:
-        return st_commit
-
-    lhs_req, rhs_req, out_req = req
-    if diag_commit != (lhs_req, rhs_req, out_req):
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-
-    out_lhs.value = lhs_req
-    out_rhs.value = rhs_req
-    out_out.value = out_req
-    return Q8_0_MATMUL_OK
-
-
-def preflight_only_parity_commit_only(case: MatrixCase, out_lhs: Ptr, out_rhs: Ptr, out_out: Ptr):
-    if out_lhs is None or out_rhs is None or out_out is None:
-        return Q8_0_MATMUL_ERR_NULL_PTR
-    if out_lhs is out_rhs or out_lhs is out_out or out_rhs is out_out:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
+    if out_lhs_required_blocks is out_rhs_required_blocks:
+        return Q8_0_ERR_BAD_DST_LEN
+    if out_lhs_required_blocks is out_out_required_cells:
+        return Q8_0_ERR_BAD_DST_LEN
+    if out_rhs_required_blocks is out_out_required_cells:
+        return Q8_0_ERR_BAD_DST_LEN
 
     snapshot = (
-        case.row_count,
-        case.col_count,
-        case.k_block_count,
-        case.lhs_row_stride_blocks,
-        case.rhs_col_stride_blocks,
-        case.out_row_stride_cells,
-        case.lhs_block_capacity,
-        case.rhs_block_capacity,
-        case.out_cell_capacity,
-        out_lhs,
-        out_rhs,
-        out_out,
+        lhs_blocks,
+        lhs_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_col_blocks,
+        rhs_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q16,
+        out_cell_capacity,
+        out_row_stride_cells,
+        out_lhs_required_blocks,
+        out_rhs_required_blocks,
+        out_out_required_cells,
     )
 
-    stage_lhs = Ptr()
-    stage_rhs = Ptr()
-    stage_out = Ptr()
-    st_parity = preflight_only_parity(case, stage_lhs, stage_rhs, stage_out)
+    staged_commit_lhs = [0x1111111111111111]
+    staged_commit_rhs = [0x2222222222222222]
+    staged_commit_out = [0x3333333333333333]
+    commit_status = ref.q8_0_matmul_q16_nopartial_commit_only_preflight_only(
+        lhs_blocks,
+        lhs_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_col_blocks,
+        rhs_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q16,
+        out_cell_capacity,
+        out_row_stride_cells,
+        staged_commit_lhs,
+        staged_commit_rhs,
+        staged_commit_out,
+    )
 
-    st_commit, diag_commit = commit_only(case)
+    staged_parity_lhs = [0x4444444444444444]
+    staged_parity_rhs = [0x5555555555555555]
+    staged_parity_out = [0x6666666666666666]
+    parity_status = ref.q8_0_matmul_q16_nopartial_commit_only_preflight_only(
+        lhs_blocks,
+        lhs_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_col_blocks,
+        rhs_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q16,
+        out_cell_capacity,
+        out_row_stride_cells,
+        staged_parity_lhs,
+        staged_parity_rhs,
+        staged_parity_out,
+    )
 
     if snapshot != (
-        case.row_count,
-        case.col_count,
-        case.k_block_count,
-        case.lhs_row_stride_blocks,
-        case.rhs_col_stride_blocks,
-        case.out_row_stride_cells,
-        case.lhs_block_capacity,
-        case.rhs_block_capacity,
-        case.out_cell_capacity,
-        out_lhs,
-        out_rhs,
-        out_out,
+        lhs_blocks,
+        lhs_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_col_blocks,
+        rhs_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q16,
+        out_cell_capacity,
+        out_row_stride_cells,
+        out_lhs_required_blocks,
+        out_rhs_required_blocks,
+        out_out_required_cells,
     ):
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
+        return Q8_0_ERR_BAD_DST_LEN
 
-    if st_parity != st_commit:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
-    if st_commit != Q8_0_MATMUL_OK:
-        return st_commit
+    if commit_status != parity_status:
+        return Q8_0_ERR_BAD_DST_LEN
 
-    if diag_commit is None:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
+    if commit_status != Q8_0_OK:
+        return commit_status
 
-    if stage_lhs.value != diag_commit[0] or stage_rhs.value != diag_commit[1] or stage_out.value != diag_commit[2]:
-        return Q8_0_MATMUL_ERR_BAD_DST_LEN
+    if (
+        staged_commit_lhs[0] != staged_parity_lhs[0]
+        or staged_commit_rhs[0] != staged_parity_rhs[0]
+        or staged_commit_out[0] != staged_parity_out[0]
+    ):
+        return Q8_0_ERR_BAD_DST_LEN
 
-    out_lhs.value = stage_lhs.value
-    out_rhs.value = stage_rhs.value
-    out_out.value = stage_out.value
-    return Q8_0_MATMUL_OK
+    out_lhs_required_blocks[0] = staged_commit_lhs[0]
+    out_rhs_required_blocks[0] = staged_commit_rhs[0]
+    out_out_required_cells[0] = staged_commit_out[0]
+    return Q8_0_OK
 
 
-def test_commit_only_parity_commit_only_ok():
-    case = MatrixCase(
-        row_count=3,
-        col_count=4,
-        k_block_count=2,
-        lhs_row_stride_blocks=2,
-        rhs_col_stride_blocks=2,
-        out_row_stride_cells=4,
-        lhs_block_capacity=16,
-        rhs_block_capacity=16,
-        out_cell_capacity=32,
+def _make_valid_case():
+    row_count = 3
+    col_count = 4
+    k_block_count = 2
+    lhs_row_stride_blocks = k_block_count + 1
+    rhs_col_stride_blocks = k_block_count + 2
+    out_row_stride_cells = col_count + 2
+
+    err, lhs_required, rhs_required, out_required = ref.compute_required_capacities_checked(
+        row_count,
+        lhs_row_stride_blocks,
+        col_count,
+        rhs_col_stride_blocks,
+        out_row_stride_cells,
     )
-    out_lhs, out_rhs, out_out = Ptr(-1), Ptr(-1), Ptr(-1)
-    st = preflight_only_parity_commit_only(case, out_lhs, out_rhs, out_out)
-    assert st == Q8_0_MATMUL_OK
-    assert (out_lhs.value, out_rhs.value, out_out.value) == (6, 8, 12)
+    assert err == Q8_0_OK
+
+    lhs_blocks = [ref.make_block(ref.random.Random(1000 + i)) for i in range(lhs_required + 3)]
+    rhs_blocks = [ref.make_block(ref.random.Random(2000 + i)) for i in range(rhs_required + 3)]
+    out_cells = [0] * (out_required + 7)
+
+    return {
+        "lhs_blocks": lhs_blocks,
+        "lhs_block_capacity": len(lhs_blocks),
+        "row_count": row_count,
+        "lhs_row_stride_blocks": lhs_row_stride_blocks,
+        "rhs_col_blocks": rhs_blocks,
+        "rhs_block_capacity": len(rhs_blocks),
+        "col_count": col_count,
+        "rhs_col_stride_blocks": rhs_col_stride_blocks,
+        "k_block_count": k_block_count,
+        "out_cells_q16": out_cells,
+        "out_cell_capacity": len(out_cells),
+        "out_row_stride_cells": out_row_stride_cells,
+    }
 
 
-def test_commit_only_parity_commit_only_alias_rejected():
-    case = MatrixCase(
-        row_count=1,
-        col_count=1,
-        k_block_count=1,
-        lhs_row_stride_blocks=1,
-        rhs_col_stride_blocks=1,
-        out_row_stride_cells=1,
-        lhs_block_capacity=1,
-        rhs_block_capacity=1,
-        out_cell_capacity=1,
+def test_success_parity_and_atomic_publish() -> None:
+    case = _make_valid_case()
+
+    expected_lhs = [0xABCDEF0011223344]
+    expected_rhs = [0xABCDEF0011223345]
+    expected_out = [0xABCDEF0011223346]
+    status_expected = ref.q8_0_matmul_q16_nopartial_commit_only_preflight_only(
+        **case,
+        out_lhs_required_blocks=expected_lhs,
+        out_rhs_required_blocks=expected_rhs,
+        out_out_required_cells=expected_out,
     )
-    shared = Ptr(123)
-    other = Ptr(456)
-    st = preflight_only_parity_commit_only(case, shared, shared, other)
-    assert st == Q8_0_MATMUL_ERR_BAD_DST_LEN
-    assert shared.value == 123 and other.value == 456
+    assert status_expected == Q8_0_OK
 
-
-def test_commit_only_parity_commit_only_capacity_error_no_publish():
-    case = MatrixCase(
-        row_count=2,
-        col_count=2,
-        k_block_count=2,
-        lhs_row_stride_blocks=2,
-        rhs_col_stride_blocks=2,
-        out_row_stride_cells=2,
-        lhs_block_capacity=3,
-        rhs_block_capacity=4,
-        out_cell_capacity=4,
+    out_lhs = [0x1111111111111111]
+    out_rhs = [0x2222222222222222]
+    out_out = [0x3333333333333333]
+    status = q8_0_matmul_q16_nopartial_commit_only_preflight_only_parity_commit_only(
+        **case,
+        out_lhs_required_blocks=out_lhs,
+        out_rhs_required_blocks=out_rhs,
+        out_out_required_cells=out_out,
     )
-    out_lhs, out_rhs, out_out = Ptr(11), Ptr(22), Ptr(33)
-    st = preflight_only_parity_commit_only(case, out_lhs, out_rhs, out_out)
-    assert st == Q8_0_MATMUL_ERR_BAD_DST_LEN
-    assert (out_lhs.value, out_rhs.value, out_out.value) == (11, 22, 33)
+
+    assert status == Q8_0_OK
+    assert out_lhs[0] == expected_lhs[0]
+    assert out_rhs[0] == expected_rhs[0]
+    assert out_out[0] == expected_out[0]
+
+
+def test_error_passthrough_and_no_partial_publish() -> None:
+    case = _make_valid_case()
+    case["lhs_block_capacity"] = 0
+
+    out_lhs = [777]
+    out_rhs = [888]
+    out_out = [999]
+    status = q8_0_matmul_q16_nopartial_commit_only_preflight_only_parity_commit_only(
+        **case,
+        out_lhs_required_blocks=out_lhs,
+        out_rhs_required_blocks=out_rhs,
+        out_out_required_cells=out_out,
+    )
+
+    assert status == Q8_0_ERR_BAD_DST_LEN
+    assert out_lhs[0] == 777
+    assert out_rhs[0] == 888
+    assert out_out[0] == 999
+
+
+def test_rejects_aliasing_output_pointers() -> None:
+    case = _make_valid_case()
+
+    shared = [123]
+    distinct = [456]
+    status = q8_0_matmul_q16_nopartial_commit_only_preflight_only_parity_commit_only(
+        **case,
+        out_lhs_required_blocks=shared,
+        out_rhs_required_blocks=shared,
+        out_out_required_cells=distinct,
+    )
+    assert status == Q8_0_ERR_BAD_DST_LEN
+
+
+def test_holyc_symbol_present() -> None:
+    source = Path("src/matmul/q8_0_matmul.HC").read_text(encoding="utf-8")
+    symbol = "Q8_0MatMulQ16NaiveCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly"
+    assert symbol in source
+
+
+def run() -> None:
+    test_success_parity_and_atomic_publish()
+    test_error_passthrough_and_no_partial_publish()
+    test_rejects_aliasing_output_pointers()
+    test_holyc_symbol_present()
+    print("q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only_parity_commit_only=ok")
+
+
+if __name__ == "__main__":
+    run()
