@@ -3220,6 +3220,8 @@ I32 PrefixCacheInvalidateRangeCheckedNoPartialCommitOnlyPreflightOnlyParityCommi
     I64 snapshot_invalidate_token_count;
     I64 snapshot_entry_count;
     I64 *snapshot_out_removed_count;
+    I64 snapshot_out_removed_value;
+    I64 snapshot_alloc_bytes;
     PrefixCacheEntry *snapshot_entries;
     I64 parity_removed_count;
     I64 parity_remaining_count;
@@ -3246,8 +3248,13 @@ I32 PrefixCacheInvalidateRangeCheckedNoPartialCommitOnlyPreflightOnlyParityCommi
     snapshot_invalidate_token_count = invalidate_token_count;
     snapshot_entry_count = cache->count;
     snapshot_out_removed_count = out_removed_count;
+    snapshot_out_removed_value = *out_removed_count;
 
-    snapshot_entries = MAlloc(snapshot_capacity * sizeof(PrefixCacheEntry));
+    if (snapshot_capacity > 0x7FFFFFFFFFFFFFFF / sizeof(PrefixCacheEntry))
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    snapshot_alloc_bytes = snapshot_capacity * sizeof(PrefixCacheEntry);
+    snapshot_entries = MAlloc(snapshot_alloc_bytes);
     if (!snapshot_entries)
         return PREFIX_CACHE_ERR_BAD_PARAM;
 
@@ -3284,6 +3291,11 @@ I32 PrefixCacheInvalidateRangeCheckedNoPartialCommitOnlyPreflightOnlyParityCommi
     }
 
     if (out_removed_count != snapshot_out_removed_count)
+    {
+        Free(snapshot_entries);
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+    if (*out_removed_count != snapshot_out_removed_value)
     {
         Free(snapshot_entries);
         return PREFIX_CACHE_ERR_BAD_PARAM;
@@ -3341,6 +3353,11 @@ I32 PrefixCacheInvalidateRangeCheckedNoPartialCommitOnlyPreflightOnlyParityCommi
     }
 
     if (out_removed_count != snapshot_out_removed_count)
+    {
+        Free(snapshot_entries);
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+    }
+    if (*out_removed_count != snapshot_out_removed_value)
     {
         Free(snapshot_entries);
         return PREFIX_CACHE_ERR_BAD_PARAM;

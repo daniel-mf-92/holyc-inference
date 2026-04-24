@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Host-side harness for IQ-1353 PrefixCacheInvalidateRangeCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly."""
+"""Host-side harness for IQ-1355 PrefixCacheInvalidateRangeCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly."""
 
 from __future__ import annotations
 
@@ -102,7 +102,7 @@ def invalidate_range_commit_only_preflight_only_parity_commit_only_preflight_onl
     return PREFIX_CACHE_OK, parity_removed
 
 
-def test_iq1353_commit_only_hardening_matches_parity_tuple():
+def test_iq1355_commit_only_hardening_matches_parity_tuple():
     entries = [Entry() for _ in range(6)]
     entries[0] = Entry(valid=1, prefix_hash=7, prefix_tokens=8, kv_start_token=0, kv_token_count=12)
     entries[1] = Entry(valid=1, prefix_hash=8, prefix_tokens=12, kv_start_token=12, kv_token_count=10)
@@ -122,7 +122,7 @@ def test_iq1353_commit_only_hardening_matches_parity_tuple():
     assert entries[2].valid == PREFIX_CACHE_FRESH_EMPTY
 
 
-def test_iq1353_commit_only_hardening_zero_length_is_noop():
+def test_iq1355_commit_only_hardening_zero_length_is_noop():
     entries = [Entry() for _ in range(3)]
     entries[0] = Entry(valid=1, prefix_hash=41, prefix_tokens=4, kv_start_token=3, kv_token_count=7)
     entries[1] = Entry(valid=1, prefix_hash=42, prefix_tokens=5, kv_start_token=20, kv_token_count=7)
@@ -138,7 +138,7 @@ def test_iq1353_commit_only_hardening_zero_length_is_noop():
     assert entries[1].valid == PREFIX_CACHE_FRESH_VALID
 
 
-def test_iq1353_commit_only_hardening_error_keeps_state_unchanged():
+def test_iq1355_commit_only_hardening_error_keeps_state_unchanged():
     entries = [Entry() for _ in range(2)]
     entries[0] = Entry(valid=1, prefix_hash=51, prefix_tokens=2, kv_start_token=0, kv_token_count=5)
     entries[1] = Entry(valid=1, prefix_hash=52, prefix_tokens=3, kv_start_token=-4, kv_token_count=5)
@@ -172,12 +172,14 @@ def test_holyc_function_body_and_contract_markers_present():
         in body
     )
     assert "if (parity_removed_count != commit_removed_count ||" in body
+    assert "snapshot_out_removed_value = *out_removed_count;" in body
+    assert "if (*out_removed_count != snapshot_out_removed_value)" in body
     assert "*out_removed_count = parity_removed_count;" in body
 
 
 if __name__ == "__main__":
-    test_iq1353_commit_only_hardening_matches_parity_tuple()
-    test_iq1353_commit_only_hardening_zero_length_is_noop()
-    test_iq1353_commit_only_hardening_error_keeps_state_unchanged()
+    test_iq1355_commit_only_hardening_matches_parity_tuple()
+    test_iq1355_commit_only_hardening_zero_length_is_noop()
+    test_iq1355_commit_only_hardening_error_keeps_state_unchanged()
     test_holyc_function_body_and_contract_markers_present()
     print("ok")
