@@ -6527,6 +6527,10 @@ I32 GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly
     snapshot_cursor = *cursor;
     snapshot_value_type = value_type;
 
+    if (snapshot_cursor > snapshot_buf_nbytes ||
+        snapshot_cursor > snapshot_table_end)
+        return GGUF_META_TABLE_ERR_OUT_OF_BOUNDS;
+
     staged_parity_cursor = snapshot_cursor;
     staged_parity_next_cursor = 0;
     err = GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
@@ -6538,6 +6542,9 @@ I32 GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly
         &staged_parity_next_cursor);
     if (err != GGUF_META_TABLE_OK)
         return err;
+
+    if (*cursor != snapshot_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
 
     if (staged_parity_cursor != staged_parity_next_cursor)
         return GGUF_META_TABLE_ERR_BAD_PARAM;
@@ -6556,6 +6563,9 @@ I32 GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly
         &staged_canonical_next_cursor);
     if (err != GGUF_META_TABLE_OK)
         return err;
+
+    if (*cursor != snapshot_cursor)
+        return GGUF_META_TABLE_ERR_BAD_PARAM;
 
     if (staged_canonical_cursor != staged_canonical_next_cursor)
         return GGUF_META_TABLE_ERR_BAD_PARAM;

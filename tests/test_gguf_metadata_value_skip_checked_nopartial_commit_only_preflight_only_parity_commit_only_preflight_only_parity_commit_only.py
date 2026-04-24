@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for ...ParityCommitOnlyPreflightOnlyParityCommitOnly (IQ-1259)."""
+"""Harness for ...ParityCommitOnlyPreflightOnlyParityCommitOnly (IQ-1325)."""
 
 from __future__ import annotations
 
@@ -98,7 +98,7 @@ def gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity
     return GGUF_META_TABLE_OK
 
 
-def test_source_contains_iq1259_function_and_strict_publish() -> None:
+def test_source_contains_iq1325_function_and_strict_publish() -> None:
     source = Path("src/gguf/metadata.HC").read_text(encoding="utf-8")
 
     sig = "I32 GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(U8 *buf,"
@@ -118,6 +118,9 @@ def test_source_contains_iq1259_function_and_strict_publish() -> None:
     assert "GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in body
     assert "GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in body
     assert "snapshot_cursor = *cursor;" in body
+    assert "snapshot_cursor > snapshot_buf_nbytes" in body
+    assert "snapshot_cursor > snapshot_table_end" in body
+    assert "if (*cursor != snapshot_cursor)" in body
     assert "staged_parity_next_cursor !=" in body
     assert "staged_canonical_next_cursor" in body
     assert "*out_next_cursor = staged_parity_next_cursor;" in body
@@ -227,7 +230,7 @@ def test_array_string_span_success_and_truncation() -> None:
 
 
 def test_randomized_parity_vectors() -> None:
-    rng = random.Random(20260424_1259)
+    rng = random.Random(20260424_1325)
 
     for _ in range(1200):
         kind = rng.randrange(4)
@@ -300,7 +303,7 @@ def test_randomized_parity_vectors() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_iq1259_function_and_strict_publish()
+    test_source_contains_iq1325_function_and_strict_publish()
     test_null_ptr_contracts()
     test_scalar_success_and_publish()
     test_bad_type_no_partial_publish()
