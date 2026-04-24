@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for ...ParityCommitOnlyPreflightOnly (IQ-1343)."""
+"""Harness for ...ParityCommitOnlyPreflightOnly (IQ-1357)."""
 
 from __future__ import annotations
 
@@ -108,7 +108,7 @@ def gguf_metadata_value_skip_checked_nopartial_commit_only_preflight_only_parity
     return GGUF_META_TABLE_OK
 
 
-def test_source_contains_iq1343_function_and_zero_write_contract() -> None:
+def test_source_contains_iq1357_function_and_zero_write_contract() -> None:
     source = Path("src/gguf/metadata.HC").read_text(encoding="utf-8")
 
     sig = "I32 GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(U8 *buf,"
@@ -325,7 +325,7 @@ def test_randomized_parity_vectors() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_iq1343_function_and_zero_write_contract()
+    test_source_contains_iq1357_function_and_zero_write_contract()
     test_null_ptr_contracts()
     test_cursor_snapshot_bounds_guard()
     test_scalar_success_is_zero_write()

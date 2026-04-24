@@ -6959,6 +6959,8 @@ I32 GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly
     return GGUF_META_TABLE_OK;
 }
 
+// Backward-compatible alias retained.
+
 // Strict diagnostics parity gate over
 // GGUFMetadataValueSkipCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly
 // and
