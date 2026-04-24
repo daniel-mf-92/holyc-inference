@@ -2011,3 +2011,38 @@ I32 Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParity(
     *out_suite_checksum = staged_suite_checksum;
     return Q8_0_DOT_BENCH_OK;
 }
+
+I32 Q8_0DotBenchRunDefaultSuiteOpsPerSecondQ16CheckedNoPartialCommitOnly(
+    I64 total_ops,
+    I64 total_cycles,
+    I64 cpu_hz,
+    I64 *out_ops_per_second_q16)
+{
+    I64 out_snapshot;
+    I64 staged_ops_per_second_q16;
+    I32 status;
+
+    if (!out_ops_per_second_q16)
+        return Q8_0_DOT_BENCH_ERR_NULL_PTR;
+
+    // Commit-only snapshot contract:
+    // - capture caller-visible state once
+    // - stage result in local scratch
+    // - publish one atomic final store on success
+    // - restore snapshot on all failures (strict no-partial)
+    out_snapshot = *out_ops_per_second_q16;
+
+    status = Q8_0DotBenchRunDefaultSuiteOpsPerSecondQ16Checked(
+        total_ops,
+        total_cycles,
+        cpu_hz,
+        &staged_ops_per_second_q16);
+    if (status != Q8_0_DOT_BENCH_OK)
+    {
+        *out_ops_per_second_q16 = out_snapshot;
+        return status;
+    }
+
+    *out_ops_per_second_q16 = staged_ops_per_second_q16;
+    return Q8_0_DOT_BENCH_OK;
+}
