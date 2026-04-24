@@ -2713,8 +2713,6 @@ I32 Q8_0DotBenchRunDefaultSuiteTelemetryDigestQ64CheckedNoPartialCommitOnlyPrefl
     if (commit_digest_q64 != canonical_digest_q64)
         return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
 
-    // Preflight-only parity wrapper keeps deterministic tuple parity and
-    // publishes once at end to preserve no-partial semantics.
-    *out_digest_q64 = commit_digest_q64;
+    // Preflight-only path is diagnostics only; caller output remains untouched.
     return Q8_0_DOT_BENCH_OK;
 }

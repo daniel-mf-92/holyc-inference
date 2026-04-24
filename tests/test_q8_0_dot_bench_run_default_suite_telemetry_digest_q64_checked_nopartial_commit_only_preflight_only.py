@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity checks for IQ-1317 preflight-only telemetry digest wrapper."""
+"""Parity + zero-write diagnostics checks for IQ-1317 preflight-only digest wrapper."""
 
 from __future__ import annotations
 
@@ -35,6 +35,8 @@ def telemetry_digest_q64_checked(
     suite_checksum: int,
     cpu_hz: int,
 ) -> tuple[int, int | None]:
+    digest_mod61 = (1 << 61) - 1
+
     if (
         total_ops < 0
         or total_cycles < 0
@@ -79,9 +81,11 @@ def telemetry_digest_q64_checked(
         status, digest = try_add_i64(digest, folded)
         if status != ERR_OK:
             return status, None
-        status, digest = try_mul_i64(digest, 1099511628211)
+        digest %= digest_mod61
+        status, digest = try_mul_i64(digest, 3)
         if status != ERR_OK:
             return status, None
+        digest %= digest_mod61
 
     return ERR_OK, digest
 
@@ -103,6 +107,7 @@ def telemetry_digest_q64_checked_nopartial_commit_only(
         or cpu_hz <= 0
     ):
         return ERR_BAD_PARAM, None
+
     return telemetry_digest_q64_checked(
         total_ops,
         total_cycles,
@@ -120,7 +125,11 @@ def telemetry_digest_q64_checked_nopartial_commit_only_preflight_only(
     remainder_cycles: int,
     suite_checksum: int,
     cpu_hz: int,
-) -> tuple[int, int | None]:
+    out_ptr: list[int] | None,
+) -> int:
+    if out_ptr is None:
+        return ERR_NULL_PTR
+
     if (
         total_ops < 0
         or total_cycles < 0
@@ -129,7 +138,10 @@ def telemetry_digest_q64_checked_nopartial_commit_only_preflight_only(
         or suite_checksum < 0
         or cpu_hz <= 0
     ):
-        return ERR_BAD_PARAM, None
+        return ERR_BAD_PARAM
+
+    out_snapshot = out_ptr[0]
+    snapshot = (total_ops, total_cycles, cycles_per_op, remainder_cycles, suite_checksum, cpu_hz)
 
     status, commit_digest = telemetry_digest_q64_checked_nopartial_commit_only(
         total_ops,
@@ -140,7 +152,7 @@ def telemetry_digest_q64_checked_nopartial_commit_only_preflight_only(
         cpu_hz,
     )
     if status != ERR_OK:
-        return status, None
+        return status
 
     status, canonical_digest = telemetry_digest_q64_checked(
         total_ops,
@@ -151,36 +163,33 @@ def telemetry_digest_q64_checked_nopartial_commit_only_preflight_only(
         cpu_hz,
     )
     if status != ERR_OK:
-        return status, None
+        return status
+
+    if snapshot != (total_ops, total_cycles, cycles_per_op, remainder_cycles, suite_checksum, cpu_hz):
+        return ERR_BAD_PARAM
 
     if commit_digest != canonical_digest:
-        return ERR_BAD_PARAM, None
+        return ERR_BAD_PARAM
 
-    return ERR_OK, commit_digest
+    if out_ptr[0] != out_snapshot:
+        return ERR_BAD_PARAM
+
+    return ERR_OK
 
 
-def test_happy_path_parity_and_determinism() -> None:
-    status, digest = telemetry_digest_q64_checked_nopartial_commit_only_preflight_only(
-        total_ops=1,
-        total_cycles=2,
-        cycles_per_op=3,
+def test_happy_path_parity_and_zero_write() -> None:
+    out = [0x1234_5678_9ABC_DEF0]
+    status = telemetry_digest_q64_checked_nopartial_commit_only_preflight_only(
+        total_ops=8_000,
+        total_cycles=152_000,
+        cycles_per_op=19,
         remainder_cycles=0,
-        suite_checksum=5,
-        cpu_hz=7,
+        suite_checksum=0x1234,
+        cpu_hz=2_000_000_000,
+        out_ptr=out,
     )
     assert status == ERR_OK
-    assert digest is not None
-
-    status2, digest2 = telemetry_digest_q64_checked_nopartial_commit_only_preflight_only(
-        total_ops=1,
-        total_cycles=2,
-        cycles_per_op=3,
-        remainder_cycles=0,
-        suite_checksum=5,
-        cpu_hz=7,
-    )
-    assert status2 == ERR_OK
-    assert digest == digest2
+    assert out[0] == 0x1234_5678_9ABC_DEF0
 
 
 def test_bad_params() -> None:
@@ -191,25 +200,45 @@ def test_bad_params() -> None:
         (1, 10, 1, -1, 1, 1),
         (1, 10, 1, 0, -1, 1),
         (1, 10, 1, 0, 1, 0),
+        (5, 10, 1, 6, 1, 1),
     ):
-        status, _ = telemetry_digest_q64_checked_nopartial_commit_only_preflight_only(*args)
+        out = [999]
+        status = telemetry_digest_q64_checked_nopartial_commit_only_preflight_only(*args, out_ptr=out)
         assert status == ERR_BAD_PARAM
+        assert out[0] == 999
 
 
-def test_overflow_propagation() -> None:
-    status, _ = telemetry_digest_q64_checked_nopartial_commit_only_preflight_only(
+def test_overflow_propagation_and_zero_write() -> None:
+    out = [777]
+    status = telemetry_digest_q64_checked_nopartial_commit_only_preflight_only(
         total_ops=(I64_MAX // 3) + 1,
         total_cycles=1,
         cycles_per_op=1,
         remainder_cycles=0,
         suite_checksum=1,
         cpu_hz=1,
+        out_ptr=out,
     )
     assert status == ERR_OVERFLOW
+    assert out[0] == 777
+
+
+def test_null_ptr() -> None:
+    status = telemetry_digest_q64_checked_nopartial_commit_only_preflight_only(
+        total_ops=1,
+        total_cycles=1,
+        cycles_per_op=1,
+        remainder_cycles=0,
+        suite_checksum=1,
+        cpu_hz=1,
+        out_ptr=None,
+    )
+    assert status == ERR_NULL_PTR
 
 
 if __name__ == "__main__":
-    test_happy_path_parity_and_determinism()
+    test_happy_path_parity_and_zero_write()
     test_bad_params()
-    test_overflow_propagation()
+    test_overflow_propagation_and_zero_write()
+    test_null_ptr()
     print("ok")
