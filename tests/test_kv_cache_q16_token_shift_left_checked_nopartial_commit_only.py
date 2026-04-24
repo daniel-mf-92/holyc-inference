@@ -21,7 +21,7 @@ SRC = Path(__file__).resolve().parents[1] / "src/model/kv_cache.HC"
 
 def _extract_fn(name: str) -> str:
     text = SRC.read_text()
-    m = re.search(rf"I32\\s+{name}\\s*\\([^)]*\\)\\s*\\{{", text)
+    m = re.search(rf"I32\s+{name}\s*\([^)]*\)\s*\{{", text)
     assert m, f"missing {name}"
     i = m.end() - 1
     depth = 0
@@ -70,6 +70,7 @@ def kv_cache_q16_token_shift_left_checked_nopartial_commit_only(
         return KV_Q16_ERR_BAD_PARAM
 
     snapshot_used_tokens = used_tokens
+    snapshot_shift_tokens = shift_tokens
     snapshot_layer_count = layer_count
     snapshot_token_capacity = token_capacity
     snapshot_kv_heads = kv_heads
@@ -88,6 +89,7 @@ def kv_cache_q16_token_shift_left_checked_nopartial_commit_only(
 
     if (
         snapshot_used_tokens != used_tokens
+        or snapshot_shift_tokens != shift_tokens
         or snapshot_layer_count != layer_count
         or snapshot_token_capacity != token_capacity
         or snapshot_kv_heads != kv_heads
@@ -98,6 +100,9 @@ def kv_cache_q16_token_shift_left_checked_nopartial_commit_only(
     if staged_new_used_tokens < 0 or staged_new_used_tokens > used_tokens:
         return KV_Q16_ERR_BAD_PARAM
     if staged_moved_cells < 0:
+        return KV_Q16_ERR_BAD_PARAM
+    expected_moved_cells = staged_new_used_tokens * layer_count * kv_heads * head_dim
+    if expected_moved_cells != staged_moved_cells:
         return KV_Q16_ERR_BAD_PARAM
 
     k_cache[:] = outk
@@ -175,8 +180,11 @@ def test_function_present_and_key_guards():
         "if (k_cache == v_cache)",
         "if (out_new_used_tokens == out_moved_cells)",
         "snapshot_used_tokens = used_tokens",
+        "snapshot_shift_tokens = shift_tokens",
         "status = KVCacheQ16TokenShiftLeftCheckedNoPartial(",
         "if (snapshot_used_tokens != used_tokens",
+        "status = KVTryMulI64Checked(staged_new_used_tokens",
+        "if (expected_moved_cells != staged_moved_cells)",
         "*out_new_used_tokens = staged_new_used_tokens",
         "*out_moved_cells = staged_moved_cells",
     ]:
@@ -246,3 +254,23 @@ def test_full_shift_scrubs_to_zero_and_reports_zero_move():
     assert out_moved == [0]
     assert k == [0] * total_cells
     assert v == [0] * total_cells
+
+
+def test_error_path_does_not_publish_outputs():
+    out_new = [77]
+    out_moved = [88]
+    err = kv_cache_q16_token_shift_left_checked_nopartial_commit_only(
+        [1, 2, 3],
+        [4, 5, 6],
+        1,
+        2,
+        1,
+        1,
+        3,
+        0,
+        out_new,
+        out_moved,
+    )
+    assert err == KV_Q16_ERR_BAD_PARAM
+    assert out_new == [77]
+    assert out_moved == [88]

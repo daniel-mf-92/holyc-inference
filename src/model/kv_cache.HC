@@ -7667,10 +7667,13 @@ I32 KVCacheQ16TokenShiftLeftCheckedNoPartialCommitOnly(
     I64 *out_moved_cells)
 {
     I64 snapshot_used_tokens;
+    I64 snapshot_shift_tokens;
     I64 snapshot_layer_count;
     I64 snapshot_token_capacity;
     I64 snapshot_kv_heads;
     I64 snapshot_head_dim;
+    I64 staged_cells_per_token;
+    I64 expected_moved_cells;
     I64 staged_new_used_tokens;
     I64 staged_moved_cells;
     I32 status;
@@ -7692,6 +7695,7 @@ I32 KVCacheQ16TokenShiftLeftCheckedNoPartialCommitOnly(
         return KV_Q16_ERR_BAD_PARAM;
 
     snapshot_used_tokens = used_tokens;
+    snapshot_shift_tokens = shift_tokens;
     snapshot_layer_count = layer_count;
     snapshot_token_capacity = token_capacity;
     snapshot_kv_heads = kv_heads;
@@ -7715,6 +7719,7 @@ I32 KVCacheQ16TokenShiftLeftCheckedNoPartialCommitOnly(
         return status;
 
     if (snapshot_used_tokens != used_tokens ||
+        snapshot_shift_tokens != shift_tokens ||
         snapshot_layer_count != layer_count ||
         snapshot_token_capacity != token_capacity ||
         snapshot_kv_heads != kv_heads ||
@@ -7725,6 +7730,27 @@ I32 KVCacheQ16TokenShiftLeftCheckedNoPartialCommitOnly(
         return KV_Q16_ERR_BAD_PARAM;
 
     if (staged_moved_cells < 0)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    status = KVCacheQ16ComputeLayerTokenSpanCellsChecked(kv_heads,
+                                                         head_dim,
+                                                         &staged_cells_per_token);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVTryMulI64Checked(layer_count,
+                                staged_cells_per_token,
+                                &staged_cells_per_token);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVTryMulI64Checked(staged_new_used_tokens,
+                                staged_cells_per_token,
+                                &expected_moved_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (expected_moved_cells != staged_moved_cells)
         return KV_Q16_ERR_BAD_PARAM;
 
     *out_new_used_tokens = staged_new_used_tokens;
