@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""IQ-1273: parity harness for KVCacheInitQ16CheckedNoAllocCommitOnlyPreflightOnlyParity."""
+"""IQ-1204: parity harness for KVCacheInitQ16CheckedNoAllocCommitOnlyPreflightOnlyParity."""
 
 KV_Q16_OK = 0
 KV_Q16_ERR_NULL_PTR = 1
@@ -39,6 +39,8 @@ def kv_init_commit_only_preflight_only_parity(
     kv_heads: int,
     head_dim: int,
     output_alias_bad: bool,
+    preflight_tuple_override=None,
+    commit_tuple_override=None,
 ):
     if not has_k_cache or not has_v_cache:
         return KV_Q16_ERR_NULL_PTR, None
@@ -67,8 +69,19 @@ def kv_init_commit_only_preflight_only_parity(
     if status != KV_Q16_OK:
         return status, None
 
-    # parity wrapper compares preflight and commit tuples; they are identical here.
-    return KV_Q16_OK, (0, layer_span, total_cells)
+    preflight_tuple = (
+        preflight_tuple_override
+        if preflight_tuple_override is not None
+        else (0, layer_span, total_cells)
+    )
+    commit_tuple = (
+        commit_tuple_override
+        if commit_tuple_override is not None
+        else (0, layer_span, total_cells)
+    )
+    if preflight_tuple != commit_tuple:
+        return KV_Q16_ERR_BAD_PARAM, None
+    return KV_Q16_OK, preflight_tuple
 
 
 def test_parity_success_deterministic_geometry():
@@ -145,3 +158,39 @@ def test_i64_overflow_rejected():
         output_alias_bad=False,
     )
     assert status == KV_Q16_ERR_OVERFLOW
+
+
+def test_tuple_mismatch_used_tokens_rejected():
+    status, out = kv_init_commit_only_preflight_only_parity(
+        has_k_cache=True,
+        k_cache_capacity=4096,
+        has_v_cache=True,
+        v_cache_capacity=4096,
+        layer_count=2,
+        token_capacity=8,
+        kv_heads=4,
+        head_dim=8,
+        output_alias_bad=False,
+        preflight_tuple_override=(0, 256, 512),
+        commit_tuple_override=(1, 256, 512),
+    )
+    assert status == KV_Q16_ERR_BAD_PARAM
+    assert out is None
+
+
+def test_tuple_mismatch_total_cells_rejected():
+    status, out = kv_init_commit_only_preflight_only_parity(
+        has_k_cache=True,
+        k_cache_capacity=4096,
+        has_v_cache=True,
+        v_cache_capacity=4096,
+        layer_count=2,
+        token_capacity=8,
+        kv_heads=4,
+        head_dim=8,
+        output_alias_bad=False,
+        preflight_tuple_override=(0, 256, 512),
+        commit_tuple_override=(0, 256, 513),
+    )
+    assert status == KV_Q16_ERR_BAD_PARAM
+    assert out is None
