@@ -1,28 +1,18 @@
 #!/usr/bin/env python3
-"""Parity harness for PrefixCacheLookupBestPrefixCheckedNoPartialCommitOnlyPreflightOnlyParity.
-
-Host-side validation only. Runtime remains pure HolyC.
-"""
-
 from dataclasses import dataclass
 
 PREFIX_CACHE_OK = 0
 PREFIX_CACHE_ERR_NULL_PTR = 1
 PREFIX_CACHE_ERR_BAD_PARAM = 2
 PREFIX_CACHE_ERR_NOT_FOUND = 4
-
-PREFIX_CACHE_FRESH_EMPTY = 0
 PREFIX_CACHE_FRESH_VALID = 1
 
 
 @dataclass
 class PrefixCacheEntry:
-    valid: int = PREFIX_CACHE_FRESH_EMPTY
+    valid: int = 0
     prefix_hash: int = 0
     prefix_tokens: int = 0
-    kv_start_token: int = 0
-    kv_token_count: int = 0
-    last_used_tick: int = 0
 
 
 @dataclass
@@ -42,7 +32,9 @@ def lookup_best_prefix_nopartial(cache, query_hash, max_prompt_tokens):
 
     best_index = -1
     best_tokens = 0
-    for idx, entry in enumerate(cache.entries):
+    idx = 0
+    while idx < cache.capacity:
+        entry = cache.entries[idx]
         if entry.valid == PREFIX_CACHE_FRESH_VALID and entry.prefix_hash == query_hash:
             if entry.prefix_tokens <= max_prompt_tokens:
                 if (
@@ -52,6 +44,7 @@ def lookup_best_prefix_nopartial(cache, query_hash, max_prompt_tokens):
                 ):
                     best_index = idx
                     best_tokens = entry.prefix_tokens
+        idx += 1
 
     if best_index < 0:
         return PREFIX_CACHE_ERR_NOT_FOUND, None, None
@@ -68,6 +61,7 @@ def lookup_best_prefix_commit_only(cache, query_hash, max_prompt_tokens):
         return PREFIX_CACHE_ERR_BAD_PARAM, None, None
 
     snapshot_entry_count = cache.count
+    snapshot_capacity = cache.capacity
     snapshot_max_prompt_tokens = max_prompt_tokens
     snapshot_query_hash = query_hash
 
@@ -75,6 +69,8 @@ def lookup_best_prefix_commit_only(cache, query_hash, max_prompt_tokens):
     if status != PREFIX_CACHE_OK:
         return status, None, None
 
+    if cache.capacity != snapshot_capacity:
+        return PREFIX_CACHE_ERR_BAD_PARAM, None, None
     if cache.count != snapshot_entry_count or cache.count < 0 or cache.count > cache.capacity:
         return PREFIX_CACHE_ERR_BAD_PARAM, None, None
     if max_prompt_tokens != snapshot_max_prompt_tokens or max_prompt_tokens < 0:
@@ -213,3 +209,11 @@ def test_lookup_best_prefix_commit_only_preflight_only_parity_bad_params():
         PrefixCache(entries=entries, capacity=0, count=0), 1, 8
     )
     assert status == PREFIX_CACHE_ERR_BAD_PARAM
+
+
+if __name__ == "__main__":
+    test_lookup_best_prefix_commit_only_preflight_only_parity_success_and_tiebreak()
+    test_lookup_best_prefix_commit_only_preflight_only_parity_max_prompt_bound()
+    test_lookup_best_prefix_commit_only_preflight_only_parity_not_found()
+    test_lookup_best_prefix_commit_only_preflight_only_parity_bad_params()
+    print("ok")
