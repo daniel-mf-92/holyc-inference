@@ -372,6 +372,143 @@ I32 PrefixCacheReplayGuardCheckedNoPartialCommitOnly(PrefixCache *cache,
     return PREFIX_CACHE_OK;
 }
 
+I32 PrefixCacheReplayGuardCheckedNoPartialCommitOnlyPreflightOnly(PrefixCache *cache,
+                                                                  I64 entry_index,
+                                                                  I64 access_tick,
+                                                                  I64 profile_id,
+                                                                  I64 *out_previous_tick,
+                                                                  I64 *out_applied_tick,
+                                                                  I64 *out_guard_passed)
+{
+    I64 snapshot_entry_index;
+    I64 snapshot_access_tick;
+    I64 snapshot_profile_id;
+    I64 snapshot_capacity;
+    I64 snapshot_count;
+    I64 snapshot_previous_tick;
+    I64 *snapshot_out_previous_tick;
+    I64 *snapshot_out_applied_tick;
+    I64 *snapshot_out_guard_passed;
+    I64 preflight_previous_tick;
+    I64 preflight_applied_tick;
+    I64 preflight_guard_passed;
+    I64 canonical_previous_tick;
+    I64 canonical_applied_tick;
+    I64 canonical_guard_passed;
+    I32 status_preflight;
+    I32 status_canonical;
+
+    if (!cache || !cache->entries ||
+        !out_previous_tick || !out_applied_tick || !out_guard_passed)
+        return PREFIX_CACHE_ERR_NULL_PTR;
+
+    if (out_previous_tick == out_applied_tick ||
+        out_previous_tick == out_guard_passed ||
+        out_applied_tick == out_guard_passed)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->capacity <= 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->count < 0 || cache->count > cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (entry_index < 0 || entry_index >= cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->entries[entry_index].valid != PREFIX_CACHE_FRESH_VALID)
+        return PREFIX_CACHE_ERR_NOT_FOUND;
+
+    if (access_tick < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (profile_id != PREFIX_CACHE_PROFILE_SECURE_LOCAL &&
+        profile_id != PREFIX_CACHE_PROFILE_DEV_LOCAL)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    snapshot_entry_index = entry_index;
+    snapshot_access_tick = access_tick;
+    snapshot_profile_id = profile_id;
+    snapshot_capacity = cache->capacity;
+    snapshot_count = cache->count;
+    snapshot_previous_tick = cache->entries[entry_index].last_used_tick;
+    snapshot_out_previous_tick = out_previous_tick;
+    snapshot_out_applied_tick = out_applied_tick;
+    snapshot_out_guard_passed = out_guard_passed;
+
+    if (snapshot_previous_tick < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    status_preflight = PrefixCacheReplayGuardCheckedNoPartialCommitOnly(cache,
+                                                                        entry_index,
+                                                                        access_tick,
+                                                                        profile_id,
+                                                                        &preflight_previous_tick,
+                                                                        &preflight_applied_tick,
+                                                                        &preflight_guard_passed);
+    if (status_preflight != PREFIX_CACHE_OK)
+        return status_preflight;
+
+    if (cache->capacity != snapshot_capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->count != snapshot_count ||
+        cache->count < 0 ||
+        cache->count > cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (entry_index != snapshot_entry_index ||
+        access_tick != snapshot_access_tick ||
+        profile_id != snapshot_profile_id)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (out_previous_tick != snapshot_out_previous_tick ||
+        out_applied_tick != snapshot_out_applied_tick ||
+        out_guard_passed != snapshot_out_guard_passed)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (preflight_previous_tick < 0 ||
+        preflight_applied_tick < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (preflight_guard_passed != 0 &&
+        preflight_guard_passed != 1)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (preflight_applied_tick != access_tick)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->entries[entry_index].last_used_tick != preflight_applied_tick)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    // Re-run canonical guard from the original tick snapshot so diagnostics
+    // can compare exact tuples before publishing caller-visible outputs.
+    cache->entries[entry_index].last_used_tick = snapshot_previous_tick;
+
+    status_canonical = PrefixCacheReplayGuardChecked(cache,
+                                                     entry_index,
+                                                     access_tick,
+                                                     profile_id,
+                                                     &canonical_previous_tick,
+                                                     &canonical_applied_tick,
+                                                     &canonical_guard_passed);
+    if (status_canonical != PREFIX_CACHE_OK)
+        return status_canonical;
+
+    if (preflight_previous_tick != canonical_previous_tick ||
+        preflight_applied_tick != canonical_applied_tick ||
+        preflight_guard_passed != canonical_guard_passed)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->entries[entry_index].last_used_tick != canonical_applied_tick)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    *out_previous_tick = preflight_previous_tick;
+    *out_applied_tick = preflight_applied_tick;
+    *out_guard_passed = preflight_guard_passed;
+    return PREFIX_CACHE_OK;
+}
+
 I32 PrefixCacheLookupBestPrefixChecked(PrefixCache *cache,
                                        I64 query_hash,
                                        I64 max_prompt_tokens,
