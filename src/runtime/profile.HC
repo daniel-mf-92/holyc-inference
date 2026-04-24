@@ -5,9 +5,16 @@
 #define INFERENCE_PROFILE_OK            0
 #define INFERENCE_PROFILE_ERR_NULL_PTR  1
 #define INFERENCE_PROFILE_ERR_BAD_PARAM 2
+#define INFERENCE_PROFILE_ERR_POLICY    3
 
 #define INFERENCE_PROFILE_SECURE_LOCAL 1
 #define INFERENCE_PROFILE_DEV_LOCAL    2
+
+#define Q8_0_DOT_BENCH_SECURE_GATE_OK                      0
+#define Q8_0_DOT_BENCH_SECURE_GATE_ERR_NULL_PTR            1
+#define Q8_0_DOT_BENCH_SECURE_GATE_ERR_BAD_PARAM           2
+#define Q8_0_DOT_BENCH_SECURE_GATE_ERR_PROFILE_NOT_SECURE  3
+#define Q8_0_DOT_BENCH_SECURE_GATE_ERR_AUDIT_HOOKS_INACTIVE 4
 
 // Global runtime profile state defaults to secure-local.
 I64 g_inference_profile_mode = INFERENCE_PROFILE_SECURE_LOCAL;
@@ -76,4 +83,47 @@ I32 InferenceProfileStatusChecked(I64 *out_profile_id,
 I64 InferenceProfileStatus()
 {
     return InferenceProfileGetCurrent();
+}
+
+I32 Q8_0DotBenchRunDefaultSuiteSecureLocalAuditGate(
+    I64 profile_id,
+    I64 audit_hooks_active,
+    I64 *out_gate_passed,
+    I64 *out_policy_error_code)
+{
+    I64 staged_gate_passed;
+    I64 staged_policy_error_code;
+
+    if (!out_gate_passed || !out_policy_error_code)
+        return Q8_0_DOT_BENCH_SECURE_GATE_ERR_NULL_PTR;
+
+    if ((profile_id != INFERENCE_PROFILE_SECURE_LOCAL) &&
+        (profile_id != INFERENCE_PROFILE_DEV_LOCAL))
+        return Q8_0_DOT_BENCH_SECURE_GATE_ERR_BAD_PARAM;
+
+    if ((audit_hooks_active != 0) && (audit_hooks_active != 1))
+        return Q8_0_DOT_BENCH_SECURE_GATE_ERR_BAD_PARAM;
+
+    staged_gate_passed = 0;
+    staged_policy_error_code = Q8_0_DOT_BENCH_SECURE_GATE_OK;
+
+    if (profile_id != INFERENCE_PROFILE_SECURE_LOCAL)
+    {
+        staged_policy_error_code =
+            Q8_0_DOT_BENCH_SECURE_GATE_ERR_PROFILE_NOT_SECURE;
+    }
+    else if (!audit_hooks_active)
+    {
+        staged_policy_error_code =
+            Q8_0_DOT_BENCH_SECURE_GATE_ERR_AUDIT_HOOKS_INACTIVE;
+    }
+    else
+    {
+        staged_gate_passed = 1;
+        staged_policy_error_code = Q8_0_DOT_BENCH_SECURE_GATE_OK;
+    }
+
+    *out_gate_passed = staged_gate_passed;
+    *out_policy_error_code = staged_policy_error_code;
+    return Q8_0_DOT_BENCH_SECURE_GATE_OK;
 }
