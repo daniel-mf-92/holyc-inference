@@ -2105,3 +2105,105 @@ I32 Q8_0DotBenchRunDefaultSuiteOpsPerSecondQ16CheckedNoPartialCommitOnlyPrefligh
     // Preflight-only path is diagnostics only; caller output remains untouched.
     return Q8_0_DOT_BENCH_OK;
 }
+
+I32 Q8_0DotBenchRunDefaultSuiteTelemetryDigestQ64Checked(
+    I64 total_ops,
+    I64 total_cycles,
+    I64 cycles_per_op,
+    I64 remainder_cycles,
+    I64 suite_checksum,
+    I64 cpu_hz,
+    I64 *out_digest_q64)
+{
+    I64 folded_ops;
+    I64 folded_cycles;
+    I64 folded_cycles_per_op;
+    I64 folded_remainder_cycles;
+    I64 folded_suite_checksum;
+    I64 folded_cpu_hz;
+    I64 digest;
+    I32 status;
+
+    if (!out_digest_q64)
+        return Q8_0_DOT_BENCH_ERR_NULL_PTR;
+
+    if (total_ops < 0 || total_cycles < 0 || cycles_per_op < 0 ||
+        remainder_cycles < 0 || suite_checksum < 0 || cpu_hz <= 0)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    if (total_ops < remainder_cycles)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
+    // All folds are odd multipliers to keep avalanche in integer domain.
+    status = Q8_0DotBenchTryMulI64(total_ops, 3, &folded_ops);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    status = Q8_0DotBenchTryMulI64(total_cycles, 5, &folded_cycles);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    status = Q8_0DotBenchTryMulI64(cycles_per_op, 7, &folded_cycles_per_op);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    status = Q8_0DotBenchTryMulI64(remainder_cycles, 11, &folded_remainder_cycles);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    status = Q8_0DotBenchTryMulI64(suite_checksum, 13, &folded_suite_checksum);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    status = Q8_0DotBenchTryMulI64(cpu_hz, 17, &folded_cpu_hz);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    // Deterministic digest starts at FNV-1a offset basis for non-zero seed.
+    digest = 1469598103934665603;
+
+    status = Q8_0DotBenchTryAddI64(digest, folded_ops, &digest);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+    status = Q8_0DotBenchTryMulI64(digest, 1099511628211, &digest);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    status = Q8_0DotBenchTryAddI64(digest, folded_cycles, &digest);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+    status = Q8_0DotBenchTryMulI64(digest, 1099511628211, &digest);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    status = Q8_0DotBenchTryAddI64(digest, folded_cycles_per_op, &digest);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+    status = Q8_0DotBenchTryMulI64(digest, 1099511628211, &digest);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    status = Q8_0DotBenchTryAddI64(digest, folded_remainder_cycles, &digest);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+    status = Q8_0DotBenchTryMulI64(digest, 1099511628211, &digest);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    status = Q8_0DotBenchTryAddI64(digest, folded_suite_checksum, &digest);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+    status = Q8_0DotBenchTryMulI64(digest, 1099511628211, &digest);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    status = Q8_0DotBenchTryAddI64(digest, folded_cpu_hz, &digest);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+    status = Q8_0DotBenchTryMulI64(digest, 1099511628211, &digest);
+    if (status != Q8_0_DOT_BENCH_OK)
+        return status;
+
+    *out_digest_q64 = digest;
+    return Q8_0_DOT_BENCH_OK;
+}
