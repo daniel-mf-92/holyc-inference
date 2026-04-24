@@ -983,6 +983,14 @@ I32 Q8_0DotBenchRunDefaultSuiteCommitOnlyPreflightOnlyParityCommitOnlyPreflightO
         !out_max_row_matrix_blocks)
         return Q8_0_DOT_BENCH_ERR_NULL_PTR;
 
+    if (out_shape_count == out_max_blocks ||
+        out_shape_count == out_max_rows ||
+        out_shape_count == out_max_row_matrix_blocks ||
+        out_max_blocks == out_max_rows ||
+        out_max_blocks == out_max_row_matrix_blocks ||
+        out_max_rows == out_max_row_matrix_blocks)
+        return Q8_0_DOT_BENCH_ERR_BAD_PARAM;
+
     snapshot_cpu_hz = cpu_hz;
     snapshot_out_shape_count = out_shape_count;
     snapshot_out_max_blocks = out_max_blocks;
