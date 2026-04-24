@@ -1247,6 +1247,12 @@ I32 RoPEQ16RotateHeadByPositionApplyPairCheckedNoPartial(I64 *head_cells_q16,
                                                          I64 freq_base_q16,
                                                          I64 position)
 {
+    I64 snapshot_head_cell_capacity;
+    I64 snapshot_head_base_index;
+    I64 snapshot_head_dim;
+    I64 snapshot_pair_stride_cells;
+    I64 snapshot_freq_base_q16;
+    I64 snapshot_position;
     I64 pair_count;
     I64 pair_index;
     I64 last_pair_y_index;
@@ -1258,6 +1264,13 @@ I32 RoPEQ16RotateHeadByPositionApplyPairCheckedNoPartial(I64 *head_cells_q16,
 
     if (!head_cells_q16)
         return ROPE_Q16_ERR_NULL_PTR;
+
+    snapshot_head_cell_capacity = head_cell_capacity;
+    snapshot_head_base_index = head_base_index;
+    snapshot_head_dim = head_dim;
+    snapshot_pair_stride_cells = pair_stride_cells;
+    snapshot_freq_base_q16 = freq_base_q16;
+    snapshot_position = position;
 
     status = RoPEQ16ValidateHeadSpanForDimChecked(head_cell_capacity,
                                                   head_base_index,
@@ -1306,6 +1319,19 @@ I32 RoPEQ16RotateHeadByPositionApplyPairCheckedNoPartial(I64 *head_cells_q16,
                 return status;
         }
     }
+
+    if (head_cell_capacity != snapshot_head_cell_capacity)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (head_base_index != snapshot_head_base_index)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (head_dim != snapshot_head_dim)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (pair_stride_cells != snapshot_pair_stride_cells)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (freq_base_q16 != snapshot_freq_base_q16)
+        return ROPE_Q16_ERR_BAD_PARAM;
+    if (position != snapshot_position)
+        return ROPE_Q16_ERR_BAD_PARAM;
 
     // Phase B: single commit pass through canonical implementation.
     return RoPEQ16RotateHeadByPositionApplyPairChecked(head_cells_q16,
