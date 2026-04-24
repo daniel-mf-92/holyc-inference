@@ -429,6 +429,161 @@ I32 KVCacheQ16PersistHeaderCheckedNoPartialCommitOnly(
     return KV_Q16_OK;
 }
 
+// Diagnostics-only no-write companion over persist-header commit-only wrapper.
+// Executes both commit-only and canonical persist/read paths into staged locals,
+// revalidates immutable snapshots, and atomically publishes header+tuple only
+// on strict parity.
+I32 KVCacheQ16PersistHeaderCheckedNoPartialCommitOnlyPreflightOnly(
+    I64 *header_cells,
+    I64 header_capacity,
+    I64 mode,
+    I64 *inout_layer_count,
+    I64 *inout_token_capacity,
+    I64 *inout_kv_heads,
+    I64 *inout_head_dim,
+    I64 *inout_used_tokens,
+    I64 *inout_total_cells)
+{
+    I64 snapshot_header[KV_CACHE_Q16_PERSIST_HEADER_CELLS];
+    I64 staged_commit_header[KV_CACHE_Q16_PERSIST_HEADER_CELLS];
+    I64 staged_canonical_header[KV_CACHE_Q16_PERSIST_HEADER_CELLS];
+    I64 snapshot_layer_count;
+    I64 snapshot_token_capacity;
+    I64 snapshot_kv_heads;
+    I64 snapshot_head_dim;
+    I64 snapshot_used_tokens;
+    I64 snapshot_total_cells;
+    I64 snapshot_header_capacity;
+    I64 snapshot_mode;
+    I64 staged_commit_layer_count;
+    I64 staged_commit_token_capacity;
+    I64 staged_commit_kv_heads;
+    I64 staged_commit_head_dim;
+    I64 staged_commit_used_tokens;
+    I64 staged_commit_total_cells;
+    I64 staged_canonical_layer_count;
+    I64 staged_canonical_token_capacity;
+    I64 staged_canonical_kv_heads;
+    I64 staged_canonical_head_dim;
+    I64 staged_canonical_used_tokens;
+    I64 staged_canonical_total_cells;
+    I64 cell_idx;
+    I32 status;
+
+    if (!header_cells ||
+        !inout_layer_count ||
+        !inout_token_capacity ||
+        !inout_kv_heads ||
+        !inout_head_dim ||
+        !inout_used_tokens ||
+        !inout_total_cells)
+        return KV_Q16_ERR_NULL_PTR;
+
+    if (header_capacity < KV_CACHE_Q16_PERSIST_HEADER_CELLS)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    snapshot_header_capacity = header_capacity;
+    snapshot_mode = mode;
+    snapshot_layer_count = *inout_layer_count;
+    snapshot_token_capacity = *inout_token_capacity;
+    snapshot_kv_heads = *inout_kv_heads;
+    snapshot_head_dim = *inout_head_dim;
+    snapshot_used_tokens = *inout_used_tokens;
+    snapshot_total_cells = *inout_total_cells;
+
+    cell_idx = 0;
+    while (cell_idx < KV_CACHE_Q16_PERSIST_HEADER_CELLS)
+    {
+        snapshot_header[cell_idx] = header_cells[cell_idx];
+        staged_commit_header[cell_idx] = snapshot_header[cell_idx];
+        staged_canonical_header[cell_idx] = snapshot_header[cell_idx];
+        cell_idx++;
+    }
+
+    staged_commit_layer_count = snapshot_layer_count;
+    staged_commit_token_capacity = snapshot_token_capacity;
+    staged_commit_kv_heads = snapshot_kv_heads;
+    staged_commit_head_dim = snapshot_head_dim;
+    staged_commit_used_tokens = snapshot_used_tokens;
+    staged_commit_total_cells = snapshot_total_cells;
+
+    staged_canonical_layer_count = snapshot_layer_count;
+    staged_canonical_token_capacity = snapshot_token_capacity;
+    staged_canonical_kv_heads = snapshot_kv_heads;
+    staged_canonical_head_dim = snapshot_head_dim;
+    staged_canonical_used_tokens = snapshot_used_tokens;
+    staged_canonical_total_cells = snapshot_total_cells;
+
+    status = KVCacheQ16PersistHeaderCheckedNoPartialCommitOnly(staged_commit_header,
+                                                                header_capacity,
+                                                                mode,
+                                                                &staged_commit_layer_count,
+                                                                &staged_commit_token_capacity,
+                                                                &staged_commit_kv_heads,
+                                                                &staged_commit_head_dim,
+                                                                &staged_commit_used_tokens,
+                                                                &staged_commit_total_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    status = KVCacheQ16PersistHeaderCheckedNoPartial(staged_canonical_header,
+                                                     header_capacity,
+                                                     mode,
+                                                     &staged_canonical_layer_count,
+                                                     &staged_canonical_token_capacity,
+                                                     &staged_canonical_kv_heads,
+                                                     &staged_canonical_head_dim,
+                                                     &staged_canonical_used_tokens,
+                                                     &staged_canonical_total_cells);
+    if (status != KV_Q16_OK)
+        return status;
+
+    if (snapshot_header_capacity != header_capacity ||
+        snapshot_mode != mode)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_layer_count != *inout_layer_count ||
+        snapshot_token_capacity != *inout_token_capacity ||
+        snapshot_kv_heads != *inout_kv_heads ||
+        snapshot_head_dim != *inout_head_dim ||
+        snapshot_used_tokens != *inout_used_tokens ||
+        snapshot_total_cells != *inout_total_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    cell_idx = 0;
+    while (cell_idx < KV_CACHE_Q16_PERSIST_HEADER_CELLS)
+    {
+        if (header_cells[cell_idx] != snapshot_header[cell_idx])
+            return KV_Q16_ERR_BAD_PARAM;
+        if (staged_commit_header[cell_idx] != staged_canonical_header[cell_idx])
+            return KV_Q16_ERR_BAD_PARAM;
+        cell_idx++;
+    }
+
+    if (staged_commit_layer_count != staged_canonical_layer_count ||
+        staged_commit_token_capacity != staged_canonical_token_capacity ||
+        staged_commit_kv_heads != staged_canonical_kv_heads ||
+        staged_commit_head_dim != staged_canonical_head_dim ||
+        staged_commit_used_tokens != staged_canonical_used_tokens ||
+        staged_commit_total_cells != staged_canonical_total_cells)
+        return KV_Q16_ERR_BAD_PARAM;
+
+    cell_idx = 0;
+    while (cell_idx < KV_CACHE_Q16_PERSIST_HEADER_CELLS)
+    {
+        header_cells[cell_idx] = staged_commit_header[cell_idx];
+        cell_idx++;
+    }
+
+    *inout_layer_count = staged_commit_layer_count;
+    *inout_token_capacity = staged_commit_token_capacity;
+    *inout_kv_heads = staged_commit_kv_heads;
+    *inout_head_dim = staged_commit_head_dim;
+    *inout_used_tokens = staged_commit_used_tokens;
+    *inout_total_cells = staged_commit_total_cells;
+    return KV_Q16_OK;
+}
+
 // Total Q16 cells needed for one cache slab (K or V):
 // total_cells = layer_count * token_capacity * kv_heads * head_dim
 // The computation is staged through checked helpers to keep overflow
