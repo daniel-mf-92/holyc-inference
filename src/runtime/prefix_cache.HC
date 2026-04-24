@@ -20,6 +20,8 @@
 #define PREFIX_CACHE_HASH_FNV_OFFSET_BASIS 1469598103934665603
 #define PREFIX_CACHE_HASH_FNV_PRIME        1099511628211
 #define PREFIX_CACHE_HASH_DOMAIN_TAG       0x5052454649584841
+#define PREFIX_CACHE_AUDIT_TUPLE_WIDTH     7
+#define PREFIX_CACHE_AUDIT_DOMAIN_TAG      0x5052464155444954
 
 class PrefixCacheEntry
 {
@@ -731,6 +733,116 @@ I32 PrefixCacheInvalidateRangeChecked(PrefixCache *cache,
 
     cache->count = live_count;
     *out_removed_count = removed_count;
+    return PREFIX_CACHE_OK;
+}
+
+I64 PrefixCacheAuditTupleDigestQ64(I64 entry_index,
+                                   I64 prefix_hash,
+                                   I64 prefix_tokens,
+                                   I64 kv_start_token,
+                                   I64 kv_token_count,
+                                   I64 last_used_tick)
+{
+    U64 digest;
+
+    digest = (U64)PREFIX_CACHE_AUDIT_DOMAIN_TAG;
+    digest ^= (U64)entry_index;
+    digest *= (U64)PREFIX_CACHE_HASH_FNV_PRIME;
+    digest ^= (U64)prefix_hash;
+    digest *= (U64)PREFIX_CACHE_HASH_FNV_PRIME;
+    digest ^= (U64)prefix_tokens;
+    digest *= (U64)PREFIX_CACHE_HASH_FNV_PRIME;
+    digest ^= (U64)kv_start_token;
+    digest *= (U64)PREFIX_CACHE_HASH_FNV_PRIME;
+    digest ^= (U64)kv_token_count;
+    digest *= (U64)PREFIX_CACHE_HASH_FNV_PRIME;
+    digest ^= (U64)last_used_tick;
+    digest *= (U64)PREFIX_CACHE_HASH_FNV_PRIME;
+    return (I64)(digest & (U64)0x7FFFFFFFFFFFFFFF);
+}
+
+I32 PrefixCacheExportAuditRowsChecked(PrefixCache *cache,
+                                      I64 *row_buffer,
+                                      I64 row_capacity,
+                                      I64 *out_rows_written)
+{
+    I64 idx;
+    I64 valid_rows;
+    I64 write_row;
+    I64 row_base;
+    PrefixCacheEntry *entry;
+    I64 digest_q64;
+
+    if (!cache || !cache->entries || !out_rows_written)
+        return PREFIX_CACHE_ERR_NULL_PTR;
+
+    if (cache->capacity <= 0 || row_capacity < 0)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (cache->count < 0 || cache->count > cache->capacity)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    // Preflight pass: validate every live tuple and required row count so
+    // export is all-or-nothing and Book-of-Truth rows stay deterministic.
+    valid_rows = 0;
+    idx = 0;
+    while (idx < cache->capacity)
+    {
+        entry = &cache->entries[idx];
+        if (entry->valid == PREFIX_CACHE_FRESH_VALID)
+        {
+            if (entry->prefix_hash < 0 ||
+                entry->prefix_tokens < 0 ||
+                entry->kv_start_token < 0 ||
+                entry->kv_token_count < 0 ||
+                entry->last_used_tick < 0)
+                return PREFIX_CACHE_ERR_BAD_PARAM;
+
+            if (entry->kv_start_token + entry->kv_token_count < entry->kv_start_token)
+                return PREFIX_CACHE_ERR_BAD_PARAM;
+
+            valid_rows++;
+        }
+        idx++;
+    }
+
+    if (valid_rows != cache->count)
+        return PREFIX_CACHE_ERR_BAD_PARAM;
+
+    if (valid_rows > row_capacity)
+        return PREFIX_CACHE_ERR_FULL;
+
+    if (valid_rows > 0 && !row_buffer)
+        return PREFIX_CACHE_ERR_NULL_PTR;
+
+    write_row = 0;
+    idx = 0;
+    while (idx < cache->capacity)
+    {
+        entry = &cache->entries[idx];
+        if (entry->valid == PREFIX_CACHE_FRESH_VALID)
+        {
+            row_base = write_row * PREFIX_CACHE_AUDIT_TUPLE_WIDTH;
+            digest_q64 = PrefixCacheAuditTupleDigestQ64(idx,
+                                                        entry->prefix_hash,
+                                                        entry->prefix_tokens,
+                                                        entry->kv_start_token,
+                                                        entry->kv_token_count,
+                                                        entry->last_used_tick);
+
+            row_buffer[row_base + 0] = idx;
+            row_buffer[row_base + 1] = entry->prefix_hash;
+            row_buffer[row_base + 2] = entry->prefix_tokens;
+            row_buffer[row_base + 3] = entry->kv_start_token;
+            row_buffer[row_base + 4] = entry->kv_token_count;
+            row_buffer[row_base + 5] = entry->last_used_tick;
+            row_buffer[row_base + 6] = digest_q64;
+            write_row++;
+        }
+        idx++;
+    }
+
+    *out_rows_written = write_row;
     return PREFIX_CACHE_OK;
 }
 
