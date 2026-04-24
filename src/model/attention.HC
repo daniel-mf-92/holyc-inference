@@ -17931,3 +17931,234 @@ I32 GQAAttentionScoreQ16CheckedNoPartialCommitOnlyPreflightOnly(
     Free(staged_commit_scores_q32);
     return ATTN_Q16_OK;
 }
+
+#define GQA_SOFTMAX_EXP_MAX_Q16  655360
+#define GQA_SOFTMAX_EXP_MIN_Q16 -655360
+#define GQA_SOFTMAX_ONE_Q16      (1 << ATTN_Q16_SHIFT)
+
+I64 FPQ16Exp(I64 x);
+
+I32 GQAAttentionApplySoftmaxQ16Checked(
+    I64 *scores_q32,
+    I64 scores_capacity,
+    I64 query_rows,
+    I64 key_rows,
+    I64 head_groups,
+    I64 row_stride,
+    I64 *out_probs_q16,
+    I64 out_capacity)
+{
+    I64 required_score_cells;
+    I64 required_out_cells;
+    I64 stage_bytes;
+    I64 row_index;
+    I64 col_index;
+    I64 row_base;
+    I64 row_max_q32;
+    I64 shifted_q16;
+    I64 exp_lane_q16;
+    I64 exp_sum_q16;
+    I64 numerator_q16;
+    I64 prob_q16;
+    I64 prob_sum_q16;
+    I64 best_index;
+    I64 best_value_q16;
+    I64 remainder_q16;
+    I64 add_value_q16;
+    I64 commit_index;
+    I64 *staged_probs_q16;
+    I32 status;
+
+    if (!scores_q32 || !out_probs_q16)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (scores_capacity < 0 || out_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_rows < 0 || key_rows < 0 || head_groups <= 0 || row_stride < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (query_rows > 0 && (query_rows % head_groups) != 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (key_rows > row_stride)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (query_rows == 0 || key_rows == 0)
+        return ATTN_Q16_OK;
+
+    status = AttentionTryMulI64Checked(query_rows - 1,
+                                       row_stride,
+                                       &required_score_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryAddI64Checked(required_score_cells,
+                                       key_rows,
+                                       &required_score_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (required_score_cells > scores_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionTryMulI64Checked(query_rows,
+                                       key_rows,
+                                       &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (required_out_cells > out_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    status = AttentionTryMulI64Checked(required_out_cells,
+                                       sizeof(I64),
+                                       &stage_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (stage_bytes <= 0)
+        return ATTN_Q16_ERR_OVERFLOW;
+
+    staged_probs_q16 = MAlloc(stage_bytes);
+    if (!staged_probs_q16)
+        return ATTN_Q16_ERR_OVERFLOW;
+
+    for (row_index = 0; row_index < query_rows; row_index++)
+    {
+        status = AttentionTryMulI64Checked(row_index,
+                                           row_stride,
+                                           &row_base);
+        if (status != ATTN_Q16_OK)
+        {
+            Free(staged_probs_q16);
+            return status;
+        }
+
+        row_max_q32 = scores_q32[row_base];
+        for (col_index = 1; col_index < key_rows; col_index++)
+        {
+            if (scores_q32[row_base + col_index] > row_max_q32)
+                row_max_q32 = scores_q32[row_base + col_index];
+        }
+
+        exp_sum_q16 = 0;
+        best_index = 0;
+        best_value_q16 = -1;
+        for (col_index = 0; col_index < key_rows; col_index++)
+        {
+            shifted_q16 = (scores_q32[row_base + col_index] - row_max_q32) >> ATTN_Q16_SHIFT;
+            if (shifted_q16 > GQA_SOFTMAX_EXP_MAX_Q16)
+                shifted_q16 = GQA_SOFTMAX_EXP_MAX_Q16;
+            if (shifted_q16 < GQA_SOFTMAX_EXP_MIN_Q16)
+                shifted_q16 = GQA_SOFTMAX_EXP_MIN_Q16;
+
+            exp_lane_q16 = FPQ16Exp(shifted_q16);
+            if (exp_lane_q16 <= 0)
+            {
+                Free(staged_probs_q16);
+                return ATTN_Q16_ERR_BAD_PARAM;
+            }
+
+            staged_probs_q16[row_index * key_rows + col_index] = exp_lane_q16;
+            status = AttentionTryAddI64Checked(exp_sum_q16,
+                                               exp_lane_q16,
+                                               &exp_sum_q16);
+            if (status != ATTN_Q16_OK)
+            {
+                Free(staged_probs_q16);
+                return status;
+            }
+
+            if (exp_lane_q16 > best_value_q16)
+            {
+                best_value_q16 = exp_lane_q16;
+                best_index = col_index;
+            }
+        }
+
+        if (exp_sum_q16 <= 0)
+        {
+            Free(staged_probs_q16);
+            return ATTN_Q16_ERR_BAD_PARAM;
+        }
+
+        prob_sum_q16 = 0;
+        for (col_index = 0; col_index < key_rows; col_index++)
+        {
+            status = AttentionTryMulI64Checked(staged_probs_q16[row_index * key_rows + col_index],
+                                               GQA_SOFTMAX_ONE_Q16,
+                                               &numerator_q16);
+            if (status != ATTN_Q16_OK)
+            {
+                Free(staged_probs_q16);
+                return status;
+            }
+
+            status = AttentionTryAddI64Checked(numerator_q16,
+                                               exp_sum_q16 / 2,
+                                               &numerator_q16);
+            if (status != ATTN_Q16_OK)
+            {
+                Free(staged_probs_q16);
+                return status;
+            }
+
+            prob_q16 = numerator_q16 / exp_sum_q16;
+            if (prob_q16 < 0)
+                prob_q16 = 0;
+
+            staged_probs_q16[row_index * key_rows + col_index] = prob_q16;
+            status = AttentionTryAddI64Checked(prob_sum_q16,
+                                               prob_q16,
+                                               &prob_sum_q16);
+            if (status != ATTN_Q16_OK)
+            {
+                Free(staged_probs_q16);
+                return status;
+            }
+        }
+
+        remainder_q16 = GQA_SOFTMAX_ONE_Q16 - prob_sum_q16;
+        if (remainder_q16 > 0)
+        {
+            status = AttentionTryAddI64Checked(staged_probs_q16[row_index * key_rows + best_index],
+                                               remainder_q16,
+                                               &add_value_q16);
+            if (status != ATTN_Q16_OK)
+            {
+                Free(staged_probs_q16);
+                return status;
+            }
+            staged_probs_q16[row_index * key_rows + best_index] = add_value_q16;
+        }
+        else if (remainder_q16 < 0)
+        {
+            remainder_q16 = -remainder_q16;
+            for (col_index = 0; col_index < key_rows && remainder_q16 > 0; col_index++)
+            {
+                commit_index = row_index * key_rows + ((best_index + col_index) % key_rows);
+                if (!staged_probs_q16[commit_index])
+                    continue;
+
+                if (staged_probs_q16[commit_index] > remainder_q16)
+                {
+                    staged_probs_q16[commit_index] -= remainder_q16;
+                    remainder_q16 = 0;
+                }
+                else
+                {
+                    remainder_q16 -= staged_probs_q16[commit_index];
+                    staged_probs_q16[commit_index] = 0;
+                }
+            }
+
+            if (remainder_q16 != 0)
+            {
+                Free(staged_probs_q16);
+                return ATTN_Q16_ERR_BAD_PARAM;
+            }
+        }
+    }
+
+    for (commit_index = 0; commit_index < required_out_cells; commit_index++)
+        out_probs_q16[commit_index] = staged_probs_q16[commit_index];
+
+    Free(staged_probs_q16);
+    return ATTN_Q16_OK;
+}
