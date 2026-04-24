@@ -3,6 +3,7 @@
 
 from pathlib import Path
 import importlib.util
+import sys
 
 _BASE = Path(__file__).resolve().parent
 
@@ -11,22 +12,15 @@ def _load(name: str, filename: str):
     spec = importlib.util.spec_from_file_location(name, _BASE / filename)
     mod = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
+    sys.modules[name] = mod
     spec.loader.exec_module(mod)
     return mod
 
 
 ref_core = _load("q8_0_matmul_core", "test_q8_0_matmul_q16_naive_checked_nopartial.py")
-ref_preflight = _load(
-    "q8_0_matmul_preflight",
-    "test_q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only.py",
-)
 ref_parity = _load(
     "q8_0_matmul_parity",
     "test_q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only_parity.py",
-)
-ref_commit_pf = _load(
-    "q8_0_matmul_commit_pf",
-    "test_q8_0_matmul_q16_naive_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only.py",
 )
 
 Q8_0_OK = ref_core.Q8_0_OK
@@ -83,27 +77,6 @@ def q8_0_matmul_q16_nopartial_commit_only_preflight_only_parity_commit_only(
         out_out_required_cells,
     )
 
-    staged_commit_lhs = [0x1111111111111111]
-    staged_commit_rhs = [0x2222222222222222]
-    staged_commit_out = [0x3333333333333333]
-    commit_status = ref_commit_pf.q8_0_matmul_q16_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only(
-        lhs_blocks,
-        lhs_block_capacity,
-        row_count,
-        lhs_row_stride_blocks,
-        rhs_col_blocks,
-        rhs_block_capacity,
-        col_count,
-        rhs_col_stride_blocks,
-        k_block_count,
-        out_cells_q16,
-        out_cell_capacity,
-        out_row_stride_cells,
-        staged_commit_lhs,
-        staged_commit_rhs,
-        staged_commit_out,
-    )
-
     staged_parity_lhs = [0x4444444444444444]
     staged_parity_rhs = [0x5555555555555555]
     staged_parity_out = [0x6666666666666666]
@@ -123,6 +96,27 @@ def q8_0_matmul_q16_nopartial_commit_only_preflight_only_parity_commit_only(
         staged_parity_lhs,
         staged_parity_rhs,
         staged_parity_out,
+    )
+
+    staged_commit_lhs = [0x1111111111111111]
+    staged_commit_rhs = [0x2222222222222222]
+    staged_commit_out = [0x3333333333333333]
+    commit_status = ref_core.q8_0_matmul_q16_nopartial_commit_only(
+        lhs_blocks,
+        lhs_block_capacity,
+        row_count,
+        lhs_row_stride_blocks,
+        rhs_col_blocks,
+        rhs_block_capacity,
+        col_count,
+        rhs_col_stride_blocks,
+        k_block_count,
+        out_cells_q16,
+        out_cell_capacity,
+        out_row_stride_cells,
+        staged_commit_lhs,
+        staged_commit_rhs,
+        staged_commit_out,
     )
 
     if snapshot != (
@@ -171,7 +165,7 @@ def _make_valid_case():
     rhs_col_stride_blocks = k_block_count + 2
     out_row_stride_cells = col_count + 2
 
-    err, lhs_required, rhs_required, out_required = ref_preflight.compute_required_capacities_checked(
+    err, lhs_required, rhs_required, out_required = ref_core.compute_required_capacities_checked(
         row_count,
         lhs_row_stride_blocks,
         col_count,
@@ -206,7 +200,7 @@ def test_success_parity_and_atomic_publish() -> None:
     expected_lhs = [0xABCDEF0011223344]
     expected_rhs = [0xABCDEF0011223345]
     expected_out = [0xABCDEF0011223346]
-    status_expected = ref_commit_pf.q8_0_matmul_q16_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only(
+    status_expected = ref_core.q8_0_matmul_q16_nopartial_commit_only(
         **case,
         out_lhs_required_blocks=expected_lhs,
         out_rhs_required_blocks=expected_rhs,
