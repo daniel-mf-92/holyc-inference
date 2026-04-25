@@ -21523,6 +21523,8 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialCommitOnly(
         return ATTN_Q16_ERR_BAD_PARAM;
     if (out_begin < values_end && values_begin < out_end)
         return ATTN_Q16_ERR_BAD_PARAM;
+    if (values_begin < scores_end && scores_begin < values_end)
+        return ATTN_Q16_ERR_BAD_PARAM;
 
     staged_out_values_q16 = MAlloc(required_out_bytes);
     if (!staged_out_values_q16)
@@ -22510,6 +22512,8 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOn
     if (out_begin < scores_end && scores_begin < out_end)
         return ATTN_Q16_ERR_BAD_PARAM;
     if (out_begin < values_end && values_begin < out_end)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (values_begin < scores_end && scores_begin < values_end)
         return ATTN_Q16_ERR_BAD_PARAM;
 
     staged_parity_out_values_q16 = MAlloc(required_out_bytes);

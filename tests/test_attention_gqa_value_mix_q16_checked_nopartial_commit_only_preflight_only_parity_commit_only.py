@@ -112,6 +112,8 @@ def gqa_attention_value_mix_q16_checked_nopartial_commit_only_preflight_only_par
 
     if out_values_q16 is scores_q16 or out_values_q16 is values_q16:
         return ATTN_Q16_ERR_BAD_PARAM
+    if scores_q16 is values_q16:
+        return ATTN_Q16_ERR_BAD_PARAM
 
     staged_parity = [0] * required_out_cells
     out_snapshot = out_values_q16[:required_out_cells]
@@ -312,6 +314,24 @@ def test_error_contract_null_alias_capacity_overflow() -> None:
     )
     assert err == ATTN_Q16_ERR_BAD_PARAM
 
+    shared = [1 << 16, 2 << 16, 3 << 16, 4 << 16]
+    out = seed.copy()
+    err = gqa_attention_value_mix_q16_checked_nopartial_commit_only_preflight_only_parity_commit_only(
+        shared,
+        len(shared),
+        1,
+        1,
+        1,
+        1,
+        1,
+        shared,
+        len(shared),
+        out,
+        len(out),
+    )
+    assert err == ATTN_Q16_ERR_BAD_PARAM
+    assert out == seed
+
     out = seed.copy()
     err = gqa_attention_value_mix_q16_checked_nopartial_commit_only_preflight_only_parity_commit_only(
         scores,
@@ -391,6 +411,7 @@ def test_source_contract_markers() -> None:
     assert "status = GQAAttentionValueMixQ16CheckedNoPartialCommitOnlyPreflightOnly(" in body
     assert "if (out_begin < scores_end && scores_begin < out_end)" in body
     assert "if (out_begin < values_end && values_begin < out_end)" in body
+    assert "if (values_begin < scores_end && scores_begin < values_end)" in body
     assert "if (out_values_q16[copy_index] != snapshot_out_values_q16_values[copy_index])" in body
 
 
