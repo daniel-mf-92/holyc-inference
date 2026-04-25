@@ -5088,11 +5088,11 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedNoPartialPrefli
     snapshot_out_max_ptr = out_max_overhead_q16;
     snapshot_out_mean_ptr = out_mean_overhead_q16;
 
-    // IQ-1480 strict preflight-only parity gate:
+    // IQ-1494 strict preflight-only parity gate hardening:
     // 1) snapshot immutable row digest and caller output slots;
     // 2) compute staged tuple via no-partial preflight-only diagnostics wrapper;
     // 3) independently compute tuple via no-partial wrapper;
-    // 4) require immutable snapshots + exact tuple parity;
+    // 4) require immutable snapshots + exact status/tuple parity;
     // 5) preserve zero-write diagnostics semantics for caller outputs.
     status_snapshot = GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked(
         rows,
@@ -5114,9 +5114,6 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedNoPartialPrefli
         &staged_min_overhead_q16,
         &staged_max_overhead_q16,
         &staged_mean_overhead_q16);
-    if (status_preflight_only != GPU_SEC_PERF_OK)
-        return status_preflight_only;
-
     status_nopartial = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedNoPartial(
         rows,
         row_count,
@@ -5129,9 +5126,6 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedNoPartialPrefli
         &parity_min_overhead_q16,
         &parity_max_overhead_q16,
         &parity_mean_overhead_q16);
-    if (status_nopartial != GPU_SEC_PERF_OK)
-        return status_nopartial;
-
     status_snapshot = GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked(
         rows,
         row_count,
@@ -5164,6 +5158,21 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedNoPartialPrefli
         return GPU_SEC_PERF_ERR_BAD_PARAM;
     if (snapshot_out_mean_ptr != out_mean_overhead_q16)
         return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (status_preflight_only != status_nopartial)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (status_preflight_only != GPU_SEC_PERF_OK)
+    {
+        if (*out_min_overhead_q16 != saved_min_overhead_q16 ||
+            *out_max_overhead_q16 != saved_max_overhead_q16 ||
+            *out_mean_overhead_q16 != saved_mean_overhead_q16)
+            return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+        *out_min_overhead_q16 = saved_min_overhead_q16;
+        *out_max_overhead_q16 = saved_max_overhead_q16;
+        *out_mean_overhead_q16 = saved_mean_overhead_q16;
+        return status_preflight_only;
+    }
 
     if (staged_min_overhead_q16 != parity_min_overhead_q16)
         return GPU_SEC_PERF_ERR_BAD_PARAM;

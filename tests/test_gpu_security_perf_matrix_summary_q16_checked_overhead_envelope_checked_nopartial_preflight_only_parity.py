@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1480 overhead-envelope no-partial preflight-only parity gate."""
+"""Harness for IQ-1494 overhead-envelope no-partial preflight-only parity gate."""
 
 from __future__ import annotations
 
@@ -249,6 +249,7 @@ def gpu_security_perf_matrix_summary_q16_checked_overhead_envelope_checked_nopar
     outputs_alias: bool = False,
     has_null_output: bool = False,
     simulate_parity_drift: bool = False,
+    simulate_status_drift: bool = False,
 ) -> tuple[int, tuple[int, int, int], tuple[int, int, int]]:
     if has_null_output:
         return GPU_SEC_PERF_ERR_NULL_PTR, caller_outputs, (0, 0, 0)
@@ -292,6 +293,9 @@ def gpu_security_perf_matrix_summary_q16_checked_overhead_envelope_checked_nopar
     if parity[0] != GPU_SEC_PERF_OK:
         return parity[0], caller_outputs, (0, 0, 0)
 
+    if simulate_status_drift:
+        return GPU_SEC_PERF_ERR_BAD_PARAM, caller_outputs, (0, 0, 0)
+
     parity_tuple = parity[1:]
     if simulate_parity_drift:
         parity_tuple = (parity_tuple[0], parity_tuple[1] + 1, parity_tuple[2])
@@ -306,12 +310,13 @@ def gpu_security_perf_matrix_summary_q16_checked_overhead_envelope_checked_nopar
     return GPU_SEC_PERF_OK, caller_outputs, preflight[2]
 
 
-def test_source_contains_iq1480_symbols() -> None:
+def test_source_contains_iq1494_symbols() -> None:
     src = Path("src/gpu/security_perf_matrix.HC").read_text(encoding="utf-8")
 
     assert "I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedNoPartialPreflightOnlyParity(" in src
     assert "status_preflight_only = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedNoPartialPreflightOnly(" in src
     assert "status_nopartial = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedNoPartial(" in src
+    assert "if (status_preflight_only != status_nopartial)" in src
     assert "snapshot_after_digest_q64" in src
     assert "saved_mean_overhead_q16" in src
 
@@ -466,3 +471,18 @@ def test_parity_vectors() -> None:
     assert drift_status == GPU_SEC_PERF_ERR_BAD_PARAM
     assert outputs_after == (71, 72, 73)
     assert drift_diag == (0, 0, 0)
+
+    status_drift, outputs_after, status_drift_diag = gpu_security_perf_matrix_summary_q16_checked_overhead_envelope_checked_nopartial_preflight_only_parity(
+        rows,
+        rows_capacity=3,
+        out_capacity=3,
+        secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
+        iommu_active=1,
+        book_of_truth_gpu_hooks=1,
+        policy_digest_parity=1,
+        caller_outputs=(81, 82, 83),
+        simulate_status_drift=True,
+    )
+    assert status_drift == GPU_SEC_PERF_ERR_BAD_PARAM
+    assert outputs_after == (81, 82, 83)
+    assert status_drift_diag == (0, 0, 0)
