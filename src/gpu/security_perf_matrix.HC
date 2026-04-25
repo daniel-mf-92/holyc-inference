@@ -1954,7 +1954,7 @@ I32 GPUSecurityPerfMatrixRowGateCheckedNoPartialPreflightOnlyCommitOnlyPreflight
     saved_gate_reason_code = *out_gate_reason_code;
     saved_row_allowed = *out_row_allowed;
 
-    // IQ-1528 commit-only hardening wrapper:
+    // IQ-1541 commit-only hardening wrapper:
     // 1) snapshot immutable gate tuple + caller output slots;
     // 2) derive canonical tuple through strict parity diagnostics wrapper;
     // 3) replay preflight-only diagnostics wrapper with canonical tuple seed;
@@ -2012,6 +2012,11 @@ I32 GPUSecurityPerfMatrixRowGateCheckedNoPartialPreflightOnlyCommitOnlyPreflight
     if (snapshot_out_gate_reason_code_ptr != out_gate_reason_code)
         return GPU_SEC_PERF_ERR_BAD_PARAM;
     if (snapshot_out_row_allowed_ptr != out_row_allowed)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (!GPUSecurityPerfStatusIsValid(status_parity))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (!GPUSecurityPerfStatusIsValid(status_preflight_only))
         return GPU_SEC_PERF_ERR_BAD_PARAM;
 
     if (status_parity != status_preflight_only)
