@@ -5566,6 +5566,172 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflight
     return GPU_SEC_PERF_OK;
 }
 
+
+I32 GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflightOnlyParityCommitOnly(
+    const GPUSecurityPerfMatrixRowOutput *rows,
+    I64 row_count,
+    I64 rows_capacity,
+    I64 out_capacity,
+    I64 secure_local_mode,
+    I64 iommu_active,
+    I64 book_of_truth_gpu_hooks,
+    I64 policy_digest_parity,
+    I64 *out_p05_q16,
+    I64 *out_p25_q16,
+    I64 *out_p75_q16,
+    I64 *out_p99_q16)
+{
+    I64 snapshot_row_count;
+    I64 snapshot_rows_capacity;
+    I64 snapshot_out_capacity;
+    I64 snapshot_secure_local_mode;
+    I64 snapshot_iommu_active;
+    I64 snapshot_book_of_truth_gpu_hooks;
+    I64 snapshot_policy_digest_parity;
+    const GPUSecurityPerfMatrixRowOutput *snapshot_rows_ptr;
+    I64 *snapshot_out_p05_ptr;
+    I64 *snapshot_out_p25_ptr;
+    I64 *snapshot_out_p75_ptr;
+    I64 *snapshot_out_p99_ptr;
+    I64 saved_p05_q16;
+    I64 saved_p25_q16;
+    I64 saved_p75_q16;
+    I64 saved_p99_q16;
+    I64 staged_p05_q16;
+    I64 staged_p25_q16;
+    I64 staged_p75_q16;
+    I64 staged_p99_q16;
+    I64 parity_p05_q16;
+    I64 parity_p25_q16;
+    I64 parity_p75_q16;
+    I64 parity_p99_q16;
+    I32 status_parity;
+    I32 status_preflight_only;
+
+    if (!rows || !out_p05_q16 || !out_p25_q16 || !out_p75_q16 || !out_p99_q16)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    if (out_p05_q16 == out_p25_q16 ||
+        out_p05_q16 == out_p75_q16 ||
+        out_p05_q16 == out_p99_q16 ||
+        out_p25_q16 == out_p75_q16 ||
+        out_p25_q16 == out_p99_q16 ||
+        out_p75_q16 == out_p99_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    snapshot_row_count = row_count;
+    snapshot_rows_capacity = rows_capacity;
+    snapshot_out_capacity = out_capacity;
+    snapshot_secure_local_mode = secure_local_mode;
+    snapshot_iommu_active = iommu_active;
+    snapshot_book_of_truth_gpu_hooks = book_of_truth_gpu_hooks;
+    snapshot_policy_digest_parity = policy_digest_parity;
+    snapshot_rows_ptr = rows;
+    snapshot_out_p05_ptr = out_p05_q16;
+    snapshot_out_p25_ptr = out_p25_q16;
+    snapshot_out_p75_ptr = out_p75_q16;
+    snapshot_out_p99_ptr = out_p99_q16;
+    saved_p05_q16 = *out_p05_q16;
+    saved_p25_q16 = *out_p25_q16;
+    saved_p75_q16 = *out_p75_q16;
+    saved_p99_q16 = *out_p99_q16;
+
+    // IQ-1506 commit-only hardening wrapper:
+    // 1) snapshot immutable input tuple + caller output slots;
+    // 2) derive canonical `{p05,p25,p75,p99}` via no-partial preflight-only parity;
+    // 3) replay no-partial preflight-only with canonical seed tuple;
+    // 4) enforce immutable snapshots and strict status/tuple parity;
+    // 5) publish tuple atomically only on strict parity + success.
+    status_parity = GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflightOnlyParity(
+        rows,
+        row_count,
+        rows_capacity,
+        out_capacity,
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        &parity_p05_q16,
+        &parity_p25_q16,
+        &parity_p75_q16,
+        &parity_p99_q16);
+
+    staged_p05_q16 = parity_p05_q16;
+    staged_p25_q16 = parity_p25_q16;
+    staged_p75_q16 = parity_p75_q16;
+    staged_p99_q16 = parity_p99_q16;
+    status_preflight_only = GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflightOnly(
+        rows,
+        row_count,
+        rows_capacity,
+        out_capacity,
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        &staged_p05_q16,
+        &staged_p25_q16,
+        &staged_p75_q16,
+        &staged_p99_q16);
+
+    if (snapshot_row_count != row_count)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_rows_capacity != rows_capacity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_capacity != out_capacity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_secure_local_mode != secure_local_mode)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_iommu_active != iommu_active)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_book_of_truth_gpu_hooks != book_of_truth_gpu_hooks)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_policy_digest_parity != policy_digest_parity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_rows_ptr != rows)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_p05_ptr != out_p05_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_p25_ptr != out_p25_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_p75_ptr != out_p75_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_p99_ptr != out_p99_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (status_parity != status_preflight_only)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (parity_p05_q16 != staged_p05_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (parity_p25_q16 != staged_p25_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (parity_p75_q16 != staged_p75_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (parity_p99_q16 != staged_p99_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (status_parity != GPU_SEC_PERF_OK)
+    {
+        if (*out_p05_q16 != saved_p05_q16 ||
+            *out_p25_q16 != saved_p25_q16 ||
+            *out_p75_q16 != saved_p75_q16 ||
+            *out_p99_q16 != saved_p99_q16)
+            return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+        *out_p05_q16 = saved_p05_q16;
+        *out_p25_q16 = saved_p25_q16;
+        *out_p75_q16 = saved_p75_q16;
+        *out_p99_q16 = saved_p99_q16;
+        return status_parity;
+    }
+
+    *out_p05_q16 = parity_p05_q16;
+    *out_p25_q16 = parity_p25_q16;
+    *out_p75_q16 = parity_p75_q16;
+    *out_p99_q16 = parity_p99_q16;
+    return GPU_SEC_PERF_OK;
+}
+
 I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeChecked(
     const GPUSecurityPerfMatrixRowOutput *rows,
     I64 row_count,
