@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1496 zero-write bridge preflight wrapper."""
+"""Harness for IQ-1510 zero-write bridge preflight wrapper."""
 
 from __future__ import annotations
 
@@ -174,6 +174,10 @@ def row_gate_checked_commit_only_nopartial_bridge_preflight_only(
     outputs_alias: bool = False,
     has_null_output: bool = False,
     inject_parity_drift: bool = False,
+    inject_invalid_staged_reason: bool = False,
+    inject_invalid_staged_allowed: bool = False,
+    inject_invalid_canonical_reason: bool = False,
+    inject_invalid_canonical_allowed: bool = False,
 ) -> tuple[int, int, int]:
     if has_null_output:
         return GPU_SEC_PERF_ERR_NULL_PTR, current_gate_reason_code, current_row_allowed
@@ -201,6 +205,24 @@ def row_gate_checked_commit_only_nopartial_bridge_preflight_only(
         row_quant_profile,
     )
 
+    if inject_invalid_staged_reason:
+        staged_reason = 99
+    if inject_invalid_staged_allowed:
+        staged_allowed = 3
+    if inject_invalid_canonical_reason:
+        canonical_reason = 99
+    if inject_invalid_canonical_allowed:
+        canonical_allowed = 3
+
+    if not (GPU_SEC_PERF_ROW_GATE_REASON_ALLOW <= staged_reason <= GPU_SEC_PERF_ROW_GATE_REASON_BAD_QUANT_PROFILE):
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_gate_reason_code, current_row_allowed
+    if staged_allowed not in (0, 1):
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_gate_reason_code, current_row_allowed
+    if not (GPU_SEC_PERF_ROW_GATE_REASON_ALLOW <= canonical_reason <= GPU_SEC_PERF_ROW_GATE_REASON_BAD_QUANT_PROFILE):
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_gate_reason_code, current_row_allowed
+    if canonical_allowed not in (0, 1):
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_gate_reason_code, current_row_allowed
+
     if inject_parity_drift:
         canonical_reason += 1
 
@@ -211,7 +233,7 @@ def row_gate_checked_commit_only_nopartial_bridge_preflight_only(
     return status_bridge, current_gate_reason_code, current_row_allowed
 
 
-def test_source_contains_iq1496_symbols() -> None:
+def test_source_contains_iq1510_symbols() -> None:
     src = Path("src/gpu/security_perf_matrix.HC").read_text(encoding="utf-8")
 
     assert "I32 GPUSecurityPerfMatrixRowGateCheckedCommitOnlyNoPartialBridgePreflightOnly(" in src
@@ -220,6 +242,8 @@ def test_source_contains_iq1496_symbols() -> None:
     assert "if (out_gate_reason_code == out_row_allowed)" in src
     assert "saved_gate_reason_code" in src
     assert "saved_row_allowed" in src
+    assert "GPUSecurityPerfRowGateReasonIsValid(staged_gate_reason_code)" in src
+    assert "GPUSecurityPerfFlagIsBinary(staged_row_allowed)" in src
 
 
 def test_null_alias_capacity_vectors() -> None:
@@ -305,6 +329,34 @@ def test_gate_missing_bad_quant_and_parity_vectors() -> None:
         inject_parity_drift=True,
     )
     assert (status, reason, allowed) == (GPU_SEC_PERF_ERR_BAD_PARAM, 55, 56)
+
+    status, reason, allowed = row_gate_checked_commit_only_nopartial_bridge_preflight_only(
+        secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
+        iommu_active=1,
+        book_of_truth_gpu_hooks=1,
+        policy_digest_parity=1,
+        row_prompt_tokens=48,
+        row_batch_size=2,
+        row_quant_profile=GPU_SEC_PERF_QUANT_Q8_0,
+        current_gate_reason_code=57,
+        current_row_allowed=58,
+        inject_invalid_staged_reason=True,
+    )
+    assert (status, reason, allowed) == (GPU_SEC_PERF_ERR_BAD_PARAM, 57, 58)
+
+    status, reason, allowed = row_gate_checked_commit_only_nopartial_bridge_preflight_only(
+        secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
+        iommu_active=1,
+        book_of_truth_gpu_hooks=1,
+        policy_digest_parity=1,
+        row_prompt_tokens=48,
+        row_batch_size=2,
+        row_quant_profile=GPU_SEC_PERF_QUANT_Q8_0,
+        current_gate_reason_code=59,
+        current_row_allowed=60,
+        inject_invalid_canonical_allowed=True,
+    )
+    assert (status, reason, allowed) == (GPU_SEC_PERF_ERR_BAD_PARAM, 59, 60)
 
 
 def test_success_zero_write_vector() -> None:

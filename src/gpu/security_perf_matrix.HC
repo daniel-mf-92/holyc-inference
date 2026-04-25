@@ -209,6 +209,12 @@ Bool GPUSecurityPerfIsSupportedQuant(I64 quant_level)
             quant_level == GPU_SEC_PERF_QUANT_Q8_0);
 }
 
+Bool GPUSecurityPerfRowGateReasonIsValid(I64 reason_code)
+{
+    return (reason_code >= GPU_SEC_PERF_ROW_GATE_REASON_ALLOW &&
+            reason_code <= GPU_SEC_PERF_ROW_GATE_REASON_BAD_QUANT_PROFILE);
+}
+
 I32 GPUSecurityPerfMatrixRowGateChecked(I64 secure_local_mode,
                                         I64 iommu_active,
                                         I64 book_of_truth_gpu_hooks,
@@ -632,12 +638,13 @@ I32 GPUSecurityPerfMatrixRowGateCheckedCommitOnlyNoPartialBridgePreflightOnly(
     canonical_gate_reason_code = GPU_SEC_PERF_ROW_GATE_REASON_BAD_ROW_GEOMETRY;
     canonical_row_allowed = 0;
 
-    // IQ-1496 preflight-only bridge diagnostics wrapper:
+    // IQ-1510 preflight-only bridge diagnostics wrapper:
     // 1) snapshot immutable gate tuple + caller output slots;
     // 2) derive staged tuple via commit-only/no-partial bridge wrapper;
     // 3) derive canonical tuple via commit-only row gate wrapper;
-    // 4) require immutable snapshots and strict status/tuple parity;
-    // 5) preserve caller outputs (zero-write diagnostics semantics).
+    // 4) require staged/canonical reason+allow tuples to remain valid;
+    // 5) require immutable snapshots and strict status/tuple parity;
+    // 6) preserve caller outputs (zero-write diagnostics semantics).
     status_bridge = GPUSecurityPerfMatrixRowGateCheckedCommitOnlyNoPartialBridge(
         secure_local_mode,
         iommu_active,
@@ -659,6 +666,15 @@ I32 GPUSecurityPerfMatrixRowGateCheckedCommitOnlyNoPartialBridgePreflightOnly(
         row_quant_profile,
         &canonical_gate_reason_code,
         &canonical_row_allowed);
+
+    if (!GPUSecurityPerfRowGateReasonIsValid(staged_gate_reason_code))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (!GPUSecurityPerfFlagIsBinary(staged_row_allowed))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (!GPUSecurityPerfRowGateReasonIsValid(canonical_gate_reason_code))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (!GPUSecurityPerfFlagIsBinary(canonical_row_allowed))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
 
     if (snapshot_secure_local_mode != secure_local_mode)
         return GPU_SEC_PERF_ERR_BAD_PARAM;
