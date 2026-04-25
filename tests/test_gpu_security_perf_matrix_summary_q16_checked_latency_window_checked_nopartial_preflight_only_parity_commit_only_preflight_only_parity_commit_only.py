@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1522 latency-window parity-commit-only hardening wrapper."""
+"""Harness for IQ-1534 latency-window parity-commit-only hardening wrapper."""
 
 from __future__ import annotations
 
@@ -417,12 +417,16 @@ def gpu_security_perf_matrix_summary_q16_checked_latency_window_checked_nopartia
     return GPU_SEC_PERF_OK, parity_tuple, staged_tuple
 
 
-def test_source_contains_iq1522_symbols() -> None:
+def test_source_contains_iq1534_symbols() -> None:
     src = Path("src/gpu/security_perf_matrix.HC").read_text(encoding="utf-8")
 
     assert "I32 GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(" in src
     assert "status_parity = GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in src
     assert "status_preflight_only = GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflightOnlyParityCommitOnlyPreflightOnly(" in src
+    assert "status_snapshot = GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked(" in src
+    assert "snapshot_after_digest_q64 != snapshot_before_digest_q64" in src
+    assert "if (!GPUSecurityPerfStatusIsValid(status_parity))" in src
+    assert "if (!GPUSecurityPerfStatusIsValid(status_preflight_only))" in src
     assert "parity_p75_q16" in src
     assert "staged_p75_q16" in src
     assert "saved_p05_q16" in src
