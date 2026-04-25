@@ -3626,3 +3626,178 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedNoPartial(
     *out_mean_overhead_q16 = staged_mean_overhead_q16;
     return GPU_SEC_PERF_OK;
 }
+
+I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedNoPartialPreflightOnly(
+    const GPUSecurityPerfMatrixRowOutput *rows,
+    I64 row_count,
+    I64 rows_capacity,
+    I64 out_capacity,
+    I64 secure_local_mode,
+    I64 iommu_active,
+    I64 book_of_truth_gpu_hooks,
+    I64 policy_digest_parity,
+    I64 *out_min_overhead_q16,
+    I64 *out_max_overhead_q16,
+    I64 *out_mean_overhead_q16)
+{
+    I64 snapshot_row_count;
+    I64 snapshot_rows_capacity;
+    I64 snapshot_out_capacity;
+    I64 snapshot_secure_local_mode;
+    I64 snapshot_iommu_active;
+    I64 snapshot_book_of_truth_gpu_hooks;
+    I64 snapshot_policy_digest_parity;
+    const GPUSecurityPerfMatrixRowOutput *snapshot_rows_ptr;
+    I64 *snapshot_out_min_ptr;
+    I64 *snapshot_out_max_ptr;
+    I64 *snapshot_out_mean_ptr;
+    I64 snapshot_before_digest_q64;
+    I64 snapshot_after_digest_q64;
+    I64 saved_min_overhead_q16;
+    I64 saved_max_overhead_q16;
+    I64 saved_mean_overhead_q16;
+    I64 staged_min_overhead_q16;
+    I64 staged_max_overhead_q16;
+    I64 staged_mean_overhead_q16;
+    I64 canonical_min_overhead_q16;
+    I64 canonical_max_overhead_q16;
+    I64 canonical_mean_overhead_q16;
+    I32 status_snapshot;
+    I32 status_nopartial;
+    I32 status_canonical;
+
+    if (!rows || !out_min_overhead_q16 ||
+        !out_max_overhead_q16 || !out_mean_overhead_q16)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    if (out_min_overhead_q16 == out_max_overhead_q16 ||
+        out_min_overhead_q16 == out_mean_overhead_q16 ||
+        out_max_overhead_q16 == out_mean_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (row_count <= 0 || rows_capacity < row_count)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (out_capacity < 3)
+        return GPU_SEC_PERF_ERR_CAPACITY;
+
+    if (!GPUSecurityPerfFlagIsBinary(iommu_active) ||
+        !GPUSecurityPerfFlagIsBinary(book_of_truth_gpu_hooks) ||
+        !GPUSecurityPerfFlagIsBinary(policy_digest_parity))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (secure_local_mode != GPU_SEC_PERF_PROFILE_SECURE_LOCAL)
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+
+    if (!policy_digest_parity)
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+
+    saved_min_overhead_q16 = *out_min_overhead_q16;
+    saved_max_overhead_q16 = *out_max_overhead_q16;
+    saved_mean_overhead_q16 = *out_mean_overhead_q16;
+
+    snapshot_row_count = row_count;
+    snapshot_rows_capacity = rows_capacity;
+    snapshot_out_capacity = out_capacity;
+    snapshot_secure_local_mode = secure_local_mode;
+    snapshot_iommu_active = iommu_active;
+    snapshot_book_of_truth_gpu_hooks = book_of_truth_gpu_hooks;
+    snapshot_policy_digest_parity = policy_digest_parity;
+    snapshot_rows_ptr = rows;
+    snapshot_out_min_ptr = out_min_overhead_q16;
+    snapshot_out_max_ptr = out_max_overhead_q16;
+    snapshot_out_mean_ptr = out_mean_overhead_q16;
+
+    // IQ-1479 preflight-only overhead-envelope wrapper:
+    // 1) snapshot immutable row digest and caller output slots;
+    // 2) compute staged tuple via no-partial wrapper and canonical envelope;
+    // 3) require immutable snapshots and strict tuple parity;
+    // 4) restore caller outputs to preserve zero-write diagnostics semantics.
+    status_snapshot = GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked(
+        rows,
+        row_count,
+        rows_capacity,
+        &snapshot_before_digest_q64);
+    if (status_snapshot != GPU_SEC_PERF_OK)
+        return status_snapshot;
+
+    status_nopartial = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedNoPartial(
+        rows,
+        row_count,
+        rows_capacity,
+        out_capacity,
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        &staged_min_overhead_q16,
+        &staged_max_overhead_q16,
+        &staged_mean_overhead_q16);
+    if (status_nopartial != GPU_SEC_PERF_OK)
+        return status_nopartial;
+
+    status_canonical = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeChecked(
+        rows,
+        row_count,
+        rows_capacity,
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        &canonical_min_overhead_q16,
+        &canonical_max_overhead_q16,
+        &canonical_mean_overhead_q16);
+    if (status_canonical != GPU_SEC_PERF_OK)
+        return status_canonical;
+
+    status_snapshot = GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked(
+        rows,
+        row_count,
+        rows_capacity,
+        &snapshot_after_digest_q64);
+    if (status_snapshot != GPU_SEC_PERF_OK)
+        return status_snapshot;
+    if (snapshot_after_digest_q64 != snapshot_before_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (snapshot_row_count != row_count)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_rows_capacity != rows_capacity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_capacity != out_capacity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_secure_local_mode != secure_local_mode)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_iommu_active != iommu_active)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_book_of_truth_gpu_hooks != book_of_truth_gpu_hooks)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_policy_digest_parity != policy_digest_parity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_rows_ptr != rows)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_min_ptr != out_min_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_max_ptr != out_max_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_mean_ptr != out_mean_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (staged_min_overhead_q16 != canonical_min_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_max_overhead_q16 != canonical_max_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_mean_overhead_q16 != canonical_mean_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (*out_min_overhead_q16 != saved_min_overhead_q16 ||
+        *out_max_overhead_q16 != saved_max_overhead_q16 ||
+        *out_mean_overhead_q16 != saved_mean_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    *out_min_overhead_q16 = saved_min_overhead_q16;
+    *out_max_overhead_q16 = saved_max_overhead_q16;
+    *out_mean_overhead_q16 = saved_mean_overhead_q16;
+
+    return GPU_SEC_PERF_OK;
+}
