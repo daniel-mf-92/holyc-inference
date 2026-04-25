@@ -47,6 +47,95 @@ I32 GPUPolicyAllowDispatchChecked(I64 iommu_enabled,
                                   I64 *out_reason_code,
                                   I64 *out_profile_id);
 
+I32 GPUSecurityPerfMatrixSelectPercentileNearestRankQ16Checked(
+    const GPUSecurityPerfMatrixRowOutput *rows,
+    I64 row_count,
+    I64 percentile_num,
+    I64 percentile_den,
+    I64 *out_value_q16)
+{
+    I64 scaled_rank_num;
+    I64 rank;
+    I64 i;
+    I64 best_value;
+    Bool found;
+
+    if (!rows || !out_value_q16)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    *out_value_q16 = 0;
+
+    if (row_count <= 0 ||
+        percentile_num <= 0 ||
+        percentile_den <= 0 ||
+        percentile_num > percentile_den)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (!GPUSecurityPerfMulChecked(percentile_num,
+                                   row_count,
+                                   &scaled_rank_num))
+        return GPU_SEC_PERF_ERR_OVERFLOW;
+
+    rank = scaled_rank_num / percentile_den;
+    if ((scaled_rank_num % percentile_den) != 0)
+    {
+        if (!GPUSecurityPerfAddChecked(rank, 1, &rank))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+    }
+
+    if (rank <= 0)
+        rank = 1;
+    if (rank > row_count)
+        rank = row_count;
+
+    found = FALSE;
+    best_value = 0;
+
+    for (i = 0; i < row_count; ++i)
+    {
+        I64 candidate;
+        I64 less_count;
+        I64 less_equal_count;
+        I64 j;
+
+        candidate = rows[i].secure_cycles_per_token_q16;
+        if (candidate < 0)
+            return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+        less_count = 0;
+        less_equal_count = 0;
+
+        for (j = 0; j < row_count; ++j)
+        {
+            I64 observed;
+
+            observed = rows[j].secure_cycles_per_token_q16;
+            if (observed < 0)
+                return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+            if (observed < candidate)
+                ++less_count;
+            if (observed <= candidate)
+                ++less_equal_count;
+        }
+
+        if (less_count < rank && rank <= less_equal_count)
+        {
+            if (!found || candidate < best_value)
+            {
+                best_value = candidate;
+                found = TRUE;
+            }
+        }
+    }
+
+    if (!found)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    *out_value_q16 = best_value;
+    return GPU_SEC_PERF_OK;
+}
+
 Bool GPUSecurityPerfAddChecked(I64 lhs,
                                I64 rhs,
                                I64 *out_sum)
@@ -227,6 +316,124 @@ I32 GPUSecurityPerfMatrixRunChecked(const GPUSecurityPerfMatrixRowInput *rows,
     *out_written_rows = row_count;
     *out_tok_per_sec_q16_total = tok_total;
     *out_audit_overhead_delta_q16_total = overhead_total;
+
+    return GPU_SEC_PERF_OK;
+}
+
+I32 GPUSecurityPerfMatrixSummaryQ16Checked(const GPUSecurityPerfMatrixRowOutput *rows,
+                                           I64 row_count,
+                                           I64 rows_capacity,
+                                           I64 secure_local_mode,
+                                           I64 iommu_enabled,
+                                           I64 bot_dma_log_enabled,
+                                           I64 bot_mmio_log_enabled,
+                                           I64 bot_dispatch_log_enabled,
+                                           I64 *out_tok_per_sec_q16,
+                                           I64 *out_audit_overhead_q16,
+                                           I64 *out_p50_q16,
+                                           I64 *out_p95_q16)
+{
+    I64 allow_dispatch;
+    I64 reason_code;
+    I64 gated_profile_id;
+    I32 policy_status;
+    I64 i;
+    I64 tok_total;
+    I64 overhead_total;
+    I64 p50_q16;
+    I64 p95_q16;
+    I64 row_count_q16;
+    I64 overhead_total_q16;
+    I32 percentile_status;
+
+    if (!rows || !out_tok_per_sec_q16 || !out_audit_overhead_q16 ||
+        !out_p50_q16 || !out_p95_q16)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    *out_tok_per_sec_q16 = 0;
+    *out_audit_overhead_q16 = 0;
+    *out_p50_q16 = 0;
+    *out_p95_q16 = 0;
+
+    if (row_count <= 0 || rows_capacity < row_count)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (secure_local_mode != GPU_SEC_PERF_PROFILE_SECURE_LOCAL)
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+
+    allow_dispatch = 0;
+    reason_code = 0;
+    gated_profile_id = 0;
+    policy_status = GPUPolicyAllowDispatchChecked(iommu_enabled,
+                                                  bot_dma_log_enabled,
+                                                  bot_mmio_log_enabled,
+                                                  bot_dispatch_log_enabled,
+                                                  &allow_dispatch,
+                                                  &reason_code,
+                                                  &gated_profile_id);
+    if (policy_status != 0 || !allow_dispatch ||
+        gated_profile_id != GPU_SEC_PERF_PROFILE_SECURE_LOCAL)
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+
+    tok_total = 0;
+    overhead_total = 0;
+
+    for (i = 0; i < row_count; ++i)
+    {
+        I64 next_tok_total;
+        I64 next_overhead_total;
+
+        if (rows[i].tok_per_sec_q16 < 0 ||
+            rows[i].audit_overhead_delta_q16 < 0 ||
+            rows[i].secure_cycles_per_token_q16 < 0)
+            return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+        if (!GPUSecurityPerfAddChecked(tok_total,
+                                       rows[i].tok_per_sec_q16,
+                                       &next_tok_total))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (!GPUSecurityPerfAddChecked(overhead_total,
+                                       rows[i].audit_overhead_delta_q16,
+                                       &next_overhead_total))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+
+        tok_total = next_tok_total;
+        overhead_total = next_overhead_total;
+    }
+
+    if (!GPUSecurityPerfMulChecked(row_count,
+                                   GPU_SEC_PERF_Q16_ONE,
+                                   &row_count_q16))
+        return GPU_SEC_PERF_ERR_OVERFLOW;
+
+    if (row_count_q16 <= 0)
+        return GPU_SEC_PERF_ERR_OVERFLOW;
+
+    percentile_status = GPUSecurityPerfMatrixSelectPercentileNearestRankQ16Checked(rows,
+                                                                                    row_count,
+                                                                                    50,
+                                                                                    100,
+                                                                                    &p50_q16);
+    if (percentile_status != GPU_SEC_PERF_OK)
+        return percentile_status;
+
+    percentile_status = GPUSecurityPerfMatrixSelectPercentileNearestRankQ16Checked(rows,
+                                                                                    row_count,
+                                                                                    95,
+                                                                                    100,
+                                                                                    &p95_q16);
+    if (percentile_status != GPU_SEC_PERF_OK)
+        return percentile_status;
+
+    if (!GPUSecurityPerfMulChecked(overhead_total,
+                                   GPU_SEC_PERF_Q16_ONE,
+                                   &overhead_total_q16))
+        return GPU_SEC_PERF_ERR_OVERFLOW;
+
+    *out_tok_per_sec_q16 = tok_total;
+    *out_audit_overhead_q16 = overhead_total_q16 / row_count_q16;
+    *out_p50_q16 = p50_q16;
+    *out_p95_q16 = p95_q16;
 
     return GPU_SEC_PERF_OK;
 }
