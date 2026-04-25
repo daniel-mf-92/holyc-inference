@@ -1854,8 +1854,10 @@ I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPrefligh
     I64 saved_snapshot_digest_q64;
     I64 parity_snapshot_digest_q64;
     I64 staged_snapshot_digest_q64;
+    I64 commit_only_snapshot_digest_q64;
     I32 status_parity;
     I32 status_preflight_only;
+    I32 status_commit_only;
 
     if (!out_snapshot_digest_q64)
         return GPU_SEC_PERF_ERR_NULL_PTR;
@@ -1870,13 +1872,25 @@ I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPrefligh
     snapshot_out_snapshot_digest_q64_ptr = out_snapshot_digest_q64;
     saved_snapshot_digest_q64 = *out_snapshot_digest_q64;
 
-    // IQ-1497 commit-only hardening wrapper:
+    // IQ-1502 commit-only hardening wrapper:
     // 1) snapshot immutable row-gate tuple + caller digest slot;
-    // 2) derive canonical digest via commit-only preflight-only parity wrapper;
-    // 3) replay commit-only preflight-only wrapper with canonical digest seed;
-    // 4) enforce immutable snapshots and strict status/digest parity;
-    // 5) publish `{snapshot_digest_q64}` atomically only on strict parity.
-    parity_snapshot_digest_q64 = 0;
+    // 2) derive canonical digest via direct commit-only helper;
+    // 3) replay commit-only preflight-only parity wrapper with canonical digest seed;
+    // 4) replay commit-only preflight-only wrapper with canonical digest seed;
+    // 5) enforce immutable snapshots and strict status/digest parity;
+    // 6) publish `{snapshot_digest_q64}` atomically only on strict parity.
+    commit_only_snapshot_digest_q64 = 0;
+    status_commit_only = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnly(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        row_prompt_tokens,
+        row_batch_size,
+        row_quant_profile,
+        &commit_only_snapshot_digest_q64);
+
+    parity_snapshot_digest_q64 = commit_only_snapshot_digest_q64;
     status_parity = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParity(
         secure_local_mode,
         iommu_active,
@@ -1917,7 +1931,11 @@ I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPrefligh
 
     if (status_parity != status_preflight_only)
         return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (status_parity != status_commit_only)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
     if (parity_snapshot_digest_q64 != staged_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (parity_snapshot_digest_q64 != commit_only_snapshot_digest_q64)
         return GPU_SEC_PERF_ERR_BAD_PARAM;
 
     if (status_parity != GPU_SEC_PERF_OK)

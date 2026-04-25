@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1497 commit-only hardening over commit-only preflight parity digest wrappers."""
+"""Harness for IQ-1502 commit-only hardening over commit-only preflight parity digest wrappers."""
 
 from __future__ import annotations
 
@@ -279,6 +279,16 @@ def gpu_security_perf_matrix_row_gate_checked_policy_snapshot_digest_q64_commit_
     if has_null_output:
         return GPU_SEC_PERF_ERR_NULL_PTR, current_snapshot_digest_q64
 
+    status_commit_only, commit_only_digest = _row_gate_policy_snapshot_digest_q64_commit_only(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        row_prompt_tokens,
+        row_batch_size,
+        row_quant_profile,
+    )
+
     status_parity, parity_digest = _row_gate_policy_snapshot_digest_q64_commit_only_preflight_only_parity(
         secure_local_mode,
         iommu_active,
@@ -287,7 +297,7 @@ def gpu_security_perf_matrix_row_gate_checked_policy_snapshot_digest_q64_commit_
         row_prompt_tokens,
         row_batch_size,
         row_quant_profile,
-        0,
+        commit_only_digest,
     )
 
     staged_digest = parity_digest
@@ -304,24 +314,68 @@ def gpu_security_perf_matrix_row_gate_checked_policy_snapshot_digest_q64_commit_
         row_quant_profile,
         staged_digest,
     )
+    status_commit_only, commit_only_digest = _row_gate_policy_snapshot_digest_q64_commit_only(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        row_prompt_tokens,
+        row_batch_size,
+        row_quant_profile,
+    )
 
     if status_parity != status_preflight_only:
         return GPU_SEC_PERF_ERR_BAD_PARAM, current_snapshot_digest_q64
+    if status_parity != status_commit_only:
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_snapshot_digest_q64
     if parity_digest != staged_digest:
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_snapshot_digest_q64
+    if parity_digest != commit_only_digest:
         return GPU_SEC_PERF_ERR_BAD_PARAM, current_snapshot_digest_q64
     if status_parity != GPU_SEC_PERF_OK:
         return status_parity, current_snapshot_digest_q64
     return GPU_SEC_PERF_OK, parity_digest
 
 
-def test_source_contains_iq1497_symbols() -> None:
+def test_source_contains_iq1502_symbols() -> None:
     src = Path("src/gpu/security_perf_matrix.HC").read_text(encoding="utf-8")
 
     assert "I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParityCommitOnly(" in src
     assert "status_parity = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParity(" in src
     assert "status_preflight_only = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnly(" in src
+    assert "status_commit_only = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnly(" in src
+    assert "parity_snapshot_digest_q64 = commit_only_snapshot_digest_q64;" in src
     assert "saved_snapshot_digest_q64" in src
     assert "if (status_parity != status_preflight_only)" in src
+    assert "if (status_parity != status_commit_only)" in src
+
+
+def test_secure_on_perf_overhead_measurement_plan_vectors() -> None:
+    # IQ-1502 secure-on perf-overhead measurement plan:
+    # measure digest stability for representative prompt/batch/quant tuples.
+    plan_vectors = [
+        (32, 1, GPU_SEC_PERF_QUANT_Q4_0),
+        (128, 2, GPU_SEC_PERF_QUANT_Q8_0),
+        (512, 4, GPU_SEC_PERF_QUANT_Q4_0),
+        (1024, 8, GPU_SEC_PERF_QUANT_Q8_0),
+    ]
+
+    digests: list[int] = []
+    for prompt_tokens, batch_size, quant_profile in plan_vectors:
+        status, digest = gpu_security_perf_matrix_row_gate_checked_policy_snapshot_digest_q64_commit_only_preflight_only_parity_commit_only(
+            secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
+            iommu_active=1,
+            book_of_truth_gpu_hooks=1,
+            policy_digest_parity=1,
+            row_prompt_tokens=prompt_tokens,
+            row_batch_size=batch_size,
+            row_quant_profile=quant_profile,
+            current_snapshot_digest_q64=7777,
+        )
+        assert status == GPU_SEC_PERF_OK
+        digests.append(digest)
+
+    assert len(set(digests)) == len(plan_vectors)
 
 
 def test_gate_missing_vectors() -> None:
@@ -388,7 +442,7 @@ def test_digest_bit_flip_sensitivity() -> None:
     assert status_canonical_base == GPU_SEC_PERF_OK
     assert status_canonical_prompt == GPU_SEC_PERF_OK
     assert digest_canonical_base != digest_canonical_prompt
-    assert (digest_base, digest_prompt) == (0, 0)
+    assert (digest_base, digest_prompt) == (digest_canonical_base, digest_canonical_prompt)
 
 
 def test_overflow_and_null_vectors() -> None:
@@ -434,7 +488,8 @@ def test_drift_rejected() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_iq1497_symbols()
+    test_source_contains_iq1502_symbols()
+    test_secure_on_perf_overhead_measurement_plan_vectors()
     test_gate_missing_vectors()
     test_digest_bit_flip_sensitivity()
     test_overflow_and_null_vectors()
