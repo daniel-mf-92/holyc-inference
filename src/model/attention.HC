@@ -28417,6 +28417,12 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideCommitOnlyP
     if (!scores_q32 || !out_probs_q16)
         return ATTN_Q16_ERR_NULL_PTR;
 
+    if (out_required_score_cells == scores_q32 ||
+        out_required_score_cells == out_probs_q16 ||
+        out_required_out_cells == scores_q32 ||
+        out_required_out_cells == out_probs_q16)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
     if (scores_capacity < 0 || out_capacity < 0)
         return ATTN_Q16_ERR_BAD_PARAM;
     if (query_rows < 0 || key_rows < 0 || head_groups <= 0)
@@ -28435,7 +28441,7 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideCommitOnlyP
     snapshot_out_required_score_cells_value = *out_required_score_cells;
     snapshot_out_required_out_cells_value = *out_required_out_cells;
 
-    // IQ-1438 commit-only diagnostics hardening:
+    // IQ-1452 commit-only diagnostics hardening:
     // 1) re-derive required tuple from immutable geometry/capacity snapshots;
     // 2) seed tuple into strict-parity and zero-write preflight wrappers;
     // 3) require exact tuple parity across both wrappers and recomputed tuple;

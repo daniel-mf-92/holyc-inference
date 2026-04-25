@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reference checks for GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly (IQ-1438)."""
+"""Reference checks for GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly (IQ-1452)."""
 
 from __future__ import annotations
 
@@ -44,6 +44,13 @@ def gqa_attention_apply_softmax_q16_checked_nopartial_preflight_default_stride_c
 
     if scores_q32 is None or out_probs_q16 is None:
         return ATTN_Q16_ERR_NULL_PTR
+    if (
+        out_required_score_cells is scores_q32
+        or out_required_score_cells is out_probs_q16
+        or out_required_out_cells is scores_q32
+        or out_required_out_cells is out_probs_q16
+    ):
+        return ATTN_Q16_ERR_BAD_PARAM
 
     if scores_capacity < 0 or out_capacity < 0:
         return ATTN_Q16_ERR_BAD_PARAM
@@ -178,6 +185,14 @@ def explicit_default_stride_commit_only_preflight_only_parity_commit_only_prefli
     out_required_score_cells = args[7]
     out_required_out_cells = args[8]
 
+    if (
+        out_required_score_cells is scores_q32
+        or out_required_score_cells is out_probs_q16
+        or out_required_out_cells is scores_q32
+        or out_required_out_cells is out_probs_q16
+    ):
+        return ATTN_Q16_ERR_BAD_PARAM
+
     recomputed_required_score_cells = 0
     recomputed_required_out_cells = 0
     if query_rows > 0 and (query_rows % head_groups) != 0:
@@ -303,6 +318,33 @@ def test_null_alias_capacity_overflow_parity_vectors() -> None:
     )
     assert err == ATTN_Q16_ERR_BAD_PARAM
     assert alias_slot[0] == 7
+
+    scores = [11, 22, 33]
+    err = gqa_attention_apply_softmax_q16_checked_nopartial_preflight_default_stride_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only(
+        scores,
+        len(scores),
+        1,
+        3,
+        1,
+        out,
+        len(out),
+        scores,
+        required_out,
+    )
+    assert err == ATTN_Q16_ERR_BAD_PARAM
+
+    err = gqa_attention_apply_softmax_q16_checked_nopartial_preflight_default_stride_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only(
+        scores,
+        len(scores),
+        1,
+        3,
+        1,
+        out,
+        len(out),
+        required_score,
+        out,
+    )
+    assert err == ATTN_Q16_ERR_BAD_PARAM
 
     err = gqa_attention_apply_softmax_q16_checked_nopartial_preflight_default_stride_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only(
         [1 << 16, 2 << 16, 3 << 16],
