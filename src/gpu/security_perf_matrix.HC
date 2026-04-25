@@ -1409,3 +1409,112 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedNoPartialPreflightOnlyParity(
 
     return GPU_SEC_PERF_OK;
 }
+
+I32 GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowChecked(
+    const GPUSecurityPerfMatrixRowOutput *rows,
+    I64 row_count,
+    I64 rows_capacity,
+    I64 secure_local_mode,
+    I64 iommu_active,
+    I64 book_of_truth_gpu_hooks,
+    I64 policy_digest_parity,
+    I64 *out_p05_q16,
+    I64 *out_p25_q16,
+    I64 *out_p75_q16,
+    I64 *out_p99_q16)
+{
+    I64 baseline_tok_per_sec_q16;
+    I64 baseline_audit_overhead_q16;
+    I64 baseline_p50_q16;
+    I64 baseline_p95_q16;
+    I32 status_baseline;
+    I32 status_percentile;
+    I64 staged_p05_q16;
+    I64 staged_p25_q16;
+    I64 staged_p75_q16;
+    I64 staged_p99_q16;
+
+    if (!rows || !out_p05_q16 || !out_p25_q16 ||
+        !out_p75_q16 || !out_p99_q16)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    *out_p05_q16 = 0;
+    *out_p25_q16 = 0;
+    *out_p75_q16 = 0;
+    *out_p99_q16 = 0;
+
+    if (row_count <= 0 || rows_capacity < row_count)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (!GPUSecurityPerfFlagIsBinary(iommu_active) ||
+        !GPUSecurityPerfFlagIsBinary(book_of_truth_gpu_hooks) ||
+        !GPUSecurityPerfFlagIsBinary(policy_digest_parity))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (secure_local_mode != GPU_SEC_PERF_PROFILE_SECURE_LOCAL)
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+
+    if (!policy_digest_parity)
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+
+    // Reuse canonical summary guard path so latency-window collection
+    // remains fail-closed on the same secure-local dispatch prerequisites.
+    status_baseline = GPUSecurityPerfMatrixSummaryQ16Checked(
+        rows,
+        row_count,
+        rows_capacity,
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        book_of_truth_gpu_hooks,
+        book_of_truth_gpu_hooks,
+        &baseline_tok_per_sec_q16,
+        &baseline_audit_overhead_q16,
+        &baseline_p50_q16,
+        &baseline_p95_q16);
+    if (status_baseline != GPU_SEC_PERF_OK)
+        return status_baseline;
+
+    status_percentile = GPUSecurityPerfMatrixSelectPercentileNearestRankQ16Checked(
+        rows,
+        row_count,
+        5,
+        100,
+        &staged_p05_q16);
+    if (status_percentile != GPU_SEC_PERF_OK)
+        return status_percentile;
+
+    status_percentile = GPUSecurityPerfMatrixSelectPercentileNearestRankQ16Checked(
+        rows,
+        row_count,
+        25,
+        100,
+        &staged_p25_q16);
+    if (status_percentile != GPU_SEC_PERF_OK)
+        return status_percentile;
+
+    status_percentile = GPUSecurityPerfMatrixSelectPercentileNearestRankQ16Checked(
+        rows,
+        row_count,
+        75,
+        100,
+        &staged_p75_q16);
+    if (status_percentile != GPU_SEC_PERF_OK)
+        return status_percentile;
+
+    status_percentile = GPUSecurityPerfMatrixSelectPercentileNearestRankQ16Checked(
+        rows,
+        row_count,
+        99,
+        100,
+        &staged_p99_q16);
+    if (status_percentile != GPU_SEC_PERF_OK)
+        return status_percentile;
+
+    *out_p05_q16 = staged_p05_q16;
+    *out_p25_q16 = staged_p25_q16;
+    *out_p75_q16 = staged_p75_q16;
+    *out_p99_q16 = staged_p99_q16;
+
+    return GPU_SEC_PERF_OK;
+}
