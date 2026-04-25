@@ -3895,6 +3895,105 @@ I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPrefligh
     return status_commit_only;
 }
 
+I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+    I64 secure_local_mode,
+    I64 iommu_active,
+    I64 book_of_truth_gpu_hooks,
+    I64 policy_digest_parity,
+    I64 row_prompt_tokens,
+    I64 row_batch_size,
+    I64 row_quant_profile,
+    I64 *out_snapshot_digest_q64)
+{
+    I64 snapshot_secure_local_mode;
+    I64 snapshot_iommu_active;
+    I64 snapshot_book_of_truth_gpu_hooks;
+    I64 snapshot_policy_digest_parity;
+    I64 snapshot_row_prompt_tokens;
+    I64 snapshot_row_batch_size;
+    I64 snapshot_row_quant_profile;
+    I64 *snapshot_out_snapshot_digest_q64_ptr;
+    I64 saved_snapshot_digest_q64;
+    I64 staged_snapshot_digest_q64;
+    I64 canonical_snapshot_digest_q64;
+    I32 status_preflight_only;
+    I32 status_commit_only;
+
+    if (!out_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    snapshot_secure_local_mode = secure_local_mode;
+    snapshot_iommu_active = iommu_active;
+    snapshot_book_of_truth_gpu_hooks = book_of_truth_gpu_hooks;
+    snapshot_policy_digest_parity = policy_digest_parity;
+    snapshot_row_prompt_tokens = row_prompt_tokens;
+    snapshot_row_batch_size = row_batch_size;
+    snapshot_row_quant_profile = row_quant_profile;
+    snapshot_out_snapshot_digest_q64_ptr = out_snapshot_digest_q64;
+    saved_snapshot_digest_q64 = *out_snapshot_digest_q64;
+
+    // IQ-1546 strict diagnostics parity gate:
+    // 1) snapshot immutable row-gate tuple + caller digest slot;
+    // 2) derive canonical digest through commit-only hardening wrapper;
+    // 3) replay zero-write diagnostics companion wrapper with canonical digest seed;
+    // 4) enforce immutable snapshots and exact status/digest tuple parity;
+    // 5) preserve caller digest slot (zero-write diagnostics semantics).
+    canonical_snapshot_digest_q64 = 0;
+    status_commit_only = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParityCommitOnly(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        row_prompt_tokens,
+        row_batch_size,
+        row_quant_profile,
+        &canonical_snapshot_digest_q64);
+
+    staged_snapshot_digest_q64 = canonical_snapshot_digest_q64;
+    status_preflight_only = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        row_prompt_tokens,
+        row_batch_size,
+        row_quant_profile,
+        &staged_snapshot_digest_q64);
+
+    if (!GPUSecurityPerfStatusIsValid(status_commit_only))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (!GPUSecurityPerfStatusIsValid(status_preflight_only))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (snapshot_secure_local_mode != secure_local_mode)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_iommu_active != iommu_active)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_book_of_truth_gpu_hooks != book_of_truth_gpu_hooks)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_policy_digest_parity != policy_digest_parity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_row_prompt_tokens != row_prompt_tokens)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_row_batch_size != row_batch_size)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_row_quant_profile != row_quant_profile)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_snapshot_digest_q64_ptr != out_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (status_preflight_only != status_commit_only)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_snapshot_digest_q64 != canonical_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (*out_snapshot_digest_q64 != saved_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    *out_snapshot_digest_q64 = saved_snapshot_digest_q64;
+    return status_preflight_only;
+}
+
 I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParityCommitOnlyParity(
     I64 secure_local_mode,
     I64 iommu_active,
