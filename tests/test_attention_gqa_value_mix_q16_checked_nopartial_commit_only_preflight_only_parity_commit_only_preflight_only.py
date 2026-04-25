@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reference checks for GQAAttentionValueMixQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly (IQ-1386)."""
+"""Reference checks for GQAAttentionValueMixQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly (IQ-1398)."""
 
 from __future__ import annotations
 
@@ -118,6 +118,8 @@ def gqa_attention_value_mix_q16_checked_nopartial_commit_only_preflight_only_par
     staged_commit_only = [0] * required_out_cells
     staged_parity = [0] * required_out_cells
     out_snapshot = out_values_q16[:required_out_cells]
+    snapshot_scores_digest = tuple(scores_q16[:required_score_cells])
+    snapshot_values_digest = tuple(values_q16[:required_value_cells])
 
     err = gqa_attention_value_mix_q16_checked_nopartial_commit_only_preflight_only_parity_commit_only(
         scores_q16,
@@ -203,6 +205,14 @@ def gqa_attention_value_mix_q16_checked_nopartial_commit_only_preflight_only_par
         required_score_cells > snapshot_scores_capacity
         or required_value_cells > snapshot_values_capacity
         or required_out_cells > snapshot_out_capacity
+    ):
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    recomputed_scores_digest = tuple(scores_q16[:required_score_cells])
+    recomputed_values_digest = tuple(values_q16[:required_value_cells])
+    if (
+        snapshot_scores_digest != recomputed_scores_digest
+        or snapshot_values_digest != recomputed_values_digest
     ):
         return ATTN_Q16_ERR_BAD_PARAM
 
@@ -372,7 +382,7 @@ def test_null_alias_capacity_overflow_and_no_write_contract() -> None:
 
 
 def test_randomized_preflight_only_parity() -> None:
-    rng = random.Random(20260425_1386)
+    rng = random.Random(20260425_1398)
 
     for _ in range(220):
         query_rows = rng.randint(1, 6)
@@ -425,6 +435,59 @@ def test_randomized_preflight_only_parity() -> None:
         assert out_a == out_b == seed
 
 
+def test_rejects_delegated_source_mutation() -> None:
+    query_rows = 2
+    key_rows = 2
+    value_dim = 2
+    head_groups = 1
+    row_stride = 2
+    scores = [1 << 16, 0, 0, 1 << 16]
+    values = [1 << 16, 0, 0, 1 << 16]
+    out = [5151, 5151, 5151, 5151]
+    baseline = out.copy()
+
+    original_parity = gqa_attention_value_mix_q16_checked_nopartial_commit_only_preflight_only_parity
+    try:
+        def tampering_parity(
+            scores_q16,
+            scores_capacity,
+            query_rows,
+            key_rows,
+            value_dim,
+            head_groups,
+            row_stride,
+            values_q16,
+            values_capacity,
+            out_values_q16,
+            out_capacity,
+        ) -> int:
+            scores_q16[0] += 1
+            return ATTN_Q16_OK
+
+        globals()["gqa_attention_value_mix_q16_checked_nopartial_commit_only_preflight_only_parity"] = (
+            tampering_parity
+        )
+        err = gqa_attention_value_mix_q16_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only(
+            scores,
+            len(scores),
+            query_rows,
+            key_rows,
+            value_dim,
+            head_groups,
+            row_stride,
+            values,
+            len(values),
+            out,
+            len(out),
+        )
+        assert err == ATTN_Q16_ERR_BAD_PARAM
+        assert out == baseline
+    finally:
+        globals()["gqa_attention_value_mix_q16_checked_nopartial_commit_only_preflight_only_parity"] = (
+            original_parity
+        )
+
+
 def test_source_contract_markers() -> None:
     source = Path("src/model/attention.HC").read_text(encoding="utf-8")
     marker = "I32 GQAAttentionValueMixQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly("
@@ -432,6 +495,9 @@ def test_source_contract_markers() -> None:
     body = source.split(marker, 1)[1]
     assert "status = GQAAttentionValueMixQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly(" in body
     assert "status = GQAAttentionValueMixQ16CheckedNoPartialCommitOnlyPreflightOnlyParity(" in body
+    assert "status = AttentionQ16BufferDigest64(scores_q16," in body
+    assert "status = AttentionQ16BufferDigest64(values_q16," in body
+    assert "if (snapshot_scores_digest != recomputed_scores_digest ||" in body
     assert "if (out_values_q16[copy_index] != snapshot_out_values_q16_values[copy_index])" in body
 
 
@@ -439,6 +505,7 @@ if __name__ == "__main__":
     test_fixed_vector_reference()
     test_null_alias_capacity_overflow_and_no_write_contract()
     test_randomized_preflight_only_parity()
+    test_rejects_delegated_source_mutation()
     test_source_contract_markers()
     print(
         "gqa_attention_value_mix_q16_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_reference_checks=ok"
