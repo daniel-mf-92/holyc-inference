@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reference checks for GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStride (IQ-1400)."""
+"""Reference checks for GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStride (IQ-1402)."""
 
 from __future__ import annotations
 
@@ -147,6 +147,28 @@ def gqa_attention_value_mix_q16_checked_nopartial_preflight_default_stride(
     if err != ATTN_Q16_OK:
         return err
 
+    staged_required_score_cells_second = [0]
+    staged_required_value_cells_second = [0]
+    staged_required_out_cells_second = [0]
+    err = gqa_attention_value_mix_q16_checked_nopartial_preflight(
+        scores_q16,
+        scores_capacity,
+        query_rows,
+        key_rows,
+        value_dim,
+        head_groups,
+        key_rows,
+        values_q16,
+        values_capacity,
+        out_values_q16,
+        out_capacity,
+        staged_required_score_cells_second,
+        staged_required_value_cells_second,
+        staged_required_out_cells_second,
+    )
+    if err != ATTN_Q16_OK:
+        return err
+
     if (
         snapshot_query_rows != query_rows
         or snapshot_key_rows != key_rows
@@ -158,6 +180,13 @@ def gqa_attention_value_mix_q16_checked_nopartial_preflight_default_stride(
         or snapshot_scores is not scores_q16
         or snapshot_values is not values_q16
         or snapshot_out is not out_values_q16
+    ):
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    if (
+        staged_required_score_cells[0] != staged_required_score_cells_second[0]
+        or staged_required_value_cells[0] != staged_required_value_cells_second[0]
+        or staged_required_out_cells[0] != staged_required_out_cells_second[0]
     ):
         return ATTN_Q16_ERR_BAD_PARAM
 
@@ -345,7 +374,7 @@ def test_alias_and_capacity_rejections() -> None:
 
 
 def test_parity_with_canonical_preflight_row_stride_equals_key_rows() -> None:
-    rng = random.Random(20260425_1400)
+    rng = random.Random(20260425_1402)
 
     for _ in range(240):
         key_rows = rng.randint(1, 6)

@@ -26132,6 +26132,9 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStride(
     I64 staged_required_score_cells;
     I64 staged_required_value_cells;
     I64 staged_required_out_cells;
+    I64 staged_required_score_cells_second;
+    I64 staged_required_value_cells_second;
+    I64 staged_required_out_cells_second;
     I32 status;
 
     if (!out_required_score_cells || !out_required_value_cells || !out_required_out_cells)
@@ -26168,10 +26171,10 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStride(
     snapshot_out_required_value_cells_value = *out_required_value_cells;
     snapshot_out_required_out_cells_value = *out_required_out_cells;
 
-    // IQ-1400 default-stride diagnostics contract:
+    // IQ-1402 default-stride diagnostics contract:
     // 1) force canonical preflight geometry with row_stride = key_rows;
     // 2) recompute required score/value/output cells with checked integer math;
-    // 3) verify immutable caller snapshots and strict tuple parity;
+    // 3) run canonical preflight twice and require deterministic tuple parity;
     // 4) publish required tuple only after proving output slab stayed unchanged.
     if (query_rows > 0 && (query_rows % head_groups) != 0)
         return ATTN_Q16_ERR_BAD_PARAM;
@@ -26283,6 +26286,28 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStride(
         return status;
     }
 
+    status = GQAAttentionValueMixQ16CheckedNoPartialPreflight(
+        scores_q16,
+        scores_capacity,
+        query_rows,
+        key_rows,
+        value_dim,
+        head_groups,
+        key_rows,
+        values_q16,
+        values_capacity,
+        out_values_q16,
+        out_capacity,
+        &staged_required_score_cells_second,
+        &staged_required_value_cells_second,
+        &staged_required_out_cells_second);
+    if (status != ATTN_Q16_OK)
+    {
+        if (snapshot_out_values_q16_values)
+            Free(snapshot_out_values_q16_values);
+        return status;
+    }
+
     if (snapshot_query_rows != query_rows ||
         snapshot_key_rows != key_rows ||
         snapshot_value_dim != value_dim ||
@@ -26293,6 +26318,15 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStride(
         snapshot_scores_q16 != scores_q16 ||
         snapshot_values_q16 != values_q16 ||
         snapshot_out_values_q16 != out_values_q16)
+    {
+        if (snapshot_out_values_q16_values)
+            Free(snapshot_out_values_q16_values);
+        return ATTN_Q16_ERR_BAD_PARAM;
+    }
+
+    if (staged_required_score_cells != staged_required_score_cells_second ||
+        staged_required_value_cells != staged_required_value_cells_second ||
+        staged_required_out_cells != staged_required_out_cells_second)
     {
         if (snapshot_out_values_q16_values)
             Free(snapshot_out_values_q16_values);
