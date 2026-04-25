@@ -20400,6 +20400,267 @@ I32 GQAAttentionScoreQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyP
     return ATTN_Q16_OK;
 }
 
+I32 GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyParity(
+    I64 *q_rows_q16,
+    I64 q_rows_capacity,
+    I64 q_rows,
+    I64 *k_rows_q16,
+    I64 k_rows_capacity,
+    I64 k_rows,
+    I64 group_count,
+    I64 seq_len,
+    I64 head_dim,
+    I64 *out_scores_q32,
+    I64 out_capacity)
+{
+    I64 snapshot_q_rows;
+    I64 snapshot_k_rows;
+    I64 snapshot_group_count;
+    I64 snapshot_seq_len;
+    I64 snapshot_head_dim;
+    I64 snapshot_out_capacity;
+    I64 required_q_cells;
+    I64 required_k_cells;
+    I64 required_out_cells;
+    I64 recomputed_required_q_cells;
+    I64 recomputed_required_k_cells;
+    I64 recomputed_required_out_cells;
+    I64 staged_preflight_required_q_cells;
+    I64 staged_preflight_required_k_cells;
+    I64 staged_preflight_required_out_cells;
+    I64 required_out_bytes;
+    I64 copy_index;
+    I64 *snapshot_out_scores_q32;
+    I64 *staged_commit_scores_q32;
+    I32 status;
+
+    if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (q_rows_capacity < 0 || k_rows_capacity < 0 || out_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (q_rows < 0 || k_rows < 0 || group_count <= 0 || seq_len < 0 || head_dim < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    snapshot_q_rows = q_rows;
+    snapshot_k_rows = k_rows;
+    snapshot_group_count = group_count;
+    snapshot_seq_len = seq_len;
+    snapshot_head_dim = head_dim;
+    snapshot_out_capacity = out_capacity;
+
+    // IQ-1410 strict diagnostics parity gate:
+    // 1) freeze immutable geometry tuple and derive required q/k/out spans;
+    // 2) run preflight-only diagnostics companion on staged required tuple;
+    // 3) run commit-only parity scorer on staged output buffer;
+    // 4) require exact required-tuple parity + immutable snapshots;
+    // 5) publish scores only after all checks pass.
+    status = AttentionTryMulI64Checked(q_rows,
+                                       head_dim,
+                                       &required_q_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(k_rows,
+                                       seq_len,
+                                       &required_k_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+    status = AttentionTryMulI64Checked(required_k_cells,
+                                       head_dim,
+                                       &required_k_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = AttentionTryMulI64Checked(q_rows,
+                                       seq_len,
+                                       &required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (required_q_cells > q_rows_capacity ||
+        required_k_cells > k_rows_capacity ||
+        required_out_cells > out_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_out_cells == 0)
+        return ATTN_Q16_OK;
+
+    status = AttentionTryMulI64Checked(required_out_cells,
+                                       sizeof(I64),
+                                       &required_out_bytes);
+    if (status != ATTN_Q16_OK)
+        return status;
+    if (required_out_bytes <= 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    staged_commit_scores_q32 = MAlloc(required_out_bytes);
+    if (!staged_commit_scores_q32)
+        return ATTN_Q16_ERR_OVERFLOW;
+
+    snapshot_out_scores_q32 = MAlloc(required_out_bytes);
+    if (!snapshot_out_scores_q32)
+    {
+        Free(staged_commit_scores_q32);
+        return ATTN_Q16_ERR_OVERFLOW;
+    }
+
+    if (staged_commit_scores_q32 == q_rows_q16 ||
+        staged_commit_scores_q32 == k_rows_q16 ||
+        staged_commit_scores_q32 == out_scores_q32 ||
+        snapshot_out_scores_q32 == q_rows_q16 ||
+        snapshot_out_scores_q32 == k_rows_q16 ||
+        snapshot_out_scores_q32 == out_scores_q32 ||
+        staged_commit_scores_q32 == snapshot_out_scores_q32)
+    {
+        Free(snapshot_out_scores_q32);
+        Free(staged_commit_scores_q32);
+        return ATTN_Q16_ERR_BAD_PARAM;
+    }
+
+    for (copy_index = 0; copy_index < required_out_cells; copy_index++)
+        snapshot_out_scores_q32[copy_index] = out_scores_q32[copy_index];
+
+    staged_preflight_required_q_cells = required_q_cells;
+    staged_preflight_required_k_cells = required_k_cells;
+    staged_preflight_required_out_cells = required_out_cells;
+
+    status = GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnly(
+        q_rows_q16,
+        q_rows_capacity,
+        q_rows,
+        k_rows_q16,
+        k_rows_capacity,
+        k_rows,
+        group_count,
+        seq_len,
+        head_dim,
+        out_scores_q32,
+        out_capacity,
+        &staged_preflight_required_q_cells,
+        &staged_preflight_required_k_cells,
+        &staged_preflight_required_out_cells);
+    if (status != ATTN_Q16_OK)
+    {
+        Free(snapshot_out_scores_q32);
+        Free(staged_commit_scores_q32);
+        return status;
+    }
+
+    status = GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnly(
+        q_rows_q16,
+        q_rows_capacity,
+        q_rows,
+        k_rows_q16,
+        k_rows_capacity,
+        k_rows,
+        group_count,
+        seq_len,
+        head_dim,
+        staged_commit_scores_q32,
+        required_out_cells);
+    if (status != ATTN_Q16_OK)
+    {
+        Free(snapshot_out_scores_q32);
+        Free(staged_commit_scores_q32);
+        return status;
+    }
+
+    status = AttentionTryMulI64Checked(snapshot_q_rows,
+                                       snapshot_head_dim,
+                                       &recomputed_required_q_cells);
+    if (status != ATTN_Q16_OK)
+    {
+        Free(snapshot_out_scores_q32);
+        Free(staged_commit_scores_q32);
+        return status;
+    }
+
+    status = AttentionTryMulI64Checked(snapshot_k_rows,
+                                       snapshot_seq_len,
+                                       &recomputed_required_k_cells);
+    if (status != ATTN_Q16_OK)
+    {
+        Free(snapshot_out_scores_q32);
+        Free(staged_commit_scores_q32);
+        return status;
+    }
+    status = AttentionTryMulI64Checked(recomputed_required_k_cells,
+                                       snapshot_head_dim,
+                                       &recomputed_required_k_cells);
+    if (status != ATTN_Q16_OK)
+    {
+        Free(snapshot_out_scores_q32);
+        Free(staged_commit_scores_q32);
+        return status;
+    }
+
+    status = AttentionTryMulI64Checked(snapshot_q_rows,
+                                       snapshot_seq_len,
+                                       &recomputed_required_out_cells);
+    if (status != ATTN_Q16_OK)
+    {
+        Free(snapshot_out_scores_q32);
+        Free(staged_commit_scores_q32);
+        return status;
+    }
+
+    if (snapshot_q_rows != q_rows ||
+        snapshot_k_rows != k_rows ||
+        snapshot_group_count != group_count ||
+        snapshot_seq_len != seq_len ||
+        snapshot_head_dim != head_dim ||
+        snapshot_out_capacity != out_capacity)
+    {
+        Free(snapshot_out_scores_q32);
+        Free(staged_commit_scores_q32);
+        return ATTN_Q16_ERR_BAD_PARAM;
+    }
+
+    if (required_q_cells != recomputed_required_q_cells ||
+        required_k_cells != recomputed_required_k_cells ||
+        required_out_cells != recomputed_required_out_cells)
+    {
+        Free(snapshot_out_scores_q32);
+        Free(staged_commit_scores_q32);
+        return ATTN_Q16_ERR_BAD_PARAM;
+    }
+
+    if (required_q_cells > q_rows_capacity ||
+        required_k_cells > k_rows_capacity ||
+        required_out_cells > snapshot_out_capacity)
+    {
+        Free(snapshot_out_scores_q32);
+        Free(staged_commit_scores_q32);
+        return ATTN_Q16_ERR_BAD_PARAM;
+    }
+
+    if (staged_preflight_required_q_cells != required_q_cells ||
+        staged_preflight_required_k_cells != required_k_cells ||
+        staged_preflight_required_out_cells != required_out_cells)
+    {
+        Free(snapshot_out_scores_q32);
+        Free(staged_commit_scores_q32);
+        return ATTN_Q16_ERR_BAD_PARAM;
+    }
+
+    for (copy_index = 0; copy_index < required_out_cells; copy_index++)
+    {
+        if (out_scores_q32[copy_index] != snapshot_out_scores_q32[copy_index])
+        {
+            Free(snapshot_out_scores_q32);
+            Free(staged_commit_scores_q32);
+            return ATTN_Q16_ERR_BAD_PARAM;
+        }
+    }
+
+    for (copy_index = 0; copy_index < required_out_cells; copy_index++)
+        out_scores_q32[copy_index] = staged_commit_scores_q32[copy_index];
+
+    Free(snapshot_out_scores_q32);
+    Free(staged_commit_scores_q32);
+    return ATTN_Q16_OK;
+}
+
 #define GQA_SOFTMAX_EXP_MAX_Q16  655360
 I32 GQAAttentionScoreQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
     I64 *q_rows_q16,
