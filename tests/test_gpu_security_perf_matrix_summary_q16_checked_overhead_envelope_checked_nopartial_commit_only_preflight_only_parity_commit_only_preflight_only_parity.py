@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1535 overhead-envelope strict diagnostics parity gate wrapper."""
+"""Harness for IQ-1539 overhead-envelope strict diagnostics parity gate wrapper."""
 
 from __future__ import annotations
 
@@ -328,12 +328,13 @@ def gpu_security_perf_matrix_summary_q16_checked_overhead_envelope_checked_nopar
     return GPU_SEC_PERF_OK, preserved_outputs, staged_tuple
 
 
-def test_source_contains_iq1535_symbols() -> None:
+def test_source_contains_iq1539_symbols() -> None:
     src = Path("src/gpu/security_perf_matrix.HC").read_text(encoding="utf-8")
 
     assert (
         "I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in src
     )
+    assert "// IQ-1539 strict diagnostics parity gate:" in src
     assert (
         "status_preflight_only = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly("
         in src
@@ -342,6 +343,12 @@ def test_source_contains_iq1535_symbols() -> None:
         "status_commit_only = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnly("
         in src
     )
+    assert (
+        "status_snapshot = GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked("
+        in src
+    )
+    assert "if (!GPUSecurityPerfStatusIsValid(status_preflight_only))" in src
+    assert "if (!GPUSecurityPerfStatusIsValid(status_commit_only))" in src
     assert "if (status_preflight_only != status_commit_only)" in src
 
 

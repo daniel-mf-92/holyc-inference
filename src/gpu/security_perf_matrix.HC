@@ -10348,7 +10348,7 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedNoPartialCommit
     saved_max_overhead_q16 = *out_max_overhead_q16;
     saved_mean_overhead_q16 = *out_mean_overhead_q16;
 
-    // IQ-1535 strict diagnostics parity gate:
+    // IQ-1539 strict diagnostics parity gate:
     // 1) snapshot immutable summary tuple + caller output slots;
     // 2) lock row-data digest before/after staged tuple derivation;
     // 3) derive staged tuple via preflight-only diagnostics companion wrapper;
