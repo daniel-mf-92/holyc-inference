@@ -30761,9 +30761,15 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideCommitOnlyPrefl
     I64 staged_commit_only_required_score_cells;
     I64 staged_commit_only_required_value_cells;
     I64 staged_commit_only_required_out_cells;
+    I64 staged_commit_only_required_score_cells_second;
+    I64 staged_commit_only_required_value_cells_second;
+    I64 staged_commit_only_required_out_cells_second;
     I64 staged_default_required_score_cells;
     I64 staged_default_required_value_cells;
     I64 staged_default_required_out_cells;
+    I64 staged_default_required_score_cells_second;
+    I64 staged_default_required_value_cells_second;
+    I64 staged_default_required_out_cells_second;
     I64 recomputed_required_score_cells;
     I64 recomputed_required_value_cells;
     I64 recomputed_required_out_cells;
@@ -30807,11 +30813,12 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideCommitOnlyPrefl
     snapshot_out_required_value_cells_value = *out_required_value_cells;
     snapshot_out_required_out_cells_value = *out_required_out_cells;
 
-    // IQ-1417 zero-write diagnostics contract:
+    // IQ-1421 zero-write diagnostics contract:
     // 1) freeze immutable geometry/capacity + pointer snapshots;
     // 2) stage tuple from commit-only + canonical default-stride preflight paths;
-    // 3) re-derive strict required tuple via checked integer math;
-    // 4) preserve caller output + required-cell slots on success and failure.
+    // 3) repeat both staging calls and require exact tuple parity across passes;
+    // 4) re-derive strict required tuple via checked integer math;
+    // 5) preserve caller output + required-cell slots on success and failure.
     if (query_rows > 0 && (query_rows % head_groups) != 0)
         return ATTN_Q16_ERR_BAD_PARAM;
 
@@ -30927,6 +30934,48 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideCommitOnlyPrefl
         return status;
     }
 
+    status = GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideCommitOnly(
+        scores_q16,
+        scores_capacity,
+        query_rows,
+        key_rows,
+        value_dim,
+        head_groups,
+        values_q16,
+        values_capacity,
+        out_values_q16,
+        out_capacity,
+        &staged_commit_only_required_score_cells_second,
+        &staged_commit_only_required_value_cells_second,
+        &staged_commit_only_required_out_cells_second);
+    if (status != ATTN_Q16_OK)
+    {
+        if (snapshot_out_values_q16_values)
+            Free(snapshot_out_values_q16_values);
+        return status;
+    }
+
+    status = GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStride(
+        scores_q16,
+        scores_capacity,
+        query_rows,
+        key_rows,
+        value_dim,
+        head_groups,
+        values_q16,
+        values_capacity,
+        out_values_q16,
+        out_capacity,
+        &staged_default_required_score_cells_second,
+        &staged_default_required_value_cells_second,
+        &staged_default_required_out_cells_second);
+    if (status != ATTN_Q16_OK)
+    {
+        if (snapshot_out_values_q16_values)
+            Free(snapshot_out_values_q16_values);
+        return status;
+    }
+
     if (snapshot_query_rows != query_rows ||
         snapshot_key_rows != key_rows ||
         snapshot_value_dim != value_dim ||
@@ -30946,6 +30995,24 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideCommitOnlyPrefl
     if (staged_commit_only_required_score_cells != staged_default_required_score_cells ||
         staged_commit_only_required_value_cells != staged_default_required_value_cells ||
         staged_commit_only_required_out_cells != staged_default_required_out_cells)
+    {
+        if (snapshot_out_values_q16_values)
+            Free(snapshot_out_values_q16_values);
+        return ATTN_Q16_ERR_BAD_PARAM;
+    }
+
+    if (staged_commit_only_required_score_cells != staged_commit_only_required_score_cells_second ||
+        staged_commit_only_required_value_cells != staged_commit_only_required_value_cells_second ||
+        staged_commit_only_required_out_cells != staged_commit_only_required_out_cells_second)
+    {
+        if (snapshot_out_values_q16_values)
+            Free(snapshot_out_values_q16_values);
+        return ATTN_Q16_ERR_BAD_PARAM;
+    }
+
+    if (staged_default_required_score_cells != staged_default_required_score_cells_second ||
+        staged_default_required_value_cells != staged_default_required_value_cells_second ||
+        staged_default_required_out_cells != staged_default_required_out_cells_second)
     {
         if (snapshot_out_values_q16_values)
             Free(snapshot_out_values_q16_values);

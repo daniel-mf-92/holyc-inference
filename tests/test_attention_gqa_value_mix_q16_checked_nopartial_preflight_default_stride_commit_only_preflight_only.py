@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reference checks for GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideCommitOnlyPreflightOnly (IQ-1417)."""
+"""Reference checks for GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideCommitOnlyPreflightOnly (IQ-1421)."""
 
 from __future__ import annotations
 
@@ -162,6 +162,48 @@ def gqa_attention_value_mix_q16_checked_nopartial_preflight_default_stride_commi
     if err != ATTN_Q16_OK:
         return err
 
+    staged_commit_score_second = [0]
+    staged_commit_value_second = [0]
+    staged_commit_out_second = [0]
+    err = gqa_attention_value_mix_q16_checked_nopartial_preflight_default_stride_commit_only(
+        scores_q16,
+        scores_capacity,
+        query_rows,
+        key_rows,
+        value_dim,
+        head_groups,
+        values_q16,
+        values_capacity,
+        out_values_q16,
+        out_capacity,
+        staged_commit_score_second,
+        staged_commit_value_second,
+        staged_commit_out_second,
+    )
+    if err != ATTN_Q16_OK:
+        return err
+
+    staged_default_score_second = [0]
+    staged_default_value_second = [0]
+    staged_default_out_second = [0]
+    err = gqa_attention_value_mix_q16_checked_nopartial_preflight_default_stride(
+        scores_q16,
+        scores_capacity,
+        query_rows,
+        key_rows,
+        value_dim,
+        head_groups,
+        values_q16,
+        values_capacity,
+        out_values_q16,
+        out_capacity,
+        staged_default_score_second,
+        staged_default_value_second,
+        staged_default_out_second,
+    )
+    if err != ATTN_Q16_OK:
+        return err
+
     if (
         snapshot_query_rows != query_rows
         or snapshot_key_rows != key_rows
@@ -180,6 +222,20 @@ def gqa_attention_value_mix_q16_checked_nopartial_preflight_default_stride_commi
         staged_commit_score[0] != staged_default_score[0]
         or staged_commit_value[0] != staged_default_value[0]
         or staged_commit_out[0] != staged_default_out[0]
+    ):
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    if (
+        staged_commit_score[0] != staged_commit_score_second[0]
+        or staged_commit_value[0] != staged_commit_value_second[0]
+        or staged_commit_out[0] != staged_commit_out_second[0]
+    ):
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    if (
+        staged_default_score[0] != staged_default_score_second[0]
+        or staged_default_value[0] != staged_default_value_second[0]
+        or staged_default_out[0] != staged_default_out_second[0]
     ):
         return ATTN_Q16_ERR_BAD_PARAM
 
@@ -342,7 +398,7 @@ def test_null_alias_capacity_overflow_vectors() -> None:
 
 
 def test_randomized_zero_write_parity_vectors() -> None:
-    rng = random.Random(20260425_1417)
+    rng = random.Random(20260425_1421)
 
     for _ in range(220):
         head_groups = rng.randint(1, 4)
@@ -396,8 +452,18 @@ def test_source_contract_markers() -> None:
         "I32 GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideCommitOnlyPreflightOnly(",
         1,
     )[1]
-    assert "status = GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideCommitOnly(" in body
-    assert "status = GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStride(" in body
+    assert body.count(
+        "status = GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideCommitOnly("
+    ) >= 2
+    assert (
+        body.count("status = GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStride(")
+        >= 2
+    )
+    assert (
+        "staged_commit_only_required_score_cells != staged_commit_only_required_score_cells_second"
+        in body
+    )
+    assert "staged_default_required_score_cells != staged_default_required_score_cells_second" in body
     assert "snapshot_out_required_score_cells_value = *out_required_score_cells;" in body
     assert "if (out_values_q16[copy_index] != snapshot_out_values_q16_values[copy_index])" in body
 
