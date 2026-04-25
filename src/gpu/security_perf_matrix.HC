@@ -374,6 +374,109 @@ I32 GPUSecurityPerfMatrixRowGateCheckedCommitOnly(I64 secure_local_mode,
     return GPU_SEC_PERF_OK;
 }
 
+I32 GPUSecurityPerfMatrixRowGateCheckedNoPartial(I64 secure_local_mode,
+                                                 I64 iommu_active,
+                                                 I64 book_of_truth_gpu_hooks,
+                                                 I64 policy_digest_parity,
+                                                 I64 row_prompt_tokens,
+                                                 I64 row_batch_size,
+                                                 I64 row_quant_profile,
+                                                 I64 *out_gate_reason_code,
+                                                 I64 *out_row_allowed)
+{
+    I64 snapshot_secure_local_mode;
+    I64 snapshot_iommu_active;
+    I64 snapshot_book_of_truth_gpu_hooks;
+    I64 snapshot_policy_digest_parity;
+    I64 snapshot_row_prompt_tokens;
+    I64 snapshot_row_batch_size;
+    I64 snapshot_row_quant_profile;
+    I64 *snapshot_out_gate_reason_code_ptr;
+    I64 *snapshot_out_row_allowed_ptr;
+    I64 staged_gate_reason_code;
+    I64 staged_row_allowed;
+    I64 commit_gate_reason_code;
+    I64 commit_row_allowed;
+    I32 status_preflight;
+    I32 status_commit;
+
+    if (!out_gate_reason_code || !out_row_allowed)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    if (out_gate_reason_code == out_row_allowed)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    snapshot_secure_local_mode = secure_local_mode;
+    snapshot_iommu_active = iommu_active;
+    snapshot_book_of_truth_gpu_hooks = book_of_truth_gpu_hooks;
+    snapshot_policy_digest_parity = policy_digest_parity;
+    snapshot_row_prompt_tokens = row_prompt_tokens;
+    snapshot_row_batch_size = row_batch_size;
+    snapshot_row_quant_profile = row_quant_profile;
+    snapshot_out_gate_reason_code_ptr = out_gate_reason_code;
+    snapshot_out_row_allowed_ptr = out_row_allowed;
+
+    // IQ-1468 no-partial row gate wrapper:
+    // 1) snapshot immutable argument tuple + output pointers;
+    // 2) run commit-only row gate preflight tuple derivation;
+    // 3) re-run commit-only tuple derivation and require exact parity;
+    // 4) publish `{gate_reason_code,row_allowed}` atomically only on success.
+    status_preflight = GPUSecurityPerfMatrixRowGateCheckedCommitOnly(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        row_prompt_tokens,
+        row_batch_size,
+        row_quant_profile,
+        &staged_gate_reason_code,
+        &staged_row_allowed);
+
+    status_commit = GPUSecurityPerfMatrixRowGateCheckedCommitOnly(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        row_prompt_tokens,
+        row_batch_size,
+        row_quant_profile,
+        &commit_gate_reason_code,
+        &commit_row_allowed);
+
+    if (snapshot_secure_local_mode != secure_local_mode)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_iommu_active != iommu_active)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_book_of_truth_gpu_hooks != book_of_truth_gpu_hooks)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_policy_digest_parity != policy_digest_parity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_row_prompt_tokens != row_prompt_tokens)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_row_batch_size != row_batch_size)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_row_quant_profile != row_quant_profile)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_gate_reason_code_ptr != out_gate_reason_code)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_row_allowed_ptr != out_row_allowed)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (status_preflight != status_commit)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_gate_reason_code != commit_gate_reason_code)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_row_allowed != commit_row_allowed)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (status_preflight != GPU_SEC_PERF_OK)
+        return status_preflight;
+
+    *out_gate_reason_code = staged_gate_reason_code;
+    *out_row_allowed = staged_row_allowed;
+    return GPU_SEC_PERF_OK;
+}
+
 I32 GPUSecurityPerfMatrixRunChecked(const GPUSecurityPerfMatrixRowInput *rows,
                                     I64 row_count,
                                     I64 profile_id,
