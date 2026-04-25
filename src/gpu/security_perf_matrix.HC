@@ -958,6 +958,171 @@ I32 GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked(
     return GPU_SEC_PERF_OK;
 }
 
+I32 GPUSecurityPerfMatrixAuditOverheadBudgetCheckedNoPartial(
+    const GPUSecurityPerfMatrixRowOutput *rows,
+    I64 row_count,
+    I64 rows_capacity,
+    I64 secure_local_mode,
+    I64 iommu_enabled,
+    I64 book_hooks,
+    I64 max_audit_overhead_delta_q16,
+    I64 *out_checked_rows,
+    I64 *out_first_violation_index,
+    I64 *out_max_observed_overhead_q16)
+{
+    I64 snapshot_row_count;
+    I64 snapshot_rows_capacity;
+    I64 snapshot_secure_local_mode;
+    I64 snapshot_iommu_enabled;
+    I64 snapshot_book_hooks;
+    I64 snapshot_max_audit_overhead_delta_q16;
+    const GPUSecurityPerfMatrixRowOutput *snapshot_rows_ptr;
+    I64 *snapshot_out_checked_rows_ptr;
+    I64 *snapshot_out_first_violation_index_ptr;
+    I64 *snapshot_out_max_observed_overhead_q16_ptr;
+    I64 snapshot_before_digest_q64;
+    I64 snapshot_mid_digest_q64;
+    I64 snapshot_after_digest_q64;
+    I64 staged_checked_rows;
+    I64 staged_first_violation_index;
+    I64 staged_max_observed_overhead_q16;
+    I64 commit_checked_rows;
+    I64 commit_first_violation_index;
+    I64 commit_max_observed_overhead_q16;
+    I32 status_snapshot;
+    I32 status_preflight;
+    I32 status_commit;
+
+    if (!rows || !out_checked_rows || !out_first_violation_index ||
+        !out_max_observed_overhead_q16)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    if (out_checked_rows == out_first_violation_index ||
+        out_checked_rows == out_max_observed_overhead_q16 ||
+        out_first_violation_index == out_max_observed_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (row_count <= 0 || rows_capacity < row_count)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (max_audit_overhead_delta_q16 < 0)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (!GPUSecurityPerfFlagIsBinary(iommu_enabled) ||
+        !GPUSecurityPerfFlagIsBinary(book_hooks))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (secure_local_mode != GPU_SEC_PERF_PROFILE_SECURE_LOCAL)
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+
+    snapshot_row_count = row_count;
+    snapshot_rows_capacity = rows_capacity;
+    snapshot_secure_local_mode = secure_local_mode;
+    snapshot_iommu_enabled = iommu_enabled;
+    snapshot_book_hooks = book_hooks;
+    snapshot_max_audit_overhead_delta_q16 = max_audit_overhead_delta_q16;
+    snapshot_rows_ptr = rows;
+    snapshot_out_checked_rows_ptr = out_checked_rows;
+    snapshot_out_first_violation_index_ptr = out_first_violation_index;
+    snapshot_out_max_observed_overhead_q16_ptr = out_max_observed_overhead_q16;
+
+    // IQ-1464 no-partial audit-overhead wrapper:
+    // 1) snapshot immutable row digest and argument tuple;
+    // 2) stage tuple via commit-only wrapper in preflight pass;
+    // 3) enforce unchanged digest + immutable snapshots;
+    // 4) recompute via commit-only wrapper and require exact parity;
+    // 5) publish outputs atomically only after parity succeeds.
+    status_snapshot = GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked(
+        rows,
+        row_count,
+        rows_capacity,
+        &snapshot_before_digest_q64);
+    if (status_snapshot != GPU_SEC_PERF_OK)
+        return status_snapshot;
+
+    status_preflight = GPUSecurityPerfMatrixAuditOverheadBudgetCheckedCommitOnly(
+        rows,
+        row_count,
+        rows_capacity,
+        secure_local_mode,
+        iommu_enabled,
+        book_hooks,
+        max_audit_overhead_delta_q16,
+        &staged_checked_rows,
+        &staged_first_violation_index,
+        &staged_max_observed_overhead_q16);
+
+    status_snapshot = GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked(
+        rows,
+        row_count,
+        rows_capacity,
+        &snapshot_mid_digest_q64);
+    if (status_snapshot != GPU_SEC_PERF_OK)
+        return status_snapshot;
+    if (snapshot_mid_digest_q64 != snapshot_before_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    status_commit = GPUSecurityPerfMatrixAuditOverheadBudgetCheckedCommitOnly(
+        rows,
+        row_count,
+        rows_capacity,
+        secure_local_mode,
+        iommu_enabled,
+        book_hooks,
+        max_audit_overhead_delta_q16,
+        &commit_checked_rows,
+        &commit_first_violation_index,
+        &commit_max_observed_overhead_q16);
+
+    status_snapshot = GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked(
+        rows,
+        row_count,
+        rows_capacity,
+        &snapshot_after_digest_q64);
+    if (status_snapshot != GPU_SEC_PERF_OK)
+        return status_snapshot;
+    if (snapshot_after_digest_q64 != snapshot_before_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (snapshot_row_count != row_count)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_rows_capacity != rows_capacity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_secure_local_mode != secure_local_mode)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_iommu_enabled != iommu_enabled)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_book_hooks != book_hooks)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_max_audit_overhead_delta_q16 != max_audit_overhead_delta_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_rows_ptr != rows)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_checked_rows_ptr != out_checked_rows)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_first_violation_index_ptr != out_first_violation_index)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_max_observed_overhead_q16_ptr != out_max_observed_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (status_preflight != status_commit)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_checked_rows != commit_checked_rows)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_first_violation_index != commit_first_violation_index)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_max_observed_overhead_q16 != commit_max_observed_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (status_preflight != GPU_SEC_PERF_OK)
+        return status_preflight;
+
+    *out_checked_rows = staged_checked_rows;
+    *out_first_violation_index = staged_first_violation_index;
+    *out_max_observed_overhead_q16 = staged_max_observed_overhead_q16;
+
+    return status_preflight;
+}
+
 I32 GPUSecurityPerfMatrixSummaryQ16CheckedNoPartial(
     const GPUSecurityPerfMatrixRowOutput *rows,
     I64 row_count,
