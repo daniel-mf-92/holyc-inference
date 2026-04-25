@@ -2257,7 +2257,7 @@ I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64NoPartialPreflight
     snapshot_out_snapshot_digest_q64_ptr = out_snapshot_digest_q64;
     saved_snapshot_digest_q64 = *out_snapshot_digest_q64;
 
-    // IQ-1488 zero-write diagnostics companion:
+    // IQ-1500 zero-write diagnostics companion:
     // 1) snapshot immutable row-gate tuple + caller digest slot;
     // 2) derive staged digest through preflight-only parity commit-only helper;
     // 3) recompute canonical digest through preflight-only parity helper;

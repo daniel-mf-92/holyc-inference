@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1488 zero-write companion over parity-commit-only digest wrapper."""
+"""Harness for IQ-1500 zero-write companion over parity-commit-only digest wrapper."""
 
 from __future__ import annotations
 
@@ -381,12 +381,13 @@ def gpu_security_perf_matrix_row_gate_checked_policy_snapshot_digest_q64_noparti
     return status_commit_only, current_snapshot_digest_q64
 
 
-def test_source_contains_iq1488_symbols() -> None:
+def test_source_contains_iq1500_symbols() -> None:
     src = Path("src/gpu/security_perf_matrix.HC").read_text(encoding="utf-8")
 
     assert "I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64NoPartialPreflightOnlyParityCommitOnlyPreflightOnly(" in src
     assert "status_commit_only = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64NoPartialPreflightOnlyParityCommitOnly(" in src
     assert "status_parity = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64NoPartialPreflightOnlyParity(" in src
+    assert "// IQ-1500 zero-write diagnostics companion:" in src
     assert "saved_snapshot_digest_q64" in src
     assert "if (status_commit_only != status_parity)" in src
 
@@ -500,10 +501,25 @@ def test_digest_drift_rejected() -> None:
     assert (status, digest) == (GPU_SEC_PERF_ERR_BAD_PARAM, 9900)
 
 
+def test_overflow_vectors() -> None:
+    status, digest = gpu_security_perf_matrix_row_gate_checked_policy_snapshot_digest_q64_nopartial_preflight_only_parity_commit_only_preflight_only(
+        secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
+        iommu_active=1,
+        book_of_truth_gpu_hooks=1,
+        policy_digest_parity=1,
+        row_prompt_tokens=GPU_SEC_PERF_I64_MAX,
+        row_batch_size=1,
+        row_quant_profile=GPU_SEC_PERF_QUANT_Q8_0,
+        current_snapshot_digest_q64=7777,
+    )
+    assert (status, digest) == (GPU_SEC_PERF_ERR_OVERFLOW, 7777)
+
+
 if __name__ == "__main__":
-    test_source_contains_iq1488_symbols()
+    test_source_contains_iq1500_symbols()
     test_null_alias_vectors()
     test_gate_missing_vectors()
     test_bit_flip_parity_vectors()
     test_digest_drift_rejected()
+    test_overflow_vectors()
     print("ok")
