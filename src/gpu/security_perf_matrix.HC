@@ -18,6 +18,14 @@
 #define GPU_SEC_PERF_QUANT_Q4_0 40
 #define GPU_SEC_PERF_QUANT_Q8_0 80
 
+#define GPU_SEC_PERF_ROW_GATE_REASON_ALLOW                  0
+#define GPU_SEC_PERF_ROW_GATE_REASON_PROFILE_GUARD          1
+#define GPU_SEC_PERF_ROW_GATE_REASON_IOMMU_GUARD            2
+#define GPU_SEC_PERF_ROW_GATE_REASON_BOOK_GUARD             3
+#define GPU_SEC_PERF_ROW_GATE_REASON_POLICY_DIGEST_MISMATCH 4
+#define GPU_SEC_PERF_ROW_GATE_REASON_BAD_ROW_GEOMETRY       5
+#define GPU_SEC_PERF_ROW_GATE_REASON_BAD_QUANT_PROFILE      6
+
 #define GPU_SEC_PERF_Q16_ONE    65536
 #define GPU_SEC_PERF_CLOCK_HZ   1000000000
 #define GPU_SEC_PERF_I64_MAX    0x7FFFFFFFFFFFFFFF
@@ -190,10 +198,77 @@ Bool GPUSecurityPerfMulChecked(I64 lhs,
     return TRUE;
 }
 
+Bool GPUSecurityPerfFlagIsBinary(I64 value)
+{
+    return (value == 0 || value == 1);
+}
+
 Bool GPUSecurityPerfIsSupportedQuant(I64 quant_level)
 {
     return (quant_level == GPU_SEC_PERF_QUANT_Q4_0 ||
             quant_level == GPU_SEC_PERF_QUANT_Q8_0);
+}
+
+I32 GPUSecurityPerfMatrixRowGateChecked(I64 secure_local_mode,
+                                        I64 iommu_active,
+                                        I64 book_of_truth_gpu_hooks,
+                                        I64 policy_digest_parity,
+                                        I64 row_prompt_tokens,
+                                        I64 row_batch_size,
+                                        I64 row_quant_profile,
+                                        I64 *out_gate_reason_code,
+                                        I64 *out_row_allowed)
+{
+    if (!out_gate_reason_code || !out_row_allowed)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    *out_gate_reason_code = GPU_SEC_PERF_ROW_GATE_REASON_BAD_ROW_GEOMETRY;
+    *out_row_allowed = 0;
+
+    if (!GPUSecurityPerfFlagIsBinary(iommu_active) ||
+        !GPUSecurityPerfFlagIsBinary(book_of_truth_gpu_hooks) ||
+        !GPUSecurityPerfFlagIsBinary(policy_digest_parity))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (secure_local_mode != GPU_SEC_PERF_PROFILE_SECURE_LOCAL)
+    {
+        *out_gate_reason_code = GPU_SEC_PERF_ROW_GATE_REASON_PROFILE_GUARD;
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+    }
+
+    if (row_prompt_tokens < 0 || row_batch_size <= 0)
+    {
+        *out_gate_reason_code = GPU_SEC_PERF_ROW_GATE_REASON_BAD_ROW_GEOMETRY;
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    }
+
+    if (!GPUSecurityPerfIsSupportedQuant(row_quant_profile))
+    {
+        *out_gate_reason_code = GPU_SEC_PERF_ROW_GATE_REASON_BAD_QUANT_PROFILE;
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    }
+
+    if (!iommu_active)
+    {
+        *out_gate_reason_code = GPU_SEC_PERF_ROW_GATE_REASON_IOMMU_GUARD;
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+    }
+
+    if (!book_of_truth_gpu_hooks)
+    {
+        *out_gate_reason_code = GPU_SEC_PERF_ROW_GATE_REASON_BOOK_GUARD;
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+    }
+
+    if (!policy_digest_parity)
+    {
+        *out_gate_reason_code = GPU_SEC_PERF_ROW_GATE_REASON_POLICY_DIGEST_MISMATCH;
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+    }
+
+    *out_gate_reason_code = GPU_SEC_PERF_ROW_GATE_REASON_ALLOW;
+    *out_row_allowed = 1;
+    return GPU_SEC_PERF_OK;
 }
 
 I32 GPUSecurityPerfMatrixRunChecked(const GPUSecurityPerfMatrixRowInput *rows,
