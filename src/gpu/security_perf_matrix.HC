@@ -702,6 +702,82 @@ I32 GPUSecurityPerfMatrixRowGateCheckedNoPartialPreflightOnlyParity(
     return status_preflight_only;
 }
 
+I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64(
+    I64 secure_local_mode,
+    I64 iommu_active,
+    I64 book_of_truth_gpu_hooks,
+    I64 policy_digest_parity,
+    I64 row_prompt_tokens,
+    I64 row_batch_size,
+    I64 row_quant_profile,
+    I64 *out_snapshot_digest_q64)
+{
+    I64 tuple_values[9];
+    I64 tuple_count;
+    I64 i;
+    I64 gate_reason_code;
+    I64 row_allowed;
+    I64 digest_q64;
+    I64 stride;
+    I64 offset_value;
+    I64 mixed_term;
+    I32 status_gate;
+
+    if (!out_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    *out_snapshot_digest_q64 = 0;
+
+    status_gate = GPUSecurityPerfMatrixRowGateChecked(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        row_prompt_tokens,
+        row_batch_size,
+        row_quant_profile,
+        &gate_reason_code,
+        &row_allowed);
+    if (status_gate != GPU_SEC_PERF_OK)
+        return status_gate;
+
+    tuple_values[0] = secure_local_mode;
+    tuple_values[1] = iommu_active;
+    tuple_values[2] = book_of_truth_gpu_hooks;
+    tuple_values[3] = policy_digest_parity;
+    tuple_values[4] = row_prompt_tokens;
+    tuple_values[5] = row_batch_size;
+    tuple_values[6] = row_quant_profile;
+    tuple_values[7] = gate_reason_code;
+    tuple_values[8] = row_allowed;
+    tuple_count = 9;
+
+    // IQ-1471 row-gate policy snapshot digest:
+    // - fold immutable gate snapshot tuple into a deterministic integer digest;
+    // - use position-dependent strides so bit flips in any field change output;
+    // - fail closed on any arithmetic overflow.
+    digest_q64 = 1469598103934665603;
+    stride = 104729;
+
+    for (i = 0; i < tuple_count; ++i)
+    {
+        if (!GPUSecurityPerfAddChecked(tuple_values[i], i + 1, &offset_value))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+
+        if (!GPUSecurityPerfMulChecked(offset_value, stride, &mixed_term))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+
+        if (!GPUSecurityPerfAddChecked(digest_q64, mixed_term, &digest_q64))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+
+        if (!GPUSecurityPerfAddChecked(stride, 104729, &stride))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+    }
+
+    *out_snapshot_digest_q64 = digest_q64;
+    return GPU_SEC_PERF_OK;
+}
+
 I32 GPUSecurityPerfMatrixRunChecked(const GPUSecurityPerfMatrixRowInput *rows,
                                     I64 row_count,
                                     I64 profile_id,
