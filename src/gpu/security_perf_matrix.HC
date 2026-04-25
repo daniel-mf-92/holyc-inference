@@ -1210,3 +1210,202 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedNoPartialPreflightOnly(
 
     return GPU_SEC_PERF_OK;
 }
+
+I32 GPUSecurityPerfMatrixSummaryQ16CheckedNoPartialPreflightOnlyParity(
+    const GPUSecurityPerfMatrixRowOutput *rows,
+    I64 row_count,
+    I64 rows_capacity,
+    I64 out_capacity,
+    I64 secure_local_mode,
+    I64 iommu_active,
+    I64 book_of_truth_gpu_hooks,
+    I64 policy_digest_parity,
+    I64 *out_tok_per_sec_q16,
+    I64 *out_audit_overhead_q16,
+    I64 *out_p50_q16,
+    I64 *out_p95_q16)
+{
+    I64 snapshot_row_count;
+    I64 snapshot_rows_capacity;
+    I64 snapshot_out_capacity;
+    I64 snapshot_secure_local_mode;
+    I64 snapshot_iommu_active;
+    I64 snapshot_book_of_truth_gpu_hooks;
+    I64 snapshot_policy_digest_parity;
+    const GPUSecurityPerfMatrixRowOutput *snapshot_rows_ptr;
+    I64 *snapshot_out_tok_ptr;
+    I64 *snapshot_out_overhead_ptr;
+    I64 *snapshot_out_p50_ptr;
+    I64 *snapshot_out_p95_ptr;
+    I64 snapshot_before_digest_q64;
+    I64 snapshot_after_digest_q64;
+    I64 saved_tok_per_sec_q16;
+    I64 saved_audit_overhead_q16;
+    I64 saved_p50_q16;
+    I64 saved_p95_q16;
+    I64 staged_tok_per_sec_q16;
+    I64 staged_audit_overhead_q16;
+    I64 staged_p50_q16;
+    I64 staged_p95_q16;
+    I64 parity_tok_per_sec_q16;
+    I64 parity_audit_overhead_q16;
+    I64 parity_p50_q16;
+    I64 parity_p95_q16;
+    I32 status_snapshot;
+    I32 status_preflight_only;
+    I32 status_nopartial;
+
+    if (!rows || !out_tok_per_sec_q16 || !out_audit_overhead_q16 ||
+        !out_p50_q16 || !out_p95_q16)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    if (out_tok_per_sec_q16 == out_audit_overhead_q16 ||
+        out_tok_per_sec_q16 == out_p50_q16 ||
+        out_tok_per_sec_q16 == out_p95_q16 ||
+        out_audit_overhead_q16 == out_p50_q16 ||
+        out_audit_overhead_q16 == out_p95_q16 ||
+        out_p50_q16 == out_p95_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (row_count <= 0 || rows_capacity < row_count)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (out_capacity < 4)
+        return GPU_SEC_PERF_ERR_CAPACITY;
+
+    if (!GPUSecurityPerfFlagIsBinary(iommu_active) ||
+        !GPUSecurityPerfFlagIsBinary(book_of_truth_gpu_hooks) ||
+        !GPUSecurityPerfFlagIsBinary(policy_digest_parity))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (secure_local_mode != GPU_SEC_PERF_PROFILE_SECURE_LOCAL)
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+
+    if (!policy_digest_parity)
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+
+    saved_tok_per_sec_q16 = *out_tok_per_sec_q16;
+    saved_audit_overhead_q16 = *out_audit_overhead_q16;
+    saved_p50_q16 = *out_p50_q16;
+    saved_p95_q16 = *out_p95_q16;
+
+    snapshot_row_count = row_count;
+    snapshot_rows_capacity = rows_capacity;
+    snapshot_out_capacity = out_capacity;
+    snapshot_secure_local_mode = secure_local_mode;
+    snapshot_iommu_active = iommu_active;
+    snapshot_book_of_truth_gpu_hooks = book_of_truth_gpu_hooks;
+    snapshot_policy_digest_parity = policy_digest_parity;
+    snapshot_rows_ptr = rows;
+    snapshot_out_tok_ptr = out_tok_per_sec_q16;
+    snapshot_out_overhead_ptr = out_audit_overhead_q16;
+    snapshot_out_p50_ptr = out_p50_q16;
+    snapshot_out_p95_ptr = out_p95_q16;
+
+    // IQ-1460 preflight-only parity gate:
+    // 1) snapshot immutable row digest and caller outputs;
+    // 2) compute staged tuple via preflight-only diagnostics wrapper;
+    // 3) independently compute tuple via no-partial wrapper;
+    // 4) require immutable snapshots + exact tuple parity;
+    // 5) preserve zero-write diagnostics semantics for caller outputs.
+    status_snapshot = GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked(
+        rows,
+        row_count,
+        rows_capacity,
+        &snapshot_before_digest_q64);
+    if (status_snapshot != GPU_SEC_PERF_OK)
+        return status_snapshot;
+
+    staged_tok_per_sec_q16 = 0;
+    staged_audit_overhead_q16 = 0;
+    staged_p50_q16 = 0;
+    staged_p95_q16 = 0;
+    status_preflight_only = GPUSecurityPerfMatrixSummaryQ16CheckedNoPartialPreflightOnly(
+        rows,
+        row_count,
+        rows_capacity,
+        out_capacity,
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        &staged_tok_per_sec_q16,
+        &staged_audit_overhead_q16,
+        &staged_p50_q16,
+        &staged_p95_q16);
+    if (status_preflight_only != GPU_SEC_PERF_OK)
+        return status_preflight_only;
+
+    status_nopartial = GPUSecurityPerfMatrixSummaryQ16CheckedNoPartial(
+        rows,
+        row_count,
+        rows_capacity,
+        out_capacity,
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        &parity_tok_per_sec_q16,
+        &parity_audit_overhead_q16,
+        &parity_p50_q16,
+        &parity_p95_q16);
+    if (status_nopartial != GPU_SEC_PERF_OK)
+        return status_nopartial;
+
+    status_snapshot = GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked(
+        rows,
+        row_count,
+        rows_capacity,
+        &snapshot_after_digest_q64);
+    if (status_snapshot != GPU_SEC_PERF_OK)
+        return status_snapshot;
+    if (snapshot_after_digest_q64 != snapshot_before_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (snapshot_row_count != row_count)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_rows_capacity != rows_capacity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_capacity != out_capacity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_secure_local_mode != secure_local_mode)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_iommu_active != iommu_active)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_book_of_truth_gpu_hooks != book_of_truth_gpu_hooks)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_policy_digest_parity != policy_digest_parity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_rows_ptr != rows)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_tok_ptr != out_tok_per_sec_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_overhead_ptr != out_audit_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_p50_ptr != out_p50_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_p95_ptr != out_p95_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (staged_tok_per_sec_q16 != parity_tok_per_sec_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_audit_overhead_q16 != parity_audit_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_p50_q16 != parity_p50_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_p95_q16 != parity_p95_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (*out_tok_per_sec_q16 != saved_tok_per_sec_q16 ||
+        *out_audit_overhead_q16 != saved_audit_overhead_q16 ||
+        *out_p50_q16 != saved_p50_q16 ||
+        *out_p95_q16 != saved_p95_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    *out_tok_per_sec_q16 = saved_tok_per_sec_q16;
+    *out_audit_overhead_q16 = saved_audit_overhead_q16;
+    *out_p50_q16 = saved_p50_q16;
+    *out_p95_q16 = saved_p95_q16;
+
+    return GPU_SEC_PERF_OK;
+}
