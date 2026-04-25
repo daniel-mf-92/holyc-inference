@@ -3500,3 +3500,129 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedCommitOnly(
     *out_mean_overhead_q16 = staged_mean_overhead_q16;
     return GPU_SEC_PERF_OK;
 }
+
+I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedNoPartial(
+    const GPUSecurityPerfMatrixRowOutput *rows,
+    I64 row_count,
+    I64 rows_capacity,
+    I64 out_capacity,
+    I64 secure_local_mode,
+    I64 iommu_active,
+    I64 book_of_truth_gpu_hooks,
+    I64 policy_digest_parity,
+    I64 *out_min_overhead_q16,
+    I64 *out_max_overhead_q16,
+    I64 *out_mean_overhead_q16)
+{
+    I64 snapshot_row_count;
+    I64 snapshot_rows_capacity;
+    I64 snapshot_out_capacity;
+    I64 snapshot_secure_local_mode;
+    I64 snapshot_iommu_active;
+    I64 snapshot_book_of_truth_gpu_hooks;
+    I64 snapshot_policy_digest_parity;
+    const GPUSecurityPerfMatrixRowOutput *snapshot_rows_ptr;
+    I64 *snapshot_out_min_ptr;
+    I64 *snapshot_out_max_ptr;
+    I64 *snapshot_out_mean_ptr;
+    I64 staged_min_overhead_q16;
+    I64 staged_max_overhead_q16;
+    I64 staged_mean_overhead_q16;
+    I64 commit_min_overhead_q16;
+    I64 commit_max_overhead_q16;
+    I64 commit_mean_overhead_q16;
+    I32 status_preflight;
+    I32 status_commit;
+
+    if (!rows || !out_min_overhead_q16 ||
+        !out_max_overhead_q16 || !out_mean_overhead_q16)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    if (out_min_overhead_q16 == out_max_overhead_q16 ||
+        out_min_overhead_q16 == out_mean_overhead_q16 ||
+        out_max_overhead_q16 == out_mean_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    snapshot_row_count = row_count;
+    snapshot_rows_capacity = rows_capacity;
+    snapshot_out_capacity = out_capacity;
+    snapshot_secure_local_mode = secure_local_mode;
+    snapshot_iommu_active = iommu_active;
+    snapshot_book_of_truth_gpu_hooks = book_of_truth_gpu_hooks;
+    snapshot_policy_digest_parity = policy_digest_parity;
+    snapshot_rows_ptr = rows;
+    snapshot_out_min_ptr = out_min_overhead_q16;
+    snapshot_out_max_ptr = out_max_overhead_q16;
+    snapshot_out_mean_ptr = out_mean_overhead_q16;
+
+    // IQ-1478 no-partial overhead-envelope wrapper:
+    // 1) snapshot immutable inputs + output pointer tuple;
+    // 2) derive staged tuple via commit-only wrapper;
+    // 3) re-run commit-only wrapper and require strict status + tuple parity;
+    // 4) publish `{min,max,mean}` atomically only after full parity.
+    status_preflight = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedCommitOnly(
+        rows,
+        row_count,
+        rows_capacity,
+        out_capacity,
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        &staged_min_overhead_q16,
+        &staged_max_overhead_q16,
+        &staged_mean_overhead_q16);
+
+    status_commit = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeCheckedCommitOnly(
+        rows,
+        row_count,
+        rows_capacity,
+        out_capacity,
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        &commit_min_overhead_q16,
+        &commit_max_overhead_q16,
+        &commit_mean_overhead_q16);
+
+    if (snapshot_row_count != row_count)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_rows_capacity != rows_capacity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_capacity != out_capacity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_secure_local_mode != secure_local_mode)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_iommu_active != iommu_active)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_book_of_truth_gpu_hooks != book_of_truth_gpu_hooks)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_policy_digest_parity != policy_digest_parity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_rows_ptr != rows)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_min_ptr != out_min_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_max_ptr != out_max_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_mean_ptr != out_mean_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (status_preflight != status_commit)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_min_overhead_q16 != commit_min_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_max_overhead_q16 != commit_max_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_mean_overhead_q16 != commit_mean_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (status_preflight != GPU_SEC_PERF_OK)
+        return status_preflight;
+
+    *out_min_overhead_q16 = staged_min_overhead_q16;
+    *out_max_overhead_q16 = staged_max_overhead_q16;
+    *out_mean_overhead_q16 = staged_mean_overhead_q16;
+    return GPU_SEC_PERF_OK;
+}
