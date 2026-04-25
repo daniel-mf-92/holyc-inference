@@ -23198,6 +23198,122 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStride(
     return ATTN_Q16_OK;
 }
 
+I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideCommitOnly(
+    I64 *scores_q32,
+    I64 scores_capacity,
+    I64 query_rows,
+    I64 key_rows,
+    I64 head_groups,
+    I64 *out_probs_q16,
+    I64 out_capacity,
+    I64 *out_required_score_cells,
+    I64 *out_required_out_cells)
+{
+    I64 snapshot_query_rows;
+    I64 snapshot_key_rows;
+    I64 snapshot_head_groups;
+    I64 snapshot_scores_capacity;
+    I64 snapshot_out_capacity;
+    I64 *snapshot_scores_q32;
+    I64 *snapshot_out_probs_q16;
+    I64 *snapshot_out_required_score_cells_ptr;
+    I64 *snapshot_out_required_out_cells_ptr;
+    I64 snapshot_out_required_score_cells_value;
+    I64 snapshot_out_required_out_cells_value;
+    I64 staged_default_required_score_cells;
+    I64 staged_default_required_out_cells;
+    I64 staged_canonical_required_score_cells;
+    I64 staged_canonical_required_out_cells;
+    I32 status;
+
+    if (!out_required_score_cells || !out_required_out_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+    if (out_required_score_cells == out_required_out_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (!scores_q32 || !out_probs_q16)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (scores_capacity < 0 || out_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_rows < 0 || key_rows < 0 || head_groups <= 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    snapshot_query_rows = query_rows;
+    snapshot_key_rows = key_rows;
+    snapshot_head_groups = head_groups;
+    snapshot_scores_capacity = scores_capacity;
+    snapshot_out_capacity = out_capacity;
+    snapshot_scores_q32 = scores_q32;
+    snapshot_out_probs_q16 = out_probs_q16;
+
+    snapshot_out_required_score_cells_ptr = out_required_score_cells;
+    snapshot_out_required_out_cells_ptr = out_required_out_cells;
+    snapshot_out_required_score_cells_value = *out_required_score_cells;
+    snapshot_out_required_out_cells_value = *out_required_out_cells;
+
+    // IQ-1408 commit-only diagnostics contract:
+    // 1) stage default-stride diagnostics (`row_stride = key_rows`);
+    // 2) stage canonical diagnostics directly from preflight;
+    // 3) enforce immutable geometry/capacity snapshots + strict tuple parity;
+    // 4) atomically publish required tuple only after all checks pass.
+    status = GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStride(
+        scores_q32,
+        scores_capacity,
+        query_rows,
+        key_rows,
+        head_groups,
+        out_probs_q16,
+        out_capacity,
+        &staged_default_required_score_cells,
+        &staged_default_required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflight(
+        scores_q32,
+        scores_capacity,
+        query_rows,
+        key_rows,
+        head_groups,
+        key_rows,
+        out_probs_q16,
+        out_capacity,
+        &staged_canonical_required_score_cells,
+        &staged_canonical_required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (snapshot_query_rows != query_rows ||
+        snapshot_key_rows != key_rows ||
+        snapshot_head_groups != head_groups ||
+        snapshot_scores_capacity != scores_capacity ||
+        snapshot_out_capacity != out_capacity ||
+        snapshot_scores_q32 != scores_q32 ||
+        snapshot_out_probs_q16 != out_probs_q16)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (staged_default_required_score_cells != staged_canonical_required_score_cells ||
+        staged_default_required_out_cells != staged_canonical_required_out_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (staged_default_required_score_cells > snapshot_scores_capacity ||
+        staged_default_required_out_cells > snapshot_out_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (out_required_score_cells != snapshot_out_required_score_cells_ptr ||
+        out_required_out_cells != snapshot_out_required_out_cells_ptr)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (*out_required_score_cells != snapshot_out_required_score_cells_value ||
+        *out_required_out_cells != snapshot_out_required_out_cells_value)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    *out_required_score_cells = staged_default_required_score_cells;
+    *out_required_out_cells = staged_default_required_out_cells;
+    return ATTN_Q16_OK;
+}
+
 #define GQA_ATTN_VALUE_MIX_CLAMP_Q16 ((I64)32 << ATTN_Q16_SHIFT)
 
 I32 GQAAttentionValueMixQ16Checked(
