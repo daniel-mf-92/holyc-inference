@@ -1161,6 +1161,101 @@ I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64NoPartialPreflight
     return status_nopartial;
 }
 
+I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64NoPartialPreflightOnlyParity(
+    I64 secure_local_mode,
+    I64 iommu_active,
+    I64 book_of_truth_gpu_hooks,
+    I64 policy_digest_parity,
+    I64 row_prompt_tokens,
+    I64 row_batch_size,
+    I64 row_quant_profile,
+    I64 *out_snapshot_digest_q64)
+{
+    I64 snapshot_secure_local_mode;
+    I64 snapshot_iommu_active;
+    I64 snapshot_book_of_truth_gpu_hooks;
+    I64 snapshot_policy_digest_parity;
+    I64 snapshot_row_prompt_tokens;
+    I64 snapshot_row_batch_size;
+    I64 snapshot_row_quant_profile;
+    I64 *snapshot_out_snapshot_digest_q64_ptr;
+    I64 saved_snapshot_digest_q64;
+    I64 staged_snapshot_digest_q64;
+    I64 parity_snapshot_digest_q64;
+    I32 status_preflight_only;
+    I32 status_nopartial;
+
+    if (!out_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    saved_snapshot_digest_q64 = *out_snapshot_digest_q64;
+
+    snapshot_secure_local_mode = secure_local_mode;
+    snapshot_iommu_active = iommu_active;
+    snapshot_book_of_truth_gpu_hooks = book_of_truth_gpu_hooks;
+    snapshot_policy_digest_parity = policy_digest_parity;
+    snapshot_row_prompt_tokens = row_prompt_tokens;
+    snapshot_row_batch_size = row_batch_size;
+    snapshot_row_quant_profile = row_quant_profile;
+    snapshot_out_snapshot_digest_q64_ptr = out_snapshot_digest_q64;
+
+    // IQ-1482 preflight-only parity gate for policy snapshot digest:
+    // 1) snapshot immutable row-gate tuple + caller digest slot;
+    // 2) derive parity digest through no-partial wrapper pass;
+    // 3) replay preflight-only wrapper with parity digest as immutable seed;
+    // 4) enforce immutable snapshots and strict status/digest parity;
+    // 5) preserve zero-write diagnostics semantics for caller output.
+    parity_snapshot_digest_q64 = 0;
+    status_nopartial = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64NoPartial(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        row_prompt_tokens,
+        row_batch_size,
+        row_quant_profile,
+        &parity_snapshot_digest_q64);
+
+    staged_snapshot_digest_q64 = parity_snapshot_digest_q64;
+    status_preflight_only = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64NoPartialPreflightOnly(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        row_prompt_tokens,
+        row_batch_size,
+        row_quant_profile,
+        &staged_snapshot_digest_q64);
+
+    if (snapshot_secure_local_mode != secure_local_mode)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_iommu_active != iommu_active)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_book_of_truth_gpu_hooks != book_of_truth_gpu_hooks)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_policy_digest_parity != policy_digest_parity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_row_prompt_tokens != row_prompt_tokens)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_row_batch_size != row_batch_size)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_row_quant_profile != row_quant_profile)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_snapshot_digest_q64_ptr != out_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (status_preflight_only != status_nopartial)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_snapshot_digest_q64 != parity_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (*out_snapshot_digest_q64 != saved_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    *out_snapshot_digest_q64 = saved_snapshot_digest_q64;
+    return status_preflight_only;
+}
+
 I32 GPUSecurityPerfMatrixRunChecked(const GPUSecurityPerfMatrixRowInput *rows,
                                     I64 row_count,
                                     I64 profile_id,
