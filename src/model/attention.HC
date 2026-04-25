@@ -20449,7 +20449,7 @@ I32 GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyP
     snapshot_head_dim = head_dim;
     snapshot_out_capacity = out_capacity;
 
-    // IQ-1410 strict diagnostics parity gate:
+    // IQ-1424 strict diagnostics parity gate:
     // 1) freeze immutable geometry tuple and derive required q/k/out spans;
     // 2) run preflight-only diagnostics companion on staged required tuple;
     // 3) run commit-only parity scorer on staged output buffer;

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reference checks for GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyParity (IQ-1410)."""
+"""Reference checks for GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyParity (IQ-1424)."""
 
 from __future__ import annotations
 
@@ -372,3 +372,38 @@ def test_randomized_zero_write_failure_and_success_publish() -> None:
 
         assert err_a == err_b == ATTN_Q16_OK
         assert out_a == out_b
+
+
+def test_group_geometry_failure_keeps_output_immutable() -> None:
+    q = [
+        1 << 16,
+        2 << 16,
+        3 << 16,
+        4 << 16,
+        5 << 16,
+        6 << 16,
+    ]
+    k = [
+        1 << 16,
+        0,
+        -(1 << 16),
+        2 << 16,
+    ]
+    out = [4444, -3333, 2222, -1111, 999, -888]
+
+    err = gqa_attention_score_q16_checked_nopartial_commit_only_parity_commit_only_preflight_only_parity(
+        q,
+        len(q),
+        3,  # q_rows
+        k,
+        len(k),
+        1,  # k_rows
+        2,  # invalid: q_rows % group_count != 0
+        2,  # seq_len
+        2,  # head_dim
+        out,
+        len(out),
+    )
+
+    assert err == ATTN_Q16_ERR_BAD_PARAM
+    assert out == [4444, -3333, 2222, -1111, 999, -888]
