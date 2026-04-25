@@ -1518,3 +1518,117 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowChecked(
 
     return GPU_SEC_PERF_OK;
 }
+
+I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeChecked(
+    const GPUSecurityPerfMatrixRowOutput *rows,
+    I64 row_count,
+    I64 rows_capacity,
+    I64 secure_local_mode,
+    I64 iommu_active,
+    I64 book_of_truth_gpu_hooks,
+    I64 policy_digest_parity,
+    I64 *out_min_overhead_q16,
+    I64 *out_max_overhead_q16,
+    I64 *out_mean_overhead_q16)
+{
+    I64 baseline_tok_per_sec_q16;
+    I64 baseline_audit_overhead_q16;
+    I64 baseline_p50_q16;
+    I64 baseline_p95_q16;
+    I32 status_baseline;
+    I64 i;
+    I64 staged_min_overhead_q16;
+    I64 staged_max_overhead_q16;
+    I64 staged_mean_overhead_q16;
+    I64 overhead_sum_q16;
+    I64 row_overhead_q16;
+    I64 row_secure_cycles_per_token_q16;
+    I64 prev_overhead_q16;
+    I64 prev_secure_cycles_per_token_q16;
+
+    if (!rows || !out_min_overhead_q16 ||
+        !out_max_overhead_q16 || !out_mean_overhead_q16)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    *out_min_overhead_q16 = 0;
+    *out_max_overhead_q16 = 0;
+    *out_mean_overhead_q16 = 0;
+
+    if (row_count <= 0 || rows_capacity < row_count)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (!GPUSecurityPerfFlagIsBinary(iommu_active) ||
+        !GPUSecurityPerfFlagIsBinary(book_of_truth_gpu_hooks) ||
+        !GPUSecurityPerfFlagIsBinary(policy_digest_parity))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (secure_local_mode != GPU_SEC_PERF_PROFILE_SECURE_LOCAL)
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+
+    if (!policy_digest_parity)
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+
+    // Reuse canonical secure-on summary gate path before envelope math.
+    status_baseline = GPUSecurityPerfMatrixSummaryQ16Checked(
+        rows,
+        row_count,
+        rows_capacity,
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        book_of_truth_gpu_hooks,
+        book_of_truth_gpu_hooks,
+        &baseline_tok_per_sec_q16,
+        &baseline_audit_overhead_q16,
+        &baseline_p50_q16,
+        &baseline_p95_q16);
+    if (status_baseline != GPU_SEC_PERF_OK)
+        return status_baseline;
+
+    overhead_sum_q16 = 0;
+    staged_min_overhead_q16 = 0;
+    staged_max_overhead_q16 = 0;
+    prev_overhead_q16 = 0;
+    prev_secure_cycles_per_token_q16 = 0;
+
+    for (i = 0; i < row_count; ++i)
+    {
+        row_overhead_q16 = rows[i].audit_overhead_delta_q16;
+        row_secure_cycles_per_token_q16 = rows[i].secure_cycles_per_token_q16;
+
+        if (rows[i].tok_per_sec_q16 < 0 ||
+            row_overhead_q16 < 0 ||
+            row_secure_cycles_per_token_q16 < 0)
+            return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+        // Monotonic secure-vs-relaxed invariant:
+        // when secure cycle cost rises, audit overhead may not shrink.
+        if (i > 0)
+        {
+            if (row_secure_cycles_per_token_q16 > prev_secure_cycles_per_token_q16 &&
+                row_overhead_q16 < prev_overhead_q16)
+                return GPU_SEC_PERF_ERR_POLICY_GUARD;
+        }
+
+        if (i == 0 || row_overhead_q16 < staged_min_overhead_q16)
+            staged_min_overhead_q16 = row_overhead_q16;
+        if (i == 0 || row_overhead_q16 > staged_max_overhead_q16)
+            staged_max_overhead_q16 = row_overhead_q16;
+
+        if (!GPUSecurityPerfAddChecked(overhead_sum_q16,
+                                       row_overhead_q16,
+                                       &overhead_sum_q16))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+
+        prev_overhead_q16 = row_overhead_q16;
+        prev_secure_cycles_per_token_q16 = row_secure_cycles_per_token_q16;
+    }
+
+    staged_mean_overhead_q16 = overhead_sum_q16 / row_count;
+
+    *out_min_overhead_q16 = staged_min_overhead_q16;
+    *out_max_overhead_q16 = staged_max_overhead_q16;
+    *out_mean_overhead_q16 = staged_mean_overhead_q16;
+
+    return GPU_SEC_PERF_OK;
+}
