@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reference checks for GQAAttentionValueMixQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity (IQ-1392)."""
+"""Reference checks for GQAAttentionValueMixQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity (IQ-1401)."""
 
 from __future__ import annotations
 
@@ -116,6 +116,8 @@ def gqa_attention_value_mix_q16_checked_nopartial_commit_only_preflight_only_par
         return ATTN_Q16_ERR_BAD_PARAM
 
     staged_commit = [0] * required_out_cells
+    scores_snapshot = scores_q16[:required_score_cells]
+    values_snapshot = values_q16[:required_value_cells]
     out_snapshot = out_values_q16[:required_out_cells]
 
     err = gqa_attention_value_mix_q16_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only(
@@ -203,6 +205,11 @@ def gqa_attention_value_mix_q16_checked_nopartial_commit_only_preflight_only_par
         or required_value_cells > snapshot_values_capacity
         or required_out_cells > snapshot_out_capacity
     ):
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    if scores_q16[:required_score_cells] != scores_snapshot:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if values_q16[:required_value_cells] != values_snapshot:
         return ATTN_Q16_ERR_BAD_PARAM
 
     if out_values_q16[:required_out_cells] != out_snapshot:

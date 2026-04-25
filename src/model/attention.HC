@@ -22671,6 +22671,10 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialCommitOnly(
     U64 values_end;
     U64 out_begin;
     U64 out_end;
+    U64 snapshot_scores_digest;
+    U64 snapshot_values_digest;
+    U64 recomputed_scores_digest;
+    U64 recomputed_values_digest;
     I32 status;
 
     if (!scores_q16 || !values_q16 || !out_values_q16)
@@ -25114,7 +25118,7 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOn
     snapshot_values_q16 = values_q16;
     snapshot_out_values_q16 = out_values_q16;
 
-    // IQ-1392 strict diagnostics parity gate:
+    // IQ-1401 strict diagnostics parity gate:
     // 1) freeze immutable geometry/capacity + pointer snapshots;
     // 2) derive required score/value/output spans with checked integer math;
     // 3) run parity-commit-preflight wrapper on caller output and parity-commit wrapper in a private stage;
@@ -25241,6 +25245,25 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOn
     for (copy_index = 0; copy_index < required_out_cells; copy_index++)
         snapshot_out_values_q16_values[copy_index] = out_values_q16[copy_index];
 
+    status = AttentionQ16BufferDigest64(scores_q16,
+                                        required_score_cells,
+                                        &snapshot_scores_digest);
+    if (status != ATTN_Q16_OK)
+    {
+        Free(snapshot_out_values_q16_values);
+        Free(staged_commit_only_out_values_q16);
+        return status;
+    }
+    status = AttentionQ16BufferDigest64(values_q16,
+                                        required_value_cells,
+                                        &snapshot_values_digest);
+    if (status != ATTN_Q16_OK)
+    {
+        Free(snapshot_out_values_q16_values);
+        Free(staged_commit_only_out_values_q16);
+        return status;
+    }
+
     status = GQAAttentionValueMixQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
         scores_q16,
         scores_capacity,
@@ -25364,6 +25387,32 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOn
     if (required_score_cells > snapshot_scores_capacity ||
         required_value_cells > snapshot_values_capacity ||
         required_out_cells > snapshot_out_capacity)
+    {
+        Free(snapshot_out_values_q16_values);
+        Free(staged_commit_only_out_values_q16);
+        return ATTN_Q16_ERR_BAD_PARAM;
+    }
+
+    status = AttentionQ16BufferDigest64(scores_q16,
+                                        required_score_cells,
+                                        &recomputed_scores_digest);
+    if (status != ATTN_Q16_OK)
+    {
+        Free(snapshot_out_values_q16_values);
+        Free(staged_commit_only_out_values_q16);
+        return status;
+    }
+    status = AttentionQ16BufferDigest64(values_q16,
+                                        required_value_cells,
+                                        &recomputed_values_digest);
+    if (status != ATTN_Q16_OK)
+    {
+        Free(snapshot_out_values_q16_values);
+        Free(staged_commit_only_out_values_q16);
+        return status;
+    }
+    if (snapshot_scores_digest != recomputed_scores_digest ||
+        snapshot_values_digest != recomputed_values_digest)
     {
         Free(snapshot_out_values_q16_values);
         Free(staged_commit_only_out_values_q16);
