@@ -6306,6 +6306,8 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflight
     I64 *snapshot_out_p25_ptr;
     I64 *snapshot_out_p75_ptr;
     I64 *snapshot_out_p99_ptr;
+    I64 snapshot_before_digest_q64;
+    I64 snapshot_after_digest_q64;
     I64 saved_p05_q16;
     I64 saved_p25_q16;
     I64 saved_p75_q16;
@@ -6318,6 +6320,7 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflight
     I64 parity_p25_q16;
     I64 parity_p75_q16;
     I64 parity_p99_q16;
+    I32 status_snapshot;
     I32 status_parity;
     I32 status_preflight_only;
 
@@ -6331,6 +6334,23 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflight
         out_p25_q16 == out_p99_q16 ||
         out_p75_q16 == out_p99_q16)
         return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (row_count <= 0 || rows_capacity < row_count)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (out_capacity < 4)
+        return GPU_SEC_PERF_ERR_CAPACITY;
+
+    if (!GPUSecurityPerfFlagIsBinary(iommu_active) ||
+        !GPUSecurityPerfFlagIsBinary(book_of_truth_gpu_hooks) ||
+        !GPUSecurityPerfFlagIsBinary(policy_digest_parity))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (secure_local_mode != GPU_SEC_PERF_PROFILE_SECURE_LOCAL)
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+
+    if (!policy_digest_parity)
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
 
     snapshot_row_count = row_count;
     snapshot_rows_capacity = rows_capacity;
@@ -6353,8 +6373,16 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflight
     // 1) snapshot immutable input tuple + caller output slots;
     // 2) derive canonical `{p05,p25,p75,p99}` via no-partial preflight-only parity;
     // 3) replay no-partial preflight-only with canonical seed tuple;
-    // 4) enforce immutable snapshots and strict status/tuple parity;
+    // 4) enforce immutable snapshots + row-data digest and strict status/tuple parity;
     // 5) publish tuple atomically only on strict parity + success.
+    status_snapshot = GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked(
+        rows,
+        row_count,
+        rows_capacity,
+        &snapshot_before_digest_q64);
+    if (status_snapshot != GPU_SEC_PERF_OK)
+        return status_snapshot;
+
     status_parity = GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflightOnlyParity(
         rows,
         row_count,
@@ -6386,6 +6414,16 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflight
         &staged_p25_q16,
         &staged_p75_q16,
         &staged_p99_q16);
+
+    status_snapshot = GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked(
+        rows,
+        row_count,
+        rows_capacity,
+        &snapshot_after_digest_q64);
+    if (status_snapshot != GPU_SEC_PERF_OK)
+        return status_snapshot;
+    if (snapshot_after_digest_q64 != snapshot_before_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
 
     if (snapshot_row_count != row_count)
         return GPU_SEC_PERF_ERR_BAD_PARAM;

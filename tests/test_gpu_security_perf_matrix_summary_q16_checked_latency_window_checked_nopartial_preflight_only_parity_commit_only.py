@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1506 latency-window no-partial preflight-only parity commit-only wrapper."""
+"""Harness for IQ-1520 latency-window no-partial preflight-only parity commit-only wrapper."""
 
 from __future__ import annotations
 
@@ -303,12 +303,15 @@ def gpu_security_perf_matrix_summary_q16_checked_latency_window_checked_nopartia
     return GPU_SEC_PERF_OK, parity_tuple, staged_tuple
 
 
-def test_source_contains_iq1506_symbols() -> None:
+def test_source_contains_iq1520_symbols() -> None:
     src = Path("src/gpu/security_perf_matrix.HC").read_text(encoding="utf-8")
 
     assert "I32 GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflightOnlyParityCommitOnly(" in src
     assert "status_parity = GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflightOnlyParity(" in src
     assert "status_preflight_only = GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflightOnly(" in src
+    assert "snapshot_before_digest_q64" in src
+    assert "snapshot_after_digest_q64" in src
+    assert "status_snapshot = GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked(" in src
     assert "saved_p05_q16" in src
     assert "saved_p99_q16" in src
 
@@ -376,6 +379,18 @@ def test_null_alias_capacity_gate_and_parity_drift_vectors() -> None:
         caller_outputs=(1, 2, 3, 4),
     )
     assert status == GPU_SEC_PERF_ERR_CAPACITY
+
+    status, *_ = gpu_security_perf_matrix_summary_q16_checked_latency_window_checked_nopartial_preflight_only_parity_commit_only(
+        [],
+        rows_capacity=0,
+        out_capacity=4,
+        secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
+        iommu_active=1,
+        book_of_truth_gpu_hooks=1,
+        policy_digest_parity=1,
+        caller_outputs=(1, 2, 3, 4),
+    )
+    assert status == GPU_SEC_PERF_ERR_BAD_PARAM
 
     status, *_ = gpu_security_perf_matrix_summary_q16_checked_latency_window_checked_nopartial_preflight_only_parity_commit_only(
         rows,
