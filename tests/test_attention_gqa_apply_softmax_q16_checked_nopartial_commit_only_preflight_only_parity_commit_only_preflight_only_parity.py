@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reference checks for ...ParityCommitOnlyPreflightOnlyParity (IQ-1384)."""
+"""Reference checks for ...ParityCommitOnlyPreflightOnlyParity (IQ-1397)."""
 
 from __future__ import annotations
 
@@ -281,7 +281,7 @@ def test_error_contract_null_alias_capacity_overflow() -> None:
 
 
 def test_randomized_parity_commit_preflight_publish_path() -> None:
-    rng = random.Random(20260425_1384)
+    rng = random.Random(20260425_1397)
 
     for _ in range(220):
         key_rows = rng.randint(1, 6)
@@ -310,6 +310,52 @@ def test_randomized_parity_commit_preflight_publish_path() -> None:
         assert err == ATTN_Q16_OK
 
 
+def test_tail_stride_vectors_and_no_partial_failure() -> None:
+    query_rows = 6
+    key_rows = 2
+    head_groups = 3
+    row_stride = 7
+
+    required_scores = (query_rows - 1) * row_stride + key_rows
+    required_out = query_rows * key_rows
+
+    scores = [((idx % 9) - 4) << 16 for idx in range(required_scores)]
+    out = [31337] * required_out
+    out_before = out.copy()
+
+    err = (
+        gqa_attention_apply_softmax_q16_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity(
+            scores,
+            len(scores),
+            query_rows,
+            key_rows,
+            head_groups,
+            row_stride,
+            out,
+            len(out),
+        )
+    )
+    assert err == ATTN_Q16_OK
+    assert out != out_before
+
+    out_fail = [31337] * required_out
+    out_fail_before = out_fail.copy()
+    err = (
+        gqa_attention_apply_softmax_q16_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity(
+            scores,
+            len(scores),
+            query_rows,
+            key_rows,
+            head_groups,
+            row_stride,
+            out_fail,
+            required_out - 1,
+        )
+    )
+    assert err == ATTN_Q16_ERR_BAD_PARAM
+    assert out_fail == out_fail_before
+
+
 def test_source_contract_markers() -> None:
     source = Path("src/model/attention.HC").read_text(encoding="utf-8")
     marker = (
@@ -332,6 +378,7 @@ if __name__ == "__main__":
     test_fixed_vector_reference_atomic_publish()
     test_error_contract_null_alias_capacity_overflow()
     test_randomized_parity_commit_preflight_publish_path()
+    test_tail_stride_vectors_and_no_partial_failure()
     test_source_contract_markers()
     print(
         "gqa_attention_apply_softmax_q16_checked_nopartial_commit_only_preflight_only_"

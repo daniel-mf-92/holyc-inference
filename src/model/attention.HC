@@ -21366,7 +21366,7 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialCommitOnlyPreflightOnlyParityComm
     snapshot_scores_q32 = scores_q32;
     snapshot_out_probs_q16 = out_probs_q16;
 
-    // IQ-1384 strict parity diagnostics gate:
+    // IQ-1397 strict parity diagnostics gate:
     // 1) freeze immutable geometry/capacity + pointer snapshots;
     // 2) derive required score/out spans with checked integer math;
     // 3) run parity-commit-preflight wrapper and parity-commit wrapper in private stages;
