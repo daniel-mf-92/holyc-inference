@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reference checks for GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly (IQ-1433)."""
+"""Reference checks for GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly (IQ-1435)."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ sys.path.append(str(Path(__file__).resolve().parent))
 from test_attention_gqa_score_q16_checked import (
     ATTN_Q16_ERR_BAD_PARAM,
     ATTN_Q16_ERR_NULL_PTR,
+    ATTN_Q16_ERR_OVERFLOW,
     ATTN_Q16_OK,
     try_mul_i64_checked,
 )
@@ -21,6 +22,8 @@ from test_attention_gqa_score_q16_checked_nopartial_commit_only_parity_commit_on
 from test_attention_gqa_score_q16_checked_nopartial_commit_only_parity_commit_only_preflight_only_parity_commit_only import (
     gqa_attention_score_q16_checked_nopartial_commit_only_parity_commit_only_preflight_only_parity_commit_only,
 )
+
+I64_MAX = (1 << 63) - 1
 
 
 
@@ -56,10 +59,24 @@ def gqa_attention_score_q16_checked_nopartial_commit_only_parity_commit_only_pre
         or out_required_k_cells is out_required_out_cells
     ):
         return ATTN_Q16_ERR_BAD_PARAM
+    if q_rows_q16 is k_rows_q16 or q_rows_q16 is out_scores_q32 or k_rows_q16 is out_scores_q32:
+        return ATTN_Q16_ERR_BAD_PARAM
 
     if q_rows_capacity < 0 or k_rows_capacity < 0 or out_capacity < 0:
         return ATTN_Q16_ERR_BAD_PARAM
     if q_rows < 0 or k_rows < 0 or group_count <= 0 or seq_len < 0 or head_dim < 0:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if (
+        out_required_q_cells is q_rows_q16
+        or out_required_q_cells is k_rows_q16
+        or out_required_q_cells is out_scores_q32
+        or out_required_k_cells is q_rows_q16
+        or out_required_k_cells is k_rows_q16
+        or out_required_k_cells is out_scores_q32
+        or out_required_out_cells is q_rows_q16
+        or out_required_out_cells is k_rows_q16
+        or out_required_out_cells is out_scores_q32
+    ):
         return ATTN_Q16_ERR_BAD_PARAM
 
     snapshot_q_rows = q_rows
@@ -313,6 +330,57 @@ def test_bad_param_on_required_slot_alias() -> None:
     assert err == ATTN_Q16_ERR_BAD_PARAM
 
 
+def test_bad_param_on_required_slot_input_alias() -> None:
+    q = [1 << 16, 2 << 16]
+    k = [3 << 16, 4 << 16]
+    out = [0]
+    req_k = [0]
+    req_out = [0]
+
+    err = gqa_attention_score_q16_checked_nopartial_commit_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only(
+        q,
+        len(q),
+        1,
+        k,
+        len(k),
+        1,
+        1,
+        1,
+        2,
+        out,
+        len(out),
+        q,
+        req_k,
+        req_out,
+    )
+    assert err == ATTN_Q16_ERR_BAD_PARAM
+
+
+def test_bad_param_on_q_k_out_alias() -> None:
+    qk = [1 << 16, 2 << 16]
+    req_q = [0]
+    req_k = [1]
+    req_out = [2]
+
+    err = gqa_attention_score_q16_checked_nopartial_commit_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only(
+        qk,
+        len(qk),
+        1,
+        qk,
+        len(qk),
+        1,
+        1,
+        1,
+        2,
+        [0],
+        1,
+        req_q,
+        req_k,
+        req_out,
+    )
+    assert err == ATTN_Q16_ERR_BAD_PARAM
+
+
 def test_null_ptr_rejected() -> None:
     req_q = [0]
     req_k = [0]
@@ -324,8 +392,33 @@ def test_null_ptr_rejected() -> None:
     assert err == ATTN_Q16_ERR_NULL_PTR
 
 
+def test_capacity_and_overflow_vectors() -> None:
+    q = [1 << 16, 2 << 16, 3 << 16, 4 << 16]
+    k = [1 << 16, 0, 2 << 16, 1 << 16]
+    out = [0, 0]
+    req_q = [7]
+    req_k = [8]
+    req_out = [9]
+
+    err = gqa_attention_score_q16_checked_nopartial_commit_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only(
+        q, -1, 1, k, len(k), 1, 1, 2, 2, out, len(out), req_q, req_k, req_out
+    )
+    assert err == ATTN_Q16_ERR_BAD_PARAM
+    assert req_q == [7]
+    assert req_k == [8]
+    assert req_out == [9]
+
+    err = gqa_attention_score_q16_checked_nopartial_commit_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only(
+        q, len(q), I64_MAX, k, len(k), 1, 1, 1, 2, out, len(out), req_q, req_k, req_out
+    )
+    assert err == ATTN_Q16_ERR_OVERFLOW
+    assert req_q == [7]
+    assert req_k == [8]
+    assert req_out == [9]
+
+
 def test_random_vectors_keep_output_and_required_slots_immutable() -> None:
-    rng = random.Random(1433)
+    rng = random.Random(1435)
 
     for _ in range(50):
         k_rows = rng.randint(1, 4)
@@ -373,6 +466,9 @@ def test_random_vectors_keep_output_and_required_slots_immutable() -> None:
 if __name__ == "__main__":
     test_fixed_vector_zero_write_required_slots_preserved()
     test_bad_param_on_required_slot_alias()
+    test_bad_param_on_required_slot_input_alias()
+    test_bad_param_on_q_k_out_alias()
     test_null_ptr_rejected()
+    test_capacity_and_overflow_vectors()
     test_random_vectors_keep_output_and_required_slots_immutable()
     print("ok")

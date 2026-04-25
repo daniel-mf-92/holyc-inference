@@ -1930,6 +1930,11 @@ I32 AttentionQ16ComputeScaledQKRowsCheckedNoPartialStridedNoAllocCommitCapacityD
     if (!q_rows_q16 || !k_rows_q16 || !out_scores_q32)
         return ATTN_Q16_ERR_NULL_PTR;
 
+    if (q_rows_q16 == k_rows_q16 ||
+        q_rows_q16 == out_scores_q32 ||
+        k_rows_q16 == out_scores_q32)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
     if (q_rows_capacity < 0 || k_rows_capacity < 0 || out_scores_capacity < 0 ||
         staged_scores_capacity < 0)
         return ATTN_Q16_ERR_BAD_PARAM;
@@ -21108,7 +21113,7 @@ I32 GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyP
     snapshot_out_required_k_cells_value = *out_required_k_cells;
     snapshot_out_required_out_cells_value = *out_required_out_cells;
 
-    // IQ-1433 zero-write diagnostics companion:
+    // IQ-1435 zero-write diagnostics companion:
     // 1) freeze immutable geometry/capacity tuple + caller diagnostics slots;
     // 2) stage parity-commit-only and strict-parity wrappers on private output slabs;
     // 3) enforce strict required tuple parity across both wrappers;
