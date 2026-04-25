@@ -21856,7 +21856,7 @@ I32 GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyP
     snapshot_out_required_k_cells_value = *out_required_k_cells;
     snapshot_out_required_out_cells_value = *out_required_out_cells;
 
-    // IQ-1440 commit-only hardening wrapper:
+    // IQ-1454 commit-only hardening wrapper:
     // 1) freeze immutable geometry/capacity tuple + required-slot pointers;
     // 2) stage strict parity and zero-write preflight-only wrappers on private outputs;
     // 3) require exact required q/k/out tuple parity across both wrappers;

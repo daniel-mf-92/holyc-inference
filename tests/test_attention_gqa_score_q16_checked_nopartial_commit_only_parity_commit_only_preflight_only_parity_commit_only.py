@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reference checks for GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnly (IQ-1425)."""
+"""Reference checks for GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly (IQ-1454)."""
 
 from __future__ import annotations
 
@@ -59,9 +59,24 @@ def gqa_attention_score_q16_checked_nopartial_commit_only_parity_commit_only_pre
     ):
         return ATTN_Q16_ERR_BAD_PARAM
 
+    if q_rows_q16 is k_rows_q16 or q_rows_q16 is out_scores_q32 or k_rows_q16 is out_scores_q32:
+        return ATTN_Q16_ERR_BAD_PARAM
+
     if q_rows_capacity < 0 or k_rows_capacity < 0 or out_capacity < 0:
         return ATTN_Q16_ERR_BAD_PARAM
     if q_rows < 0 or k_rows < 0 or group_count <= 0 or seq_len < 0 or head_dim < 0:
+        return ATTN_Q16_ERR_BAD_PARAM
+    if (
+        out_required_q_cells is q_rows_q16
+        or out_required_q_cells is k_rows_q16
+        or out_required_q_cells is out_scores_q32
+        or out_required_k_cells is q_rows_q16
+        or out_required_k_cells is k_rows_q16
+        or out_required_k_cells is out_scores_q32
+        or out_required_out_cells is q_rows_q16
+        or out_required_out_cells is k_rows_q16
+        or out_required_out_cells is out_scores_q32
+    ):
         return ATTN_Q16_ERR_BAD_PARAM
 
     snapshot_q_rows = q_rows
@@ -368,9 +383,10 @@ def test_error_contract_preserves_outputs() -> None:
     assert req_q == [10]
     assert req_out == [30]
 
+    q_alias = [1 << 16, 2 << 16, 3 << 16, 4 << 16]
     err = gqa_attention_score_q16_checked_nopartial_commit_only_parity_commit_only_preflight_only_parity_commit_only(
-        [1 << 16],
-        1,
+        q_alias,
+        len(q_alias),
         I64_MAX,
         [1 << 16],
         1,
@@ -385,6 +401,50 @@ def test_error_contract_preserves_outputs() -> None:
         req_out,
     )
     assert err == ATTN_Q16_ERR_OVERFLOW
+    assert out == [5150] * 6
+    assert req_q == [10]
+    assert req_k == [20]
+    assert req_out == [30]
+
+    err = gqa_attention_score_q16_checked_nopartial_commit_only_parity_commit_only_preflight_only_parity_commit_only(
+        q_alias,
+        len(q_alias),
+        1,
+        q_alias,
+        len(q_alias),
+        1,
+        1,
+        1,
+        2,
+        out,
+        len(out),
+        req_q,
+        req_k,
+        req_out,
+    )
+    assert err == ATTN_Q16_ERR_BAD_PARAM
+    assert out == [5150] * 6
+    assert req_q == [10]
+    assert req_k == [20]
+    assert req_out == [30]
+
+    err = gqa_attention_score_q16_checked_nopartial_commit_only_parity_commit_only_preflight_only_parity_commit_only(
+        q_alias,
+        len(q_alias),
+        1,
+        [3 << 16, 4 << 16],
+        2,
+        1,
+        1,
+        1,
+        2,
+        out,
+        len(out),
+        req_q,
+        out,
+        req_out,
+    )
+    assert err == ATTN_Q16_ERR_BAD_PARAM
     assert out == [5150] * 6
     assert req_q == [10]
     assert req_k == [20]
@@ -439,11 +499,11 @@ def test_randomized_parity_success() -> None:
 
 def test_source_contract_markers() -> None:
     source = Path("src/model/attention.HC").read_text(encoding="utf-8")
-    sig = "I32 GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnly("
+    sig = "I32 GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly("
     assert sig in source
     body = source.split(sig, 1)[1]
-    assert "status = GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyParity(" in body
-    assert "status = GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnly(" in body
+    assert "status = GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in body
+    assert "status = GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in body
     assert "if (*out_required_q_cells != snapshot_out_required_q_cells_value ||" in body
     assert "*out_required_q_cells = staged_parity_required_q_cells;" in body
 
@@ -453,4 +513,6 @@ if __name__ == "__main__":
     test_error_contract_preserves_outputs()
     test_randomized_parity_success()
     test_source_contract_markers()
-    print("gqa_attention_score_q16_checked_nopartial_commit_only_parity_commit_only_preflight_only_parity_commit_only_reference_checks=ok")
+    print(
+        "gqa_attention_score_q16_checked_nopartial_commit_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_reference_checks=ok"
+    )
