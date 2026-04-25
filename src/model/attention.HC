@@ -34624,11 +34624,27 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideParityCommitOnl
     I64 staged_preflight_required_score_cells;
     I64 staged_preflight_required_value_cells;
     I64 staged_preflight_required_out_cells;
+    I64 required_score_cells;
+    I64 required_value_cells;
+    I64 required_out_cells;
     I64 recomputed_required_score_cells;
     I64 recomputed_required_value_cells;
     I64 recomputed_required_out_cells;
+    I64 required_out_bytes;
+    I64 copy_index;
     I64 kv_rows;
+    I64 *snapshot_out_values_q16_values;
+    I64 *staged_parity_out_values_q16;
+    I64 *staged_preflight_out_values_q16;
+    I64 *parity_out_values_q16;
+    I64 parity_out_capacity;
+    I64 *preflight_out_values_q16;
+    I64 preflight_out_capacity;
     I32 status;
+
+    snapshot_out_values_q16_values = NULL;
+    staged_parity_out_values_q16 = NULL;
+    staged_preflight_out_values_q16 = NULL;
 
     if (!out_required_score_cells || !out_required_value_cells || !out_required_out_cells)
         return ATTN_Q16_ERR_NULL_PTR;
@@ -34643,6 +34659,16 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideParityCommitOnl
     if (scores_capacity < 0 || values_capacity < 0 || out_capacity < 0)
         return ATTN_Q16_ERR_BAD_PARAM;
     if (query_rows < 0 || key_rows < 0 || value_dim < 0 || head_groups <= 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (out_required_score_cells == scores_q16 ||
+        out_required_score_cells == values_q16 ||
+        out_required_score_cells == out_values_q16 ||
+        out_required_value_cells == scores_q16 ||
+        out_required_value_cells == values_q16 ||
+        out_required_value_cells == out_values_q16 ||
+        out_required_out_cells == scores_q16 ||
+        out_required_out_cells == values_q16 ||
+        out_required_out_cells == out_values_q16)
         return ATTN_Q16_ERR_BAD_PARAM;
 
     snapshot_query_rows = query_rows;
@@ -34663,60 +34689,141 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideParityCommitOnl
     snapshot_out_required_value_cells_value = *out_required_value_cells;
     snapshot_out_required_out_cells_value = *out_required_out_cells;
 
-    // IQ-1443 commit-only hardening contract:
+    // IQ-1445 commit-only hardening contract:
     // 1) freeze immutable geometry/capacity + output-slot snapshots;
     // 2) re-derive required tuple with checked integer geometry math;
-    // 3) stage tuple via parity + preflight-only diagnostics wrappers;
+    // 3) stage tuple via parity + preflight-only diagnostics wrappers on
+    //    private output buffers to prove caller output immutability;
     // 4) atomically publish only if strict tuple parity and snapshots hold.
     if (query_rows > 0 && (query_rows % head_groups) != 0)
         return ATTN_Q16_ERR_BAD_PARAM;
 
-    recomputed_required_score_cells = 0;
-    recomputed_required_value_cells = 0;
-    recomputed_required_out_cells = 0;
+    required_score_cells = 0;
+    required_value_cells = 0;
+    required_out_cells = 0;
     if (!(query_rows == 0 || key_rows == 0 || value_dim == 0))
     {
         status = AttentionTryMulI64Checked(query_rows - 1,
                                            key_rows,
-                                           &recomputed_required_score_cells);
+                                           &required_score_cells);
         if (status != ATTN_Q16_OK)
-            return status;
-        status = AttentionTryAddI64Checked(recomputed_required_score_cells,
+            goto Cleanup;
+        status = AttentionTryAddI64Checked(required_score_cells,
                                            key_rows,
-                                           &recomputed_required_score_cells);
+                                           &required_score_cells);
         if (status != ATTN_Q16_OK)
-            return status;
+            goto Cleanup;
 
         kv_rows = query_rows / head_groups;
         if (kv_rows <= 0)
-            return ATTN_Q16_ERR_BAD_PARAM;
+        {
+            status = ATTN_Q16_ERR_BAD_PARAM;
+            goto Cleanup;
+        }
 
         status = AttentionTryMulI64Checked(kv_rows,
                                            key_rows,
-                                           &recomputed_required_value_cells);
+                                           &required_value_cells);
         if (status != ATTN_Q16_OK)
-            return status;
-        status = AttentionTryMulI64Checked(recomputed_required_value_cells,
+            goto Cleanup;
+        status = AttentionTryMulI64Checked(required_value_cells,
                                            value_dim,
-                                           &recomputed_required_value_cells);
+                                           &required_value_cells);
         if (status != ATTN_Q16_OK)
-            return status;
+            goto Cleanup;
 
         status = AttentionTryMulI64Checked(query_rows,
                                            value_dim,
-                                           &recomputed_required_out_cells);
+                                           &required_out_cells);
         if (status != ATTN_Q16_OK)
-            return status;
-
-        if (recomputed_required_score_cells > scores_capacity ||
-            recomputed_required_value_cells > values_capacity ||
-            recomputed_required_out_cells > out_capacity)
-            return ATTN_Q16_ERR_BAD_PARAM;
+            goto Cleanup;
     }
 
-    staged_parity_required_score_cells = recomputed_required_score_cells;
-    staged_parity_required_value_cells = recomputed_required_value_cells;
-    staged_parity_required_out_cells = recomputed_required_out_cells;
+    if (required_score_cells > scores_capacity ||
+        required_value_cells > values_capacity ||
+        required_out_cells > out_capacity)
+    {
+        status = ATTN_Q16_ERR_BAD_PARAM;
+        goto Cleanup;
+    }
+
+    parity_out_values_q16 = out_values_q16;
+    parity_out_capacity = out_capacity;
+    preflight_out_values_q16 = out_values_q16;
+    preflight_out_capacity = out_capacity;
+
+    if (required_out_cells > 0)
+    {
+        status = AttentionTryMulI64Checked(required_out_cells,
+                                           sizeof(I64),
+                                           &required_out_bytes);
+        if (status != ATTN_Q16_OK)
+            goto Cleanup;
+        if (required_out_bytes <= 0)
+        {
+            status = ATTN_Q16_ERR_BAD_PARAM;
+            goto Cleanup;
+        }
+
+        snapshot_out_values_q16_values = MAlloc(required_out_bytes);
+        if (!snapshot_out_values_q16_values)
+        {
+            status = ATTN_Q16_ERR_OVERFLOW;
+            goto Cleanup;
+        }
+
+        staged_parity_out_values_q16 = MAlloc(required_out_bytes);
+        if (!staged_parity_out_values_q16)
+        {
+            status = ATTN_Q16_ERR_OVERFLOW;
+            goto Cleanup;
+        }
+
+        staged_preflight_out_values_q16 = MAlloc(required_out_bytes);
+        if (!staged_preflight_out_values_q16)
+        {
+            status = ATTN_Q16_ERR_OVERFLOW;
+            goto Cleanup;
+        }
+
+        if (snapshot_out_values_q16_values == scores_q16 ||
+            snapshot_out_values_q16_values == values_q16 ||
+            snapshot_out_values_q16_values == out_values_q16 ||
+            snapshot_out_values_q16_values == out_required_score_cells ||
+            snapshot_out_values_q16_values == out_required_value_cells ||
+            snapshot_out_values_q16_values == out_required_out_cells ||
+            staged_parity_out_values_q16 == scores_q16 ||
+            staged_parity_out_values_q16 == values_q16 ||
+            staged_parity_out_values_q16 == out_values_q16 ||
+            staged_parity_out_values_q16 == out_required_score_cells ||
+            staged_parity_out_values_q16 == out_required_value_cells ||
+            staged_parity_out_values_q16 == out_required_out_cells ||
+            staged_preflight_out_values_q16 == scores_q16 ||
+            staged_preflight_out_values_q16 == values_q16 ||
+            staged_preflight_out_values_q16 == out_values_q16 ||
+            staged_preflight_out_values_q16 == out_required_score_cells ||
+            staged_preflight_out_values_q16 == out_required_value_cells ||
+            staged_preflight_out_values_q16 == out_required_out_cells ||
+            snapshot_out_values_q16_values == staged_parity_out_values_q16 ||
+            snapshot_out_values_q16_values == staged_preflight_out_values_q16 ||
+            staged_parity_out_values_q16 == staged_preflight_out_values_q16)
+        {
+            status = ATTN_Q16_ERR_BAD_PARAM;
+            goto Cleanup;
+        }
+
+        for (copy_index = 0; copy_index < required_out_cells; copy_index++)
+            snapshot_out_values_q16_values[copy_index] = out_values_q16[copy_index];
+
+        parity_out_values_q16 = staged_parity_out_values_q16;
+        parity_out_capacity = required_out_cells;
+        preflight_out_values_q16 = staged_preflight_out_values_q16;
+        preflight_out_capacity = required_out_cells;
+    }
+
+    staged_parity_required_score_cells = required_score_cells;
+    staged_parity_required_value_cells = required_value_cells;
+    staged_parity_required_out_cells = required_out_cells;
     status = GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideParityCommitOnlyPreflightOnlyParity(
         scores_q16,
         scores_capacity,
@@ -34726,17 +34833,17 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideParityCommitOnl
         head_groups,
         values_q16,
         values_capacity,
-        out_values_q16,
-        out_capacity,
+        parity_out_values_q16,
+        parity_out_capacity,
         &staged_parity_required_score_cells,
         &staged_parity_required_value_cells,
         &staged_parity_required_out_cells);
     if (status != ATTN_Q16_OK)
-        return status;
+        goto Cleanup;
 
-    staged_preflight_required_score_cells = recomputed_required_score_cells;
-    staged_preflight_required_value_cells = recomputed_required_value_cells;
-    staged_preflight_required_out_cells = recomputed_required_out_cells;
+    staged_preflight_required_score_cells = required_score_cells;
+    staged_preflight_required_value_cells = required_value_cells;
+    staged_preflight_required_out_cells = required_out_cells;
     status = GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideParityCommitOnlyPreflightOnly(
         scores_q16,
         scores_capacity,
@@ -34746,13 +34853,54 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideParityCommitOnl
         head_groups,
         values_q16,
         values_capacity,
-        out_values_q16,
-        out_capacity,
+        preflight_out_values_q16,
+        preflight_out_capacity,
         &staged_preflight_required_score_cells,
         &staged_preflight_required_value_cells,
         &staged_preflight_required_out_cells);
     if (status != ATTN_Q16_OK)
-        return status;
+        goto Cleanup;
+
+    recomputed_required_score_cells = 0;
+    recomputed_required_value_cells = 0;
+    recomputed_required_out_cells = 0;
+    if (!(snapshot_query_rows == 0 || snapshot_key_rows == 0 || snapshot_value_dim == 0))
+    {
+        status = AttentionTryMulI64Checked(snapshot_query_rows - 1,
+                                           snapshot_key_rows,
+                                           &recomputed_required_score_cells);
+        if (status != ATTN_Q16_OK)
+            goto Cleanup;
+        status = AttentionTryAddI64Checked(recomputed_required_score_cells,
+                                           snapshot_key_rows,
+                                           &recomputed_required_score_cells);
+        if (status != ATTN_Q16_OK)
+            goto Cleanup;
+
+        kv_rows = snapshot_query_rows / snapshot_head_groups;
+        if (kv_rows <= 0)
+        {
+            status = ATTN_Q16_ERR_BAD_PARAM;
+            goto Cleanup;
+        }
+
+        status = AttentionTryMulI64Checked(kv_rows,
+                                           snapshot_key_rows,
+                                           &recomputed_required_value_cells);
+        if (status != ATTN_Q16_OK)
+            goto Cleanup;
+        status = AttentionTryMulI64Checked(recomputed_required_value_cells,
+                                           snapshot_value_dim,
+                                           &recomputed_required_value_cells);
+        if (status != ATTN_Q16_OK)
+            goto Cleanup;
+
+        status = AttentionTryMulI64Checked(snapshot_query_rows,
+                                           snapshot_value_dim,
+                                           &recomputed_required_out_cells);
+        if (status != ATTN_Q16_OK)
+            goto Cleanup;
+    }
 
     if (snapshot_query_rows != query_rows ||
         snapshot_key_rows != key_rows ||
@@ -34764,37 +34912,84 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideParityCommitOnl
         snapshot_scores_q16 != scores_q16 ||
         snapshot_values_q16 != values_q16 ||
         snapshot_out_values_q16 != out_values_q16)
-        return ATTN_Q16_ERR_BAD_PARAM;
+    {
+        status = ATTN_Q16_ERR_BAD_PARAM;
+        goto Cleanup;
+    }
 
     if (staged_parity_required_score_cells != staged_preflight_required_score_cells ||
         staged_parity_required_value_cells != staged_preflight_required_value_cells ||
         staged_parity_required_out_cells != staged_preflight_required_out_cells)
-        return ATTN_Q16_ERR_BAD_PARAM;
+    {
+        status = ATTN_Q16_ERR_BAD_PARAM;
+        goto Cleanup;
+    }
 
-    if (staged_parity_required_score_cells != recomputed_required_score_cells ||
-        staged_parity_required_value_cells != recomputed_required_value_cells ||
-        staged_parity_required_out_cells != recomputed_required_out_cells)
-        return ATTN_Q16_ERR_BAD_PARAM;
+    if (required_score_cells != recomputed_required_score_cells ||
+        required_value_cells != recomputed_required_value_cells ||
+        required_out_cells != recomputed_required_out_cells)
+    {
+        status = ATTN_Q16_ERR_BAD_PARAM;
+        goto Cleanup;
+    }
+
+    if (staged_parity_required_score_cells != required_score_cells ||
+        staged_parity_required_value_cells != required_value_cells ||
+        staged_parity_required_out_cells != required_out_cells)
+    {
+        status = ATTN_Q16_ERR_BAD_PARAM;
+        goto Cleanup;
+    }
 
     if (staged_parity_required_score_cells > snapshot_scores_capacity ||
         staged_parity_required_value_cells > snapshot_values_capacity ||
         staged_parity_required_out_cells > snapshot_out_capacity)
-        return ATTN_Q16_ERR_BAD_PARAM;
+    {
+        status = ATTN_Q16_ERR_BAD_PARAM;
+        goto Cleanup;
+    }
 
     if (out_required_score_cells != snapshot_out_required_score_cells_ptr ||
         out_required_value_cells != snapshot_out_required_value_cells_ptr ||
         out_required_out_cells != snapshot_out_required_out_cells_ptr)
-        return ATTN_Q16_ERR_BAD_PARAM;
+    {
+        status = ATTN_Q16_ERR_BAD_PARAM;
+        goto Cleanup;
+    }
 
     if (*out_required_score_cells != snapshot_out_required_score_cells_value ||
         *out_required_value_cells != snapshot_out_required_value_cells_value ||
         *out_required_out_cells != snapshot_out_required_out_cells_value)
-        return ATTN_Q16_ERR_BAD_PARAM;
+    {
+        status = ATTN_Q16_ERR_BAD_PARAM;
+        goto Cleanup;
+    }
+
+    if (snapshot_out_values_q16_values)
+    {
+        for (copy_index = 0; copy_index < required_out_cells; copy_index++)
+        {
+            if (out_values_q16[copy_index] != snapshot_out_values_q16_values[copy_index])
+            {
+                status = ATTN_Q16_ERR_BAD_PARAM;
+                goto Cleanup;
+            }
+        }
+    }
 
     *out_required_score_cells = staged_parity_required_score_cells;
     *out_required_value_cells = staged_parity_required_value_cells;
     *out_required_out_cells = staged_parity_required_out_cells;
-    return ATTN_Q16_OK;
+    status = ATTN_Q16_OK;
+
+Cleanup:
+    if (staged_preflight_out_values_q16)
+        Free(staged_preflight_out_values_q16);
+    if (staged_parity_out_values_q16)
+        Free(staged_parity_out_values_q16);
+    if (snapshot_out_values_q16_values)
+        Free(snapshot_out_values_q16_values);
+    return status;
 }
 
 I32 GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(

@@ -57,6 +57,18 @@ def gqa_attention_value_mix_q16_checked_nopartial_preflight_default_stride_parit
         return ATTN_Q16_ERR_BAD_PARAM
     if query_rows < 0 or key_rows < 0 or value_dim < 0 or head_groups <= 0:
         return ATTN_Q16_ERR_BAD_PARAM
+    if (
+        out_required_score_cells is scores_q16
+        or out_required_score_cells is values_q16
+        or out_required_score_cells is out_values_q16
+        or out_required_value_cells is scores_q16
+        or out_required_value_cells is values_q16
+        or out_required_value_cells is out_values_q16
+        or out_required_out_cells is scores_q16
+        or out_required_out_cells is values_q16
+        or out_required_out_cells is out_values_q16
+    ):
+        return ATTN_Q16_ERR_BAD_PARAM
 
     snapshot_query_rows = query_rows
     snapshot_key_rows = key_rows
@@ -68,6 +80,7 @@ def gqa_attention_value_mix_q16_checked_nopartial_preflight_default_stride_parit
     snapshot_scores = scores_q16
     snapshot_values = values_q16
     snapshot_out = out_values_q16
+    snapshot_out_values = out_values_q16[:]
 
     snapshot_required_score_ptr = out_required_score_cells
     snapshot_required_value_ptr = out_required_value_cells
@@ -207,6 +220,8 @@ def gqa_attention_value_mix_q16_checked_nopartial_preflight_default_stride_parit
         or out_required_value_cells[0] != snapshot_required_value_slot
         or out_required_out_cells[0] != snapshot_required_out_slot
     ):
+        return ATTN_Q16_ERR_BAD_PARAM
+    if out_values_q16 != snapshot_out_values:
         return ATTN_Q16_ERR_BAD_PARAM
 
     out_required_score_cells[0] = staged_parity_score[0]
@@ -400,6 +415,63 @@ def test_null_alias_capacity_overflow_parity_vectors() -> None:
             req_score,
             req_score,
             req_out,
+        )
+        == ATTN_Q16_ERR_BAD_PARAM
+    )
+
+    assert (
+        gqa_attention_value_mix_q16_checked_nopartial_preflight_default_stride_parity_commit_only_preflight_only_parity_commit_only(
+            scores,
+            len(scores),
+            4,
+            3,
+            2,
+            2,
+            values,
+            len(values),
+            out,
+            len(out),
+            scores,
+            req_value,
+            req_out,
+        )
+        == ATTN_Q16_ERR_BAD_PARAM
+    )
+
+    assert (
+        gqa_attention_value_mix_q16_checked_nopartial_preflight_default_stride_parity_commit_only_preflight_only_parity_commit_only(
+            scores,
+            len(scores),
+            4,
+            3,
+            2,
+            2,
+            values,
+            len(values),
+            out,
+            len(out),
+            req_score,
+            values,
+            req_out,
+        )
+        == ATTN_Q16_ERR_BAD_PARAM
+    )
+
+    assert (
+        gqa_attention_value_mix_q16_checked_nopartial_preflight_default_stride_parity_commit_only_preflight_only_parity_commit_only(
+            scores,
+            len(scores),
+            4,
+            3,
+            2,
+            2,
+            values,
+            len(values),
+            out,
+            len(out),
+            req_score,
+            req_value,
+            out,
         )
         == ATTN_Q16_ERR_BAD_PARAM
     )
