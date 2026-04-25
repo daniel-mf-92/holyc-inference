@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reference checks for ...ParityCommitOnlyPreflightOnlyParityCommitOnly (IQ-1393)."""
+"""Reference checks for ...ParityCommitOnlyPreflightOnlyParityCommitOnly (IQ-1399)."""
 
 from __future__ import annotations
 
@@ -281,7 +281,7 @@ def test_error_contract_null_alias_capacity_overflow() -> None:
 
 
 def test_randomized_parity_commit_publish_path() -> None:
-    rng = random.Random(20260425_1393)
+    rng = random.Random(20260425_1399)
 
     for _ in range(220):
         key_rows = rng.randint(1, 6)
@@ -328,11 +328,81 @@ def test_source_contract_markers() -> None:
     assert "if (out_probs_q16[copy_index] != snapshot_out_probs_q16_values[copy_index])" in body
 
 
+def test_bad_geometry_and_zero_dim_semantics() -> None:
+    sentinel = [31337] * 12
+    scores = [11 << 16, 9 << 16, 7 << 16, 5 << 16, 3 << 16, 1 << 16]
+
+    out = sentinel.copy()
+    err = (
+        gqa_attention_apply_softmax_q16_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only(
+            scores,
+            len(scores),
+            3,
+            2,
+            2,
+            2,
+            out,
+            len(out),
+        )
+    )
+    assert err == ATTN_Q16_ERR_BAD_PARAM
+    assert out == sentinel
+
+    out = sentinel.copy()
+    err = (
+        gqa_attention_apply_softmax_q16_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only(
+            scores,
+            len(scores),
+            2,
+            3,
+            1,
+            2,
+            out,
+            len(out),
+        )
+    )
+    assert err == ATTN_Q16_ERR_BAD_PARAM
+    assert out == sentinel
+
+    out = sentinel.copy()
+    err = (
+        gqa_attention_apply_softmax_q16_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only(
+            scores,
+            len(scores),
+            0,
+            3,
+            1,
+            3,
+            out,
+            len(out),
+        )
+    )
+    assert err == ATTN_Q16_OK
+    assert out == sentinel
+
+    out = sentinel.copy()
+    err = (
+        gqa_attention_apply_softmax_q16_checked_nopartial_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only(
+            scores,
+            len(scores),
+            2,
+            0,
+            1,
+            2,
+            out,
+            len(out),
+        )
+    )
+    assert err == ATTN_Q16_OK
+    assert out == sentinel
+
+
 if __name__ == "__main__":
     test_fixed_vector_reference_atomic_publish()
     test_error_contract_null_alias_capacity_overflow()
     test_randomized_parity_commit_publish_path()
     test_source_contract_markers()
+    test_bad_geometry_and_zero_dim_semantics()
     print(
         "gqa_attention_apply_softmax_q16_checked_nopartial_commit_only_preflight_only_"
         "parity_commit_only_preflight_only_parity_commit_only_reference_checks=ok"

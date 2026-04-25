@@ -21651,7 +21651,7 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialCommitOnlyPreflightOnlyParityComm
     snapshot_scores_q32 = scores_q32;
     snapshot_out_probs_q16 = out_probs_q16;
 
-    // IQ-1393 commit-only hardening wrapper:
+    // IQ-1399 commit-only hardening wrapper:
     // 1) freeze immutable geometry/capacity + pointer snapshots;
     // 2) derive required score/out spans with checked integer math;
     // 3) run strict parity + preflight-only wrappers into private stage buffers;
