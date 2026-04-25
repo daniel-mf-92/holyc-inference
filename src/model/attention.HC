@@ -22232,7 +22232,7 @@ I32 GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyP
     snapshot_out_required_k_cells_value = *out_required_k_cells;
     snapshot_out_required_out_cells_value = *out_required_out_cells;
 
-    // IQ-1447 zero-write diagnostics companion:
+    // IQ-1450 zero-write diagnostics companion:
     // 1) freeze immutable geometry/capacity tuple + caller diagnostics slots;
     // 2) stage strict parity and commit-only wrappers on private output slabs;
     // 3) enforce exact required q/k/out tuple parity across both wrappers;
@@ -22465,6 +22465,18 @@ I32 GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyP
     {
         status = ATTN_Q16_ERR_BAD_PARAM;
         goto Cleanup;
+    }
+
+    if (required_out_cells > 0)
+    {
+        for (copy_index = 0; copy_index < required_out_cells; copy_index++)
+        {
+            if (staged_parity_scores_q32[copy_index] != staged_commit_scores_q32[copy_index])
+            {
+                status = ATTN_Q16_ERR_BAD_PARAM;
+                goto Cleanup;
+            }
+        }
     }
 
     if (out_required_q_cells != snapshot_out_required_q_cells_ptr ||

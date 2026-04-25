@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reference checks for GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly (IQ-1447)."""
+"""Reference checks for GQAAttentionScoreQ16CheckedNoPartialCommitOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly (IQ-1450)."""
 
 from __future__ import annotations
 
@@ -223,6 +223,9 @@ def gqa_attention_score_q16_checked_nopartial_commit_only_parity_commit_only_pre
         or staged_parity_req_k[0] != staged_commit_req_k[0]
         or staged_parity_req_out[0] != staged_commit_req_out[0]
     ):
+        return ATTN_Q16_ERR_BAD_PARAM
+
+    if staged_parity_scores != staged_commit_scores:
         return ATTN_Q16_ERR_BAD_PARAM
 
     if (
