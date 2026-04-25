@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1501 zero-write companion over parity-commit-only digest wrapper."""
+"""Harness for IQ-1511 zero-write companion over parity-commit-only digest wrapper."""
 
 from __future__ import annotations
 
@@ -310,16 +310,6 @@ def gpu_security_perf_matrix_row_gate_checked_policy_snapshot_digest_q64_commit_
     if has_null_output:
         return GPU_SEC_PERF_ERR_NULL_PTR, current_snapshot_digest_q64
 
-    status_commit_only, staged_digest = _row_gate_policy_snapshot_digest_q64_commit_only_preflight_only_parity_commit_only(
-        secure_local_mode,
-        iommu_active,
-        book_of_truth_gpu_hooks,
-        policy_digest_parity,
-        row_prompt_tokens,
-        row_batch_size,
-        row_quant_profile,
-        current_snapshot_digest_q64,
-    )
     status_parity, parity_digest = _row_gate_policy_snapshot_digest_q64_commit_only_preflight_only_parity(
         secure_local_mode,
         iommu_active,
@@ -328,28 +318,38 @@ def gpu_security_perf_matrix_row_gate_checked_policy_snapshot_digest_q64_commit_
         row_prompt_tokens,
         row_batch_size,
         row_quant_profile,
-        staged_digest,
+        0,
+    )
+    status_commit_only, staged_digest = _row_gate_policy_snapshot_digest_q64_commit_only_preflight_only_parity_commit_only(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        row_prompt_tokens,
+        row_batch_size,
+        row_quant_profile,
+        parity_digest,
     )
 
     if inject_digest_drift:
         staged_digest += 1
 
-    if status_commit_only != status_parity:
+    if status_parity != status_commit_only:
         return GPU_SEC_PERF_ERR_BAD_PARAM, current_snapshot_digest_q64
-    if staged_digest != parity_digest:
+    if parity_digest != staged_digest:
         return GPU_SEC_PERF_ERR_BAD_PARAM, current_snapshot_digest_q64
     return status_commit_only, current_snapshot_digest_q64
 
 
-def test_source_contains_iq1501_symbols() -> None:
+def test_source_contains_iq1511_symbols() -> None:
     src = Path("src/gpu/security_perf_matrix.HC").read_text(encoding="utf-8")
 
     assert "I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in src
     assert "status_commit_only = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParityCommitOnly(" in src
     assert "status_parity = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParity(" in src
-    assert "// IQ-1501 zero-write diagnostics companion:" in src
+    assert "// IQ-1511 zero-write diagnostics companion:" in src
     assert "saved_snapshot_digest_q64" in src
-    assert "if (status_commit_only != status_parity)" in src
+    assert "if (status_parity != status_commit_only)" in src
 
 
 def test_gate_missing_vectors() -> None:
@@ -462,7 +462,7 @@ def test_overflow_and_null_vectors() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_iq1501_symbols()
+    test_source_contains_iq1511_symbols()
     test_gate_missing_vectors()
     test_digest_bit_flip_sensitivity()
     test_drift_rejected()

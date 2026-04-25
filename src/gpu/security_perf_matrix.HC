@@ -1986,10 +1986,10 @@ I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPrefligh
     I64 snapshot_row_quant_profile;
     I64 *snapshot_out_snapshot_digest_q64_ptr;
     I64 saved_snapshot_digest_q64;
-    I64 staged_snapshot_digest_q64;
     I64 parity_snapshot_digest_q64;
-    I32 status_commit_only;
+    I64 staged_snapshot_digest_q64;
     I32 status_parity;
+    I32 status_commit_only;
 
     if (!out_snapshot_digest_q64)
         return GPU_SEC_PERF_ERR_NULL_PTR;
@@ -2004,24 +2004,13 @@ I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPrefligh
     snapshot_out_snapshot_digest_q64_ptr = out_snapshot_digest_q64;
     saved_snapshot_digest_q64 = *out_snapshot_digest_q64;
 
-    // IQ-1501 zero-write diagnostics companion:
+    // IQ-1511 zero-write diagnostics companion:
     // 1) snapshot immutable row-gate tuple + caller digest slot;
-    // 2) derive staged digest through parity commit-only helper;
-    // 3) recompute canonical digest through commit-only preflight-only parity helper;
+    // 2) derive canonical digest through preflight-only parity helper;
+    // 3) replay parity-commit-only wrapper from canonical digest seed;
     // 4) enforce immutable snapshots and strict status/digest tuple parity;
     // 5) preserve zero-write diagnostics semantics for caller output slot.
-    staged_snapshot_digest_q64 = 0;
-    status_commit_only = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParityCommitOnly(
-        secure_local_mode,
-        iommu_active,
-        book_of_truth_gpu_hooks,
-        policy_digest_parity,
-        row_prompt_tokens,
-        row_batch_size,
-        row_quant_profile,
-        &staged_snapshot_digest_q64);
-
-    parity_snapshot_digest_q64 = staged_snapshot_digest_q64;
+    parity_snapshot_digest_q64 = 0;
     status_parity = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParity(
         secure_local_mode,
         iommu_active,
@@ -2031,6 +2020,17 @@ I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPrefligh
         row_batch_size,
         row_quant_profile,
         &parity_snapshot_digest_q64);
+
+    staged_snapshot_digest_q64 = parity_snapshot_digest_q64;
+    status_commit_only = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParityCommitOnly(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        row_prompt_tokens,
+        row_batch_size,
+        row_quant_profile,
+        &staged_snapshot_digest_q64);
 
     if (snapshot_secure_local_mode != secure_local_mode)
         return GPU_SEC_PERF_ERR_BAD_PARAM;
@@ -2049,9 +2049,9 @@ I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPrefligh
     if (snapshot_out_snapshot_digest_q64_ptr != out_snapshot_digest_q64)
         return GPU_SEC_PERF_ERR_BAD_PARAM;
 
-    if (status_commit_only != status_parity)
+    if (status_parity != status_commit_only)
         return GPU_SEC_PERF_ERR_BAD_PARAM;
-    if (staged_snapshot_digest_q64 != parity_snapshot_digest_q64)
+    if (parity_snapshot_digest_q64 != staged_snapshot_digest_q64)
         return GPU_SEC_PERF_ERR_BAD_PARAM;
 
     if (*out_snapshot_digest_q64 != saved_snapshot_digest_q64)
