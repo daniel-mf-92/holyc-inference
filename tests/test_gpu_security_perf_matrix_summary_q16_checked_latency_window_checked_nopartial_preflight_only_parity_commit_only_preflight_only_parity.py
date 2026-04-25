@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1519 latency-window strict diagnostics parity gate wrapper."""
+"""Harness for IQ-1533 latency-window strict diagnostics parity gate wrapper."""
 
 from __future__ import annotations
 
@@ -341,6 +341,7 @@ def gpu_security_perf_matrix_summary_q16_checked_latency_window_checked_nopartia
     caller_outputs: tuple[int, int, int, int],
     outputs_alias: bool = False,
     inject_parity_drift: bool = False,
+    inject_invalid_status: bool = False,
 ) -> tuple[int, tuple[int, int, int, int], tuple[int, int, int, int]]:
     if rows is None:
         return GPU_SEC_PERF_ERR_NULL_PTR, caller_outputs, (0, 0, 0, 0)
@@ -366,8 +367,30 @@ def gpu_security_perf_matrix_summary_q16_checked_latency_window_checked_nopartia
         policy_digest_parity,
     )
 
+    if inject_invalid_status:
+        preflight_status = 77
+
     if inject_parity_drift:
         staged_tuple = (staged_tuple[0], staged_tuple[1], staged_tuple[2] + 1, staged_tuple[3])
+
+    if preflight_status not in (
+        GPU_SEC_PERF_OK,
+        GPU_SEC_PERF_ERR_NULL_PTR,
+        GPU_SEC_PERF_ERR_BAD_PARAM,
+        GPU_SEC_PERF_ERR_POLICY_GUARD,
+        GPU_SEC_PERF_ERR_CAPACITY,
+        GPU_SEC_PERF_ERR_OVERFLOW,
+    ):
+        return GPU_SEC_PERF_ERR_BAD_PARAM, caller_outputs, (0, 0, 0, 0)
+    if commit_status not in (
+        GPU_SEC_PERF_OK,
+        GPU_SEC_PERF_ERR_NULL_PTR,
+        GPU_SEC_PERF_ERR_BAD_PARAM,
+        GPU_SEC_PERF_ERR_POLICY_GUARD,
+        GPU_SEC_PERF_ERR_CAPACITY,
+        GPU_SEC_PERF_ERR_OVERFLOW,
+    ):
+        return GPU_SEC_PERF_ERR_BAD_PARAM, caller_outputs, (0, 0, 0, 0)
 
     if preflight_status != commit_status:
         return GPU_SEC_PERF_ERR_BAD_PARAM, caller_outputs, (0, 0, 0, 0)
@@ -379,12 +402,16 @@ def gpu_security_perf_matrix_summary_q16_checked_latency_window_checked_nopartia
     return GPU_SEC_PERF_OK, caller_outputs, canonical_tuple
 
 
-def test_source_contains_iq1519_symbols() -> None:
+def test_source_contains_iq1533_symbols() -> None:
     src = Path("src/gpu/security_perf_matrix.HC").read_text(encoding="utf-8")
 
     assert "I32 GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in src
     assert "status_preflight_only = GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflightOnlyParityCommitOnlyPreflightOnly(" in src
     assert "status_commit_only = GPUSecurityPerfMatrixSummaryQ16CheckedLatencyWindowCheckedNoPartialPreflightOnlyParityCommitOnly(" in src
+    assert "snapshot_before_digest_q64" in src
+    assert "snapshot_after_digest_q64" in src
+    assert "if (!GPUSecurityPerfStatusIsValid(status_preflight_only))" in src
+    assert "if (!GPUSecurityPerfStatusIsValid(status_commit_only))" in src
     assert "staged_p75_q16" in src
     assert "canonical_p75_q16" in src
     assert "saved_p05_q16" in src
@@ -485,6 +512,21 @@ def test_null_alias_capacity_gate_missing_and_parity_drift_vectors() -> None:
     )
     assert status == GPU_SEC_PERF_ERR_BAD_PARAM
     assert preserved == (31, 32, 33, 34)
+    assert staged == (0, 0, 0, 0)
+
+    status, preserved, staged = gpu_security_perf_matrix_summary_q16_checked_latency_window_checked_nopartial_preflight_only_parity_commit_only_preflight_only_parity(
+        parity_rows,
+        rows_capacity=3,
+        out_capacity=4,
+        secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
+        iommu_active=1,
+        book_of_truth_gpu_hooks=1,
+        policy_digest_parity=1,
+        caller_outputs=(41, 42, 43, 44),
+        inject_invalid_status=True,
+    )
+    assert status == GPU_SEC_PERF_ERR_BAD_PARAM
+    assert preserved == (41, 42, 43, 44)
     assert staged == (0, 0, 0, 0)
 
 
