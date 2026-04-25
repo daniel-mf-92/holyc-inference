@@ -47,6 +47,20 @@ I32 GPUPolicyAllowDispatchChecked(I64 iommu_enabled,
                                   I64 *out_reason_code,
                                   I64 *out_profile_id);
 
+I32 GPUSecurityPerfMatrixAuditOverheadBudgetChecked(
+    const GPUSecurityPerfMatrixRowOutput *rows,
+    I64 row_count,
+    I64 rows_capacity,
+    I64 secure_local_mode,
+    I64 iommu_enabled,
+    I64 bot_dma_log_enabled,
+    I64 bot_mmio_log_enabled,
+    I64 bot_dispatch_log_enabled,
+    I64 max_audit_overhead_delta_q16,
+    I64 *out_checked_rows,
+    I64 *out_first_violation_index,
+    I64 *out_max_observed_overhead_q16);
+
 I32 GPUSecurityPerfMatrixSelectPercentileNearestRankQ16Checked(
     const GPUSecurityPerfMatrixRowOutput *rows,
     I64 row_count,
@@ -316,6 +330,89 @@ I32 GPUSecurityPerfMatrixRunChecked(const GPUSecurityPerfMatrixRowInput *rows,
     *out_written_rows = row_count;
     *out_tok_per_sec_q16_total = tok_total;
     *out_audit_overhead_delta_q16_total = overhead_total;
+
+    return GPU_SEC_PERF_OK;
+}
+
+I32 GPUSecurityPerfMatrixAuditOverheadBudgetChecked(
+    const GPUSecurityPerfMatrixRowOutput *rows,
+    I64 row_count,
+    I64 rows_capacity,
+    I64 secure_local_mode,
+    I64 iommu_enabled,
+    I64 bot_dma_log_enabled,
+    I64 bot_mmio_log_enabled,
+    I64 bot_dispatch_log_enabled,
+    I64 max_audit_overhead_delta_q16,
+    I64 *out_checked_rows,
+    I64 *out_first_violation_index,
+    I64 *out_max_observed_overhead_q16)
+{
+    I64 allow_dispatch;
+    I64 reason_code;
+    I64 gated_profile_id;
+    I32 policy_status;
+    I64 i;
+    I64 max_observed_q16;
+
+    if (!rows || !out_checked_rows || !out_first_violation_index ||
+        !out_max_observed_overhead_q16)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    *out_checked_rows = 0;
+    *out_first_violation_index = -1;
+    *out_max_observed_overhead_q16 = 0;
+
+    if (row_count <= 0 || rows_capacity < row_count)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (max_audit_overhead_delta_q16 < 0)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    // Budget checks are part of secure-local policy enforcement.
+    if (secure_local_mode != GPU_SEC_PERF_PROFILE_SECURE_LOCAL)
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+
+    allow_dispatch = 0;
+    reason_code = 0;
+    gated_profile_id = 0;
+
+    policy_status = GPUPolicyAllowDispatchChecked(iommu_enabled,
+                                                  bot_dma_log_enabled,
+                                                  bot_mmio_log_enabled,
+                                                  bot_dispatch_log_enabled,
+                                                  &allow_dispatch,
+                                                  &reason_code,
+                                                  &gated_profile_id);
+    if (policy_status != 0 || !allow_dispatch ||
+        gated_profile_id != GPU_SEC_PERF_PROFILE_SECURE_LOCAL)
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+
+    max_observed_q16 = 0;
+
+    for (i = 0; i < row_count; ++i)
+    {
+        I64 row_overhead_q16;
+
+        if (rows[i].tok_per_sec_q16 < 0 ||
+            rows[i].audit_overhead_delta_q16 < 0 ||
+            rows[i].secure_cycles_per_token_q16 < 0)
+            return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+        row_overhead_q16 = rows[i].audit_overhead_delta_q16;
+        if (i == 0 || row_overhead_q16 > max_observed_q16)
+            max_observed_q16 = row_overhead_q16;
+
+        *out_checked_rows = i + 1;
+        *out_max_observed_overhead_q16 = max_observed_q16;
+
+        // Fail closed on first over-budget row before summary publish.
+        if (row_overhead_q16 > max_audit_overhead_delta_q16)
+        {
+            *out_first_violation_index = i;
+            return GPU_SEC_PERF_ERR_POLICY_GUARD;
+        }
+    }
 
     return GPU_SEC_PERF_OK;
 }
