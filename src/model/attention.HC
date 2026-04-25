@@ -27849,3 +27849,154 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStride(
         Free(snapshot_out_values_q16_values);
     return ATTN_Q16_OK;
 }
+
+I32 GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStrideCommitOnly(
+    I64 *scores_q16,
+    I64 scores_capacity,
+    I64 query_rows,
+    I64 key_rows,
+    I64 value_dim,
+    I64 head_groups,
+    I64 *values_q16,
+    I64 values_capacity,
+    I64 *out_values_q16,
+    I64 out_capacity,
+    I64 *out_required_score_cells,
+    I64 *out_required_value_cells,
+    I64 *out_required_out_cells)
+{
+    I64 snapshot_query_rows;
+    I64 snapshot_key_rows;
+    I64 snapshot_value_dim;
+    I64 snapshot_head_groups;
+    I64 snapshot_scores_capacity;
+    I64 snapshot_values_capacity;
+    I64 snapshot_out_capacity;
+    I64 *snapshot_scores_q16;
+    I64 *snapshot_values_q16;
+    I64 *snapshot_out_values_q16;
+    I64 *snapshot_out_required_score_cells_ptr;
+    I64 *snapshot_out_required_value_cells_ptr;
+    I64 *snapshot_out_required_out_cells_ptr;
+    I64 snapshot_out_required_score_cells_value;
+    I64 snapshot_out_required_value_cells_value;
+    I64 snapshot_out_required_out_cells_value;
+    I64 staged_default_required_score_cells;
+    I64 staged_default_required_value_cells;
+    I64 staged_default_required_out_cells;
+    I64 staged_canonical_required_score_cells;
+    I64 staged_canonical_required_value_cells;
+    I64 staged_canonical_required_out_cells;
+    I32 status;
+
+    if (!out_required_score_cells || !out_required_value_cells || !out_required_out_cells)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (out_required_score_cells == out_required_value_cells ||
+        out_required_score_cells == out_required_out_cells ||
+        out_required_value_cells == out_required_out_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (!scores_q16 || !values_q16 || !out_values_q16)
+        return ATTN_Q16_ERR_NULL_PTR;
+
+    if (scores_capacity < 0 || values_capacity < 0 || out_capacity < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+    if (query_rows < 0 || key_rows < 0 || value_dim < 0 || head_groups <= 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    snapshot_query_rows = query_rows;
+    snapshot_key_rows = key_rows;
+    snapshot_value_dim = value_dim;
+    snapshot_head_groups = head_groups;
+    snapshot_scores_capacity = scores_capacity;
+    snapshot_values_capacity = values_capacity;
+    snapshot_out_capacity = out_capacity;
+    snapshot_scores_q16 = scores_q16;
+    snapshot_values_q16 = values_q16;
+    snapshot_out_values_q16 = out_values_q16;
+
+    snapshot_out_required_score_cells_ptr = out_required_score_cells;
+    snapshot_out_required_value_cells_ptr = out_required_value_cells;
+    snapshot_out_required_out_cells_ptr = out_required_out_cells;
+    snapshot_out_required_score_cells_value = *out_required_score_cells;
+    snapshot_out_required_value_cells_value = *out_required_value_cells;
+    snapshot_out_required_out_cells_value = *out_required_out_cells;
+
+    // IQ-1407 commit-only diagnostics contract:
+    // 1) stage default-stride diagnostics (`row_stride = key_rows`);
+    // 2) stage canonical diagnostics directly from preflight;
+    // 3) enforce immutable geometry/capacity snapshots + strict tuple parity;
+    // 4) atomically publish required tuple only after all checks pass.
+    status = GQAAttentionValueMixQ16CheckedNoPartialPreflightDefaultStride(
+        scores_q16,
+        scores_capacity,
+        query_rows,
+        key_rows,
+        value_dim,
+        head_groups,
+        values_q16,
+        values_capacity,
+        out_values_q16,
+        out_capacity,
+        &staged_default_required_score_cells,
+        &staged_default_required_value_cells,
+        &staged_default_required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    status = GQAAttentionValueMixQ16CheckedNoPartialPreflight(
+        scores_q16,
+        scores_capacity,
+        query_rows,
+        key_rows,
+        value_dim,
+        head_groups,
+        key_rows,
+        values_q16,
+        values_capacity,
+        out_values_q16,
+        out_capacity,
+        &staged_canonical_required_score_cells,
+        &staged_canonical_required_value_cells,
+        &staged_canonical_required_out_cells);
+    if (status != ATTN_Q16_OK)
+        return status;
+
+    if (snapshot_query_rows != query_rows ||
+        snapshot_key_rows != key_rows ||
+        snapshot_value_dim != value_dim ||
+        snapshot_head_groups != head_groups ||
+        snapshot_scores_capacity != scores_capacity ||
+        snapshot_values_capacity != values_capacity ||
+        snapshot_out_capacity != out_capacity ||
+        snapshot_scores_q16 != scores_q16 ||
+        snapshot_values_q16 != values_q16 ||
+        snapshot_out_values_q16 != out_values_q16)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (staged_default_required_score_cells != staged_canonical_required_score_cells ||
+        staged_default_required_value_cells != staged_canonical_required_value_cells ||
+        staged_default_required_out_cells != staged_canonical_required_out_cells)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (staged_default_required_score_cells > snapshot_scores_capacity ||
+        staged_default_required_value_cells > snapshot_values_capacity ||
+        staged_default_required_out_cells > snapshot_out_capacity)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (out_required_score_cells != snapshot_out_required_score_cells_ptr ||
+        out_required_value_cells != snapshot_out_required_value_cells_ptr ||
+        out_required_out_cells != snapshot_out_required_out_cells_ptr)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    if (*out_required_score_cells != snapshot_out_required_score_cells_value ||
+        *out_required_value_cells != snapshot_out_required_value_cells_value ||
+        *out_required_out_cells != snapshot_out_required_out_cells_value)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    *out_required_score_cells = staged_default_required_score_cells;
+    *out_required_value_cells = staged_default_required_value_cells;
+    *out_required_out_cells = staged_default_required_out_cells;
+    return ATTN_Q16_OK;
+}
