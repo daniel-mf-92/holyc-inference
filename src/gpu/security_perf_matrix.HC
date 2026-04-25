@@ -215,6 +215,16 @@ Bool GPUSecurityPerfRowGateReasonIsValid(I64 reason_code)
             reason_code <= GPU_SEC_PERF_ROW_GATE_REASON_BAD_QUANT_PROFILE);
 }
 
+Bool GPUSecurityPerfStatusIsValid(I32 status_code)
+{
+    return (status_code == GPU_SEC_PERF_OK ||
+            status_code == GPU_SEC_PERF_ERR_NULL_PTR ||
+            status_code == GPU_SEC_PERF_ERR_BAD_PARAM ||
+            status_code == GPU_SEC_PERF_ERR_POLICY_GUARD ||
+            status_code == GPU_SEC_PERF_ERR_CAPACITY ||
+            status_code == GPU_SEC_PERF_ERR_OVERFLOW);
+}
+
 I32 GPUSecurityPerfMatrixRowGateChecked(I64 secure_local_mode,
                                         I64 iommu_active,
                                         I64 book_of_truth_gpu_hooks,
@@ -2325,7 +2335,7 @@ I32 GPUSecurityPerfMatrixRowGateCheckedNoPartialPreflightOnlyParityCommitOnlyPre
     saved_gate_reason_code = *out_gate_reason_code;
     saved_row_allowed = *out_row_allowed;
 
-    // IQ-1529 zero-write diagnostics companion:
+    // IQ-1530 zero-write diagnostics companion:
     // 1) snapshot immutable gate tuple + caller output slots;
     // 2) derive staged tuple via parity commit-only preflight wrapper;
     // 3) recompute canonical tuple via strict parity diagnostics wrapper;
@@ -2355,6 +2365,10 @@ I32 GPUSecurityPerfMatrixRowGateCheckedNoPartialPreflightOnlyParityCommitOnlyPre
         &canonical_gate_reason_code,
         &canonical_row_allowed);
 
+    if (!GPUSecurityPerfStatusIsValid(status_commit_only))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (!GPUSecurityPerfStatusIsValid(status_parity))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
     if (!GPUSecurityPerfRowGateReasonIsValid(staged_gate_reason_code))
         return GPU_SEC_PERF_ERR_BAD_PARAM;
     if (!GPUSecurityPerfFlagIsBinary(staged_row_allowed))
