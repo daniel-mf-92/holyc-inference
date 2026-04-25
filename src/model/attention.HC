@@ -2724,6 +2724,32 @@ I32 AttentionTryAddU64Checked(U64 lhs, U64 rhs, U64 *out_sum)
     return ATTN_Q16_OK;
 }
 
+I32 AttentionQ16BufferDigest64(I64 *cells,
+                               I64 cell_count,
+                               U64 *out_digest)
+{
+    U64 digest;
+    U64 lane;
+    I64 idx;
+
+    if (!cells || !out_digest)
+        return ATTN_Q16_ERR_NULL_PTR;
+    if (cell_count < 0)
+        return ATTN_Q16_ERR_BAD_PARAM;
+
+    // FNV-1a over 64-bit lanes so wrappers can prove immutable source buffers.
+    digest = 0xCBF29CE484222325;
+    for (idx = 0; idx < cell_count; idx++)
+    {
+        lane = (U64)cells[idx];
+        digest ^= lane;
+        digest *= 0x100000001B3;
+    }
+
+    *out_digest = digest;
+    return ATTN_Q16_OK;
+}
+
 I32 AttentionByteRangeEndChecked(I64 base_addr,
                                  I64 span_bytes,
                                  I64 *out_end_addr)
@@ -23959,6 +23985,10 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOn
     I64 copy_index;
     I64 *staged_parity_out_values_q16;
     I64 *snapshot_out_values_q16_values;
+    U64 snapshot_scores_digest;
+    U64 snapshot_values_digest;
+    U64 recomputed_scores_digest;
+    U64 recomputed_values_digest;
     U64 scores_begin;
     U64 scores_end;
     U64 values_begin;
@@ -24114,6 +24144,25 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOn
     for (copy_index = 0; copy_index < required_out_cells; copy_index++)
         snapshot_out_values_q16_values[copy_index] = out_values_q16[copy_index];
 
+    status = AttentionQ16BufferDigest64(scores_q16,
+                                        required_score_cells,
+                                        &snapshot_scores_digest);
+    if (status != ATTN_Q16_OK)
+    {
+        Free(snapshot_out_values_q16_values);
+        Free(staged_parity_out_values_q16);
+        return status;
+    }
+    status = AttentionQ16BufferDigest64(values_q16,
+                                        required_value_cells,
+                                        &snapshot_values_digest);
+    if (status != ATTN_Q16_OK)
+    {
+        Free(snapshot_out_values_q16_values);
+        Free(staged_parity_out_values_q16);
+        return status;
+    }
+
     status = GQAAttentionValueMixQ16CheckedNoPartialCommitOnlyPreflightOnlyParity(
         scores_q16,
         scores_capacity,
@@ -24237,6 +24286,33 @@ I32 GQAAttentionValueMixQ16CheckedNoPartialCommitOnlyPreflightOnlyParityCommitOn
     if (required_score_cells > snapshot_scores_capacity ||
         required_value_cells > snapshot_values_capacity ||
         required_out_cells > snapshot_out_capacity)
+    {
+        Free(snapshot_out_values_q16_values);
+        Free(staged_parity_out_values_q16);
+        return ATTN_Q16_ERR_BAD_PARAM;
+    }
+
+    status = AttentionQ16BufferDigest64(scores_q16,
+                                        required_score_cells,
+                                        &recomputed_scores_digest);
+    if (status != ATTN_Q16_OK)
+    {
+        Free(snapshot_out_values_q16_values);
+        Free(staged_parity_out_values_q16);
+        return status;
+    }
+    status = AttentionQ16BufferDigest64(values_q16,
+                                        required_value_cells,
+                                        &recomputed_values_digest);
+    if (status != ATTN_Q16_OK)
+    {
+        Free(snapshot_out_values_q16_values);
+        Free(staged_parity_out_values_q16);
+        return status;
+    }
+
+    if (snapshot_scores_digest != recomputed_scores_digest ||
+        snapshot_values_digest != recomputed_values_digest)
     {
         Free(snapshot_out_values_q16_values);
         Free(staged_parity_out_values_q16);
