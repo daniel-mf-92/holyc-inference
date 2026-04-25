@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reference checks for GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideParityCommitOnlyPreflightOnly (IQ-1418)."""
+"""Reference checks for GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideParityCommitOnlyPreflightOnly (IQ-1428)."""
 
 from __future__ import annotations
 
@@ -89,6 +89,7 @@ def gqa_attention_apply_softmax_q16_checked_nopartial_preflight_default_stride_p
         ):
             return ATTN_Q16_ERR_BAD_PARAM
 
+    snapshot_scores_vals = scores_q32[:recomputed_required_score_cells]
     snapshot_out_vals = out_probs_q16[:recomputed_required_out_cells]
 
     staged_commit_score = [0]
@@ -164,6 +165,9 @@ def gqa_attention_apply_softmax_q16_checked_nopartial_preflight_default_stride_p
     ):
         return ATTN_Q16_ERR_BAD_PARAM
 
+    if scores_q32[:recomputed_required_score_cells] != snapshot_scores_vals:
+        return ATTN_Q16_ERR_BAD_PARAM
+
     if out_probs_q16[:recomputed_required_out_cells] != snapshot_out_vals:
         return ATTN_Q16_ERR_BAD_PARAM
 
@@ -176,6 +180,7 @@ def test_fixed_vector_reference_zero_write_required_slots() -> None:
     head_groups = 2
 
     scores = [111] * (query_rows * key_rows)
+    scores_before = scores.copy()
     out = [333] * (query_rows * key_rows)
     out_before = out.copy()
 
@@ -195,6 +200,7 @@ def test_fixed_vector_reference_zero_write_required_slots() -> None:
     )
 
     assert err == ATTN_Q16_OK
+    assert scores == scores_before
     assert required_score[0] == 7001
     assert required_out[0] == 7002
     assert out == out_before
@@ -267,7 +273,7 @@ def test_null_alias_capacity_overflow_parity_vectors() -> None:
 
 
 def test_randomized_zero_write_success() -> None:
-    rng = random.Random(20260425_1418)
+    rng = random.Random(20260425_1428)
 
     for _ in range(240):
         key_rows = rng.randint(1, 6)
@@ -283,6 +289,7 @@ def test_randomized_zero_write_success() -> None:
         required_out = [rng.randint(-100, 100)]
         required_score_slot = required_score[0]
         required_out_slot = required_out[0]
+        scores_snapshot = scores.copy()
 
         err = (
             gqa_attention_apply_softmax_q16_checked_nopartial_preflight_default_stride_parity_commit_only_preflight_only(
@@ -299,6 +306,7 @@ def test_randomized_zero_write_success() -> None:
         )
 
         assert err == ATTN_Q16_OK
+        assert scores == scores_snapshot
         assert out == out_snapshot
         assert required_score[0] == required_score_slot
         assert required_out[0] == required_out_slot
@@ -317,6 +325,7 @@ def test_source_contract_markers() -> None:
     assert "status = GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideParityCommitOnly(" in body
     assert "status = GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideParity(" in body
     assert "snapshot_out_required_score_cells_value = *out_required_score_cells;" in body
+    assert "if (scores_q32[copy_index] != snapshot_scores_q32_values[copy_index])" in body
     assert "if (out_probs_q16[copy_index] != snapshot_out_probs_q16_values[copy_index])" in body
 
 

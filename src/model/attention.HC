@@ -24143,8 +24143,10 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflight(
     I64 required_out_cells;
     I64 recomputed_required_score_cells;
     I64 recomputed_required_out_cells;
+    I64 required_scores_bytes;
     I64 required_out_bytes;
     I64 copy_index;
+    I64 *snapshot_scores_q32_values;
     I64 *snapshot_out_probs_q16_values;
     I32 status;
 
@@ -25028,8 +25030,10 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideParityCommi
     I64 staged_parity_required_out_cells;
     I64 recomputed_required_score_cells;
     I64 recomputed_required_out_cells;
+    I64 required_scores_bytes;
     I64 required_out_bytes;
     I64 copy_index;
+    I64 *snapshot_scores_q32_values;
     I64 *snapshot_out_probs_q16_values;
     I32 status;
 
@@ -25059,11 +25063,11 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideParityCommi
     snapshot_out_required_score_cells_value = *out_required_score_cells;
     snapshot_out_required_out_cells_value = *out_required_out_cells;
 
-    // IQ-1418 zero-write diagnostics contract:
+    // IQ-1428 zero-write diagnostics contract:
     // 1) freeze immutable geometry/capacity + pointer snapshots;
     // 2) stage tuples from parity-commit and parity diagnostic helpers;
     // 3) re-derive required tuple with checked integer geometry math;
-    // 4) preserve caller output + required-cell slots on success and failure.
+    // 4) preserve caller score/output buffers + required-cell slots on success/failure.
     if (query_rows > 0 && (query_rows % head_groups) != 0)
         return ATTN_Q16_ERR_BAD_PARAM;
 
@@ -25093,6 +25097,32 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideParityCommi
             return ATTN_Q16_ERR_BAD_PARAM;
     }
 
+    snapshot_scores_q32_values = NULL;
+    if (recomputed_required_score_cells > 0)
+    {
+        status = AttentionTryMulI64Checked(recomputed_required_score_cells,
+                                           sizeof(I64),
+                                           &required_scores_bytes);
+        if (status != ATTN_Q16_OK)
+            return status;
+        if (required_scores_bytes <= 0)
+            return ATTN_Q16_ERR_BAD_PARAM;
+
+        snapshot_scores_q32_values = MAlloc(required_scores_bytes);
+        if (!snapshot_scores_q32_values)
+            return ATTN_Q16_ERR_OVERFLOW;
+
+        if (snapshot_scores_q32_values == scores_q32 ||
+            snapshot_scores_q32_values == out_probs_q16)
+        {
+            Free(snapshot_scores_q32_values);
+            return ATTN_Q16_ERR_BAD_PARAM;
+        }
+
+        for (copy_index = 0; copy_index < recomputed_required_score_cells; copy_index++)
+            snapshot_scores_q32_values[copy_index] = scores_q32[copy_index];
+    }
+
     snapshot_out_probs_q16_values = NULL;
     if (recomputed_required_out_cells > 0)
     {
@@ -25100,18 +25130,32 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideParityCommi
                                            sizeof(I64),
                                            &required_out_bytes);
         if (status != ATTN_Q16_OK)
+        {
+            if (snapshot_scores_q32_values)
+                Free(snapshot_scores_q32_values);
             return status;
+        }
         if (required_out_bytes <= 0)
+        {
+            if (snapshot_scores_q32_values)
+                Free(snapshot_scores_q32_values);
             return ATTN_Q16_ERR_BAD_PARAM;
+        }
 
         snapshot_out_probs_q16_values = MAlloc(required_out_bytes);
         if (!snapshot_out_probs_q16_values)
+        {
+            if (snapshot_scores_q32_values)
+                Free(snapshot_scores_q32_values);
             return ATTN_Q16_ERR_OVERFLOW;
+        }
 
         if (snapshot_out_probs_q16_values == scores_q32 ||
             snapshot_out_probs_q16_values == out_probs_q16)
         {
             Free(snapshot_out_probs_q16_values);
+            if (snapshot_scores_q32_values)
+                Free(snapshot_scores_q32_values);
             return ATTN_Q16_ERR_BAD_PARAM;
         }
 
@@ -25131,6 +25175,8 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideParityCommi
         &staged_commit_only_required_out_cells);
     if (status != ATTN_Q16_OK)
     {
+        if (snapshot_scores_q32_values)
+            Free(snapshot_scores_q32_values);
         if (snapshot_out_probs_q16_values)
             Free(snapshot_out_probs_q16_values);
         return status;
@@ -25148,6 +25194,8 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideParityCommi
         &staged_parity_required_out_cells);
     if (status != ATTN_Q16_OK)
     {
+        if (snapshot_scores_q32_values)
+            Free(snapshot_scores_q32_values);
         if (snapshot_out_probs_q16_values)
             Free(snapshot_out_probs_q16_values);
         return status;
@@ -25161,6 +25209,8 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideParityCommi
         snapshot_scores_q32 != scores_q32 ||
         snapshot_out_probs_q16 != out_probs_q16)
     {
+        if (snapshot_scores_q32_values)
+            Free(snapshot_scores_q32_values);
         if (snapshot_out_probs_q16_values)
             Free(snapshot_out_probs_q16_values);
         return ATTN_Q16_ERR_BAD_PARAM;
@@ -25169,6 +25219,8 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideParityCommi
     if (staged_commit_only_required_score_cells != staged_parity_required_score_cells ||
         staged_commit_only_required_out_cells != staged_parity_required_out_cells)
     {
+        if (snapshot_scores_q32_values)
+            Free(snapshot_scores_q32_values);
         if (snapshot_out_probs_q16_values)
             Free(snapshot_out_probs_q16_values);
         return ATTN_Q16_ERR_BAD_PARAM;
@@ -25177,6 +25229,8 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideParityCommi
     if (staged_commit_only_required_score_cells != recomputed_required_score_cells ||
         staged_commit_only_required_out_cells != recomputed_required_out_cells)
     {
+        if (snapshot_scores_q32_values)
+            Free(snapshot_scores_q32_values);
         if (snapshot_out_probs_q16_values)
             Free(snapshot_out_probs_q16_values);
         return ATTN_Q16_ERR_BAD_PARAM;
@@ -25185,6 +25239,8 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideParityCommi
     if (staged_commit_only_required_score_cells > snapshot_scores_capacity ||
         staged_commit_only_required_out_cells > snapshot_out_capacity)
     {
+        if (snapshot_scores_q32_values)
+            Free(snapshot_scores_q32_values);
         if (snapshot_out_probs_q16_values)
             Free(snapshot_out_probs_q16_values);
         return ATTN_Q16_ERR_BAD_PARAM;
@@ -25193,6 +25249,8 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideParityCommi
     if (out_required_score_cells != snapshot_out_required_score_cells_ptr ||
         out_required_out_cells != snapshot_out_required_out_cells_ptr)
     {
+        if (snapshot_scores_q32_values)
+            Free(snapshot_scores_q32_values);
         if (snapshot_out_probs_q16_values)
             Free(snapshot_out_probs_q16_values);
         return ATTN_Q16_ERR_BAD_PARAM;
@@ -25201,9 +25259,26 @@ I32 GQAAttentionApplySoftmaxQ16CheckedNoPartialPreflightDefaultStrideParityCommi
     if (*out_required_score_cells != snapshot_out_required_score_cells_value ||
         *out_required_out_cells != snapshot_out_required_out_cells_value)
     {
+        if (snapshot_scores_q32_values)
+            Free(snapshot_scores_q32_values);
         if (snapshot_out_probs_q16_values)
             Free(snapshot_out_probs_q16_values);
         return ATTN_Q16_ERR_BAD_PARAM;
+    }
+
+    if (snapshot_scores_q32_values)
+    {
+        for (copy_index = 0; copy_index < recomputed_required_score_cells; copy_index++)
+        {
+            if (scores_q32[copy_index] != snapshot_scores_q32_values[copy_index])
+            {
+                Free(snapshot_scores_q32_values);
+                if (snapshot_out_probs_q16_values)
+                    Free(snapshot_out_probs_q16_values);
+                return ATTN_Q16_ERR_BAD_PARAM;
+            }
+        }
+        Free(snapshot_scores_q32_values);
     }
 
     if (snapshot_out_probs_q16_values)
