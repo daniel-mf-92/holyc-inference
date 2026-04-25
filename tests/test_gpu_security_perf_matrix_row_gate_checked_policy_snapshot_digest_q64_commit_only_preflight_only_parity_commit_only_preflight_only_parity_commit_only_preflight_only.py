@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1531 zero-write diagnostics companion over digest preflight/parity commit wrappers."""
+"""Harness for IQ-1540 zero-write diagnostics companion over digest preflight/parity commit wrappers."""
 
 from __future__ import annotations
 
@@ -50,6 +50,16 @@ def _is_binary(value: int) -> bool:
 
 def _is_supported_quant(quant_level: int) -> bool:
     return quant_level in (GPU_SEC_PERF_QUANT_Q4_0, GPU_SEC_PERF_QUANT_Q8_0)
+
+
+def _status_is_valid(status_code: int) -> bool:
+    return status_code in (
+        GPU_SEC_PERF_OK,
+        GPU_SEC_PERF_ERR_NULL_PTR,
+        GPU_SEC_PERF_ERR_BAD_PARAM,
+        GPU_SEC_PERF_ERR_POLICY_GUARD,
+        GPU_SEC_PERF_ERR_OVERFLOW,
+    )
 
 
 def _row_gate_checked(
@@ -424,6 +434,7 @@ def gpu_security_perf_matrix_row_gate_checked_policy_snapshot_digest_q64_commit_
     current_snapshot_digest_q64: int,
     has_null_output: bool = False,
     inject_digest_drift: bool = False,
+    inject_status_invalid_both: bool = False,
 ) -> tuple[int, int]:
     if has_null_output:
         return GPU_SEC_PERF_ERR_NULL_PTR, current_snapshot_digest_q64
@@ -453,6 +464,15 @@ def gpu_security_perf_matrix_row_gate_checked_policy_snapshot_digest_q64_commit_
     if inject_digest_drift:
         parity_digest += 1
 
+    if inject_status_invalid_both:
+        status_commit_only = 99
+        status_parity = 99
+
+    if not _status_is_valid(status_commit_only):
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_snapshot_digest_q64
+    if not _status_is_valid(status_parity):
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_snapshot_digest_q64
+
     if status_commit_only != status_parity:
         return GPU_SEC_PERF_ERR_BAD_PARAM, current_snapshot_digest_q64
     if commit_only_digest != parity_digest:
@@ -460,14 +480,16 @@ def gpu_security_perf_matrix_row_gate_checked_policy_snapshot_digest_q64_commit_
     return status_commit_only, current_snapshot_digest_q64
 
 
-def test_source_contains_iq1531_symbols() -> None:
+def test_source_contains_iq1540_symbols() -> None:
     src = Path("src/gpu/security_perf_matrix.HC").read_text(encoding="utf-8")
 
     assert "I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in src
     assert "status_commit_only = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(" in src
     assert "status_parity = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in src
-    assert "// IQ-1531 zero-write diagnostics companion:" in src
+    assert "// IQ-1540 zero-write diagnostics companion:" in src
     assert "saved_snapshot_digest_q64" in src
+    assert "if (!GPUSecurityPerfStatusIsValid(status_commit_only))" in src
+    assert "if (!GPUSecurityPerfStatusIsValid(status_parity))" in src
     assert "if (status_commit_only != status_parity)" in src
     assert "*out_snapshot_digest_q64 = saved_snapshot_digest_q64;" in src
 
@@ -618,11 +640,27 @@ def test_drift_rejected() -> None:
     assert (status, digest) == (GPU_SEC_PERF_ERR_BAD_PARAM, 9900)
 
 
+def test_invalid_status_domain_rejected() -> None:
+    status, digest = gpu_security_perf_matrix_row_gate_checked_policy_snapshot_digest_q64_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only(
+        secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
+        iommu_active=1,
+        book_of_truth_gpu_hooks=1,
+        policy_digest_parity=1,
+        row_prompt_tokens=192,
+        row_batch_size=4,
+        row_quant_profile=GPU_SEC_PERF_QUANT_Q8_0,
+        current_snapshot_digest_q64=8800,
+        inject_status_invalid_both=True,
+    )
+    assert (status, digest) == (GPU_SEC_PERF_ERR_BAD_PARAM, 8800)
+
+
 if __name__ == "__main__":
-    test_source_contains_iq1531_symbols()
+    test_source_contains_iq1540_symbols()
     test_secure_on_overhead_budget_vectors()
     test_gate_missing_vectors()
     test_digest_bit_flip_sensitivity()
     test_overflow_parity_and_null_vectors()
     test_drift_rejected()
+    test_invalid_status_domain_rejected()
     print("ok")
