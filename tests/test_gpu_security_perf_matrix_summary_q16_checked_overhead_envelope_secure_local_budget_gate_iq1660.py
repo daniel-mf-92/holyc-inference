@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1651 commit-only hardening wrapper over IQ-1650 strict parity + IQ-1648 preflight-only."""
+"""Harness for IQ-1660 commit-only hardening wrapper over IQ-1650 strict parity + IQ-1648 preflight-only."""
 
 from __future__ import annotations
 
@@ -266,7 +266,7 @@ def _secure_local_budget_gate_commit_only_preflight_only_parity(
     return status_preflight_only, caller_outputs
 
 
-def secure_local_budget_gate_iq1651(
+def secure_local_budget_gate_iq1660(
     rows: list[RowOutput],
     rows_capacity: int,
     secure_local_mode: int,
@@ -334,11 +334,13 @@ def secure_local_budget_gate_iq1651(
     return GPU_SEC_PERF_OK, parity_tuple
 
 
-def test_source_contains_iq1651_symbols() -> None:
+def test_source_contains_iq1660_symbols() -> None:
     src = Path("src/gpu/security_perf_matrix.HC").read_text(encoding="utf-8")
+    assert "I32 GPUSecurityPerfMatrixRowOutputsSnapshotDigestQ64(" in src
     assert "I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(" in src
     assert "status_parity = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in src
     assert "status_preflight_only = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in src
+    assert "status_snapshot_digest = GPUSecurityPerfMatrixRowOutputsSnapshotDigestQ64(" in src
     assert "// IQ-1660/IQ-1651 commit-only hardening wrapper over IQ-1650 strict parity + IQ-1648 preflight-only:" in src
 
 
@@ -348,7 +350,7 @@ def test_gate_missing_and_threshold_breach_vectors() -> None:
         RowOutput(88_000, 6_000, 49_000),
         RowOutput(86_000, 7_000, 50_000),
     ]
-    status, outputs = secure_local_budget_gate_iq1651(
+    status, outputs = secure_local_budget_gate_iq1660(
         rows_gate_missing,
         rows_capacity=3,
         secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
@@ -369,7 +371,7 @@ def test_gate_missing_and_threshold_breach_vectors() -> None:
         RowOutput(100_000, 11_000, 55_000),
         RowOutput(100_000, 14_000, 60_000),
     ]
-    status, outputs = secure_local_budget_gate_iq1651(
+    status, outputs = secure_local_budget_gate_iq1660(
         rows_threshold_breach,
         rows_capacity=5,
         secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
@@ -392,7 +394,7 @@ def test_status_domain_drift_and_deterministic_tuple_parity_vectors() -> None:
         RowOutput(84_000, 6_000, 44_000),
     ]
 
-    status, outputs = secure_local_budget_gate_iq1651(
+    status, outputs = secure_local_budget_gate_iq1660(
         rows,
         rows_capacity=4,
         secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
@@ -407,7 +409,7 @@ def test_status_domain_drift_and_deterministic_tuple_parity_vectors() -> None:
     assert status == GPU_SEC_PERF_ERR_BAD_PARAM
     assert outputs == (211, 222, GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK)
 
-    status, outputs = secure_local_budget_gate_iq1651(
+    status, outputs = secure_local_budget_gate_iq1660(
         rows,
         rows_capacity=4,
         secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
@@ -422,7 +424,7 @@ def test_status_domain_drift_and_deterministic_tuple_parity_vectors() -> None:
     assert status == GPU_SEC_PERF_ERR_BAD_PARAM
     assert outputs == (233, 244, GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK)
 
-    status, outputs = secure_local_budget_gate_iq1651(
+    status, outputs = secure_local_budget_gate_iq1660(
         rows,
         rows_capacity=4,
         secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
@@ -437,7 +439,7 @@ def test_status_domain_drift_and_deterministic_tuple_parity_vectors() -> None:
     assert status == GPU_SEC_PERF_ERR_BAD_PARAM
     assert outputs == (255, 266, GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK)
 
-    status, outputs = secure_local_budget_gate_iq1651(
+    status, outputs = secure_local_budget_gate_iq1660(
         rows,
         rows_capacity=4,
         secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
@@ -455,7 +457,7 @@ def test_status_domain_drift_and_deterministic_tuple_parity_vectors() -> None:
 def test_null_and_alias_vectors() -> None:
     rows = [RowOutput(90_000, 5_000, 48_000)]
 
-    status, outputs = secure_local_budget_gate_iq1651(
+    status, outputs = secure_local_budget_gate_iq1660(
         rows,
         rows_capacity=1,
         secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
@@ -470,7 +472,7 @@ def test_null_and_alias_vectors() -> None:
     assert status == GPU_SEC_PERF_ERR_NULL_PTR
     assert outputs == (1, 2, GPU_SEC_PERF_BUDGET_GATE_STATUS_PASS)
 
-    status, outputs = secure_local_budget_gate_iq1651(
+    status, outputs = secure_local_budget_gate_iq1660(
         rows,
         rows_capacity=1,
         secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
@@ -487,7 +489,7 @@ def test_null_and_alias_vectors() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_iq1651_symbols()
+    test_source_contains_iq1660_symbols()
     test_gate_missing_and_threshold_breach_vectors()
     test_status_domain_drift_and_deterministic_tuple_parity_vectors()
     test_null_and_alias_vectors()

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1651 commit-only hardening wrapper over IQ-1650 strict parity + IQ-1648 preflight-only."""
+"""Harness for IQ-1661 zero-write diagnostics companion over IQ-1660 + canonical parity."""
 
 from __future__ import annotations
 
@@ -266,7 +266,7 @@ def _secure_local_budget_gate_commit_only_preflight_only_parity(
     return status_preflight_only, caller_outputs
 
 
-def secure_local_budget_gate_iq1651(
+def secure_local_budget_gate_iq1660(
     rows: list[RowOutput],
     rows_capacity: int,
     secure_local_mode: int,
@@ -334,12 +334,77 @@ def secure_local_budget_gate_iq1651(
     return GPU_SEC_PERF_OK, parity_tuple
 
 
-def test_source_contains_iq1651_symbols() -> None:
+def secure_local_budget_gate_iq1661(
+    rows: list[RowOutput],
+    rows_capacity: int,
+    secure_local_mode: int,
+    iommu_active: int,
+    book_of_truth_gpu_hooks: int,
+    policy_digest_parity: int,
+    max_p50_overhead_q16: int,
+    max_p95_overhead_q16: int,
+    caller_outputs: tuple[int, int, int],
+    *,
+    has_null_output: bool = False,
+    outputs_alias: bool = False,
+    force_commit_status_domain_drift: bool = False,
+    force_canonical_status_domain_drift: bool = False,
+    force_commit_tuple_drift: bool = False,
+    force_canonical_tuple_drift: bool = False,
+) -> tuple[int, tuple[int, int, int]]:
+    if has_null_output:
+        return GPU_SEC_PERF_ERR_NULL_PTR, caller_outputs
+    if outputs_alias:
+        return GPU_SEC_PERF_ERR_BAD_PARAM, caller_outputs
+
+    status_commit_only, staged_tuple = secure_local_budget_gate_iq1660(
+        rows,
+        rows_capacity,
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        max_p50_overhead_q16,
+        max_p95_overhead_q16,
+        (0, 0, GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK),
+        force_parity_status_domain_drift=force_commit_status_domain_drift,
+        force_parity_tuple_drift=force_commit_tuple_drift,
+    )
+
+    status_canonical, canonical_tuple = _secure_local_budget_gate_commit_only_preflight_only_parity(
+        rows,
+        rows_capacity,
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        max_p50_overhead_q16,
+        max_p95_overhead_q16,
+        staged_tuple,
+        force_preflight_status_domain_drift=force_canonical_status_domain_drift,
+        force_commit_status_domain_drift=force_canonical_status_domain_drift,
+    )
+    if force_canonical_tuple_drift:
+        canonical_tuple = (canonical_tuple[0], canonical_tuple[1] + 1, canonical_tuple[2])
+
+    if not _status_is_valid(status_commit_only) or not _status_is_valid(status_canonical):
+        return GPU_SEC_PERF_ERR_BAD_PARAM, caller_outputs
+    if not _budget_gate_status_is_valid(staged_tuple[2]) or not _budget_gate_status_is_valid(canonical_tuple[2]):
+        return GPU_SEC_PERF_ERR_BAD_PARAM, caller_outputs
+    if status_commit_only != status_canonical or staged_tuple != canonical_tuple:
+        return GPU_SEC_PERF_ERR_BAD_PARAM, caller_outputs
+
+    return status_commit_only, caller_outputs
+
+
+def test_source_contains_iq1661_symbols() -> None:
     src = Path("src/gpu/security_perf_matrix.HC").read_text(encoding="utf-8")
-    assert "I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(" in src
-    assert "status_parity = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in src
-    assert "status_preflight_only = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in src
-    assert "// IQ-1660/IQ-1651 commit-only hardening wrapper over IQ-1650 strict parity + IQ-1648 preflight-only:" in src
+    assert "I32 GPUSecurityPerfMatrixRowOutputsSnapshotDigestQ64(" in src
+    assert "I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in src
+    assert "status_commit_only = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(" in src
+    assert "status_canonical = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in src
+    assert "status_snapshot_digest = GPUSecurityPerfMatrixRowOutputsSnapshotDigestQ64(" in src
+    assert "// IQ-1661/IQ-1660 zero-write diagnostics companion over IQ-1660 commit-only hardening + canonical parity gate:" in src
 
 
 def test_gate_missing_and_threshold_breach_vectors() -> None:
@@ -348,7 +413,7 @@ def test_gate_missing_and_threshold_breach_vectors() -> None:
         RowOutput(88_000, 6_000, 49_000),
         RowOutput(86_000, 7_000, 50_000),
     ]
-    status, outputs = secure_local_budget_gate_iq1651(
+    status, outputs = secure_local_budget_gate_iq1661(
         rows_gate_missing,
         rows_capacity=3,
         secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
@@ -369,7 +434,7 @@ def test_gate_missing_and_threshold_breach_vectors() -> None:
         RowOutput(100_000, 11_000, 55_000),
         RowOutput(100_000, 14_000, 60_000),
     ]
-    status, outputs = secure_local_budget_gate_iq1651(
+    status, outputs = secure_local_budget_gate_iq1661(
         rows_threshold_breach,
         rows_capacity=5,
         secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
@@ -392,7 +457,7 @@ def test_status_domain_drift_and_deterministic_tuple_parity_vectors() -> None:
         RowOutput(84_000, 6_000, 44_000),
     ]
 
-    status, outputs = secure_local_budget_gate_iq1651(
+    status, outputs = secure_local_budget_gate_iq1661(
         rows,
         rows_capacity=4,
         secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
@@ -402,12 +467,12 @@ def test_status_domain_drift_and_deterministic_tuple_parity_vectors() -> None:
         max_p50_overhead_q16=6_000,
         max_p95_overhead_q16=7_000,
         caller_outputs=(211, 222, GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK),
-        force_parity_status_domain_drift=True,
+        force_commit_status_domain_drift=True,
     )
     assert status == GPU_SEC_PERF_ERR_BAD_PARAM
     assert outputs == (211, 222, GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK)
 
-    status, outputs = secure_local_budget_gate_iq1651(
+    status, outputs = secure_local_budget_gate_iq1661(
         rows,
         rows_capacity=4,
         secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
@@ -417,12 +482,12 @@ def test_status_domain_drift_and_deterministic_tuple_parity_vectors() -> None:
         max_p50_overhead_q16=6_000,
         max_p95_overhead_q16=7_000,
         caller_outputs=(233, 244, GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK),
-        force_parity_tuple_drift=True,
+        force_commit_tuple_drift=True,
     )
     assert status == GPU_SEC_PERF_ERR_BAD_PARAM
     assert outputs == (233, 244, GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK)
 
-    status, outputs = secure_local_budget_gate_iq1651(
+    status, outputs = secure_local_budget_gate_iq1661(
         rows,
         rows_capacity=4,
         secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
@@ -432,12 +497,12 @@ def test_status_domain_drift_and_deterministic_tuple_parity_vectors() -> None:
         max_p50_overhead_q16=6_000,
         max_p95_overhead_q16=7_000,
         caller_outputs=(255, 266, GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK),
-        force_preflight_tuple_drift=True,
+        force_canonical_tuple_drift=True,
     )
     assert status == GPU_SEC_PERF_ERR_BAD_PARAM
     assert outputs == (255, 266, GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK)
 
-    status, outputs = secure_local_budget_gate_iq1651(
+    status, outputs = secure_local_budget_gate_iq1661(
         rows,
         rows_capacity=4,
         secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
@@ -449,13 +514,13 @@ def test_status_domain_drift_and_deterministic_tuple_parity_vectors() -> None:
         caller_outputs=(277, 288, GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK),
     )
     assert status == GPU_SEC_PERF_OK
-    assert outputs == (0, 0, GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK)
+    assert outputs == (277, 288, GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK)
 
 
 def test_null_and_alias_vectors() -> None:
     rows = [RowOutput(90_000, 5_000, 48_000)]
 
-    status, outputs = secure_local_budget_gate_iq1651(
+    status, outputs = secure_local_budget_gate_iq1661(
         rows,
         rows_capacity=1,
         secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
@@ -470,7 +535,7 @@ def test_null_and_alias_vectors() -> None:
     assert status == GPU_SEC_PERF_ERR_NULL_PTR
     assert outputs == (1, 2, GPU_SEC_PERF_BUDGET_GATE_STATUS_PASS)
 
-    status, outputs = secure_local_budget_gate_iq1651(
+    status, outputs = secure_local_budget_gate_iq1661(
         rows,
         rows_capacity=1,
         secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
@@ -487,7 +552,7 @@ def test_null_and_alias_vectors() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_iq1651_symbols()
+    test_source_contains_iq1661_symbols()
     test_gate_missing_and_threshold_breach_vectors()
     test_status_domain_drift_and_deterministic_tuple_parity_vectors()
     test_null_and_alias_vectors()
