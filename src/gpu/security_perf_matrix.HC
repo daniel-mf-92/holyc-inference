@@ -2349,7 +2349,7 @@ I32 GPUSecurityPerfMatrixRowGateCheckedNoPartialPreflightOnlyCommitOnlyPreflight
     saved_gate_reason_code = *out_gate_reason_code;
     saved_row_allowed = *out_row_allowed;
 
-    // IQ-1557 commit-only hardening wrapper:
+    // IQ-1560 commit-only hardening wrapper:
     // 1) snapshot immutable gate tuple + caller output slots;
     // 2) derive canonical tuple through no-partial commit-only row-gate wrapper;
     // 3) replay strict parity + zero-write diagnostics wrappers with canonical tuple seed;
@@ -2412,6 +2412,26 @@ I32 GPUSecurityPerfMatrixRowGateCheckedNoPartialPreflightOnlyCommitOnlyPreflight
     if (!GPUSecurityPerfRowGateReasonIsValid(staged_gate_reason_code))
         return GPU_SEC_PERF_ERR_BAD_PARAM;
     if (!GPUSecurityPerfFlagIsBinary(staged_row_allowed))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (status_parity != GPU_SEC_PERF_OK && canonical_row_allowed != 0)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (status_parity == GPU_SEC_PERF_OK && canonical_row_allowed != 1)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (status_preflight_only != GPU_SEC_PERF_OK && staged_row_allowed != 0)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (status_preflight_only == GPU_SEC_PERF_OK && staged_row_allowed != 1)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (status_parity == GPU_SEC_PERF_OK &&
+        canonical_gate_reason_code != GPU_SEC_PERF_ROW_GATE_REASON_ALLOW)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (status_parity != GPU_SEC_PERF_OK &&
+        canonical_gate_reason_code == GPU_SEC_PERF_ROW_GATE_REASON_ALLOW)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (status_preflight_only == GPU_SEC_PERF_OK &&
+        staged_gate_reason_code != GPU_SEC_PERF_ROW_GATE_REASON_ALLOW)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (status_preflight_only != GPU_SEC_PERF_OK &&
+        staged_gate_reason_code == GPU_SEC_PERF_ROW_GATE_REASON_ALLOW)
         return GPU_SEC_PERF_ERR_BAD_PARAM;
 
     if (snapshot_secure_local_mode != secure_local_mode)
