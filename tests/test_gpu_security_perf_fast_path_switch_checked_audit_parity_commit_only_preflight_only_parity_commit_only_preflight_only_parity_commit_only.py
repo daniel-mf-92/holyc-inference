@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1584 commit-only hardening over fast-path parity/preflight wrappers."""
+"""Harness for IQ-1597 commit-only hardening over fast-path parity/preflight wrappers."""
 
 from __future__ import annotations
 
@@ -333,14 +333,32 @@ def fast_path_switch_checked_audit_parity_commit_only_preflight_only_parity_comm
     if outputs_alias:
         return GPU_SEC_PERF_ERR_BAD_PARAM, current_fast_path_enabled, current_disable_reason_code
 
+    status_seed_commit_only, seed_enabled, seed_reason = _fast_path_switch_checked_audit_parity_commit_only(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        dispatch_transcript_parity,
+    )
+    if not _status_is_valid(status_seed_commit_only):
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_fast_path_enabled, current_disable_reason_code
+    if not _flag_is_binary(seed_enabled) or not _disable_reason_is_valid(seed_reason):
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_fast_path_enabled, current_disable_reason_code
+    if status_seed_commit_only == GPU_SEC_PERF_OK:
+        if seed_enabled != 1 or seed_reason != GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_ALLOW:
+            return GPU_SEC_PERF_ERR_BAD_PARAM, current_fast_path_enabled, current_disable_reason_code
+    else:
+        if seed_enabled != 0 or seed_reason == GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_ALLOW:
+            return GPU_SEC_PERF_ERR_BAD_PARAM, current_fast_path_enabled, current_disable_reason_code
+
     status_parity, parity_enabled, parity_reason = _fast_path_switch_checked_audit_parity_commit_only_preflight_only_parity(
         secure_local_mode,
         iommu_active,
         book_of_truth_gpu_hooks,
         policy_digest_parity,
         dispatch_transcript_parity,
-        current_fast_path_enabled=0,
-        current_disable_reason_code=GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_PROFILE_GUARD,
+        current_fast_path_enabled=seed_enabled,
+        current_disable_reason_code=seed_reason,
     )
 
     status_preflight_only, staged_enabled, staged_reason = _fast_path_switch_checked_audit_parity_commit_only_preflight_only_parity_commit_only_preflight_only(
@@ -362,8 +380,22 @@ def fast_path_switch_checked_audit_parity_commit_only_preflight_only_parity_comm
     if not _disable_reason_is_valid(parity_reason) or not _disable_reason_is_valid(staged_reason):
         return GPU_SEC_PERF_ERR_BAD_PARAM, current_fast_path_enabled, current_disable_reason_code
 
+    if status_seed_commit_only != status_parity or status_seed_commit_only != status_preflight_only:
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_fast_path_enabled, current_disable_reason_code
+    if seed_enabled != parity_enabled or seed_enabled != staged_enabled:
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_fast_path_enabled, current_disable_reason_code
+    if seed_reason != parity_reason or seed_reason != staged_reason:
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_fast_path_enabled, current_disable_reason_code
+
     if status_parity != status_preflight_only or parity_enabled != staged_enabled or parity_reason != staged_reason:
         return GPU_SEC_PERF_ERR_BAD_PARAM, current_fast_path_enabled, current_disable_reason_code
+
+    if status_parity == GPU_SEC_PERF_OK:
+        if parity_enabled != 1 or parity_reason != GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_ALLOW:
+            return GPU_SEC_PERF_ERR_BAD_PARAM, current_fast_path_enabled, current_disable_reason_code
+    else:
+        if parity_enabled != 0 or parity_reason == GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_ALLOW:
+            return GPU_SEC_PERF_ERR_BAD_PARAM, current_fast_path_enabled, current_disable_reason_code
 
     if status_parity != GPU_SEC_PERF_OK:
         return status_parity, current_fast_path_enabled, current_disable_reason_code
@@ -371,12 +403,14 @@ def fast_path_switch_checked_audit_parity_commit_only_preflight_only_parity_comm
     return GPU_SEC_PERF_OK, parity_enabled, parity_reason
 
 
-def test_source_contains_iq1584_symbols() -> None:
+def test_source_contains_iq1597_symbols() -> None:
     src = Path("src/gpu/security_perf_matrix.HC").read_text(encoding="utf-8")
 
     assert "I32 GPUSecurityPerfFastPathSwitchCheckedAuditParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(" in src
+    assert "status_seed_commit_only = GPUSecurityPerfFastPathSwitchCheckedAuditParityCommitOnly(" in src
     assert "status_parity = GPUSecurityPerfFastPathSwitchCheckedAuditParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in src
     assert "status_preflight_only = GPUSecurityPerfFastPathSwitchCheckedAuditParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in src
+    assert "if (status_seed_commit_only != status_parity)" in src
     assert "if (status_parity != GPU_SEC_PERF_OK)" in src
 
 
@@ -428,6 +462,6 @@ def test_status_domain_drift_and_deterministic_tuple_parity_vectors() -> None:
     )
     assert (status, enabled, reason) == (
         GPU_SEC_PERF_OK,
-        0,
-        GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_PROFILE_GUARD,
+        1,
+        GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_ALLOW,
     )
