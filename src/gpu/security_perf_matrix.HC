@@ -1791,7 +1791,7 @@ I32 GPUSecurityPerfFastPathSwitchSecureLocalOverheadBudgetCrossGateSnapshotDiges
     snapshot_out_disable_reason_code_ptr = out_disable_reason_code;
     snapshot_out_snapshot_digest_q64_ptr = out_snapshot_digest_q64;
 
-    // IQ-1689 commit-only hardening wrapper:
+    // IQ-1703 commit-only hardening wrapper:
     // 1) derive staged tuple via IQ-1688 strict diagnostics parity gate;
     // 2) replay staged tuple via IQ-1687 zero-write diagnostics companion;
     // 3) require status-domain validity + strict tuple parity;
