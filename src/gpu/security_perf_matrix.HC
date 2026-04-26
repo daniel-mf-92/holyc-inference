@@ -18286,6 +18286,209 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGate(
     return GPU_SEC_PERF_OK;
 }
 
+I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateSnapshotDigestQ64Checked(
+    const GPUSecurityPerfMatrixRowOutput *rows,
+    I64 row_count,
+    I64 rows_capacity,
+    I64 secure_local_mode,
+    I64 iommu_active,
+    I64 book_of_truth_gpu_hooks,
+    I64 policy_digest_parity,
+    I64 max_p50_overhead_q16,
+    I64 max_p95_overhead_q16,
+    I64 *out_p50_overhead_q16,
+    I64 *out_p95_overhead_q16,
+    I64 *out_budget_gate_status,
+    I64 *out_snapshot_digest_q64)
+{
+    I64 snapshot_row_count;
+    I64 snapshot_rows_capacity;
+    I64 snapshot_secure_local_mode;
+    I64 snapshot_iommu_active;
+    I64 snapshot_book_of_truth_gpu_hooks;
+    I64 snapshot_policy_digest_parity;
+    I64 snapshot_max_p50_overhead_q16;
+    I64 snapshot_max_p95_overhead_q16;
+    const GPUSecurityPerfMatrixRowOutput *snapshot_rows_ptr;
+    I64 *snapshot_out_p50_ptr;
+    I64 *snapshot_out_p95_ptr;
+    I64 *snapshot_out_budget_status_ptr;
+    I64 *snapshot_out_snapshot_digest_q64_ptr;
+    I64 staged_p50_overhead_q16;
+    I64 staged_p95_overhead_q16;
+    I64 staged_budget_gate_status;
+    I64 tuple_values[9];
+    I64 tuple_count;
+    I64 i;
+    I64 offset_value;
+    I64 mixed_term;
+    I64 digest_primary;
+    I64 digest_parity;
+    I64 stride;
+    I64 row_digest_before_q64;
+    I64 row_digest_after_q64;
+    I32 status_row_snapshot;
+    I32 status_primary;
+
+    if (!rows || !out_p50_overhead_q16 || !out_p95_overhead_q16 ||
+        !out_budget_gate_status || !out_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    if (out_p50_overhead_q16 == out_p95_overhead_q16 ||
+        out_p50_overhead_q16 == out_budget_gate_status ||
+        out_p50_overhead_q16 == out_snapshot_digest_q64 ||
+        out_p95_overhead_q16 == out_budget_gate_status ||
+        out_p95_overhead_q16 == out_snapshot_digest_q64 ||
+        out_budget_gate_status == out_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    *out_p50_overhead_q16 = 0;
+    *out_p95_overhead_q16 = 0;
+    *out_budget_gate_status = GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK;
+    *out_snapshot_digest_q64 = 0;
+
+    snapshot_row_count = row_count;
+    snapshot_rows_capacity = rows_capacity;
+    snapshot_secure_local_mode = secure_local_mode;
+    snapshot_iommu_active = iommu_active;
+    snapshot_book_of_truth_gpu_hooks = book_of_truth_gpu_hooks;
+    snapshot_policy_digest_parity = policy_digest_parity;
+    snapshot_max_p50_overhead_q16 = max_p50_overhead_q16;
+    snapshot_max_p95_overhead_q16 = max_p95_overhead_q16;
+    snapshot_rows_ptr = rows;
+    snapshot_out_p50_ptr = out_p50_overhead_q16;
+    snapshot_out_p95_ptr = out_p95_overhead_q16;
+    snapshot_out_budget_status_ptr = out_budget_gate_status;
+    snapshot_out_snapshot_digest_q64_ptr = out_snapshot_digest_q64;
+
+    status_row_snapshot = GPUSecurityPerfMatrixRowOutputsSnapshotDigestQ64(
+        rows,
+        row_count,
+        rows_capacity,
+        &row_digest_before_q64);
+    if (status_row_snapshot != GPU_SEC_PERF_OK)
+        return status_row_snapshot;
+
+    status_primary = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGate(
+        rows,
+        row_count,
+        rows_capacity,
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        max_p50_overhead_q16,
+        max_p95_overhead_q16,
+        &staged_p50_overhead_q16,
+        &staged_p95_overhead_q16,
+        &staged_budget_gate_status);
+
+    status_row_snapshot = GPUSecurityPerfMatrixRowOutputsSnapshotDigestQ64(
+        rows,
+        row_count,
+        rows_capacity,
+        &row_digest_after_q64);
+    if (status_row_snapshot != GPU_SEC_PERF_OK)
+        return status_row_snapshot;
+    if (row_digest_before_q64 != row_digest_after_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (snapshot_row_count != row_count)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_rows_capacity != rows_capacity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_secure_local_mode != secure_local_mode)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_iommu_active != iommu_active)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_book_of_truth_gpu_hooks != book_of_truth_gpu_hooks)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_policy_digest_parity != policy_digest_parity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_max_p50_overhead_q16 != max_p50_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_max_p95_overhead_q16 != max_p95_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_rows_ptr != rows)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_p50_ptr != out_p50_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_p95_ptr != out_p95_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_budget_status_ptr != out_budget_gate_status)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_snapshot_digest_q64_ptr != out_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (!GPUSecurityPerfStatusIsValid(status_primary))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (!GPUSecurityPerfBudgetGateStatusIsValid(staged_budget_gate_status))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_p50_overhead_q16 < 0 || staged_p95_overhead_q16 < 0)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (status_primary != GPU_SEC_PERF_OK)
+    {
+        *out_p50_overhead_q16 = staged_p50_overhead_q16;
+        *out_p95_overhead_q16 = staged_p95_overhead_q16;
+        *out_budget_gate_status = staged_budget_gate_status;
+        return status_primary;
+    }
+
+    tuple_values[0] = secure_local_mode;
+    tuple_values[1] = iommu_active;
+    tuple_values[2] = book_of_truth_gpu_hooks;
+    tuple_values[3] = policy_digest_parity;
+    tuple_values[4] = max_p50_overhead_q16;
+    tuple_values[5] = max_p95_overhead_q16;
+    tuple_values[6] = staged_p50_overhead_q16;
+    tuple_values[7] = staged_p95_overhead_q16;
+    tuple_values[8] = staged_budget_gate_status;
+    tuple_count = 9;
+
+    // IQ-1681 row+gate immutable snapshot digest:
+    // - lock row outputs against mutation before/after secure-local budget summary;
+    // - hash immutable gate tuple + staged summary tuple before publishing eligibility;
+    // - replay digest fold and fail closed on any drift or arithmetic overflow.
+    digest_primary = 1469598103934665603;
+    digest_parity = 1469598103934665603;
+    stride = 104729;
+
+    for (i = 0; i < tuple_count; ++i)
+    {
+        if (!GPUSecurityPerfAddChecked(tuple_values[i], i + 1, &offset_value))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (!GPUSecurityPerfMulChecked(offset_value, stride, &mixed_term))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (!GPUSecurityPerfAddChecked(digest_primary, mixed_term, &digest_primary))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (!GPUSecurityPerfAddChecked(stride, 104729, &stride))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+    }
+
+    stride = 104729;
+    for (i = 0; i < tuple_count; ++i)
+    {
+        if (!GPUSecurityPerfAddChecked(tuple_values[i], i + 1, &offset_value))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (!GPUSecurityPerfMulChecked(offset_value, stride, &mixed_term))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (!GPUSecurityPerfAddChecked(digest_parity, mixed_term, &digest_parity))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (!GPUSecurityPerfAddChecked(stride, 104729, &stride))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+    }
+
+    if (digest_primary != digest_parity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    *out_p50_overhead_q16 = staged_p50_overhead_q16;
+    *out_p95_overhead_q16 = staged_p95_overhead_q16;
+    *out_budget_gate_status = staged_budget_gate_status;
+    *out_snapshot_digest_q64 = digest_primary;
+    return GPU_SEC_PERF_OK;
+}
+
 I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnly(
     const GPUSecurityPerfMatrixRowOutput *rows,
     I64 row_count,
