@@ -2018,7 +2018,7 @@ I32 GPUSecurityPerfFastPathSwitchCheckedAuditParityCommitOnlyPreflightOnlyParity
     saved_fast_path_enabled = *out_fast_path_enabled;
     saved_disable_reason_code = *out_disable_reason_code;
 
-    // IQ-1594 zero-write diagnostics companion:
+    // IQ-1608 zero-write diagnostics companion:
     // 1) snapshot immutable security gate tuple + caller output slots;
     // 2) derive staged tuple via commit-only hardening wrapper (IQ-1593);
     // 3) derive canonical tuple via strict diagnostics parity gate (IQ-1592);
