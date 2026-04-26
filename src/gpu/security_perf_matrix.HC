@@ -604,6 +604,174 @@ I32 GPUSecurityPerfFastPathSwitchSecureLocalOverheadBudgetCrossGateChecked(
     return GPU_SEC_PERF_OK;
 }
 
+I32 GPUSecurityPerfFastPathSwitchSecureLocalOverheadBudgetCrossGateSnapshotDigestQ64Checked(
+    I64 secure_local_mode,
+    I64 iommu_active,
+    I64 book_of_truth_gpu_hooks,
+    I64 policy_digest_parity,
+    I64 dispatch_transcript_parity,
+    I64 p50_overhead_q16,
+    I64 p95_overhead_q16,
+    I64 max_p50_overhead_q16,
+    I64 max_p95_overhead_q16,
+    I64 *out_fast_path_enabled,
+    I64 *out_disable_reason_code,
+    I64 *out_snapshot_digest_q64)
+{
+    I64 snapshot_secure_local_mode;
+    I64 snapshot_iommu_active;
+    I64 snapshot_book_of_truth_gpu_hooks;
+    I64 snapshot_policy_digest_parity;
+    I64 snapshot_dispatch_transcript_parity;
+    I64 snapshot_p50_overhead_q16;
+    I64 snapshot_p95_overhead_q16;
+    I64 snapshot_max_p50_overhead_q16;
+    I64 snapshot_max_p95_overhead_q16;
+    I64 *snapshot_out_fast_path_enabled_ptr;
+    I64 *snapshot_out_disable_reason_code_ptr;
+    I64 *snapshot_out_snapshot_digest_q64_ptr;
+    I64 staged_fast_path_enabled;
+    I64 staged_disable_reason_code;
+    I64 tuple_values[9];
+    I64 tuple_count;
+    I64 i;
+    I64 offset_value;
+    I64 mixed_term;
+    I64 digest_primary;
+    I64 digest_parity;
+    I64 stride;
+    I32 status_primary;
+
+    if (!out_fast_path_enabled || !out_disable_reason_code || !out_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    if (out_fast_path_enabled == out_disable_reason_code ||
+        out_fast_path_enabled == out_snapshot_digest_q64 ||
+        out_disable_reason_code == out_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    *out_fast_path_enabled = 0;
+    *out_disable_reason_code = GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_PROFILE_GUARD;
+    *out_snapshot_digest_q64 = 0;
+
+    snapshot_secure_local_mode = secure_local_mode;
+    snapshot_iommu_active = iommu_active;
+    snapshot_book_of_truth_gpu_hooks = book_of_truth_gpu_hooks;
+    snapshot_policy_digest_parity = policy_digest_parity;
+    snapshot_dispatch_transcript_parity = dispatch_transcript_parity;
+    snapshot_p50_overhead_q16 = p50_overhead_q16;
+    snapshot_p95_overhead_q16 = p95_overhead_q16;
+    snapshot_max_p50_overhead_q16 = max_p50_overhead_q16;
+    snapshot_max_p95_overhead_q16 = max_p95_overhead_q16;
+    snapshot_out_fast_path_enabled_ptr = out_fast_path_enabled;
+    snapshot_out_disable_reason_code_ptr = out_disable_reason_code;
+    snapshot_out_snapshot_digest_q64_ptr = out_snapshot_digest_q64;
+
+    status_primary = GPUSecurityPerfFastPathSwitchSecureLocalOverheadBudgetCrossGateChecked(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        dispatch_transcript_parity,
+        p50_overhead_q16,
+        p95_overhead_q16,
+        max_p50_overhead_q16,
+        max_p95_overhead_q16,
+        &staged_fast_path_enabled,
+        &staged_disable_reason_code);
+
+    if (!GPUSecurityPerfStatusIsValid(status_primary))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (!GPUSecurityPerfFlagIsBinary(staged_fast_path_enabled))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (!GPUSecurityPerfFastPathDisableReasonIsValid(staged_disable_reason_code))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (status_primary != GPU_SEC_PERF_OK)
+    {
+        *out_fast_path_enabled = staged_fast_path_enabled;
+        *out_disable_reason_code = staged_disable_reason_code;
+        return status_primary;
+    }
+
+    tuple_values[0] = secure_local_mode;
+    tuple_values[1] = iommu_active;
+    tuple_values[2] = book_of_truth_gpu_hooks;
+    tuple_values[3] = policy_digest_parity;
+    tuple_values[4] = dispatch_transcript_parity;
+    tuple_values[5] = p50_overhead_q16;
+    tuple_values[6] = p95_overhead_q16;
+    tuple_values[7] = max_p50_overhead_q16;
+    tuple_values[8] = max_p95_overhead_q16;
+    tuple_count = 9;
+
+    // IQ-1679 immutable secure-local fast-path snapshot digest:
+    // - hash policy/perf gate inputs before publishing dispatch eligibility;
+    // - replay digest fold to detect mutation/replay drift on identical tuple;
+    // - fail closed on any digest mismatch or integer overflow.
+    digest_primary = 1469598103934665603;
+    digest_parity = 1469598103934665603;
+    stride = 104729;
+
+    for (i = 0; i < tuple_count; ++i)
+    {
+        if (!GPUSecurityPerfAddChecked(tuple_values[i], i + 1, &offset_value))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (!GPUSecurityPerfMulChecked(offset_value, stride, &mixed_term))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (!GPUSecurityPerfAddChecked(digest_primary, mixed_term, &digest_primary))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (!GPUSecurityPerfAddChecked(stride, 104729, &stride))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+    }
+
+    stride = 104729;
+    for (i = 0; i < tuple_count; ++i)
+    {
+        if (!GPUSecurityPerfAddChecked(tuple_values[i], i + 1, &offset_value))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (!GPUSecurityPerfMulChecked(offset_value, stride, &mixed_term))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (!GPUSecurityPerfAddChecked(digest_parity, mixed_term, &digest_parity))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (!GPUSecurityPerfAddChecked(stride, 104729, &stride))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+    }
+
+    if (snapshot_secure_local_mode != secure_local_mode)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_iommu_active != iommu_active)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_book_of_truth_gpu_hooks != book_of_truth_gpu_hooks)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_policy_digest_parity != policy_digest_parity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_dispatch_transcript_parity != dispatch_transcript_parity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_p50_overhead_q16 != p50_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_p95_overhead_q16 != p95_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_max_p50_overhead_q16 != max_p50_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_max_p95_overhead_q16 != max_p95_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_fast_path_enabled_ptr != out_fast_path_enabled)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_disable_reason_code_ptr != out_disable_reason_code)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_snapshot_digest_q64_ptr != out_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (digest_primary != digest_parity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    *out_fast_path_enabled = staged_fast_path_enabled;
+    *out_disable_reason_code = staged_disable_reason_code;
+    *out_snapshot_digest_q64 = digest_primary;
+    return GPU_SEC_PERF_OK;
+}
+
 I32 GPUSecurityPerfFastPathSwitchSecureLocalOverheadBudgetCrossGateCheckedCommitOnly(
     I64 secure_local_mode,
     I64 iommu_active,
