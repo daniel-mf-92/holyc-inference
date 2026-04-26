@@ -1630,10 +1630,10 @@ I32 GPUSecurityPerfFastPathSwitchSecureLocalOverheadBudgetCrossGateSnapshotDiges
     saved_disable_reason_code = *out_disable_reason_code;
     saved_snapshot_digest_q64 = *out_snapshot_digest_q64;
 
-    // IQ-1688 strict diagnostics parity gate:
+    // IQ-1702 strict diagnostics parity gate:
     // 1) snapshot immutable secure-local gate tuple + caller output slots;
-    // 2) derive staged tuple via IQ-1687 zero-write diagnostics companion;
-    // 3) derive canonical tuple via IQ-1686 commit-only hardening wrapper;
+    // 2) derive staged tuple via commit-only preflight-only diagnostics companion;
+    // 3) derive canonical tuple via commit-only hardening wrapper;
     // 4) require status-domain validity + exact status/tuple parity;
     // 5) preserve caller outputs (strict zero-write semantics).
     status_preflight_only =
@@ -1651,6 +1651,9 @@ I32 GPUSecurityPerfFastPathSwitchSecureLocalOverheadBudgetCrossGateSnapshotDiges
             &staged_disable_reason_code,
             &staged_snapshot_digest_q64);
 
+    canonical_fast_path_enabled = staged_fast_path_enabled;
+    canonical_disable_reason_code = staged_disable_reason_code;
+    canonical_snapshot_digest_q64 = staged_snapshot_digest_q64;
     status_canonical =
         GPUSecurityPerfFastPathSwitchSecureLocalOverheadBudgetCrossGateSnapshotDigestQ64CheckedCommitOnlyPreflightOnlyParityCommitOnly(
             secure_local_mode,
