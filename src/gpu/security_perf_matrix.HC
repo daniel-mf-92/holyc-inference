@@ -20567,6 +20567,7 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateS
     saved_budget_gate_status = *out_budget_gate_status;
     saved_snapshot_digest_q64 = *out_snapshot_digest_q64;
 
+    // IQ-1698 zero-write diagnostics companion:
     // IQ-1695 zero-write diagnostics companion:
     // 1) snapshot immutable secure-local tuple and caller output slots;
     // 2) derive staged tuple through IQ-1693 commit-only hardening wrapper;
