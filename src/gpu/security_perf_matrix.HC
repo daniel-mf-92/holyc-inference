@@ -15544,6 +15544,8 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateC
     I64 *snapshot_out_p50_ptr;
     I64 *snapshot_out_p95_ptr;
     I64 *snapshot_out_budget_status_ptr;
+    I64 snapshot_before_digest_q64;
+    I64 snapshot_after_digest_q64;
     I64 saved_p50_overhead_q16;
     I64 saved_p95_overhead_q16;
     I64 saved_budget_gate_status;
@@ -15555,6 +15557,7 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateC
     I64 staged_budget_gate_status;
     I32 status_parity;
     I32 status_preflight_only;
+    I32 status_snapshot;
 
     if (!rows || !out_p50_overhead_q16 || !out_p95_overhead_q16 || !out_budget_gate_status)
         return GPU_SEC_PERF_ERR_NULL_PTR;
@@ -15580,12 +15583,21 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateC
     saved_p95_overhead_q16 = *out_p95_overhead_q16;
     saved_budget_gate_status = *out_budget_gate_status;
 
-    // IQ-1603 commit-only hardening wrapper:
+    // IQ-1617 commit-only hardening wrapper:
     // 1) snapshot immutable secure-local gate tuple + caller output slots;
-    // 2) derive parity tuple via strict diagnostics parity wrapper;
-    // 3) replay zero-write diagnostics companion seeded from parity tuple;
-    // 4) require valid status/budget domains plus exact status/tuple parity;
-    // 5) atomically publish outputs only on strict tuple parity.
+    // 2) digest-lock row set before/after wrapper replay for immutable input proof;
+    // 3) derive parity tuple via strict diagnostics parity wrapper;
+    // 4) replay zero-write diagnostics companion seeded from parity tuple;
+    // 5) require valid status/budget domains plus exact status/tuple parity;
+    // 6) atomically publish outputs only on strict tuple parity.
+    status_snapshot = GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked(
+        rows,
+        row_count,
+        rows_capacity,
+        &snapshot_before_digest_q64);
+    if (status_snapshot != GPU_SEC_PERF_OK)
+        return status_snapshot;
+
     parity_p50_overhead_q16 = 0;
     parity_p95_overhead_q16 = 0;
     parity_budget_gate_status = GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK;
@@ -15619,6 +15631,16 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateC
         &staged_p50_overhead_q16,
         &staged_p95_overhead_q16,
         &staged_budget_gate_status);
+
+    status_snapshot = GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked(
+        rows,
+        row_count,
+        rows_capacity,
+        &snapshot_after_digest_q64);
+    if (status_snapshot != GPU_SEC_PERF_OK)
+        return status_snapshot;
+    if (snapshot_after_digest_q64 != snapshot_before_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
 
     if (snapshot_row_count != row_count)
         return GPU_SEC_PERF_ERR_BAD_PARAM;

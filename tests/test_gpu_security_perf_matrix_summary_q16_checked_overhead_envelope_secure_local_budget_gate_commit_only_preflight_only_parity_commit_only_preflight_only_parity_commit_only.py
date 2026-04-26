@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1603 commit-only hardening wrapper over IQ-1602 and IQ-1601."""
+"""Harness for IQ-1617 commit-only hardening wrapper over IQ-1602 and IQ-1601."""
 
 from __future__ import annotations
 
@@ -329,11 +329,13 @@ def secure_local_budget_gate_commit_only_preflight_only_parity_commit_only_prefl
     return GPU_SEC_PERF_OK, parity_tuple
 
 
-def test_source_contains_iq1603_symbols() -> None:
+def test_source_contains_iq1617_symbols() -> None:
     src = Path("src/gpu/security_perf_matrix.HC").read_text(encoding="utf-8")
     assert "I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(" in src
     assert "status_parity = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in src
     assert "status_preflight_only = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in src
+    assert "status_snapshot = GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked(" in src
+    assert "if (snapshot_after_digest_q64 != snapshot_before_digest_q64)" in src
     assert "if (status_parity != status_preflight_only)" in src
     assert "if (parity_budget_gate_status != staged_budget_gate_status)" in src
     assert "if (status_parity != GPU_SEC_PERF_OK)" in src
@@ -486,7 +488,7 @@ def test_null_and_alias_vectors() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_iq1603_symbols()
+    test_source_contains_iq1617_symbols()
     test_gate_missing_and_threshold_breach_vectors()
     test_status_domain_drift_and_deterministic_tuple_parity_vectors()
     test_null_and_alias_vectors()
