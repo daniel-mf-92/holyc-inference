@@ -4245,7 +4245,7 @@ I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPrefligh
     snapshot_out_snapshot_digest_q64_ptr = out_snapshot_digest_q64;
     saved_snapshot_digest_q64 = *out_snapshot_digest_q64;
 
-    // IQ-1555 commit-only hardening wrapper:
+    // IQ-1563 commit-only hardening wrapper:
     // 1) snapshot immutable row-gate tuple + caller digest slot;
     // 2) derive canonical digest through strict diagnostics parity gate;
     // 3) replay zero-write diagnostics companion with canonical digest seed;
@@ -4308,6 +4308,9 @@ I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPrefligh
         *out_snapshot_digest_q64 = saved_snapshot_digest_q64;
         return status_parity;
     }
+
+    if (*out_snapshot_digest_q64 != saved_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
 
     *out_snapshot_digest_q64 = parity_snapshot_digest_q64;
     return GPU_SEC_PERF_OK;

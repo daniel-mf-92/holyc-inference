@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1555 commit-only digest wrapper over strict parity + preflight-only diagnostics."""
+"""Harness for IQ-1563 commit-only digest wrapper over strict parity + preflight-only diagnostics."""
 
 from __future__ import annotations
 
@@ -526,17 +526,18 @@ def gpu_security_perf_matrix_row_gate_checked_policy_snapshot_digest_q64_commit_
     return GPU_SEC_PERF_OK, parity_digest
 
 
-def test_source_contains_iq1555_symbols() -> None:
+def test_source_contains_iq1563_symbols() -> None:
     src = Path("src/gpu/security_perf_matrix.HC").read_text(encoding="utf-8")
 
     assert "I32 GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(" in src
     assert "status_parity = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in src
     assert "status_preflight_only = GPUSecurityPerfMatrixRowGateCheckedPolicySnapshotDigestQ64CommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in src
-    assert "// IQ-1555 commit-only hardening wrapper:" in src
+    assert "// IQ-1563 commit-only hardening wrapper:" in src
     assert "saved_snapshot_digest_q64" in src
     assert "if (!GPUSecurityPerfStatusIsValid(status_parity))" in src
     assert "if (!GPUSecurityPerfStatusIsValid(status_preflight_only))" in src
     assert "if (status_parity != status_preflight_only)" in src
+    assert "if (*out_snapshot_digest_q64 != saved_snapshot_digest_q64)" in src
     assert "*out_snapshot_digest_q64 = parity_snapshot_digest_q64;" in src
 
 
@@ -605,6 +606,50 @@ def test_gate_missing_vectors() -> None:
         )
         assert status == GPU_SEC_PERF_ERR_POLICY_GUARD
         assert digest == seed
+
+
+def test_reason_code_parity_vectors() -> None:
+    vectors = [
+        ((0, 1, 1, 64, 1, GPU_SEC_PERF_QUANT_Q4_0), GPU_SEC_PERF_ERR_POLICY_GUARD, GPU_SEC_PERF_ROW_GATE_REASON_IOMMU_GUARD),
+        ((1, 1, 0, 64, 1, GPU_SEC_PERF_QUANT_Q4_0), GPU_SEC_PERF_ERR_POLICY_GUARD, GPU_SEC_PERF_ROW_GATE_REASON_POLICY_DIGEST_MISMATCH),
+        ((1, 0, 1, 64, 1, GPU_SEC_PERF_QUANT_Q4_0), GPU_SEC_PERF_ERR_POLICY_GUARD, GPU_SEC_PERF_ROW_GATE_REASON_BOOK_GUARD),
+        ((1, 1, 1, 64, 1, 123), GPU_SEC_PERF_ERR_BAD_PARAM, GPU_SEC_PERF_ROW_GATE_REASON_BAD_QUANT_PROFILE),
+        ((1, 1, 1, -1, 1, GPU_SEC_PERF_QUANT_Q8_0), GPU_SEC_PERF_ERR_BAD_PARAM, GPU_SEC_PERF_ROW_GATE_REASON_BAD_ROW_GEOMETRY),
+        ((1, 1, 1, 64, 0, GPU_SEC_PERF_QUANT_Q8_0), GPU_SEC_PERF_ERR_BAD_PARAM, GPU_SEC_PERF_ROW_GATE_REASON_BAD_ROW_GEOMETRY),
+    ]
+
+    seen_reasons: set[int] = set()
+    for idx, (args, expected_status, expected_reason) in enumerate(vectors):
+        iommu_active, book_hooks, policy_digest_parity, row_prompt_tokens, row_batch_size, row_quant = args
+        status_gate, gate_reason, row_allowed = _row_gate_checked(
+            secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
+            iommu_active=iommu_active,
+            book_of_truth_gpu_hooks=book_hooks,
+            policy_digest_parity=policy_digest_parity,
+            row_prompt_tokens=row_prompt_tokens,
+            row_batch_size=row_batch_size,
+            row_quant_profile=row_quant,
+        )
+        assert status_gate == expected_status
+        assert gate_reason == expected_reason
+        assert row_allowed == 0
+        seen_reasons.add(gate_reason)
+
+        seed = 9800 + idx
+        status, digest = gpu_security_perf_matrix_row_gate_checked_policy_snapshot_digest_q64_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only_preflight_only_parity_commit_only(
+            secure_local_mode=GPU_SEC_PERF_PROFILE_SECURE_LOCAL,
+            iommu_active=iommu_active,
+            book_of_truth_gpu_hooks=book_hooks,
+            policy_digest_parity=policy_digest_parity,
+            row_prompt_tokens=row_prompt_tokens,
+            row_batch_size=row_batch_size,
+            row_quant_profile=row_quant,
+            current_snapshot_digest_q64=seed,
+        )
+        assert status == expected_status
+        assert digest == seed
+
+    assert len(seen_reasons) >= 4
 
 
 def test_digest_bit_flip_sensitivity() -> None:
@@ -735,9 +780,10 @@ def test_invalid_status_domain_rejected() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_iq1555_symbols()
+    test_source_contains_iq1563_symbols()
     test_secure_on_overhead_budget_vectors()
     test_gate_missing_vectors()
+    test_reason_code_parity_vectors()
     test_digest_bit_flip_sensitivity()
     test_overflow_parity_and_null_vectors()
     test_drift_rejected()
