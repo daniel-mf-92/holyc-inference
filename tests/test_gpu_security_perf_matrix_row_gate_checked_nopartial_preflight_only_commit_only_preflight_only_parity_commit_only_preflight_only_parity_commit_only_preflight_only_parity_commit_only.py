@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1544 commit-only row-gate wrapper over strict parity + preflight diagnostics."""
+"""Harness for IQ-1557 commit-only row-gate wrapper over canonical no-partial + parity/preflight diagnostics."""
 
 from __future__ import annotations
 
@@ -407,6 +407,24 @@ def row_gate_checked_nopartial_preflight_only_commit_only_preflight_only_parity_
     if outputs_alias:
         return GPU_SEC_PERF_ERR_BAD_PARAM, current_gate_reason_code, current_row_allowed
 
+    status_canonical, canonical_reason, canonical_allowed = _row_gate_checked_nopartial(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        row_prompt_tokens,
+        row_batch_size,
+        row_quant_profile,
+    )
+    if status_canonical != GPU_SEC_PERF_OK and canonical_allowed != 0:
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_gate_reason_code, current_row_allowed
+    if status_canonical == GPU_SEC_PERF_OK and canonical_allowed != 1:
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_gate_reason_code, current_row_allowed
+    if status_canonical == GPU_SEC_PERF_OK and canonical_reason != GPU_SEC_PERF_ROW_GATE_REASON_ALLOW:
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_gate_reason_code, current_row_allowed
+    if status_canonical != GPU_SEC_PERF_OK and canonical_reason == GPU_SEC_PERF_ROW_GATE_REASON_ALLOW:
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_gate_reason_code, current_row_allowed
+
     status_parity, parity_reason, parity_allowed = row_gate_checked_nopartial_preflight_only_commit_only_preflight_only_parity_commit_only_preflight_only_parity(
         secure_local_mode,
         iommu_active,
@@ -415,8 +433,8 @@ def row_gate_checked_nopartial_preflight_only_commit_only_preflight_only_parity_
         row_prompt_tokens,
         row_batch_size,
         row_quant_profile,
-        GPU_SEC_PERF_ROW_GATE_REASON_BAD_ROW_GEOMETRY,
-        0,
+        canonical_reason,
+        canonical_allowed,
     )
     status_preflight_only, staged_reason, staged_allowed = _row_gate_checked_nopartial_preflight_only_commit_only_preflight_only_parity_commit_only_preflight_only(
         secure_local_mode,
@@ -436,6 +454,10 @@ def row_gate_checked_nopartial_preflight_only_commit_only_preflight_only_parity_
     if inject_tuple_drift:
         staged_allowed ^= 1
 
+    if status_canonical != status_parity:
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_gate_reason_code, current_row_allowed
+    if status_canonical != status_preflight_only:
+        return GPU_SEC_PERF_ERR_BAD_PARAM, current_gate_reason_code, current_row_allowed
     if status_preflight_only != status_parity:
         return GPU_SEC_PERF_ERR_BAD_PARAM, current_gate_reason_code, current_row_allowed
     if staged_reason != parity_reason or staged_allowed != parity_allowed:
@@ -445,14 +467,17 @@ def row_gate_checked_nopartial_preflight_only_commit_only_preflight_only_parity_
     return GPU_SEC_PERF_OK, parity_reason, parity_allowed
 
 
-def test_source_contains_iq1544_symbols() -> None:
+def test_source_contains_iq1557_symbols() -> None:
     src = Path("src/gpu/security_perf_matrix.HC").read_text(encoding="utf-8")
 
     assert "I32 GPUSecurityPerfMatrixRowGateCheckedNoPartialPreflightOnlyCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(" in src
+    assert "status_canonical = GPUSecurityPerfMatrixRowGateCheckedNoPartial(" in src
     assert "status_parity = GPUSecurityPerfMatrixRowGateCheckedNoPartialPreflightOnlyCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in src
     assert "status_preflight_only = GPUSecurityPerfMatrixRowGateCheckedNoPartialPreflightOnlyCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in src
     assert "saved_gate_reason_code" in src
     assert "saved_row_allowed" in src
+    assert "if (status_canonical != status_parity)" in src
+    assert "if (status_canonical != status_preflight_only)" in src
     assert "if (!GPUSecurityPerfStatusIsValid(status_parity))" in src
     assert "if (!GPUSecurityPerfStatusIsValid(status_preflight_only))" in src
     assert "if (status_parity != GPU_SEC_PERF_OK)" in src
@@ -570,7 +595,7 @@ def test_success_commit_publish_vector() -> None:
         current_row_allowed=102,
     )
     assert status == GPU_SEC_PERF_OK
-    assert (reason, allowed) == (GPU_SEC_PERF_ROW_GATE_REASON_BAD_ROW_GEOMETRY, 0)
+    assert (reason, allowed) == (GPU_SEC_PERF_ROW_GATE_REASON_ALLOW, 1)
 
 
 def test_profile_guard_preserves_outputs() -> None:
@@ -589,7 +614,7 @@ def test_profile_guard_preserves_outputs() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_iq1544_symbols()
+    test_source_contains_iq1557_symbols()
     test_null_alias_capacity_vectors()
     test_gate_missing_and_reason_parity_vectors()
     test_success_commit_publish_vector()

@@ -2323,10 +2323,11 @@ I32 GPUSecurityPerfMatrixRowGateCheckedNoPartialPreflightOnlyCommitOnlyPreflight
     I64 *snapshot_out_row_allowed_ptr;
     I64 saved_gate_reason_code;
     I64 saved_row_allowed;
-    I64 parity_gate_reason_code;
-    I64 parity_row_allowed;
+    I64 canonical_gate_reason_code;
+    I64 canonical_row_allowed;
     I64 staged_gate_reason_code;
     I64 staged_row_allowed;
+    I32 status_canonical;
     I32 status_parity;
     I32 status_preflight_only;
 
@@ -2348,14 +2349,42 @@ I32 GPUSecurityPerfMatrixRowGateCheckedNoPartialPreflightOnlyCommitOnlyPreflight
     saved_gate_reason_code = *out_gate_reason_code;
     saved_row_allowed = *out_row_allowed;
 
-    // IQ-1544 commit-only hardening wrapper:
+    // IQ-1557 commit-only hardening wrapper:
     // 1) snapshot immutable gate tuple + caller output slots;
-    // 2) derive canonical tuple through strict parity diagnostics wrapper;
-    // 3) replay zero-write diagnostics wrapper with canonical tuple seed;
-    // 4) enforce immutable snapshots + exact status/tuple parity;
+    // 2) derive canonical tuple through no-partial commit-only row-gate wrapper;
+    // 3) replay strict parity + zero-write diagnostics wrappers with canonical tuple seed;
+    // 4) enforce immutable snapshots + exact status/tuple parity + status-domain invariants;
     // 5) atomically publish `{gate_reason_code,row_allowed}` only on success.
-    parity_gate_reason_code = GPU_SEC_PERF_ROW_GATE_REASON_BAD_ROW_GEOMETRY;
-    parity_row_allowed = 0;
+    status_canonical = GPUSecurityPerfMatrixRowGateCheckedNoPartial(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        row_prompt_tokens,
+        row_batch_size,
+        row_quant_profile,
+        &canonical_gate_reason_code,
+        &canonical_row_allowed);
+
+    if (!GPUSecurityPerfStatusIsValid(status_canonical))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (!GPUSecurityPerfRowGateReasonIsValid(canonical_gate_reason_code))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (!GPUSecurityPerfFlagIsBinary(canonical_row_allowed))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (status_canonical != GPU_SEC_PERF_OK && canonical_row_allowed != 0)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (status_canonical == GPU_SEC_PERF_OK && canonical_row_allowed != 1)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (status_canonical == GPU_SEC_PERF_OK &&
+        canonical_gate_reason_code != GPU_SEC_PERF_ROW_GATE_REASON_ALLOW)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (status_canonical != GPU_SEC_PERF_OK &&
+        canonical_gate_reason_code == GPU_SEC_PERF_ROW_GATE_REASON_ALLOW)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
     status_parity = GPUSecurityPerfMatrixRowGateCheckedNoPartialPreflightOnlyCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
         secure_local_mode,
         iommu_active,
@@ -2364,11 +2393,11 @@ I32 GPUSecurityPerfMatrixRowGateCheckedNoPartialPreflightOnlyCommitOnlyPreflight
         row_prompt_tokens,
         row_batch_size,
         row_quant_profile,
-        &parity_gate_reason_code,
-        &parity_row_allowed);
+        &canonical_gate_reason_code,
+        &canonical_row_allowed);
 
-    staged_gate_reason_code = parity_gate_reason_code;
-    staged_row_allowed = parity_row_allowed;
+    staged_gate_reason_code = canonical_gate_reason_code;
+    staged_row_allowed = canonical_row_allowed;
     status_preflight_only = GPUSecurityPerfMatrixRowGateCheckedNoPartialPreflightOnlyCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
         secure_local_mode,
         iommu_active,
@@ -2380,10 +2409,6 @@ I32 GPUSecurityPerfMatrixRowGateCheckedNoPartialPreflightOnlyCommitOnlyPreflight
         &staged_gate_reason_code,
         &staged_row_allowed);
 
-    if (!GPUSecurityPerfRowGateReasonIsValid(parity_gate_reason_code))
-        return GPU_SEC_PERF_ERR_BAD_PARAM;
-    if (!GPUSecurityPerfFlagIsBinary(parity_row_allowed))
-        return GPU_SEC_PERF_ERR_BAD_PARAM;
     if (!GPUSecurityPerfRowGateReasonIsValid(staged_gate_reason_code))
         return GPU_SEC_PERF_ERR_BAD_PARAM;
     if (!GPUSecurityPerfFlagIsBinary(staged_row_allowed))
@@ -2413,11 +2438,15 @@ I32 GPUSecurityPerfMatrixRowGateCheckedNoPartialPreflightOnlyCommitOnlyPreflight
     if (!GPUSecurityPerfStatusIsValid(status_preflight_only))
         return GPU_SEC_PERF_ERR_BAD_PARAM;
 
+    if (status_canonical != status_parity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (status_canonical != status_preflight_only)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
     if (status_parity != status_preflight_only)
         return GPU_SEC_PERF_ERR_BAD_PARAM;
-    if (parity_gate_reason_code != staged_gate_reason_code)
+    if (canonical_gate_reason_code != staged_gate_reason_code)
         return GPU_SEC_PERF_ERR_BAD_PARAM;
-    if (parity_row_allowed != staged_row_allowed)
+    if (canonical_row_allowed != staged_row_allowed)
         return GPU_SEC_PERF_ERR_BAD_PARAM;
 
     if (status_parity != GPU_SEC_PERF_OK)
@@ -2431,8 +2460,8 @@ I32 GPUSecurityPerfMatrixRowGateCheckedNoPartialPreflightOnlyCommitOnlyPreflight
         return status_parity;
     }
 
-    *out_gate_reason_code = parity_gate_reason_code;
-    *out_row_allowed = parity_row_allowed;
+    *out_gate_reason_code = canonical_gate_reason_code;
+    *out_row_allowed = canonical_row_allowed;
     return GPU_SEC_PERF_OK;
 }
 
