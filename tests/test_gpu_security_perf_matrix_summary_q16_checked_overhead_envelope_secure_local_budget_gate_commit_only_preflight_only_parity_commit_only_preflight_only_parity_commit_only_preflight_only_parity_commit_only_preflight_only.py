@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1607 zero-write diagnostics companion over IQ-1606 and IQ-1605."""
+"""Harness for IQ-1621 zero-write diagnostics companion over IQ-1617 and IQ-1630."""
 
 from __future__ import annotations
 
@@ -328,11 +328,13 @@ def secure_local_budget_gate_commit_only_preflight_only_parity_commit_only_prefl
     return status_commit_only, caller_outputs
 
 
-def test_source_contains_iq1607_symbols() -> None:
+def test_source_contains_iq1621_symbols() -> None:
     src = Path("src/gpu/security_perf_matrix.HC").read_text(encoding="utf-8")
     assert "I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in src
     assert "status_commit_only = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(" in src
     assert "status_parity = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in src
+    assert "status_snapshot = GPUSecurityPerfMatrixRowsSnapshotDigestQ64Checked(" in src
+    assert "if (snapshot_after_digest_q64 != snapshot_before_digest_q64)" in src
     assert "if (!GPUSecurityPerfStatusIsValid(status_commit_only))" in src
     assert "if (!GPUSecurityPerfStatusIsValid(status_parity))" in src
 
@@ -482,7 +484,7 @@ def test_null_and_alias_vectors() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_iq1607_symbols()
+    test_source_contains_iq1621_symbols()
     test_gate_missing_and_threshold_breach_vectors()
     test_status_domain_drift_and_deterministic_tuple_parity_vectors()
     test_null_and_alias_vectors()
