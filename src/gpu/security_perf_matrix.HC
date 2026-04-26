@@ -2112,10 +2112,10 @@ I32 GPUSecurityPerfFastPathSwitchSecureLocalOverheadBudgetCrossGateSnapshotDiges
     saved_disable_reason_code = *out_disable_reason_code;
     saved_snapshot_digest_q64 = *out_snapshot_digest_q64;
 
-    // IQ-1691 strict diagnostics parity gate:
+    // IQ-1704 strict diagnostics parity gate:
     // 1) snapshot immutable secure-local gate tuple + caller output slots;
-    // 2) derive staged tuple via IQ-1690 zero-write diagnostics companion;
-    // 3) derive canonical tuple via IQ-1689 commit-only hardening wrapper;
+    // 2) derive staged tuple via IQ-1703 zero-write diagnostics companion;
+    // 3) derive canonical tuple via IQ-1702 strict diagnostics parity gate;
     // 4) require status-domain validity + exact status/tuple parity;
     // 5) preserve caller outputs (strict zero-write semantics).
     status_preflight_only =
