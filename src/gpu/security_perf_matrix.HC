@@ -22601,11 +22601,12 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateC
     if (status_snapshot_digest != GPU_SEC_PERF_OK)
         return status_snapshot_digest;
 
+    // IQ-1678 zero-write diagnostics companion over IQ-1677 commit-only hardening + IQ-1676 canonical parity gate:
     // IQ-1668 zero-write diagnostics companion over IQ-1667 commit-only hardening + IQ-1666 canonical parity gate:
     // 1) snapshot immutable secure-local gate tuple + caller output slots;
     // 2) digest row outputs before/after nested calls to detect row mutation;
-    // 3) derive staged tuple from IQ-1667 commit-only hardening wrapper;
-    // 4) replay IQ-1666 strict diagnostics parity gate seeded from staged tuple;
+    // 3) derive staged tuple from IQ-1677 commit-only hardening wrapper;
+    // 4) replay IQ-1676 strict diagnostics parity gate seeded from staged tuple;
     // 5) enforce immutable snapshots + valid status/budget domains + strict tuple parity;
     // 6) preserve caller output slots (zero-write diagnostics semantics).
     status_commit_only = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
