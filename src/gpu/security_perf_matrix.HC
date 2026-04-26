@@ -2288,7 +2288,7 @@ I32 GPUSecurityPerfFastPathSwitchSecureLocalOverheadBudgetCrossGateCheckedParity
     snapshot_out_fast_path_enabled_ptr = out_fast_path_enabled;
     snapshot_out_disable_reason_code_ptr = out_disable_reason_code;
 
-    // IQ-1658 commit-only hardening wrapper over IQ-1657 parity + IQ-1656 preflight-only:
+    // IQ-1665 commit-only hardening wrapper over IQ-1664 parity + IQ-1659 preflight-only:
     // 1) snapshot immutable secure-on cross-gate inputs + output pointers;
     // 2) derive parity tuple through strict diagnostics parity gate (IQ-1657);
     // 3) replay preflight-only diagnostics companion (IQ-1656) seeded from parity tuple;
