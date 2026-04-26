@@ -31,6 +31,7 @@
 #define GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_BOOK_GUARD                   3
 #define GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_POLICY_DIGEST_MISMATCH       4
 #define GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_DISPATCH_TRANSCRIPT_MISMATCH 5
+#define GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_OVERHEAD_BUDGET_BREACH       6
 #define GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK         0
 #define GPU_SEC_PERF_BUDGET_GATE_STATUS_PASS                 1
 #define GPU_SEC_PERF_BUDGET_GATE_STATUS_THRESHOLD_BREACH     2
@@ -227,7 +228,7 @@ Bool GPUSecurityPerfRowGateReasonIsValid(I64 reason_code)
 Bool GPUSecurityPerfFastPathDisableReasonIsValid(I64 reason_code)
 {
     return (reason_code >= GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_ALLOW &&
-            reason_code <= GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_DISPATCH_TRANSCRIPT_MISMATCH);
+            reason_code <= GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_OVERHEAD_BUDGET_BREACH);
 }
 
 Bool GPUSecurityPerfStatusIsValid(I32 status_code)
@@ -443,6 +444,87 @@ I32 GPUSecurityPerfFastPathSwitchCheckedAuditParity(
     if (!dispatch_transcript_parity)
     {
         *out_disable_reason_code = GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_DISPATCH_TRANSCRIPT_MISMATCH;
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+    }
+
+    *out_fast_path_enabled = 1;
+    *out_disable_reason_code = GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_ALLOW;
+    return GPU_SEC_PERF_OK;
+}
+
+I32 GPUSecurityPerfFastPathSwitchSecureLocalOverheadBudgetCrossGateChecked(
+    I64 secure_local_mode,
+    I64 iommu_active,
+    I64 book_of_truth_gpu_hooks,
+    I64 policy_digest_parity,
+    I64 dispatch_transcript_parity,
+    I64 p50_overhead_q16,
+    I64 p95_overhead_q16,
+    I64 max_p50_overhead_q16,
+    I64 max_p95_overhead_q16,
+    I64 *out_fast_path_enabled,
+    I64 *out_disable_reason_code)
+{
+    I64 staged_fast_path_enabled;
+    I64 staged_disable_reason_code;
+    I32 staged_status;
+
+    if (!out_fast_path_enabled || !out_disable_reason_code)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    *out_fast_path_enabled = 0;
+    *out_disable_reason_code = GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_PROFILE_GUARD;
+
+    if (!GPUSecurityPerfFlagIsBinary(iommu_active) ||
+        !GPUSecurityPerfFlagIsBinary(book_of_truth_gpu_hooks) ||
+        !GPUSecurityPerfFlagIsBinary(policy_digest_parity) ||
+        !GPUSecurityPerfFlagIsBinary(dispatch_transcript_parity))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (p50_overhead_q16 < 0 ||
+        p95_overhead_q16 < 0 ||
+        max_p50_overhead_q16 < 0 ||
+        max_p95_overhead_q16 < 0)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (p95_overhead_q16 < p50_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (max_p95_overhead_q16 < max_p50_overhead_q16)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    staged_fast_path_enabled = 0;
+    staged_disable_reason_code = GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_PROFILE_GUARD;
+    staged_status = GPUSecurityPerfFastPathSwitchCheckedAuditParity(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        dispatch_transcript_parity,
+        &staged_fast_path_enabled,
+        &staged_disable_reason_code);
+
+    if (!GPUSecurityPerfStatusIsValid(staged_status))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (!GPUSecurityPerfFlagIsBinary(staged_fast_path_enabled))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (!GPUSecurityPerfFastPathDisableReasonIsValid(staged_disable_reason_code))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (staged_status != GPU_SEC_PERF_OK)
+    {
+        *out_fast_path_enabled = staged_fast_path_enabled;
+        *out_disable_reason_code = staged_disable_reason_code;
+        return staged_status;
+    }
+
+    // IQ-1639 cross-gate: security parity gate passes first, then secure-on
+    // overhead percentile envelope is enforced before enabling fast path.
+    if (p50_overhead_q16 > max_p50_overhead_q16 ||
+        p95_overhead_q16 > max_p95_overhead_q16)
+    {
+        *out_fast_path_enabled = 0;
+        *out_disable_reason_code =
+            GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_OVERHEAD_BUDGET_BREACH;
         return GPU_SEC_PERF_ERR_POLICY_GUARD;
     }
 
