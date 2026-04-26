@@ -20018,11 +20018,11 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateS
     saved_budget_gate_status = *out_budget_gate_status;
     saved_snapshot_digest_q64 = *out_snapshot_digest_q64;
 
-    // IQ-1683 zero-write diagnostics companion:
+    // IQ-1697 zero-write diagnostics companion:
     // 1) snapshot immutable secure-local tuple and caller output slots;
     // 2) derive staged tuple via IQ-1696 commit-only hardening wrapper;
     // 3) derive canonical tuple via IQ-1681 snapshot-digest checked gate;
-    // 4) require status-domain validity + exact status/tuple parity;
+    // 4) require status-domain validity + strict status/tuple parity;
     // 5) preserve caller outputs (strict zero-write preflight semantics).
     status_preflight_only = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateSnapshotDigestQ64CheckedCommitOnly(
         rows,
