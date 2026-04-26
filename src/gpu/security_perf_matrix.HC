@@ -15770,7 +15770,7 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateC
     saved_p95_overhead_q16 = *out_p95_overhead_q16;
     saved_budget_gate_status = *out_budget_gate_status;
 
-    // IQ-1604 zero-write diagnostics companion:
+    // IQ-1618 zero-write diagnostics companion:
     // 1) snapshot immutable secure-local gate tuple + caller output slots;
     // 2) derive staged tuple via commit-only hardening wrapper;
     // 3) replay strict diagnostics parity wrapper with staged parity seed;

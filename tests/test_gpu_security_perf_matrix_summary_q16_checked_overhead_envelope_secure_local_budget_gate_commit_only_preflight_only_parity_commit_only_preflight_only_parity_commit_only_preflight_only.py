@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harness for IQ-1604 zero-write diagnostics companion over IQ-1603 and IQ-1602."""
+"""Harness for IQ-1618 zero-write diagnostics companion over IQ-1617 and IQ-1602."""
 
 from __future__ import annotations
 
@@ -328,9 +328,10 @@ def secure_local_budget_gate_commit_only_preflight_only_parity_commit_only_prefl
     return status_commit_only, caller_outputs
 
 
-def test_source_contains_iq1604_symbols() -> None:
+def test_source_contains_iq1618_symbols() -> None:
     src = Path("src/gpu/security_perf_matrix.HC").read_text(encoding="utf-8")
     assert "I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(" in src
+    assert "// IQ-1618 zero-write diagnostics companion:" in src
     assert "status_commit_only = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(" in src
     assert "status_parity = GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(" in src
     assert "if (!GPUSecurityPerfStatusIsValid(status_commit_only))" in src
@@ -427,7 +428,7 @@ def test_status_domain_drift_and_deterministic_tuple_parity_vectors() -> None:
         max_p50_overhead_q16=6_000,
         max_p95_overhead_q16=7_000,
         caller_outputs=(255, 266, GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK),
-        force_parity_status_domain_drift=True,
+        force_commit_status_domain_drift=True,
     )
     assert status == GPU_SEC_PERF_ERR_BAD_PARAM
     assert outputs == (255, 266, GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK)
@@ -482,7 +483,7 @@ def test_null_and_alias_vectors() -> None:
 
 
 if __name__ == "__main__":
-    test_source_contains_iq1604_symbols()
+    test_source_contains_iq1618_symbols()
     test_gate_missing_and_threshold_breach_vectors()
     test_status_domain_drift_and_deterministic_tuple_parity_vectors()
     test_null_and_alias_vectors()
