@@ -21495,7 +21495,7 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateC
     if (status_snapshot_digest != GPU_SEC_PERF_OK)
         return status_snapshot_digest;
 
-    // IQ-1663 commit-only hardening wrapper over IQ-1662 strict diagnostics parity + IQ-1661 preflight-only:
+    // IQ-1667 commit-only hardening wrapper over IQ-1666 strict diagnostics parity + IQ-1661 preflight-only:
     // 1) snapshot immutable secure-local gate tuple + caller output slots;
     // 2) digest row outputs before/after nested calls to detect row mutation;
     // 3) replay zero-write diagnostics companion seeded from parity tuple;
