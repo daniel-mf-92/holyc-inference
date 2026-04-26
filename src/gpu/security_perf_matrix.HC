@@ -25,6 +25,12 @@
 #define GPU_SEC_PERF_ROW_GATE_REASON_POLICY_DIGEST_MISMATCH 4
 #define GPU_SEC_PERF_ROW_GATE_REASON_BAD_ROW_GEOMETRY       5
 #define GPU_SEC_PERF_ROW_GATE_REASON_BAD_QUANT_PROFILE      6
+#define GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_ALLOW                        0
+#define GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_PROFILE_GUARD                1
+#define GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_IOMMU_GUARD                  2
+#define GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_BOOK_GUARD                   3
+#define GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_POLICY_DIGEST_MISMATCH       4
+#define GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_DISPATCH_TRANSCRIPT_MISMATCH 5
 #define GPU_SEC_PERF_BUDGET_GATE_STATUS_POLICY_BLOCK         0
 #define GPU_SEC_PERF_BUDGET_GATE_STATUS_PASS                 1
 #define GPU_SEC_PERF_BUDGET_GATE_STATUS_THRESHOLD_BREACH     2
@@ -218,6 +224,12 @@ Bool GPUSecurityPerfRowGateReasonIsValid(I64 reason_code)
             reason_code <= GPU_SEC_PERF_ROW_GATE_REASON_BAD_QUANT_PROFILE);
 }
 
+Bool GPUSecurityPerfFastPathDisableReasonIsValid(I64 reason_code)
+{
+    return (reason_code >= GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_ALLOW &&
+            reason_code <= GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_DISPATCH_TRANSCRIPT_MISMATCH);
+}
+
 Bool GPUSecurityPerfStatusIsValid(I32 status_code)
 {
     return (status_code == GPU_SEC_PERF_OK ||
@@ -381,6 +393,161 @@ I32 GPUSecurityPerfMatrixRowGateChecked(I64 secure_local_mode,
     *out_gate_reason_code = GPU_SEC_PERF_ROW_GATE_REASON_ALLOW;
     *out_row_allowed = 1;
     return GPU_SEC_PERF_OK;
+}
+
+I32 GPUSecurityPerfFastPathSwitchCheckedAuditParity(
+    I64 secure_local_mode,
+    I64 iommu_active,
+    I64 book_of_truth_gpu_hooks,
+    I64 policy_digest_parity,
+    I64 dispatch_transcript_parity,
+    I64 *out_fast_path_enabled,
+    I64 *out_disable_reason_code)
+{
+    if (!out_fast_path_enabled || !out_disable_reason_code)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    *out_fast_path_enabled = 0;
+    *out_disable_reason_code = GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_PROFILE_GUARD;
+
+    if (!GPUSecurityPerfFlagIsBinary(iommu_active) ||
+        !GPUSecurityPerfFlagIsBinary(book_of_truth_gpu_hooks) ||
+        !GPUSecurityPerfFlagIsBinary(policy_digest_parity) ||
+        !GPUSecurityPerfFlagIsBinary(dispatch_transcript_parity))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (secure_local_mode != GPU_SEC_PERF_PROFILE_SECURE_LOCAL)
+    {
+        *out_disable_reason_code = GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_PROFILE_GUARD;
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+    }
+
+    if (!iommu_active)
+    {
+        *out_disable_reason_code = GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_IOMMU_GUARD;
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+    }
+
+    if (!book_of_truth_gpu_hooks)
+    {
+        *out_disable_reason_code = GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_BOOK_GUARD;
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+    }
+
+    if (!policy_digest_parity)
+    {
+        *out_disable_reason_code = GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_POLICY_DIGEST_MISMATCH;
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+    }
+
+    if (!dispatch_transcript_parity)
+    {
+        *out_disable_reason_code = GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_DISPATCH_TRANSCRIPT_MISMATCH;
+        return GPU_SEC_PERF_ERR_POLICY_GUARD;
+    }
+
+    *out_fast_path_enabled = 1;
+    *out_disable_reason_code = GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_ALLOW;
+    return GPU_SEC_PERF_OK;
+}
+
+I32 GPUSecurityPerfFastPathSwitchCheckedAuditParityCommitOnly(
+    I64 secure_local_mode,
+    I64 iommu_active,
+    I64 book_of_truth_gpu_hooks,
+    I64 policy_digest_parity,
+    I64 dispatch_transcript_parity,
+    I64 *out_fast_path_enabled,
+    I64 *out_disable_reason_code)
+{
+    I64 snapshot_secure_local_mode;
+    I64 snapshot_iommu_active;
+    I64 snapshot_book_of_truth_gpu_hooks;
+    I64 snapshot_policy_digest_parity;
+    I64 snapshot_dispatch_transcript_parity;
+    I64 *snapshot_out_fast_path_enabled_ptr;
+    I64 *snapshot_out_disable_reason_code_ptr;
+    I64 staged_fast_path_enabled;
+    I64 staged_disable_reason_code;
+    I64 parity_fast_path_enabled;
+    I64 parity_disable_reason_code;
+    I32 status_primary;
+    I32 status_parity;
+
+    if (!out_fast_path_enabled || !out_disable_reason_code)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    *out_fast_path_enabled = 0;
+    *out_disable_reason_code = GPU_SEC_PERF_FAST_PATH_DISABLE_REASON_PROFILE_GUARD;
+
+    snapshot_secure_local_mode = secure_local_mode;
+    snapshot_iommu_active = iommu_active;
+    snapshot_book_of_truth_gpu_hooks = book_of_truth_gpu_hooks;
+    snapshot_policy_digest_parity = policy_digest_parity;
+    snapshot_dispatch_transcript_parity = dispatch_transcript_parity;
+    snapshot_out_fast_path_enabled_ptr = out_fast_path_enabled;
+    snapshot_out_disable_reason_code_ptr = out_disable_reason_code;
+
+    // IQ-1577 commit-only fast-path gate hardening contract:
+    // 1) stage canonical `{fast_path_enabled,disable_reason_code}` tuple;
+    // 2) recompute canonical tuple over identical immutable snapshots;
+    // 3) enforce status-domain validity + exact status/tuple parity;
+    // 4) publish outputs atomically only when parity is exact.
+    status_primary = GPUSecurityPerfFastPathSwitchCheckedAuditParity(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        dispatch_transcript_parity,
+        &staged_fast_path_enabled,
+        &staged_disable_reason_code);
+
+    status_parity = GPUSecurityPerfFastPathSwitchCheckedAuditParity(
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        dispatch_transcript_parity,
+        &parity_fast_path_enabled,
+        &parity_disable_reason_code);
+
+    if (snapshot_secure_local_mode != secure_local_mode)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_iommu_active != iommu_active)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_book_of_truth_gpu_hooks != book_of_truth_gpu_hooks)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_policy_digest_parity != policy_digest_parity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_dispatch_transcript_parity != dispatch_transcript_parity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_fast_path_enabled_ptr != out_fast_path_enabled)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_disable_reason_code_ptr != out_disable_reason_code)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (!GPUSecurityPerfStatusIsValid(status_primary))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (!GPUSecurityPerfStatusIsValid(status_parity))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (!GPUSecurityPerfFlagIsBinary(staged_fast_path_enabled) ||
+        !GPUSecurityPerfFlagIsBinary(parity_fast_path_enabled))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (!GPUSecurityPerfFastPathDisableReasonIsValid(staged_disable_reason_code) ||
+        !GPUSecurityPerfFastPathDisableReasonIsValid(parity_disable_reason_code))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (status_primary != status_parity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_fast_path_enabled != parity_fast_path_enabled)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_disable_reason_code != parity_disable_reason_code)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    *out_fast_path_enabled = staged_fast_path_enabled;
+    *out_disable_reason_code = staged_disable_reason_code;
+    return status_primary;
 }
 
 I32 GPUSecurityPerfMatrixRowGateCheckedCommitOnly(I64 secure_local_mode,
