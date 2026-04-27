@@ -89,7 +89,9 @@ network flags such as `-netdev` or virtual NIC devices, including legacy QEMU
 NIC models such as e1000, ne2k, pcnet, rtl8139, usb-net, virtio-net, and vmxnet.
 
 Use `--repeat N` to run every prompt multiple times. Reports include raw per-run
-records plus per-prompt medians and min/max tok/s in both JSON and Markdown.
+records plus per-prompt medians and min/max tok/s in JSON and Markdown. The
+runner also writes `qemu_prompt_bench_latest.csv` with one row per run for CI
+artifact upload, spreadsheets, and simple shell comparisons.
 
 Prompt files can be JSON, JSONL, or plain text split with `---`. Guest output may
 include a JSON line such as:

@@ -168,6 +168,9 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
     assert report["benchmarks"][0]["tok_per_s"] == 320.0
     assert report["benchmarks"][0]["memory_bytes"] == 8388608
     assert report["benchmarks"][0]["command"][1:3] == ["-nic", "none"]
+    csv_report = (output_dir / "qemu_prompt_bench_latest.csv").read_text(encoding="utf-8")
+    assert "benchmark,profile,model,quantization,prompt" in csv_report
+    assert "qemu_prompt,default,,,prompt-1" in csv_report
 
 
 def test_cli_repeat_writes_prompt_summary_and_markdown(tmp_path: Path) -> None:
@@ -218,3 +221,7 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
     assert report["summaries"][0]["memory_bytes_max"] == 1000
     assert "QEMU Prompt Benchmark" in markdown
     assert "| one | 3 | 3 | 20 | 100000 | 200.000 | 200.000 | 200.000 | 1000 |" in markdown
+    csv_report = (output_dir / "qemu_prompt_bench_latest.csv").read_text(encoding="utf-8")
+    assert csv_report.count("\n") == 7
+    assert ",one," in csv_report
+    assert ",two," in csv_report

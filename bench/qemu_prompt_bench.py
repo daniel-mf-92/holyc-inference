@@ -9,6 +9,7 @@ always disabled with `-nic none`, and conflicting network flags are rejected.
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import json
 import os
@@ -435,11 +436,40 @@ def write_report(runs: list[BenchRun], output_dir: Path) -> Path:
     }
     latest = output_dir / "qemu_prompt_bench_latest.json"
     latest_md = output_dir / "qemu_prompt_bench_latest.md"
+    latest_csv = output_dir / "qemu_prompt_bench_latest.csv"
     latest.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     latest_md.write_text(markdown_report(report), encoding="utf-8")
+    write_csv_report(runs, latest_csv)
     stamped = output_dir / f"qemu_prompt_bench_{report['generated_at'].replace(':', '').replace('-', '')}.json"
     stamped.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return latest
+
+
+def write_csv_report(runs: list[BenchRun], path: Path) -> None:
+    fields = [
+        "timestamp",
+        "commit",
+        "benchmark",
+        "profile",
+        "model",
+        "quantization",
+        "prompt",
+        "prompt_sha256",
+        "iteration",
+        "tokens",
+        "elapsed_us",
+        "wall_elapsed_us",
+        "tok_per_s",
+        "memory_bytes",
+        "returncode",
+        "timed_out",
+    ]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        for run in runs:
+            row = asdict(run)
+            writer.writerow({field: row[field] for field in fields})
 
 
 def build_parser() -> argparse.ArgumentParser:
