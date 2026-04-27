@@ -23,6 +23,14 @@
 #define INFERENCE_TOKEN_STREAM_CALLBACK_ABI_TUPLE_CELLS 5
 #define INFERENCE_TOKEN_STREAM_CALLBACK_FLAG_NONE      0
 
+#define INFERENCE_BOT_EVENT_TUPLE_CELLS 6
+#define INFERENCE_BOT_PROFILE_SECURE 1
+#define INFERENCE_BOT_PROFILE_DEV 2
+#define INFERENCE_BOT_STATUS_BLOCKED 0
+#define INFERENCE_BOT_STATUS_EMITTED 1
+#define INFERENCE_BOT_DIGEST_OFFSET 1469598103934665603
+#define INFERENCE_BOT_DIGEST_PRIME 1099511628211
+
 I32 InferenceForwardQ16CheckedNoPartial(
     I64 *embed_q16,
     I64 embed_capacity,
@@ -3357,5 +3365,153 @@ I32 InferenceGenerateTokensCheckedTopKTopPNoPartial(
         *out_generated_count = step_index + 1;
     }
 
+    return SAMPLING_Q16_OK;
+}
+
+// IQ-1791 per-token Book-of-Truth emission gate for secure-local replay logs.
+//
+// Contract:
+// - Snapshot immutable event tuple
+//   `{session_id,step_index,token_id,logit_q16,policy_digest_q64,profile_mode}`.
+// - Fail-closed policy: secure-local + digest match required for emit.
+// - Validate status domain exactly `{blocked=0,emitted=1}`.
+// - No partial writes: caller event/output buffers mutate only after all checks.
+I32 InferenceBookOfTruthTokenEventEmitChecked(
+    I64 *event_buffer,
+    I64 event_buffer_capacity,
+    I64 session_id,
+    I64 step_index,
+    I64 token_id,
+    I64 logit_q16,
+    I64 policy_digest_q64,
+    I64 expected_policy_digest_q64,
+    I64 profile_mode,
+    I64 *out_event_status,
+    I64 *out_event_count,
+    I64 *out_event_digest_q64)
+{
+    I64 staged_event[INFERENCE_BOT_EVENT_TUPLE_CELLS];
+    I64 staged_event_status;
+    I64 staged_event_count;
+    I64 staged_event_digest_q64;
+    I64 digest_q64;
+    I64 lane;
+
+    I64 snapshot_event_buffer_capacity;
+    I64 snapshot_session_id;
+    I64 snapshot_step_index;
+    I64 snapshot_token_id;
+    I64 snapshot_logit_q16;
+    I64 snapshot_policy_digest_q64;
+    I64 snapshot_expected_policy_digest_q64;
+    I64 snapshot_profile_mode;
+    I64 *snapshot_event_buffer;
+    I64 *snapshot_out_event_status;
+    I64 *snapshot_out_event_count;
+    I64 *snapshot_out_event_digest_q64;
+
+    if (!event_buffer || !out_event_status || !out_event_count ||
+        !out_event_digest_q64)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (out_event_status == out_event_count ||
+        out_event_status == out_event_digest_q64 ||
+        out_event_count == out_event_digest_q64)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (event_buffer_capacity < INFERENCE_BOT_EVENT_TUPLE_CELLS)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (session_id < 0 || step_index < 0 || token_id < 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (profile_mode != INFERENCE_BOT_PROFILE_SECURE &&
+        profile_mode != INFERENCE_BOT_PROFILE_DEV)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_event_buffer_capacity = event_buffer_capacity;
+    snapshot_session_id = session_id;
+    snapshot_step_index = step_index;
+    snapshot_token_id = token_id;
+    snapshot_logit_q16 = logit_q16;
+    snapshot_policy_digest_q64 = policy_digest_q64;
+    snapshot_expected_policy_digest_q64 = expected_policy_digest_q64;
+    snapshot_profile_mode = profile_mode;
+    snapshot_event_buffer = event_buffer;
+    snapshot_out_event_status = out_event_status;
+    snapshot_out_event_count = out_event_count;
+    snapshot_out_event_digest_q64 = out_event_digest_q64;
+
+    staged_event[0] = session_id;
+    staged_event[1] = step_index;
+    staged_event[2] = token_id;
+    staged_event[3] = logit_q16;
+    staged_event[4] = policy_digest_q64;
+    staged_event[5] = profile_mode;
+
+    if (profile_mode == INFERENCE_BOT_PROFILE_SECURE &&
+        policy_digest_q64 == expected_policy_digest_q64)
+    {
+        staged_event_status = INFERENCE_BOT_STATUS_EMITTED;
+        staged_event_count = 1;
+    }
+    else
+    {
+        staged_event_status = INFERENCE_BOT_STATUS_BLOCKED;
+        staged_event_count = 0;
+    }
+
+    if (staged_event_status != INFERENCE_BOT_STATUS_BLOCKED &&
+        staged_event_status != INFERENCE_BOT_STATUS_EMITTED)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (staged_event_status == INFERENCE_BOT_STATUS_EMITTED &&
+        staged_event_count != 1)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (staged_event_status == INFERENCE_BOT_STATUS_BLOCKED &&
+        staged_event_count != 0)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    digest_q64 = INFERENCE_BOT_DIGEST_OFFSET;
+    for (lane = 0; lane < INFERENCE_BOT_EVENT_TUPLE_CELLS; lane++)
+    {
+        digest_q64 = digest_q64 ^ staged_event[lane];
+        digest_q64 = digest_q64 * INFERENCE_BOT_DIGEST_PRIME;
+    }
+    digest_q64 = digest_q64 ^ staged_event_status;
+    digest_q64 = digest_q64 * INFERENCE_BOT_DIGEST_PRIME;
+    digest_q64 = digest_q64 ^ staged_event_count;
+    digest_q64 = digest_q64 * INFERENCE_BOT_DIGEST_PRIME;
+    staged_event_digest_q64 = digest_q64;
+
+    if (snapshot_event_buffer_capacity != event_buffer_capacity ||
+        snapshot_session_id != session_id ||
+        snapshot_step_index != step_index ||
+        snapshot_token_id != token_id ||
+        snapshot_logit_q16 != logit_q16 ||
+        snapshot_policy_digest_q64 != policy_digest_q64 ||
+        snapshot_expected_policy_digest_q64 != expected_policy_digest_q64 ||
+        snapshot_profile_mode != profile_mode)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_event_buffer != event_buffer ||
+        snapshot_out_event_status != out_event_status ||
+        snapshot_out_event_count != out_event_count ||
+        snapshot_out_event_digest_q64 != out_event_digest_q64)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_event_buffer_capacity < INFERENCE_BOT_EVENT_TUPLE_CELLS)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (staged_event_status == INFERENCE_BOT_STATUS_EMITTED)
+    {
+        for (lane = 0; lane < INFERENCE_BOT_EVENT_TUPLE_CELLS; lane++)
+            event_buffer[lane] = staged_event[lane];
+    }
+
+    *out_event_status = staged_event_status;
+    *out_event_count = staged_event_count;
+    *out_event_digest_q64 = staged_event_digest_q64;
     return SAMPLING_Q16_OK;
 }
