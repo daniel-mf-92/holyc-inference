@@ -182,6 +182,11 @@ python3 bench/qemu_prompt_bench.py \
   --dry-run
 ```
 
+Dry-runs also write `qemu_prompt_bench_dry_run_latest.json` and `.md` under the
+selected output directory. These artifacts record the exact `-nic none` command,
+prompt-suite hash, warmup count, repeat count, and planned launch totals for CI
+review without booting a guest.
+
 Refresh the committed smoke report without booting a guest:
 
 ```bash

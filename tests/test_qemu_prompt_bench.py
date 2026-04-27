@@ -113,6 +113,7 @@ def test_extract_memory_bytes_accepts_common_units() -> None:
 def test_cli_dry_run_validates_without_launching_qemu(tmp_path: Path, capsys) -> None:
     prompts = tmp_path / "prompts.jsonl"
     image = tmp_path / "temple.img"
+    output_dir = tmp_path / "results"
     prompts.write_text('{"prompt_id":"one","prompt":"A"}\n', encoding="utf-8")
 
     status = qemu_prompt_bench.main(
@@ -121,7 +122,13 @@ def test_cli_dry_run_validates_without_launching_qemu(tmp_path: Path, capsys) ->
             str(image),
             "--prompts",
             str(prompts),
+            "--output-dir",
+            str(output_dir),
             "--dry-run",
+            "--warmup",
+            "1",
+            "--repeat",
+            "2",
             "--",
             "-m",
             "256M",
@@ -130,10 +137,20 @@ def test_cli_dry_run_validates_without_launching_qemu(tmp_path: Path, capsys) ->
 
     assert status == 0
     payload = json.loads(capsys.readouterr().out)
+    report = json.loads((output_dir / "qemu_prompt_bench_dry_run_latest.json").read_text(encoding="utf-8"))
+    markdown = (output_dir / "qemu_prompt_bench_dry_run_latest.md").read_text(encoding="utf-8")
     assert payload["prompt_count"] == 1
     assert payload["prompt_suite"]["prompt_count"] == 1
     assert len(payload["prompt_suite"]["suite_sha256"]) == 64
+    assert payload["planned_warmup_launches"] == 1
+    assert payload["planned_measured_launches"] == 2
+    assert payload["planned_total_launches"] == 3
     assert payload["command"][1:3] == ["-nic", "none"]
+    assert payload["dry_run_report"] == str(output_dir / "qemu_prompt_bench_dry_run_latest.json")
+    assert report["status"] == "planned"
+    assert report["command"][1:3] == ["-nic", "none"]
+    assert "QEMU Prompt Benchmark Dry Run" in markdown
+    assert "Total launches: 3" in markdown
 
 
 def test_cli_writes_result_file_with_fake_qemu(tmp_path: Path) -> None:

@@ -1,0 +1,28 @@
+{
+  "command": [
+    "bench/fixtures/qemu_synthetic_bench.py",
+    "-nic",
+    "none",
+    "-serial",
+    "stdio",
+    "-display",
+    "none",
+    "-drive",
+    "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide",
+    "-m",
+    "256M"
+  ],
+  "generated_at": "2026-04-27T22:27:13Z",
+  "planned_measured_launches": 4,
+  "planned_total_launches": 6,
+  "planned_warmup_launches": 2,
+  "prompt_count": 2,
+  "prompt_suite": {
+    "prompt_count": 2,
+    "source": "bench/prompts/smoke.jsonl",
+    "suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a"
+  },
+  "repeat": 2,
+  "status": "planned",
+  "warmup": 1
+}

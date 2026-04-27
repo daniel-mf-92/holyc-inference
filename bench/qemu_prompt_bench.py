@@ -591,12 +591,71 @@ def markdown_report(report: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def markdown_dry_run_report(report: dict[str, Any]) -> str:
+    prompt_suite = report.get("prompt_suite") or {}
+    command = report.get("command") or []
+    lines = [
+        "# QEMU Prompt Benchmark Dry Run",
+        "",
+        f"Generated: {report['generated_at']}",
+        f"Status: {report['status']}",
+        f"Prompt suite: {prompt_suite.get('suite_sha256', '-')}",
+        f"Prompt count: {report['prompt_count']}",
+        f"Warmup launches: {report['planned_warmup_launches']}",
+        f"Measured launches: {report['planned_measured_launches']}",
+        f"Total launches: {report['planned_total_launches']}",
+        "",
+        "## Command",
+        "",
+        "```text",
+        " ".join(command),
+        "```",
+    ]
+    return "\n".join(lines) + "\n"
+
+
 def format_summary_value(value: Any) -> str:
     if value is None:
         return "-"
     if isinstance(value, float):
         return f"{value:.3f}"
     return str(value)
+
+
+def dry_run_payload(
+    *,
+    command: list[str],
+    prompts_path: Path,
+    prompts: list[PromptCase],
+    warmup: int,
+    repeat: int,
+) -> dict[str, Any]:
+    prompt_count = len(prompts)
+    planned_warmups = prompt_count * warmup
+    planned_measured = prompt_count * repeat
+    return {
+        "generated_at": iso_now(),
+        "status": "planned",
+        "command": command,
+        "prompt_count": prompt_count,
+        "prompt_suite": prompt_suite_metadata(prompts_path, prompts),
+        "warmup": warmup,
+        "repeat": repeat,
+        "planned_warmup_launches": planned_warmups,
+        "planned_measured_launches": planned_measured,
+        "planned_total_launches": planned_warmups + planned_measured,
+    }
+
+
+def write_dry_run_report(report: dict[str, Any], output_dir: Path) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    latest = output_dir / "qemu_prompt_bench_dry_run_latest.json"
+    latest_md = output_dir / "qemu_prompt_bench_dry_run_latest.md"
+    latest.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    latest_md.write_text(markdown_dry_run_report(report), encoding="utf-8")
+    stamped = output_dir / f"qemu_prompt_bench_dry_run_{report['generated_at'].replace(':', '').replace('-', '')}.json"
+    stamped.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return latest
 
 
 def write_report(
@@ -736,16 +795,16 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.dry_run:
-        print(
-            json.dumps(
-                {
-                    "command": command,
-                    "prompt_count": len(prompts),
-                    "prompt_suite": prompt_suite_metadata(args.prompts, prompts),
-                },
-                indent=2,
-            )
+        report = dry_run_payload(
+            command=command,
+            prompts_path=args.prompts,
+            prompts=prompts,
+            warmup=args.warmup,
+            repeat=args.repeat,
         )
+        output = write_dry_run_report(report, args.output_dir)
+        report["dry_run_report"] = str(output)
+        print(json.dumps(report, indent=2, sort_keys=True))
         return 0
 
     metadata = {
