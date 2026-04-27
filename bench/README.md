@@ -25,6 +25,24 @@ python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin
 python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin
 ```
 
+## Offline Eval Dataset Packer
+
+`dataset_pack.py` converts local JSONL multiple-choice evaluation rows into a
+deterministic HolyC-loadable binary plus a provenance manifest. It accepts a
+normalized schema as well as HellaSwag-, ARC-, and TruthfulQA-shaped rows. It is
+offline-only; place source data on disk first and document provenance.
+
+Example:
+
+```bash
+python3 bench/dataset_pack.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/smoke_eval.hceval \
+  --manifest bench/results/datasets/smoke_eval.manifest.json \
+  --dataset smoke-eval \
+  --split validation
+```
+
 ## QEMU Prompt Benchmark
 
 `qemu_prompt_bench.py` launches an air-gapped QEMU guest once per prompt, captures
