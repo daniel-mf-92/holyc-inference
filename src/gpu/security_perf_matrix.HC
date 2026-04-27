@@ -2886,7 +2886,7 @@ I32 GPUSecurityPerfFastPathSwitchSecureLocalOverheadBudgetCrossGateSnapshotDiges
     I64 canonical_fast_path_enabled;
     I64 canonical_disable_reason_code;
     I64 canonical_snapshot_digest_q64;
-    I32 status_primary;
+    I32 status_companion;
     I32 status_canonical;
 
     if (!out_fast_path_enabled || !out_disable_reason_code || !out_snapshot_digest_q64)
@@ -40279,11 +40279,11 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
     canonical_drift_count = 0;
     canonical_snapshot_digest_q64 = 0;
 
-    // IQ-1774 strict diagnostics parity gate:
-    // - derive canonical tuple through IQ-1772 commit-only hardening wrapper;
-    // - replay canonical tuple through IQ-1773 zero-write diagnostics companion;
+    // IQ-1781 zero-write diagnostics companion:
+    // - derive staged tuple through IQ-1780 commit-only hardening wrapper;
+    // - derive canonical tuple through IQ-1779 strict diagnostics parity gate;
     // - enforce immutable batch snapshot + status-domain + strict tuple parity;
-    // - preserve caller output slots (strict zero-write diagnostics semantics).
+    // - preserve caller output slots (no-write diagnostics semantics).
     status_canonical = GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
         p50_overhead_q16_rows,
         p95_overhead_q16_rows,
@@ -40305,7 +40305,7 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
     staged_blocked_count = canonical_blocked_count;
     staged_drift_count = canonical_drift_count;
     staged_snapshot_digest_q64 = canonical_snapshot_digest_q64;
-    status_primary = GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnly(
+    status_companion = GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
         p50_overhead_q16_rows,
         p95_overhead_q16_rows,
         max_p50_overhead_q16_rows,
@@ -40342,11 +40342,11 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
         snapshot_out_digest_ptr != out_snapshot_digest_q64)
         return GPU_SEC_PERF_ERR_BAD_PARAM;
 
-    if (!GPUSecurityPerfStatusIsValid(status_primary) ||
+    if (!GPUSecurityPerfStatusIsValid(status_companion) ||
         !GPUSecurityPerfStatusIsValid(status_canonical))
         return GPU_SEC_PERF_ERR_BAD_PARAM;
 
-    if (status_primary == GPU_SEC_PERF_OK)
+    if (status_companion == GPU_SEC_PERF_OK)
     {
         if (staged_ok_count < 0 || staged_blocked_count < 0 || staged_drift_count < 0)
             return GPU_SEC_PERF_ERR_BAD_PARAM;
@@ -40374,7 +40374,7 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
             return GPU_SEC_PERF_ERR_BAD_PARAM;
     }
 
-    if (status_primary != status_canonical)
+    if (status_companion != status_canonical)
         return GPU_SEC_PERF_ERR_BAD_PARAM;
     if (staged_ok_count != canonical_ok_count ||
         staged_blocked_count != canonical_blocked_count ||
@@ -40392,7 +40392,7 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
     *out_blocked_count = saved_blocked_count;
     *out_drift_count = saved_drift_count;
     *out_snapshot_digest_q64 = saved_snapshot_digest_q64;
-    return status_primary;
+    return status_companion;
 }
 
 I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
