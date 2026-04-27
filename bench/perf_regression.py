@@ -65,6 +65,14 @@ class CommitPoint:
     max_memory_bytes: int | None
 
 
+@dataclass(frozen=True)
+class SampleViolation:
+    key: str
+    commit: str
+    records: int
+    minimum_records: int
+
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -329,6 +337,23 @@ def detect_regressions(
     return regressions
 
 
+def detect_sample_violations(points: list[CommitPoint], minimum_records: int) -> list[SampleViolation]:
+    if minimum_records <= 1:
+        return []
+    violations = []
+    for point in points:
+        if point.records < minimum_records:
+            violations.append(
+                SampleViolation(
+                    key=point.key,
+                    commit=point.commit,
+                    records=point.records,
+                    minimum_records=minimum_records,
+                )
+            )
+    return violations
+
+
 def markdown_report(report: dict[str, Any]) -> str:
     lines = [
         "# Perf Regression Dashboard",
@@ -337,6 +362,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Status: {report['status']}",
         f"Records: {report['record_count']}",
         f"Regressions: {len(report['regressions'])}",
+        f"Sample violations: {len(report['sample_violations'])}",
         "",
         "## Regressions",
         "",
@@ -352,6 +378,17 @@ def markdown_report(report: dict[str, Any]) -> str:
             )
     else:
         lines.append("No regressions detected.")
+
+    lines.extend(["", "## Sample Coverage", ""])
+    if report["sample_violations"]:
+        lines.append("| Key | Commit | Records | Minimum Records |")
+        lines.append("| --- | --- | ---: | ---: |")
+        for violation in report["sample_violations"]:
+            lines.append(
+                "| {key} | {commit} | {records} | {minimum_records} |".format(**violation)
+            )
+    else:
+        lines.append("Sample coverage requirements satisfied.")
 
     lines.extend(["", "## Commit Points", ""])
     if report["commit_points"]:
@@ -402,6 +439,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
     md_path = output_dir / "perf_regression_latest.md"
     commit_points_csv = output_dir / "perf_regression_commit_points_latest.csv"
     regressions_csv = output_dir / "perf_regression_regressions_latest.csv"
+    sample_violations_csv = output_dir / "perf_regression_sample_violations_latest.csv"
 
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
@@ -431,11 +469,17 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "threshold_pct",
         ],
     )
+    write_csv(
+        sample_violations_csv,
+        report["sample_violations"],
+        ["key", "commit", "records", "minimum_records"],
+    )
 
     print(f"wrote_json={json_path}")
     print(f"wrote_markdown={md_path}")
     print(f"wrote_commit_points_csv={commit_points_csv}")
     print(f"wrote_regressions_csv={regressions_csv}")
+    print(f"wrote_sample_violations_csv={sample_violations_csv}")
 
 
 def build_report(
@@ -444,7 +488,9 @@ def build_report(
     memory_threshold_pct: float,
     baseline_commit: str | None = None,
     candidate_commit: str | None = None,
+    min_records_per_point: int = 1,
 ) -> dict[str, Any]:
+    points = commit_points(records)
     regressions = detect_regressions(
         records,
         tok_threshold_pct,
@@ -452,10 +498,11 @@ def build_report(
         baseline_commit=baseline_commit,
         candidate_commit=candidate_commit,
     )
+    sample_violations = detect_sample_violations(points, min_records_per_point)
     return {
         "generated_at": iso_now(),
         "record_count": len(records),
-        "status": "fail" if regressions else "pass",
+        "status": "fail" if regressions or sample_violations else "pass",
         "comparison": {
             "baseline_commit": baseline_commit,
             "candidate_commit": candidate_commit,
@@ -464,10 +511,12 @@ def build_report(
         "thresholds": {
             "tok_regression_pct": tok_threshold_pct,
             "memory_regression_pct": memory_threshold_pct,
+            "min_records_per_point": min_records_per_point,
         },
         "summaries": summarize(records),
-        "commit_points": [asdict(point) for point in commit_points(records)],
+        "commit_points": [asdict(point) for point in points],
         "regressions": [asdict(regression) for regression in regressions],
+        "sample_violations": [asdict(violation) for violation in sample_violations],
         "records": [asdict(record) for record in sorted(records, key=lambda item: (item.key, item.timestamp))],
     }
 
@@ -486,6 +535,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--memory-regression-pct", type=float, default=DEFAULT_MEMORY_REGRESSION_PCT)
     parser.add_argument("--baseline-commit", help="Commit SHA/name to use as the comparison baseline")
     parser.add_argument("--candidate-commit", help="Commit SHA/name to compare against the baseline")
+    parser.add_argument(
+        "--min-records-per-point",
+        type=int,
+        default=1,
+        help="Minimum samples required for each benchmark key/commit point before the dashboard passes",
+    )
     parser.add_argument("--fail-on-regression", action="store_true")
     return parser
 
@@ -500,6 +555,7 @@ def main(argv: list[str] | None = None) -> int:
         args.memory_regression_pct,
         baseline_commit=args.baseline_commit,
         candidate_commit=args.candidate_commit,
+        min_records_per_point=args.min_records_per_point,
     )
 
     write_dashboard_outputs(report, args.output_dir)

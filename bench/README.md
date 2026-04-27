@@ -181,6 +181,26 @@ python3 bench/bench_matrix.py \
   --dry-run
 ```
 
+## Perf Regression Dashboard
+
+`perf_regression.py` scans JSON, JSONL, and CSV benchmark artifacts, groups
+results by benchmark/profile/model/quantization/prompt plus commit, and writes
+tok/s, memory, and sample-coverage dashboards under `bench/dashboards/`.
+
+Example CI gate:
+
+```bash
+python3 bench/perf_regression.py \
+  --input bench/results \
+  --output-dir bench/dashboards \
+  --min-records-per-point 3 \
+  --fail-on-regression
+```
+
+`--min-records-per-point` fails the dashboard when any benchmark key/commit
+point has fewer samples than required. This catches partial matrix uploads and
+single-run artifacts before noisy throughput medians are accepted.
+
 ## Build Benchmark Compare
 
 `build_compare.py` compares multiple `qemu_prompt_bench.py` JSON reports by

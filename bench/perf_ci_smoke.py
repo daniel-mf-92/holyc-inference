@@ -44,6 +44,7 @@ def main() -> int:
 
         report_path = output_dir / "perf_regression_latest.json"
         markdown_path = output_dir / "perf_regression_latest.md"
+        sample_violations_path = output_dir / "perf_regression_sample_violations_latest.csv"
         report = json.loads(report_path.read_text(encoding="utf-8"))
         if report["status"] != "pass":
             print(f"unexpected_status={report['status']}", file=sys.stderr)
@@ -51,11 +52,19 @@ def main() -> int:
         if report["regressions"]:
             print("unexpected_regressions=true", file=sys.stderr)
             return 1
+        if report["sample_violations"]:
+            print("unexpected_sample_violations=true", file=sys.stderr)
+            return 1
         if "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/ci-short" not in report["summaries"]:
             print("missing_ci_fixture_summary=true", file=sys.stderr)
             return 1
         if "Perf Regression Dashboard" not in markdown_path.read_text(encoding="utf-8"):
             print("missing_markdown_dashboard=true", file=sys.stderr)
+            return 1
+        if "key,commit,records,minimum_records" not in sample_violations_path.read_text(
+            encoding="utf-8"
+        ):
+            print("missing_sample_violations_csv=true", file=sys.stderr)
             return 1
 
         audit_output = tmp_path / "airgap_audit.json"
