@@ -225,6 +225,23 @@ llama.cpp against the same local gold JSONL dataset. It aligns by record id,
 supports prediction indexes, labels, exact choice text, or score arrays, and
 writes JSON, Markdown, and per-record CSV reports to `bench/results/`.
 
+Before comparing, `eval_input_audit.py` can gate apples-to-apples inputs. It
+checks gold/prediction record coverage, duplicates, invalid prediction indexes,
+dataset/split metadata, and optional model/quantization metadata drift. The
+audit writes JSON and Markdown reports and exits non-zero when it finds errors:
+
+```bash
+python3 bench/eval_input_audit.py \
+  --gold bench/datasets/samples/smoke_eval.jsonl \
+  --holyc bench/eval/samples/holyc_smoke_predictions.jsonl \
+  --llama bench/eval/samples/llama_smoke_predictions.jsonl \
+  --dataset smoke-eval \
+  --split validation \
+  --model synthetic-smoke \
+  --quantization Q4_0 \
+  --output-stem eval_input_audit_smoke_latest
+```
+
 Example:
 
 ```bash
