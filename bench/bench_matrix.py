@@ -11,6 +11,7 @@ injects `-nic none` and rejects networking arguments.
 from __future__ import annotations
 
 import argparse
+import csv
 import contextlib
 import io
 import json
@@ -311,9 +312,35 @@ def write_matrix_report(
     }
     json_path = output_dir / "bench_matrix_latest.json"
     md_path = output_dir / "bench_matrix_latest.md"
+    csv_path = output_dir / "bench_matrix_latest.csv"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
+    write_matrix_csv(cells, csv_path)
     return json_path
+
+
+def write_matrix_csv(cells: list[MatrixCellResult], path: Path) -> None:
+    fields = [
+        "profile",
+        "model",
+        "quantization",
+        "status",
+        "output_dir",
+        "report",
+        "prompts",
+        "measured_runs",
+        "warmup_runs",
+        "median_tok_per_s",
+        "max_memory_bytes",
+        "command",
+    ]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for cell in cells:
+            row = asdict(cell)
+            row["command"] = json.dumps(cell.command, separators=(",", ":"))
+            writer.writerow({field: row[field] for field in fields})
 
 
 def build_parser() -> argparse.ArgumentParser:

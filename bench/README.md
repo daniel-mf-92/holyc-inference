@@ -155,8 +155,8 @@ python3 bench/qemu_prompt_bench.py \
 `bench_matrix.py` runs `qemu_prompt_bench.py` across a local JSON matrix of
 profiles, models, and quantization formats. Each cell writes an isolated
 `qemu_prompt_bench_latest.json` under `bench/results/bench_matrix_*`, while the
-matrix summary is written to `bench/results/bench_matrix_latest.json` and
-`.md`. QEMU launches still flow through the air-gap guard that injects
+matrix summary is written to `bench/results/bench_matrix_latest.json`, `.md`,
+and `.csv`. QEMU launches still flow through the air-gap guard that injects
 `-nic none` and rejects NIC/network arguments.
 
 Example:
