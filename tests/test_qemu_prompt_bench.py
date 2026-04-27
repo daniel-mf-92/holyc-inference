@@ -79,7 +79,7 @@ import os
 import sys
 prompt = sys.stdin.read()
 assert prompt == os.environ["HOLYC_BENCH_PROMPT"]
-print("BENCH_RESULT: " + json.dumps({"tokens": 64, "elapsed_us": 250000, "tok_per_s": 256.0}))
+print("BENCH_RESULT: " + json.dumps({"tokens": 64, "elapsed_us": 250000, "tok_per_s": 256.0, "max_rss_kib": 4096}))
 """,
         encoding="utf-8",
     )
@@ -97,8 +97,17 @@ print("BENCH_RESULT: " + json.dumps({"tokens": 64, "elapsed_us": 250000, "tok_pe
     assert run.tokens == 64
     assert run.elapsed_us == 250000
     assert run.tok_per_s == 256.0
+    assert run.memory_bytes == 4194304
     assert run.prompt == "smoke"
     assert run.profile == "secure-local"
+
+
+def test_extract_memory_bytes_accepts_common_units() -> None:
+    assert qemu_prompt_bench.extract_memory_bytes({"memory_bytes": 123}) == 123
+    assert qemu_prompt_bench.extract_memory_bytes({"max_rss_kib": 2}) == 2048
+    assert qemu_prompt_bench.extract_memory_bytes({"peak_memory_kb": 2}) == 2000
+    assert qemu_prompt_bench.extract_memory_bytes({"memory_mib": 1.5}) == 1572864
+    assert qemu_prompt_bench.extract_memory_bytes({"rss_mb": 1.5}) == 1500000
 
 
 def test_cli_dry_run_validates_without_launching_qemu(tmp_path: Path, capsys) -> None:
@@ -133,7 +142,7 @@ def test_cli_writes_result_file_with_fake_qemu(tmp_path: Path) -> None:
     prompts.write_text("Measure this prompt.\n", encoding="utf-8")
     fake_qemu.write_text(
         """#!/usr/bin/env python3
-print("tokens=32 elapsed_us=100000")
+print("tokens=32 elapsed_us=100000 memory_kib=8192")
 """,
         encoding="utf-8",
     )
@@ -157,6 +166,7 @@ print("tokens=32 elapsed_us=100000")
     assert report["status"] == "pass"
     assert report["benchmarks"][0]["tokens"] == 32
     assert report["benchmarks"][0]["tok_per_s"] == 320.0
+    assert report["benchmarks"][0]["memory_bytes"] == 8388608
     assert report["benchmarks"][0]["command"][1:3] == ["-nic", "none"]
 
 
@@ -174,7 +184,8 @@ def test_cli_repeat_writes_prompt_summary_and_markdown(tmp_path: Path) -> None:
 import os
 prompt_id = os.environ["HOLYC_BENCH_PROMPT_ID"]
 tokens = 20 if prompt_id == "one" else 40
-print(f"tokens={tokens} elapsed_us=100000")
+memory_bytes = 1000 if prompt_id == "one" else 2000
+print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
 """,
         encoding="utf-8",
     )
@@ -204,5 +215,6 @@ print(f"tokens={tokens} elapsed_us=100000")
     assert report["summaries"][0]["prompt"] == "one"
     assert report["summaries"][0]["runs"] == 3
     assert report["summaries"][0]["tok_per_s_median"] == 200.0
+    assert report["summaries"][0]["memory_bytes_max"] == 1000
     assert "QEMU Prompt Benchmark" in markdown
-    assert "| one | 3 | 3 | 20 | 100000 | 200.000 | 200.000 | 200.000 |" in markdown
+    assert "| one | 3 | 3 | 20 | 100000 | 200.000 | 200.000 | 200.000 | 1000 |" in markdown

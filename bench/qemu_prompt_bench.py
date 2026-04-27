@@ -65,6 +65,7 @@ class BenchRun:
     elapsed_us: int
     wall_elapsed_us: int
     tok_per_s: float | None
+    memory_bytes: int | None
     returncode: int
     timed_out: bool
     command: list[str]
@@ -262,6 +263,35 @@ def extract_tok_per_s(payload: dict[str, Any], tokens: int | None, elapsed_us: i
     return None
 
 
+def extract_memory_bytes(payload: dict[str, Any]) -> int | None:
+    for key in ("memory_bytes", "max_rss_bytes", "rss_bytes", "peak_memory_bytes"):
+        parsed = parse_int(payload.get(key))
+        if parsed is not None and parsed >= 0:
+            return parsed
+
+    for key in ("memory_kib", "max_rss_kib", "rss_kib", "peak_memory_kib"):
+        parsed = parse_int(payload.get(key))
+        if parsed is not None and parsed >= 0:
+            return parsed * 1024
+
+    for key in ("memory_kb", "max_rss_kb", "rss_kb", "peak_memory_kb"):
+        parsed = parse_int(payload.get(key))
+        if parsed is not None and parsed >= 0:
+            return parsed * 1000
+
+    for key in ("memory_mib", "max_rss_mib", "rss_mib", "peak_memory_mib"):
+        parsed = parse_float(payload.get(key))
+        if parsed is not None and parsed >= 0:
+            return int(parsed * 1024 * 1024)
+
+    for key in ("memory_mb", "max_rss_mb", "rss_mb", "peak_memory_mb"):
+        parsed = parse_float(payload.get(key))
+        if parsed is not None and parsed >= 0:
+            return int(parsed * 1000 * 1000)
+
+    return None
+
+
 def run_prompt(
     command: list[str],
     prompt_case: PromptCase,
@@ -303,6 +333,7 @@ def run_prompt(
     tokens = extract_tokens(payload)
     elapsed_us = extract_elapsed_us(payload, wall_elapsed_us)
     tok_per_s = extract_tok_per_s(payload, tokens, elapsed_us)
+    memory_bytes = extract_memory_bytes(payload)
 
     return BenchRun(
         benchmark="qemu_prompt",
@@ -318,6 +349,7 @@ def run_prompt(
         elapsed_us=elapsed_us,
         wall_elapsed_us=wall_elapsed_us,
         tok_per_s=tok_per_s,
+        memory_bytes=memory_bytes,
         returncode=returncode,
         timed_out=timed_out,
         command=command,
@@ -335,6 +367,7 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
     for prompt_id, prompt_runs in sorted(by_prompt.items()):
         tok_values = [run.tok_per_s for run in prompt_runs if run.tok_per_s is not None]
         elapsed_values = [run.elapsed_us for run in prompt_runs if run.elapsed_us > 0]
+        memory_values = [run.memory_bytes for run in prompt_runs if run.memory_bytes is not None]
         ok_runs = [run for run in prompt_runs if run.returncode == 0 and not run.timed_out]
         summaries.append(
             {
@@ -350,6 +383,7 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
                 "tok_per_s_min": min(tok_values) if tok_values else None,
                 "tok_per_s_median": statistics.median(tok_values) if tok_values else None,
                 "tok_per_s_max": max(tok_values) if tok_values else None,
+                "memory_bytes_max": max(memory_values) if memory_values else None,
             }
         )
     return summaries
@@ -367,12 +401,14 @@ def markdown_report(report: dict[str, Any]) -> str:
         "",
     ]
     if report["summaries"]:
-        lines.append("| Prompt | Runs | OK | Median tokens | Median elapsed us | Min tok/s | Median tok/s | Max tok/s |")
-        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append(
+            "| Prompt | Runs | OK | Median tokens | Median elapsed us | Min tok/s | Median tok/s | Max tok/s | Max memory bytes |"
+        )
+        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for summary in report["summaries"]:
             lines.append(
                 "| {prompt} | {runs} | {ok_runs} | {tokens_median} | {elapsed_us_median} | "
-                "{tok_per_s_min} | {tok_per_s_median} | {tok_per_s_max} |".format(
+                "{tok_per_s_min} | {tok_per_s_median} | {tok_per_s_max} | {memory_bytes_max} |".format(
                     **{key: format_summary_value(value) for key, value in summary.items()}
                 )
             )

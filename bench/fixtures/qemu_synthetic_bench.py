@@ -24,7 +24,11 @@ def main() -> int:
     prompt = sys.stdin.read()
     tokens = TOKEN_COUNTS.get(prompt_id, max(1, len(prompt.split())))
     elapsed_us = tokens * 6250
-    print("BENCH_RESULT: " + json.dumps({"tokens": tokens, "elapsed_us": elapsed_us}))
+    memory_bytes = 64 * 1024 * 1024 + tokens * 2048
+    print(
+        "BENCH_RESULT: "
+        + json.dumps({"tokens": tokens, "elapsed_us": elapsed_us, "memory_bytes": memory_bytes})
+    )
     return 0
 
 

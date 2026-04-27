@@ -98,6 +98,11 @@ include a JSON line such as:
 BENCH_RESULT: {"tokens": 128, "elapsed_us": 500000, "tok_per_s": 256.0}
 ```
 
+Memory telemetry is optional. The runner normalizes `memory_bytes`,
+`max_rss_bytes`, `rss_bytes`, `peak_memory_bytes`, plus `_kib`, `_kb`, `_mib`,
+and `_mb` variants into `memory_bytes` so the perf regression dashboard can
+track peak memory alongside tok/s.
+
 Example:
 
 ```bash
