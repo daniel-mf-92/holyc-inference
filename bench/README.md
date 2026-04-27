@@ -191,6 +191,14 @@ python3 bench/perf_regression.py \
   --fail-on-regression
 ```
 
+`airgap_audit.py` scans benchmark artifacts for recorded QEMU commands and
+fails if any QEMU-like command is missing `-nic none` or includes networking
+flags/devices:
+
+```bash
+python3 bench/airgap_audit.py --input bench/results
+```
+
 The `bench-perf-regression` GitHub Actions workflow runs a stdlib-only smoke
 gate:
 
@@ -199,4 +207,6 @@ python3 bench/perf_ci_smoke.py
 ```
 
 It scans committed benchmark results plus `bench/fixtures/perf_regression/`,
-writes dashboards into a temporary directory, and fails if regressions are found.
+writes dashboards into a temporary directory, audits QEMU benchmark artifacts
+for explicit air-gap settings, and fails if regressions or unsafe guest
+networking settings are found.

@@ -17,6 +17,7 @@ RESULTS = ROOT / "bench" / "results"
 
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="holyc-perf-ci-") as tmp:
+        tmp_path = Path(tmp)
         output_dir = Path(tmp) / "dashboards"
         command = [
             sys.executable,
@@ -55,6 +56,75 @@ def main() -> int:
             return 1
         if "Perf Regression Dashboard" not in markdown_path.read_text(encoding="utf-8"):
             print("missing_markdown_dashboard=true", file=sys.stderr)
+            return 1
+
+        audit_output = tmp_path / "airgap_audit.json"
+        audit_command = [
+            sys.executable,
+            str(ROOT / "bench" / "airgap_audit.py"),
+            "--input",
+            str(RESULTS),
+            "--output",
+            str(audit_output),
+        ]
+        completed = subprocess.run(
+            audit_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode != 0:
+            sys.stdout.write(completed.stdout)
+            sys.stderr.write(completed.stderr)
+            return completed.returncode
+
+        audit_report = json.loads(audit_output.read_text(encoding="utf-8"))
+        if audit_report["status"] != "pass":
+            print(f"unexpected_airgap_status={audit_report['status']}", file=sys.stderr)
+            return 1
+        if audit_report["commands_checked"] < 1:
+            print("missing_qemu_command_audit=true", file=sys.stderr)
+            return 1
+
+        unsafe_fixture = tmp_path / "unsafe_qemu.json"
+        unsafe_fixture.write_text(
+            json.dumps(
+                {
+                    "benchmarks": [
+                        {
+                            "benchmark": "qemu_prompt",
+                            "command": [
+                                "qemu-system-x86_64",
+                                "-drive",
+                                "file=/tmp/TempleOS.img,format=raw,if=ide",
+                                "-device",
+                                "e1000",
+                            ],
+                        }
+                    ]
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        unsafe_command = [
+            sys.executable,
+            str(ROOT / "bench" / "airgap_audit.py"),
+            "--input",
+            str(unsafe_fixture),
+            "--output",
+            str(tmp_path / "unsafe_airgap_audit.json"),
+        ]
+        completed = subprocess.run(
+            unsafe_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("unsafe_qemu_command_not_rejected=true", file=sys.stderr)
             return 1
 
     print("perf_ci_smoke=ok")
