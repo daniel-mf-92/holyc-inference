@@ -24165,6 +24165,7 @@ I32 GPUSecurityPerfMatrixSummaryQ16CheckedOverheadEnvelopeSecureLocalBudgetGateS
     saved_snapshot_digest_q64 = *out_snapshot_digest_q64;
 
     // IQ-1717 strict diagnostics parity gate:
+    // IQ-1731 strict diagnostics parity gate:
     // 1) snapshot immutable secure-local tuple and caller output slots;
     // 2) derive staged tuple through zero-write diagnostics companion (IQ-1716);
     // 3) derive canonical tuple through commit-only hardening wrapper (IQ-1715);
