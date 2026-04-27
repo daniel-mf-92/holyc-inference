@@ -120,3 +120,13 @@ CI can fail on throughput or memory regressions with:
 ```bash
 python3 bench/perf_regression.py --fail-on-regression
 ```
+
+The `bench-perf-regression` GitHub Actions workflow runs a stdlib-only smoke
+gate:
+
+```bash
+python3 bench/perf_ci_smoke.py
+```
+
+It scans committed benchmark results plus `bench/fixtures/perf_regression/`,
+writes dashboards into a temporary directory, and fails if regressions are found.

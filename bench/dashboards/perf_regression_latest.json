@@ -1,7 +1,31 @@
 {
-  "generated_at": "2026-04-27T14:42:06Z",
-  "record_count": 12,
+  "generated_at": "2026-04-27T14:52:29Z",
+  "record_count": 14,
   "records": [
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ci-base",
+      "memory_bytes": 1000000,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "ci-short",
+      "quantization": "Q4_0",
+      "source": "bench/fixtures/perf_regression/ci_pass.jsonl",
+      "timestamp": "2026-04-27T14:00:00Z",
+      "tok_per_s": 100.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ci-head",
+      "memory_bytes": 1000000,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "ci-short",
+      "quantization": "Q4_0",
+      "source": "bench/fixtures/perf_regression/ci_pass.jsonl",
+      "timestamp": "2026-04-27T14:05:00Z",
+      "tok_per_s": 101.0
+    },
     {
       "benchmark": "qemu_prompt",
       "commit": "5b98f2570b1c",
@@ -150,6 +174,12 @@
   "regressions": [],
   "status": "pass",
   "summaries": {
+    "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/ci-short": {
+      "latest_commit": "ci-head",
+      "max_memory_bytes": 1000000,
+      "median_tok_per_s": 100.5,
+      "records": 2
+    },
     "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code": {
       "latest_commit": "5b98f2570b1c",
       "max_memory_bytes": null,

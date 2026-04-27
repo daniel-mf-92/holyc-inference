@@ -1,0 +1,22 @@
+name: bench-perf-regression
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "bench/**"
+      - ".github/workflows/bench-perf-regression.yml"
+  pull_request:
+    branches: ["**"]
+    paths:
+      - "bench/**"
+      - ".github/workflows/bench-perf-regression.yml"
+  workflow_dispatch:
+
+jobs:
+  perf-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run perf regression smoke gate
+        run: python3 bench/perf_ci_smoke.py
