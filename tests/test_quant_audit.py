@@ -116,3 +116,34 @@ def test_cli_writes_pass_report(tmp_path: Path) -> None:
     text = output.read_text(encoding="utf-8")
     assert '"status": "pass"' in text
     assert "Quantization Audit" in markdown.read_text(encoding="utf-8")
+
+
+def test_cli_audits_mixed_q4_and_q8_block_files(tmp_path: Path) -> None:
+    source = tmp_path / "ok.HC"
+    q4_file = tmp_path / "q4.bin"
+    q8_file = tmp_path / "q8.bin"
+    output = tmp_path / "report.json"
+    source.write_text("I64 Good(U16 d_fp16) { return d_fp16; }\n", encoding="utf-8")
+    q4_file.write_bytes(half_bits(1.0) + bytes([0x88] * 16))
+    q8_file.write_bytes(half_bits(2.0) + bytes(range(32)))
+
+    status = quant_audit.main(
+        [
+            "--source-root",
+            str(source),
+            "--q4-block-file",
+            str(q4_file),
+            "--q8-block-file",
+            str(q8_file),
+            "--expect-blocks",
+            "1",
+            "--output",
+            str(output),
+        ]
+    )
+
+    report = output.read_text(encoding="utf-8")
+    assert status == 0
+    assert '"format": "q4_0"' in report
+    assert '"format": "q8_0"' in report
+    assert '"block_count": 1' in report

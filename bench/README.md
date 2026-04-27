@@ -29,6 +29,14 @@ python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin --exp
 python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --expect-blocks 128
 ```
 
+Mixed-format audits can validate Q4_0 and Q8_0 streams in one report:
+
+```bash
+python3 bench/quant_audit.py \
+  --q4-block-file path/to/q4_blocks.bin \
+  --q8-block-file path/to/q8_blocks.bin
+```
+
 ## Offline Eval Dataset Packer
 
 `dataset_curate.py` prepares deterministic, local-only evaluation subsets before

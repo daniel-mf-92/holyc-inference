@@ -435,7 +435,21 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         action="append",
         default=[],
-        help="Raw block stream to audit",
+        help="Raw block stream to audit with --format",
+    )
+    parser.add_argument(
+        "--q4-block-file",
+        type=Path,
+        action="append",
+        default=[],
+        help="Raw Q4_0 block stream to audit; may be mixed with --q8-block-file",
+    )
+    parser.add_argument(
+        "--q8-block-file",
+        type=Path,
+        action="append",
+        default=[],
+        help="Raw Q8_0 block stream to audit; may be mixed with --q4-block-file",
     )
     parser.add_argument(
         "--format",
@@ -463,9 +477,14 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
     source_audit = audit_sources(args.source_root)
+    block_specs = (
+        [(path, args.format) for path in args.block_file]
+        + [(path, "q4_0") for path in args.q4_block_file]
+        + [(path, "q8_0") for path in args.q8_block_file]
+    )
     block_audits = [
-        audit_blocks(path, args.format, args.allow_inf_nan_scale, args.expect_blocks, args.expect_elements)
-        for path in args.block_file
+        audit_blocks(path, quant_format, args.allow_inf_nan_scale, args.expect_blocks, args.expect_elements)
+        for path, quant_format in block_specs
     ]
     failed = bool(source_audit.findings) or any(audit.findings for audit in block_audits)
     report = {
