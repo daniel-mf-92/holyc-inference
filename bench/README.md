@@ -43,6 +43,18 @@ python3 bench/dataset_pack.py \
   --split validation
 ```
 
+`hceval_inspect.py` independently parses `.hceval` binaries, validates record
+bounds, verifies source/binary hashes against a companion manifest, and writes
+JSON or Markdown inspection reports:
+
+```bash
+python3 bench/hceval_inspect.py \
+  --input bench/results/datasets/smoke_eval.hceval \
+  --manifest bench/results/datasets/smoke_eval.manifest.json \
+  --output bench/results/datasets/smoke_eval.inspect.json \
+  --markdown bench/results/datasets/smoke_eval.inspect.md
+```
+
 ## QEMU Prompt Benchmark
 
 `qemu_prompt_bench.py` launches an air-gapped QEMU guest once per prompt, captures

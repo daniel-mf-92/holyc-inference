@@ -34,6 +34,18 @@ python3 bench/dataset_pack.py \
   --split validation
 ```
 
+## Binary Inspection
+
+Validate packed binaries and their manifests before loading them in TempleOS:
+
+```bash
+python3 bench/hceval_inspect.py \
+  --input bench/results/datasets/smoke_eval.hceval \
+  --manifest bench/results/datasets/smoke_eval.manifest.json \
+  --output bench/results/datasets/smoke_eval.inspect.json \
+  --markdown bench/results/datasets/smoke_eval.inspect.md
+```
+
 ## Provenance
 
 The committed sample is synthetic and hand-written for packer validation only. For
