@@ -39837,6 +39837,7 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
     parity_snapshot_digest_q64 = 0;
 
     // IQ-1768 commit-only hardening wrapper refresh:
+    // IQ-1770 retag: shared wrapper lineage retained for duplicate symbol task.
     // - seed staged tuple through IQ-1765 commit-only hardening wrapper;
     // - derive staged tuple through IQ-1767 strict diagnostics parity gate;
     // - replay parity tuple through IQ-1766 zero-write diagnostics companion;
@@ -40278,7 +40279,8 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
     canonical_drift_count = 0;
     canonical_snapshot_digest_q64 = 0;
 
-    // IQ-1759 strict diagnostics parity gate:
+    // IQ-1768 / IQ-1770 commit-only hardening wrapper refresh:
+    // IQ-1771 strict diagnostics parity gate refresh:
     // - derive staged tuple through IQ-1758 zero-write diagnostics companion;
     // - derive canonical tuple through IQ-1757 commit-only hardening wrapper;
     // - enforce immutable batch snapshot + status-domain + strict tuple parity;
