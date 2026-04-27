@@ -50,6 +50,9 @@ serial output, extracts token timing records, and writes normalized JSON to
 `bench/results/`. The runner always injects `-nic none` and rejects conflicting
 network flags such as `-netdev` or virtual NIC devices.
 
+Use `--repeat N` to run every prompt multiple times. Reports include raw per-run
+records plus per-prompt medians and min/max tok/s in both JSON and Markdown.
+
 Prompt files can be JSON, JSONL, or plain text split with `---`. Guest output may
 include a JSON line such as:
 
@@ -65,6 +68,7 @@ python3 bench/qemu_prompt_bench.py \
   --prompts bench/prompts/smoke.jsonl \
   --profile secure-local \
   --quantization Q4_0 \
+  --repeat 5 \
   -- -m 512M
 ```
 

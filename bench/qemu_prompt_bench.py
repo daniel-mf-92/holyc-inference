@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import re
+import statistics
 import subprocess
 import sys
 import time
@@ -42,6 +43,7 @@ class BenchRun:
     quantization: str
     prompt: str
     prompt_sha256: str
+    iteration: int
     commit: str
     timestamp: str
     tokens: int | None
@@ -245,6 +247,7 @@ def run_prompt(
     prompt_case: PromptCase,
     timeout: float,
     metadata: dict[str, str],
+    iteration: int = 1,
 ) -> BenchRun:
     started = time.monotonic_ns()
     env = os.environ.copy()
@@ -288,6 +291,7 @@ def run_prompt(
         quantization=metadata["quantization"],
         prompt=prompt_case.prompt_id,
         prompt_sha256=prompt_hash(prompt_case.prompt),
+        iteration=iteration,
         commit=metadata["commit"],
         timestamp=iso_now(),
         tokens=tokens,
@@ -302,15 +306,81 @@ def run_prompt(
     )
 
 
+def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
+    by_prompt: dict[str, list[BenchRun]] = {}
+    for run in runs:
+        by_prompt.setdefault(run.prompt, []).append(run)
+
+    summaries: list[dict[str, Any]] = []
+    for prompt_id, prompt_runs in sorted(by_prompt.items()):
+        tok_values = [run.tok_per_s for run in prompt_runs if run.tok_per_s is not None]
+        elapsed_values = [run.elapsed_us for run in prompt_runs if run.elapsed_us > 0]
+        ok_runs = [run for run in prompt_runs if run.returncode == 0 and not run.timed_out]
+        summaries.append(
+            {
+                "prompt": prompt_id,
+                "runs": len(prompt_runs),
+                "ok_runs": len(ok_runs),
+                "tokens_median": statistics.median(
+                    [run.tokens for run in prompt_runs if run.tokens is not None]
+                )
+                if any(run.tokens is not None for run in prompt_runs)
+                else None,
+                "elapsed_us_median": statistics.median(elapsed_values) if elapsed_values else None,
+                "tok_per_s_min": min(tok_values) if tok_values else None,
+                "tok_per_s_median": statistics.median(tok_values) if tok_values else None,
+                "tok_per_s_max": max(tok_values) if tok_values else None,
+            }
+        )
+    return summaries
+
+
+def markdown_report(report: dict[str, Any]) -> str:
+    lines = [
+        "# QEMU Prompt Benchmark",
+        "",
+        f"Generated: {report['generated_at']}",
+        f"Status: {report['status']}",
+        f"Runs: {len(report['benchmarks'])}",
+        "",
+        "## Prompt Summary",
+        "",
+    ]
+    if report["summaries"]:
+        lines.append("| Prompt | Runs | OK | Median tokens | Median elapsed us | Min tok/s | Median tok/s | Max tok/s |")
+        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        for summary in report["summaries"]:
+            lines.append(
+                "| {prompt} | {runs} | {ok_runs} | {tokens_median} | {elapsed_us_median} | "
+                "{tok_per_s_min} | {tok_per_s_median} | {tok_per_s_max} |".format(
+                    **{key: format_summary_value(value) for key, value in summary.items()}
+                )
+            )
+    else:
+        lines.append("No benchmark runs recorded.")
+    return "\n".join(lines) + "\n"
+
+
+def format_summary_value(value: Any) -> str:
+    if value is None:
+        return "-"
+    if isinstance(value, float):
+        return f"{value:.3f}"
+    return str(value)
+
+
 def write_report(runs: list[BenchRun], output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     report = {
         "generated_at": iso_now(),
         "status": "pass" if all(run.returncode == 0 and not run.timed_out for run in runs) else "fail",
+        "summaries": summarize_runs(runs),
         "benchmarks": [asdict(run) for run in runs],
     }
     latest = output_dir / "qemu_prompt_bench_latest.json"
+    latest_md = output_dir / "qemu_prompt_bench_latest.md"
     latest.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    latest_md.write_text(markdown_report(report), encoding="utf-8")
     stamped = output_dir / f"qemu_prompt_bench_{report['generated_at'].replace(':', '').replace('-', '')}.json"
     stamped.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return latest
@@ -328,6 +398,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Extra QEMU argument; repeat per token. Use --qemu-arg=-m for values beginning with '-'.",
     )
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS)
+    parser.add_argument("--repeat", type=int, default=1, help="Run each prompt this many times")
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--profile", default="default")
     parser.add_argument("--model", default="")
@@ -339,6 +410,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.repeat < 1:
+        print("error: --repeat must be >= 1", file=sys.stderr)
+        return 2
+
     root = Path(__file__).resolve().parents[1]
     prompts = load_prompt_cases(args.prompts)
     trailing_qemu_args = args.qemu_args[1:] if args.qemu_args[:1] == ["--"] else args.qemu_args
@@ -358,7 +433,11 @@ def main(argv: list[str] | None = None) -> int:
         "quantization": args.quantization,
         "commit": git_commit(root),
     }
-    runs = [run_prompt(command, prompt_case, args.timeout, metadata) for prompt_case in prompts]
+    runs = [
+        run_prompt(command, prompt_case, args.timeout, metadata, iteration=iteration)
+        for prompt_case in prompts
+        for iteration in range(1, args.repeat + 1)
+    ]
     output = write_report(runs, args.output_dir)
     print(f"wrote_json={output}")
     print(f"status={'pass' if all(run.returncode == 0 and not run.timed_out for run in runs) else 'fail'}")

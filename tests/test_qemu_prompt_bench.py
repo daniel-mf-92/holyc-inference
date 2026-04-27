@@ -143,3 +143,51 @@ print("tokens=32 elapsed_us=100000")
     assert report["benchmarks"][0]["tokens"] == 32
     assert report["benchmarks"][0]["tok_per_s"] == 320.0
     assert report["benchmarks"][0]["command"][1:3] == ["-nic", "none"]
+
+
+def test_cli_repeat_writes_prompt_summary_and_markdown(tmp_path: Path) -> None:
+    fake_qemu = tmp_path / "fake-qemu.py"
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    output_dir = tmp_path / "results"
+    prompts.write_text(
+        '{"prompt_id":"one","prompt":"First"}\n{"prompt_id":"two","prompt":"Second"}\n',
+        encoding="utf-8",
+    )
+    fake_qemu.write_text(
+        """#!/usr/bin/env python3
+import os
+prompt_id = os.environ["HOLYC_BENCH_PROMPT_ID"]
+tokens = 20 if prompt_id == "one" else 40
+print(f"tokens={tokens} elapsed_us=100000")
+""",
+        encoding="utf-8",
+    )
+    fake_qemu.chmod(0o755)
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--qemu-bin",
+            str(fake_qemu),
+            "--output-dir",
+            str(output_dir),
+            "--repeat",
+            "3",
+        ]
+    )
+
+    assert status == 0
+    report = json.loads((output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8"))
+    markdown = (output_dir / "qemu_prompt_bench_latest.md").read_text(encoding="utf-8")
+
+    assert len(report["benchmarks"]) == 6
+    assert [run["iteration"] for run in report["benchmarks"][:3]] == [1, 2, 3]
+    assert report["summaries"][0]["prompt"] == "one"
+    assert report["summaries"][0]["runs"] == 3
+    assert report["summaries"][0]["tok_per_s_median"] == 200.0
+    assert "QEMU Prompt Benchmark" in markdown
+    assert "| one | 3 | 3 | 20 | 100000 | 200.000 | 200.000 | 200.000 |" in markdown
