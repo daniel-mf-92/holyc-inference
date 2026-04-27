@@ -272,7 +272,9 @@ surface throughput regressions and sample-coverage failures as test failures.
 
 `build_compare.py` compares multiple `qemu_prompt_bench.py` JSON reports by
 prompt/profile/model/quantization and writes per-build throughput and elapsed
-time deltas to `bench/results/`.
+time deltas to `bench/results/` as JSON, Markdown, and CSV. Use
+`--fail-on-regression` with `--max-tok-regression-pct` to gate median tok/s
+drops in CI without launching QEMU.
 
 Example:
 
@@ -280,7 +282,9 @@ Example:
 python3 bench/build_compare.py \
   --input base=bench/results/qemu_prompt_bench_base.json \
   --input head=bench/results/qemu_prompt_bench_latest.json \
-  --baseline base
+  --baseline base \
+  --fail-on-regression \
+  --max-tok-regression-pct 5
 ```
 
 ## HolyC vs llama.cpp Eval Compare

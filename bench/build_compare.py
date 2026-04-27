@@ -9,6 +9,7 @@ host-side tooling only; it never launches QEMU.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import statistics
 import sys
@@ -58,6 +59,14 @@ class BuildDelta:
     elapsed_delta_pct: float | None
     baseline_ok_runs: int
     candidate_ok_runs: int
+
+
+@dataclass(frozen=True)
+class BuildRegression:
+    key: str
+    candidate_build: str
+    tok_per_s_delta_pct: float
+    max_tok_regression_pct: float
 
 
 def iso_now() -> str:
@@ -231,6 +240,24 @@ def compare_builds(metrics: list[BuildMetric], baseline_build: str) -> list[Buil
     return sorted(deltas, key=lambda delta: (delta.candidate_build, delta.key))
 
 
+def throughput_regressions(deltas: list[BuildDelta], max_tok_regression_pct: float) -> list[BuildRegression]:
+    threshold = -abs(max_tok_regression_pct)
+    regressions: list[BuildRegression] = []
+    for delta in deltas:
+        if delta.tok_per_s_delta_pct is None:
+            continue
+        if delta.tok_per_s_delta_pct <= threshold:
+            regressions.append(
+                BuildRegression(
+                    key=delta.key,
+                    candidate_build=delta.candidate_build,
+                    tok_per_s_delta_pct=delta.tok_per_s_delta_pct,
+                    max_tok_regression_pct=abs(max_tok_regression_pct),
+                )
+            )
+    return regressions
+
+
 def format_value(value: Any) -> str:
     if value is None:
         return "-"
@@ -244,8 +271,10 @@ def markdown_report(report: dict[str, Any]) -> str:
         "# Build Benchmark Compare",
         "",
         f"Generated: {report['generated_at']}",
+        f"Status: {report['status']}",
         f"Baseline: {report['baseline_build']}",
         f"Builds: {', '.join(report['builds'])}",
+        f"Throughput regressions: {len(report['regressions'])}",
         "",
         "## Deltas",
         "",
@@ -267,19 +296,55 @@ def markdown_report(report: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def write_report(metrics: list[BuildMetric], deltas: list[BuildDelta], baseline_build: str, output_dir: Path) -> Path:
+def write_csv(deltas: list[BuildDelta], path: Path) -> None:
+    fields = [
+        "key",
+        "baseline_build",
+        "candidate_build",
+        "baseline_commit",
+        "candidate_commit",
+        "baseline_tok_per_s",
+        "candidate_tok_per_s",
+        "tok_per_s_delta_pct",
+        "baseline_elapsed_us",
+        "candidate_elapsed_us",
+        "elapsed_delta_pct",
+        "baseline_ok_runs",
+        "candidate_ok_runs",
+    ]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for delta in deltas:
+            writer.writerow({field: getattr(delta, field) for field in fields})
+
+
+def write_report(
+    metrics: list[BuildMetric],
+    deltas: list[BuildDelta],
+    baseline_build: str,
+    output_dir: Path,
+    *,
+    max_tok_regression_pct: float,
+) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
+    regressions = throughput_regressions(deltas, max_tok_regression_pct)
     report = {
         "generated_at": iso_now(),
+        "status": "fail" if regressions else "pass",
         "baseline_build": baseline_build,
         "builds": sorted({metric.build for metric in metrics}),
+        "max_tok_regression_pct": abs(max_tok_regression_pct),
         "metrics": [asdict(metric) for metric in metrics],
         "deltas": [asdict(delta) for delta in deltas],
+        "regressions": [asdict(regression) for regression in regressions],
     }
     json_path = output_dir / "build_compare_latest.json"
     md_path = output_dir / "build_compare_latest.md"
+    csv_path = output_dir / "build_compare_latest.csv"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
+    write_csv(deltas, csv_path)
     return json_path
 
 
@@ -293,6 +358,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--baseline", help="Build name to compare against. Defaults to first --input build.")
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
+    parser.add_argument(
+        "--max-tok-regression-pct",
+        type=float,
+        default=5.0,
+        help="Allowed median tok/s drop before a regression is reported",
+    )
+    parser.add_argument("--fail-on-regression", action="store_true", help="Return non-zero on throughput regression")
     return parser
 
 
@@ -311,9 +383,19 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     deltas = compare_builds(metrics, baseline)
-    output = write_report(metrics, deltas, baseline, args.output_dir)
+    output = write_report(
+        metrics,
+        deltas,
+        baseline,
+        args.output_dir,
+        max_tok_regression_pct=args.max_tok_regression_pct,
+    )
+    regressions = throughput_regressions(deltas, args.max_tok_regression_pct)
     print(f"wrote_json={output}")
     print(f"compared_deltas={len(deltas)}")
+    print(f"regressions={len(regressions)}")
+    if args.fail_on_regression and regressions:
+        return 1
     return 0
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import sys
+import csv
 from tempfile import TemporaryDirectory
 from pathlib import Path
 
@@ -57,7 +58,7 @@ def test_compare_builds_computes_tok_per_s_and_elapsed_deltas(tmp_path: Path) ->
     assert deltas[0].key == "qemu_prompt/secure-local/tiny/Q4_0/smoke"
 
 
-def test_cli_writes_json_and_markdown_reports(tmp_path: Path) -> None:
+def test_cli_writes_json_markdown_and_csv_reports(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     candidate = tmp_path / "candidate.json"
     output_dir = tmp_path / "results"
@@ -78,11 +79,52 @@ def test_cli_writes_json_and_markdown_reports(tmp_path: Path) -> None:
     assert status == 0
     payload = json.loads((output_dir / "build_compare_latest.json").read_text(encoding="utf-8"))
     markdown = (output_dir / "build_compare_latest.md").read_text(encoding="utf-8")
+    csv_rows = list(csv.DictReader((output_dir / "build_compare_latest.csv").open(newline="", encoding="utf-8")))
 
+    assert payload["status"] == "fail"
     assert payload["baseline_build"] == "base"
     assert payload["deltas"][0]["tok_per_s_delta_pct"] == -10.0
+    assert payload["regressions"][0]["candidate_build"] == "head"
+    assert csv_rows[0]["tok_per_s_delta_pct"] == "-10.0"
     assert "Build Benchmark Compare" in markdown
+    assert "Status: fail" in markdown
     assert "| head | qemu_prompt/secure-local/tiny/Q4_0/smoke | 100.000 | 90.000 | -10.000 |" in markdown
+
+
+def test_cli_can_fail_on_throughput_regression(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    candidate = tmp_path / "candidate.json"
+    output_dir = tmp_path / "results"
+    write_report(baseline, "base", 100.0, 200000)
+    write_report(candidate, "head", 96.0, 210000)
+
+    passing_status = build_compare.main(
+        [
+            "--input",
+            f"base={baseline}",
+            "--input",
+            f"head={candidate}",
+            "--output-dir",
+            str(output_dir),
+            "--fail-on-regression",
+        ]
+    )
+    failing_status = build_compare.main(
+        [
+            "--input",
+            f"base={baseline}",
+            "--input",
+            f"head={candidate}",
+            "--output-dir",
+            str(output_dir),
+            "--max-tok-regression-pct",
+            "3",
+            "--fail-on-regression",
+        ]
+    )
+
+    assert passing_status == 0
+    assert failing_status == 1
 
 
 def test_missing_baseline_returns_error(tmp_path: Path) -> None:
@@ -98,6 +140,7 @@ if __name__ == "__main__":
     with TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         test_compare_builds_computes_tok_per_s_and_elapsed_deltas(tmp_path)
-        test_cli_writes_json_and_markdown_reports(tmp_path)
+        test_cli_writes_json_markdown_and_csv_reports(tmp_path)
+        test_cli_can_fail_on_throughput_regression(tmp_path)
         test_missing_baseline_returns_error(tmp_path)
     print("build_compare_tests=ok")

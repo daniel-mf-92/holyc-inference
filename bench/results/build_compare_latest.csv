@@ -1,0 +1,3 @@
+key,baseline_build,candidate_build,baseline_commit,candidate_commit,baseline_tok_per_s,candidate_tok_per_s,tok_per_s_delta_pct,baseline_elapsed_us,candidate_elapsed_us,elapsed_delta_pct,baseline_ok_runs,candidate_ok_runs
+qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code,base,head,708be92b565a,786eee1bfa27,160.0,160.0,0.0,300000.0,300000.0,0.0,3,3
+qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short,base,head,708be92b565a,786eee1bfa27,160.0,160.0,0.0,200000.0,200000.0,0.0,3,3

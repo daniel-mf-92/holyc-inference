@@ -1,18 +1,18 @@
 {
-  "baseline_build": "previous",
+  "baseline_build": "base",
   "builds": [
-    "latest",
-    "previous"
+    "base",
+    "head"
   ],
   "deltas": [
     {
-      "baseline_build": "previous",
-      "baseline_commit": "e71bfc15a184",
+      "baseline_build": "base",
+      "baseline_commit": "708be92b565a",
       "baseline_elapsed_us": 300000.0,
       "baseline_ok_runs": 3,
       "baseline_tok_per_s": 160.0,
-      "candidate_build": "latest",
-      "candidate_commit": "7f007ced1a84",
+      "candidate_build": "head",
+      "candidate_commit": "786eee1bfa27",
       "candidate_elapsed_us": 300000.0,
       "candidate_ok_runs": 3,
       "candidate_tok_per_s": 160.0,
@@ -21,13 +21,13 @@
       "tok_per_s_delta_pct": 0.0
     },
     {
-      "baseline_build": "previous",
-      "baseline_commit": "e71bfc15a184",
+      "baseline_build": "base",
+      "baseline_commit": "708be92b565a",
       "baseline_elapsed_us": 200000.0,
       "baseline_ok_runs": 3,
       "baseline_tok_per_s": 160.0,
-      "candidate_build": "latest",
-      "candidate_commit": "7f007ced1a84",
+      "candidate_build": "head",
+      "candidate_commit": "786eee1bfa27",
       "candidate_elapsed_us": 200000.0,
       "candidate_ok_runs": 3,
       "candidate_tok_per_s": 160.0,
@@ -36,12 +36,13 @@
       "tok_per_s_delta_pct": 0.0
     }
   ],
-  "generated_at": "2026-04-27T18:13:28Z",
+  "generated_at": "2026-04-27T21:31:04Z",
+  "max_tok_regression_pct": 5.0,
   "metrics": [
     {
       "benchmark": "qemu_prompt",
-      "build": "previous",
-      "commit": "e71bfc15a184",
+      "build": "base",
+      "commit": "708be92b565a",
       "median_elapsed_us": 300000.0,
       "median_tok_per_s": 160.0,
       "median_tokens": 48.0,
@@ -51,12 +52,12 @@
       "prompt": "smoke-code",
       "quantization": "Q4_0",
       "runs": 3,
-      "source": "bench/results/qemu_prompt_bench_20260427T172021Z.json"
+      "source": "bench/results/qemu_prompt_bench_20260427T192232Z.json"
     },
     {
       "benchmark": "qemu_prompt",
-      "build": "previous",
-      "commit": "e71bfc15a184",
+      "build": "base",
+      "commit": "708be92b565a",
       "median_elapsed_us": 200000.0,
       "median_tok_per_s": 160.0,
       "median_tokens": 32.0,
@@ -66,12 +67,12 @@
       "prompt": "smoke-short",
       "quantization": "Q4_0",
       "runs": 3,
-      "source": "bench/results/qemu_prompt_bench_20260427T172021Z.json"
+      "source": "bench/results/qemu_prompt_bench_20260427T192232Z.json"
     },
     {
       "benchmark": "qemu_prompt",
-      "build": "latest",
-      "commit": "7f007ced1a84",
+      "build": "head",
+      "commit": "786eee1bfa27",
       "median_elapsed_us": 300000.0,
       "median_tok_per_s": 160.0,
       "median_tokens": 48.0,
@@ -85,8 +86,8 @@
     },
     {
       "benchmark": "qemu_prompt",
-      "build": "latest",
-      "commit": "7f007ced1a84",
+      "build": "head",
+      "commit": "786eee1bfa27",
       "median_elapsed_us": 200000.0,
       "median_tok_per_s": 160.0,
       "median_tokens": 32.0,
@@ -98,5 +99,7 @@
       "runs": 3,
       "source": "bench/results/qemu_prompt_bench_latest.json"
     }
-  ]
+  ],
+  "regressions": [],
+  "status": "pass"
 }
