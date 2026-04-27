@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import csv
 import json
 import sys
 import tempfile
@@ -65,8 +66,12 @@ def test_cli_writes_json_and_markdown_report() -> None:
             == 0
         )
         payload = json.loads((Path(tmp) / "ppl.json").read_text(encoding="utf-8"))
+        csv_rows = list(csv.DictReader((Path(tmp) / "ppl.csv").open(newline="", encoding="utf-8")))
         assert payload["summary"]["record_count"] == 3
         assert "Perplexity Compare Report" in (Path(tmp) / "ppl.md").read_text(encoding="utf-8")
+        assert len(csv_rows) == 3
+        assert csv_rows[0]["record_id"] == "smoke-arc-1"
+        assert "nll_delta_holyc_minus_llama" in csv_rows[0]
 
 
 def test_token_count_mismatch_fails_by_default(tmp_path: Path) -> None:

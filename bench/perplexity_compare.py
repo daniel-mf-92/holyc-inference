@@ -340,13 +340,34 @@ def markdown_report(report: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def write_csv_report(path: Path, rows: list[CompareRow]) -> None:
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "record_id",
+                "holyc_token_count",
+                "llama_token_count",
+                "holyc_nll_per_token",
+                "llama_nll_per_token",
+                "nll_delta_holyc_minus_llama",
+                "holyc_perplexity",
+                "llama_perplexity",
+                "perplexity_delta_holyc_minus_llama",
+            ],
+        )
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(asdict(row))
+
+
 def write_report(
     rows: list[CompareRow],
     summary: dict[str, Any],
     args: argparse.Namespace,
     holyc_path: Path,
     llama_path: Path,
-) -> tuple[Path, Path]:
+) -> tuple[Path, Path, Path]:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     report = {
         "dataset": args.dataset,
@@ -362,9 +383,11 @@ def write_report(
     }
     json_path = args.output_dir / f"{args.output_stem}.json"
     md_path = args.output_dir / f"{args.output_stem}.md"
+    csv_path = args.output_dir / f"{args.output_stem}.csv"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
-    return json_path, md_path
+    write_csv_report(csv_path, rows)
+    return json_path, md_path, csv_path
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -388,13 +411,14 @@ def main(argv: list[str] | None = None) -> int:
         holyc = load_records(args.holyc)
         llama = load_records(args.llama)
         rows, summary = compare(holyc, llama, args.allow_token_count_mismatch)
-        json_path, md_path = write_report(rows, summary, args, args.holyc, args.llama)
+        json_path, md_path, csv_path = write_report(rows, summary, args, args.holyc, args.llama)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
     print(f"wrote_json={json_path}")
     print(f"wrote_markdown={md_path}")
+    print(f"wrote_csv={csv_path}")
     print(f"holyc_perplexity={summary['holyc']['perplexity']:.6f}")
     print(f"llama_perplexity={summary['llama']['perplexity']:.6f}")
     print(f"ppl_delta_holyc_minus_llama={summary['perplexity_delta_holyc_minus_llama']:.6f}")

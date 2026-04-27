@@ -277,8 +277,8 @@ python3 bench/eval_compare.py \
 
 `perplexity_compare.py` compares offline token logprob or aggregate NLL outputs
 from HolyC and llama.cpp. It aligns rows by record id, computes token-weighted
-NLL/token and perplexity, and fails on token-count mismatches unless
-`--allow-token-count-mismatch` is passed.
+NLL/token and perplexity, writes JSON, Markdown, and per-record CSV reports, and
+fails on token-count mismatches unless `--allow-token-count-mismatch` is passed.
 
 Example:
 
