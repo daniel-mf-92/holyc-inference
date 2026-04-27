@@ -36743,6 +36743,11 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnly(
     I64 parity_blocked_count;
     I64 parity_drift_count;
     I64 parity_snapshot_digest_q64;
+    I64 seed_ok_count;
+    I64 seed_blocked_count;
+    I64 seed_drift_count;
+    I64 seed_snapshot_digest_q64;
+    I64 seed_total;
     I64 staged_total;
     I64 parity_total;
     I32 status_primary;
@@ -37996,6 +38001,11 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
     I64 parity_blocked_count;
     I64 parity_drift_count;
     I64 parity_snapshot_digest_q64;
+    I64 seed_ok_count;
+    I64 seed_blocked_count;
+    I64 seed_drift_count;
+    I64 seed_snapshot_digest_q64;
+    I64 seed_total;
     I64 staged_total;
     I64 parity_total;
     I32 status_seed;
@@ -39168,7 +39178,15 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
         &staged_snapshot_digest_q64);
     if (!GPUSecurityPerfStatusIsValid(status_seed))
         return GPU_SEC_PERF_ERR_BAD_PARAM;
+    seed_ok_count = staged_ok_count;
+    seed_blocked_count = staged_blocked_count;
+    seed_drift_count = staged_drift_count;
+    seed_snapshot_digest_q64 = staged_snapshot_digest_q64;
 
+    // IQ-1765 hardening refresh:
+    // - preserve seed tuple from commit-only ancestor before primary/parity replay;
+    // - require status and tuple continuity between seed and primary executions;
+    // - fail closed on any seed/primary drift before publish.
     status_primary = GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
         p50_overhead_q16_rows,
         p95_overhead_q16_rows,
@@ -39230,6 +39248,27 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
     if (!GPUSecurityPerfStatusIsValid(status_primary) ||
         !GPUSecurityPerfStatusIsValid(status_parity))
         return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (status_seed != status_primary)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (status_seed == GPU_SEC_PERF_OK)
+    {
+        if (seed_ok_count < 0 || seed_blocked_count < 0 || seed_drift_count < 0)
+            return GPU_SEC_PERF_ERR_BAD_PARAM;
+        if (seed_snapshot_digest_q64 <= 0)
+            return GPU_SEC_PERF_ERR_BAD_PARAM;
+        if (!GPUSecurityPerfAddChecked(seed_ok_count, seed_blocked_count, &seed_total))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (!GPUSecurityPerfAddChecked(seed_total, seed_drift_count, &seed_total))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (seed_total != scenario_count)
+            return GPU_SEC_PERF_ERR_BAD_PARAM;
+        if (seed_ok_count != staged_ok_count ||
+            seed_blocked_count != staged_blocked_count ||
+            seed_drift_count != staged_drift_count ||
+            seed_snapshot_digest_q64 != staged_snapshot_digest_q64)
+            return GPU_SEC_PERF_ERR_BAD_PARAM;
+    }
 
     if (status_primary == GPU_SEC_PERF_OK)
     {
@@ -39373,9 +39412,9 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
     canonical_drift_count = 0;
     canonical_snapshot_digest_q64 = 0;
 
-    // IQ-1755 zero-write diagnostics companion:
-    // - derive staged tuple through IQ-1754 commit-only hardening wrapper;
-    // - derive canonical tuple through IQ-1753 strict diagnostics parity gate;
+    // IQ-1766 zero-write diagnostics companion:
+    // - derive staged tuple through IQ-1765 commit-only hardening wrapper;
+    // - derive canonical tuple through IQ-1756 strict diagnostics parity gate;
     // - enforce immutable batch snapshot + status-domain + strict tuple parity;
     // - preserve caller output slots (no-write diagnostics semantics).
     status_companion = GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
