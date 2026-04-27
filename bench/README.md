@@ -152,7 +152,9 @@ python3 bench/perplexity_compare.py \
 `perf_regression.py` scans host-side benchmark result files and writes dashboards
 to `bench/dashboards/`. It accepts JSON, JSONL, and CSV records with `tok_per_s`
 or `tok_per_s_milli`, plus optional memory fields such as `memory_bytes` or
-`max_rss_bytes`.
+`max_rss_bytes`. Regression checks compare commit-level aggregates, so repeated
+runs and duplicate latest/stamped result files are collapsed by benchmark key and
+commit before the latest distinct commits are compared.
 
 Example:
 
@@ -164,6 +166,15 @@ CI can fail on throughput or memory regressions with:
 
 ```bash
 python3 bench/perf_regression.py --fail-on-regression
+```
+
+Pin an explicit baseline/candidate pair when CI provides known SHAs:
+
+```bash
+python3 bench/perf_regression.py \
+  --baseline-commit "$BASE_SHA" \
+  --candidate-commit "$GITHUB_SHA" \
+  --fail-on-regression
 ```
 
 The `bench-perf-regression` GitHub Actions workflow runs a stdlib-only smoke

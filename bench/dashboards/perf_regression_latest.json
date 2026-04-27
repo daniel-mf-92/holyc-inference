@@ -1,5 +1,44 @@
 {
-  "generated_at": "2026-04-27T14:52:29Z",
+  "commit_points": [
+    {
+      "commit": "ci-base",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/ci-short",
+      "latest_timestamp": "2026-04-27T14:00:00Z",
+      "max_memory_bytes": 1000000,
+      "median_tok_per_s": 100.0,
+      "records": 1
+    },
+    {
+      "commit": "ci-head",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/ci-short",
+      "latest_timestamp": "2026-04-27T14:05:00Z",
+      "max_memory_bytes": 1000000,
+      "median_tok_per_s": 101.0,
+      "records": 1
+    },
+    {
+      "commit": "5b98f2570b1c",
+      "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
+      "latest_timestamp": "2026-04-27T14:41:37Z",
+      "max_memory_bytes": null,
+      "median_tok_per_s": 160.0,
+      "records": 6
+    },
+    {
+      "commit": "5b98f2570b1c",
+      "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
+      "latest_timestamp": "2026-04-27T14:41:37Z",
+      "max_memory_bytes": null,
+      "median_tok_per_s": 160.0,
+      "records": 6
+    }
+  ],
+  "comparison": {
+    "baseline_commit": null,
+    "candidate_commit": null,
+    "mode": "latest-distinct-commits"
+  },
+  "generated_at": "2026-04-27T15:46:16Z",
   "record_count": 14,
   "records": [
     {

@@ -59,6 +59,92 @@ def test_detects_tok_per_s_and_memory_regressions(tmp_path: Path) -> None:
     assert regressions[0].candidate_commit == "head"
 
 
+def test_regression_detection_compares_latest_distinct_commits(tmp_path: Path) -> None:
+    result = tmp_path / "perf.jsonl"
+    write_jsonl(
+        result,
+        [
+            {
+                "timestamp": "2026-04-27T10:00:00Z",
+                "commit": "base",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "tok_per_s": 100.0,
+            },
+            {
+                "timestamp": "2026-04-27T11:00:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "tok_per_s": 90.0,
+            },
+            {
+                "timestamp": "2026-04-27T11:00:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "tok_per_s": 92.0,
+            },
+        ],
+    )
+
+    records = perf_regression.load_records([result])
+    regressions = perf_regression.detect_regressions(records, 5.0, 10.0)
+
+    assert len(regressions) == 1
+    assert regressions[0].baseline_commit == "base"
+    assert regressions[0].candidate_commit == "head"
+    assert regressions[0].candidate_value == 91.0
+
+
+def test_explicit_baseline_and_candidate_commits(tmp_path: Path) -> None:
+    result = tmp_path / "perf.jsonl"
+    write_jsonl(
+        result,
+        [
+            {
+                "timestamp": "2026-04-27T10:00:00Z",
+                "commit": "old",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "tok_per_s": 80.0,
+            },
+            {
+                "timestamp": "2026-04-27T11:00:00Z",
+                "commit": "base",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "tok_per_s": 100.0,
+            },
+            {
+                "timestamp": "2026-04-27T12:00:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "tok_per_s": 93.0,
+            },
+        ],
+    )
+
+    records = perf_regression.load_records([result])
+    regressions = perf_regression.detect_regressions(
+        records,
+        5.0,
+        10.0,
+        baseline_commit="base",
+        candidate_commit="head",
+    )
+
+    assert len(regressions) == 1
+    assert regressions[0].baseline_commit == "base"
+
+
 def test_csv_tok_per_s_milli_is_normalized(tmp_path: Path) -> None:
     result = tmp_path / "perf.csv"
     result.write_text(
@@ -100,4 +186,5 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
     assert (output_dir / "perf_regression_latest.json").exists()
     markdown = (output_dir / "perf_regression_latest.md").read_text(encoding="utf-8")
     assert "Perf Regression Dashboard" in markdown
+    assert "Commit Points" in markdown
     assert "prompt/dev-local/-/-/-" in markdown
