@@ -41142,7 +41142,7 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
     parity_drift_count = 0;
     parity_snapshot_digest_q64 = 0;
 
-    // IQ-1763 commit-only hardening wrapper:
+    // IQ-1772 commit-only hardening wrapper refresh:
     // - seed staged tuple through IQ-1760 commit-only wrapper;
     // - verify staged tuple is preserved by IQ-1762 strict diagnostics parity gate;
     // - replay parity tuple through IQ-1761 zero-write diagnostics companion;
