@@ -145,6 +145,39 @@ def test_explicit_baseline_and_candidate_commits(tmp_path: Path) -> None:
     assert regressions[0].baseline_commit == "base"
 
 
+def test_memory_regression_uses_commit_point_max_memory(tmp_path: Path) -> None:
+    result = tmp_path / "perf.jsonl"
+    write_jsonl(
+        result,
+        [
+            {
+                "timestamp": "2026-04-27T10:00:00Z",
+                "commit": "base",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q8_0",
+                "memory_bytes": 1000,
+            },
+            {
+                "timestamp": "2026-04-27T11:00:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q8_0",
+                "memory_bytes": 1150,
+            },
+        ],
+    )
+
+    records = perf_regression.load_records([result])
+    regressions = perf_regression.detect_regressions(records, 5.0, 10.0)
+
+    assert len(regressions) == 1
+    assert regressions[0].metric == "memory_bytes"
+    assert regressions[0].baseline_value == 1000.0
+    assert regressions[0].candidate_value == 1150.0
+
+
 def test_csv_tok_per_s_milli_is_normalized(tmp_path: Path) -> None:
     result = tmp_path / "perf.csv"
     result.write_text(

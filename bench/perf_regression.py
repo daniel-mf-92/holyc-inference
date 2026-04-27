@@ -320,8 +320,8 @@ def detect_regressions(
                         metric="memory_bytes",
                         baseline_commit=baseline.commit,
                         candidate_commit=candidate.commit,
-                        baseline_value=float(baseline.memory_bytes),
-                        candidate_value=float(candidate.memory_bytes),
+                        baseline_value=float(baseline.max_memory_bytes),
+                        candidate_value=float(candidate.max_memory_bytes),
                         delta_pct=delta_pct,
                         threshold_pct=memory_threshold_pct,
                     )
