@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import csv
 import json
 import sys
 import tempfile
@@ -71,8 +72,13 @@ def test_cli_writes_json_and_markdown_report() -> None:
             == 0
         )
         payload = json.loads((Path(tmp) / "smoke.json").read_text(encoding="utf-8"))
+        csv_rows = list(csv.DictReader((Path(tmp) / "smoke.csv").open(newline="", encoding="utf-8")))
         assert payload["summary"]["record_count"] == 3
         assert (Path(tmp) / "smoke.md").exists()
+        assert len(csv_rows) == 3
+        assert csv_rows[0]["record_id"] == "smoke-arc-1"
+        assert csv_rows[0]["holyc_correct"] == "True"
+        assert csv_rows[0]["engines_agree"] == "True"
 
 
 def test_missing_prediction_fails_fast() -> None:

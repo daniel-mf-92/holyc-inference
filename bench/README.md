@@ -195,7 +195,7 @@ python3 bench/build_compare.py \
 `eval_compare.py` compares offline multiple-choice predictions from HolyC and
 llama.cpp against the same local gold JSONL dataset. It aligns by record id,
 supports prediction indexes, labels, exact choice text, or score arrays, and
-writes JSON plus Markdown reports to `bench/results/`.
+writes JSON, Markdown, and per-record CSV reports to `bench/results/`.
 
 Example:
 

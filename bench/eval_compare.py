@@ -313,6 +313,27 @@ def markdown_report(report: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def write_csv_report(path: Path, rows: list[EvalRow]) -> None:
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "record_id",
+                "dataset",
+                "split",
+                "answer_index",
+                "holyc_prediction",
+                "llama_prediction",
+                "holyc_correct",
+                "llama_correct",
+                "engines_agree",
+            ],
+        )
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(asdict(row))
+
+
 def write_report(
     rows: list[EvalRow],
     summary: dict[str, Any],
@@ -320,7 +341,7 @@ def write_report(
     gold_path: Path,
     holyc_path: Path,
     llama_path: Path,
-) -> tuple[Path, Path]:
+) -> tuple[Path, Path, Path]:
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     report = {
@@ -338,9 +359,11 @@ def write_report(
     stem = args.output_stem
     json_path = output_dir / f"{stem}.json"
     md_path = output_dir / f"{stem}.md"
+    csv_path = output_dir / f"{stem}.csv"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
-    return json_path, md_path
+    write_csv_report(csv_path, rows)
+    return json_path, md_path, csv_path
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -364,13 +387,14 @@ def main(argv: list[str] | None = None) -> int:
         holyc_predictions = load_predictions(args.holyc, gold)
         llama_predictions = load_predictions(args.llama, gold)
         rows, summary = compare(gold, holyc_predictions, llama_predictions)
-        json_path, md_path = write_report(rows, summary, args, args.gold, args.holyc, args.llama)
+        json_path, md_path, csv_path = write_report(rows, summary, args, args.gold, args.holyc, args.llama)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
     print(f"wrote_json={json_path}")
     print(f"wrote_markdown={md_path}")
+    print(f"wrote_csv={csv_path}")
     print(f"holyc_accuracy={summary['holyc_accuracy']:.4f}")
     print(f"llama_accuracy={summary['llama_accuracy']:.4f}")
     print(f"agreement={summary['agreement']:.4f}")

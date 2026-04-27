@@ -1,0 +1,4 @@
+record_id,dataset,split,answer_index,holyc_prediction,llama_prediction,holyc_correct,llama_correct,engines_agree
+smoke-arc-1,arc-smoke,validation,0,0,0,True,True,True
+smoke-hellaswag-1,hellaswag-smoke,validation,0,0,0,True,True,True
+smoke-truthfulqa-1,truthfulqa-smoke,validation,0,0,0,True,True,True
