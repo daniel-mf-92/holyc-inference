@@ -233,6 +233,19 @@ python3 bench/bench_result_index.py \
   --fail-on-drift
 ```
 
+`bench_artifact_manifest.py` builds on the same indexer and writes a
+deterministic latest-artifact manifest for CI upload/download consumers. It
+records SHA256 and byte size for each benchmark JSON, retains compact history,
+selects the newest artifact for each profile/model/quantization/prompt-suite
+key, and keeps the same recorded-command air-gap checks.
+
+```bash
+python3 bench/bench_artifact_manifest.py \
+  --input bench/results \
+  --output-dir bench/results \
+  --fail-on-airgap
+```
+
 ## Perf Regression Dashboard
 
 `perf_regression.py` scans JSON, JSONL, and CSV benchmark artifacts, groups
