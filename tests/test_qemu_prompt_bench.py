@@ -285,6 +285,54 @@ print("tokens=10 elapsed_us=100000")
     assert csv_report.count("\n") == 4
 
 
+def test_cli_variability_gate_fails_noisy_prompt_runs(tmp_path: Path) -> None:
+    fake_qemu = tmp_path / "fake-qemu.py"
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    output_dir = tmp_path / "results"
+    prompts.write_text('{"prompt_id":"one","prompt":"Noisy"}\n', encoding="utf-8")
+    fake_qemu.write_text(
+        """#!/usr/bin/env python3
+from pathlib import Path
+counter = Path(__file__).with_suffix(".count")
+iteration = int(counter.read_text()) + 1 if counter.exists() else 1
+counter.write_text(str(iteration))
+elapsed_us = 100000 if iteration != 2 else 200000
+print(f"tokens=100 elapsed_us={elapsed_us}")
+""",
+        encoding="utf-8",
+    )
+    fake_qemu.chmod(0o755)
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--qemu-bin",
+            str(fake_qemu),
+            "--output-dir",
+            str(output_dir),
+            "--repeat",
+            "3",
+            "--max-prompt-cv-pct",
+            "10",
+        ]
+    )
+
+    assert status == 1
+    report = json.loads((output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8"))
+    markdown = (output_dir / "qemu_prompt_bench_latest.md").read_text(encoding="utf-8")
+
+    assert report["status"] == "fail"
+    assert report["variability_gates"]["max_prompt_cv_pct"] == 10.0
+    assert report["variability_findings"][0]["scope"] == "prompt"
+    assert report["variability_findings"][0]["prompt"] == "one"
+    assert report["variability_findings"][0]["metric"] == "tok_per_s_cv_pct"
+    assert "Variability Gate Findings" in markdown
+
+
 def test_cli_rejects_negative_warmup(tmp_path: Path) -> None:
     prompts = tmp_path / "prompts.jsonl"
     image = tmp_path / "temple.img"
@@ -298,6 +346,26 @@ def test_cli_rejects_negative_warmup(tmp_path: Path) -> None:
             str(prompts),
             "--dry-run",
             "--warmup",
+            "-1",
+        ]
+    )
+
+    assert status == 2
+
+
+def test_cli_rejects_negative_variability_gate(tmp_path: Path) -> None:
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    prompts.write_text('{"prompt_id":"one","prompt":"A"}\n', encoding="utf-8")
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--dry-run",
+            "--max-suite-cv-pct",
             "-1",
         ]
     )

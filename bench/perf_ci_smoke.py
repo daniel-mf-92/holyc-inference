@@ -175,6 +175,8 @@ def main() -> int:
             "Q4_0",
             "--repeat",
             "3",
+            "--max-prompt-cv-pct",
+            "0.1",
             "--output-dir",
             str(bench_output_dir),
         ]
@@ -202,6 +204,9 @@ def main() -> int:
             return 1
         if not all("tok_per_s_cv_pct" in row for row in bench_report["summaries"]):
             print("missing_prompt_tok_cv=true", file=sys.stderr)
+            return 1
+        if bench_report.get("variability_findings"):
+            print("unexpected_variability_findings=true", file=sys.stderr)
             return 1
 
     print("perf_ci_smoke=ok")

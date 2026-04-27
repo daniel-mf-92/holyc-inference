@@ -154,6 +154,11 @@ Memory telemetry is optional. The runner normalizes `memory_bytes`,
 and `_mb` variants into `memory_bytes` so the perf regression dashboard can
 track peak memory alongside tok/s.
 
+Use `--max-suite-cv-pct` and `--max-prompt-cv-pct` to fail noisy benchmark runs
+when measured tok/s coefficient of variation exceeds a CI threshold. Gate
+findings are written into the JSON and Markdown reports as
+`variability_findings`.
+
 Example:
 
 ```bash
@@ -164,6 +169,7 @@ python3 bench/qemu_prompt_bench.py \
   --quantization Q4_0 \
   --warmup 1 \
   --repeat 5 \
+  --max-prompt-cv-pct 5 \
   -- -m 512M
 ```
 

@@ -455,6 +455,43 @@ def coefficient_of_variation_pct(values: list[float]) -> float | None:
     return statistics.stdev(values) * 100.0 / mean
 
 
+def variability_findings(
+    suite: dict[str, Any],
+    summaries: list[dict[str, Any]],
+    *,
+    max_suite_cv_pct: float | None = None,
+    max_prompt_cv_pct: float | None = None,
+) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    suite_cv = parse_float(suite.get("tok_per_s_cv_pct"))
+    if max_suite_cv_pct is not None and suite_cv is not None and suite_cv > max_suite_cv_pct:
+        findings.append(
+            {
+                "scope": "suite",
+                "prompt": "",
+                "metric": "tok_per_s_cv_pct",
+                "value": suite_cv,
+                "limit": max_suite_cv_pct,
+            }
+        )
+
+    if max_prompt_cv_pct is not None:
+        for summary in summaries:
+            prompt_cv = parse_float(summary.get("tok_per_s_cv_pct"))
+            if prompt_cv is None or prompt_cv <= max_prompt_cv_pct:
+                continue
+            findings.append(
+                {
+                    "scope": "prompt",
+                    "prompt": str(summary.get("prompt", "")),
+                    "metric": "tok_per_s_cv_pct",
+                    "value": prompt_cv,
+                    "limit": max_prompt_cv_pct,
+                }
+            )
+    return findings
+
+
 def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
     tok_values = [run.tok_per_s for run in runs if run.tok_per_s is not None]
     elapsed_values = [run.elapsed_us for run in runs if run.elapsed_us > 0]
@@ -478,6 +515,11 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
         "elapsed_us_p95": percentile([float(value) for value in elapsed_values], 95.0),
         "memory_bytes_max": max(memory_values) if memory_values else None,
     }
+
+
+def report_status(all_runs: list[BenchRun], findings: list[dict[str, Any]]) -> str:
+    runs_ok = all(run.returncode == 0 and not run.timed_out for run in all_runs)
+    return "pass" if runs_ok and not findings else "fail"
 
 
 def markdown_report(report: dict[str, Any]) -> str:
@@ -529,6 +571,23 @@ def markdown_report(report: dict[str, Any]) -> str:
             )
     else:
         lines.append("No benchmark runs recorded.")
+
+    if report.get("variability_findings"):
+        lines.extend(
+            [
+                "",
+                "## Variability Gate Findings",
+                "",
+                "| Scope | Prompt | Metric | Value | Limit |",
+                "| --- | --- | --- | ---: | ---: |",
+            ]
+        )
+        for finding in report["variability_findings"]:
+            lines.append(
+                "| {scope} | {prompt} | {metric} | {value} | {limit} |".format(
+                    **{key: format_summary_value(value) for key, value in finding.items()}
+                )
+            )
     return "\n".join(lines) + "\n"
 
 
@@ -546,17 +605,32 @@ def write_report(
     *,
     prompt_suite: dict[str, Any] | None = None,
     warmups: list[BenchRun] | None = None,
+    max_suite_cv_pct: float | None = None,
+    max_prompt_cv_pct: float | None = None,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     warmup_runs = warmups or []
     all_runs = warmup_runs + runs
+    suite = suite_summary(runs)
+    summaries = summarize_runs(runs)
+    findings = variability_findings(
+        suite,
+        summaries,
+        max_suite_cv_pct=max_suite_cv_pct,
+        max_prompt_cv_pct=max_prompt_cv_pct,
+    )
     report = {
         "generated_at": iso_now(),
-        "status": "pass" if all(run.returncode == 0 and not run.timed_out for run in all_runs) else "fail",
+        "status": report_status(all_runs, findings),
         "prompt_suite": prompt_suite or {},
         "warmups": [asdict(run) for run in warmup_runs],
-        "suite_summary": suite_summary(runs),
-        "summaries": summarize_runs(runs),
+        "suite_summary": suite,
+        "summaries": summaries,
+        "variability_gates": {
+            "max_suite_cv_pct": max_suite_cv_pct,
+            "max_prompt_cv_pct": max_prompt_cv_pct,
+        },
+        "variability_findings": findings,
         "benchmarks": [asdict(run) for run in runs],
     }
     latest = output_dir / "qemu_prompt_bench_latest.json"
@@ -616,6 +690,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run each prompt this many times before measured repeats; warmups are recorded separately",
     )
     parser.add_argument("--repeat", type=int, default=1, help="Run each prompt this many times")
+    parser.add_argument(
+        "--max-suite-cv-pct",
+        type=float,
+        default=None,
+        help="Fail if measured suite tok/s coefficient of variation exceeds this percentage",
+    )
+    parser.add_argument(
+        "--max-prompt-cv-pct",
+        type=float,
+        default=None,
+        help="Fail if any prompt tok/s coefficient of variation exceeds this percentage",
+    )
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--profile", default="default")
     parser.add_argument("--model", default="")
@@ -632,6 +718,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.warmup < 0:
         print("error: --warmup must be >= 0", file=sys.stderr)
+        return 2
+    if args.max_suite_cv_pct is not None and args.max_suite_cv_pct < 0:
+        print("error: --max-suite-cv-pct must be >= 0", file=sys.stderr)
+        return 2
+    if args.max_prompt_cv_pct is not None and args.max_prompt_cv_pct < 0:
+        print("error: --max-prompt-cv-pct must be >= 0", file=sys.stderr)
         return 2
 
     root = Path(__file__).resolve().parents[1]
@@ -677,11 +769,14 @@ def main(argv: list[str] | None = None) -> int:
         args.output_dir,
         prompt_suite=prompt_suite_metadata(args.prompts, prompts),
         warmups=warmups,
+        max_suite_cv_pct=args.max_suite_cv_pct,
+        max_prompt_cv_pct=args.max_prompt_cv_pct,
     )
-    all_runs = warmups + runs
+    report = json.loads(output.read_text(encoding="utf-8"))
     print(f"wrote_json={output}")
-    print(f"status={'pass' if all(run.returncode == 0 and not run.timed_out for run in all_runs) else 'fail'}")
-    return 0 if all(run.returncode == 0 and not run.timed_out for run in all_runs) else 1
+    print(f"status={report['status']}")
+    print(f"variability_findings={len(report['variability_findings'])}")
+    return 0 if report["status"] == "pass" else 1
 
 
 if __name__ == "__main__":
