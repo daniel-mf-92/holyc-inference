@@ -202,6 +202,20 @@ python3 bench/bench_matrix.py \
   --dry-run
 ```
 
+`bench_result_index.py` scans existing QEMU prompt and matrix JSON reports,
+rolls their tok/s, memory, prompt-suite, and run-count metadata into a single
+JSON/Markdown/CSV index, and checks each recorded QEMU command for explicit
+`-nic none` air-gap compliance. It never launches QEMU.
+
+Example:
+
+```bash
+python3 bench/bench_result_index.py \
+  --input bench/results \
+  --output-dir bench/results \
+  --fail-on-airgap
+```
+
 ## Perf Regression Dashboard
 
 `perf_regression.py` scans JSON, JSONL, and CSV benchmark artifacts, groups
