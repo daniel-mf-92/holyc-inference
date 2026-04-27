@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import sys
 import csv
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,10 +58,14 @@ def test_dry_run_writes_planned_air_gapped_commands(tmp_path: Path) -> None:
     assert status == 0
     report = json.loads((output_dir / "bench_matrix_latest.json").read_text(encoding="utf-8"))
     csv_rows = list(csv.DictReader((output_dir / "bench_matrix_latest.csv").open(newline="", encoding="utf-8")))
+    junit_root = ET.parse(output_dir / "bench_matrix_junit_latest.xml").getroot()
     cell = report["cells"][0]
     assert report["status"] == "planned"
     assert cell["status"] == "planned"
     assert csv_rows[0]["status"] == "planned"
+    assert junit_root.attrib["name"] == "holyc_bench_matrix"
+    assert junit_root.attrib["tests"] == "1"
+    assert junit_root.attrib["failures"] == "0"
     assert len(cell["prompt_suite_sha256"]) == 64
     assert csv_rows[0]["prompt_suite_sha256"] == cell["prompt_suite_sha256"]
     assert json.loads(csv_rows[0]["command"])[1:3] == ["-nic", "none"]
@@ -95,10 +100,13 @@ def test_cli_runs_synthetic_matrix(tmp_path: Path) -> None:
     report = json.loads((output_dir / "bench_matrix_latest.json").read_text(encoding="utf-8"))
     markdown = (output_dir / "bench_matrix_latest.md").read_text(encoding="utf-8")
     csv_rows = list(csv.DictReader((output_dir / "bench_matrix_latest.csv").open(newline="", encoding="utf-8")))
+    junit_root = ET.parse(output_dir / "bench_matrix_junit_latest.xml").getroot()
 
     assert report["status"] == "pass"
     assert len(report["cells"]) == 2
     assert len(csv_rows) == 2
+    assert junit_root.attrib["tests"] == "2"
+    assert junit_root.attrib["failures"] == "0"
     assert {cell["quantization"] for cell in report["cells"]} == {"Q4_0", "Q8_0"}
     assert {row["quantization"] for row in csv_rows} == {"Q4_0", "Q8_0"}
     assert all(cell["measured_runs"] == 4 for cell in report["cells"])
@@ -113,3 +121,52 @@ def test_cli_runs_synthetic_matrix(tmp_path: Path) -> None:
     assert all(cell["command"][1:3] == ["-nic", "none"] for cell in report["cells"])
     assert "Benchmark Matrix" in markdown
     assert "Prompt suite" in markdown
+
+
+def test_junit_marks_failed_matrix_cells(tmp_path: Path) -> None:
+    output = tmp_path / "bench_matrix_junit_latest.xml"
+    cells = [
+        bench_matrix.MatrixCellResult(
+            profile="secure",
+            model="tiny",
+            quantization="Q4_0",
+            status="pass",
+            output_dir=str(tmp_path / "pass"),
+            report=str(tmp_path / "pass" / "qemu_prompt_bench_latest.json"),
+            command=["qemu-system-x86_64", "-nic", "none"],
+            prompts=1,
+            prompt_suite_sha256="a" * 64,
+            measured_runs=3,
+            warmup_runs=1,
+            median_tok_per_s=120.0,
+            max_memory_bytes=4096,
+            variability_findings=0,
+        ),
+        bench_matrix.MatrixCellResult(
+            profile="secure",
+            model="tiny",
+            quantization="Q8_0",
+            status="fail",
+            output_dir=str(tmp_path / "fail"),
+            report=str(tmp_path / "fail" / "qemu_prompt_bench_latest.json"),
+            command=["qemu-system-x86_64", "-nic", "none"],
+            prompts=1,
+            prompt_suite_sha256="b" * 64,
+            measured_runs=3,
+            warmup_runs=1,
+            median_tok_per_s=90.0,
+            max_memory_bytes=8192,
+            variability_findings=1,
+        ),
+    ]
+
+    bench_matrix.write_matrix_junit(cells, output)
+
+    root = ET.parse(output).getroot()
+    failure = root.find("./testcase/failure")
+    assert root.attrib["name"] == "holyc_bench_matrix"
+    assert root.attrib["tests"] == "2"
+    assert root.attrib["failures"] == "1"
+    assert failure is not None
+    assert failure.attrib["type"] == "benchmark_matrix_cell_failure"
+    assert "variability_findings=1" in (failure.text or "")

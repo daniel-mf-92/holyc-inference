@@ -55,3 +55,4 @@
 2026-04-27T23:25:48Z | Added offline eval dataset split-leak audit with JSON/Markdown/CSV reports, smoke artifacts, docs, and tests.
 2026-04-27T23:33:06Z | Added QEMU benchmark host provenance to JSON/Markdown reports with refreshed air-gapped smoke artifacts.
 2026-04-27T23:41:55Z | Added QEMU prompt byte telemetry to dry-run metadata, measured reports, CSV/Markdown outputs, and refreshed smoke artifacts.
+2026-04-27T23:47:43Z | Added JUnit XML export for benchmark matrix cells with smoke coverage and refreshed matrix artifacts.

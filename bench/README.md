@@ -257,8 +257,9 @@ python3 bench/qemu_prompt_bench.py \
 profiles, models, and quantization formats. Each cell writes an isolated
 `qemu_prompt_bench_latest.json` under `bench/results/bench_matrix_*`, while the
 matrix summary is written to `bench/results/bench_matrix_latest.json`, `.md`,
-and `.csv`. QEMU launches still flow through the air-gap guard that injects
-`-nic none` and rejects NIC/network arguments. Each matrix cell records the
+`.csv`, and `bench_matrix_junit_latest.xml`. QEMU launches still flow through
+the air-gap guard that injects `-nic none` and rejects NIC/network arguments.
+Each matrix cell records the
 prompt-suite SHA256 from its underlying prompt benchmark report so matrix
 comparisons can reject accidental prompt drift.
 Use `max_suite_cv_pct` and `max_prompt_cv_pct` in the matrix JSON, or the

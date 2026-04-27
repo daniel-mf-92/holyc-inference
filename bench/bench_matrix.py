@@ -18,6 +18,7 @@ import json
 import re
 import statistics
 import sys
+import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -347,9 +348,11 @@ def write_matrix_report(
     json_path = output_dir / "bench_matrix_latest.json"
     md_path = output_dir / "bench_matrix_latest.md"
     csv_path = output_dir / "bench_matrix_latest.csv"
+    junit_path = output_dir / "bench_matrix_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
     write_matrix_csv(cells, csv_path)
+    write_matrix_junit(cells, junit_path)
     return json_path
 
 
@@ -377,6 +380,63 @@ def write_matrix_csv(cells: list[MatrixCellResult], path: Path) -> None:
             row = asdict(cell)
             row["command"] = json.dumps(cell.command, separators=(",", ":"))
             writer.writerow({field: row[field] for field in fields})
+
+
+def write_matrix_junit(cells: list[MatrixCellResult], path: Path) -> None:
+    failures = sum(1 for cell in cells if cell.status == "fail")
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": "holyc_bench_matrix",
+            "tests": str(len(cells)),
+            "failures": str(failures),
+            "errors": "0",
+        },
+    )
+    for cell in cells:
+        case = ET.SubElement(
+            suite,
+            "testcase",
+            {
+                "classname": "bench_matrix.cell",
+                "name": f"{cell.profile}:{cell.model}:{cell.quantization}",
+            },
+        )
+        if cell.status != "fail":
+            continue
+        message = (
+            f"status={cell.status} runs={cell.measured_runs} "
+            f"warmups={cell.warmup_runs} variability_findings={cell.variability_findings}"
+        )
+        failure = ET.SubElement(
+            case,
+            "failure",
+            {
+                "type": "benchmark_matrix_cell_failure",
+                "message": message,
+            },
+        )
+        failure.text = "\n".join(
+            [
+                f"profile={cell.profile}",
+                f"model={cell.model}",
+                f"quantization={cell.quantization}",
+                f"status={cell.status}",
+                f"report={cell.report}",
+                f"output_dir={cell.output_dir}",
+                f"prompt_suite_sha256={cell.prompt_suite_sha256}",
+                f"measured_runs={cell.measured_runs}",
+                f"warmup_runs={cell.warmup_runs}",
+                f"median_tok_per_s={cell.median_tok_per_s}",
+                f"max_memory_bytes={cell.max_memory_bytes}",
+                f"variability_findings={cell.variability_findings}",
+                f"command={json.dumps(cell.command, separators=(',', ':'))}",
+            ]
+        )
+    ET.indent(suite)
+    ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
+    with path.open("ab") as handle:
+        handle.write(b"\n")
 
 
 def build_parser() -> argparse.ArgumentParser:
