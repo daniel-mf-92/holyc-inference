@@ -36739,6 +36739,10 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnly(
     I64 staged_blocked_count;
     I64 staged_drift_count;
     I64 staged_snapshot_digest_q64;
+    I64 seed_ok_count;
+    I64 seed_blocked_count;
+    I64 seed_drift_count;
+    I64 seed_snapshot_digest_q64;
     I64 parity_ok_count;
     I64 parity_blocked_count;
     I64 parity_drift_count;
@@ -42221,10 +42225,10 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
     parity_drift_count = 0;
     parity_snapshot_digest_q64 = 0;
 
-    // IQ-1780 commit-only hardening wrapper:
-    // - seed staged tuple through IQ-1778 zero-write diagnostics companion;
-    // - verify staged tuple is preserved by IQ-1779 strict diagnostics parity gate;
-    // - replay parity tuple through IQ-1778 zero-write diagnostics companion;
+    // IQ-1784 commit-only hardening wrapper:
+    // - seed staged tuple through IQ-1783 zero-write diagnostics companion;
+    // - verify staged tuple is preserved by IQ-1781 strict diagnostics parity gate;
+    // - replay parity tuple through IQ-1783 zero-write diagnostics companion;
     // - require immutable batch snapshot + status-domain validity + strict tuple parity;
     // - atomically publish {ok_count, blocked_count, drift_count, snapshot_digest_q64}
     //   only when strict tuple parity holds.
@@ -42246,6 +42250,10 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
         &staged_snapshot_digest_q64);
     if (!GPUSecurityPerfStatusIsValid(status_seed))
         return GPU_SEC_PERF_ERR_BAD_PARAM;
+    seed_ok_count = staged_ok_count;
+    seed_blocked_count = staged_blocked_count;
+    seed_drift_count = staged_drift_count;
+    seed_snapshot_digest_q64 = staged_snapshot_digest_q64;
 
     status_primary = GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
         p50_overhead_q16_rows,
@@ -42337,6 +42345,13 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
             return GPU_SEC_PERF_ERR_BAD_PARAM;
     }
 
+    if (status_seed != status_parity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (seed_ok_count != parity_ok_count ||
+        seed_blocked_count != parity_blocked_count ||
+        seed_drift_count != parity_drift_count ||
+        seed_snapshot_digest_q64 != parity_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
     if (status_primary != status_parity)
         return GPU_SEC_PERF_ERR_BAD_PARAM;
     if (staged_ok_count != parity_ok_count ||
