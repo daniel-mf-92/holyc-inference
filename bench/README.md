@@ -93,6 +93,21 @@ python3 bench/qemu_prompt_bench.py \
   --dry-run
 ```
 
+## Build Benchmark Compare
+
+`build_compare.py` compares multiple `qemu_prompt_bench.py` JSON reports by
+prompt/profile/model/quantization and writes per-build throughput and elapsed
+time deltas to `bench/results/`.
+
+Example:
+
+```bash
+python3 bench/build_compare.py \
+  --input base=bench/results/qemu_prompt_bench_base.json \
+  --input head=bench/results/qemu_prompt_bench_latest.json \
+  --baseline base
+```
+
 ## HolyC vs llama.cpp Eval Compare
 
 `eval_compare.py` compares offline multiple-choice predictions from HolyC and
