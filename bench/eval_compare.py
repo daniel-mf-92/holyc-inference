@@ -228,6 +228,62 @@ def accuracy(correct_count: int, total: int) -> float:
     return correct_count / total if total else 0.0
 
 
+def safe_div(numerator: int | float, denominator: int | float) -> float:
+    return numerator / denominator if denominator else 0.0
+
+
+def f1_score(precision: float, recall: float) -> float:
+    return 2.0 * precision * recall / (precision + recall) if precision + recall else 0.0
+
+
+def class_count(gold: dict[str, GoldCase]) -> int:
+    return max((len(case.choices) for case in gold.values()), default=0)
+
+
+def classification_metrics(rows: list[EvalRow], engine: str, labels: list[int]) -> dict[str, Any]:
+    matrix = [[0 for _ in labels] for _ in labels]
+    label_to_offset = {label: offset for offset, label in enumerate(labels)}
+
+    for row in rows:
+        prediction = row.holyc_prediction if engine == "holyc" else row.llama_prediction
+        gold_offset = label_to_offset[row.answer_index]
+        pred_offset = label_to_offset[prediction]
+        matrix[gold_offset][pred_offset] += 1
+
+    per_answer_index: list[dict[str, Any]] = []
+    supported_f1: list[float] = []
+    for label in labels:
+        offset = label_to_offset[label]
+        true_positive = matrix[offset][offset]
+        support = sum(matrix[offset])
+        predicted_count = sum(row[offset] for row in matrix)
+        precision = safe_div(true_positive, predicted_count)
+        recall = safe_div(true_positive, support)
+        f1 = f1_score(precision, recall)
+        if support:
+            supported_f1.append(f1)
+        per_answer_index.append(
+            {
+                "answer_index": label,
+                "f1": f1,
+                "precision": precision,
+                "predicted_count": predicted_count,
+                "recall": recall,
+                "support": support,
+                "true_positive": true_positive,
+            }
+        )
+
+    return {
+        "confusion_matrix": {
+            "labels": labels,
+            "matrix": matrix,
+        },
+        "macro_f1": sum(supported_f1) / len(supported_f1) if supported_f1 else 0.0,
+        "per_answer_index": per_answer_index,
+    }
+
+
 def compare(
     gold: dict[str, GoldCase],
     holyc_predictions: dict[str, Prediction],
@@ -262,16 +318,27 @@ def compare(
     holyc_correct = sum(1 for row in rows if row.holyc_correct)
     llama_correct = sum(1 for row in rows if row.llama_correct)
     agreements = sum(1 for row in rows if row.engines_agree)
+    labels = list(range(class_count(gold)))
+    holyc_metrics = classification_metrics(rows, "holyc", labels)
+    llama_metrics = classification_metrics(rows, "llama", labels)
     summary = {
         "agreement": accuracy(agreements, total),
         "agreement_count": agreements,
+        "class_count": len(labels),
         "holyc_accuracy": accuracy(holyc_correct, total),
+        "holyc_confusion_matrix": holyc_metrics["confusion_matrix"],
         "holyc_correct": holyc_correct,
+        "holyc_macro_f1": holyc_metrics["macro_f1"],
+        "holyc_per_answer_index": holyc_metrics["per_answer_index"],
         "llama_accuracy": accuracy(llama_correct, total),
+        "llama_confusion_matrix": llama_metrics["confusion_matrix"],
         "llama_correct": llama_correct,
+        "llama_macro_f1": llama_metrics["macro_f1"],
+        "llama_per_answer_index": llama_metrics["per_answer_index"],
         "record_count": total,
     }
     summary["accuracy_delta_holyc_minus_llama"] = summary["holyc_accuracy"] - summary["llama_accuracy"]
+    summary["macro_f1_delta_holyc_minus_llama"] = summary["holyc_macro_f1"] - summary["llama_macro_f1"]
     return rows, summary
 
 
@@ -294,11 +361,42 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"| HolyC accuracy | {summary['holyc_accuracy']:.4f} |",
         f"| llama.cpp accuracy | {summary['llama_accuracy']:.4f} |",
         f"| Accuracy delta | {summary['accuracy_delta_holyc_minus_llama']:.4f} |",
+        f"| HolyC macro F1 | {summary['holyc_macro_f1']:.4f} |",
+        f"| llama.cpp macro F1 | {summary['llama_macro_f1']:.4f} |",
+        f"| Macro F1 delta | {summary['macro_f1_delta_holyc_minus_llama']:.4f} |",
         f"| Agreement | {summary['agreement']:.4f} |",
         "",
-        "## Disagreements",
+        "## Per-Answer F1",
         "",
+        "| Answer index | HolyC support | HolyC F1 | llama.cpp support | llama.cpp F1 |",
+        "| ---: | ---: | ---: | ---: | ---: |",
     ]
+    for holyc_metric, llama_metric in zip(summary["holyc_per_answer_index"], summary["llama_per_answer_index"]):
+        lines.append(
+            f"| {holyc_metric['answer_index']} | {holyc_metric['support']} | {holyc_metric['f1']:.4f} | "
+            f"{llama_metric['support']} | {llama_metric['f1']:.4f} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Confusion Matrices",
+            "",
+            "Rows are gold answer indexes; columns are predicted answer indexes.",
+            "",
+            "### HolyC",
+            "",
+        ]
+    )
+    lines.extend(confusion_matrix_markdown(summary["holyc_confusion_matrix"]))
+    lines.extend(["", "### llama.cpp", ""])
+    lines.extend(confusion_matrix_markdown(summary["llama_confusion_matrix"]))
+    lines.extend(
+        [
+            "",
+            "## Disagreements",
+            "",
+        ]
+    )
     disagreements = [row for row in report["rows"] if not row["engines_agree"]]
     if disagreements:
         lines.append("| ID | Gold | HolyC | llama.cpp |")
@@ -311,6 +409,17 @@ def markdown_report(report: dict[str, Any]) -> str:
     else:
         lines.append("No prediction disagreements.")
     return "\n".join(lines) + "\n"
+
+
+def confusion_matrix_markdown(confusion: dict[str, Any]) -> list[str]:
+    labels = confusion["labels"]
+    matrix = confusion["matrix"]
+    header = "| Gold \\ Pred | " + " | ".join(str(label) for label in labels) + " |"
+    separator = "| ---: | " + " | ".join("---:" for _ in labels) + " |"
+    lines = [header, separator]
+    for label, counts in zip(labels, matrix):
+        lines.append("| " + str(label) + " | " + " | ".join(str(count) for count in counts) + " |")
+    return lines
 
 
 def write_csv_report(path: Path, rows: list[EvalRow]) -> None:
