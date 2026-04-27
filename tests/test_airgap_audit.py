@@ -51,3 +51,43 @@ def test_audit_checks_warmup_commands(tmp_path: Path) -> None:
     assert len(findings) == 2
     assert any("missing explicit `-nic none`" in finding.reason for finding in findings)
     assert any("non-air-gapped" in finding.reason for finding in findings)
+
+
+def test_audit_checks_bench_matrix_cell_commands(tmp_path: Path) -> None:
+    report = tmp_path / "bench_matrix_latest.json"
+    report.write_text(
+        json.dumps(
+            {
+                "cells": [
+                    {
+                        "profile": "unsafe",
+                        "command": [
+                            "qemu-system-x86_64",
+                            "-netdev",
+                            "user,id=n0",
+                            "-drive",
+                            "file=TempleOS.img,format=raw,if=ide",
+                        ],
+                    },
+                    {
+                        "profile": "safe",
+                        "command": [
+                            "qemu-system-x86_64",
+                            "-nic",
+                            "none",
+                            "-drive",
+                            "file=TempleOS.img,format=raw,if=ide",
+                        ],
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    commands_checked, findings = airgap_audit.audit([report])
+
+    assert commands_checked == 2
+    assert len(findings) == 2
+    assert any("missing explicit `-nic none`" in finding.reason for finding in findings)
+    assert any("network backend" in finding.reason for finding in findings)

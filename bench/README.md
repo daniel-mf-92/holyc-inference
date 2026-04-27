@@ -321,9 +321,9 @@ python3 bench/perf_regression.py \
   --fail-on-regression
 ```
 
-`airgap_audit.py` scans benchmark artifacts for recorded QEMU commands and
-fails if any QEMU-like command is missing `-nic none` or includes networking
-flags/devices:
+`airgap_audit.py` scans benchmark artifacts, including benchmark-matrix cells,
+for recorded QEMU commands and fails if any QEMU-like command is missing
+`-nic none` or includes networking flags/devices:
 
 ```bash
 python3 bench/airgap_audit.py --input bench/results

@@ -35,7 +35,7 @@ NETWORK_DEVICE_MARKERS = (
     "vmxnet",
     "xen_nic",
 )
-RESULT_KEYS = ("benchmarks", "warmups", "results", "runs", "rows")
+RESULT_KEYS = ("benchmarks", "warmups", "cells", "results", "runs", "rows")
 
 
 @dataclass(frozen=True)
