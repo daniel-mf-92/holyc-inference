@@ -251,13 +251,14 @@ python3 bench/bench_matrix.py \
 
 `bench_result_index.py` scans existing QEMU prompt and matrix JSON reports,
 rolls their tok/s, memory, prompt-suite, and run-count metadata into a single
-JSON/Markdown/CSV index, and checks each recorded QEMU command for explicit
-`-nic none` air-gap compliance. It also reports prompt-suite drift when
+JSON/Markdown/CSV/JUnit XML index, and checks each recorded QEMU command for
+explicit `-nic none` air-gap compliance. It also reports prompt-suite drift when
 comparable profile/model/quantization artifacts carry different non-empty suite
 hashes, which catches accidental prompt changes before throughput numbers are
 compared. The drift findings are also written to
-`bench_result_index_prompt_suite_drift_latest.csv` for CI upload or spreadsheet
-review. It never launches QEMU.
+`bench_result_index_prompt_suite_drift_latest.csv`, and
+`bench_result_index_junit_latest.xml` exposes artifact failures, air-gap
+violations, and prompt drift as CI test failures. It never launches QEMU.
 
 Example:
 

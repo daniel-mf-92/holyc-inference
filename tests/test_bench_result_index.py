@@ -6,6 +6,7 @@ from __future__ import annotations
 import csv
 import json
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -253,6 +254,7 @@ def test_cli_writes_json_markdown_and_csv(tmp_path: Path) -> None:
     payload = json.loads((output_dir / "bench_result_index_latest.json").read_text(encoding="utf-8"))
     markdown = (output_dir / "bench_result_index_latest.md").read_text(encoding="utf-8")
     rows = list(csv.DictReader((output_dir / "bench_result_index_latest.csv").open(encoding="utf-8")))
+    junit_root = ET.parse(output_dir / "bench_result_index_junit_latest.xml").getroot()
 
     assert payload["status"] == "pass"
     assert payload["artifacts"][0]["prompt_suite_sha256"] == "c" * 64
@@ -260,6 +262,8 @@ def test_cli_writes_json_markdown_and_csv(tmp_path: Path) -> None:
     assert "Benchmark Result Index" in markdown
     assert "Prompt suite drift: none detected." in markdown
     assert rows[0]["command_airgap_status"] == "pass"
+    assert junit_root.attrib["name"] == "holyc_bench_result_index"
+    assert junit_root.attrib["failures"] == "0"
 
 
 def test_cli_writes_drift_csv_and_can_fail_on_drift(tmp_path: Path) -> None:
@@ -307,3 +311,33 @@ def test_cli_writes_drift_csv_and_can_fail_on_drift(tmp_path: Path) -> None:
     )
     assert rows[0]["key"] == "synthetic/smoke/Q4_0"
     assert rows[0]["hash_count"] == "2"
+
+
+def test_junit_report_marks_artifact_airgap_and_drift_failures() -> None:
+    report = {
+        "artifacts": [
+            {
+                "source": "qemu_prompt_bench_latest.json",
+                "status": "fail",
+                "command_airgap_status": "pass",
+            },
+            {
+                "source": "bench_matrix_latest.json",
+                "status": "pass",
+                "command_airgap_status": "fail",
+            },
+        ],
+        "prompt_suite_drift": [{"key": "secure/tiny/Q4_0"}],
+    }
+
+    root = ET.fromstring(bench_result_index.junit_report(report))
+
+    assert root.attrib["name"] == "holyc_bench_result_index"
+    assert root.attrib["tests"] == "3"
+    assert root.attrib["failures"] == "3"
+    failures = root.findall("./testcase/failure")
+    assert {failure.attrib["type"] for failure in failures} == {
+        "benchmark_artifact_failure",
+        "airgap_violation",
+        "prompt_suite_drift",
+    }

@@ -48,3 +48,4 @@
 2026-04-27T22:36:57Z | Added eval quality gates with JUnit reporting for HolyC vs llama.cpp comparisons and refreshed smoke artifacts.
 2026-04-27T22:45:25Z | Added Wilson confidence intervals to offline HolyC vs llama.cpp eval comparison reports with refreshed smoke artifacts.
 2026-04-27T22:55:45Z | Hardened benchmark result indexing to derive fail status from QEMU run failures and variability gate findings with refreshed index artifacts.
+2026-04-27T23:02:00Z | Added JUnit XML export for benchmark result indexing with focused coverage and refreshed index artifacts.

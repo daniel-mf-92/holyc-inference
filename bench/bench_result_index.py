@@ -13,6 +13,7 @@ import csv
 import json
 import statistics
 import sys
+import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -316,6 +317,61 @@ def markdown_report(report: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def junit_report(report: dict[str, Any]) -> str:
+    artifacts = [row for row in report["artifacts"] if isinstance(row, dict)]
+    drift = [row for row in report["prompt_suite_drift"] if isinstance(row, dict)]
+    failed_artifacts = [row for row in artifacts if row.get("status") == "fail"]
+    airgap_failures = [row for row in artifacts if row.get("command_airgap_status") == "fail"]
+    failures = int(bool(failed_artifacts)) + int(bool(airgap_failures)) + int(bool(drift))
+
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": "holyc_bench_result_index",
+            "tests": "3",
+            "failures": str(failures),
+        },
+    )
+
+    artifact_case = ET.SubElement(suite, "testcase", {"name": "artifact_status"})
+    if failed_artifacts:
+        failure = ET.SubElement(
+            artifact_case,
+            "failure",
+            {
+                "type": "benchmark_artifact_failure",
+                "message": f"{len(failed_artifacts)} benchmark artifact(s) failed",
+            },
+        )
+        failure.text = "\n".join(str(row.get("source", "")) for row in failed_artifacts)
+
+    airgap_case = ET.SubElement(suite, "testcase", {"name": "airgap_status"})
+    if airgap_failures:
+        failure = ET.SubElement(
+            airgap_case,
+            "failure",
+            {
+                "type": "airgap_violation",
+                "message": f"{len(airgap_failures)} benchmark command(s) violated air-gap policy",
+            },
+        )
+        failure.text = "\n".join(str(row.get("source", "")) for row in airgap_failures)
+
+    drift_case = ET.SubElement(suite, "testcase", {"name": "prompt_suite_drift"})
+    if drift:
+        failure = ET.SubElement(
+            drift_case,
+            "failure",
+            {
+                "type": "prompt_suite_drift",
+                "message": f"{len(drift)} comparable benchmark key(s) have prompt-suite drift",
+            },
+        )
+        failure.text = "\n".join(str(row.get("key", "")) for row in drift)
+
+    return ET.tostring(suite, encoding="unicode") + "\n"
+
+
 def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
     fields = [
         "source",
@@ -373,8 +429,10 @@ def write_report(summaries: list[ArtifactSummary], output_dir: Path) -> tuple[Pa
     md_path = output_dir / "bench_result_index_latest.md"
     csv_path = output_dir / "bench_result_index_latest.csv"
     drift_csv_path = output_dir / "bench_result_index_prompt_suite_drift_latest.csv"
+    junit_path = output_dir / "bench_result_index_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
+    junit_path.write_text(junit_report(report), encoding="utf-8")
     write_csv(summaries, csv_path)
     write_drift_csv(drift, drift_csv_path)
     return json_path, drift
