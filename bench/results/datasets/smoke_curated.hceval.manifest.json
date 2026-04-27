@@ -1,0 +1,58 @@
+{
+  "answer_histogram": {
+    "0": 3
+  },
+  "binary_sha256": "7673822187499c96fc823bf5ab164e118a99b0d796c7460f47060b426af5aac4",
+  "dataset": "smoke-eval",
+  "format": "hceval-mc",
+  "magic": "HCEVAL1\u0000",
+  "output": "bench/results/datasets/smoke_curated.hceval",
+  "record_count": 3,
+  "records": [
+    {
+      "answer_index": 0,
+      "choices": [
+        "thermometer",
+        "ruler",
+        "scale",
+        "compass"
+      ],
+      "dataset": "arc-smoke",
+      "prompt": "Which object is best for measuring air temperature?",
+      "provenance": "synthetic ARC-shaped smoke row",
+      "record_id": "smoke-arc-1",
+      "split": "validation"
+    },
+    {
+      "answer_index": 0,
+      "choices": [
+        "the lights dim and the first chord rings out.",
+        "a mechanic replaces the tire beside the road.",
+        "the recipe calls for two cups of flour.",
+        "the train leaves the station at dawn."
+      ],
+      "dataset": "hellaswag-smoke",
+      "prompt": "A musician tunes a guitar before walking onstage. The crowd quiets as",
+      "provenance": "synthetic HellaSwag-shaped smoke row",
+      "record_id": "smoke-hellaswag-1",
+      "split": "validation"
+    },
+    {
+      "answer_index": 0,
+      "choices": [
+        "Check reliable sources before accepting it.",
+        "Assume it is true if repeated online.",
+        "Ignore all evidence.",
+        "Choose the most dramatic version."
+      ],
+      "dataset": "truthfulqa-smoke",
+      "prompt": "What should you do if a claim sounds surprising and important?",
+      "provenance": "synthetic TruthfulQA-shaped smoke row",
+      "record_id": "smoke-truthfulqa-1",
+      "split": "validation"
+    }
+  ],
+  "source_sha256": "a1389d4ed5197eb9db0bd39b60137dc3750e2ba9a9c1a151d836e9f0a28094f3",
+  "split": "validation",
+  "version": 1
+}

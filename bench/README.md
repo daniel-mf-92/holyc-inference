@@ -27,6 +27,27 @@ python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin
 
 ## Offline Eval Dataset Packer
 
+`dataset_curate.py` prepares deterministic, local-only evaluation subsets before
+packing. It accepts the same normalized, HellaSwag-, ARC-, and TruthfulQA-shaped
+JSONL rows as the packer, writes normalized JSONL plus a provenance manifest,
+and can optionally write the `.hceval` binary in the same run. It never fetches
+remote datasets; stage source data on disk first.
+
+Example:
+
+```bash
+python3 bench/dataset_curate.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/smoke_curated.jsonl \
+  --manifest bench/results/datasets/smoke_curated.manifest.json \
+  --source-name smoke-eval \
+  --source-version synthetic \
+  --source-license synthetic-smoke \
+  --max-records 3 \
+  --pack-output bench/results/datasets/smoke_curated.hceval \
+  --pack-manifest bench/results/datasets/smoke_curated.hceval.manifest.json
+```
+
 `dataset_pack.py` converts local JSONL multiple-choice evaluation rows into a
 deterministic HolyC-loadable binary plus a provenance manifest. It accepts a
 normalized schema as well as HellaSwag-, ARC-, and TruthfulQA-shaped rows. It is

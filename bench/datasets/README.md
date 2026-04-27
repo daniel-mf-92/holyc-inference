@@ -11,6 +11,26 @@ be placed on disk with provenance notes before packing.
 - ARC-style: `question`, `choices` objects with `label`/`text`, `answerKey`.
 - TruthfulQA-style: `question`, `mc1_targets.choices`, `mc1_targets.labels`.
 
+## Curation
+
+Use `bench/dataset_curate.py` to make a reproducible subset from locally staged
+source JSONL before packing. The curator normalizes rows through the packer, can
+filter by dataset or split, samples with a stable SHA-256 key, rejects duplicate
+record ids, and writes a manifest with source hashes and provenance fields.
+
+```bash
+python3 bench/dataset_curate.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/smoke_curated.jsonl \
+  --manifest bench/results/datasets/smoke_curated.manifest.json \
+  --source-name smoke-eval \
+  --source-version synthetic \
+  --source-license synthetic-smoke \
+  --max-records 3 \
+  --pack-output bench/results/datasets/smoke_curated.hceval \
+  --pack-manifest bench/results/datasets/smoke_curated.hceval.manifest.json
+```
+
 ## Binary Format
 
 - Header: `<8sHHII32s`

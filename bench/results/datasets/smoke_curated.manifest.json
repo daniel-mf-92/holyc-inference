@@ -1,0 +1,41 @@
+{
+  "answer_histogram": {
+    "0": 3
+  },
+  "created_at": "2026-04-27T16:35:55Z",
+  "dataset_counts": {
+    "arc-smoke": 1,
+    "hellaswag-smoke": 1,
+    "truthfulqa-smoke": 1
+  },
+  "filters": {
+    "include_dataset": [],
+    "include_split": [],
+    "max_records": 3,
+    "require_provenance": false,
+    "seed": "holyc-eval-v1"
+  },
+  "format": "hceval-curated-jsonl",
+  "license": "synthetic-smoke",
+  "normalized_sha256": "a1389d4ed5197eb9db0bd39b60137dc3750e2ba9a9c1a151d836e9f0a28094f3",
+  "output": "bench/results/datasets/smoke_curated.jsonl",
+  "pack_output": "bench/results/datasets/smoke_curated.hceval",
+  "record_count": 3,
+  "selected_record_ids": [
+    "smoke-arc-1",
+    "smoke-hellaswag-1",
+    "smoke-truthfulqa-1"
+  ],
+  "source": {
+    "path": "bench/datasets/samples/smoke_eval.jsonl",
+    "record_count": 3,
+    "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+  },
+  "source_name": "smoke-eval",
+  "source_url": "",
+  "source_version": "synthetic",
+  "split_counts": {
+    "validation": 3
+  },
+  "total_after_filters": 3
+}
