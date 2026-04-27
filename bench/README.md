@@ -232,13 +232,18 @@ and `.csv`. QEMU launches still flow through the air-gap guard that injects
 `-nic none` and rejects NIC/network arguments. Each matrix cell records the
 prompt-suite SHA256 from its underlying prompt benchmark report so matrix
 comparisons can reject accidental prompt drift.
+Use `max_suite_cv_pct` and `max_prompt_cv_pct` in the matrix JSON, or the
+matching CLI flags, to pass tok/s variability gates through to every cell. A
+cell that fails a variability gate still writes its prompt-benchmark report and
+is preserved in the matrix summary as a failed cell with a findings count.
 
 Example:
 
 ```bash
 python3 bench/bench_matrix.py \
   --matrix bench/fixtures/bench_matrix_smoke.json \
-  --output-dir bench/results
+  --output-dir bench/results \
+  --max-prompt-cv-pct 5
 ```
 
 Validate the expanded matrix without launching QEMU:

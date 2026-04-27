@@ -209,6 +209,60 @@ def main() -> int:
             print("unexpected_variability_findings=true", file=sys.stderr)
             return 1
 
+        matrix_output_dir = tmp_path / "bench_matrix"
+        matrix_command = [
+            sys.executable,
+            str(ROOT / "bench" / "bench_matrix.py"),
+            "--matrix",
+            str(ROOT / "bench" / "fixtures" / "bench_matrix_smoke.json"),
+            "--output-dir",
+            str(matrix_output_dir),
+            "--max-suite-cv-pct",
+            "0.1",
+        ]
+        completed = subprocess.run(
+            matrix_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode != 0:
+            sys.stdout.write(completed.stdout)
+            sys.stderr.write(completed.stderr)
+            return completed.returncode
+
+        matrix_report = json.loads(
+            (matrix_output_dir / "bench_matrix_latest.json").read_text(encoding="utf-8")
+        )
+        if matrix_report["status"] != "pass":
+            print(f"unexpected_matrix_status={matrix_report['status']}", file=sys.stderr)
+            return 1
+        if matrix_report["variability_gates"].get("max_suite_cv_pct") != 0.1:
+            print("missing_matrix_suite_cv_gate=true", file=sys.stderr)
+            return 1
+        if matrix_report["variability_gates"].get("max_prompt_cv_pct") != 0.1:
+            print("missing_matrix_prompt_cv_gate=true", file=sys.stderr)
+            return 1
+        if not matrix_report["cells"] or any(
+            "variability_findings" not in cell for cell in matrix_report["cells"]
+        ):
+            print("missing_matrix_variability_findings=true", file=sys.stderr)
+            return 1
+        if any(cell["variability_findings"] for cell in matrix_report["cells"]):
+            print("unexpected_matrix_variability_findings=true", file=sys.stderr)
+            return 1
+        if "Variability gates" not in (matrix_output_dir / "bench_matrix_latest.md").read_text(
+            encoding="utf-8"
+        ):
+            print("missing_matrix_variability_markdown=true", file=sys.stderr)
+            return 1
+        if "variability_findings" not in (
+            matrix_output_dir / "bench_matrix_latest.csv"
+        ).read_text(encoding="utf-8"):
+            print("missing_matrix_variability_csv=true", file=sys.stderr)
+            return 1
+
     print("perf_ci_smoke=ok")
     return 0
 

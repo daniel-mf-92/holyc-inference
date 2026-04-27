@@ -64,6 +64,7 @@ class MatrixCellResult:
     warmup_runs: int
     median_tok_per_s: float | None
     max_memory_bytes: int | None
+    variability_findings: int
 
 
 def iso_now() -> str:
@@ -190,6 +191,8 @@ def run_cell(
     timeout: float,
     warmup: int,
     repeat: int,
+    max_suite_cv_pct: float | None,
+    max_prompt_cv_pct: float | None,
     matrix_dir: Path,
     dry_run: bool,
 ) -> MatrixCellResult:
@@ -215,6 +218,7 @@ def run_cell(
             warmup_runs=0,
             median_tok_per_s=None,
             max_memory_bytes=None,
+            variability_findings=0,
         )
 
     argv = [
@@ -239,16 +243,21 @@ def run_cell(
         "--quantization",
         cell.quantization.name,
     ]
+    if max_suite_cv_pct is not None:
+        argv.extend(["--max-suite-cv-pct", str(max_suite_cv_pct)])
+    if max_prompt_cv_pct is not None:
+        argv.extend(["--max-prompt-cv-pct", str(max_prompt_cv_pct)])
     for arg in global_qemu_args + cell.profile.qemu_args + cell.model.qemu_args + cell.quantization.qemu_args:
         argv.append(f"--qemu-arg={arg}")
 
     stdout = io.StringIO()
     with contextlib.redirect_stdout(stdout):
         status_code = qemu_prompt_bench.main(argv)
-    if status_code != 0:
+    if status_code not in {0, 1} or not report_path.exists():
         raise RuntimeError(f"benchmark cell {cell.slug} failed with status {status_code}: {stdout.getvalue()}")
 
     report = load_report(report_path)
+    findings = report.get("variability_findings", [])
     return MatrixCellResult(
         profile=cell.profile.name,
         model=cell.model.name,
@@ -265,6 +274,7 @@ def run_cell(
         warmup_runs=len(report.get("warmups", [])),
         median_tok_per_s=median_cell_tok_per_s(report),
         max_memory_bytes=max_cell_memory_bytes(report),
+        variability_findings=len(findings) if isinstance(findings, list) else 0,
     )
 
 
@@ -276,15 +286,19 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Status: {report['status']}",
         f"Matrix: {report['matrix_name']}",
         f"Cells: {len(report['cells'])}",
+        "Variability gates: suite CV <= {suite}, prompt CV <= {prompt}".format(
+            suite=format_gate(report["variability_gates"].get("max_suite_cv_pct")),
+            prompt=format_gate(report["variability_gates"].get("max_prompt_cv_pct")),
+        ),
         "",
         "## Cells",
         "",
     ]
     if report["cells"]:
         lines.append(
-            "| Profile | Model | Quantization | Status | Prompts | Prompt suite | Runs | Warmups | Median tok/s | Max memory bytes |"
+            "| Profile | Model | Quantization | Status | Prompts | Prompt suite | Runs | Warmups | Median tok/s | Max memory bytes | Variability findings |"
         )
-        lines.append("| --- | --- | --- | --- | ---: | --- | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |")
         for cell in report["cells"]:
             median = cell["median_tok_per_s"]
             memory = cell["max_memory_bytes"]
@@ -294,11 +308,15 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"| {cell['profile']} | {cell['model']} | {cell['quantization']} | {cell['status']} | "
                 f"{cell['prompts']} | {cell['prompt_suite_sha256']} | "
                 f"{cell['measured_runs']} | {cell['warmup_runs']} | "
-                f"{median_cell} | {memory_cell} |"
+                f"{median_cell} | {memory_cell} | {cell['variability_findings']} |"
             )
     else:
         lines.append("No matrix cells were expanded.")
     return "\n".join(lines) + "\n"
+
+
+def format_gate(value: Any) -> str:
+    return "-" if value is None else str(value)
 
 
 def write_matrix_report(
@@ -309,6 +327,8 @@ def write_matrix_report(
     matrix_dir: Path,
     cells: list[MatrixCellResult],
     dry_run: bool,
+    max_suite_cv_pct: float | None,
+    max_prompt_cv_pct: float | None,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     report = {
@@ -318,6 +338,10 @@ def write_matrix_report(
         "matrix_file": str(matrix_file),
         "matrix_dir": str(matrix_dir),
         "dry_run": dry_run,
+        "variability_gates": {
+            "max_suite_cv_pct": max_suite_cv_pct,
+            "max_prompt_cv_pct": max_prompt_cv_pct,
+        },
         "cells": [asdict(cell) for cell in cells],
     }
     json_path = output_dir / "bench_matrix_latest.json"
@@ -343,6 +367,7 @@ def write_matrix_csv(cells: list[MatrixCellResult], path: Path) -> None:
         "warmup_runs",
         "median_tok_per_s",
         "max_memory_bytes",
+        "variability_findings",
         "command",
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:
@@ -363,6 +388,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--timeout", type=float)
     parser.add_argument("--warmup", type=int)
     parser.add_argument("--repeat", type=int)
+    parser.add_argument("--max-suite-cv-pct", type=float, help="Fail cells whose suite tok/s CV exceeds this percentage")
+    parser.add_argument("--max-prompt-cv-pct", type=float, help="Fail cells whose per-prompt tok/s CV exceeds this percentage")
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--dry-run", action="store_true", help="Validate and write planned commands without launching")
     return parser
@@ -392,6 +419,22 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("--warmup must be >= 0")
         if repeat < 1:
             raise ValueError("--repeat must be >= 1")
+        max_suite_cv_pct = (
+            args.max_suite_cv_pct
+            if args.max_suite_cv_pct is not None
+            else payload.get("max_suite_cv_pct")
+        )
+        max_prompt_cv_pct = (
+            args.max_prompt_cv_pct
+            if args.max_prompt_cv_pct is not None
+            else payload.get("max_prompt_cv_pct")
+        )
+        max_suite_cv_pct = float(max_suite_cv_pct) if max_suite_cv_pct is not None else None
+        max_prompt_cv_pct = float(max_prompt_cv_pct) if max_prompt_cv_pct is not None else None
+        if max_suite_cv_pct is not None and max_suite_cv_pct < 0:
+            raise ValueError("--max-suite-cv-pct must be >= 0")
+        if max_prompt_cv_pct is not None and max_prompt_cv_pct < 0:
+            raise ValueError("--max-prompt-cv-pct must be >= 0")
 
         global_qemu_args = as_args(payload.get("qemu_args"), "qemu_args")
         cells = expand_cells(payload)
@@ -406,6 +449,8 @@ def main(argv: list[str] | None = None) -> int:
                 timeout=timeout,
                 warmup=warmup,
                 repeat=repeat,
+                max_suite_cv_pct=max_suite_cv_pct,
+                max_prompt_cv_pct=max_prompt_cv_pct,
                 matrix_dir=matrix_dir,
                 dry_run=args.dry_run,
             )
@@ -418,6 +463,8 @@ def main(argv: list[str] | None = None) -> int:
             matrix_dir=matrix_dir,
             cells=results,
             dry_run=args.dry_run,
+            max_suite_cv_pct=max_suite_cv_pct,
+            max_prompt_cv_pct=max_prompt_cv_pct,
         )
     except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
