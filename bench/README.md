@@ -184,7 +184,9 @@ tokens, total elapsed time, median/P95 tok/s, tok/s standard deviation,
 coefficient of variation, and max memory. The runner also writes a deterministic
 prompt-suite SHA256 matching `prompt_audit.py`, plus
 `qemu_prompt_bench_latest.csv` with one row per measured run for CI artifact
-upload, spreadsheets, and simple shell comparisons.
+upload, spreadsheets, and simple shell comparisons. JSON and Markdown reports
+also include host provenance for reproducibility: platform, machine, Python
+version, CPU count, QEMU binary/path, and QEMU version when discoverable.
 
 Prompt files can be JSON, JSONL, or plain text split with `---`. Guest output may
 include a JSON line such as:
@@ -231,7 +233,8 @@ python3 bench/qemu_prompt_bench.py \
 Dry-runs also write `qemu_prompt_bench_dry_run_latest.json` and `.md` under the
 selected output directory. These artifacts record the exact `-nic none` command,
 prompt-suite hash, warmup count, repeat count, and planned launch totals for CI
-review without booting a guest.
+review without booting a guest, plus the same host/QEMU provenance fields used
+by measured benchmark reports.
 
 Refresh the committed smoke report without booting a guest:
 

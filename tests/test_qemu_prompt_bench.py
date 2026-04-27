@@ -147,11 +147,15 @@ def test_cli_dry_run_validates_without_launching_qemu(tmp_path: Path, capsys) ->
     assert payload["planned_measured_launches"] == 2
     assert payload["planned_total_launches"] == 3
     assert payload["command"][1:3] == ["-nic", "none"]
+    assert payload["environment"]["qemu_bin"] == "qemu-system-x86_64"
+    assert payload["environment"]["python"]
     assert payload["dry_run_report"] == str(output_dir / "qemu_prompt_bench_dry_run_latest.json")
     assert report["status"] == "planned"
     assert report["command"][1:3] == ["-nic", "none"]
+    assert report["environment"]["qemu_bin"] == "qemu-system-x86_64"
     assert "QEMU Prompt Benchmark Dry Run" in markdown
     assert "Total launches: 3" in markdown
+    assert "Environment" in markdown
 
 
 def test_cli_writes_result_file_with_fake_qemu(tmp_path: Path) -> None:
@@ -190,6 +194,9 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
     assert report["benchmarks"][0]["tok_per_s"] == 320.0
     assert report["benchmarks"][0]["memory_bytes"] == 8388608
     assert report["benchmarks"][0]["command"][1:3] == ["-nic", "none"]
+    assert report["environment"]["qemu_bin"] == str(fake_qemu)
+    assert report["environment"]["qemu_path"] == str(fake_qemu)
+    assert report["environment"]["qemu_version"] is None
     csv_report = (output_dir / "qemu_prompt_bench_latest.csv").read_text(encoding="utf-8")
     assert "benchmark,profile,model,quantization,prompt" in csv_report
     assert "qemu_prompt,default,,,prompt-1" in csv_report

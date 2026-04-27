@@ -13,7 +13,9 @@ import csv
 import hashlib
 import json
 import os
+import platform
 import re
+import shutil
 import statistics
 import subprocess
 import sys
@@ -126,6 +128,45 @@ def git_commit(root: Path) -> str:
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
     return result.stdout.strip() or "unknown"
+
+
+def qemu_version_line(qemu_bin: str) -> str | None:
+    """Return a stable first-line QEMU version when the binary is discoverable."""
+    qemu_path = shutil.which(qemu_bin)
+    if qemu_path is None:
+        return None
+    if not Path(qemu_bin).name.startswith("qemu-"):
+        return None
+    try:
+        result = subprocess.run(
+            [qemu_path, "--version"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=5.0,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    for line in result.stdout.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return None
+
+
+def host_environment(qemu_bin: str) -> dict[str, Any]:
+    qemu_path = shutil.which(qemu_bin)
+    return {
+        "platform": platform.platform(),
+        "machine": platform.machine(),
+        "processor": platform.processor(),
+        "python": platform.python_version(),
+        "cpu_count": os.cpu_count(),
+        "qemu_bin": qemu_bin,
+        "qemu_path": qemu_path,
+        "qemu_version": qemu_version_line(qemu_bin),
+    }
 
 
 def load_prompt_cases(path: Path) -> list[PromptCase]:
@@ -589,12 +630,31 @@ def markdown_report(report: dict[str, Any]) -> str:
                     **{key: format_summary_value(value) for key, value in finding.items()}
                 )
             )
+    environment = report.get("environment") or {}
+    if environment:
+        lines.extend(
+            [
+                "",
+                "## Environment",
+                "",
+                "| Platform | Machine | Python | CPU count | QEMU |",
+                "| --- | --- | --- | ---: | --- |",
+                "| {platform} | {machine} | {python} | {cpu_count} | {qemu} |".format(
+                    platform=format_summary_value(environment.get("platform")),
+                    machine=format_summary_value(environment.get("machine")),
+                    python=format_summary_value(environment.get("python")),
+                    cpu_count=format_summary_value(environment.get("cpu_count")),
+                    qemu=format_summary_value(environment.get("qemu_version") or environment.get("qemu_bin")),
+                ),
+            ]
+        )
     return "\n".join(lines) + "\n"
 
 
 def markdown_dry_run_report(report: dict[str, Any]) -> str:
     prompt_suite = report.get("prompt_suite") or {}
     command = report.get("command") or []
+    environment = report.get("environment") or {}
     lines = [
         "# QEMU Prompt Benchmark Dry Run",
         "",
@@ -612,6 +672,23 @@ def markdown_dry_run_report(report: dict[str, Any]) -> str:
         " ".join(command),
         "```",
     ]
+    if environment:
+        lines.extend(
+            [
+                "",
+                "## Environment",
+                "",
+                "| Platform | Machine | Python | CPU count | QEMU |",
+                "| --- | --- | --- | ---: | --- |",
+                "| {platform} | {machine} | {python} | {cpu_count} | {qemu} |".format(
+                    platform=format_summary_value(environment.get("platform")),
+                    machine=format_summary_value(environment.get("machine")),
+                    python=format_summary_value(environment.get("python")),
+                    cpu_count=format_summary_value(environment.get("cpu_count")),
+                    qemu=format_summary_value(environment.get("qemu_version") or environment.get("qemu_bin")),
+                ),
+            ]
+        )
     return "\n".join(lines) + "\n"
 
 
@@ -630,6 +707,7 @@ def dry_run_payload(
     prompts: list[PromptCase],
     warmup: int,
     repeat: int,
+    environment: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     prompt_count = len(prompts)
     planned_warmups = prompt_count * warmup
@@ -640,6 +718,7 @@ def dry_run_payload(
         "command": command,
         "prompt_count": prompt_count,
         "prompt_suite": prompt_suite_metadata(prompts_path, prompts),
+        "environment": environment or {},
         "warmup": warmup,
         "repeat": repeat,
         "planned_warmup_launches": planned_warmups,
@@ -667,6 +746,7 @@ def write_report(
     warmups: list[BenchRun] | None = None,
     max_suite_cv_pct: float | None = None,
     max_prompt_cv_pct: float | None = None,
+    environment: dict[str, Any] | None = None,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     warmup_runs = warmups or []
@@ -683,6 +763,7 @@ def write_report(
         "generated_at": iso_now(),
         "status": report_status(all_runs, findings),
         "prompt_suite": prompt_suite or {},
+        "environment": environment or {},
         "warmups": [asdict(run) for run in warmup_runs],
         "suite_summary": suite,
         "summaries": summaries,
@@ -887,6 +968,7 @@ def main(argv: list[str] | None = None) -> int:
             prompts=prompts,
             warmup=args.warmup,
             repeat=args.repeat,
+            environment=host_environment(args.qemu_bin),
         )
         output = write_dry_run_report(report, args.output_dir)
         report["dry_run_report"] = str(output)
@@ -916,6 +998,7 @@ def main(argv: list[str] | None = None) -> int:
         warmups=warmups,
         max_suite_cv_pct=args.max_suite_cv_pct,
         max_prompt_cv_pct=args.max_prompt_cv_pct,
+        environment=host_environment(args.qemu_bin),
     )
     report = json.loads(output.read_text(encoding="utf-8"))
     print(f"wrote_json={output}")

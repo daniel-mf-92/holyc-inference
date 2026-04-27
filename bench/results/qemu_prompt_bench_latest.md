@@ -1,6 +1,6 @@
 # QEMU Prompt Benchmark
 
-Generated: 2026-04-27T23:19:04Z
+Generated: 2026-04-27T23:32:53Z
 Status: pass
 Prompt suite: 68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a
 Warmup runs: 0
@@ -22,3 +22,9 @@ Runs: 6
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | smoke-code | 3 | 3 | 48 | 300000 | 160.000 | 160.000 | 0.000 | 0.000 | 160.000 | 67207168 |
 | smoke-short | 3 | 3 | 32 | 200000 | 160.000 | 160.000 | 0.000 | 0.000 | 160.000 | 67174400 |
+
+## Environment
+
+| Platform | Machine | Python | CPU count | QEMU |
+| --- | --- | --- | ---: | --- |
+| macOS-26.2-arm64-arm-64bit-Mach-O | arm64 | 3.14.3 | 10 | bench/fixtures/qemu_synthetic_bench.py |
