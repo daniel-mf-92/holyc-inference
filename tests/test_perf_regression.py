@@ -217,7 +217,18 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
 
     assert status == 0
     assert (output_dir / "perf_regression_latest.json").exists()
+    assert (output_dir / "perf_regression_commit_points_latest.csv").exists()
+    assert (output_dir / "perf_regression_regressions_latest.csv").exists()
     markdown = (output_dir / "perf_regression_latest.md").read_text(encoding="utf-8")
     assert "Perf Regression Dashboard" in markdown
     assert "Commit Points" in markdown
     assert "prompt/dev-local/-/-/-" in markdown
+    commit_points_csv = (output_dir / "perf_regression_commit_points_latest.csv").read_text(
+        encoding="utf-8"
+    )
+    regressions_csv = (output_dir / "perf_regression_regressions_latest.csv").read_text(
+        encoding="utf-8"
+    )
+    assert "key,commit,latest_timestamp,records,median_tok_per_s,max_memory_bytes" in commit_points_csv
+    assert "prompt/dev-local/-/-/-,abc,2026-04-27T10:00:00Z,1,42.0," in commit_points_csv
+    assert "key,metric,baseline_commit,candidate_commit,baseline_value,candidate_value" in regressions_csv

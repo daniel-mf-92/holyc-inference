@@ -388,6 +388,56 @@ def markdown_report(report: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def write_csv(path: Path, rows: list[dict[str, Any]], fields: list[str]) -> None:
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: row.get(field) for field in fields})
+
+
+def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    json_path = output_dir / "perf_regression_latest.json"
+    md_path = output_dir / "perf_regression_latest.md"
+    commit_points_csv = output_dir / "perf_regression_commit_points_latest.csv"
+    regressions_csv = output_dir / "perf_regression_regressions_latest.csv"
+
+    json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    md_path.write_text(markdown_report(report), encoding="utf-8")
+    write_csv(
+        commit_points_csv,
+        report["commit_points"],
+        [
+            "key",
+            "commit",
+            "latest_timestamp",
+            "records",
+            "median_tok_per_s",
+            "max_memory_bytes",
+        ],
+    )
+    write_csv(
+        regressions_csv,
+        report["regressions"],
+        [
+            "key",
+            "metric",
+            "baseline_commit",
+            "candidate_commit",
+            "baseline_value",
+            "candidate_value",
+            "delta_pct",
+            "threshold_pct",
+        ],
+    )
+
+    print(f"wrote_json={json_path}")
+    print(f"wrote_markdown={md_path}")
+    print(f"wrote_commit_points_csv={commit_points_csv}")
+    print(f"wrote_regressions_csv={regressions_csv}")
+
+
 def build_report(
     records: list[PerfRecord],
     tok_threshold_pct: float,
@@ -452,14 +502,7 @@ def main(argv: list[str] | None = None) -> int:
         candidate_commit=args.candidate_commit,
     )
 
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    json_path = args.output_dir / "perf_regression_latest.json"
-    md_path = args.output_dir / "perf_regression_latest.md"
-    json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    md_path.write_text(markdown_report(report), encoding="utf-8")
-
-    print(f"wrote_json={json_path}")
-    print(f"wrote_markdown={md_path}")
+    write_dashboard_outputs(report, args.output_dir)
     print(f"status={report['status']}")
 
     if args.fail_on_regression and report["status"] == "fail":

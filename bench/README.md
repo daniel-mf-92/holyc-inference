@@ -200,7 +200,8 @@ to `bench/dashboards/`. It accepts JSON, JSONL, and CSV records with `tok_per_s`
 or `tok_per_s_milli`, plus optional memory fields such as `memory_bytes` or
 `max_rss_bytes`. Regression checks compare commit-level aggregates, so repeated
 runs and duplicate latest/stamped result files are collapsed by benchmark key and
-commit before the latest distinct commits are compared.
+commit before the latest distinct commits are compared. Outputs include JSON,
+Markdown, commit-point CSV, and regression CSV artifacts.
 
 Example:
 
