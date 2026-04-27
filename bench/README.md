@@ -25,6 +25,40 @@ python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin
 python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin
 ```
 
+## QEMU Prompt Benchmark
+
+`qemu_prompt_bench.py` launches an air-gapped QEMU guest once per prompt, captures
+serial output, extracts token timing records, and writes normalized JSON to
+`bench/results/`. The runner always injects `-nic none` and rejects conflicting
+network flags such as `-netdev` or virtual NIC devices.
+
+Prompt files can be JSON, JSONL, or plain text split with `---`. Guest output may
+include a JSON line such as:
+
+```text
+BENCH_RESULT: {"tokens": 128, "elapsed_us": 500000, "tok_per_s": 256.0}
+```
+
+Example:
+
+```bash
+python3 bench/qemu_prompt_bench.py \
+  --image path/to/TempleOS.img \
+  --prompts bench/prompts/smoke.jsonl \
+  --profile secure-local \
+  --quantization Q4_0 \
+  -- -m 512M
+```
+
+Validate the final QEMU command without launching:
+
+```bash
+python3 bench/qemu_prompt_bench.py \
+  --image path/to/TempleOS.img \
+  --prompts bench/prompts/smoke.jsonl \
+  --dry-run
+```
+
 ## Perf Regression Dashboard
 
 `perf_regression.py` scans host-side benchmark result files and writes dashboards

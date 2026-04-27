@@ -1,0 +1,2 @@
+{"prompt_id":"smoke-short","prompt":"Summarize integer-only inference in one sentence."}
+{"prompt_id":"smoke-code","prompt":"Write a tiny HolyC-style pseudocode loop that accumulates token scores."}
