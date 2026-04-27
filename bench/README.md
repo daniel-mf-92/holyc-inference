@@ -129,6 +129,24 @@ python3 bench/eval_compare.py \
   --output-stem eval_compare_smoke_latest
 ```
 
+`perplexity_compare.py` compares offline token logprob or aggregate NLL outputs
+from HolyC and llama.cpp. It aligns rows by record id, computes token-weighted
+NLL/token and perplexity, and fails on token-count mismatches unless
+`--allow-token-count-mismatch` is passed.
+
+Example:
+
+```bash
+python3 bench/perplexity_compare.py \
+  --holyc bench/eval/samples/holyc_smoke_logprobs.jsonl \
+  --llama bench/eval/samples/llama_smoke_logprobs.jsonl \
+  --dataset smoke-eval \
+  --split validation \
+  --model synthetic-smoke \
+  --quantization Q4_0 \
+  --output-stem perplexity_compare_smoke_latest
+```
+
 ## Perf Regression Dashboard
 
 `perf_regression.py` scans host-side benchmark result files and writes dashboards

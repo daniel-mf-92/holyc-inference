@@ -1,0 +1,66 @@
+{
+  "dataset": "smoke-eval",
+  "generated_at": "2026-04-27T15:34:38Z",
+  "holyc_sha256": "62a0452c5c9cdd713620f356dc5c11ef960949b5b4ddd1b7ca25c7f47074d7c4",
+  "llama_sha256": "a7cf9c18443e9a35af2d090404fb1c964eb316ca87c4d66eb6253fe1e93b9f79",
+  "model": "synthetic-smoke",
+  "quantization": "Q4_0",
+  "rows": [
+    {
+      "holyc_nll_per_token": 0.35000000000000003,
+      "holyc_perplexity": 1.4190675485932573,
+      "holyc_token_count": 3,
+      "llama_nll_per_token": 0.34,
+      "llama_perplexity": 1.4049475905635938,
+      "llama_token_count": 3,
+      "nll_delta_holyc_minus_llama": 0.010000000000000009,
+      "perplexity_delta_holyc_minus_llama": 0.014119958029663593,
+      "record_id": "smoke-arc-1"
+    },
+    {
+      "holyc_nll_per_token": 0.3125,
+      "holyc_perplexity": 1.3668379411737963,
+      "holyc_token_count": 4,
+      "llama_nll_per_token": 0.3125,
+      "llama_perplexity": 1.3668379411737963,
+      "llama_token_count": 4,
+      "nll_delta_holyc_minus_llama": 0.0,
+      "perplexity_delta_holyc_minus_llama": 0.0,
+      "record_id": "smoke-hellaswag-1"
+    },
+    {
+      "holyc_nll_per_token": 0.42,
+      "holyc_perplexity": 1.5219615556186337,
+      "holyc_token_count": 4,
+      "llama_nll_per_token": 0.4125001356373084,
+      "llama_perplexity": 1.510589747199986,
+      "llama_token_count": 4,
+      "nll_delta_holyc_minus_llama": 0.007499864362691566,
+      "perplexity_delta_holyc_minus_llama": 0.0113718084186476,
+      "record_id": "smoke-truthfulqa-1"
+    }
+  ],
+  "split": "validation",
+  "summary": {
+    "holyc": {
+      "nll_per_token": 0.3618181818181818,
+      "perplexity": 1.4359378386173822,
+      "record_count": 3,
+      "token_count": 11,
+      "total_nll": 3.98
+    },
+    "llama": {
+      "nll_per_token": 0.356363685686294,
+      "perplexity": 1.428126843119123,
+      "record_count": 3,
+      "token_count": 11,
+      "total_nll": 3.920000542549234
+    },
+    "max_abs_record_nll_delta": 0.010000000000000009,
+    "nll_delta_holyc_minus_llama": 0.005454496131887809,
+    "perplexity_delta_holyc_minus_llama": 0.007810995498259254,
+    "record_count": 3,
+    "token_count_mismatches": 0
+  },
+  "top_n": 10
+}
