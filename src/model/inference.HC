@@ -32,6 +32,8 @@
 #define INFERENCE_BOT_DIGEST_PRIME 1099511628211
 // Keep IQ-1792 ABI name while avoiding new compounded function identifiers.
 #define InferenceBookOfTruthTokenEventEmitCheckedCommitOnly BotTokenEmitCommitOnly
+// Keep IQ-1793 ABI name while avoiding new compounded function identifiers.
+#define InferenceBookOfTruthTokenEventEmitCheckedCommitOnlyPreflightOnly BotTokenEmitPreflightOnly
 
 I32 InferenceForwardQ16CheckedNoPartial(
     I64 *embed_q16,
@@ -3656,5 +3658,159 @@ I32 BotTokenEmitCommitOnly(
     *out_event_status = staged_event_status_primary;
     *out_event_count = staged_event_count_primary;
     *out_event_digest_q64 = staged_event_digest_primary;
+    return SAMPLING_Q16_OK;
+}
+
+// IQ-1793 zero-write diagnostics companion for per-token Book-of-Truth event
+// emission parity between commit-only and canonical checked paths.
+//
+// Contract:
+// - Snapshot immutable event tuple inputs and output-pointer identities.
+// - Evaluate both commit-only and canonical checked paths into private staging.
+// - Require strict tuple parity `{event_status,event_count,event_digest_q64}` and
+//   staged event-lane parity.
+// - Preserve caller output slots and caller event buffer (no writes on success).
+I32 BotTokenEmitPreflightOnly(
+    I64 *event_buffer,
+    I64 event_buffer_capacity,
+    I64 session_id,
+    I64 step_index,
+    I64 token_id,
+    I64 logit_q16,
+    I64 policy_digest_q64,
+    I64 expected_policy_digest_q64,
+    I64 profile_mode,
+    I64 *out_event_status,
+    I64 *out_event_count,
+    I64 *out_event_digest_q64)
+{
+    I64 staged_commit_event[INFERENCE_BOT_EVENT_TUPLE_CELLS];
+    I64 staged_canonical_event[INFERENCE_BOT_EVENT_TUPLE_CELLS];
+    I64 staged_commit_status;
+    I64 staged_commit_count;
+    I64 staged_commit_digest_q64;
+    I64 staged_canonical_status;
+    I64 staged_canonical_count;
+    I64 staged_canonical_digest_q64;
+    I64 snapshot_event[INFERENCE_BOT_EVENT_TUPLE_CELLS];
+    I64 snapshot_event_status;
+    I64 snapshot_event_count;
+    I64 snapshot_event_digest_q64;
+    I64 snapshot_event_buffer_capacity;
+    I64 snapshot_session_id;
+    I64 snapshot_step_index;
+    I64 snapshot_token_id;
+    I64 snapshot_logit_q16;
+    I64 snapshot_policy_digest_q64;
+    I64 snapshot_expected_policy_digest_q64;
+    I64 snapshot_profile_mode;
+    I64 *snapshot_event_buffer;
+    I64 *snapshot_out_event_status;
+    I64 *snapshot_out_event_count;
+    I64 *snapshot_out_event_digest_q64;
+    I32 status_commit;
+    I32 status_canonical;
+    I64 lane;
+
+    if (!event_buffer || !out_event_status || !out_event_count ||
+        !out_event_digest_q64)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (out_event_status == out_event_count ||
+        out_event_status == out_event_digest_q64 ||
+        out_event_count == out_event_digest_q64)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (event_buffer_capacity < INFERENCE_BOT_EVENT_TUPLE_CELLS)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_event_buffer_capacity = event_buffer_capacity;
+    snapshot_session_id = session_id;
+    snapshot_step_index = step_index;
+    snapshot_token_id = token_id;
+    snapshot_logit_q16 = logit_q16;
+    snapshot_policy_digest_q64 = policy_digest_q64;
+    snapshot_expected_policy_digest_q64 = expected_policy_digest_q64;
+    snapshot_profile_mode = profile_mode;
+    snapshot_event_buffer = event_buffer;
+    snapshot_out_event_status = out_event_status;
+    snapshot_out_event_count = out_event_count;
+    snapshot_out_event_digest_q64 = out_event_digest_q64;
+    snapshot_event_status = *out_event_status;
+    snapshot_event_count = *out_event_count;
+    snapshot_event_digest_q64 = *out_event_digest_q64;
+    for (lane = 0; lane < INFERENCE_BOT_EVENT_TUPLE_CELLS; lane++)
+        snapshot_event[lane] = event_buffer[lane];
+
+    status_commit = InferenceBookOfTruthTokenEventEmitCheckedCommitOnly(
+        staged_commit_event,
+        INFERENCE_BOT_EVENT_TUPLE_CELLS,
+        session_id,
+        step_index,
+        token_id,
+        logit_q16,
+        policy_digest_q64,
+        expected_policy_digest_q64,
+        profile_mode,
+        &staged_commit_status,
+        &staged_commit_count,
+        &staged_commit_digest_q64);
+    if (status_commit)
+        return status_commit;
+
+    status_canonical = InferenceBookOfTruthTokenEventEmitChecked(
+        staged_canonical_event,
+        INFERENCE_BOT_EVENT_TUPLE_CELLS,
+        session_id,
+        step_index,
+        token_id,
+        logit_q16,
+        policy_digest_q64,
+        expected_policy_digest_q64,
+        profile_mode,
+        &staged_canonical_status,
+        &staged_canonical_count,
+        &staged_canonical_digest_q64);
+    if (status_canonical)
+        return status_canonical;
+
+    if (snapshot_event_buffer_capacity != event_buffer_capacity ||
+        snapshot_session_id != session_id ||
+        snapshot_step_index != step_index ||
+        snapshot_token_id != token_id ||
+        snapshot_logit_q16 != logit_q16 ||
+        snapshot_policy_digest_q64 != policy_digest_q64 ||
+        snapshot_expected_policy_digest_q64 != expected_policy_digest_q64 ||
+        snapshot_profile_mode != profile_mode)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_event_buffer != event_buffer ||
+        snapshot_out_event_status != out_event_status ||
+        snapshot_out_event_count != out_event_count ||
+        snapshot_out_event_digest_q64 != out_event_digest_q64)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (staged_commit_status != staged_canonical_status ||
+        staged_commit_count != staged_canonical_count ||
+        staged_commit_digest_q64 != staged_canonical_digest_q64)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    for (lane = 0; lane < INFERENCE_BOT_EVENT_TUPLE_CELLS; lane++)
+    {
+        if (staged_commit_event[lane] != staged_canonical_event[lane])
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+
+    if (*out_event_status != snapshot_event_status ||
+        *out_event_count != snapshot_event_count ||
+        *out_event_digest_q64 != snapshot_event_digest_q64)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    for (lane = 0; lane < INFERENCE_BOT_EVENT_TUPLE_CELLS; lane++)
+    {
+        if (event_buffer[lane] != snapshot_event[lane])
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+
     return SAMPLING_Q16_OK;
 }
