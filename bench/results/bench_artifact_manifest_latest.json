@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-27T23:20:32Z",
+  "generated_at": "2026-04-27T23:41:09Z",
   "history": [
     {
       "artifact_type": "qemu_prompt",
@@ -399,9 +399,9 @@
     },
     {
       "artifact_type": "qemu_prompt",
-      "bytes": 7179,
+      "bytes": 7492,
       "command_airgap_status": "pass",
-      "generated_at": "2026-04-27T23:19:04Z",
+      "generated_at": "2026-04-27T23:32:53Z",
       "key": "synthetic-airgap-smoke/synthetic-smoke/Q4_0/68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "max_memory_bytes": 67207168,
       "measured_runs": 6,
@@ -410,7 +410,43 @@
       "profile": "synthetic-airgap-smoke",
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "quantization": "Q4_0",
-      "sha256": "b926982911873580d956553c90e26ab75cb615c215eec5addea9e0e0a57b9866",
+      "sha256": "90eb7cf76f9677ef57b9eccb0880e6a2056e72f2817e5ef5376cd7f4290c0b21",
+      "source": "bench/results/qemu_prompt_bench_20260427T233253Z.json",
+      "status": "pass",
+      "warmup_runs": 0
+    },
+    {
+      "artifact_type": "qemu_prompt",
+      "bytes": 8027,
+      "command_airgap_status": "pass",
+      "generated_at": "2026-04-27T23:40:33Z",
+      "key": "synthetic-airgap-smoke/synthetic-smoke/Q4_0/68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "max_memory_bytes": 67207168,
+      "measured_runs": 6,
+      "median_tok_per_s": 160.0,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "sha256": "d1c1674b86c71c780cccdc94f9361d37abe1c9532aff6fc976c4254a76d0f6ad",
+      "source": "bench/results/qemu_prompt_bench_20260427T234033Z.json",
+      "status": "pass",
+      "warmup_runs": 0
+    },
+    {
+      "artifact_type": "qemu_prompt",
+      "bytes": 8027,
+      "command_airgap_status": "pass",
+      "generated_at": "2026-04-27T23:40:33Z",
+      "key": "synthetic-airgap-smoke/synthetic-smoke/Q4_0/68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "max_memory_bytes": 67207168,
+      "measured_runs": 6,
+      "median_tok_per_s": 160.0,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "sha256": "d1c1674b86c71c780cccdc94f9361d37abe1c9532aff6fc976c4254a76d0f6ad",
       "source": "bench/results/qemu_prompt_bench_latest.json",
       "status": "pass",
       "warmup_runs": 0
@@ -524,7 +560,7 @@
       "warmup_runs": 0
     }
   ],
-  "history_artifacts": 29,
+  "history_artifacts": 31,
   "latest_artifacts": [
     {
       "artifact_type": "bench_matrix_cell",
@@ -600,9 +636,9 @@
     },
     {
       "artifact_type": "qemu_prompt",
-      "bytes": 7179,
+      "bytes": 8027,
       "command_airgap_status": "pass",
-      "generated_at": "2026-04-27T23:19:04Z",
+      "generated_at": "2026-04-27T23:40:33Z",
       "key": "synthetic-airgap-smoke/synthetic-smoke/Q4_0/68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "max_memory_bytes": 67207168,
       "measured_runs": 6,
@@ -611,7 +647,7 @@
       "profile": "synthetic-airgap-smoke",
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "quantization": "Q4_0",
-      "sha256": "b926982911873580d956553c90e26ab75cb615c215eec5addea9e0e0a57b9866",
+      "sha256": "d1c1674b86c71c780cccdc94f9361d37abe1c9532aff6fc976c4254a76d0f6ad",
       "source": "bench/results/qemu_prompt_bench_latest.json",
       "status": "pass",
       "warmup_runs": 0

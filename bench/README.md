@@ -180,8 +180,10 @@ runs into throughput dashboards, and `--repeat N` to run every prompt multiple
 times. Reports include separate warmup records, raw measured per-run records,
 an overall suite summary, and per-prompt medians and min/max tok/s in JSON and
 Markdown. The suite summary includes measured prompt count, run count, total
-tokens, total elapsed time, median/P95 tok/s, tok/s standard deviation,
-coefficient of variation, and max memory. The runner also writes a deterministic
+prompt bytes launched, total tokens, total elapsed time, median/P95 tok/s, tok/s
+standard deviation, coefficient of variation, and max memory. Per-run and
+per-prompt reports include UTF-8 prompt byte counts so benchmark changes can be
+separated from prompt-suite size drift. The runner also writes a deterministic
 prompt-suite SHA256 matching `prompt_audit.py`, plus
 `qemu_prompt_bench_latest.csv` with one row per measured run for CI artifact
 upload, spreadsheets, and simple shell comparisons. JSON and Markdown reports

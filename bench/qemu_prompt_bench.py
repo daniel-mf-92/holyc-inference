@@ -62,6 +62,7 @@ class BenchRun:
     quantization: str
     prompt: str
     prompt_sha256: str
+    prompt_bytes: int
     iteration: int
     commit: str
     timestamp: str
@@ -108,10 +109,14 @@ def prompt_suite_hash(cases: list[PromptCase]) -> str:
 
 
 def prompt_suite_metadata(source: Path, cases: list[PromptCase]) -> dict[str, Any]:
+    byte_counts = [prompt_bytes(case.prompt) for case in cases]
     return {
         "source": str(source),
         "prompt_count": len(cases),
         "suite_sha256": prompt_suite_hash(cases),
+        "prompt_bytes_total": sum(byte_counts),
+        "prompt_bytes_min": min(byte_counts) if byte_counts else None,
+        "prompt_bytes_max": max(byte_counts) if byte_counts else None,
     }
 
 
@@ -415,6 +420,7 @@ def run_prompt(
         quantization=metadata["quantization"],
         prompt=prompt_case.prompt_id,
         prompt_sha256=prompt_hash(prompt_case.prompt),
+        prompt_bytes=prompt_bytes(prompt_case.prompt),
         iteration=iteration,
         commit=metadata["commit"],
         timestamp=iso_now(),
@@ -445,6 +451,7 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
         summaries.append(
             {
                 "prompt": prompt_id,
+                "prompt_bytes": prompt_runs[0].prompt_bytes,
                 "runs": len(prompt_runs),
                 "ok_runs": len(ok_runs),
                 "tokens_median": statistics.median(
@@ -541,11 +548,15 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
     token_values = [run.tokens for run in runs if run.tokens is not None]
     prompts = sorted({run.prompt for run in runs})
     ok_runs = [run for run in runs if run.returncode == 0 and not run.timed_out]
+    prompt_byte_values = [run.prompt_bytes for run in runs]
 
     return {
         "prompts": len(prompts),
         "runs": len(runs),
         "ok_runs": len(ok_runs),
+        "measured_prompt_bytes_total": sum(prompt_byte_values) if prompt_byte_values else None,
+        "prompt_bytes_min": min(prompt_byte_values) if prompt_byte_values else None,
+        "prompt_bytes_max": max(prompt_byte_values) if prompt_byte_values else None,
         "total_tokens": sum(token_values) if token_values else None,
         "total_elapsed_us": sum(elapsed_values) if elapsed_values else None,
         "tok_per_s_min": min(tok_values) if tok_values else None,
@@ -581,9 +592,9 @@ def markdown_report(report: dict[str, Any]) -> str:
             [
                 "## Suite Summary",
                 "",
-                "| Prompts | Runs | OK | Total tokens | Total elapsed us | Median tok/s | P95 tok/s | Max memory bytes |",
-                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
-                "| {prompts} | {runs} | {ok_runs} | {total_tokens} | {total_elapsed_us} | "
+                "| Prompts | Runs | OK | Measured prompt bytes | Total tokens | Total elapsed us | Median tok/s | P95 tok/s | Max memory bytes |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| {prompts} | {runs} | {ok_runs} | {measured_prompt_bytes_total} | {total_tokens} | {total_elapsed_us} | "
                 "{tok_per_s_median} | {tok_per_s_p95} | {memory_bytes_max} |".format(
                     **{key: format_summary_value(value) for key, value in suite.items()}
                 ),
@@ -600,12 +611,12 @@ def markdown_report(report: dict[str, Any]) -> str:
         )
     if report["summaries"]:
         lines.append(
-            "| Prompt | Runs | OK | Median tokens | Median elapsed us | Min tok/s | Median tok/s | tok/s stdev | tok/s CV % | Max tok/s | Max memory bytes |"
+            "| Prompt | Prompt bytes | Runs | OK | Median tokens | Median elapsed us | Min tok/s | Median tok/s | tok/s stdev | tok/s CV % | Max tok/s | Max memory bytes |"
         )
-        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for summary in report["summaries"]:
             lines.append(
-                "| {prompt} | {runs} | {ok_runs} | {tokens_median} | {elapsed_us_median} | "
+                "| {prompt} | {prompt_bytes} | {runs} | {ok_runs} | {tokens_median} | {elapsed_us_median} | "
                 "{tok_per_s_min} | {tok_per_s_median} | {tok_per_s_stdev} | {tok_per_s_cv_pct} | "
                 "{tok_per_s_max} | {memory_bytes_max} |".format(
                     **{key: format_summary_value(value) for key, value in summary.items()}
@@ -797,6 +808,7 @@ def write_csv_report(runs: list[BenchRun], path: Path) -> None:
         "quantization",
         "prompt",
         "prompt_sha256",
+        "prompt_bytes",
         "iteration",
         "tokens",
         "elapsed_us",
