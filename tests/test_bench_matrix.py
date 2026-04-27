@@ -61,6 +61,8 @@ def test_dry_run_writes_planned_air_gapped_commands(tmp_path: Path) -> None:
     assert report["status"] == "planned"
     assert cell["status"] == "planned"
     assert csv_rows[0]["status"] == "planned"
+    assert len(cell["prompt_suite_sha256"]) == 64
+    assert csv_rows[0]["prompt_suite_sha256"] == cell["prompt_suite_sha256"]
     assert json.loads(csv_rows[0]["command"])[1:3] == ["-nic", "none"]
     assert cell["command"][1:3] == ["-nic", "none"]
     assert "-m" in cell["command"]
@@ -100,8 +102,14 @@ def test_cli_runs_synthetic_matrix(tmp_path: Path) -> None:
     assert {cell["quantization"] for cell in report["cells"]} == {"Q4_0", "Q8_0"}
     assert {row["quantization"] for row in csv_rows} == {"Q4_0", "Q8_0"}
     assert all(cell["measured_runs"] == 4 for cell in report["cells"])
+    assert all(len(cell["prompt_suite_sha256"]) == 64 for cell in report["cells"])
+    assert all(
+        row["prompt_suite_sha256"] == report["cells"][index]["prompt_suite_sha256"]
+        for index, row in enumerate(csv_rows)
+    )
     assert all(row["measured_runs"] == "4" for row in csv_rows)
     assert all(cell["warmup_runs"] == 2 for cell in report["cells"])
     assert all(cell["median_tok_per_s"] == 160.0 for cell in report["cells"])
     assert all(cell["command"][1:3] == ["-nic", "none"] for cell in report["cells"])
     assert "Benchmark Matrix" in markdown
+    assert "Prompt suite" in markdown

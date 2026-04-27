@@ -9,7 +9,6 @@ does not launch QEMU.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import statistics
 import sys
@@ -46,7 +45,7 @@ def iso_now() -> str:
 
 
 def prompt_bytes(prompt: str) -> int:
-    return len(prompt.encode("utf-8"))
+    return qemu_prompt_bench.prompt_bytes(prompt)
 
 
 def prompt_lines(prompt: str) -> int:
@@ -54,12 +53,12 @@ def prompt_lines(prompt: str) -> int:
 
 
 def suite_hash(stats: list[PromptStat]) -> str:
-    payload = [
-        {"prompt_id": stat.prompt_id, "sha256": stat.sha256, "bytes": stat.bytes}
-        for stat in stats
-    ]
-    encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
+    return qemu_prompt_bench.prompt_suite_hash_parts(
+        [
+            {"prompt_id": stat.prompt_id, "sha256": stat.sha256, "bytes": stat.bytes}
+            for stat in stats
+        ]
+    )
 
 
 def percentile(values: list[int], pct: float) -> float | None:

@@ -124,8 +124,9 @@ times. Reports include separate warmup records, raw measured per-run records,
 an overall suite summary, and per-prompt medians and min/max tok/s in JSON and
 Markdown. The suite summary includes measured prompt count, run count, total
 tokens, total elapsed time, median/P95 tok/s, and max memory. The runner also
-writes `qemu_prompt_bench_latest.csv` with one row per measured run for CI
-artifact upload, spreadsheets, and simple shell comparisons.
+writes a deterministic prompt-suite SHA256 matching `prompt_audit.py`, plus
+`qemu_prompt_bench_latest.csv` with one row per measured run for CI artifact
+upload, spreadsheets, and simple shell comparisons.
 
 Prompt files can be JSON, JSONL, or plain text split with `---`. Guest output may
 include a JSON line such as:
@@ -181,7 +182,9 @@ profiles, models, and quantization formats. Each cell writes an isolated
 `qemu_prompt_bench_latest.json` under `bench/results/bench_matrix_*`, while the
 matrix summary is written to `bench/results/bench_matrix_latest.json`, `.md`,
 and `.csv`. QEMU launches still flow through the air-gap guard that injects
-`-nic none` and rejects NIC/network arguments.
+`-nic none` and rejects NIC/network arguments. Each matrix cell records the
+prompt-suite SHA256 from its underlying prompt benchmark report so matrix
+comparisons can reject accidental prompt drift.
 
 Example:
 

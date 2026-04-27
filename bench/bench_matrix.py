@@ -59,6 +59,7 @@ class MatrixCellResult:
     report: str
     command: list[str]
     prompts: int
+    prompt_suite_sha256: str
     measured_runs: int
     warmup_runs: int
     median_tok_per_s: float | None
@@ -193,7 +194,9 @@ def run_cell(
     dry_run: bool,
 ) -> MatrixCellResult:
     command = cell_command(qemu_bin, image, global_qemu_args, cell)
-    prompt_count = len(qemu_prompt_bench.load_prompt_cases(prompts))
+    prompt_cases = qemu_prompt_bench.load_prompt_cases(prompts)
+    prompt_count = len(prompt_cases)
+    prompt_suite_sha256 = qemu_prompt_bench.prompt_suite_hash(prompt_cases)
     cell_output_dir = matrix_dir / cell.slug
     report_path = cell_output_dir / "qemu_prompt_bench_latest.json"
 
@@ -207,6 +210,7 @@ def run_cell(
             report=str(report_path),
             command=command,
             prompts=prompt_count,
+            prompt_suite_sha256=prompt_suite_sha256,
             measured_runs=0,
             warmup_runs=0,
             median_tok_per_s=None,
@@ -254,6 +258,9 @@ def run_cell(
         report=str(report_path),
         command=command,
         prompts=prompt_count,
+        prompt_suite_sha256=str(
+            (report.get("prompt_suite") or {}).get("suite_sha256") or prompt_suite_sha256
+        ),
         measured_runs=len(report.get("benchmarks", [])),
         warmup_runs=len(report.get("warmups", [])),
         median_tok_per_s=median_cell_tok_per_s(report),
@@ -274,8 +281,10 @@ def markdown_report(report: dict[str, Any]) -> str:
         "",
     ]
     if report["cells"]:
-        lines.append("| Profile | Model | Quantization | Status | Prompts | Runs | Warmups | Median tok/s | Max memory bytes |")
-        lines.append("| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |")
+        lines.append(
+            "| Profile | Model | Quantization | Status | Prompts | Prompt suite | Runs | Warmups | Median tok/s | Max memory bytes |"
+        )
+        lines.append("| --- | --- | --- | --- | ---: | --- | ---: | ---: | ---: | ---: |")
         for cell in report["cells"]:
             median = cell["median_tok_per_s"]
             memory = cell["max_memory_bytes"]
@@ -283,7 +292,8 @@ def markdown_report(report: dict[str, Any]) -> str:
             memory_cell = str(memory) if memory is not None else "-"
             lines.append(
                 f"| {cell['profile']} | {cell['model']} | {cell['quantization']} | {cell['status']} | "
-                f"{cell['prompts']} | {cell['measured_runs']} | {cell['warmup_runs']} | "
+                f"{cell['prompts']} | {cell['prompt_suite_sha256']} | "
+                f"{cell['measured_runs']} | {cell['warmup_runs']} | "
                 f"{median_cell} | {memory_cell} |"
             )
     else:
@@ -328,6 +338,7 @@ def write_matrix_csv(cells: list[MatrixCellResult], path: Path) -> None:
         "output_dir",
         "report",
         "prompts",
+        "prompt_suite_sha256",
         "measured_runs",
         "warmup_runs",
         "median_tok_per_s",

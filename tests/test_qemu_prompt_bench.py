@@ -131,6 +131,8 @@ def test_cli_dry_run_validates_without_launching_qemu(tmp_path: Path, capsys) ->
     assert status == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["prompt_count"] == 1
+    assert payload["prompt_suite"]["prompt_count"] == 1
+    assert len(payload["prompt_suite"]["suite_sha256"]) == 64
     assert payload["command"][1:3] == ["-nic", "none"]
 
 
@@ -164,6 +166,8 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
     assert status == 0
     report = json.loads((output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8"))
     assert report["status"] == "pass"
+    assert report["prompt_suite"]["source"] == str(prompts)
+    assert report["prompt_suite"]["prompt_count"] == 1
     assert report["benchmarks"][0]["tokens"] == 32
     assert report["benchmarks"][0]["tok_per_s"] == 320.0
     assert report["benchmarks"][0]["memory_bytes"] == 8388608
@@ -215,6 +219,7 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
 
     assert len(report["benchmarks"]) == 6
     assert report["suite_summary"]["prompts"] == 2
+    assert len(report["prompt_suite"]["suite_sha256"]) == 64
     assert report["suite_summary"]["runs"] == 6
     assert report["suite_summary"]["ok_runs"] == 6
     assert report["suite_summary"]["total_tokens"] == 180
@@ -228,6 +233,7 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
     assert report["summaries"][0]["tok_per_s_median"] == 200.0
     assert report["summaries"][0]["memory_bytes_max"] == 1000
     assert "QEMU Prompt Benchmark" in markdown
+    assert f"Prompt suite: {report['prompt_suite']['suite_sha256']}" in markdown
     assert "| 2 | 6 | 6 | 180 | 600000 | 300.000 | 400.000 | 2000 |" in markdown
     assert "| one | 3 | 3 | 20 | 100000 | 200.000 | 200.000 | 200.000 | 1000 |" in markdown
     csv_report = (output_dir / "qemu_prompt_bench_latest.csv").read_text(encoding="utf-8")

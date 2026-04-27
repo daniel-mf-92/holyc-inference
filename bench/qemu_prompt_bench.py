@@ -82,6 +82,36 @@ def prompt_hash(prompt: str) -> str:
     return hashlib.sha256(prompt.encode("utf-8")).hexdigest()
 
 
+def prompt_bytes(prompt: str) -> int:
+    return len(prompt.encode("utf-8"))
+
+
+def prompt_suite_hash_parts(payload: list[dict[str, Any]]) -> str:
+    encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def prompt_suite_hash(cases: list[PromptCase]) -> str:
+    return prompt_suite_hash_parts(
+        [
+            {
+                "prompt_id": case.prompt_id,
+                "sha256": prompt_hash(case.prompt),
+                "bytes": prompt_bytes(case.prompt),
+            }
+            for case in cases
+        ]
+    )
+
+
+def prompt_suite_metadata(source: Path, cases: list[PromptCase]) -> dict[str, Any]:
+    return {
+        "source": str(source),
+        "prompt_count": len(cases),
+        "suite_sha256": prompt_suite_hash(cases),
+    }
+
+
 def git_commit(root: Path) -> str:
     try:
         result = subprocess.run(
@@ -437,6 +467,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         "",
         f"Generated: {report['generated_at']}",
         f"Status: {report['status']}",
+        f"Prompt suite: {report.get('prompt_suite', {}).get('suite_sha256', '-')}",
         f"Warmup runs: {len(report['warmups'])}",
         f"Runs: {len(report['benchmarks'])}",
         "",
@@ -483,13 +514,20 @@ def format_summary_value(value: Any) -> str:
     return str(value)
 
 
-def write_report(runs: list[BenchRun], output_dir: Path, warmups: list[BenchRun] | None = None) -> Path:
+def write_report(
+    runs: list[BenchRun],
+    output_dir: Path,
+    *,
+    prompt_suite: dict[str, Any] | None = None,
+    warmups: list[BenchRun] | None = None,
+) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     warmup_runs = warmups or []
     all_runs = warmup_runs + runs
     report = {
         "generated_at": iso_now(),
         "status": "pass" if all(run.returncode == 0 and not run.timed_out for run in all_runs) else "fail",
+        "prompt_suite": prompt_suite or {},
         "warmups": [asdict(run) for run in warmup_runs],
         "suite_summary": suite_summary(runs),
         "summaries": summarize_runs(runs),
@@ -580,7 +618,16 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.dry_run:
-        print(json.dumps({"command": command, "prompt_count": len(prompts)}, indent=2))
+        print(
+            json.dumps(
+                {
+                    "command": command,
+                    "prompt_count": len(prompts),
+                    "prompt_suite": prompt_suite_metadata(args.prompts, prompts),
+                },
+                indent=2,
+            )
+        )
         return 0
 
     metadata = {
@@ -599,7 +646,12 @@ def main(argv: list[str] | None = None) -> int:
         for prompt_case in prompts
         for iteration in range(1, args.repeat + 1)
     ]
-    output = write_report(runs, args.output_dir, warmups=warmups)
+    output = write_report(
+        runs,
+        args.output_dir,
+        prompt_suite=prompt_suite_metadata(args.prompts, prompts),
+        warmups=warmups,
+    )
     all_runs = warmups + runs
     print(f"wrote_json={output}")
     print(f"status={'pass' if all(run.returncode == 0 and not run.timed_out for run in all_runs) else 'fail'}")
