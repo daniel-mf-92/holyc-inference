@@ -41799,12 +41799,12 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
     canonical_drift_count = 0;
     canonical_snapshot_digest_q64 = 0;
 
-    // IQ-1778 zero-write diagnostics companion:
-    // - derive staged tuple through IQ-1775 commit-only hardening wrapper;
-    // - derive canonical tuple through IQ-1777 strict diagnostics parity gate;
+    // IQ-1783 zero-write diagnostics companion:
+    // - derive staged tuple through IQ-1782 commit-only hardening wrapper;
+    // - derive canonical tuple through IQ-1781 strict diagnostics parity gate;
     // - enforce immutable batch snapshot + status-domain + strict tuple parity;
     // - preserve caller output slots (no-write diagnostics semantics).
-    status_companion = GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
+    status_companion = GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(
         p50_overhead_q16_rows,
         p95_overhead_q16_rows,
         max_p50_overhead_q16_rows,
@@ -41825,7 +41825,7 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
     canonical_blocked_count = staged_blocked_count;
     canonical_drift_count = staged_drift_count;
     canonical_snapshot_digest_q64 = staged_snapshot_digest_q64;
-    status_canonical = GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+    status_canonical = GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
         p50_overhead_q16_rows,
         p95_overhead_q16_rows,
         max_p50_overhead_q16_rows,
