@@ -1,0 +1,12 @@
+{
+  "generated_at": "2026-04-27T13:31:05Z",
+  "record_count": 0,
+  "records": [],
+  "regressions": [],
+  "status": "pass",
+  "summaries": {},
+  "thresholds": {
+    "memory_regression_pct": 10.0,
+    "tok_regression_pct": 5.0
+  }
+}

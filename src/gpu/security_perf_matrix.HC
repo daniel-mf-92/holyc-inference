@@ -40960,7 +40960,7 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
     canonical_blocked_count = staged_blocked_count;
     canonical_drift_count = staged_drift_count;
     canonical_snapshot_digest_q64 = staged_snapshot_digest_q64;
-    status_canonical = GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
+    status_canonical = GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParity(
         p50_overhead_q16_rows,
         p95_overhead_q16_rows,
         max_p50_overhead_q16_rows,

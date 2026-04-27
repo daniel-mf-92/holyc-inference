@@ -24,3 +24,22 @@ Raw block streams can be checked with:
 python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin
 python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin
 ```
+
+## Perf Regression Dashboard
+
+`perf_regression.py` scans host-side benchmark result files and writes dashboards
+to `bench/dashboards/`. It accepts JSON, JSONL, and CSV records with `tok_per_s`
+or `tok_per_s_milli`, plus optional memory fields such as `memory_bytes` or
+`max_rss_bytes`.
+
+Example:
+
+```bash
+python3 bench/perf_regression.py --input bench/results --output-dir bench/dashboards
+```
+
+CI can fail on throughput or memory regressions with:
+
+```bash
+python3 bench/perf_regression.py --fail-on-regression
+```
