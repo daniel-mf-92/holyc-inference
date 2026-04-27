@@ -4,7 +4,7 @@
 The audit intentionally runs outside TempleOS. It validates two invariants:
 
 * quant HolyC sources do not introduce float runtime types or math helpers
-* raw Q4_0/Q8_0 block streams have valid sizes and sane fp16 scale fields
+* raw Q4_0/Q8_0 block streams have valid sizes and sane fp16/Q16 scale fields
 """
 
 from __future__ import annotations
@@ -59,6 +59,11 @@ class BlockAudit:
     scale_subnormal_count: int
     scale_normal_count: int
     scale_inf_nan_count: int
+    scale_q16_min: int
+    scale_q16_max: int
+    scale_q16_abs_max: int
+    scale_q16_zero_count: int
+    scale_q16_over_limit_count: int
     quant_min: int
     quant_max: int
     quant_zero_count: int
@@ -185,6 +190,43 @@ def fp16_to_float(bits: int) -> float:
     return struct.unpack("<e", struct.pack("<H", bits))[0]
 
 
+def fp16_to_q16(bits: int) -> int:
+    return int(round(fp16_to_float(bits) * (1 << 16)))
+
+
+def update_scale_q16_stats(
+    findings: list[str],
+    stats: dict[str, int | None],
+    block_index: int,
+    scale_bits: int,
+    max_abs_scale_q16: int | None,
+) -> None:
+    scale_q16 = fp16_to_q16(scale_bits)
+    abs_scale_q16 = abs(scale_q16)
+    stats["min"] = (
+        scale_q16 if stats["min"] is None else min(int(stats["min"]), scale_q16)
+    )
+    stats["max"] = (
+        scale_q16 if stats["max"] is None else max(int(stats["max"]), scale_q16)
+    )
+    stats["abs_max"] = max(int(stats["abs_max"] or 0), abs_scale_q16)
+    if scale_q16 == 0:
+        stats["zero_count"] = int(stats["zero_count"] or 0) + 1
+    if max_abs_scale_q16 is not None and abs_scale_q16 > max_abs_scale_q16:
+        stats["over_limit_count"] = int(stats["over_limit_count"] or 0) + 1
+        findings.append(
+            (
+                "block {block}: |scale_q16| {actual} exceeds limit {limit} "
+                "(fp16 bits=0x{bits:04x})"
+            ).format(
+                block=block_index,
+                actual=abs_scale_q16,
+                limit=max_abs_scale_q16,
+                bits=scale_bits,
+            )
+        )
+
+
 def check_expected_shape(
     findings: list[str],
     block_count: int,
@@ -216,6 +258,7 @@ def audit_q4_0_blocks(
     allow_inf_nan_scale: bool,
     expect_blocks: int | None = None,
     expect_elements: int | None = None,
+    max_abs_scale_q16: int | None = None,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -229,6 +272,13 @@ def audit_q4_0_blocks(
     quant_max = -math.inf
     quant_zero_count = 0
     quant_histogram = empty_histogram(-8, 7)
+    scale_q16_stats: dict[str, int | None] = {
+        "min": None,
+        "max": None,
+        "abs_max": 0,
+        "zero_count": 0,
+        "over_limit_count": 0,
+    }
 
     for block_index in range(block_count):
         offset = block_index * Q4_0_BLOCK_BYTES
@@ -241,6 +291,14 @@ def audit_q4_0_blocks(
         scale_value = fp16_to_float(scale_bits)
         if math.isnan(scale_value) and not allow_inf_nan_scale:
             findings.append(f"block {block_index}: fp16 scale decoded to nan")
+        if math.isfinite(scale_value):
+            update_scale_q16_stats(
+                findings,
+                scale_q16_stats,
+                block_index,
+                scale_bits,
+                max_abs_scale_q16,
+            )
 
         packed = data[offset + 2 : offset + 2 + Q4_0_PACKED_BYTES]
         for byte in packed:
@@ -266,6 +324,11 @@ def audit_q4_0_blocks(
         scale_subnormal_count=counts["subnormal"],
         scale_normal_count=counts["normal"],
         scale_inf_nan_count=counts["inf_nan"],
+        scale_q16_min=int(scale_q16_stats["min"] or 0),
+        scale_q16_max=int(scale_q16_stats["max"] or 0),
+        scale_q16_abs_max=int(scale_q16_stats["abs_max"] or 0),
+        scale_q16_zero_count=int(scale_q16_stats["zero_count"] or 0),
+        scale_q16_over_limit_count=int(scale_q16_stats["over_limit_count"] or 0),
         quant_min=int(quant_min),
         quant_max=int(quant_max),
         quant_zero_count=quant_zero_count,
@@ -279,6 +342,7 @@ def audit_q8_0_blocks(
     allow_inf_nan_scale: bool,
     expect_blocks: int | None = None,
     expect_elements: int | None = None,
+    max_abs_scale_q16: int | None = None,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -292,6 +356,13 @@ def audit_q8_0_blocks(
     quant_max = -math.inf
     quant_zero_count = 0
     quant_histogram = empty_histogram(-128, 127)
+    scale_q16_stats: dict[str, int | None] = {
+        "min": None,
+        "max": None,
+        "abs_max": 0,
+        "zero_count": 0,
+        "over_limit_count": 0,
+    }
 
     for block_index in range(block_count):
         offset = block_index * Q8_0_BLOCK_BYTES
@@ -304,6 +375,14 @@ def audit_q8_0_blocks(
         scale_value = fp16_to_float(scale_bits)
         if math.isnan(scale_value) and not allow_inf_nan_scale:
             findings.append(f"block {block_index}: fp16 scale decoded to nan")
+        if math.isfinite(scale_value):
+            update_scale_q16_stats(
+                findings,
+                scale_q16_stats,
+                block_index,
+                scale_bits,
+                max_abs_scale_q16,
+            )
 
         qs = data[offset + 2 : offset + 2 + Q8_0_PACKED_BYTES]
         for value in struct.unpack("<32b", qs):
@@ -327,6 +406,11 @@ def audit_q8_0_blocks(
         scale_subnormal_count=counts["subnormal"],
         scale_normal_count=counts["normal"],
         scale_inf_nan_count=counts["inf_nan"],
+        scale_q16_min=int(scale_q16_stats["min"] or 0),
+        scale_q16_max=int(scale_q16_stats["max"] or 0),
+        scale_q16_abs_max=int(scale_q16_stats["abs_max"] or 0),
+        scale_q16_zero_count=int(scale_q16_stats["zero_count"] or 0),
+        scale_q16_over_limit_count=int(scale_q16_stats["over_limit_count"] or 0),
         quant_min=int(quant_min),
         quant_max=int(quant_max),
         quant_zero_count=quant_zero_count,
@@ -341,11 +425,24 @@ def audit_blocks(
     allow_inf_nan_scale: bool,
     expect_blocks: int | None = None,
     expect_elements: int | None = None,
+    max_abs_scale_q16: int | None = None,
 ) -> BlockAudit:
     if quant_format == "q4_0":
-        return audit_q4_0_blocks(path, allow_inf_nan_scale, expect_blocks, expect_elements)
+        return audit_q4_0_blocks(
+            path,
+            allow_inf_nan_scale,
+            expect_blocks,
+            expect_elements,
+            max_abs_scale_q16,
+        )
     if quant_format == "q8_0":
-        return audit_q8_0_blocks(path, allow_inf_nan_scale, expect_blocks, expect_elements)
+        return audit_q8_0_blocks(
+            path,
+            allow_inf_nan_scale,
+            expect_blocks,
+            expect_elements,
+            max_abs_scale_q16,
+        )
     raise ValueError(f"unsupported quant format: {quant_format}")
 
 
@@ -375,8 +472,8 @@ def markdown_report(report: dict) -> str:
         lines.extend(
             [
                 "| Format | Path | Blocks | Capacity | Scale zero/subnormal/normal/inf_nan "
-                "| Quant min/max | Zero quants | Findings |",
-                "| --- | --- | ---: | ---: | --- | --- | ---: | ---: |",
+                "| Scale Q16 min/max/absmax/zero/overlimit | Quant min/max | Zero quants | Findings |",
+                "| --- | --- | ---: | ---: | --- | --- | --- | ---: | ---: |",
             ]
         )
         for audit in block_audits:
@@ -389,16 +486,24 @@ def markdown_report(report: dict) -> str:
                     "scale_inf_nan_count",
                 )
             )
+            scale_q16 = "{}/{}/{}/{}/{}".format(
+                audit["scale_q16_min"],
+                audit["scale_q16_max"],
+                audit["scale_q16_abs_max"],
+                audit["scale_q16_zero_count"],
+                audit["scale_q16_over_limit_count"],
+            )
             lines.append(
                 (
                     "| {format} | `{path}` | {block_count} | {element_capacity} | "
-                    "{scales} | {quant_min}/{quant_max} | {quant_zero_count} | {findings} |"
+                    "{scales} | {scale_q16} | {quant_min}/{quant_max} | {quant_zero_count} | {findings} |"
                 ).format(
                     format=audit["format"],
                     path=audit["path"],
                     block_count=audit["block_count"],
                     element_capacity=audit["element_capacity"],
                     scales=scale_counts,
+                    scale_q16=scale_q16,
                     quant_min=audit["quant_min"],
                     quant_max=audit["quant_max"],
                     quant_zero_count=audit["quant_zero_count"],
@@ -467,6 +572,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Require each block file to have capacity for this element count",
     )
+    parser.add_argument(
+        "--max-abs-scale-q16",
+        type=int,
+        help="Fail any finite fp16 scale whose rounded Q16 magnitude exceeds this limit",
+    )
     parser.add_argument("--allow-inf-nan-scale", action="store_true", help="Do not fail on fp16 inf/nan scales")
     parser.add_argument("--output", type=Path, help="Write JSON report to this path")
     parser.add_argument("--markdown", type=Path, help="Write Markdown report to this path")
@@ -483,7 +593,14 @@ def main(argv: list[str] | None = None) -> int:
         + [(path, "q8_0") for path in args.q8_block_file]
     )
     block_audits = [
-        audit_blocks(path, quant_format, args.allow_inf_nan_scale, args.expect_blocks, args.expect_elements)
+        audit_blocks(
+            path,
+            quant_format,
+            args.allow_inf_nan_scale,
+            args.expect_blocks,
+            args.expect_elements,
+            args.max_abs_scale_q16,
+        )
         for path, quant_format in block_specs
     ]
     failed = bool(source_audit.findings) or any(audit.findings for audit in block_audits)

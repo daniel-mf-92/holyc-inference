@@ -71,6 +71,11 @@ def test_q4_0_block_audit_reports_signed_nibble_range(tmp_path: Path) -> None:
     assert audit.quant_histogram["0"] == 30
     assert audit.quant_histogram["7"] == 1
     assert audit.scale_normal_count == 1
+    assert audit.scale_q16_min == 65536
+    assert audit.scale_q16_max == 65536
+    assert audit.scale_q16_abs_max == 65536
+    assert audit.scale_q16_zero_count == 0
+    assert audit.scale_q16_over_limit_count == 0
 
 
 def test_q8_0_block_audit_checks_size_and_inf_scale(tmp_path: Path) -> None:
@@ -102,6 +107,37 @@ def test_block_audit_checks_expected_shape(tmp_path: Path) -> None:
     assert "expected 33 elements exceeds block capacity 32" in audit.findings
 
 
+def test_block_audit_checks_q16_scale_limit(tmp_path: Path) -> None:
+    block_file = tmp_path / "q8.bin"
+    block_file.write_bytes(half_bits(2.0) + bytes([0] * 32))
+
+    audit = quant_audit.audit_q8_0_blocks(
+        block_file,
+        allow_inf_nan_scale=False,
+        max_abs_scale_q16=100000,
+    )
+
+    assert audit.scale_q16_min == 131072
+    assert audit.scale_q16_max == 131072
+    assert audit.scale_q16_abs_max == 131072
+    assert audit.scale_q16_zero_count == 0
+    assert audit.scale_q16_over_limit_count == 1
+    assert "|scale_q16| 131072 exceeds limit 100000" in audit.findings[0]
+
+
+def test_block_audit_counts_zero_q16_scales(tmp_path: Path) -> None:
+    block_file = tmp_path / "q4.bin"
+    block_file.write_bytes(half_bits(0.0) + bytes([0x88] * 16))
+
+    audit = quant_audit.audit_q4_0_blocks(block_file, allow_inf_nan_scale=False)
+
+    assert audit.scale_zero_count == 1
+    assert audit.scale_q16_min == 0
+    assert audit.scale_q16_max == 0
+    assert audit.scale_q16_abs_max == 0
+    assert audit.scale_q16_zero_count == 1
+
+
 def test_cli_writes_pass_report(tmp_path: Path) -> None:
     source = tmp_path / "ok.HC"
     output = tmp_path / "report.json"
@@ -116,6 +152,36 @@ def test_cli_writes_pass_report(tmp_path: Path) -> None:
     text = output.read_text(encoding="utf-8")
     assert '"status": "pass"' in text
     assert "Quantization Audit" in markdown.read_text(encoding="utf-8")
+
+
+def test_cli_fails_on_q16_scale_limit(tmp_path: Path) -> None:
+    source = tmp_path / "ok.HC"
+    q4_file = tmp_path / "q4.bin"
+    output = tmp_path / "report.json"
+    markdown = tmp_path / "report.md"
+    source.write_text("I64 Good(U16 d_fp16) { return d_fp16; }\n", encoding="utf-8")
+    q4_file.write_bytes(half_bits(1.0) + bytes([0x88] * 16))
+
+    status = quant_audit.main(
+        [
+            "--source-root",
+            str(source),
+            "--q4-block-file",
+            str(q4_file),
+            "--max-abs-scale-q16",
+            "32768",
+            "--output",
+            str(output),
+            "--markdown",
+            str(markdown),
+        ]
+    )
+
+    assert status == 1
+    report = output.read_text(encoding="utf-8")
+    assert '"scale_q16_abs_max": 65536' in report
+    assert '"scale_q16_over_limit_count": 1' in report
+    assert "Scale Q16 min/max/absmax/zero/overlimit" in markdown.read_text(encoding="utf-8")
 
 
 def test_cli_audits_mixed_q4_and_q8_block_files(tmp_path: Path) -> None:
