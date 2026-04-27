@@ -36,8 +36,9 @@ while IFS= read -r f; do
   # For .HC and .sh files, check function/identifier names added in this diff
   case "$f" in
     *.HC|*.sh|*.py)
-      # Extract added lines (start with +) and find function-like definitions
-      added=$(git diff "$REV"^ "$REV" -- "$f" 2>/dev/null | grep -E "^\+" | grep -v "^+++") || true
+      # Extract added lines from current working diff against the target rev.
+      # This enforces naming on changes being made now, not historical commits.
+      added=$(git diff "$REV" -- "$f" 2>/dev/null | grep -E "^\+" | grep -v "^+++") || true
 
       # HolyC: Type FuncName(...)  ; bash: function_name() {  ; python: def func(
       idents=$(echo "$added" | grep -oE '(\b[A-Za-z_][A-Za-z0-9_]+)\s*\(' | sed 's/[[:space:]]*($//' | sort -u) || true

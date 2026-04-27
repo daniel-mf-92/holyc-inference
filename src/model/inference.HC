@@ -4003,3 +4003,223 @@ I32 BotTokenEmitParity(
 
     return SAMPLING_Q16_OK;
 }
+
+// IQ-1795 commit-only hardening wrapper over parity + preflight diagnostics.
+//
+// Contract:
+// - Snapshot immutable event tuple inputs and output-pointer identities.
+// - Require parity and preflight diagnostics to succeed in zero-write mode.
+// - Run commit-only emission twice into private staging buffers and require
+//   strict replay parity before any publish.
+// - Publish `{event_status,event_count,event_digest_q64}` and event tuple
+//   atomically (only on emitted status), with no partial writes on failure.
+I32 BotTokenEmitParityCommit(
+    I64 *event_buffer,
+    I64 event_buffer_capacity,
+    I64 session_id,
+    I64 step_index,
+    I64 token_id,
+    I64 logit_q16,
+    I64 policy_digest_q64,
+    I64 expected_policy_digest_q64,
+    I64 profile_mode,
+    I64 *out_event_status,
+    I64 *out_event_count,
+    I64 *out_event_digest_q64)
+{
+    I64 staged_parity_event[INFERENCE_BOT_EVENT_TUPLE_CELLS];
+    I64 staged_preflight_event[INFERENCE_BOT_EVENT_TUPLE_CELLS];
+    I64 staged_primary_event[INFERENCE_BOT_EVENT_TUPLE_CELLS];
+    I64 staged_replay_event[INFERENCE_BOT_EVENT_TUPLE_CELLS];
+    I64 staged_parity_status;
+    I64 staged_parity_count;
+    I64 staged_parity_digest_q64;
+    I64 staged_preflight_status;
+    I64 staged_preflight_count;
+    I64 staged_preflight_digest_q64;
+    I64 staged_primary_status;
+    I64 staged_primary_count;
+    I64 staged_primary_digest_q64;
+    I64 staged_replay_status;
+    I64 staged_replay_count;
+    I64 staged_replay_digest_q64;
+    I64 snapshot_event[INFERENCE_BOT_EVENT_TUPLE_CELLS];
+    I64 snapshot_event_status;
+    I64 snapshot_event_count;
+    I64 snapshot_event_digest_q64;
+    I64 snapshot_event_buffer_capacity;
+    I64 snapshot_session_id;
+    I64 snapshot_step_index;
+    I64 snapshot_token_id;
+    I64 snapshot_logit_q16;
+    I64 snapshot_policy_digest_q64;
+    I64 snapshot_expected_policy_digest_q64;
+    I64 snapshot_profile_mode;
+    I64 *snapshot_event_buffer;
+    I64 *snapshot_out_event_status;
+    I64 *snapshot_out_event_count;
+    I64 *snapshot_out_event_digest_q64;
+    I32 status_parity;
+    I32 status_preflight;
+    I32 status_primary;
+    I32 status_replay;
+    I64 lane;
+
+    if (!event_buffer || !out_event_status || !out_event_count ||
+        !out_event_digest_q64)
+        return SAMPLING_Q16_ERR_NULL_PTR;
+
+    if (out_event_status == out_event_count ||
+        out_event_status == out_event_digest_q64 ||
+        out_event_count == out_event_digest_q64)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (event_buffer_capacity < INFERENCE_BOT_EVENT_TUPLE_CELLS)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    snapshot_event_buffer_capacity = event_buffer_capacity;
+    snapshot_session_id = session_id;
+    snapshot_step_index = step_index;
+    snapshot_token_id = token_id;
+    snapshot_logit_q16 = logit_q16;
+    snapshot_policy_digest_q64 = policy_digest_q64;
+    snapshot_expected_policy_digest_q64 = expected_policy_digest_q64;
+    snapshot_profile_mode = profile_mode;
+    snapshot_event_buffer = event_buffer;
+    snapshot_out_event_status = out_event_status;
+    snapshot_out_event_count = out_event_count;
+    snapshot_out_event_digest_q64 = out_event_digest_q64;
+    snapshot_event_status = *out_event_status;
+    snapshot_event_count = *out_event_count;
+    snapshot_event_digest_q64 = *out_event_digest_q64;
+
+    for (lane = 0; lane < INFERENCE_BOT_EVENT_TUPLE_CELLS; lane++)
+    {
+        snapshot_event[lane] = event_buffer[lane];
+        staged_parity_event[lane] = 0;
+        staged_preflight_event[lane] = 0;
+        staged_primary_event[lane] = 0;
+        staged_replay_event[lane] = 0;
+    }
+
+    staged_parity_status = 0x1111;
+    staged_parity_count = 0x2222;
+    staged_parity_digest_q64 = 0x3333;
+    staged_preflight_status = 0x4444;
+    staged_preflight_count = 0x5555;
+    staged_preflight_digest_q64 = 0x6666;
+
+    status_parity = BotTokenEmitParity(
+        staged_parity_event,
+        INFERENCE_BOT_EVENT_TUPLE_CELLS,
+        session_id,
+        step_index,
+        token_id,
+        logit_q16,
+        policy_digest_q64,
+        expected_policy_digest_q64,
+        profile_mode,
+        &staged_parity_status,
+        &staged_parity_count,
+        &staged_parity_digest_q64);
+    if (status_parity)
+        return status_parity;
+
+    if (staged_parity_status != 0x1111 ||
+        staged_parity_count != 0x2222 ||
+        staged_parity_digest_q64 != 0x3333)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    status_preflight = BotTokenEmitPreflightOnly(
+        staged_preflight_event,
+        INFERENCE_BOT_EVENT_TUPLE_CELLS,
+        session_id,
+        step_index,
+        token_id,
+        logit_q16,
+        policy_digest_q64,
+        expected_policy_digest_q64,
+        profile_mode,
+        &staged_preflight_status,
+        &staged_preflight_count,
+        &staged_preflight_digest_q64);
+    if (status_preflight)
+        return status_preflight;
+
+    if (staged_preflight_status != 0x4444 ||
+        staged_preflight_count != 0x5555 ||
+        staged_preflight_digest_q64 != 0x6666)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    status_primary = BotTokenEmitCommitOnly(
+        staged_primary_event,
+        INFERENCE_BOT_EVENT_TUPLE_CELLS,
+        session_id,
+        step_index,
+        token_id,
+        logit_q16,
+        policy_digest_q64,
+        expected_policy_digest_q64,
+        profile_mode,
+        &staged_primary_status,
+        &staged_primary_count,
+        &staged_primary_digest_q64);
+    if (status_primary)
+        return status_primary;
+
+    status_replay = BotTokenEmitCommitOnly(
+        staged_replay_event,
+        INFERENCE_BOT_EVENT_TUPLE_CELLS,
+        session_id,
+        step_index,
+        token_id,
+        logit_q16,
+        policy_digest_q64,
+        expected_policy_digest_q64,
+        profile_mode,
+        &staged_replay_status,
+        &staged_replay_count,
+        &staged_replay_digest_q64);
+    if (status_replay)
+        return status_replay;
+
+    if (snapshot_event_buffer_capacity != event_buffer_capacity ||
+        snapshot_session_id != session_id ||
+        snapshot_step_index != step_index ||
+        snapshot_token_id != token_id ||
+        snapshot_logit_q16 != logit_q16 ||
+        snapshot_policy_digest_q64 != policy_digest_q64 ||
+        snapshot_expected_policy_digest_q64 != expected_policy_digest_q64 ||
+        snapshot_profile_mode != profile_mode)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (snapshot_event_buffer != event_buffer ||
+        snapshot_out_event_status != out_event_status ||
+        snapshot_out_event_count != out_event_count ||
+        snapshot_out_event_digest_q64 != out_event_digest_q64)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    if (staged_primary_status != staged_replay_status ||
+        staged_primary_count != staged_replay_count ||
+        staged_primary_digest_q64 != staged_replay_digest_q64)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    for (lane = 0; lane < INFERENCE_BOT_EVENT_TUPLE_CELLS; lane++)
+    {
+        if (staged_primary_event[lane] != staged_replay_event[lane])
+            return SAMPLING_Q16_ERR_BAD_PARAM;
+    }
+
+    if (staged_primary_status == INFERENCE_BOT_STATUS_EMITTED)
+    {
+        for (lane = 0; lane < INFERENCE_BOT_EVENT_TUPLE_CELLS; lane++)
+            event_buffer[lane] = staged_primary_event[lane];
+    }
+    else if (staged_primary_status != INFERENCE_BOT_STATUS_BLOCKED)
+        return SAMPLING_Q16_ERR_BAD_PARAM;
+
+    *out_event_status = staged_primary_status;
+    *out_event_count = staged_primary_count;
+    *out_event_digest_q64 = staged_primary_digest_q64;
+    return SAMPLING_Q16_OK;
+}
