@@ -115,6 +115,20 @@ python3 bench/dataset_index.py \
   --fail-on-findings
 ```
 
+`dataset_leak_audit.py` checks local eval JSONL before packing for duplicate
+record IDs, normalized prompt reuse across splits, repeated prompt+choice
+payloads across splits, and conflicting answers for the same payload. It never
+fetches datasets and can fail CI when split leakage is found:
+
+```bash
+python3 bench/dataset_leak_audit.py \
+  --input bench/results/datasets/smoke_curated.jsonl \
+  --output bench/results/datasets/dataset_leak_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_leak_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_leak_audit_smoke_latest.csv \
+  --fail-on-leaks
+```
+
 ## Offline Eval Comparator
 
 `eval_compare.py` compares local HolyC and llama.cpp multiple-choice predictions

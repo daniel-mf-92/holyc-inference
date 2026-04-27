@@ -92,6 +92,22 @@ python3 bench/dataset_index.py \
   --fail-on-findings
 ```
 
+## Split Leakage Audit
+
+Before freezing a train/dev/test subset, run the local leakage audit over the
+curated JSONL files. It checks duplicate record IDs, normalized prompt reuse
+across splits, repeated prompt+choice payloads across splits, and answer
+conflicts for identical payloads:
+
+```bash
+python3 bench/dataset_leak_audit.py \
+  --input bench/results/datasets/smoke_curated.jsonl \
+  --output bench/results/datasets/dataset_leak_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_leak_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_leak_audit_smoke_latest.csv \
+  --fail-on-leaks
+```
+
 ## Provenance
 
 The committed sample is synthetic and hand-written for packer validation only. For

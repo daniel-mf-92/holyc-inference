@@ -1,0 +1,23 @@
+{
+  "counts_by_dataset_split": {
+    "arc-smoke": {
+      "validation": 1
+    },
+    "hellaswag-smoke": {
+      "validation": 1
+    },
+    "truthfulqa-smoke": {
+      "validation": 1
+    }
+  },
+  "error_count": 0,
+  "findings": [],
+  "format": "hceval-leak-audit",
+  "generated_at": "2026-04-27T23:25:42Z",
+  "inputs": [
+    "bench/results/datasets/smoke_curated.jsonl"
+  ],
+  "record_count": 3,
+  "status": "pass",
+  "warning_count": 0
+}
