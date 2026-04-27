@@ -1,0 +1,66 @@
+{
+  "cells": [
+    {
+      "command": [
+        "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/fixtures/qemu_synthetic_bench.py",
+        "-nic",
+        "none",
+        "-serial",
+        "stdio",
+        "-display",
+        "none",
+        "-drive",
+        "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide",
+        "-m",
+        "256M",
+        "-smp",
+        "1"
+      ],
+      "max_memory_bytes": 67207168,
+      "measured_runs": 4,
+      "median_tok_per_s": 160.0,
+      "model": "synthetic-smoke",
+      "output_dir": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q4_0",
+      "profile": "ci-airgap-smoke",
+      "prompts": 2,
+      "quantization": "Q4_0",
+      "report": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass",
+      "warmup_runs": 2
+    },
+    {
+      "command": [
+        "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/fixtures/qemu_synthetic_bench.py",
+        "-nic",
+        "none",
+        "-serial",
+        "stdio",
+        "-display",
+        "none",
+        "-drive",
+        "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide",
+        "-m",
+        "256M",
+        "-smp",
+        "1"
+      ],
+      "max_memory_bytes": 67207168,
+      "measured_runs": 4,
+      "median_tok_per_s": 160.0,
+      "model": "synthetic-smoke",
+      "output_dir": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q8_0",
+      "profile": "ci-airgap-smoke",
+      "prompts": 2,
+      "quantization": "Q8_0",
+      "report": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass",
+      "warmup_runs": 2
+    }
+  ],
+  "dry_run": false,
+  "generated_at": "2026-04-27T18:29:11Z",
+  "matrix_dir": "bench/results/bench_matrix_20260427T182910Z",
+  "matrix_file": "bench/fixtures/bench_matrix_smoke.json",
+  "matrix_name": "synthetic-smoke-matrix",
+  "status": "pass"
+}

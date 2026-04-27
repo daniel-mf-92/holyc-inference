@@ -1,0 +1,28 @@
+{
+  "name": "synthetic-smoke-matrix",
+  "image": "/tmp/TempleOS.synthetic.img",
+  "prompts": "bench/prompts/smoke.jsonl",
+  "qemu_bin": "bench/fixtures/qemu_synthetic_bench.py",
+  "qemu_args": ["-m", "256M"],
+  "repeat": 2,
+  "warmup": 1,
+  "profiles": [
+    {
+      "name": "ci-airgap-smoke",
+      "qemu_args": ["-smp", "1"]
+    }
+  ],
+  "models": [
+    {
+      "name": "synthetic-smoke"
+    }
+  ],
+  "quantizations": [
+    {
+      "name": "Q4_0"
+    },
+    {
+      "name": "Q8_0"
+    }
+  ]
+}
