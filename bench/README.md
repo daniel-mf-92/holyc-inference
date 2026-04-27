@@ -96,6 +96,22 @@ python3 bench/hceval_inspect.py \
 
 ## QEMU Prompt Benchmark
 
+`prompt_audit.py` validates benchmark prompt files before a guest run. It
+checks prompt ID uniqueness, duplicate prompt text, byte/line stats, optional
+minimum prompt count and maximum prompt byte limits, then writes a stable suite
+hash so benchmark artifacts can name the exact prompt set they used.
+
+Example:
+
+```bash
+python3 bench/prompt_audit.py \
+  --prompts bench/prompts/smoke.jsonl \
+  --output bench/results/prompt_audit_smoke_latest.json \
+  --markdown bench/results/prompt_audit_smoke_latest.md \
+  --min-prompts 2 \
+  --max-prompt-bytes 1024
+```
+
 `qemu_prompt_bench.py` launches an air-gapped QEMU guest once per prompt, captures
 serial output, extracts token timing records, and writes normalized JSON to
 `bench/results/`. The runner always injects `-nic none` and rejects conflicting
