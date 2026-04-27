@@ -187,7 +187,9 @@ track peak memory alongside tok/s.
 Use `--max-suite-cv-pct` and `--max-prompt-cv-pct` to fail noisy benchmark runs
 when measured tok/s coefficient of variation exceeds a CI threshold. Gate
 findings are written into the JSON and Markdown reports as
-`variability_findings`.
+`variability_findings`. The runner also writes
+`qemu_prompt_bench_junit_latest.xml` so CI can surface failed prompt launches
+and variability gate failures directly from the benchmark job.
 
 Example:
 

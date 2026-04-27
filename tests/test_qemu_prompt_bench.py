@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -254,9 +255,13 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
     assert "| 2 | 6 | 6 | 180 | 600000 | 300.000 | 400.000 | 2000 |" in markdown
     assert "| one | 3 | 3 | 20 | 100000 | 200.000 | 200.000 | 200.000 | 1000 |" in markdown
     csv_report = (output_dir / "qemu_prompt_bench_latest.csv").read_text(encoding="utf-8")
+    junit_root = ET.parse(output_dir / "qemu_prompt_bench_junit_latest.xml").getroot()
     assert csv_report.count("\n") == 7
     assert ",one," in csv_report
     assert ",two," in csv_report
+    assert junit_root.attrib["name"] == "holyc_qemu_prompt_bench"
+    assert junit_root.attrib["tests"] == "6"
+    assert junit_root.attrib["failures"] == "0"
 
 
 def test_cli_warmup_records_separately_from_measured_runs(tmp_path: Path) -> None:
@@ -348,6 +353,53 @@ print(f"tokens=100 elapsed_us={elapsed_us}")
     assert report["variability_findings"][0]["prompt"] == "one"
     assert report["variability_findings"][0]["metric"] == "tok_per_s_cv_pct"
     assert "Variability Gate Findings" in markdown
+    junit_root = ET.parse(output_dir / "qemu_prompt_bench_junit_latest.xml").getroot()
+    assert junit_root.attrib["failures"] == "1"
+    failure = junit_root.find(".//failure")
+    assert failure is not None
+    assert failure.attrib["type"] == "benchmark_variability"
+
+
+def test_cli_junit_reports_failed_qemu_run(tmp_path: Path) -> None:
+    fake_qemu = tmp_path / "fake-qemu.py"
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    output_dir = tmp_path / "results"
+    prompts.write_text('{"prompt_id":"one","prompt":"Fail"}\n', encoding="utf-8")
+    fake_qemu.write_text(
+        """#!/usr/bin/env python3
+import sys
+print("tokens=4 elapsed_us=100000")
+print("guest failure", file=sys.stderr)
+raise SystemExit(7)
+""",
+        encoding="utf-8",
+    )
+    fake_qemu.chmod(0o755)
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--qemu-bin",
+            str(fake_qemu),
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+
+    assert status == 1
+    report = json.loads((output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8"))
+    junit_root = ET.parse(output_dir / "qemu_prompt_bench_junit_latest.xml").getroot()
+    failure = junit_root.find(".//failure")
+    assert report["status"] == "fail"
+    assert junit_root.attrib["tests"] == "1"
+    assert junit_root.attrib["failures"] == "1"
+    assert failure is not None
+    assert failure.attrib["type"] == "qemu_prompt_failure"
+    assert "returncode=7" in (failure.text or "")
 
 
 def test_cli_rejects_negative_warmup(tmp_path: Path) -> None:

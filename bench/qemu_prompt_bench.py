@@ -18,6 +18,7 @@ import statistics
 import subprocess
 import sys
 import time
+import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -695,9 +696,11 @@ def write_report(
     latest = output_dir / "qemu_prompt_bench_latest.json"
     latest_md = output_dir / "qemu_prompt_bench_latest.md"
     latest_csv = output_dir / "qemu_prompt_bench_latest.csv"
+    latest_junit = output_dir / "qemu_prompt_bench_junit_latest.xml"
     latest.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     latest_md.write_text(markdown_report(report), encoding="utf-8")
     write_csv_report(runs, latest_csv)
+    write_junit_report(runs, warmup_runs, findings, latest_junit)
     stamped = output_dir / f"qemu_prompt_bench_{report['generated_at'].replace(':', '').replace('-', '')}.json"
     stamped.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return latest
@@ -728,6 +731,89 @@ def write_csv_report(runs: list[BenchRun], path: Path) -> None:
         for run in runs:
             row = asdict(run)
             writer.writerow({field: row[field] for field in fields})
+
+
+def write_junit_report(
+    runs: list[BenchRun],
+    warmups: list[BenchRun],
+    variability_findings: list[dict[str, Any]],
+    path: Path,
+) -> None:
+    all_runs = [("warmup", run) for run in warmups] + [("measured", run) for run in runs]
+    failed_runs = [run for _, run in all_runs if run.returncode != 0 or run.timed_out]
+    failures = len(failed_runs) + len(variability_findings)
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": "holyc_qemu_prompt_bench",
+            "tests": str(len(all_runs) + len(variability_findings)),
+            "failures": str(failures),
+            "errors": "0",
+        },
+    )
+
+    for phase, run in all_runs:
+        case = ET.SubElement(
+            suite,
+            "testcase",
+            {
+                "classname": f"qemu_prompt_bench.{phase}",
+                "name": f"{run.profile}:{run.model}:{run.quantization}:{run.prompt}:{run.iteration}",
+            },
+        )
+        if run.returncode != 0 or run.timed_out:
+            message = f"returncode={run.returncode} timed_out={run.timed_out}"
+            failure = ET.SubElement(
+                case,
+                "failure",
+                {
+                    "type": "qemu_prompt_failure",
+                    "message": message,
+                },
+            )
+            failure.text = (
+                f"phase={phase}\n"
+                f"prompt={run.prompt}\n"
+                f"iteration={run.iteration}\n"
+                f"returncode={run.returncode}\n"
+                f"timed_out={run.timed_out}\n"
+                f"tokens={format_summary_value(run.tokens)}\n"
+                f"elapsed_us={run.elapsed_us}\n"
+                f"tok_per_s={format_summary_value(run.tok_per_s)}\n"
+                f"stdout_tail={run.stdout_tail}\n"
+                f"stderr_tail={run.stderr_tail}\n"
+            )
+
+    for index, finding in enumerate(variability_findings, 1):
+        scope = str(finding.get("scope", "unknown"))
+        prompt = str(finding.get("prompt") or "suite")
+        metric = str(finding.get("metric", "unknown"))
+        case = ET.SubElement(
+            suite,
+            "testcase",
+            {
+                "classname": "qemu_prompt_bench.variability",
+                "name": f"{scope}:{prompt}:{metric}:{index}",
+            },
+        )
+        message = (
+            f"{metric}={format_summary_value(finding.get('value'))} "
+            f"limit={format_summary_value(finding.get('limit'))}"
+        )
+        failure = ET.SubElement(
+            case,
+            "failure",
+            {
+                "type": "benchmark_variability",
+                "message": message,
+            },
+        )
+        failure.text = "\n".join(f"{key}={format_summary_value(value)}" for key, value in sorted(finding.items()))
+
+    ET.indent(suite)
+    ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
+    with path.open("ab") as handle:
+        handle.write(b"\n")
 
 
 def build_parser() -> argparse.ArgumentParser:

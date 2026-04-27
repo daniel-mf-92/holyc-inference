@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-27T23:07:52Z",
+  "generated_at": "2026-04-27T23:20:32Z",
   "history": [
     {
       "artifact_type": "qemu_prompt",
@@ -383,7 +383,7 @@
       "artifact_type": "qemu_prompt",
       "bytes": 7179,
       "command_airgap_status": "pass",
-      "generated_at": "2026-04-27T22:19:51Z",
+      "generated_at": "2026-04-27T23:19:04Z",
       "key": "synthetic-airgap-smoke/synthetic-smoke/Q4_0/68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "max_memory_bytes": 67207168,
       "measured_runs": 6,
@@ -392,7 +392,25 @@
       "profile": "synthetic-airgap-smoke",
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "quantization": "Q4_0",
-      "sha256": "0e2406a9bb88ba1a10473ba873cb7bfab569fd3e9d6afec0af2a5cd0875a7824",
+      "sha256": "b926982911873580d956553c90e26ab75cb615c215eec5addea9e0e0a57b9866",
+      "source": "bench/results/qemu_prompt_bench_20260427T231904Z.json",
+      "status": "pass",
+      "warmup_runs": 0
+    },
+    {
+      "artifact_type": "qemu_prompt",
+      "bytes": 7179,
+      "command_airgap_status": "pass",
+      "generated_at": "2026-04-27T23:19:04Z",
+      "key": "synthetic-airgap-smoke/synthetic-smoke/Q4_0/68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "max_memory_bytes": 67207168,
+      "measured_runs": 6,
+      "median_tok_per_s": 160.0,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "sha256": "b926982911873580d956553c90e26ab75cb615c215eec5addea9e0e0a57b9866",
       "source": "bench/results/qemu_prompt_bench_latest.json",
       "status": "pass",
       "warmup_runs": 0
@@ -506,7 +524,7 @@
       "warmup_runs": 0
     }
   ],
-  "history_artifacts": 28,
+  "history_artifacts": 29,
   "latest_artifacts": [
     {
       "artifact_type": "bench_matrix_cell",
@@ -584,7 +602,7 @@
       "artifact_type": "qemu_prompt",
       "bytes": 7179,
       "command_airgap_status": "pass",
-      "generated_at": "2026-04-27T22:19:51Z",
+      "generated_at": "2026-04-27T23:19:04Z",
       "key": "synthetic-airgap-smoke/synthetic-smoke/Q4_0/68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "max_memory_bytes": 67207168,
       "measured_runs": 6,
@@ -593,7 +611,7 @@
       "profile": "synthetic-airgap-smoke",
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "quantization": "Q4_0",
-      "sha256": "0e2406a9bb88ba1a10473ba873cb7bfab569fd3e9d6afec0af2a5cd0875a7824",
+      "sha256": "b926982911873580d956553c90e26ab75cb615c215eec5addea9e0e0a57b9866",
       "source": "bench/results/qemu_prompt_bench_latest.json",
       "status": "pass",
       "warmup_runs": 0
