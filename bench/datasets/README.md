@@ -27,9 +27,14 @@ python3 bench/dataset_curate.py \
   --source-version synthetic \
   --source-license synthetic-smoke \
   --max-records 3 \
+  --balance-answer-index \
   --pack-output bench/results/datasets/smoke_curated.hceval \
   --pack-manifest bench/results/datasets/smoke_curated.hceval.manifest.json
 ```
+
+Add `--balance-answer-index` when capping a larger local source to round-robin
+the deterministic sample across answer labels. The manifest records the flag and
+the resulting answer histogram for downstream eval reproducibility checks.
 
 ## Binary Format
 

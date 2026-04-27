@@ -56,9 +56,15 @@ python3 bench/dataset_curate.py \
   --source-version synthetic \
   --source-license synthetic-smoke \
   --max-records 3 \
+  --balance-answer-index \
   --pack-output bench/results/datasets/smoke_curated.hceval \
   --pack-manifest bench/results/datasets/smoke_curated.hceval.manifest.json
 ```
+
+When `--max-records` trims a larger local source, `--balance-answer-index`
+round-robins through answer labels before applying the final stable output sort.
+This keeps compact multiple-choice subsets from accidentally overrepresenting a
+single answer index.
 
 `dataset_pack.py` converts local JSONL multiple-choice evaluation rows into a
 deterministic HolyC-loadable binary plus a provenance manifest. It accepts a

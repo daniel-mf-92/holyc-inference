@@ -92,11 +92,42 @@ def select_records(
     records: list[dataset_pack.EvalRecord],
     max_records: int | None,
     seed: str,
+    balance_answer_index: bool,
 ) -> list[dataset_pack.EvalRecord]:
     selected = list(records)
     if max_records is not None and max_records < len(selected):
-        selected = sorted(selected, key=lambda record: stable_sample_key(record, seed))[:max_records]
+        if balance_answer_index:
+            selected = select_balanced_by_answer_index(selected, max_records, seed)
+        else:
+            selected = sorted(selected, key=lambda record: stable_sample_key(record, seed))[:max_records]
     return sorted(selected, key=lambda record: (record.dataset, record.split, record.record_id))
+
+
+def select_balanced_by_answer_index(
+    records: list[dataset_pack.EvalRecord],
+    max_records: int,
+    seed: str,
+) -> list[dataset_pack.EvalRecord]:
+    groups: dict[int, list[dataset_pack.EvalRecord]] = {}
+    for record in records:
+        groups.setdefault(record.answer_index, []).append(record)
+    for answer_index, group in groups.items():
+        groups[answer_index] = sorted(group, key=lambda record: stable_sample_key(record, seed))
+
+    selected: list[dataset_pack.EvalRecord] = []
+    while len(selected) < max_records:
+        added = False
+        for answer_index in sorted(groups):
+            group = groups[answer_index]
+            if not group:
+                continue
+            selected.append(group.pop(0))
+            added = True
+            if len(selected) == max_records:
+                break
+        if not added:
+            break
+    return selected
 
 
 def write_jsonl(records: list[dataset_pack.EvalRecord], output: Path) -> None:
@@ -120,6 +151,7 @@ def build_manifest(
         "filters": {
             "include_dataset": sorted(args.include_dataset),
             "include_split": sorted(args.include_split),
+            "balance_answer_index": args.balance_answer_index,
             "max_records": args.max_records,
             "require_provenance": args.require_provenance,
             "seed": args.seed,
@@ -155,6 +187,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--include-split", action="append", default=[], help="Keep only this split; repeatable")
     parser.add_argument("--max-records", type=int, help="Deterministically sample at most this many records")
     parser.add_argument("--seed", default="holyc-eval-v1", help="Stable sampling seed")
+    parser.add_argument(
+        "--balance-answer-index",
+        action="store_true",
+        help="When sampling, round-robin by answer index to reduce label skew",
+    )
     parser.add_argument("--require-provenance", action="store_true", help="Drop rows without provenance")
     parser.add_argument("--source-name", required=True, help="Original dataset or collection name")
     parser.add_argument("--source-version", default="", help="Original dataset version or release")
@@ -186,7 +223,7 @@ def main(argv: list[str] | None = None) -> int:
             args.require_provenance,
         )
         reject_duplicate_ids(filtered)
-        selected = select_records(filtered, args.max_records, args.seed)
+        selected = select_records(filtered, args.max_records, args.seed, args.balance_answer_index)
         if not selected:
             raise ValueError("no records selected after filters")
 
