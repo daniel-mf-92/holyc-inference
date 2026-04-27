@@ -64,8 +64,12 @@ def test_q4_0_block_audit_reports_signed_nibble_range(tmp_path: Path) -> None:
     audit = quant_audit.audit_q4_0_blocks(block_file, allow_inf_nan_scale=False)
     assert audit.findings == []
     assert audit.block_count == 1
+    assert audit.element_capacity == 32
     assert audit.quant_min == -8
     assert audit.quant_max == 7
+    assert audit.quant_histogram["-8"] == 1
+    assert audit.quant_histogram["0"] == 30
+    assert audit.quant_histogram["7"] == 1
     assert audit.scale_normal_count == 1
 
 
@@ -81,13 +85,34 @@ def test_q8_0_block_audit_checks_size_and_inf_scale(tmp_path: Path) -> None:
     assert "inf/nan" in audit.findings[1]
 
 
+def test_block_audit_checks_expected_shape(tmp_path: Path) -> None:
+    block_file = tmp_path / "q4.bin"
+    block_file.write_bytes(half_bits(1.0) + bytes([0x88] * 16))
+
+    audit = quant_audit.audit_q4_0_blocks(
+        block_file,
+        allow_inf_nan_scale=False,
+        expect_blocks=2,
+        expect_elements=33,
+    )
+
+    assert audit.element_capacity == 32
+    assert "expected 2 blocks, found 1" in audit.findings
+    assert "expected 33 elements to occupy 2 blocks, found 1" in audit.findings
+    assert "expected 33 elements exceeds block capacity 32" in audit.findings
+
+
 def test_cli_writes_pass_report(tmp_path: Path) -> None:
     source = tmp_path / "ok.HC"
     output = tmp_path / "report.json"
+    markdown = tmp_path / "report.md"
     source.write_text("I64 Good(U16 d_fp16) { return d_fp16; }\n", encoding="utf-8")
 
-    status = quant_audit.main(["--source-root", str(source), "--output", str(output)])
+    status = quant_audit.main(
+        ["--source-root", str(source), "--output", str(output), "--markdown", str(markdown)]
+    )
 
     assert status == 0
     text = output.read_text(encoding="utf-8")
     assert '"status": "pass"' in text
+    assert "Quantization Audit" in markdown.read_text(encoding="utf-8")

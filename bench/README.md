@@ -10,19 +10,23 @@ TempleOS air-gapped; any QEMU command added under this tree must pass `-nic none
 
 - HolyC quantization sources do not contain runtime float types, float literals, or
   common float math helper calls after comments and strings are stripped.
-- Raw Q4_0/Q8_0 block streams have valid block sizes and finite fp16 scales.
+- Raw Q4_0/Q8_0 block streams have valid block sizes, optional expected
+  block/element counts, finite fp16 scales, quant ranges, and quant histograms.
 
 Example:
 
 ```bash
-python3 bench/quant_audit.py --source-root src/quant --output bench/results/quant_audit_latest.json
+python3 bench/quant_audit.py \
+  --source-root src/quant \
+  --output bench/results/quant_audit_latest.json \
+  --markdown bench/results/quant_audit_latest.md
 ```
 
 Raw block streams can be checked with:
 
 ```bash
-python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin
-python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin
+python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin --expect-elements 4096
+python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --expect-blocks 128
 ```
 
 ## Offline Eval Dataset Packer
