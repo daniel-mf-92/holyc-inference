@@ -1,0 +1,96 @@
+{
+  "artifacts": [
+    {
+      "answer_histogram": {
+        "0": 3
+      },
+      "artifact_type": "curated_manifest",
+      "binary_sha256": "",
+      "dataset": "arc-smoke,hellaswag-smoke,truthfulqa-smoke",
+      "findings": [],
+      "license": "synthetic-smoke",
+      "output": "bench/results/datasets/smoke_curated.jsonl",
+      "record_count": 3,
+      "source": "bench/results/datasets/smoke_curated.manifest.json",
+      "source_name": "smoke-eval",
+      "source_sha256": "a1389d4ed5197eb9db0bd39b60137dc3750e2ba9a9c1a151d836e9f0a28094f3",
+      "source_version": "synthetic",
+      "split": "validation",
+      "status": "pass"
+    },
+    {
+      "answer_histogram": {
+        "0": 3
+      },
+      "artifact_type": "inspect_report",
+      "binary_sha256": "7673822187499c96fc823bf5ab164e118a99b0d796c7460f47060b426af5aac4",
+      "dataset": "smoke-eval",
+      "findings": [],
+      "license": "",
+      "output": "bench/results/datasets/smoke_curated.hceval",
+      "record_count": 3,
+      "source": "bench/results/datasets/smoke_curated.inspect.json",
+      "source_name": "smoke-eval",
+      "source_sha256": "a1389d4ed5197eb9db0bd39b60137dc3750e2ba9a9c1a151d836e9f0a28094f3",
+      "source_version": "",
+      "split": "validation",
+      "status": "pass"
+    },
+    {
+      "answer_histogram": {
+        "0": 3
+      },
+      "artifact_type": "inspect_report",
+      "binary_sha256": "5d961b26360f3181caa5d0e05a4ba49fbb99ad53aa0b07bd56c742034d4f782f",
+      "dataset": "smoke-eval",
+      "findings": [],
+      "license": "",
+      "output": "bench/results/datasets/smoke_eval.hceval",
+      "record_count": 3,
+      "source": "bench/results/datasets/smoke_eval.inspect.json",
+      "source_name": "smoke-eval",
+      "source_sha256": "454a4036ea4020c0c8a1ee3485ccfe07a53483dfbeb0600d78684b874ad56003",
+      "source_version": "",
+      "split": "validation",
+      "status": "pass"
+    },
+    {
+      "answer_histogram": {
+        "0": 3
+      },
+      "artifact_type": "pack_manifest",
+      "binary_sha256": "7673822187499c96fc823bf5ab164e118a99b0d796c7460f47060b426af5aac4",
+      "dataset": "smoke-eval",
+      "findings": [],
+      "license": "",
+      "output": "bench/results/datasets/smoke_curated.hceval",
+      "record_count": 3,
+      "source": "bench/results/datasets/smoke_curated.hceval.manifest.json",
+      "source_name": "smoke-eval",
+      "source_sha256": "a1389d4ed5197eb9db0bd39b60137dc3750e2ba9a9c1a151d836e9f0a28094f3",
+      "source_version": "",
+      "split": "validation",
+      "status": "pass"
+    },
+    {
+      "answer_histogram": {
+        "0": 3
+      },
+      "artifact_type": "pack_manifest",
+      "binary_sha256": "5d961b26360f3181caa5d0e05a4ba49fbb99ad53aa0b07bd56c742034d4f782f",
+      "dataset": "smoke-eval",
+      "findings": [],
+      "license": "",
+      "output": "bench/results/datasets/smoke_eval.hceval",
+      "record_count": 3,
+      "source": "bench/results/datasets/smoke_eval.manifest.json",
+      "source_name": "smoke-eval",
+      "source_sha256": "454a4036ea4020c0c8a1ee3485ccfe07a53483dfbeb0600d78684b874ad56003",
+      "source_version": "",
+      "split": "validation",
+      "status": "pass"
+    }
+  ],
+  "generated_at": "2026-04-27T20:50:58Z",
+  "status": "pass"
+}

@@ -94,6 +94,17 @@ python3 bench/hceval_inspect.py \
   --markdown bench/results/datasets/smoke_eval.inspect.md
 ```
 
+`dataset_index.py` scans curated manifests, packed `.hceval` manifests, and
+inspection reports, verifies local hashes/provenance fields where possible, and
+writes JSON/Markdown/CSV rollups:
+
+```bash
+python3 bench/dataset_index.py \
+  --input bench/results/datasets \
+  --output-dir bench/results/datasets \
+  --fail-on-findings
+```
+
 ## QEMU Prompt Benchmark
 
 `prompt_audit.py` validates benchmark prompt files before a guest run. It

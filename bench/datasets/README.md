@@ -71,6 +71,18 @@ python3 bench/hceval_inspect.py \
   --markdown bench/results/datasets/smoke_eval.inspect.md
 ```
 
+## Artifact Index
+
+Summarize curated JSONL manifests, packed binary manifests, and inspection
+reports into one local provenance/hash rollup:
+
+```bash
+python3 bench/dataset_index.py \
+  --input bench/results/datasets \
+  --output-dir bench/results/datasets \
+  --fail-on-findings
+```
+
 ## Provenance
 
 The committed sample is synthetic and hand-written for packer validation only. For
