@@ -42011,9 +42011,9 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
     canonical_drift_count = 0;
     canonical_snapshot_digest_q64 = 0;
 
-    // IQ-1773 zero-write diagnostics companion:
-    // - derive staged tuple through IQ-1772 commit-only hardening wrapper;
-    // - derive canonical tuple through IQ-1771 strict diagnostics parity gate;
+    // IQ-1783 zero-write diagnostics companion:
+    // - derive staged tuple through IQ-1782 commit-only hardening wrapper;
+    // - derive canonical tuple through IQ-1781 strict diagnostics parity gate;
     // - enforce immutable batch snapshot + status-domain + strict tuple parity;
     // - preserve caller output slots (no-write diagnostics semantics).
     status_companion = GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnlyPreflightOnlyParityCommitOnly(

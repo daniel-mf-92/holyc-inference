@@ -1,0 +1,10 @@
+{
+  "block_audits": [],
+  "generated_at": "2026-04-27T13:23:13+00:00",
+  "source_audit": {
+    "files_scanned": 8,
+    "findings": []
+  },
+  "source_root": "src/quant",
+  "status": "pass"
+}
