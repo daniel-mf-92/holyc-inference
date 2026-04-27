@@ -456,14 +456,15 @@ python3 bench/perf_regression.py \
 `airgap_audit.py` scans benchmark artifacts, including benchmark-matrix cells,
 for recorded QEMU commands and fails if any QEMU-like command is missing
 `-nic none` or includes networking flags/devices. It writes JSON, and can also
-emit Markdown and CSV reports for CI artifacts:
+emit Markdown, CSV, and JUnit XML reports for CI artifacts:
 
 ```bash
 python3 bench/airgap_audit.py \
   --input bench/results \
   --output bench/results/airgap_audit_latest.json \
   --markdown bench/results/airgap_audit_latest.md \
-  --csv bench/results/airgap_audit_latest.csv
+  --csv bench/results/airgap_audit_latest.csv \
+  --junit bench/results/airgap_audit_junit_latest.xml
 ```
 
 The `bench-perf-regression` GitHub Actions workflow runs a stdlib-only smoke

@@ -14,6 +14,7 @@ import csv
 import json
 import shlex
 import sys
+import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -248,6 +249,79 @@ def write_csv(findings: list[Finding], path: Path) -> None:
             )
 
 
+def write_junit(report: dict[str, Any], path: Path) -> None:
+    findings_by_command: dict[tuple[str, int, tuple[str, ...]], list[str]] = {}
+    for finding in report["findings"]:
+        key = (finding["source"], finding["row"], tuple(finding["command"]))
+        findings_by_command.setdefault(key, []).append(finding["reason"])
+
+    passing_commands = max(0, int(report["commands_checked"]) - len(findings_by_command))
+    testcase_count = len(findings_by_command) + (1 if passing_commands else 0)
+    if testcase_count == 0:
+        testcase_count = 1
+
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": "holyc_benchmark_airgap_audit",
+            "tests": str(testcase_count),
+            "failures": str(len(findings_by_command)),
+            "errors": "0",
+        },
+    )
+
+    if passing_commands:
+        ET.SubElement(
+            suite,
+            "testcase",
+            {
+                "classname": "airgap_audit.commands",
+                "name": f"air_gapped_qemu_commands:{passing_commands}",
+            },
+        )
+    elif not findings_by_command:
+        ET.SubElement(
+            suite,
+            "testcase",
+            {
+                "classname": "airgap_audit.commands",
+                "name": "no_qemu_commands_checked",
+            },
+        )
+
+    for index, ((source, row, command), reasons) in enumerate(sorted(findings_by_command.items()), 1):
+        case = ET.SubElement(
+            suite,
+            "testcase",
+            {
+                "classname": "airgap_audit.commands",
+                "name": f"{Path(source).name}:{row}:{index}",
+            },
+        )
+        failure = ET.SubElement(
+            case,
+            "failure",
+            {
+                "type": "benchmark_airgap_violation",
+                "message": "; ".join(reasons),
+            },
+        )
+        failure.text = "\n".join(
+            [
+                f"source={source}",
+                f"row={row}",
+                f"command={shlex.join(list(command))}",
+                "reasons:",
+                *[f"- {reason}" for reason in reasons],
+            ]
+        )
+
+    ET.indent(suite)
+    ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
+    with path.open("ab") as handle:
+        handle.write(b"\n")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -260,6 +334,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, default=Path("bench/results/airgap_audit_latest.json"))
     parser.add_argument("--markdown", type=Path, help="Optional Markdown audit report path")
     parser.add_argument("--csv", type=Path, help="Optional CSV findings report path")
+    parser.add_argument("--junit", type=Path, help="Optional JUnit XML audit report path")
     return parser
 
 
@@ -282,11 +357,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.csv:
         args.csv.parent.mkdir(parents=True, exist_ok=True)
         write_csv(findings, args.csv)
+    if args.junit:
+        args.junit.parent.mkdir(parents=True, exist_ok=True)
+        write_junit(report, args.junit)
     print(f"wrote_json={args.output}")
     if args.markdown:
         print(f"wrote_markdown={args.markdown}")
     if args.csv:
         print(f"wrote_csv={args.csv}")
+    if args.junit:
+        print(f"wrote_junit={args.junit}")
     print(f"status={report['status']}")
     print(f"commands_checked={commands_checked}")
     if findings:

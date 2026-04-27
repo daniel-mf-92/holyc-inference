@@ -79,6 +79,7 @@ def main() -> int:
         audit_output = tmp_path / "airgap_audit.json"
         audit_markdown = tmp_path / "airgap_audit.md"
         audit_csv = tmp_path / "airgap_audit.csv"
+        audit_junit = tmp_path / "airgap_audit.xml"
         audit_command = [
             sys.executable,
             str(ROOT / "bench" / "airgap_audit.py"),
@@ -90,6 +91,8 @@ def main() -> int:
             str(audit_markdown),
             "--csv",
             str(audit_csv),
+            "--junit",
+            str(audit_junit),
         ]
         completed = subprocess.run(
             audit_command,
@@ -115,6 +118,13 @@ def main() -> int:
             return 1
         if "source,row,reason,command" not in audit_csv.read_text(encoding="utf-8"):
             print("missing_airgap_csv=true", file=sys.stderr)
+            return 1
+        audit_junit_root = ET.parse(audit_junit).getroot()
+        if audit_junit_root.attrib.get("name") != "holyc_benchmark_airgap_audit":
+            print("missing_airgap_junit_suite=true", file=sys.stderr)
+            return 1
+        if audit_junit_root.attrib.get("failures") != "0":
+            print("unexpected_airgap_junit_failures=true", file=sys.stderr)
             return 1
 
         unsafe_fixture = tmp_path / "unsafe_qemu.json"

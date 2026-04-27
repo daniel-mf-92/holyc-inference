@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -93,7 +94,7 @@ def test_audit_checks_bench_matrix_cell_commands(tmp_path: Path) -> None:
     assert any("network backend" in finding.reason for finding in findings)
 
 
-def test_cli_writes_markdown_and_csv_reports(tmp_path: Path) -> None:
+def test_cli_writes_markdown_csv_and_junit_reports(tmp_path: Path) -> None:
     report = tmp_path / "qemu_prompt_bench_latest.json"
     report.write_text(
         json.dumps(
@@ -114,6 +115,7 @@ def test_cli_writes_markdown_and_csv_reports(tmp_path: Path) -> None:
     output = tmp_path / "airgap.json"
     markdown = tmp_path / "airgap.md"
     csv_report = tmp_path / "airgap.csv"
+    junit = tmp_path / "airgap.xml"
 
     status = airgap_audit.main(
         [
@@ -125,6 +127,8 @@ def test_cli_writes_markdown_and_csv_reports(tmp_path: Path) -> None:
             str(markdown),
             "--csv",
             str(csv_report),
+            "--junit",
+            str(junit),
         ]
     )
 
@@ -133,3 +137,10 @@ def test_cli_writes_markdown_and_csv_reports(tmp_path: Path) -> None:
     assert payload["status"] == "fail"
     assert "Benchmark Air-Gap Audit" in markdown.read_text(encoding="utf-8")
     assert "missing explicit `-nic none`" in csv_report.read_text(encoding="utf-8")
+    junit_root = ET.parse(junit).getroot()
+    assert junit_root.attrib["name"] == "holyc_benchmark_airgap_audit"
+    assert junit_root.attrib["tests"] == "1"
+    assert junit_root.attrib["failures"] == "1"
+    failure = junit_root.find("./testcase/failure")
+    assert failure is not None
+    assert "missing explicit `-nic none`" in (failure.text or "")

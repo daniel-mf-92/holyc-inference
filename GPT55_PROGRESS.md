@@ -56,3 +56,4 @@
 2026-04-27T23:33:06Z | Added QEMU benchmark host provenance to JSON/Markdown reports with refreshed air-gapped smoke artifacts.
 2026-04-27T23:41:55Z | Added QEMU prompt byte telemetry to dry-run metadata, measured reports, CSV/Markdown outputs, and refreshed smoke artifacts.
 2026-04-27T23:47:43Z | Added JUnit XML export for benchmark matrix cells with smoke coverage and refreshed matrix artifacts.
+2026-04-27T23:56:01Z | Added JUnit XML export for benchmark air-gap audits with smoke coverage and refreshed audit artifacts.
