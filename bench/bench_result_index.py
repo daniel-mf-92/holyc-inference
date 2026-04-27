@@ -321,7 +321,24 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
             writer.writerow({field: row[field] for field in fields})
 
 
-def write_report(summaries: list[ArtifactSummary], output_dir: Path) -> Path:
+def write_drift_csv(findings: list[PromptSuiteDrift], path: Path) -> None:
+    fields = ["key", "hash_count", "source_count", "hashes", "sources"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for finding in findings:
+            writer.writerow(
+                {
+                    "key": finding.key,
+                    "hash_count": len(finding.hashes),
+                    "source_count": len(finding.sources),
+                    "hashes": json.dumps(finding.hashes, separators=(",", ":")),
+                    "sources": json.dumps(finding.sources, separators=(",", ":")),
+                }
+            )
+
+
+def write_report(summaries: list[ArtifactSummary], output_dir: Path) -> tuple[Path, list[PromptSuiteDrift]]:
     output_dir.mkdir(parents=True, exist_ok=True)
     drift = prompt_suite_drift(summaries)
     report = {
@@ -333,10 +350,12 @@ def write_report(summaries: list[ArtifactSummary], output_dir: Path) -> Path:
     json_path = output_dir / "bench_result_index_latest.json"
     md_path = output_dir / "bench_result_index_latest.md"
     csv_path = output_dir / "bench_result_index_latest.csv"
+    drift_csv_path = output_dir / "bench_result_index_prompt_suite_drift_latest.csv"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
     write_csv(summaries, csv_path)
-    return json_path
+    write_drift_csv(drift, drift_csv_path)
+    return json_path, drift
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -354,6 +373,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Return non-zero if any indexed command violates air-gap policy",
     )
+    parser.add_argument(
+        "--fail-on-drift",
+        action="store_true",
+        help="Return non-zero if comparable artifacts use different prompt-suite hashes",
+    )
     return parser
 
 
@@ -362,7 +386,7 @@ def main(argv: list[str] | None = None) -> int:
     inputs = args.input or [Path("bench/results")]
     try:
         summaries = load_summaries(inputs)
-        output = write_report(summaries, args.output_dir)
+        output, drift = write_report(summaries, args.output_dir)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -371,7 +395,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"wrote_json={output}")
     print(f"status={status}")
     print(f"artifacts={len(summaries)}")
+    print(f"prompt_suite_drift={len(drift)}")
     if args.fail_on_airgap and status == "fail":
+        return 1
+    if args.fail_on_drift and drift:
         return 1
     return 0
 

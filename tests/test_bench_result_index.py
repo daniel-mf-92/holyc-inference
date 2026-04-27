@@ -181,3 +181,50 @@ def test_cli_writes_json_markdown_and_csv(tmp_path: Path) -> None:
     assert "Benchmark Result Index" in markdown
     assert "Prompt suite drift: none detected." in markdown
     assert rows[0]["command_airgap_status"] == "pass"
+
+
+def test_cli_writes_drift_csv_and_can_fail_on_drift(tmp_path: Path) -> None:
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    input_dir.mkdir()
+    for index, suite_hash in enumerate(("a" * 64, "b" * 64), 1):
+        report_dir = input_dir / f"run{index}"
+        report_dir.mkdir()
+        (report_dir / "qemu_prompt_bench_latest.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": f"2026-04-27T20:1{index}:00Z",
+                    "status": "pass",
+                    "prompt_suite": {"suite_sha256": suite_hash, "prompt_count": 1},
+                    "suite_summary": {"tok_per_s_median": 160.0},
+                    "benchmarks": [
+                        {
+                            "profile": "synthetic",
+                            "model": "smoke",
+                            "quantization": "Q4_0",
+                            "command": [
+                                "qemu-system-x86_64",
+                                "-nic",
+                                "none",
+                                "-drive",
+                                "file=TempleOS.img,format=raw,if=ide",
+                            ],
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    status = bench_result_index.main(
+        ["--input", str(input_dir), "--output-dir", str(output_dir), "--fail-on-drift"]
+    )
+
+    assert status == 1
+    rows = list(
+        csv.DictReader(
+            (output_dir / "bench_result_index_prompt_suite_drift_latest.csv").open(encoding="utf-8")
+        )
+    )
+    assert rows[0]["key"] == "synthetic/smoke/Q4_0"
+    assert rows[0]["hash_count"] == "2"

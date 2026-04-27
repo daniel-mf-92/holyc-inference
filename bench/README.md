@@ -219,7 +219,9 @@ JSON/Markdown/CSV index, and checks each recorded QEMU command for explicit
 `-nic none` air-gap compliance. It also reports prompt-suite drift when
 comparable profile/model/quantization artifacts carry different non-empty suite
 hashes, which catches accidental prompt changes before throughput numbers are
-compared. It never launches QEMU.
+compared. The drift findings are also written to
+`bench_result_index_prompt_suite_drift_latest.csv` for CI upload or spreadsheet
+review. It never launches QEMU.
 
 Example:
 
@@ -227,7 +229,8 @@ Example:
 python3 bench/bench_result_index.py \
   --input bench/results \
   --output-dir bench/results \
-  --fail-on-airgap
+  --fail-on-airgap \
+  --fail-on-drift
 ```
 
 ## Perf Regression Dashboard
