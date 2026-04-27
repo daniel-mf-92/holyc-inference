@@ -40702,7 +40702,7 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
     parity_drift_count = 0;
     parity_snapshot_digest_q64 = 0;
 
-    // IQ-1760 commit-only hardening wrapper:
+    // IQ-1780 commit-only hardening wrapper:
     // - seed staged tuple through IQ-1757 commit-only wrapper;
     // - verify staged tuple is preserved by IQ-1759 strict diagnostics parity gate;
     // - replay parity tuple through IQ-1758 zero-write diagnostics companion;
@@ -42219,10 +42219,10 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
     parity_drift_count = 0;
     parity_snapshot_digest_q64 = 0;
 
-    // IQ-1775 commit-only hardening wrapper:
-    // - seed staged tuple through IQ-1773 zero-write diagnostics companion;
-    // - verify staged tuple is preserved by IQ-1774 strict diagnostics parity gate;
-    // - replay parity tuple through IQ-1773 zero-write diagnostics companion;
+    // IQ-1780 commit-only hardening wrapper:
+    // - seed staged tuple through IQ-1778 zero-write diagnostics companion;
+    // - verify staged tuple is preserved by IQ-1779 strict diagnostics parity gate;
+    // - replay parity tuple through IQ-1778 zero-write diagnostics companion;
     // - require immutable batch snapshot + status-domain validity + strict tuple parity;
     // - atomically publish {ok_count, blocked_count, drift_count, snapshot_digest_q64}
     //   only when strict tuple parity holds.
