@@ -100,6 +100,91 @@ def bot_emit_model(
     return SAMPLING_Q16_OK
 
 
+def bot_emit_commit_only_model(
+    *,
+    event_buffer: list[int] | None,
+    event_buffer_capacity: int,
+    session_id: int,
+    step_index: int,
+    token_id: int,
+    logit_q16: int,
+    policy_digest_q64: int,
+    expected_policy_digest_q64: int,
+    profile_mode: int,
+    out_event_status: list[int] | None,
+    out_event_count: list[int] | None,
+    out_event_digest_q64: list[int] | None,
+) -> int:
+    if event_buffer is None or out_event_status is None or out_event_count is None or out_event_digest_q64 is None:
+        return SAMPLING_Q16_ERR_NULL_PTR
+
+    if out_event_status is out_event_count or out_event_status is out_event_digest_q64 or out_event_count is out_event_digest_q64:
+        return SAMPLING_Q16_ERR_BAD_PARAM
+
+    if event_buffer_capacity < INFERENCE_BOT_EVENT_TUPLE_CELLS:
+        return SAMPLING_Q16_ERR_BAD_PARAM
+
+    primary_event = [0] * INFERENCE_BOT_EVENT_TUPLE_CELLS
+    primary_status = [0]
+    primary_count = [0]
+    primary_digest = [0]
+    replay_event = [0] * INFERENCE_BOT_EVENT_TUPLE_CELLS
+    replay_status = [0]
+    replay_count = [0]
+    replay_digest = [0]
+
+    status_primary = bot_emit_model(
+        event_buffer=primary_event,
+        event_buffer_capacity=INFERENCE_BOT_EVENT_TUPLE_CELLS,
+        session_id=session_id,
+        step_index=step_index,
+        token_id=token_id,
+        logit_q16=logit_q16,
+        policy_digest_q64=policy_digest_q64,
+        expected_policy_digest_q64=expected_policy_digest_q64,
+        profile_mode=profile_mode,
+        out_event_status=primary_status,
+        out_event_count=primary_count,
+        out_event_digest_q64=primary_digest,
+    )
+    if status_primary != SAMPLING_Q16_OK:
+        return status_primary
+
+    status_replay = bot_emit_model(
+        event_buffer=replay_event,
+        event_buffer_capacity=INFERENCE_BOT_EVENT_TUPLE_CELLS,
+        session_id=session_id,
+        step_index=step_index,
+        token_id=token_id,
+        logit_q16=logit_q16,
+        policy_digest_q64=policy_digest_q64,
+        expected_policy_digest_q64=expected_policy_digest_q64,
+        profile_mode=profile_mode,
+        out_event_status=replay_status,
+        out_event_count=replay_count,
+        out_event_digest_q64=replay_digest,
+    )
+    if status_replay != SAMPLING_Q16_OK:
+        return status_replay
+
+    if (
+        primary_status[0] != replay_status[0]
+        or primary_count[0] != replay_count[0]
+        or primary_digest[0] != replay_digest[0]
+        or primary_event != replay_event
+    ):
+        return SAMPLING_Q16_ERR_BAD_PARAM
+
+    if primary_status[0] == INFERENCE_BOT_STATUS_EMITTED:
+        for lane in range(INFERENCE_BOT_EVENT_TUPLE_CELLS):
+            event_buffer[lane] = primary_event[lane]
+
+    out_event_status[0] = primary_status[0]
+    out_event_count[0] = primary_count[0]
+    out_event_digest_q64[0] = primary_digest[0]
+    return SAMPLING_Q16_OK
+
+
 def _extract_body(source: str, signature: str) -> str:
     start = source.index(signature)
     brace = source.index("{", start)
@@ -125,6 +210,18 @@ def test_source_contains_iq_1791_contract() -> None:
     assert "staged_event_status = INFERENCE_BOT_STATUS_BLOCKED;" in body
     assert "if (snapshot_event_buffer != event_buffer ||" in body
     assert "*out_event_digest_q64 = staged_event_digest_q64;" in body
+
+
+def test_source_contains_iq_1792_contract() -> None:
+    source = Path("src/model/inference.HC").read_text(encoding="utf-8")
+    assert "#define InferenceBookOfTruthTokenEventEmitCheckedCommitOnly BotTokenEmitCommitOnly" in source
+    signature = "I32 BotTokenEmitCommitOnly("
+    assert signature in source
+    body = _extract_body(source, signature)
+    assert "status_primary = InferenceBookOfTruthTokenEventEmitChecked(" in body
+    assert "status_replay = InferenceBookOfTruthTokenEventEmitChecked(" in body
+    assert "if (staged_event_status_primary != staged_event_status_replay ||" in body
+    assert "*out_event_digest_q64 = staged_event_digest_primary;" in body
 
 
 def test_secure_local_success_emits_event() -> None:
@@ -178,6 +275,61 @@ def test_digest_mismatch_blocks_and_preserves_event_buffer() -> None:
 
     assert status == SAMPLING_Q16_OK
     assert event_buffer == [8, 7, 6, 5, 4, 3]
+    assert out_status == [INFERENCE_BOT_STATUS_BLOCKED]
+    assert out_count == [0]
+
+
+def test_commit_only_secure_local_success_emits_event() -> None:
+    event_buffer = [111] * INFERENCE_BOT_EVENT_TUPLE_CELLS
+    out_status = [0]
+    out_count = [0]
+    out_digest = [0]
+
+    status = bot_emit_commit_only_model(
+        event_buffer=event_buffer,
+        event_buffer_capacity=INFERENCE_BOT_EVENT_TUPLE_CELLS,
+        session_id=9,
+        step_index=10,
+        token_id=11,
+        logit_q16=12,
+        policy_digest_q64=0x55AA,
+        expected_policy_digest_q64=0x55AA,
+        profile_mode=INFERENCE_BOT_PROFILE_SECURE,
+        out_event_status=out_status,
+        out_event_count=out_count,
+        out_event_digest_q64=out_digest,
+    )
+
+    assert status == SAMPLING_Q16_OK
+    assert event_buffer == [9, 10, 11, 12, 0x55AA, INFERENCE_BOT_PROFILE_SECURE]
+    assert out_status == [INFERENCE_BOT_STATUS_EMITTED]
+    assert out_count == [1]
+    assert out_digest[0] == _digest(event_buffer, INFERENCE_BOT_STATUS_EMITTED, 1)
+
+
+def test_commit_only_digest_mismatch_blocks_and_preserves_event_buffer() -> None:
+    event_buffer = [4, 5, 6, 7, 8, 9]
+    out_status = [3]
+    out_count = [2]
+    out_digest = [1]
+
+    status = bot_emit_commit_only_model(
+        event_buffer=event_buffer,
+        event_buffer_capacity=INFERENCE_BOT_EVENT_TUPLE_CELLS,
+        session_id=1,
+        step_index=2,
+        token_id=3,
+        logit_q16=4,
+        policy_digest_q64=999,
+        expected_policy_digest_q64=111,
+        profile_mode=INFERENCE_BOT_PROFILE_SECURE,
+        out_event_status=out_status,
+        out_event_count=out_count,
+        out_event_digest_q64=out_digest,
+    )
+
+    assert status == SAMPLING_Q16_OK
+    assert event_buffer == [4, 5, 6, 7, 8, 9]
     assert out_status == [INFERENCE_BOT_STATUS_BLOCKED]
     assert out_count == [0]
 
@@ -256,8 +408,11 @@ def test_deterministic_replay_digest() -> None:
 
 if __name__ == "__main__":
     test_source_contains_iq_1791_contract()
+    test_source_contains_iq_1792_contract()
     test_secure_local_success_emits_event()
     test_digest_mismatch_blocks_and_preserves_event_buffer()
+    test_commit_only_secure_local_success_emits_event()
+    test_commit_only_digest_mismatch_blocks_and_preserves_event_buffer()
     test_capacity_underflow_is_fail_closed()
     test_deterministic_replay_digest()
     print("ok")
