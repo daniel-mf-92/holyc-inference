@@ -26,10 +26,10 @@
       "stderr_tail": "",
       "stdout_tail": "BENCH_RESULT: {\"tokens\": 32, \"elapsed_us\": 200000, \"memory_bytes\": 67174400}\n",
       "timed_out": false,
-      "timestamp": "2026-04-27T18:13:14Z",
+      "timestamp": "2026-04-27T18:02:18Z",
       "tok_per_s": 160.0,
       "tokens": 32,
-      "wall_elapsed_us": 51859
+      "wall_elapsed_us": 55832
     },
     {
       "benchmark": "qemu_prompt",
@@ -57,10 +57,10 @@
       "stderr_tail": "",
       "stdout_tail": "BENCH_RESULT: {\"tokens\": 32, \"elapsed_us\": 200000, \"memory_bytes\": 67174400}\n",
       "timed_out": false,
-      "timestamp": "2026-04-27T18:13:14Z",
+      "timestamp": "2026-04-27T18:02:18Z",
       "tok_per_s": 160.0,
       "tokens": 32,
-      "wall_elapsed_us": 47804
+      "wall_elapsed_us": 66163
     },
     {
       "benchmark": "qemu_prompt",
@@ -88,10 +88,10 @@
       "stderr_tail": "",
       "stdout_tail": "BENCH_RESULT: {\"tokens\": 32, \"elapsed_us\": 200000, \"memory_bytes\": 67174400}\n",
       "timed_out": false,
-      "timestamp": "2026-04-27T18:13:14Z",
+      "timestamp": "2026-04-27T18:02:19Z",
       "tok_per_s": 160.0,
       "tokens": 32,
-      "wall_elapsed_us": 41933
+      "wall_elapsed_us": 60148
     },
     {
       "benchmark": "qemu_prompt",
@@ -119,10 +119,10 @@
       "stderr_tail": "",
       "stdout_tail": "BENCH_RESULT: {\"tokens\": 48, \"elapsed_us\": 300000, \"memory_bytes\": 67207168}\n",
       "timed_out": false,
-      "timestamp": "2026-04-27T18:13:14Z",
+      "timestamp": "2026-04-27T18:02:19Z",
       "tok_per_s": 160.0,
       "tokens": 48,
-      "wall_elapsed_us": 41350
+      "wall_elapsed_us": 54868
     },
     {
       "benchmark": "qemu_prompt",
@@ -150,10 +150,10 @@
       "stderr_tail": "",
       "stdout_tail": "BENCH_RESULT: {\"tokens\": 48, \"elapsed_us\": 300000, \"memory_bytes\": 67207168}\n",
       "timed_out": false,
-      "timestamp": "2026-04-27T18:13:14Z",
+      "timestamp": "2026-04-27T18:02:19Z",
       "tok_per_s": 160.0,
       "tokens": 48,
-      "wall_elapsed_us": 40857
+      "wall_elapsed_us": 58006
     },
     {
       "benchmark": "qemu_prompt",
@@ -181,13 +181,13 @@
       "stderr_tail": "",
       "stdout_tail": "BENCH_RESULT: {\"tokens\": 48, \"elapsed_us\": 300000, \"memory_bytes\": 67207168}\n",
       "timed_out": false,
-      "timestamp": "2026-04-27T18:13:14Z",
+      "timestamp": "2026-04-27T18:02:19Z",
       "tok_per_s": 160.0,
       "tokens": 48,
-      "wall_elapsed_us": 43255
+      "wall_elapsed_us": 56861
     }
   ],
-  "generated_at": "2026-04-27T18:13:14Z",
+  "generated_at": "2026-04-27T18:02:19Z",
   "status": "pass",
   "summaries": [
     {
@@ -240,10 +240,10 @@
       "stderr_tail": "",
       "stdout_tail": "BENCH_RESULT: {\"tokens\": 32, \"elapsed_us\": 200000, \"memory_bytes\": 67174400}\n",
       "timed_out": false,
-      "timestamp": "2026-04-27T18:13:14Z",
+      "timestamp": "2026-04-27T18:02:18Z",
       "tok_per_s": 160.0,
       "tokens": 32,
-      "wall_elapsed_us": 187813
+      "wall_elapsed_us": 658041
     },
     {
       "benchmark": "qemu_prompt",
@@ -271,10 +271,10 @@
       "stderr_tail": "",
       "stdout_tail": "BENCH_RESULT: {\"tokens\": 48, \"elapsed_us\": 300000, \"memory_bytes\": 67207168}\n",
       "timed_out": false,
-      "timestamp": "2026-04-27T18:13:14Z",
+      "timestamp": "2026-04-27T18:02:18Z",
       "tok_per_s": 160.0,
       "tokens": 48,
-      "wall_elapsed_us": 68466
+      "wall_elapsed_us": 59729
     }
   ]
 }

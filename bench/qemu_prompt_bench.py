@@ -396,6 +396,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         "",
         f"Generated: {report['generated_at']}",
         f"Status: {report['status']}",
+        f"Warmup runs: {len(report['warmups'])}",
         f"Runs: {len(report['benchmarks'])}",
         "",
         "## Prompt Summary",
@@ -426,11 +427,14 @@ def format_summary_value(value: Any) -> str:
     return str(value)
 
 
-def write_report(runs: list[BenchRun], output_dir: Path) -> Path:
+def write_report(runs: list[BenchRun], output_dir: Path, warmups: list[BenchRun] | None = None) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
+    warmup_runs = warmups or []
+    all_runs = warmup_runs + runs
     report = {
         "generated_at": iso_now(),
-        "status": "pass" if all(run.returncode == 0 and not run.timed_out for run in runs) else "fail",
+        "status": "pass" if all(run.returncode == 0 and not run.timed_out for run in all_runs) else "fail",
+        "warmups": [asdict(run) for run in warmup_runs],
         "summaries": summarize_runs(runs),
         "benchmarks": [asdict(run) for run in runs],
     }
@@ -465,7 +469,7 @@ def write_csv_report(runs: list[BenchRun], path: Path) -> None:
         "timed_out",
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
         for run in runs:
             row = asdict(run)
@@ -484,6 +488,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Extra QEMU argument; repeat per token. Use --qemu-arg=-m for values beginning with '-'.",
     )
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS)
+    parser.add_argument(
+        "--warmup",
+        type=int,
+        default=0,
+        help="Run each prompt this many times before measured repeats; warmups are recorded separately",
+    )
     parser.add_argument("--repeat", type=int, default=1, help="Run each prompt this many times")
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--profile", default="default")
@@ -498,6 +508,9 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.repeat < 1:
         print("error: --repeat must be >= 1", file=sys.stderr)
+        return 2
+    if args.warmup < 0:
+        print("error: --warmup must be >= 0", file=sys.stderr)
         return 2
 
     root = Path(__file__).resolve().parents[1]
@@ -519,15 +532,21 @@ def main(argv: list[str] | None = None) -> int:
         "quantization": args.quantization,
         "commit": git_commit(root),
     }
+    warmups = [
+        run_prompt(command, prompt_case, args.timeout, metadata, iteration=iteration)
+        for prompt_case in prompts
+        for iteration in range(1, args.warmup + 1)
+    ]
     runs = [
         run_prompt(command, prompt_case, args.timeout, metadata, iteration=iteration)
         for prompt_case in prompts
         for iteration in range(1, args.repeat + 1)
     ]
-    output = write_report(runs, args.output_dir)
+    output = write_report(runs, args.output_dir, warmups=warmups)
+    all_runs = warmups + runs
     print(f"wrote_json={output}")
-    print(f"status={'pass' if all(run.returncode == 0 and not run.timed_out for run in runs) else 'fail'}")
-    return 0 if all(run.returncode == 0 and not run.timed_out for run in runs) else 1
+    print(f"status={'pass' if all(run.returncode == 0 and not run.timed_out for run in all_runs) else 'fail'}")
+    return 0 if all(run.returncode == 0 and not run.timed_out for run in all_runs) else 1
 
 
 if __name__ == "__main__":

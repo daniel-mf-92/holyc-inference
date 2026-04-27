@@ -225,3 +225,66 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
     assert csv_report.count("\n") == 7
     assert ",one," in csv_report
     assert ",two," in csv_report
+
+
+def test_cli_warmup_records_separately_from_measured_runs(tmp_path: Path) -> None:
+    fake_qemu = tmp_path / "fake-qemu.py"
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    output_dir = tmp_path / "results"
+    prompts.write_text('{"prompt_id":"one","prompt":"Warm up"}\n', encoding="utf-8")
+    fake_qemu.write_text(
+        """#!/usr/bin/env python3
+print("tokens=10 elapsed_us=100000")
+""",
+        encoding="utf-8",
+    )
+    fake_qemu.chmod(0o755)
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--qemu-bin",
+            str(fake_qemu),
+            "--output-dir",
+            str(output_dir),
+            "--warmup",
+            "2",
+            "--repeat",
+            "3",
+        ]
+    )
+
+    assert status == 0
+    report = json.loads((output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8"))
+    markdown = (output_dir / "qemu_prompt_bench_latest.md").read_text(encoding="utf-8")
+    csv_report = (output_dir / "qemu_prompt_bench_latest.csv").read_text(encoding="utf-8")
+
+    assert len(report["warmups"]) == 2
+    assert len(report["benchmarks"]) == 3
+    assert report["summaries"][0]["runs"] == 3
+    assert "Warmup runs: 2" in markdown
+    assert csv_report.count("\n") == 4
+
+
+def test_cli_rejects_negative_warmup(tmp_path: Path) -> None:
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    prompts.write_text('{"prompt_id":"one","prompt":"A"}\n', encoding="utf-8")
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--dry-run",
+            "--warmup",
+            "-1",
+        ]
+    )
+
+    assert status == 2

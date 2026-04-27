@@ -1,7 +1,8 @@
 # QEMU Prompt Benchmark
 
-Generated: 2026-04-27T17:20:21Z
+Generated: 2026-04-27T18:13:14Z
 Status: pass
+Warmup runs: 2
 Runs: 6
 
 ## Prompt Summary

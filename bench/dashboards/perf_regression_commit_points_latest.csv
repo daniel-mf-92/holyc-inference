@@ -2,8 +2,10 @@ key,commit,latest_timestamp,records,median_tok_per_s,max_memory_bytes
 qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code,5b98f2570b1c,2026-04-27T14:41:37Z,3,160.0,
 qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code,85cce7c2f224,2026-04-27T16:12:59Z,3,160.0,
 qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code,3f9df4f0bd7a,2026-04-27T17:04:37Z,3,160.0,67207168
-qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code,e71bfc15a184,2026-04-27T17:20:21Z,9,160.0,67207168
+qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code,e71bfc15a184,2026-04-27T17:20:21Z,3,160.0,67207168
+qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code,7f007ced1a84,2026-04-27T18:13:14Z,9,160.0,67207168
 qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short,5b98f2570b1c,2026-04-27T14:41:37Z,3,160.0,
 qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short,85cce7c2f224,2026-04-27T16:12:59Z,3,160.0,
 qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short,3f9df4f0bd7a,2026-04-27T17:04:37Z,3,160.0,67174400
-qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short,e71bfc15a184,2026-04-27T17:20:21Z,9,160.0,67174400
+qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short,e71bfc15a184,2026-04-27T17:20:21Z,3,160.0,67174400
+qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short,7f007ced1a84,2026-04-27T18:13:14Z,9,160.0,67174400
