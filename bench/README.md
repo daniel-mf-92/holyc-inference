@@ -77,6 +77,27 @@ python3 bench/qemu_prompt_bench.py \
   --dry-run
 ```
 
+## HolyC vs llama.cpp Eval Compare
+
+`eval_compare.py` compares offline multiple-choice predictions from HolyC and
+llama.cpp against the same local gold JSONL dataset. It aligns by record id,
+supports prediction indexes, labels, exact choice text, or score arrays, and
+writes JSON plus Markdown reports to `bench/results/`.
+
+Example:
+
+```bash
+python3 bench/eval_compare.py \
+  --gold bench/datasets/samples/smoke_eval.jsonl \
+  --holyc bench/eval/samples/holyc_smoke_predictions.jsonl \
+  --llama bench/eval/samples/llama_smoke_predictions.jsonl \
+  --dataset smoke-eval \
+  --split validation \
+  --model synthetic-smoke \
+  --quantization Q4_0 \
+  --output-stem eval_compare_smoke_latest
+```
+
 ## Perf Regression Dashboard
 
 `perf_regression.py` scans host-side benchmark result files and writes dashboards

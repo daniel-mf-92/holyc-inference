@@ -1,0 +1,55 @@
+{
+  "dataset": "smoke-eval",
+  "generated_at": "2026-04-27T14:31:12Z",
+  "gold_sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131",
+  "holyc_predictions_sha256": "61bb69247c6343f53493b5febb5636780ed8c5d99d6114976164e1c7ecd1c4e9",
+  "llama_predictions_sha256": "22a31f8ffa48784acd9645bf802ac0f3e0260d45e703a34c926a3331e643dfa1",
+  "model": "synthetic-smoke",
+  "quantization": "Q4_0",
+  "rows": [
+    {
+      "answer_index": 0,
+      "dataset": "arc-smoke",
+      "engines_agree": true,
+      "holyc_correct": true,
+      "holyc_prediction": 0,
+      "llama_correct": true,
+      "llama_prediction": 0,
+      "record_id": "smoke-arc-1",
+      "split": "validation"
+    },
+    {
+      "answer_index": 0,
+      "dataset": "hellaswag-smoke",
+      "engines_agree": true,
+      "holyc_correct": true,
+      "holyc_prediction": 0,
+      "llama_correct": true,
+      "llama_prediction": 0,
+      "record_id": "smoke-hellaswag-1",
+      "split": "validation"
+    },
+    {
+      "answer_index": 0,
+      "dataset": "truthfulqa-smoke",
+      "engines_agree": true,
+      "holyc_correct": true,
+      "holyc_prediction": 0,
+      "llama_correct": true,
+      "llama_prediction": 0,
+      "record_id": "smoke-truthfulqa-1",
+      "split": "validation"
+    }
+  ],
+  "split": "validation",
+  "summary": {
+    "accuracy_delta_holyc_minus_llama": 0.0,
+    "agreement": 1.0,
+    "agreement_count": 3,
+    "holyc_accuracy": 1.0,
+    "holyc_correct": 3,
+    "llama_accuracy": 1.0,
+    "llama_correct": 3,
+    "record_count": 3
+  }
+}
