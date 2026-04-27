@@ -99,6 +99,43 @@ def test_indexes_matrix_cells_and_flags_network_devices(tmp_path: Path) -> None:
     assert bench_result_index.index_status(summaries) == "fail"
 
 
+def test_reports_prompt_suite_drift_for_comparable_artifacts(tmp_path: Path) -> None:
+    for index, suite_hash in enumerate(("a" * 64, "b" * 64), 1):
+        report_dir = tmp_path / f"run{index}"
+        report_dir.mkdir()
+        (report_dir / "qemu_prompt_bench_latest.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": f"2026-04-27T20:0{index}:00Z",
+                    "status": "pass",
+                    "prompt_suite": {"suite_sha256": suite_hash, "prompt_count": 1},
+                    "suite_summary": {"tok_per_s_median": 100 + index},
+                    "benchmarks": [
+                        {
+                            "profile": "secure",
+                            "model": "tiny",
+                            "quantization": "Q4_0",
+                            "command": [
+                                "qemu-system-x86_64",
+                                "-nic",
+                                "none",
+                                "-drive",
+                                "file=TempleOS.img,format=raw,if=ide",
+                            ],
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    drift = bench_result_index.prompt_suite_drift(bench_result_index.load_summaries([tmp_path]))
+
+    assert len(drift) == 1
+    assert drift[0].key == "secure/tiny/Q4_0"
+    assert drift[0].hashes == ["a" * 64, "b" * 64]
+
+
 def test_cli_writes_json_markdown_and_csv(tmp_path: Path) -> None:
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"
@@ -140,5 +177,7 @@ def test_cli_writes_json_markdown_and_csv(tmp_path: Path) -> None:
 
     assert payload["status"] == "pass"
     assert payload["artifacts"][0]["prompt_suite_sha256"] == "c" * 64
+    assert payload["prompt_suite_drift"] == []
     assert "Benchmark Result Index" in markdown
+    assert "Prompt suite drift: none detected." in markdown
     assert rows[0]["command_airgap_status"] == "pass"

@@ -42,6 +42,13 @@ class ArtifactSummary:
     command_findings: list[str]
 
 
+@dataclass(frozen=True)
+class PromptSuiteDrift:
+    key: str
+    hashes: list[str]
+    sources: list[str]
+
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -201,6 +208,34 @@ def index_status(summaries: list[ArtifactSummary]) -> str:
     return "pass"
 
 
+def prompt_suite_drift(summaries: list[ArtifactSummary]) -> list[PromptSuiteDrift]:
+    by_key: dict[str, dict[str, set[str]]] = {}
+    for summary in summaries:
+        if not summary.prompt_suite_sha256:
+            continue
+        key = "/".join(
+            (
+                summary.profile or "-",
+                summary.model or "-",
+                summary.quantization or "-",
+            )
+        )
+        by_key.setdefault(key, {}).setdefault(summary.prompt_suite_sha256, set()).add(summary.source)
+
+    findings: list[PromptSuiteDrift] = []
+    for key, hash_sources in sorted(by_key.items()):
+        if len(hash_sources) <= 1:
+            continue
+        findings.append(
+            PromptSuiteDrift(
+                key=key,
+                hashes=sorted(hash_sources),
+                sources=sorted(source for sources in hash_sources.values() for source in sources),
+            )
+        )
+    return findings
+
+
 def format_value(value: Any) -> str:
     if value is None or value == "":
         return "-"
@@ -235,6 +270,27 @@ def markdown_report(report: dict[str, Any]) -> str:
             )
     else:
         lines.append("No supported benchmark artifacts found.")
+
+    if report["prompt_suite_drift"]:
+        lines.extend(
+            [
+                "",
+                "## Prompt Suite Drift",
+                "",
+                "| Profile/Model/Quant | Hashes | Sources |",
+                "| --- | ---: | ---: |",
+            ]
+        )
+        for finding in report["prompt_suite_drift"]:
+            lines.append(
+                "| {key} | {hashes} | {sources} |".format(
+                    key=finding["key"],
+                    hashes=len(finding["hashes"]),
+                    sources=len(finding["sources"]),
+                )
+            )
+    else:
+        lines.extend(["", "Prompt suite drift: none detected."])
     return "\n".join(lines) + "\n"
 
 
@@ -267,10 +323,12 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
 
 def write_report(summaries: list[ArtifactSummary], output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
+    drift = prompt_suite_drift(summaries)
     report = {
         "generated_at": iso_now(),
         "status": index_status(summaries),
         "artifacts": [asdict(summary) for summary in summaries],
+        "prompt_suite_drift": [asdict(finding) for finding in drift],
     }
     json_path = output_dir / "bench_result_index_latest.json"
     md_path = output_dir / "bench_result_index_latest.md"

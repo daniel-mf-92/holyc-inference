@@ -375,6 +375,7 @@
       "warmup_runs": 2
     }
   ],
-  "generated_at": "2026-04-27T20:28:51Z",
+  "generated_at": "2026-04-27T20:37:49Z",
+  "prompt_suite_drift": [],
   "status": "pass"
 }
