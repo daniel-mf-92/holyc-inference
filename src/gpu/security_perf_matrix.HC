@@ -40702,7 +40702,7 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
     parity_drift_count = 0;
     parity_snapshot_digest_q64 = 0;
 
-    // IQ-1780 commit-only hardening wrapper:
+    // IQ-1780/IQ-1782 commit-only hardening wrapper:
     // - seed staged tuple through IQ-1757 commit-only wrapper;
     // - verify staged tuple is preserved by IQ-1759 strict diagnostics parity gate;
     // - replay parity tuple through IQ-1758 zero-write diagnostics companion;
@@ -40788,6 +40788,8 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
 
     if (!GPUSecurityPerfStatusIsValid(status_primary) ||
         !GPUSecurityPerfStatusIsValid(status_parity))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (status_seed != status_parity)
         return GPU_SEC_PERF_ERR_BAD_PARAM;
 
     if (status_primary == GPU_SEC_PERF_OK)
