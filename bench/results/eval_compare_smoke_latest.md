@@ -1,10 +1,11 @@
 # Eval Compare Report
 
-Generated: 2026-04-27T21:45:24Z
+Generated: 2026-04-27T22:35:03Z
 Dataset: smoke-eval
 Split: validation
 Quantization: Q4_0
 Model: synthetic-smoke
+Status: pass
 
 ## Summary
 
@@ -18,6 +19,10 @@ Model: synthetic-smoke
 | llama.cpp macro F1 | 1.0000 |
 | Macro F1 delta | 0.0000 |
 | Agreement | 1.0000 |
+
+## Quality Gates
+
+No quality gate regressions.
 
 ## Per-Answer F1
 

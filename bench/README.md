@@ -107,6 +107,28 @@ python3 bench/dataset_index.py \
   --fail-on-findings
 ```
 
+## Offline Eval Comparator
+
+`eval_compare.py` compares local HolyC and llama.cpp multiple-choice predictions
+against the same gold JSONL and writes JSON, Markdown, CSV, and JUnit XML
+reports. Optional quality gates can fail CI when HolyC accuracy, engine
+agreement, or accuracy delta versus llama.cpp falls outside configured bounds.
+
+```bash
+python3 bench/eval_compare.py \
+  --gold bench/datasets/samples/smoke_eval.jsonl \
+  --holyc bench/eval/samples/holyc_smoke_predictions.jsonl \
+  --llama bench/eval/samples/llama_smoke_predictions.jsonl \
+  --dataset smoke-eval \
+  --split validation \
+  --model synthetic-smoke \
+  --quantization Q4_0 \
+  --min-holyc-accuracy 0.95 \
+  --min-agreement 0.95 \
+  --max-accuracy-drop 0.02 \
+  --fail-on-regression
+```
+
 ## QEMU Prompt Benchmark
 
 `prompt_audit.py` validates benchmark prompt files before a guest run. It

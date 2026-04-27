@@ -8,6 +8,7 @@ import csv
 import json
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -76,14 +77,20 @@ def test_cli_writes_json_and_markdown_report() -> None:
         )
         payload = json.loads((Path(tmp) / "smoke.json").read_text(encoding="utf-8"))
         csv_rows = list(csv.DictReader((Path(tmp) / "smoke.csv").open(newline="", encoding="utf-8")))
+        junit_root = ET.parse(Path(tmp) / "smoke_junit.xml").getroot()
         assert payload["summary"]["record_count"] == 3
+        assert payload["status"] == "pass"
+        assert payload["regressions"] == []
         assert payload["summary"]["class_count"] == 4
         assert payload["summary"]["holyc_per_answer_index"][0]["support"] == 3
         assert (Path(tmp) / "smoke.md").exists()
+        assert "No quality gate regressions." in (Path(tmp) / "smoke.md").read_text(encoding="utf-8")
         assert len(csv_rows) == 3
         assert csv_rows[0]["record_id"] == "smoke-arc-1"
         assert csv_rows[0]["holyc_correct"] == "True"
         assert csv_rows[0]["engines_agree"] == "True"
+        assert junit_root.attrib["name"] == "holyc_eval_compare"
+        assert junit_root.attrib["failures"] == "0"
 
 
 def test_compare_reports_macro_f1_and_confusion_matrix() -> None:
@@ -138,9 +145,65 @@ def test_missing_prediction_fails_fast() -> None:
         )
 
 
+def test_cli_can_fail_on_quality_gate_regression() -> None:
+    gold = BENCH_PATH / "datasets" / "samples" / "smoke_eval.jsonl"
+    llama = BENCH_PATH / "eval" / "samples" / "llama_smoke_predictions.jsonl"
+    with tempfile.TemporaryDirectory() as tmp:
+        holyc = Path(tmp) / "wrong.jsonl"
+        holyc.write_text(
+            "\n".join(
+                [
+                    '{"id":"smoke-arc-1","prediction":1}',
+                    '{"id":"smoke-hellaswag-1","prediction":0}',
+                    '{"id":"smoke-truthfulqa-1","prediction":0}',
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        status = eval_compare.main(
+            [
+                "--gold",
+                str(gold),
+                "--holyc",
+                str(holyc),
+                "--llama",
+                str(llama),
+                "--dataset",
+                "smoke-eval",
+                "--split",
+                "validation",
+                "--output-dir",
+                tmp,
+                "--output-stem",
+                "gated",
+                "--min-holyc-accuracy",
+                "0.9",
+                "--min-agreement",
+                "0.9",
+                "--max-accuracy-drop",
+                "0.1",
+                "--fail-on-regression",
+            ]
+        )
+        payload = json.loads((Path(tmp) / "gated.json").read_text(encoding="utf-8"))
+        junit_root = ET.parse(Path(tmp) / "gated_junit.xml").getroot()
+
+        assert status == 1
+        assert payload["status"] == "fail"
+        assert {row["metric"] for row in payload["regressions"]} == {
+            "accuracy_delta_holyc_minus_llama",
+            "agreement",
+            "holyc_accuracy",
+        }
+        assert junit_root.attrib["failures"] == "3"
+        assert junit_root.find("./testcase/failure") is not None
+
+
 if __name__ == "__main__":
     test_smoke_predictions_compare_cleanly()
     test_cli_writes_json_and_markdown_report()
     test_compare_reports_macro_f1_and_confusion_matrix()
     test_missing_prediction_fails_fast()
+    test_cli_can_fail_on_quality_gate_regression()
     print("eval_compare_tests=ok")

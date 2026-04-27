@@ -1,11 +1,15 @@
 {
   "dataset": "smoke-eval",
-  "generated_at": "2026-04-27T21:45:24Z",
+  "generated_at": "2026-04-27T22:35:03Z",
   "gold_sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131",
   "holyc_predictions_sha256": "61bb69247c6343f53493b5febb5636780ed8c5d99d6114976164e1c7ecd1c4e9",
   "llama_predictions_sha256": "22a31f8ffa48784acd9645bf802ac0f3e0260d45e703a34c926a3331e643dfa1",
+  "max_accuracy_drop": 0.02,
+  "min_agreement": 0.95,
+  "min_holyc_accuracy": 0.95,
   "model": "synthetic-smoke",
   "quantization": "Q4_0",
+  "regressions": [],
   "rows": [
     {
       "answer_index": 0,
@@ -42,6 +46,7 @@
     }
   ],
   "split": "validation",
+  "status": "pass",
   "summary": {
     "accuracy_delta_holyc_minus_llama": 0.0,
     "agreement": 1.0,

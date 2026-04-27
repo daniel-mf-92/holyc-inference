@@ -14,6 +14,7 @@ import csv
 import hashlib
 import json
 import sys
+import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -59,6 +60,14 @@ class EvalRow:
     holyc_correct: bool
     llama_correct: bool
     engines_agree: bool
+
+
+@dataclass(frozen=True)
+class EvalRegression:
+    metric: str
+    value: float
+    threshold: float
+    message: str
 
 
 def iso_now() -> str:
@@ -352,6 +361,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Split: {report['split']}",
         f"Quantization: {report['quantization'] or '-'}",
         f"Model: {report['model'] or '-'}",
+        f"Status: {report['status']}",
         "",
         "## Summary",
         "",
@@ -366,11 +376,28 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"| Macro F1 delta | {summary['macro_f1_delta_holyc_minus_llama']:.4f} |",
         f"| Agreement | {summary['agreement']:.4f} |",
         "",
-        "## Per-Answer F1",
+        "## Quality Gates",
         "",
-        "| Answer index | HolyC support | HolyC F1 | llama.cpp support | llama.cpp F1 |",
-        "| ---: | ---: | ---: | ---: | ---: |",
     ]
+    if report["regressions"]:
+        lines.append("| Metric | Value | Threshold | Finding |")
+        lines.append("| --- | ---: | ---: | --- |")
+        for regression in report["regressions"]:
+            lines.append(
+                f"| {regression['metric']} | {regression['value']:.4f} | "
+                f"{regression['threshold']:.4f} | {regression['message']} |"
+            )
+    else:
+        lines.append("No quality gate regressions.")
+    lines.extend(
+        [
+            "",
+            "## Per-Answer F1",
+            "",
+            "| Answer index | HolyC support | HolyC F1 | llama.cpp support | llama.cpp F1 |",
+            "| ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
     for holyc_metric, llama_metric in zip(summary["holyc_per_answer_index"], summary["llama_per_answer_index"]):
         lines.append(
             f"| {holyc_metric['answer_index']} | {holyc_metric['support']} | {holyc_metric['f1']:.4f} | "
@@ -422,6 +449,83 @@ def confusion_matrix_markdown(confusion: dict[str, Any]) -> list[str]:
     return lines
 
 
+def find_regressions(
+    summary: dict[str, Any],
+    *,
+    min_holyc_accuracy: float | None = None,
+    min_agreement: float | None = None,
+    max_accuracy_drop: float | None = None,
+) -> list[EvalRegression]:
+    regressions: list[EvalRegression] = []
+    if min_holyc_accuracy is not None and summary["holyc_accuracy"] < min_holyc_accuracy:
+        regressions.append(
+            EvalRegression(
+                metric="holyc_accuracy",
+                value=summary["holyc_accuracy"],
+                threshold=min_holyc_accuracy,
+                message=(
+                    f"HolyC accuracy {summary['holyc_accuracy']:.4f} "
+                    f"is below minimum {min_holyc_accuracy:.4f}"
+                ),
+            )
+        )
+    if min_agreement is not None and summary["agreement"] < min_agreement:
+        regressions.append(
+            EvalRegression(
+                metric="agreement",
+                value=summary["agreement"],
+                threshold=min_agreement,
+                message=f"engine agreement {summary['agreement']:.4f} is below minimum {min_agreement:.4f}",
+            )
+        )
+    if max_accuracy_drop is not None:
+        allowed_delta = -abs(max_accuracy_drop)
+        delta = summary["accuracy_delta_holyc_minus_llama"]
+        if delta < allowed_delta:
+            regressions.append(
+                EvalRegression(
+                    metric="accuracy_delta_holyc_minus_llama",
+                    value=delta,
+                    threshold=allowed_delta,
+                    message=(
+                        f"HolyC accuracy delta {delta:.4f} is below allowed drop "
+                        f"{allowed_delta:.4f}"
+                    ),
+                )
+            )
+    return regressions
+
+
+def write_junit(regressions: list[EvalRegression], path: Path) -> None:
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": "holyc_eval_compare",
+            "tests": "1",
+            "failures": str(len(regressions)),
+            "errors": "0",
+        },
+    )
+    case = ET.SubElement(suite, "testcase", {"classname": "eval_compare", "name": "quality_gates"})
+    if regressions:
+        failure = ET.SubElement(
+            case,
+            "failure",
+            {
+                "type": "eval_regression",
+                "message": "; ".join(regression.message for regression in regressions),
+            },
+        )
+        failure.text = "\n".join(
+            f"{regression.metric}: value={regression.value:.6f} threshold={regression.threshold:.6f}"
+            for regression in regressions
+        )
+    ET.indent(suite)
+    ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
+    with path.open("ab") as handle:
+        handle.write(b"\n")
+
+
 def write_csv_report(path: Path, rows: list[EvalRow]) -> None:
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
@@ -453,25 +557,38 @@ def write_report(
 ) -> tuple[Path, Path, Path]:
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
+    regressions = find_regressions(
+        summary,
+        min_holyc_accuracy=args.min_holyc_accuracy,
+        min_agreement=args.min_agreement,
+        max_accuracy_drop=args.max_accuracy_drop,
+    )
     report = {
         "dataset": args.dataset,
         "generated_at": iso_now(),
         "gold_sha256": file_sha256(gold_path),
         "holyc_predictions_sha256": file_sha256(holyc_path),
         "llama_predictions_sha256": file_sha256(llama_path),
+        "max_accuracy_drop": args.max_accuracy_drop,
         "model": args.model,
+        "min_agreement": args.min_agreement,
+        "min_holyc_accuracy": args.min_holyc_accuracy,
         "quantization": args.quantization,
+        "regressions": [asdict(regression) for regression in regressions],
         "rows": [asdict(row) for row in rows],
         "split": args.split,
+        "status": "fail" if regressions else "pass",
         "summary": summary,
     }
     stem = args.output_stem
     json_path = output_dir / f"{stem}.json"
     md_path = output_dir / f"{stem}.md"
     csv_path = output_dir / f"{stem}.csv"
+    junit_path = output_dir / f"{stem}_junit.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
     write_csv_report(csv_path, rows)
+    write_junit(regressions, junit_path)
     return json_path, md_path, csv_path
 
 
@@ -484,6 +601,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--split", default="validation")
     parser.add_argument("--model", default="")
     parser.add_argument("--quantization", default="")
+    parser.add_argument("--min-holyc-accuracy", type=float, help="Minimum HolyC accuracy before CI gate failure")
+    parser.add_argument("--min-agreement", type=float, help="Minimum HolyC/llama.cpp agreement before CI gate failure")
+    parser.add_argument(
+        "--max-accuracy-drop",
+        type=float,
+        help="Allowed HolyC accuracy drop versus llama.cpp before CI gate failure",
+    )
+    parser.add_argument("--fail-on-regression", action="store_true", help="Return non-zero when quality gates fail")
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--output-stem", default="eval_compare_latest")
     return parser
@@ -507,6 +632,15 @@ def main(argv: list[str] | None = None) -> int:
     print(f"holyc_accuracy={summary['holyc_accuracy']:.4f}")
     print(f"llama_accuracy={summary['llama_accuracy']:.4f}")
     print(f"agreement={summary['agreement']:.4f}")
+    regressions = find_regressions(
+        summary,
+        min_holyc_accuracy=args.min_holyc_accuracy,
+        min_agreement=args.min_agreement,
+        max_accuracy_drop=args.max_accuracy_drop,
+    )
+    print(f"regressions={len(regressions)}")
+    if args.fail_on_regression and regressions:
+        return 1
     return 0
 
 
