@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -223,6 +224,52 @@ def test_min_records_per_point_flags_under_sampled_commit_points(tmp_path: Path)
             "minimum_records": 2,
         }
     ]
+
+
+def test_junit_report_marks_perf_failures() -> None:
+    report = {
+        "generated_at": "2026-04-27T20:00:00Z",
+        "regressions": [
+            {
+                "key": "decode/secure-local/-/Q4_0/-",
+                "metric": "tok_per_s",
+                "baseline_commit": "base",
+                "candidate_commit": "head",
+                "baseline_value": 100.0,
+                "candidate_value": 90.0,
+                "delta_pct": 10.0,
+                "threshold_pct": 5.0,
+            }
+        ],
+        "sample_violations": [
+            {
+                "key": "decode/secure-local/-/Q4_0/-",
+                "commit": "head",
+                "records": 1,
+                "minimum_records": 3,
+            }
+        ],
+    }
+
+    root = ET.fromstring(perf_regression.junit_report(report))
+    failures = root.findall(".//failure")
+
+    assert root.attrib["tests"] == "2"
+    assert root.attrib["failures"] == "2"
+    assert failures[0].attrib["type"] == "perf_regression"
+    assert "tok_per_s changed 10.00%" in failures[0].attrib["message"]
+    assert failures[1].attrib["type"] == "sample_coverage"
+
+
+def test_write_dashboard_outputs_includes_junit(tmp_path: Path) -> None:
+    report = perf_regression.build_report([], 5.0, 10.0)
+
+    perf_regression.write_dashboard_outputs(report, tmp_path)
+
+    root = ET.parse(tmp_path / "perf_regression_junit_latest.xml").getroot()
+    assert root.attrib["name"] == "holyc_perf_regression"
+    assert root.attrib["failures"] == "0"
+    assert root.find("./testcase").attrib["name"] == "dashboard_pass"
 
 
 def test_csv_tok_per_s_milli_is_normalized(tmp_path: Path) -> None:

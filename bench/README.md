@@ -252,6 +252,8 @@ python3 bench/perf_regression.py \
 `--min-records-per-point` fails the dashboard when any benchmark key/commit
 point has fewer samples than required. This catches partial matrix uploads and
 single-run artifacts before noisy throughput medians are accepted.
+The dashboard also writes `perf_regression_junit_latest.xml` so CI systems can
+surface throughput regressions and sample-coverage failures as test failures.
 
 ## Build Benchmark Compare
 
@@ -332,7 +334,7 @@ or `tok_per_s_milli`, plus optional memory fields such as `memory_bytes` or
 `max_rss_bytes`. Regression checks compare commit-level aggregates, so repeated
 runs and duplicate latest/stamped result files are collapsed by benchmark key and
 commit before the latest distinct commits are compared. Outputs include JSON,
-Markdown, commit-point CSV, and regression CSV artifacts.
+Markdown, JUnit XML, commit-point CSV, and regression CSV artifacts.
 
 Example:
 

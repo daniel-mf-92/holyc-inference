@@ -7,6 +7,7 @@ import json
 import subprocess
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -44,6 +45,7 @@ def main() -> int:
 
         report_path = output_dir / "perf_regression_latest.json"
         markdown_path = output_dir / "perf_regression_latest.md"
+        junit_path = output_dir / "perf_regression_junit_latest.xml"
         sample_violations_path = output_dir / "perf_regression_sample_violations_latest.csv"
         report = json.loads(report_path.read_text(encoding="utf-8"))
         if report["status"] != "pass":
@@ -60,6 +62,13 @@ def main() -> int:
             return 1
         if "Perf Regression Dashboard" not in markdown_path.read_text(encoding="utf-8"):
             print("missing_markdown_dashboard=true", file=sys.stderr)
+            return 1
+        junit_root = ET.parse(junit_path).getroot()
+        if junit_root.attrib.get("name") != "holyc_perf_regression":
+            print("missing_junit_suite=true", file=sys.stderr)
+            return 1
+        if junit_root.attrib.get("failures") != "0":
+            print("unexpected_junit_failures=true", file=sys.stderr)
             return 1
         if "key,commit,records,minimum_records" not in sample_violations_path.read_text(
             encoding="utf-8"

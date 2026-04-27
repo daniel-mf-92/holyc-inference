@@ -13,6 +13,7 @@ import csv
 import json
 import statistics
 import sys
+import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -433,16 +434,99 @@ def write_csv(path: Path, rows: list[dict[str, Any]], fields: list[str]) -> None
             writer.writerow({field: row.get(field) for field in fields})
 
 
+def junit_report(report: dict[str, Any]) -> str:
+    failures = len(report["regressions"]) + len(report["sample_violations"])
+    tests = failures or 1
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": "holyc_perf_regression",
+            "tests": str(tests),
+            "failures": str(failures),
+            "errors": "0",
+            "timestamp": report["generated_at"],
+        },
+    )
+
+    if failures == 0:
+        ET.SubElement(
+            suite,
+            "testcase",
+            {
+                "classname": "perf_regression",
+                "name": "dashboard_pass",
+            },
+        )
+    else:
+        for regression in report["regressions"]:
+            case = ET.SubElement(
+                suite,
+                "testcase",
+                {
+                    "classname": "perf_regression.regression",
+                    "name": f"{regression['metric']}:{regression['key']}",
+                },
+            )
+            failure = ET.SubElement(
+                case,
+                "failure",
+                {
+                    "type": "perf_regression",
+                    "message": (
+                        f"{regression['metric']} changed {regression['delta_pct']:.2f}% "
+                        f"over {regression['threshold_pct']:.2f}% threshold"
+                    ),
+                },
+            )
+            failure.text = (
+                f"baseline={regression['baseline_commit']} value={regression['baseline_value']:.3f}\n"
+                f"candidate={regression['candidate_commit']} value={regression['candidate_value']:.3f}\n"
+                f"key={regression['key']}"
+            )
+
+        for violation in report["sample_violations"]:
+            case = ET.SubElement(
+                suite,
+                "testcase",
+                {
+                    "classname": "perf_regression.sample_coverage",
+                    "name": f"{violation['commit']}:{violation['key']}",
+                },
+            )
+            failure = ET.SubElement(
+                case,
+                "failure",
+                {
+                    "type": "sample_coverage",
+                    "message": (
+                        f"{violation['records']} samples below minimum "
+                        f"{violation['minimum_records']}"
+                    ),
+                },
+            )
+            failure.text = (
+                f"commit={violation['commit']}\n"
+                f"records={violation['records']}\n"
+                f"minimum_records={violation['minimum_records']}\n"
+                f"key={violation['key']}"
+            )
+
+    ET.indent(suite, space="  ")
+    return ET.tostring(suite, encoding="unicode", xml_declaration=True) + "\n"
+
+
 def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / "perf_regression_latest.json"
     md_path = output_dir / "perf_regression_latest.md"
+    junit_path = output_dir / "perf_regression_junit_latest.xml"
     commit_points_csv = output_dir / "perf_regression_commit_points_latest.csv"
     regressions_csv = output_dir / "perf_regression_regressions_latest.csv"
     sample_violations_csv = output_dir / "perf_regression_sample_violations_latest.csv"
 
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
+    junit_path.write_text(junit_report(report), encoding="utf-8")
     write_csv(
         commit_points_csv,
         report["commit_points"],
@@ -477,6 +561,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
 
     print(f"wrote_json={json_path}")
     print(f"wrote_markdown={md_path}")
+    print(f"wrote_junit={junit_path}")
     print(f"wrote_commit_points_csv={commit_points_csv}")
     print(f"wrote_regressions_csv={regressions_csv}")
     print(f"wrote_sample_violations_csv={sample_violations_csv}")
