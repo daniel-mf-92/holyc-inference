@@ -1,6 +1,6 @@
 {
   "dataset": "smoke-eval",
-  "generated_at": "2026-04-27T22:35:03Z",
+  "generated_at": "2026-04-27T22:45:13Z",
   "gold_sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131",
   "holyc_predictions_sha256": "61bb69247c6343f53493b5febb5636780ed8c5d99d6114976164e1c7ecd1c4e9",
   "llama_predictions_sha256": "22a31f8ffa48784acd9645bf802ac0f3e0260d45e703a34c926a3331e643dfa1",
@@ -52,6 +52,35 @@
     "agreement": 1.0,
     "agreement_count": 3,
     "class_count": 4,
+    "confidence_intervals": {
+      "agreement": {
+        "confidence_level": 0.95,
+        "lower": 0.4385029682449546,
+        "method": "wilson",
+        "point": 1.0,
+        "successes": 3,
+        "total": 3,
+        "upper": 1.0
+      },
+      "holyc_accuracy": {
+        "confidence_level": 0.95,
+        "lower": 0.4385029682449546,
+        "method": "wilson",
+        "point": 1.0,
+        "successes": 3,
+        "total": 3,
+        "upper": 1.0
+      },
+      "llama_accuracy": {
+        "confidence_level": 0.95,
+        "lower": 0.4385029682449546,
+        "method": "wilson",
+        "point": 1.0,
+        "successes": 3,
+        "total": 3,
+        "upper": 1.0
+      }
+    },
     "holyc_accuracy": 1.0,
     "holyc_confusion_matrix": {
       "labels": [

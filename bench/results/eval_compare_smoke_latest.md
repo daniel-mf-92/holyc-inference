@@ -1,6 +1,6 @@
 # Eval Compare Report
 
-Generated: 2026-04-27T22:35:03Z
+Generated: 2026-04-27T22:45:13Z
 Dataset: smoke-eval
 Split: validation
 Quantization: Q4_0
@@ -19,6 +19,14 @@ Status: pass
 | llama.cpp macro F1 | 1.0000 |
 | Macro F1 delta | 0.0000 |
 | Agreement | 1.0000 |
+
+## Confidence Intervals
+
+| Metric | Point | Lower | Upper | Confidence | Method |
+| --- | ---: | ---: | ---: | ---: | --- |
+| holyc_accuracy | 1.0000 | 0.4385 | 1.0000 | 0.95 | wilson |
+| llama_accuracy | 1.0000 | 0.4385 | 1.0000 | 0.95 | wilson |
+| agreement | 1.0000 | 0.4385 | 1.0000 | 0.95 | wilson |
 
 ## Quality Gates
 

@@ -13,6 +13,7 @@ import argparse
 import csv
 import hashlib
 import json
+import math
 import sys
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
@@ -30,6 +31,13 @@ import dataset_pack
 RESULT_KEYS = ("predictions", "results", "rows", "records")
 PREDICTION_KEYS = ("prediction", "predicted", "predicted_index", "answer", "answer_index", "choice")
 SCORE_KEYS = ("scores", "logprobs", "choice_scores", "choice_logprobs")
+CONFIDENCE_Z = {
+    0.80: 1.2815515655446004,
+    0.90: 1.6448536269514722,
+    0.95: 1.959963984540054,
+    0.98: 2.3263478740408408,
+    0.99: 2.5758293035489004,
+}
 
 
 @dataclass(frozen=True)
@@ -237,6 +245,56 @@ def accuracy(correct_count: int, total: int) -> float:
     return correct_count / total if total else 0.0
 
 
+def z_for_confidence(confidence_level: float) -> float:
+    rounded = round(confidence_level, 2)
+    if rounded not in CONFIDENCE_Z:
+        raise ValueError("--confidence-level must be one of: 0.80, 0.90, 0.95, 0.98, 0.99")
+    return CONFIDENCE_Z[rounded]
+
+
+def wilson_interval(successes: int, total: int, confidence_level: float) -> dict[str, Any]:
+    if total <= 0:
+        return {
+            "confidence_level": confidence_level,
+            "lower": 0.0,
+            "method": "wilson",
+            "point": 0.0,
+            "successes": successes,
+            "total": total,
+            "upper": 0.0,
+        }
+
+    z = z_for_confidence(confidence_level)
+    point = successes / total
+    denominator = 1.0 + (z * z / total)
+    center = (point + (z * z / (2.0 * total))) / denominator
+    margin = (
+        z
+        * math.sqrt((point * (1.0 - point) / total) + (z * z / (4.0 * total * total)))
+        / denominator
+    )
+    return {
+        "confidence_level": confidence_level,
+        "lower": max(0.0, center - margin),
+        "method": "wilson",
+        "point": point,
+        "successes": successes,
+        "total": total,
+        "upper": min(1.0, center + margin),
+    }
+
+
+def add_confidence_intervals(summary: dict[str, Any], confidence_level: float) -> dict[str, Any]:
+    total = int(summary["record_count"])
+    enriched = dict(summary)
+    enriched["confidence_intervals"] = {
+        "agreement": wilson_interval(int(summary["agreement_count"]), total, confidence_level),
+        "holyc_accuracy": wilson_interval(int(summary["holyc_correct"]), total, confidence_level),
+        "llama_accuracy": wilson_interval(int(summary["llama_correct"]), total, confidence_level),
+    }
+    return enriched
+
+
 def safe_div(numerator: int | float, denominator: int | float) -> float:
     return numerator / denominator if denominator else 0.0
 
@@ -376,9 +434,25 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"| Macro F1 delta | {summary['macro_f1_delta_holyc_minus_llama']:.4f} |",
         f"| Agreement | {summary['agreement']:.4f} |",
         "",
-        "## Quality Gates",
-        "",
     ]
+    intervals = summary.get("confidence_intervals", {})
+    if intervals:
+        lines.extend(
+            [
+                "## Confidence Intervals",
+                "",
+                "| Metric | Point | Lower | Upper | Confidence | Method |",
+                "| --- | ---: | ---: | ---: | ---: | --- |",
+            ]
+        )
+        for metric in ("holyc_accuracy", "llama_accuracy", "agreement"):
+            interval = intervals[metric]
+            lines.append(
+                f"| {metric} | {interval['point']:.4f} | {interval['lower']:.4f} | "
+                f"{interval['upper']:.4f} | {interval['confidence_level']:.2f} | {interval['method']} |"
+            )
+        lines.append("")
+    lines.extend(["## Quality Gates", ""])
     if report["regressions"]:
         lines.append("| Metric | Value | Threshold | Finding |")
         lines.append("| --- | ---: | ---: | --- |")
@@ -608,6 +682,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         help="Allowed HolyC accuracy drop versus llama.cpp before CI gate failure",
     )
+    parser.add_argument(
+        "--confidence-level",
+        type=float,
+        default=0.95,
+        help="Wilson confidence level for accuracy/agreement intervals",
+    )
     parser.add_argument("--fail-on-regression", action="store_true", help="Return non-zero when quality gates fail")
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--output-stem", default="eval_compare_latest")
@@ -621,6 +701,7 @@ def main(argv: list[str] | None = None) -> int:
         holyc_predictions = load_predictions(args.holyc, gold)
         llama_predictions = load_predictions(args.llama, gold)
         rows, summary = compare(gold, holyc_predictions, llama_predictions)
+        summary = add_confidence_intervals(summary, args.confidence_level)
         json_path, md_path, csv_path = write_report(rows, summary, args, args.gold, args.holyc, args.llama)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)

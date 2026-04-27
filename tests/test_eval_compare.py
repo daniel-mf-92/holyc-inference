@@ -82,9 +82,17 @@ def test_cli_writes_json_and_markdown_report() -> None:
         assert payload["status"] == "pass"
         assert payload["regressions"] == []
         assert payload["summary"]["class_count"] == 4
+        holyc_interval = payload["summary"]["confidence_intervals"]["holyc_accuracy"]
+        assert holyc_interval["method"] == "wilson"
+        assert holyc_interval["successes"] == 3
+        assert holyc_interval["total"] == 3
+        assert round(holyc_interval["lower"], 4) == 0.4385
+        assert holyc_interval["upper"] == 1.0
         assert payload["summary"]["holyc_per_answer_index"][0]["support"] == 3
         assert (Path(tmp) / "smoke.md").exists()
-        assert "No quality gate regressions." in (Path(tmp) / "smoke.md").read_text(encoding="utf-8")
+        markdown = (Path(tmp) / "smoke.md").read_text(encoding="utf-8")
+        assert "## Confidence Intervals" in markdown
+        assert "No quality gate regressions." in markdown
         assert len(csv_rows) == 3
         assert csv_rows[0]["record_id"] == "smoke-arc-1"
         assert csv_rows[0]["holyc_correct"] == "True"
@@ -116,6 +124,44 @@ def test_compare_reports_macro_f1_and_confusion_matrix() -> None:
     assert round(summary["llama_macro_f1"], 4) == 0.4
     assert summary["holyc_confusion_matrix"]["matrix"] == [[1, 1], [0, 1]]
     assert summary["llama_confusion_matrix"]["matrix"] == [[2, 0], [1, 0]]
+
+
+def test_confidence_level_can_be_configured() -> None:
+    interval_90 = eval_compare.wilson_interval(8, 10, 0.90)
+    interval_99 = eval_compare.wilson_interval(8, 10, 0.99)
+
+    assert interval_90["point"] == 0.8
+    assert interval_99["lower"] < interval_90["lower"]
+    assert interval_99["upper"] > interval_90["upper"]
+
+
+def test_invalid_confidence_level_fails_fast() -> None:
+    gold = BENCH_PATH / "datasets" / "samples" / "smoke_eval.jsonl"
+    holyc = BENCH_PATH / "eval" / "samples" / "holyc_smoke_predictions.jsonl"
+    llama = BENCH_PATH / "eval" / "samples" / "llama_smoke_predictions.jsonl"
+
+    with tempfile.TemporaryDirectory() as tmp:
+        assert (
+            eval_compare.main(
+                [
+                    "--gold",
+                    str(gold),
+                    "--holyc",
+                    str(holyc),
+                    "--llama",
+                    str(llama),
+                    "--dataset",
+                    "smoke-eval",
+                    "--split",
+                    "validation",
+                    "--output-dir",
+                    tmp,
+                    "--confidence-level",
+                    "0.97",
+                ]
+            )
+            == 2
+        )
 
 
 def test_missing_prediction_fails_fast() -> None:
@@ -204,6 +250,8 @@ if __name__ == "__main__":
     test_smoke_predictions_compare_cleanly()
     test_cli_writes_json_and_markdown_report()
     test_compare_reports_macro_f1_and_confusion_matrix()
+    test_confidence_level_can_be_configured()
+    test_invalid_confidence_level_fails_fast()
     test_missing_prediction_fails_fast()
     test_cli_can_fail_on_quality_gate_regression()
     print("eval_compare_tests=ok")
