@@ -284,6 +284,156 @@ def bot_emit_preflight_only_model(
     return SAMPLING_Q16_OK
 
 
+def bot_emit_parity_model(
+    *,
+    event_buffer: list[int] | None,
+    event_buffer_capacity: int,
+    session_id: int,
+    step_index: int,
+    token_id: int,
+    logit_q16: int,
+    policy_digest_q64: int,
+    expected_policy_digest_q64: int,
+    profile_mode: int,
+    out_event_status: list[int] | None,
+    out_event_count: list[int] | None,
+    out_event_digest_q64: list[int] | None,
+) -> int:
+    if event_buffer is None or out_event_status is None or out_event_count is None or out_event_digest_q64 is None:
+        return SAMPLING_Q16_ERR_NULL_PTR
+
+    if out_event_status is out_event_count or out_event_status is out_event_digest_q64 or out_event_count is out_event_digest_q64:
+        return SAMPLING_Q16_ERR_BAD_PARAM
+
+    if event_buffer_capacity < INFERENCE_BOT_EVENT_TUPLE_CELLS:
+        return SAMPLING_Q16_ERR_BAD_PARAM
+
+    snap_buffer = list(event_buffer)
+    snap_status = out_event_status[0]
+    snap_count = out_event_count[0]
+    snap_digest = out_event_digest_q64[0]
+
+    preflight_event = [0] * INFERENCE_BOT_EVENT_TUPLE_CELLS
+    preflight_status = [0x1212]
+    preflight_count = [0x3434]
+    preflight_digest = [0x5656]
+    commit_event = [0] * INFERENCE_BOT_EVENT_TUPLE_CELLS
+    commit_status = [0]
+    commit_count = [0]
+    commit_digest = [0]
+    checked_event = [0] * INFERENCE_BOT_EVENT_TUPLE_CELLS
+    checked_status = [0]
+    checked_count = [0]
+    checked_digest = [0]
+
+    status_preflight = bot_emit_preflight_only_model(
+        event_buffer=preflight_event,
+        event_buffer_capacity=INFERENCE_BOT_EVENT_TUPLE_CELLS,
+        session_id=session_id,
+        step_index=step_index,
+        token_id=token_id,
+        logit_q16=logit_q16,
+        policy_digest_q64=policy_digest_q64,
+        expected_policy_digest_q64=expected_policy_digest_q64,
+        profile_mode=profile_mode,
+        out_event_status=preflight_status,
+        out_event_count=preflight_count,
+        out_event_digest_q64=preflight_digest,
+    )
+    if status_preflight != SAMPLING_Q16_OK:
+        assert event_buffer == snap_buffer
+        assert out_event_status[0] == snap_status
+        assert out_event_count[0] == snap_count
+        assert out_event_digest_q64[0] == snap_digest
+        return status_preflight
+    if preflight_status[0] != 0x1212 or preflight_count[0] != 0x3434 or preflight_digest[0] != 0x5656:
+        assert event_buffer == snap_buffer
+        assert out_event_status[0] == snap_status
+        assert out_event_count[0] == snap_count
+        assert out_event_digest_q64[0] == snap_digest
+        return SAMPLING_Q16_ERR_BAD_PARAM
+
+    status_commit = bot_emit_commit_only_model(
+        event_buffer=commit_event,
+        event_buffer_capacity=INFERENCE_BOT_EVENT_TUPLE_CELLS,
+        session_id=session_id,
+        step_index=step_index,
+        token_id=token_id,
+        logit_q16=logit_q16,
+        policy_digest_q64=policy_digest_q64,
+        expected_policy_digest_q64=expected_policy_digest_q64,
+        profile_mode=profile_mode,
+        out_event_status=commit_status,
+        out_event_count=commit_count,
+        out_event_digest_q64=commit_digest,
+    )
+    if status_commit != SAMPLING_Q16_OK:
+        assert event_buffer == snap_buffer
+        assert out_event_status[0] == snap_status
+        assert out_event_count[0] == snap_count
+        assert out_event_digest_q64[0] == snap_digest
+        return status_commit
+
+    status_checked = bot_emit_model(
+        event_buffer=checked_event,
+        event_buffer_capacity=INFERENCE_BOT_EVENT_TUPLE_CELLS,
+        session_id=session_id,
+        step_index=step_index,
+        token_id=token_id,
+        logit_q16=logit_q16,
+        policy_digest_q64=policy_digest_q64,
+        expected_policy_digest_q64=expected_policy_digest_q64,
+        profile_mode=profile_mode,
+        out_event_status=checked_status,
+        out_event_count=checked_count,
+        out_event_digest_q64=checked_digest,
+    )
+    if status_checked != SAMPLING_Q16_OK:
+        assert event_buffer == snap_buffer
+        assert out_event_status[0] == snap_status
+        assert out_event_count[0] == snap_count
+        assert out_event_digest_q64[0] == snap_digest
+        return status_checked
+
+    if commit_status[0] not in (INFERENCE_BOT_STATUS_BLOCKED, INFERENCE_BOT_STATUS_EMITTED):
+        assert event_buffer == snap_buffer
+        assert out_event_status[0] == snap_status
+        assert out_event_count[0] == snap_count
+        assert out_event_digest_q64[0] == snap_digest
+        return SAMPLING_Q16_ERR_BAD_PARAM
+
+    if checked_status[0] not in (INFERENCE_BOT_STATUS_BLOCKED, INFERENCE_BOT_STATUS_EMITTED):
+        assert event_buffer == snap_buffer
+        assert out_event_status[0] == snap_status
+        assert out_event_count[0] == snap_count
+        assert out_event_digest_q64[0] == snap_digest
+        return SAMPLING_Q16_ERR_BAD_PARAM
+
+    if (
+        commit_status[0] != checked_status[0]
+        or commit_count[0] != checked_count[0]
+        or commit_digest[0] != checked_digest[0]
+    ):
+        assert event_buffer == snap_buffer
+        assert out_event_status[0] == snap_status
+        assert out_event_count[0] == snap_count
+        assert out_event_digest_q64[0] == snap_digest
+        return SAMPLING_Q16_ERR_BAD_PARAM
+
+    if commit_event != checked_event:
+        assert event_buffer == snap_buffer
+        assert out_event_status[0] == snap_status
+        assert out_event_count[0] == snap_count
+        assert out_event_digest_q64[0] == snap_digest
+        return SAMPLING_Q16_ERR_BAD_PARAM
+
+    assert event_buffer == snap_buffer
+    assert out_event_status[0] == snap_status
+    assert out_event_count[0] == snap_count
+    assert out_event_digest_q64[0] == snap_digest
+    return SAMPLING_Q16_OK
+
+
 def _extract_body(source: str, signature: str) -> str:
     start = source.index(signature)
     brace = source.index("{", start)
@@ -301,7 +451,7 @@ def _extract_body(source: str, signature: str) -> str:
 
 def test_source_contains_iq_1791_contract() -> None:
     source = Path("src/model/inference.HC").read_text(encoding="utf-8")
-    signature = "I32 InferenceBookOfTruthTokenEventEmitChecked("
+    signature = "I32 BotTokenEmitChecked("
     assert signature in source
     body = _extract_body(source, signature)
     assert "staged_event[0] = session_id;" in body
@@ -313,30 +463,39 @@ def test_source_contains_iq_1791_contract() -> None:
 
 def test_source_contains_iq_1792_contract() -> None:
     source = Path("src/model/inference.HC").read_text(encoding="utf-8")
-    assert "#define InferenceBookOfTruthTokenEventEmitCheckedCommitOnly BotTokenEmitCommitOnly" in source
     signature = "I32 BotTokenEmitCommitOnly("
     assert signature in source
     body = _extract_body(source, signature)
-    assert "status_primary = InferenceBookOfTruthTokenEventEmitChecked(" in body
-    assert "status_replay = InferenceBookOfTruthTokenEventEmitChecked(" in body
+    assert "status_primary = BotTokenEmitChecked(" in body
+    assert "status_replay = BotTokenEmitChecked(" in body
     assert "if (staged_event_status_primary != staged_event_status_replay ||" in body
     assert "*out_event_digest_q64 = staged_event_digest_primary;" in body
 
 
 def test_source_contains_iq_1793_contract() -> None:
     source = Path("src/model/inference.HC").read_text(encoding="utf-8")
-    assert (
-        "#define InferenceBookOfTruthTokenEventEmitCheckedCommitOnlyPreflightOnly "
-        "BotTokenEmitPreflightOnly"
-    ) in source
     signature = "I32 BotTokenEmitPreflightOnly("
     assert signature in source
     body = _extract_body(source, signature)
-    assert "status_commit = InferenceBookOfTruthTokenEventEmitCheckedCommitOnly(" in body
-    assert "status_canonical = InferenceBookOfTruthTokenEventEmitChecked(" in body
+    assert "status_commit = BotTokenEmitCommitOnly(" in body
+    assert "status_canonical = BotTokenEmitChecked(" in body
     assert "if (staged_commit_status != staged_canonical_status ||" in body
     assert "if (*out_event_status != snapshot_event_status ||" in body
     assert "if (event_buffer[lane] != snapshot_event[lane])" in body
+
+
+def test_source_contains_iq_1794_contract() -> None:
+    source = Path("src/model/inference.HC").read_text(encoding="utf-8")
+    signature = "I32 BotTokenEmitParity("
+    assert signature in source
+    body = _extract_body(source, signature)
+    assert "status_preflight =" in body
+    assert "BotTokenEmitPreflightOnly(" in body
+    assert "status_commit = BotTokenEmitCommitOnly(" in body
+    assert "status_preflight = BotTokenEmitChecked(" in body
+    assert "if (staged_preflight_status != 0x1212 ||" in body
+    assert "if (staged_commit_status != staged_checked_status ||" in body
+    assert "if (*out_event_status != snapshot_event_status ||" in body
 
 
 def test_secure_local_success_emits_event() -> None:
@@ -521,7 +680,7 @@ def test_deterministic_replay_digest() -> None:
     assert digest_a == digest_b
 
 
-def test_preflight_only_secure_local_success_keeps_slots_immutable() -> None:
+def test_preflight_success_keeps_slots() -> None:
     event_buffer = [901, 902, 903, 904, 905, 906]
     out_status = [17]
     out_count = [18]
@@ -549,7 +708,7 @@ def test_preflight_only_secure_local_success_keeps_slots_immutable() -> None:
     assert out_digest == [19]
 
 
-def test_preflight_only_digest_mismatch_keeps_slots_immutable() -> None:
+def test_preflight_digest_mismatch_slots() -> None:
     event_buffer = [11, 12, 13, 14, 15, 16]
     out_status = [21]
     out_count = [22]
@@ -577,16 +736,75 @@ def test_preflight_only_digest_mismatch_keeps_slots_immutable() -> None:
     assert out_digest == [23]
 
 
+def test_parity_secure_local_success_keeps_slots_immutable() -> None:
+    event_buffer = [31, 32, 33, 34, 35, 36]
+    out_status = [41]
+    out_count = [42]
+    out_digest = [43]
+
+    status = bot_emit_parity_model(
+        event_buffer=event_buffer,
+        event_buffer_capacity=INFERENCE_BOT_EVENT_TUPLE_CELLS,
+        session_id=99,
+        step_index=3,
+        token_id=15496,
+        logit_q16=2048,
+        policy_digest_q64=0xA55A,
+        expected_policy_digest_q64=0xA55A,
+        profile_mode=INFERENCE_BOT_PROFILE_SECURE,
+        out_event_status=out_status,
+        out_event_count=out_count,
+        out_event_digest_q64=out_digest,
+    )
+
+    assert status == SAMPLING_Q16_OK
+    assert event_buffer == [31, 32, 33, 34, 35, 36]
+    assert out_status == [41]
+    assert out_count == [42]
+    assert out_digest == [43]
+
+
+def test_parity_digest_mismatch_keeps_slots_immutable() -> None:
+    event_buffer = [51, 52, 53, 54, 55, 56]
+    out_status = [61]
+    out_count = [62]
+    out_digest = [63]
+
+    status = bot_emit_parity_model(
+        event_buffer=event_buffer,
+        event_buffer_capacity=INFERENCE_BOT_EVENT_TUPLE_CELLS,
+        session_id=12,
+        step_index=13,
+        token_id=14,
+        logit_q16=15,
+        policy_digest_q64=0x1010,
+        expected_policy_digest_q64=0x2020,
+        profile_mode=INFERENCE_BOT_PROFILE_SECURE,
+        out_event_status=out_status,
+        out_event_count=out_count,
+        out_event_digest_q64=out_digest,
+    )
+
+    assert status == SAMPLING_Q16_OK
+    assert event_buffer == [51, 52, 53, 54, 55, 56]
+    assert out_status == [61]
+    assert out_count == [62]
+    assert out_digest == [63]
+
+
 if __name__ == "__main__":
     test_source_contains_iq_1791_contract()
     test_source_contains_iq_1792_contract()
     test_source_contains_iq_1793_contract()
+    test_source_contains_iq_1794_contract()
     test_secure_local_success_emits_event()
     test_digest_mismatch_blocks_and_preserves_event_buffer()
     test_commit_only_secure_local_success_emits_event()
     test_commit_only_digest_mismatch_blocks_and_preserves_event_buffer()
     test_capacity_underflow_is_fail_closed()
     test_deterministic_replay_digest()
-    test_preflight_only_secure_local_success_keeps_slots_immutable()
-    test_preflight_only_digest_mismatch_keeps_slots_immutable()
+    test_preflight_success_keeps_slots()
+    test_preflight_digest_mismatch_slots()
+    test_parity_secure_local_success_keeps_slots_immutable()
+    test_parity_digest_mismatch_keeps_slots_immutable()
     print("ok")
