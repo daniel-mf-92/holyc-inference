@@ -77,6 +77,8 @@ def main() -> int:
             return 1
 
         audit_output = tmp_path / "airgap_audit.json"
+        audit_markdown = tmp_path / "airgap_audit.md"
+        audit_csv = tmp_path / "airgap_audit.csv"
         audit_command = [
             sys.executable,
             str(ROOT / "bench" / "airgap_audit.py"),
@@ -84,6 +86,10 @@ def main() -> int:
             str(RESULTS),
             "--output",
             str(audit_output),
+            "--markdown",
+            str(audit_markdown),
+            "--csv",
+            str(audit_csv),
         ]
         completed = subprocess.run(
             audit_command,
@@ -103,6 +109,12 @@ def main() -> int:
             return 1
         if audit_report["commands_checked"] < 1:
             print("missing_qemu_command_audit=true", file=sys.stderr)
+            return 1
+        if "Benchmark Air-Gap Audit" not in audit_markdown.read_text(encoding="utf-8"):
+            print("missing_airgap_markdown=true", file=sys.stderr)
+            return 1
+        if "source,row,reason,command" not in audit_csv.read_text(encoding="utf-8"):
+            print("missing_airgap_csv=true", file=sys.stderr)
             return 1
 
         unsafe_fixture = tmp_path / "unsafe_qemu.json"

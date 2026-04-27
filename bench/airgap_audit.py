@@ -10,6 +10,7 @@ virtual NIC devices.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import shlex
 import sys
@@ -198,6 +199,55 @@ def audit(paths: Iterable[Path]) -> tuple[int, list[Finding]]:
     return commands_checked, findings
 
 
+def markdown_report(report: dict[str, Any]) -> str:
+    lines = [
+        "# Benchmark Air-Gap Audit",
+        "",
+        f"Generated: {report['generated_at']}",
+        f"Status: {report['status']}",
+        f"QEMU commands checked: {report['commands_checked']}",
+        f"Findings: {len(report['findings'])}",
+        "",
+    ]
+    findings = report["findings"]
+    if findings:
+        lines.extend(
+            [
+                "| Source | Row | Reason | Command |",
+                "| --- | ---: | --- | --- |",
+            ]
+        )
+        for finding in findings:
+            command = shlex.join(finding["command"])
+            lines.append(
+                "| {source} | {row} | {reason} | `{command}` |".format(
+                    source=finding["source"],
+                    row=finding["row"],
+                    reason=finding["reason"].replace("|", "\\|"),
+                    command=command.replace("`", "\\`"),
+                )
+            )
+    else:
+        lines.append("All recorded QEMU commands explicitly disable networking with `-nic none`.")
+    return "\n".join(lines) + "\n"
+
+
+def write_csv(findings: list[Finding], path: Path) -> None:
+    fields = ["source", "row", "reason", "command"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for finding in findings:
+            writer.writerow(
+                {
+                    "source": finding.source,
+                    "row": finding.row,
+                    "reason": finding.reason,
+                    "command": shlex.join(finding.command),
+                }
+            )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -208,6 +258,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Benchmark artifact file or directory; defaults to bench/results",
     )
     parser.add_argument("--output", type=Path, default=Path("bench/results/airgap_audit_latest.json"))
+    parser.add_argument("--markdown", type=Path, help="Optional Markdown audit report path")
+    parser.add_argument("--csv", type=Path, help="Optional CSV findings report path")
     return parser
 
 
@@ -224,7 +276,17 @@ def main(argv: list[str] | None = None) -> int:
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if args.markdown:
+        args.markdown.parent.mkdir(parents=True, exist_ok=True)
+        args.markdown.write_text(markdown_report(report), encoding="utf-8")
+    if args.csv:
+        args.csv.parent.mkdir(parents=True, exist_ok=True)
+        write_csv(findings, args.csv)
     print(f"wrote_json={args.output}")
+    if args.markdown:
+        print(f"wrote_markdown={args.markdown}")
+    if args.csv:
+        print(f"wrote_csv={args.csv}")
     print(f"status={report['status']}")
     print(f"commands_checked={commands_checked}")
     if findings:
