@@ -413,6 +413,8 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
                 "elapsed_us_median": statistics.median(elapsed_values) if elapsed_values else None,
                 "tok_per_s_min": min(tok_values) if tok_values else None,
                 "tok_per_s_median": statistics.median(tok_values) if tok_values else None,
+                "tok_per_s_stdev": sample_stdev(tok_values),
+                "tok_per_s_cv_pct": coefficient_of_variation_pct(tok_values),
                 "tok_per_s_max": max(tok_values) if tok_values else None,
                 "memory_bytes_max": max(memory_values) if memory_values else None,
             }
@@ -438,6 +440,21 @@ def percentile(values: list[float], pct: float) -> float | None:
     return ordered[lower] + (ordered[upper] - ordered[lower]) * fraction
 
 
+def sample_stdev(values: list[float]) -> float | None:
+    if len(values) < 2:
+        return None
+    return statistics.stdev(values)
+
+
+def coefficient_of_variation_pct(values: list[float]) -> float | None:
+    if len(values) < 2:
+        return None
+    mean = statistics.mean(values)
+    if mean == 0:
+        return None
+    return statistics.stdev(values) * 100.0 / mean
+
+
 def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
     tok_values = [run.tok_per_s for run in runs if run.tok_per_s is not None]
     elapsed_values = [run.elapsed_us for run in runs if run.elapsed_us > 0]
@@ -454,6 +471,8 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
         "total_elapsed_us": sum(elapsed_values) if elapsed_values else None,
         "tok_per_s_min": min(tok_values) if tok_values else None,
         "tok_per_s_median": statistics.median(tok_values) if tok_values else None,
+        "tok_per_s_stdev": sample_stdev(tok_values),
+        "tok_per_s_cv_pct": coefficient_of_variation_pct(tok_values),
         "tok_per_s_p95": percentile(tok_values, 95.0),
         "tok_per_s_max": max(tok_values) if tok_values else None,
         "elapsed_us_p95": percentile([float(value) for value in elapsed_values], 95.0),
@@ -485,19 +504,26 @@ def markdown_report(report: dict[str, Any]) -> str:
                     **{key: format_summary_value(value) for key, value in suite.items()}
                 ),
                 "",
+                "| tok/s stdev | tok/s CV % |",
+                "| ---: | ---: |",
+                "| {tok_per_s_stdev} | {tok_per_s_cv_pct} |".format(
+                    **{key: format_summary_value(value) for key, value in suite.items()}
+                ),
+                "",
                 "## Prompt Summary",
                 "",
             ]
         )
     if report["summaries"]:
         lines.append(
-            "| Prompt | Runs | OK | Median tokens | Median elapsed us | Min tok/s | Median tok/s | Max tok/s | Max memory bytes |"
+            "| Prompt | Runs | OK | Median tokens | Median elapsed us | Min tok/s | Median tok/s | tok/s stdev | tok/s CV % | Max tok/s | Max memory bytes |"
         )
-        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for summary in report["summaries"]:
             lines.append(
                 "| {prompt} | {runs} | {ok_runs} | {tokens_median} | {elapsed_us_median} | "
-                "{tok_per_s_min} | {tok_per_s_median} | {tok_per_s_max} | {memory_bytes_max} |".format(
+                "{tok_per_s_min} | {tok_per_s_median} | {tok_per_s_stdev} | {tok_per_s_cv_pct} | "
+                "{tok_per_s_max} | {memory_bytes_max} |".format(
                     **{key: format_summary_value(value) for key, value in summary.items()}
                 )
             )

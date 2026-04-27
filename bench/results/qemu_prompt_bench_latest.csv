@@ -1,7 +1,7 @@
 timestamp,commit,benchmark,profile,model,quantization,prompt,prompt_sha256,iteration,tokens,elapsed_us,wall_elapsed_us,tok_per_s,memory_bytes,returncode,timed_out
-2026-04-27T20:02:33Z,786eee1bfa27,qemu_prompt,synthetic-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4,1,32,200000,63096,160.0,67174400,0,False
-2026-04-27T20:02:33Z,786eee1bfa27,qemu_prompt,synthetic-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4,2,32,200000,59724,160.0,67174400,0,False
-2026-04-27T20:02:33Z,786eee1bfa27,qemu_prompt,synthetic-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4,3,32,200000,58198,160.0,67174400,0,False
-2026-04-27T20:02:33Z,786eee1bfa27,qemu_prompt,synthetic-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091,1,48,300000,75282,160.0,67207168,0,False
-2026-04-27T20:02:33Z,786eee1bfa27,qemu_prompt,synthetic-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091,2,48,300000,157250,160.0,67207168,0,False
-2026-04-27T20:02:33Z,786eee1bfa27,qemu_prompt,synthetic-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091,3,48,300000,71344,160.0,67207168,0,False
+2026-04-27T22:08:28Z,b5c013b1b596,qemu_prompt,synthetic-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4,1,32,200000,47628,160.0,67174400,0,False
+2026-04-27T22:08:28Z,b5c013b1b596,qemu_prompt,synthetic-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4,2,32,200000,43131,160.0,67174400,0,False
+2026-04-27T22:08:28Z,b5c013b1b596,qemu_prompt,synthetic-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4,3,32,200000,52524,160.0,67174400,0,False
+2026-04-27T22:08:28Z,b5c013b1b596,qemu_prompt,synthetic-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091,1,48,300000,69126,160.0,67207168,0,False
+2026-04-27T22:08:28Z,b5c013b1b596,qemu_prompt,synthetic-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091,2,48,300000,63774,160.0,67207168,0,False
+2026-04-27T22:08:28Z,b5c013b1b596,qemu_prompt,synthetic-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091,3,48,300000,60063,160.0,67207168,0,False

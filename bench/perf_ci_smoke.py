@@ -157,6 +157,53 @@ def main() -> int:
             print("unsafe_qemu_command_not_rejected=true", file=sys.stderr)
             return 1
 
+        bench_output_dir = tmp_path / "qemu_prompt_bench"
+        bench_command = [
+            sys.executable,
+            str(ROOT / "bench" / "qemu_prompt_bench.py"),
+            "--image",
+            "/tmp/TempleOS.synthetic.img",
+            "--prompts",
+            str(ROOT / "bench" / "prompts" / "smoke.jsonl"),
+            "--qemu-bin",
+            str(ROOT / "bench" / "fixtures" / "qemu_synthetic_bench.py"),
+            "--profile",
+            "ci-airgap-smoke",
+            "--model",
+            "synthetic-smoke",
+            "--quantization",
+            "Q4_0",
+            "--repeat",
+            "3",
+            "--output-dir",
+            str(bench_output_dir),
+        ]
+        completed = subprocess.run(
+            bench_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode != 0:
+            sys.stdout.write(completed.stdout)
+            sys.stderr.write(completed.stderr)
+            return completed.returncode
+
+        bench_report = json.loads(
+            (bench_output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8")
+        )
+        suite_summary = bench_report["suite_summary"]
+        if suite_summary.get("tok_per_s_stdev") is None:
+            print("missing_suite_tok_stdev=true", file=sys.stderr)
+            return 1
+        if suite_summary.get("tok_per_s_cv_pct") is None:
+            print("missing_suite_tok_cv=true", file=sys.stderr)
+            return 1
+        if not all("tok_per_s_cv_pct" in row for row in bench_report["summaries"]):
+            print("missing_prompt_tok_cv=true", file=sys.stderr)
+            return 1
+
     print("perf_ci_smoke=ok")
     return 0
 
