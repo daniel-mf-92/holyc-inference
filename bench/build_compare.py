@@ -13,6 +13,7 @@ import csv
 import json
 import statistics
 import sys
+import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -319,6 +320,57 @@ def write_csv(deltas: list[BuildDelta], path: Path) -> None:
             writer.writerow({field: getattr(delta, field) for field in fields})
 
 
+def write_junit(deltas: list[BuildDelta], regressions: list[BuildRegression], path: Path) -> None:
+    regression_by_key = {
+        (regression.candidate_build, regression.key): regression for regression in regressions
+    }
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": "holyc_build_compare",
+            "tests": str(len(deltas)),
+            "failures": str(len(regressions)),
+            "errors": "0",
+        },
+    )
+    for delta in deltas:
+        case_name = f"{delta.candidate_build}:{delta.key}"
+        case = ET.SubElement(
+            suite,
+            "testcase",
+            {
+                "classname": "build_compare",
+                "name": case_name,
+            },
+        )
+        regression = regression_by_key.get((delta.candidate_build, delta.key))
+        if regression is not None:
+            failure = ET.SubElement(
+                case,
+                "failure",
+                {
+                    "type": "throughput_regression",
+                    "message": (
+                        f"median tok/s changed by {regression.tok_per_s_delta_pct:.3f}% "
+                        f"with allowed drop {regression.max_tok_regression_pct:.3f}%"
+                    ),
+                },
+            )
+            failure.text = (
+                f"candidate={delta.candidate_build}\n"
+                f"key={delta.key}\n"
+                f"baseline_tok_per_s={format_value(delta.baseline_tok_per_s)}\n"
+                f"candidate_tok_per_s={format_value(delta.candidate_tok_per_s)}\n"
+                f"tok_per_s_delta_pct={format_value(delta.tok_per_s_delta_pct)}\n"
+                f"baseline_commit={delta.baseline_commit}\n"
+                f"candidate_commit={delta.candidate_commit}\n"
+            )
+    ET.indent(suite)
+    ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
+    with path.open("ab") as handle:
+        handle.write(b"\n")
+
+
 def write_report(
     metrics: list[BuildMetric],
     deltas: list[BuildDelta],
@@ -342,9 +394,11 @@ def write_report(
     json_path = output_dir / "build_compare_latest.json"
     md_path = output_dir / "build_compare_latest.md"
     csv_path = output_dir / "build_compare_latest.csv"
+    junit_path = output_dir / "build_compare_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
     write_csv(deltas, csv_path)
+    write_junit(deltas, regressions, junit_path)
     return json_path
 
 

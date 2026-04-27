@@ -272,7 +272,7 @@ surface throughput regressions and sample-coverage failures as test failures.
 
 `build_compare.py` compares multiple `qemu_prompt_bench.py` JSON reports by
 prompt/profile/model/quantization and writes per-build throughput and elapsed
-time deltas to `bench/results/` as JSON, Markdown, and CSV. Use
+time deltas to `bench/results/` as JSON, Markdown, CSV, and JUnit XML. Use
 `--fail-on-regression` with `--max-tok-regression-pct` to gate median tok/s
 drops in CI without launching QEMU.
 

@@ -1,0 +1,5 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="holyc_build_compare" tests="2" failures="0" errors="0">
+  <testcase classname="build_compare" name="head:qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code" />
+  <testcase classname="build_compare" name="head:qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short" />
+</testsuite>

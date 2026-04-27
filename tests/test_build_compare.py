@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import sys
 import csv
+import xml.etree.ElementTree as ET
 from tempfile import TemporaryDirectory
 from pathlib import Path
 
@@ -80,12 +81,17 @@ def test_cli_writes_json_markdown_and_csv_reports(tmp_path: Path) -> None:
     payload = json.loads((output_dir / "build_compare_latest.json").read_text(encoding="utf-8"))
     markdown = (output_dir / "build_compare_latest.md").read_text(encoding="utf-8")
     csv_rows = list(csv.DictReader((output_dir / "build_compare_latest.csv").open(newline="", encoding="utf-8")))
+    junit_root = ET.parse(output_dir / "build_compare_junit_latest.xml").getroot()
 
     assert payload["status"] == "fail"
     assert payload["baseline_build"] == "base"
     assert payload["deltas"][0]["tok_per_s_delta_pct"] == -10.0
     assert payload["regressions"][0]["candidate_build"] == "head"
     assert csv_rows[0]["tok_per_s_delta_pct"] == "-10.0"
+    assert junit_root.attrib["name"] == "holyc_build_compare"
+    assert junit_root.attrib["tests"] == "1"
+    assert junit_root.attrib["failures"] == "1"
+    assert junit_root.find("./testcase/failure") is not None
     assert "Build Benchmark Compare" in markdown
     assert "Status: fail" in markdown
     assert "| head | qemu_prompt/secure-local/tiny/Q4_0/smoke | 100.000 | 90.000 | -10.000 |" in markdown
