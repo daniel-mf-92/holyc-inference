@@ -37111,3 +37111,216 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnly(
     *out_snapshot_digest_q64 = saved_snapshot_digest_q64;
     return status_commit_only;
 }
+
+I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyParity(
+    const I64 *p50_overhead_q16_rows,
+    const I64 *p95_overhead_q16_rows,
+    const I64 *max_p50_overhead_q16_rows,
+    const I64 *max_p95_overhead_q16_rows,
+    I64 scenario_count,
+    I64 scenario_capacity,
+    I64 secure_local_mode,
+    I64 iommu_active,
+    I64 book_of_truth_gpu_hooks,
+    I64 policy_digest_parity,
+    I64 dispatch_transcript_parity,
+    I64 *out_ok_count,
+    I64 *out_blocked_count,
+    I64 *out_drift_count,
+    I64 *out_snapshot_digest_q64)
+{
+    const I64 *snapshot_p50_ptr;
+    const I64 *snapshot_p95_ptr;
+    const I64 *snapshot_max_p50_ptr;
+    const I64 *snapshot_max_p95_ptr;
+    I64 snapshot_scenario_count;
+    I64 snapshot_scenario_capacity;
+    I64 snapshot_secure_local_mode;
+    I64 snapshot_iommu_active;
+    I64 snapshot_book_of_truth_gpu_hooks;
+    I64 snapshot_policy_digest_parity;
+    I64 snapshot_dispatch_transcript_parity;
+    I64 *snapshot_out_ok_count_ptr;
+    I64 *snapshot_out_blocked_count_ptr;
+    I64 *snapshot_out_drift_count_ptr;
+    I64 *snapshot_out_digest_ptr;
+    I64 saved_ok_count;
+    I64 saved_blocked_count;
+    I64 saved_drift_count;
+    I64 saved_snapshot_digest_q64;
+    I64 staged_ok_count;
+    I64 staged_blocked_count;
+    I64 staged_drift_count;
+    I64 staged_snapshot_digest_q64;
+    I64 canonical_ok_count;
+    I64 canonical_blocked_count;
+    I64 canonical_drift_count;
+    I64 canonical_snapshot_digest_q64;
+    I64 staged_total;
+    I64 canonical_total;
+    I32 status_preflight_only;
+    I32 status_commit_only;
+
+    if (!p50_overhead_q16_rows || !p95_overhead_q16_rows ||
+        !max_p50_overhead_q16_rows || !max_p95_overhead_q16_rows)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    if (!out_ok_count || !out_blocked_count || !out_drift_count || !out_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_NULL_PTR;
+
+    if (out_ok_count == out_blocked_count ||
+        out_ok_count == out_drift_count ||
+        out_ok_count == out_snapshot_digest_q64 ||
+        out_blocked_count == out_drift_count ||
+        out_blocked_count == out_snapshot_digest_q64 ||
+        out_drift_count == out_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (scenario_count <= 0 || scenario_capacity < scenario_count)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    snapshot_p50_ptr = p50_overhead_q16_rows;
+    snapshot_p95_ptr = p95_overhead_q16_rows;
+    snapshot_max_p50_ptr = max_p50_overhead_q16_rows;
+    snapshot_max_p95_ptr = max_p95_overhead_q16_rows;
+    snapshot_scenario_count = scenario_count;
+    snapshot_scenario_capacity = scenario_capacity;
+    snapshot_secure_local_mode = secure_local_mode;
+    snapshot_iommu_active = iommu_active;
+    snapshot_book_of_truth_gpu_hooks = book_of_truth_gpu_hooks;
+    snapshot_policy_digest_parity = policy_digest_parity;
+    snapshot_dispatch_transcript_parity = dispatch_transcript_parity;
+    snapshot_out_ok_count_ptr = out_ok_count;
+    snapshot_out_blocked_count_ptr = out_blocked_count;
+    snapshot_out_drift_count_ptr = out_drift_count;
+    snapshot_out_digest_ptr = out_snapshot_digest_q64;
+    saved_ok_count = *out_ok_count;
+    saved_blocked_count = *out_blocked_count;
+    saved_drift_count = *out_drift_count;
+    saved_snapshot_digest_q64 = *out_snapshot_digest_q64;
+
+    staged_ok_count = 0;
+    staged_blocked_count = 0;
+    staged_drift_count = 0;
+    staged_snapshot_digest_q64 = 0;
+    canonical_ok_count = 0;
+    canonical_blocked_count = 0;
+    canonical_drift_count = 0;
+    canonical_snapshot_digest_q64 = 0;
+
+    // IQ-1745 strict diagnostics parity gate:
+    // - run commit-only canonical path (IQ-1743), then seed that tuple into
+    //   zero-write diagnostics companion (IQ-1744) under immutable snapshots;
+    // - require valid status domain plus exact tuple parity
+    //   {ok_count, blocked_count, drift_count, snapshot_digest_q64};
+    // - preserve caller output slots on all return paths (diagnostics no-write semantics).
+    status_commit_only = GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnly(
+        p50_overhead_q16_rows,
+        p95_overhead_q16_rows,
+        max_p50_overhead_q16_rows,
+        max_p95_overhead_q16_rows,
+        scenario_count,
+        scenario_capacity,
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        dispatch_transcript_parity,
+        &canonical_ok_count,
+        &canonical_blocked_count,
+        &canonical_drift_count,
+        &canonical_snapshot_digest_q64);
+
+    staged_ok_count = canonical_ok_count;
+    staged_blocked_count = canonical_blocked_count;
+    staged_drift_count = canonical_drift_count;
+    staged_snapshot_digest_q64 = canonical_snapshot_digest_q64;
+    status_preflight_only = GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnly(
+        p50_overhead_q16_rows,
+        p95_overhead_q16_rows,
+        max_p50_overhead_q16_rows,
+        max_p95_overhead_q16_rows,
+        scenario_count,
+        scenario_capacity,
+        secure_local_mode,
+        iommu_active,
+        book_of_truth_gpu_hooks,
+        policy_digest_parity,
+        dispatch_transcript_parity,
+        &staged_ok_count,
+        &staged_blocked_count,
+        &staged_drift_count,
+        &staged_snapshot_digest_q64);
+
+    if (snapshot_p50_ptr != p50_overhead_q16_rows ||
+        snapshot_p95_ptr != p95_overhead_q16_rows ||
+        snapshot_max_p50_ptr != max_p50_overhead_q16_rows ||
+        snapshot_max_p95_ptr != max_p95_overhead_q16_rows)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_scenario_count != scenario_count ||
+        snapshot_scenario_capacity != scenario_capacity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_secure_local_mode != secure_local_mode ||
+        snapshot_iommu_active != iommu_active ||
+        snapshot_book_of_truth_gpu_hooks != book_of_truth_gpu_hooks ||
+        snapshot_policy_digest_parity != policy_digest_parity ||
+        snapshot_dispatch_transcript_parity != dispatch_transcript_parity)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (snapshot_out_ok_count_ptr != out_ok_count ||
+        snapshot_out_blocked_count_ptr != out_blocked_count ||
+        snapshot_out_drift_count_ptr != out_drift_count ||
+        snapshot_out_digest_ptr != out_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (!GPUSecurityPerfStatusIsValid(status_preflight_only) ||
+        !GPUSecurityPerfStatusIsValid(status_commit_only))
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (status_preflight_only == GPU_SEC_PERF_OK)
+    {
+        if (staged_ok_count < 0 || staged_blocked_count < 0 || staged_drift_count < 0)
+            return GPU_SEC_PERF_ERR_BAD_PARAM;
+        if (staged_snapshot_digest_q64 <= 0)
+            return GPU_SEC_PERF_ERR_BAD_PARAM;
+        if (!GPUSecurityPerfAddChecked(staged_ok_count, staged_blocked_count, &staged_total))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (!GPUSecurityPerfAddChecked(staged_total, staged_drift_count, &staged_total))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (staged_total != scenario_count)
+            return GPU_SEC_PERF_ERR_BAD_PARAM;
+    }
+
+    if (status_commit_only == GPU_SEC_PERF_OK)
+    {
+        if (canonical_ok_count < 0 || canonical_blocked_count < 0 || canonical_drift_count < 0)
+            return GPU_SEC_PERF_ERR_BAD_PARAM;
+        if (canonical_snapshot_digest_q64 <= 0)
+            return GPU_SEC_PERF_ERR_BAD_PARAM;
+        if (!GPUSecurityPerfAddChecked(canonical_ok_count, canonical_blocked_count, &canonical_total))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (!GPUSecurityPerfAddChecked(canonical_total, canonical_drift_count, &canonical_total))
+            return GPU_SEC_PERF_ERR_OVERFLOW;
+        if (canonical_total != scenario_count)
+            return GPU_SEC_PERF_ERR_BAD_PARAM;
+    }
+
+    if (status_preflight_only != status_commit_only)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+    if (staged_ok_count != canonical_ok_count ||
+        staged_blocked_count != canonical_blocked_count ||
+        staged_drift_count != canonical_drift_count ||
+        staged_snapshot_digest_q64 != canonical_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    if (*out_ok_count != saved_ok_count ||
+        *out_blocked_count != saved_blocked_count ||
+        *out_drift_count != saved_drift_count ||
+        *out_snapshot_digest_q64 != saved_snapshot_digest_q64)
+        return GPU_SEC_PERF_ERR_BAD_PARAM;
+
+    *out_ok_count = saved_ok_count;
+    *out_blocked_count = saved_blocked_count;
+    *out_drift_count = saved_drift_count;
+    *out_snapshot_digest_q64 = saved_snapshot_digest_q64;
+    return status_preflight_only;
+}
