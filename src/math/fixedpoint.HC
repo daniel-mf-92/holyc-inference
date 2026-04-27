@@ -18,6 +18,9 @@
 // Core Q16.16 aliases used by inference math call sites.
 typedef I64 FPQ16;
 typedef I64 FPStatus;
+// Keep IQ-1789 ABI symbols while avoiding new compounded function identifiers.
+#define FPQ16MulShiftRoundCheckedNoPartialArrayCommitOnlyPreflightOnlyParity FPMulShiftRoundParity
+#define FPQ16MulShiftRoundCheckedNoPartialArrayCommitOnlyPreflightOnlyParityCommitOnly FPMulShiftRoundCommitParity
 
 U64 FPAbsToU64(I64 x)
 {
@@ -1340,6 +1343,236 @@ I32 FPQ16MulShiftRoundCheckedNoPartialArrayCommitOnlyPreflightOnly(I64 *lhs_valu
     *out_required_lhs = staged_commit_required_lhs;
     *out_required_rhs = staged_commit_required_rhs;
     *out_required_out = staged_commit_required_out;
+    return FP_Q16_OK;
+}
+
+// Strict diagnostics parity gate over
+// FPQ16MulShiftRoundCheckedNoPartialArrayCommitOnlyPreflightOnly and
+// FPQ16MulShiftRoundCheckedNoPartialArrayCommitOnly.
+//
+// Runs both delegated tuple producers against immutable scalar snapshots and
+// publishes exactly one tuple on strict parity.
+I32 FPMulShiftRoundParity(I64 *lhs_values,
+                          I64 lhs_capacity,
+                          I64 *rhs_values,
+                          I64 rhs_capacity,
+                          I64 *out_values,
+                          I64 out_capacity,
+                          I64 count,
+                          I64 shift,
+                          I64 *out_required_lhs,
+                          I64 *out_required_rhs,
+                          I64 *out_required_out)
+{
+    I64 *snapshot_lhs_values;
+    I64 *snapshot_rhs_values;
+    I64 *snapshot_out_values;
+    I64 snapshot_lhs_capacity;
+    I64 snapshot_rhs_capacity;
+    I64 snapshot_out_capacity;
+    I64 snapshot_count;
+    I64 snapshot_shift;
+    I64 staged_preflight_required_lhs;
+    I64 staged_preflight_required_rhs;
+    I64 staged_preflight_required_out;
+    I64 staged_commit_required_lhs;
+    I64 staged_commit_required_rhs;
+    I64 staged_commit_required_out;
+    I32 status;
+
+    if (!lhs_values || !rhs_values || !out_values ||
+        !out_required_lhs || !out_required_rhs || !out_required_out)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (lhs_capacity < 0 || rhs_capacity < 0 || out_capacity < 0 || count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (count > lhs_capacity || count > rhs_capacity || count > out_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_required_lhs == out_required_rhs ||
+        out_required_lhs == out_required_out ||
+        out_required_rhs == out_required_out)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_required_lhs == lhs_values || out_required_lhs == rhs_values ||
+        out_required_lhs == out_values || out_required_rhs == lhs_values ||
+        out_required_rhs == rhs_values || out_required_rhs == out_values ||
+        out_required_out == lhs_values || out_required_out == rhs_values ||
+        out_required_out == out_values)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    snapshot_lhs_values = lhs_values;
+    snapshot_rhs_values = rhs_values;
+    snapshot_out_values = out_values;
+    snapshot_lhs_capacity = lhs_capacity;
+    snapshot_rhs_capacity = rhs_capacity;
+    snapshot_out_capacity = out_capacity;
+    snapshot_count = count;
+    snapshot_shift = shift;
+
+    status = FPQ16MulShiftRoundCheckedNoPartialArrayCommitOnlyPreflightOnly(
+        lhs_values,
+        lhs_capacity,
+        rhs_values,
+        rhs_capacity,
+        out_values,
+        out_capacity,
+        count,
+        shift,
+        &staged_preflight_required_lhs,
+        &staged_preflight_required_rhs,
+        &staged_preflight_required_out);
+    if (status != FP_Q16_OK)
+        return status;
+
+    status = FPQ16MulShiftRoundCheckedNoPartialArrayCommitOnly(
+        lhs_values,
+        lhs_capacity,
+        rhs_values,
+        rhs_capacity,
+        out_values,
+        out_capacity,
+        count,
+        shift,
+        &staged_commit_required_lhs,
+        &staged_commit_required_rhs,
+        &staged_commit_required_out);
+    if (status != FP_Q16_OK)
+        return status;
+
+    if (snapshot_lhs_values != lhs_values ||
+        snapshot_rhs_values != rhs_values ||
+        snapshot_out_values != out_values ||
+        snapshot_lhs_capacity != lhs_capacity ||
+        snapshot_rhs_capacity != rhs_capacity ||
+        snapshot_out_capacity != out_capacity ||
+        snapshot_count != count ||
+        snapshot_shift != shift)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (staged_preflight_required_lhs != staged_commit_required_lhs ||
+        staged_preflight_required_rhs != staged_commit_required_rhs ||
+        staged_preflight_required_out != staged_commit_required_out)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_required_lhs = staged_preflight_required_lhs;
+    *out_required_rhs = staged_preflight_required_rhs;
+    *out_required_out = staged_preflight_required_out;
+    return FP_Q16_OK;
+}
+
+// IQ-1789 commit-only diagnostics wrapper over
+// FPQ16MulShiftRoundCheckedNoPartialArrayCommitOnlyPreflightOnlyParity and
+// FPQ16MulShiftRoundCheckedNoPartialArrayCommitOnlyPreflightOnly.
+//
+// Stages outputs privately, enforces immutable scalar snapshots and strict
+// tuple parity, then publishes exactly once on success.
+I32 FPMulShiftRoundCommitParity(I64 *lhs_values,
+                                I64 lhs_capacity,
+                                I64 *rhs_values,
+                                I64 rhs_capacity,
+                                I64 *out_values,
+                                I64 out_capacity,
+                                I64 count,
+                                I64 shift,
+                                I64 *out_required_lhs,
+                                I64 *out_required_rhs,
+                                I64 *out_required_out)
+{
+    I64 *snapshot_lhs_values;
+    I64 *snapshot_rhs_values;
+    I64 *snapshot_out_values;
+    I64 snapshot_lhs_capacity;
+    I64 snapshot_rhs_capacity;
+    I64 snapshot_out_capacity;
+    I64 snapshot_count;
+    I64 snapshot_shift;
+    I64 staged_parity_required_lhs;
+    I64 staged_parity_required_rhs;
+    I64 staged_parity_required_out;
+    I64 staged_preflight_required_lhs;
+    I64 staged_preflight_required_rhs;
+    I64 staged_preflight_required_out;
+    I32 status;
+
+    if (!lhs_values || !rhs_values || !out_values ||
+        !out_required_lhs || !out_required_rhs || !out_required_out)
+        return FP_Q16_ERR_NULL_PTR;
+
+    if (lhs_capacity < 0 || rhs_capacity < 0 || out_capacity < 0 || count < 0)
+        return FP_Q16_ERR_BAD_PARAM;
+    if (count > lhs_capacity || count > rhs_capacity || count > out_capacity)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_required_lhs == out_required_rhs ||
+        out_required_lhs == out_required_out ||
+        out_required_rhs == out_required_out)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (out_required_lhs == lhs_values || out_required_lhs == rhs_values ||
+        out_required_lhs == out_values || out_required_rhs == lhs_values ||
+        out_required_rhs == rhs_values || out_required_rhs == out_values ||
+        out_required_out == lhs_values || out_required_out == rhs_values ||
+        out_required_out == out_values)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    snapshot_lhs_values = lhs_values;
+    snapshot_rhs_values = rhs_values;
+    snapshot_out_values = out_values;
+    snapshot_lhs_capacity = lhs_capacity;
+    snapshot_rhs_capacity = rhs_capacity;
+    snapshot_out_capacity = out_capacity;
+    snapshot_count = count;
+    snapshot_shift = shift;
+
+    status = FPQ16MulShiftRoundCheckedNoPartialArrayCommitOnlyPreflightOnlyParity(
+        lhs_values,
+        lhs_capacity,
+        rhs_values,
+        rhs_capacity,
+        out_values,
+        out_capacity,
+        count,
+        shift,
+        &staged_parity_required_lhs,
+        &staged_parity_required_rhs,
+        &staged_parity_required_out);
+    if (status != FP_Q16_OK)
+        return status;
+
+    status = FPQ16MulShiftRoundCheckedNoPartialArrayCommitOnlyPreflightOnly(
+        lhs_values,
+        lhs_capacity,
+        rhs_values,
+        rhs_capacity,
+        out_values,
+        out_capacity,
+        count,
+        shift,
+        &staged_preflight_required_lhs,
+        &staged_preflight_required_rhs,
+        &staged_preflight_required_out);
+    if (status != FP_Q16_OK)
+        return status;
+
+    if (snapshot_lhs_values != lhs_values ||
+        snapshot_rhs_values != rhs_values ||
+        snapshot_out_values != out_values ||
+        snapshot_lhs_capacity != lhs_capacity ||
+        snapshot_rhs_capacity != rhs_capacity ||
+        snapshot_out_capacity != out_capacity ||
+        snapshot_count != count ||
+        snapshot_shift != shift)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    if (staged_parity_required_lhs != staged_preflight_required_lhs ||
+        staged_parity_required_rhs != staged_preflight_required_rhs ||
+        staged_parity_required_out != staged_preflight_required_out)
+        return FP_Q16_ERR_BAD_PARAM;
+
+    *out_required_lhs = staged_parity_required_lhs;
+    *out_required_rhs = staged_parity_required_rhs;
+    *out_required_out = staged_parity_required_out;
     return FP_Q16_OK;
 }
 
