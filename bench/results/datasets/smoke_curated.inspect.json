@@ -2,10 +2,17 @@
   "answer_histogram": {
     "0": 3
   },
+  "byte_stats": {
+    "max_choice_bytes": 45,
+    "max_prompt_bytes": 69,
+    "max_record_payload_bytes": 304,
+    "total_choice_bytes": 327,
+    "total_prompt_bytes": 182
+  },
   "dataset": "smoke-eval",
   "findings": [],
   "format": "hceval-mc",
-  "generated_at": "2026-04-27T19:01:42Z",
+  "generated_at": "2026-04-27T23:13:11Z",
   "input": "bench/results/datasets/smoke_curated.hceval",
   "payload_sha256": "7673822187499c96fc823bf5ab164e118a99b0d796c7460f47060b426af5aac4",
   "record_count": 3,

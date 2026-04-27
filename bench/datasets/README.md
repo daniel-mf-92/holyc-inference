@@ -46,7 +46,8 @@ the resulting answer histogram for downstream eval reproducibility checks.
   followed by UTF-8 `id`, `prompt`, `provenance`, and each u32-prefixed choice.
 
 All integers are little-endian. The manifest records the source digest, binary
-digest, answer histogram, and cleaned records.
+digest, answer histogram, UTF-8 prompt/choice/record byte statistics, and cleaned
+records.
 
 ## Sample Build
 
@@ -56,7 +57,10 @@ python3 bench/dataset_pack.py \
   --output bench/results/datasets/smoke_eval.hceval \
   --manifest bench/results/datasets/smoke_eval.manifest.json \
   --dataset smoke-eval \
-  --split validation
+  --split validation \
+  --max-prompt-bytes 4096 \
+  --max-choice-bytes 1024 \
+  --max-record-payload-bytes 8192
 ```
 
 ## Binary Inspection
@@ -68,8 +72,13 @@ python3 bench/hceval_inspect.py \
   --input bench/results/datasets/smoke_eval.hceval \
   --manifest bench/results/datasets/smoke_eval.manifest.json \
   --output bench/results/datasets/smoke_eval.inspect.json \
-  --markdown bench/results/datasets/smoke_eval.inspect.md
+  --markdown bench/results/datasets/smoke_eval.inspect.md \
+  --max-prompt-bytes 4096 \
+  --max-choice-bytes 1024
 ```
+
+Use the optional byte gates to reject local subsets that exceed the fixed buffer
+budgets chosen for a TempleOS loader before the binary reaches the guest.
 
 ## Artifact Index
 

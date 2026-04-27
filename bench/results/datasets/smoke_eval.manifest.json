@@ -3,6 +3,13 @@
     "0": 3
   },
   "binary_sha256": "5d961b26360f3181caa5d0e05a4ba49fbb99ad53aa0b07bd56c742034d4f782f",
+  "byte_stats": {
+    "max_choice_bytes": 45,
+    "max_prompt_bytes": 69,
+    "max_record_payload_bytes": 304,
+    "total_choice_bytes": 327,
+    "total_prompt_bytes": 182
+  },
   "dataset": "smoke-eval",
   "format": "hceval-mc",
   "magic": "HCEVAL1\u0000",

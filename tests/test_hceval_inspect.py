@@ -62,7 +62,29 @@ def test_cli_writes_json_and_markdown() -> None:
         report = json.loads(output.read_text(encoding="utf-8"))
         assert report["status"] == "pass"
         assert report["record_count"] == 3
+        assert report["byte_stats"]["max_prompt_bytes"] > 0
         assert "HCEval Dataset Inspection" in markdown.read_text(encoding="utf-8")
+
+
+def test_cli_size_gates_report_findings() -> None:
+    input_path = ROOT / "bench" / "results" / "datasets" / "smoke_eval.hceval"
+    with tempfile.TemporaryDirectory() as tmp:
+        output = Path(tmp) / "inspect.json"
+        status = hceval_inspect.main(
+            [
+                "--input",
+                str(input_path),
+                "--output",
+                str(output),
+                "--max-choice-bytes",
+                "4",
+            ]
+        )
+
+        assert status == 1
+        report = json.loads(output.read_text(encoding="utf-8"))
+        assert report["status"] == "fail"
+        assert any("choice is" in finding for finding in report["findings"])
 
 
 def test_truncated_payload_fails_fast() -> None:
@@ -81,5 +103,6 @@ def test_truncated_payload_fails_fast() -> None:
 if __name__ == "__main__":
     test_sample_hceval_parses_and_validates()
     test_cli_writes_json_and_markdown()
+    test_cli_size_gates_report_findings()
     test_truncated_payload_fails_fast()
     print("hceval_inspect_tests=ok")

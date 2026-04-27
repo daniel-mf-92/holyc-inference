@@ -108,6 +108,31 @@ def test_cli_writes_binary_and_manifest() -> None:
         manifest_json = json.loads(manifest.read_text(encoding="utf-8"))
         assert manifest_json["record_count"] == 3
         assert manifest_json["binary_sha256"] == dataset_pack.hashlib.sha256(payload).hexdigest()
+        assert manifest_json["byte_stats"]["max_prompt_bytes"] > 0
+        assert manifest_json["byte_stats"]["max_record_payload_bytes"] > 0
+
+
+def test_cli_size_gates_fail_before_writing() -> None:
+    sample = ROOT / "bench" / "datasets" / "samples" / "smoke_eval.jsonl"
+    with tempfile.TemporaryDirectory() as tmp:
+        output = Path(tmp) / "sample.hceval"
+        manifest = Path(tmp) / "sample.manifest.json"
+        status = dataset_pack.main(
+            [
+                "--input",
+                str(sample),
+                "--output",
+                str(output),
+                "--manifest",
+                str(manifest),
+                "--max-prompt-bytes",
+                "8",
+            ]
+        )
+
+        assert status == 2
+        assert not output.exists()
+        assert not manifest.exists()
 
 
 def test_invalid_answer_fails_fast() -> None:
@@ -128,5 +153,6 @@ def test_invalid_answer_fails_fast() -> None:
 if __name__ == "__main__":
     test_smoke_shapes_pack_into_deterministic_binary()
     test_cli_writes_binary_and_manifest()
+    test_cli_size_gates_fail_before_writing()
     test_invalid_answer_fails_fast()
     print("eval_dataset_pack_tests=ok")

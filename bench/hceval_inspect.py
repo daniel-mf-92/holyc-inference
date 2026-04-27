@@ -160,7 +160,29 @@ def answer_histogram(records: list[InspectRecord]) -> dict[str, int]:
     return histogram
 
 
-def validate_dataset(dataset: HCEvalDataset, manifest_path: Path | None = None) -> list[str]:
+def byte_stats(records: list[InspectRecord]) -> dict[str, int]:
+    pack_records = [
+        dataset_pack.EvalRecord(
+            record_id=record.record_id,
+            dataset="",
+            split="",
+            prompt=record.prompt,
+            choices=record.choices,
+            answer_index=record.answer_index,
+            provenance=record.provenance,
+        )
+        for record in records
+    ]
+    return dataset_pack.byte_stats(pack_records)
+
+
+def validate_dataset(
+    dataset: HCEvalDataset,
+    manifest_path: Path | None = None,
+    max_prompt_bytes: int | None = None,
+    max_choice_bytes: int | None = None,
+    max_record_payload_bytes: int | None = None,
+) -> list[str]:
     findings: list[str] = []
     metadata = dataset.metadata
     records = dataset.records
@@ -194,6 +216,14 @@ def validate_dataset(dataset: HCEvalDataset, manifest_path: Path | None = None) 
 
     reconstructed_digest = hashlib.sha256(dataset_pack.canonical_rows(as_pack_records(dataset))).hexdigest()
     source_verified: bool | None = reconstructed_digest == dataset.source_digest
+    findings.extend(
+        dataset_pack.size_limit_findings(
+            as_pack_records(dataset),
+            max_prompt_bytes=max_prompt_bytes,
+            max_choice_bytes=max_choice_bytes,
+            max_record_payload_bytes=max_record_payload_bytes,
+        )
+    )
 
     if manifest_path is not None:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -207,6 +237,8 @@ def validate_dataset(dataset: HCEvalDataset, manifest_path: Path | None = None) 
             findings.append("manifest dataset does not match metadata")
         if manifest.get("split") != metadata.get("split"):
             findings.append("manifest split does not match metadata")
+        if "byte_stats" in manifest and manifest.get("byte_stats") != byte_stats(records):
+            findings.append("manifest byte_stats does not match parsed records")
         manifest_records = manifest.get("records")
         if isinstance(manifest_records, list):
             source_verified = hashlib.sha256(
@@ -227,6 +259,7 @@ def validate_dataset(dataset: HCEvalDataset, manifest_path: Path | None = None) 
 def build_report(path: Path, dataset: HCEvalDataset, findings: list[str]) -> dict[str, Any]:
     return {
         "answer_histogram": answer_histogram(dataset.records),
+        "byte_stats": byte_stats(dataset.records),
         "dataset": dataset.metadata.get("dataset", ""),
         "findings": findings,
         "format": dataset.metadata.get("format", ""),
@@ -260,6 +293,19 @@ def markdown_report(report: dict[str, Any]) -> str:
     else:
         lines.append("No findings.")
 
+    lines.extend(
+        [
+            "",
+            "## Byte Stats",
+            "",
+            f"- Max prompt bytes: {report['byte_stats']['max_prompt_bytes']}",
+            f"- Max choice bytes: {report['byte_stats']['max_choice_bytes']}",
+            f"- Max record payload bytes: {report['byte_stats']['max_record_payload_bytes']}",
+            f"- Total prompt bytes: {report['byte_stats']['total_prompt_bytes']}",
+            f"- Total choice bytes: {report['byte_stats']['total_choice_bytes']}",
+        ]
+    )
+
     lines.extend(["", "## Records", ""])
     if report["records"]:
         lines.append("| ID | Choices | Answer | Provenance |")
@@ -281,6 +327,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, help="Optional JSON inspection report path")
     parser.add_argument("--markdown", type=Path, help="Optional Markdown inspection report path")
     parser.add_argument("--no-records", action="store_true", help="Omit full record text from JSON output")
+    parser.add_argument("--max-prompt-bytes", type=int, help="Fail if any prompt exceeds this UTF-8 byte limit")
+    parser.add_argument("--max-choice-bytes", type=int, help="Fail if any choice exceeds this UTF-8 byte limit")
+    parser.add_argument(
+        "--max-record-payload-bytes",
+        type=int,
+        help="Fail if any record payload excluding the fixed record header exceeds this byte limit",
+    )
     return parser
 
 
@@ -288,7 +341,13 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         dataset = parse_hceval(args.input)
-        findings = validate_dataset(dataset, args.manifest)
+        findings = validate_dataset(
+            dataset,
+            args.manifest,
+            max_prompt_bytes=args.max_prompt_bytes,
+            max_choice_bytes=args.max_choice_bytes,
+            max_record_payload_bytes=args.max_record_payload_bytes,
+        )
         report = build_report(args.input, dataset, findings)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)

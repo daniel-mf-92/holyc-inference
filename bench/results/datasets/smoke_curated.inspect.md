@@ -1,6 +1,6 @@
 # HCEval Dataset Inspection
 
-Generated: 2026-04-27T19:01:42Z
+Generated: 2026-04-27T23:13:11Z
 Status: pass
 Dataset: smoke-eval
 Split: validation
@@ -9,6 +9,14 @@ Records: 3
 ## Findings
 
 No findings.
+
+## Byte Stats
+
+- Max prompt bytes: 69
+- Max choice bytes: 45
+- Max record payload bytes: 304
+- Total prompt bytes: 182
+- Total choice bytes: 327
 
 ## Records
 

@@ -50,3 +50,4 @@
 2026-04-27T22:55:45Z | Hardened benchmark result indexing to derive fail status from QEMU run failures and variability gate findings with refreshed index artifacts.
 2026-04-27T23:02:00Z | Added JUnit XML export for benchmark result indexing with focused coverage and refreshed index artifacts.
 2026-04-27T23:08:36Z | Added benchmark matrix tok/s variability gate pass-through with smoke coverage and refreshed matrix/index artifacts.
+2026-04-27T23:14:13Z | Added HCEval prompt/choice/record byte stats and optional size gates to offline dataset packing and inspection with refreshed artifacts.

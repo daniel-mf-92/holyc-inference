@@ -208,6 +208,57 @@ def record_bytes(record: EvalRecord) -> bytes:
     )
 
 
+def record_payload_bytes(record: EvalRecord) -> int:
+    return len(record_bytes(record)) - RECORD_HEADER.size
+
+
+def byte_stats(records: list[EvalRecord]) -> dict[str, int]:
+    prompt_lengths = [len(record.prompt.encode("utf-8")) for record in records]
+    choice_lengths = [
+        len(choice.encode("utf-8"))
+        for record in records
+        for choice in record.choices
+    ]
+    record_lengths = [record_payload_bytes(record) for record in records]
+    return {
+        "max_choice_bytes": max(choice_lengths, default=0),
+        "max_prompt_bytes": max(prompt_lengths, default=0),
+        "max_record_payload_bytes": max(record_lengths, default=0),
+        "total_choice_bytes": sum(choice_lengths),
+        "total_prompt_bytes": sum(prompt_lengths),
+    }
+
+
+def size_limit_findings(
+    records: list[EvalRecord],
+    max_prompt_bytes: int | None = None,
+    max_choice_bytes: int | None = None,
+    max_record_payload_bytes: int | None = None,
+) -> list[str]:
+    findings: list[str] = []
+    for index, record in enumerate(records, 1):
+        prompt_bytes = len(record.prompt.encode("utf-8"))
+        if max_prompt_bytes is not None and prompt_bytes > max_prompt_bytes:
+            findings.append(
+                f"record {index} ({record.record_id}): prompt is {prompt_bytes} bytes, "
+                f"limit is {max_prompt_bytes}"
+            )
+        for choice_index, choice in enumerate(record.choices, 1):
+            choice_bytes = len(choice.encode("utf-8"))
+            if max_choice_bytes is not None and choice_bytes > max_choice_bytes:
+                findings.append(
+                    f"record {index} ({record.record_id}) choice {choice_index}: "
+                    f"choice is {choice_bytes} bytes, limit is {max_choice_bytes}"
+                )
+        payload_bytes = record_payload_bytes(record)
+        if max_record_payload_bytes is not None and payload_bytes > max_record_payload_bytes:
+            findings.append(
+                f"record {index} ({record.record_id}): payload is {payload_bytes} bytes, "
+                f"limit is {max_record_payload_bytes}"
+            )
+    return findings
+
+
 def canonical_rows(records: list[EvalRecord]) -> bytes:
     rows = [asdict(record) for record in records]
     return json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -235,6 +286,7 @@ def write_outputs(records: list[EvalRecord], output: Path, manifest_path: Path, 
     manifest = {
         "answer_histogram": answer_histogram(records),
         "binary_sha256": hashlib.sha256(payload).hexdigest(),
+        "byte_stats": byte_stats(records),
         "dataset": dataset,
         "format": "hceval-mc",
         "magic": MAGIC.decode("ascii"),
@@ -264,6 +316,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--manifest", type=Path, help="Output manifest JSON path")
     parser.add_argument("--dataset", default="eval", help="Default dataset name for rows without dataset")
     parser.add_argument("--split", default="validation", help="Default split for rows without split")
+    parser.add_argument("--max-prompt-bytes", type=int, help="Fail if any cleaned prompt exceeds this UTF-8 byte limit")
+    parser.add_argument("--max-choice-bytes", type=int, help="Fail if any cleaned choice exceeds this UTF-8 byte limit")
+    parser.add_argument(
+        "--max-record-payload-bytes",
+        type=int,
+        help="Fail if any record payload excluding the fixed record header exceeds this byte limit",
+    )
     return parser
 
 
@@ -272,6 +331,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         rows = read_jsonl(args.input)
         records = normalize_records(rows, args.dataset, args.split)
+        findings = size_limit_findings(
+            records,
+            max_prompt_bytes=args.max_prompt_bytes,
+            max_choice_bytes=args.max_choice_bytes,
+            max_record_payload_bytes=args.max_record_payload_bytes,
+        )
+        if findings:
+            raise ValueError("; ".join(findings))
         manifest = args.manifest or args.output.with_suffix(args.output.suffix + ".manifest.json")
         write_outputs(records, args.output, manifest, args.dataset, args.split)
     except ValueError as exc:

@@ -72,6 +72,8 @@ single answer index.
 deterministic HolyC-loadable binary plus a provenance manifest. It accepts a
 normalized schema as well as HellaSwag-, ARC-, and TruthfulQA-shaped rows. It is
 offline-only; place source data on disk first and document provenance.
+Manifests include UTF-8 prompt/choice/record byte statistics, and optional size
+gates can fail packing before writing oversized artifacts.
 
 Example:
 
@@ -81,19 +83,25 @@ python3 bench/dataset_pack.py \
   --output bench/results/datasets/smoke_eval.hceval \
   --manifest bench/results/datasets/smoke_eval.manifest.json \
   --dataset smoke-eval \
-  --split validation
+  --split validation \
+  --max-prompt-bytes 4096 \
+  --max-choice-bytes 1024 \
+  --max-record-payload-bytes 8192
 ```
 
 `hceval_inspect.py` independently parses `.hceval` binaries, validates record
 bounds, verifies source/binary hashes against a companion manifest, and writes
 JSON or Markdown inspection reports:
+It can re-apply the same byte-size gates to already packed binaries.
 
 ```bash
 python3 bench/hceval_inspect.py \
   --input bench/results/datasets/smoke_eval.hceval \
   --manifest bench/results/datasets/smoke_eval.manifest.json \
   --output bench/results/datasets/smoke_eval.inspect.json \
-  --markdown bench/results/datasets/smoke_eval.inspect.md
+  --markdown bench/results/datasets/smoke_eval.inspect.md \
+  --max-prompt-bytes 4096 \
+  --max-choice-bytes 1024
 ```
 
 `dataset_index.py` scans curated manifests, packed `.hceval` manifests, and
