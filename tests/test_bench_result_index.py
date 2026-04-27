@@ -56,6 +56,85 @@ def test_indexes_qemu_prompt_report_with_airgap_status(tmp_path: Path) -> None:
     assert summary.max_memory_bytes == 4096
 
 
+def test_qemu_prompt_report_status_reflects_failed_runs(tmp_path: Path) -> None:
+    report = tmp_path / "qemu_prompt_bench_latest.json"
+    report.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-04-27T20:00:00Z",
+                "status": "pass",
+                "prompt_suite": {"suite_sha256": "d" * 64, "prompt_count": 1},
+                "suite_summary": {"tok_per_s_median": 123.0},
+                "warmups": [{"returncode": 0, "timed_out": False}],
+                "benchmarks": [
+                    {
+                        "benchmark": "qemu_prompt",
+                        "profile": "secure",
+                        "model": "tiny",
+                        "quantization": "Q4_0",
+                        "returncode": 124,
+                        "timed_out": True,
+                        "command": [
+                            "qemu-system-x86_64",
+                            "-nic",
+                            "none",
+                            "-drive",
+                            "file=TempleOS.img,format=raw,if=ide",
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summaries = bench_result_index.load_summaries([tmp_path])
+
+    assert summaries[0].status == "fail"
+    assert summaries[0].command_airgap_status == "pass"
+    assert bench_result_index.index_status(summaries) == "fail"
+
+
+def test_qemu_prompt_report_status_reflects_variability_findings(tmp_path: Path) -> None:
+    report = tmp_path / "qemu_prompt_bench_latest.json"
+    report.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-04-27T20:00:00Z",
+                "status": "pass",
+                "prompt_suite": {"suite_sha256": "e" * 64, "prompt_count": 1},
+                "suite_summary": {"tok_per_s_median": 123.0},
+                "variability_findings": [
+                    {"scope": "suite", "metric": "tok_per_s_cv_pct", "value": 20.0, "limit": 5.0}
+                ],
+                "benchmarks": [
+                    {
+                        "benchmark": "qemu_prompt",
+                        "profile": "secure",
+                        "model": "tiny",
+                        "quantization": "Q4_0",
+                        "returncode": 0,
+                        "timed_out": False,
+                        "command": [
+                            "qemu-system-x86_64",
+                            "-nic",
+                            "none",
+                            "-drive",
+                            "file=TempleOS.img,format=raw,if=ide",
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summaries = bench_result_index.load_summaries([tmp_path])
+
+    assert summaries[0].status == "fail"
+    assert bench_result_index.index_status(summaries) == "fail"
+
+
 def test_indexes_matrix_cells_and_flags_network_devices(tmp_path: Path) -> None:
     report = tmp_path / "bench_matrix_latest.json"
     report.write_text(

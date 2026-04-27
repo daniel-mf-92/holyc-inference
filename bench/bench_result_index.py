@@ -71,6 +71,14 @@ def parse_int(value: Any) -> int | None:
         return None
 
 
+def parse_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.lower() in {"1", "true", "yes"}
+    return bool(value)
+
+
 def first_present(row: dict[str, Any], names: Iterable[str], default: str = "") -> str:
     for name in names:
         value = row.get(name)
@@ -108,6 +116,20 @@ def command_status(command: Any) -> tuple[str, list[str]]:
     return ("fail" if violations else "pass"), violations
 
 
+def qemu_run_failed(row: dict[str, Any]) -> bool:
+    returncode = parse_int(row.get("returncode"))
+    return (returncode is not None and returncode != 0) or parse_bool(row.get("timed_out"))
+
+
+def qemu_report_status(report: dict[str, Any], runs: list[dict[str, Any]], warmups: list[dict[str, Any]]) -> str:
+    status = str(report.get("status", "unknown"))
+    if any(qemu_run_failed(row) for row in runs + warmups):
+        return "fail"
+    if report.get("variability_findings"):
+        return "fail"
+    return status
+
+
 def summarize_qemu_report(path: Path, report: dict[str, Any]) -> ArtifactSummary:
     runs = [row for row in report.get("benchmarks", []) if isinstance(row, dict)]
     warmups = [row for row in report.get("warmups", []) if isinstance(row, dict)]
@@ -132,7 +154,7 @@ def summarize_qemu_report(path: Path, report: dict[str, Any]) -> ArtifactSummary
     return ArtifactSummary(
         source=str(path),
         artifact_type="qemu_prompt",
-        status=str(report.get("status", "unknown")),
+        status=qemu_report_status(report, runs, warmups),
         generated_at=str(report.get("generated_at", "")),
         profile=first_present(first_run, ("profile",), str(report.get("profile", ""))),
         model=first_present(first_run, ("model",), str(report.get("model", ""))),
