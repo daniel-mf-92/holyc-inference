@@ -105,7 +105,9 @@ NIC models such as e1000, ne2k, pcnet, rtl8139, usb-net, virtio-net, and vmxnet.
 Use `--warmup N` to launch each prompt before measurement without mixing those
 runs into throughput dashboards, and `--repeat N` to run every prompt multiple
 times. Reports include separate warmup records, raw measured per-run records,
-and per-prompt medians and min/max tok/s in JSON and Markdown. The runner also
+an overall suite summary, and per-prompt medians and min/max tok/s in JSON and
+Markdown. The suite summary includes measured prompt count, run count, total
+tokens, total elapsed time, median/P95 tok/s, and max memory. The runner also
 writes `qemu_prompt_bench_latest.csv` with one row per measured run for CI
 artifact upload, spreadsheets, and simple shell comparisons.
 

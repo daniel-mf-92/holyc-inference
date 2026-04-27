@@ -214,12 +214,21 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
     markdown = (output_dir / "qemu_prompt_bench_latest.md").read_text(encoding="utf-8")
 
     assert len(report["benchmarks"]) == 6
+    assert report["suite_summary"]["prompts"] == 2
+    assert report["suite_summary"]["runs"] == 6
+    assert report["suite_summary"]["ok_runs"] == 6
+    assert report["suite_summary"]["total_tokens"] == 180
+    assert report["suite_summary"]["total_elapsed_us"] == 600000
+    assert report["suite_summary"]["tok_per_s_median"] == 300.0
+    assert report["suite_summary"]["tok_per_s_p95"] == 400.0
+    assert report["suite_summary"]["memory_bytes_max"] == 2000
     assert [run["iteration"] for run in report["benchmarks"][:3]] == [1, 2, 3]
     assert report["summaries"][0]["prompt"] == "one"
     assert report["summaries"][0]["runs"] == 3
     assert report["summaries"][0]["tok_per_s_median"] == 200.0
     assert report["summaries"][0]["memory_bytes_max"] == 1000
     assert "QEMU Prompt Benchmark" in markdown
+    assert "| 2 | 6 | 6 | 180 | 600000 | 300.000 | 400.000 | 2000 |" in markdown
     assert "| one | 3 | 3 | 20 | 100000 | 200.000 | 200.000 | 200.000 | 1000 |" in markdown
     csv_report = (output_dir / "qemu_prompt_bench_latest.csv").read_text(encoding="utf-8")
     assert csv_report.count("\n") == 7

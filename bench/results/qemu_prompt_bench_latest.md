@@ -1,9 +1,15 @@
 # QEMU Prompt Benchmark
 
-Generated: 2026-04-27T18:13:14Z
+Generated: 2026-04-27T19:22:32Z
 Status: pass
-Warmup runs: 2
+Warmup runs: 0
 Runs: 6
+
+## Suite Summary
+
+| Prompts | Runs | OK | Total tokens | Total elapsed us | Median tok/s | P95 tok/s | Max memory bytes |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2 | 6 | 6 | 240 | 1500000 | 160.000 | 160.000 | 67207168 |
 
 ## Prompt Summary
 

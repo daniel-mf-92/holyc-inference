@@ -390,6 +390,47 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
     return summaries
 
 
+def percentile(values: list[float], pct: float) -> float | None:
+    if not values:
+        return None
+    if pct <= 0:
+        return min(values)
+    if pct >= 100:
+        return max(values)
+
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * pct / 100.0
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    if lower == upper:
+        return ordered[lower]
+    fraction = position - lower
+    return ordered[lower] + (ordered[upper] - ordered[lower]) * fraction
+
+
+def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
+    tok_values = [run.tok_per_s for run in runs if run.tok_per_s is not None]
+    elapsed_values = [run.elapsed_us for run in runs if run.elapsed_us > 0]
+    memory_values = [run.memory_bytes for run in runs if run.memory_bytes is not None]
+    token_values = [run.tokens for run in runs if run.tokens is not None]
+    prompts = sorted({run.prompt for run in runs})
+    ok_runs = [run for run in runs if run.returncode == 0 and not run.timed_out]
+
+    return {
+        "prompts": len(prompts),
+        "runs": len(runs),
+        "ok_runs": len(ok_runs),
+        "total_tokens": sum(token_values) if token_values else None,
+        "total_elapsed_us": sum(elapsed_values) if elapsed_values else None,
+        "tok_per_s_min": min(tok_values) if tok_values else None,
+        "tok_per_s_median": statistics.median(tok_values) if tok_values else None,
+        "tok_per_s_p95": percentile(tok_values, 95.0),
+        "tok_per_s_max": max(tok_values) if tok_values else None,
+        "elapsed_us_p95": percentile([float(value) for value in elapsed_values], 95.0),
+        "memory_bytes_max": max(memory_values) if memory_values else None,
+    }
+
+
 def markdown_report(report: dict[str, Any]) -> str:
     lines = [
         "# QEMU Prompt Benchmark",
@@ -399,9 +440,24 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Warmup runs: {len(report['warmups'])}",
         f"Runs: {len(report['benchmarks'])}",
         "",
-        "## Prompt Summary",
-        "",
     ]
+    suite = report.get("suite_summary") or {}
+    if suite:
+        lines.extend(
+            [
+                "## Suite Summary",
+                "",
+                "| Prompts | Runs | OK | Total tokens | Total elapsed us | Median tok/s | P95 tok/s | Max memory bytes |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| {prompts} | {runs} | {ok_runs} | {total_tokens} | {total_elapsed_us} | "
+                "{tok_per_s_median} | {tok_per_s_p95} | {memory_bytes_max} |".format(
+                    **{key: format_summary_value(value) for key, value in suite.items()}
+                ),
+                "",
+                "## Prompt Summary",
+                "",
+            ]
+        )
     if report["summaries"]:
         lines.append(
             "| Prompt | Runs | OK | Median tokens | Median elapsed us | Min tok/s | Median tok/s | Max tok/s | Max memory bytes |"
@@ -435,6 +491,7 @@ def write_report(runs: list[BenchRun], output_dir: Path, warmups: list[BenchRun]
         "generated_at": iso_now(),
         "status": "pass" if all(run.returncode == 0 and not run.timed_out for run in all_runs) else "fail",
         "warmups": [asdict(run) for run in warmup_runs],
+        "suite_summary": suite_summary(runs),
         "summaries": summarize_runs(runs),
         "benchmarks": [asdict(run) for run in runs],
     }
