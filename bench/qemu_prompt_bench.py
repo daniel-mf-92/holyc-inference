@@ -24,7 +24,22 @@ from typing import Any, Iterable
 
 
 DEFAULT_TIMEOUT_SECONDS = 300.0
-NETWORK_DEVICE_MARKERS = ("e1000", "rtl8139", "virtio-net", "vmxnet", "i825")
+NETWORK_DEVICE_MARKERS = (
+    "e1000",
+    "eepro100",
+    "i825",
+    "ne2k",
+    "pcnet",
+    "rtl8139",
+    "spapr-vlan",
+    "sunhme",
+    "sungem",
+    "tulip",
+    "usb-net",
+    "virtio-net",
+    "vmxnet",
+    "xen_nic",
+)
 RESULT_LINE_RE = re.compile(r"(?:BENCH_RESULT|bench_result)\s*[:=]\s*(\{.*\})")
 KV_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)=([^,\s]+)")
 
@@ -115,6 +130,11 @@ def prompt_case_from_row(row: Any, index: int) -> PromptCase:
     return PromptCase(prompt_id=prompt_id, prompt=prompt)
 
 
+def is_network_device_arg(value: str) -> bool:
+    lowered = value.lower()
+    return any(marker in lowered for marker in NETWORK_DEVICE_MARKERS)
+
+
 def reject_network_args(args: list[str]) -> None:
     index = 0
     while index < len(args):
@@ -139,9 +159,9 @@ def reject_network_args(args: list[str]) -> None:
 
         if arg == "-netdev" or arg.startswith("-netdev"):
             raise ValueError("-netdev is not allowed for air-gapped benchmark runs")
-        if arg == "-device" and any(marker in next_arg for marker in NETWORK_DEVICE_MARKERS):
+        if arg == "-device" and is_network_device_arg(next_arg):
             raise ValueError(f"network device is not allowed: {next_arg}")
-        if arg.startswith("-device=") and any(marker in arg for marker in NETWORK_DEVICE_MARKERS):
+        if arg.startswith("-device=") and is_network_device_arg(arg):
             raise ValueError(f"network device is not allowed: {arg}")
 
         index += 1

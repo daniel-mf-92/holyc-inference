@@ -60,7 +60,8 @@ python3 bench/hceval_inspect.py \
 `qemu_prompt_bench.py` launches an air-gapped QEMU guest once per prompt, captures
 serial output, extracts token timing records, and writes normalized JSON to
 `bench/results/`. The runner always injects `-nic none` and rejects conflicting
-network flags such as `-netdev` or virtual NIC devices.
+network flags such as `-netdev` or virtual NIC devices, including legacy QEMU
+NIC models such as e1000, ne2k, pcnet, rtl8139, usb-net, virtio-net, and vmxnet.
 
 Use `--repeat N` to run every prompt multiple times. Reports include raw per-run
 records plus per-prompt medians and min/max tok/s in both JSON and Markdown.
@@ -91,6 +92,19 @@ python3 bench/qemu_prompt_bench.py \
   --image path/to/TempleOS.img \
   --prompts bench/prompts/smoke.jsonl \
   --dry-run
+```
+
+Refresh the committed smoke report without booting a guest:
+
+```bash
+python3 bench/qemu_prompt_bench.py \
+  --image /tmp/TempleOS.synthetic.img \
+  --prompts bench/prompts/smoke.jsonl \
+  --qemu-bin bench/fixtures/qemu_synthetic_bench.py \
+  --profile synthetic-airgap-smoke \
+  --model synthetic-smoke \
+  --quantization Q4_0 \
+  --repeat 3
 ```
 
 ## Build Benchmark Compare

@@ -40,6 +40,21 @@ def test_network_args_are_rejected(tmp_path: Path) -> None:
     else:
         raise AssertionError("expected network device rejection")
 
+    for device in ("ne2k_pci", "pcnet", "usb-net", "e1000e"):
+        try:
+            qemu_prompt_bench.build_command("qemu-system-x86_64", image, ["-device", device])
+        except ValueError as exc:
+            assert "network device" in str(exc)
+        else:
+            raise AssertionError(f"expected network device rejection for {device}")
+
+    try:
+        qemu_prompt_bench.build_command("qemu-system-x86_64", image, ["-device=rtl8139"])
+    except ValueError as exc:
+        assert "network device" in str(exc)
+    else:
+        raise AssertionError("expected network device rejection")
+
 
 def test_load_prompt_cases_json_and_text(tmp_path: Path) -> None:
     prompt_json = tmp_path / "prompts.json"
