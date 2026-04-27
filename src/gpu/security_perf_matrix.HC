@@ -39624,6 +39624,7 @@ I32 GPUSecurityPerfFastPathSwitchBatchAuditQ64CheckedCommitOnlyPreflightOnlyPari
     canonical_drift_count = 0;
     canonical_snapshot_digest_q64 = 0;
 
+    // IQ-1767 strict diagnostics parity gate refresh:
     // IQ-1756 strict diagnostics parity gate:
     // - derive canonical tuple through IQ-1754 commit-only hardening wrapper;
     // - seed staged tuple from canonical and require IQ-1755 zero-write companion
