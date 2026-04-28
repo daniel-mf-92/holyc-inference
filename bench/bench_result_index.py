@@ -117,6 +117,21 @@ def command_status(command: Any) -> tuple[str, list[str]]:
     return ("fail" if violations else "pass"), violations
 
 
+def aggregate_command_status(commands: Iterable[tuple[str, Any]]) -> tuple[str, list[str]]:
+    statuses: list[str] = []
+    findings: list[str] = []
+    for label, command in commands:
+        status, command_findings = command_status(command)
+        statuses.append(status)
+        findings.extend(f"{label}: {finding}" for finding in command_findings)
+
+    if any(status == "fail" for status in statuses):
+        return "fail", findings
+    if any(status == "pass" for status in statuses):
+        return "pass", findings
+    return "not-qemu", findings
+
+
 def qemu_run_failed(row: dict[str, Any]) -> bool:
     returncode = parse_int(row.get("returncode"))
     return (returncode is not None and returncode != 0) or parse_bool(row.get("timed_out"))
@@ -149,8 +164,10 @@ def summarize_qemu_report(path: Path, report: dict[str, Any]) -> ArtifactSummary
         for row in summaries
         if (value := parse_int(row.get("memory_bytes_max"))) is not None
     ]
-    command = first_run.get("command") or (warmups[0].get("command") if warmups else None)
-    airgap_status, findings = command_status(command)
+    airgap_status, findings = aggregate_command_status(
+        [(f"measured[{index}]", row.get("command")) for index, row in enumerate(runs)]
+        + [(f"warmup[{index}]", row.get("command")) for index, row in enumerate(warmups)]
+    )
 
     return ArtifactSummary(
         source=str(path),

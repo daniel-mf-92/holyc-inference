@@ -136,6 +136,72 @@ def test_qemu_prompt_report_status_reflects_variability_findings(tmp_path: Path)
     assert bench_result_index.index_status(summaries) == "fail"
 
 
+def test_qemu_prompt_report_checks_every_recorded_command(tmp_path: Path) -> None:
+    report = tmp_path / "qemu_prompt_bench_latest.json"
+    report.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-04-27T20:00:00Z",
+                "status": "pass",
+                "prompt_suite": {"suite_sha256": "f" * 64, "prompt_count": 2},
+                "suite_summary": {"tok_per_s_median": 123.0},
+                "warmups": [
+                    {
+                        "returncode": 0,
+                        "timed_out": False,
+                        "command": [
+                            "qemu-system-x86_64",
+                            "-nic",
+                            "none",
+                            "-drive",
+                            "file=TempleOS.img,format=raw,if=ide",
+                        ],
+                    }
+                ],
+                "benchmarks": [
+                    {
+                        "benchmark": "qemu_prompt",
+                        "profile": "secure",
+                        "model": "tiny",
+                        "quantization": "Q4_0",
+                        "returncode": 0,
+                        "timed_out": False,
+                        "command": [
+                            "qemu-system-x86_64",
+                            "-nic",
+                            "none",
+                            "-drive",
+                            "file=TempleOS.img,format=raw,if=ide",
+                        ],
+                    },
+                    {
+                        "benchmark": "qemu_prompt",
+                        "profile": "secure",
+                        "model": "tiny",
+                        "quantization": "Q4_0",
+                        "returncode": 0,
+                        "timed_out": False,
+                        "command": [
+                            "qemu-system-x86_64",
+                            "-device",
+                            "rtl8139",
+                            "-drive",
+                            "file=TempleOS.img,format=raw,if=ide",
+                        ],
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summaries = bench_result_index.load_summaries([tmp_path])
+
+    assert summaries[0].command_airgap_status == "fail"
+    assert any(finding.startswith("measured[1]:") for finding in summaries[0].command_findings)
+    assert bench_result_index.index_status(summaries) == "fail"
+
+
 def test_indexes_matrix_cells_and_flags_network_devices(tmp_path: Path) -> None:
     report = tmp_path / "bench_matrix_latest.json"
     report.write_text(

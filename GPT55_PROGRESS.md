@@ -59,3 +59,4 @@
 2026-04-27T23:56:01Z | Added JUnit XML export for benchmark air-gap audits with smoke coverage and refreshed audit artifacts.
 2026-04-28T00:01:28Z | Added optional QEMU first-token latency telemetry with synthetic smoke coverage and refreshed benchmark artifacts.
 2026-04-28T00:07:37Z | Added host wall-clock tok/s telemetry to QEMU prompt benchmarks with refreshed synthetic smoke artifacts.
+2026-04-28T00:13:13Z | Hardened benchmark result indexing to audit every recorded warmup/measured QEMU command for air-gap violations with refreshed index artifacts.
