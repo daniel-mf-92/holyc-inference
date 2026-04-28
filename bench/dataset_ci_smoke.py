@@ -369,6 +369,8 @@ def main() -> int:
             "100",
             "--max-split-majority-answer-pct",
             "100",
+            "--max-dataset-split-majority-answer-pct",
+            "100",
             "--fail-on-findings",
         ]
         completed = run_command(provenance_command)
@@ -410,6 +412,15 @@ def main() -> int:
         if rc := require(
             json.loads(provenance_rows[0]["split_answer_histograms"]) == {"validation": {"0": 3}},
             "missing_provenance_split_answer_histograms",
+        ):
+            return rc
+        if rc := require(
+            json.loads(provenance_rows[0]["dataset_split_answer_histograms"]) == {
+                "arc-smoke": {"validation": {"0": 1}},
+                "hellaswag-smoke": {"validation": {"0": 1}},
+                "truthfulqa-smoke": {"validation": {"0": 1}},
+            },
+            "missing_provenance_dataset_split_answer_histograms",
         ):
             return rc
         if rc := require(
@@ -651,6 +662,89 @@ def main() -> int:
         if rc := require(
             "split_answer_histograms_mismatch" in stale_split_answer_kinds,
             "missing_split_answer_histogram_finding",
+        ):
+            return rc
+
+        stale_dataset_split_answer_manifest = tmp_path / "stale_dataset_split_answer_histogram.manifest.json"
+        stale_dataset_split_answer_report = dict(curated_report)
+        stale_dataset_split_answer_report["dataset_split_answer_histograms"] = {
+            "arc-smoke": {"validation": {"1": 1}}
+        }
+        stale_dataset_split_answer_manifest.write_text(
+            json.dumps(stale_dataset_split_answer_report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        stale_dataset_split_answer_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_provenance_audit.py"),
+            "--input",
+            str(stale_dataset_split_answer_manifest),
+            "--output-dir",
+            str(tmp_path / "stale-dataset-split-answer-provenance"),
+            "--fail-on-findings",
+        ]
+        completed = subprocess.run(
+            stale_dataset_split_answer_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("stale_dataset_split_answer_histogram_not_rejected=true", file=sys.stderr)
+            return 1
+        stale_dataset_split_answer_failure = json.loads(
+            (
+                tmp_path
+                / "stale-dataset-split-answer-provenance"
+                / "dataset_provenance_audit_latest.json"
+            ).read_text(encoding="utf-8")
+        )
+        stale_dataset_split_answer_kinds = {
+            finding["kind"]
+            for artifact in stale_dataset_split_answer_failure["artifacts"]
+            for finding in artifact["findings"]
+        }
+        if rc := require(
+            "dataset_split_answer_histograms_mismatch" in stale_dataset_split_answer_kinds,
+            "missing_dataset_split_answer_histogram_finding",
+        ):
+            return rc
+
+        dataset_split_skew_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_provenance_audit.py"),
+            "--input",
+            str(curated_manifest),
+            "--output-dir",
+            str(tmp_path / "dataset-split-skew-provenance"),
+            "--max-dataset-split-majority-answer-pct",
+            "90",
+            "--fail-on-findings",
+        ]
+        completed = subprocess.run(
+            dataset_split_skew_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("dataset_split_answer_skew_not_rejected=true", file=sys.stderr)
+            return 1
+        dataset_split_skew_failure = json.loads(
+            (tmp_path / "dataset-split-skew-provenance" / "dataset_provenance_audit_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        dataset_split_skew_kinds = {
+            finding["kind"]
+            for artifact in dataset_split_skew_failure["artifacts"]
+            for finding in artifact["findings"]
+        }
+        if rc := require(
+            "dataset_split_majority_answer_skew" in dataset_split_skew_kinds,
+            "missing_dataset_split_answer_skew_finding",
         ):
             return rc
 

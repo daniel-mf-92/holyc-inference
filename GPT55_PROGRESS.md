@@ -118,6 +118,7 @@
 2026-04-28T10:15:29Z | Added perf regression baseline/candidate comparison CSV dashboards with docs, smoke checks, and refreshed artifacts.
 2026-04-28T10:28:58Z | Added perf regression QEMU host-overhead telemetry, comparison deltas, opt-in gating, smoke checks, and refreshed dashboards.
 2026-04-28T10:57:07Z | Added matrix/result-index latency and host-overhead rollups with smoke coverage and refreshed benchmark artifacts.
+2026-04-28T22:12:06Z | Added dataset/split answer-skew telemetry and gates to provenance audits with smoke coverage and refreshed dataset artifacts.
 2026-04-28T11:10:38Z | Added eval dataset choice-count curation filters with smoke gate coverage and refreshed dataset artifacts.
 2026-04-28T11:41:20Z | Added eval dataset byte-budget curation filters with smoke gate coverage and refreshed dataset artifacts.
 2026-04-28T11:49:31Z | Added focused eval dataset provenance audit with JSON/Markdown/CSV/JUnit artifacts and smoke gate coverage.

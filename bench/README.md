@@ -205,11 +205,12 @@ python3 bench/dataset_leak_audit.py \
 `dataset_provenance_audit.py` checks curated JSONL manifests for source/license
 metadata, source and output hashes, selected IDs, dataset/split counts, and
 answer histograms. Reports include provenance/source contribution counts plus
-overall, per-dataset, and per-split answer-majority telemetry;
+overall, per-dataset, per-split, and per-dataset/split answer-majority telemetry;
 `--max-majority-answer-pct`,
 `--max-provenance-pct`, `--max-dataset-majority-answer-pct`, and
-`--max-split-majority-answer-pct` can fail CI when curated subsets are label
-skewed or dominated by one local source/provenance string.
+`--max-split-majority-answer-pct`,
+`--max-dataset-split-majority-answer-pct` can fail CI when curated subsets are
+label skewed or dominated by one local source/provenance string.
 
 ```bash
 python3 bench/dataset_provenance_audit.py \
@@ -218,6 +219,7 @@ python3 bench/dataset_provenance_audit.py \
   --max-provenance-pct 80 \
   --max-dataset-majority-answer-pct 80 \
   --max-split-majority-answer-pct 80 \
+  --max-dataset-split-majority-answer-pct 90 \
   --fail-on-findings
 ```
 

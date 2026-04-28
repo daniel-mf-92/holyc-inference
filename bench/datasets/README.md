@@ -129,9 +129,10 @@ python3 bench/dataset_index.py \
 Run the focused provenance audit on curated manifests before promoting an eval
 subset. It verifies source/license metadata, source and normalized hashes,
 selected record IDs, count rollups, pack outputs, non-empty row provenance, and
-overall/per-dataset/per-split answer histograms. Curated manifests also record
-per-provenance contribution counts, and `--max-provenance-pct` can fail CI when
-one staged local source dominates a compact subset.
+overall/per-dataset/per-split/per-dataset-split answer histograms. Curated
+manifests also record per-provenance contribution counts, and
+`--max-provenance-pct` can fail CI when one staged local source dominates a
+compact subset.
 Synthetic smoke manifests are allowed to omit `source_url`; real dataset
 manifests should record one, and `--require-source-url` turns that policy into a
 hard gate.
@@ -141,6 +142,7 @@ python3 bench/dataset_provenance_audit.py \
   --input bench/results/datasets \
   --output-dir bench/results/datasets \
   --max-provenance-pct 80 \
+  --max-dataset-split-majority-answer-pct 90 \
   --fail-on-findings
 ```
 

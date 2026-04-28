@@ -32,6 +32,46 @@
           "records": 1
         }
       },
+      "dataset_split_answer_histograms": {
+        "arc-smoke": {
+          "validation": {
+            "0": 1
+          }
+        },
+        "hellaswag-smoke": {
+          "validation": {
+            "0": 1
+          }
+        },
+        "truthfulqa-smoke": {
+          "validation": {
+            "0": 1
+          }
+        }
+      },
+      "dataset_split_majority_answers": {
+        "arc-smoke": {
+          "validation": {
+            "answer_index": "0",
+            "pct": 100.0,
+            "records": 1
+          }
+        },
+        "hellaswag-smoke": {
+          "validation": {
+            "answer_index": "0",
+            "pct": 100.0,
+            "records": 1
+          }
+        },
+        "truthfulqa-smoke": {
+          "validation": {
+            "answer_index": "0",
+            "pct": 100.0,
+            "records": 1
+          }
+        }
+      },
       "findings": [],
       "license": "synthetic-smoke",
       "majority_answer_index": "0",
@@ -66,6 +106,6 @@
       "status": "pass"
     }
   ],
-  "generated_at": "2026-04-28T18:26:59Z",
+  "generated_at": "2026-04-28T22:11:35Z",
   "status": "pass"
 }
