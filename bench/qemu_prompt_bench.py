@@ -624,8 +624,10 @@ def telemetry_findings(
     require_tokens: bool = False,
     require_tok_per_s: bool = False,
     require_memory: bool = False,
+    require_ttft_us: bool = False,
     min_tokens: int | None = None,
     min_tok_per_s: float | None = None,
+    max_ttft_us: int | None = None,
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     for run in runs:
@@ -644,6 +646,10 @@ def telemetry_findings(
             findings.append({**base, "metric": "tok_per_s", "value": run.tok_per_s, "limit": min_tok_per_s})
         if require_memory and run.memory_bytes is None:
             findings.append({**base, "metric": "memory_bytes", "value": None, "limit": "present"})
+        if require_ttft_us and run.ttft_us is None:
+            findings.append({**base, "metric": "ttft_us", "value": None, "limit": "present"})
+        if max_ttft_us is not None and (run.ttft_us is None or run.ttft_us > max_ttft_us):
+            findings.append({**base, "metric": "ttft_us", "value": run.ttft_us, "limit": max_ttft_us})
     return findings
 
 
@@ -895,8 +901,10 @@ def write_report(
     require_tokens: bool = False,
     require_tok_per_s: bool = False,
     require_memory: bool = False,
+    require_ttft_us: bool = False,
     min_tokens: int | None = None,
     min_tok_per_s: float | None = None,
+    max_ttft_us: int | None = None,
     environment: dict[str, Any] | None = None,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -915,8 +923,10 @@ def write_report(
         require_tokens=require_tokens,
         require_tok_per_s=require_tok_per_s,
         require_memory=require_memory,
+        require_ttft_us=require_ttft_us,
         min_tokens=min_tokens,
         min_tok_per_s=min_tok_per_s,
+        max_ttft_us=max_ttft_us,
     )
     report = {
         "generated_at": iso_now(),
@@ -935,8 +945,10 @@ def write_report(
             "require_tokens": require_tokens,
             "require_tok_per_s": require_tok_per_s,
             "require_memory": require_memory,
+            "require_ttft_us": require_ttft_us,
             "min_tokens": min_tokens,
             "min_tok_per_s": min_tok_per_s,
+            "max_ttft_us": max_ttft_us,
         },
         "telemetry_findings": telemetry,
         "benchmarks": [asdict(run) for run in runs],
@@ -1142,8 +1154,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--require-tokens", action="store_true", help="Fail if any measured run omits token count")
     parser.add_argument("--require-tok-per-s", action="store_true", help="Fail if any measured run omits tok/s")
     parser.add_argument("--require-memory", action="store_true", help="Fail if any measured run omits memory telemetry")
+    parser.add_argument("--require-ttft-us", action="store_true", help="Fail if any measured run omits TTFT telemetry")
     parser.add_argument("--min-tokens", type=int, default=None, help="Fail if any measured run emits fewer tokens")
     parser.add_argument("--min-tok-per-s", type=float, default=None, help="Fail if any measured run is below tok/s")
+    parser.add_argument("--max-ttft-us", type=int, default=None, help="Fail if any measured run exceeds TTFT in us")
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--profile", default="default")
     parser.add_argument("--model", default="")
@@ -1172,6 +1186,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.min_tok_per_s is not None and args.min_tok_per_s < 0:
         print("error: --min-tok-per-s must be >= 0", file=sys.stderr)
+        return 2
+    if args.max_ttft_us is not None and args.max_ttft_us < 0:
+        print("error: --max-ttft-us must be >= 0", file=sys.stderr)
         return 2
 
     try:
@@ -1224,8 +1241,10 @@ def main(argv: list[str] | None = None) -> int:
         require_tokens=args.require_tokens,
         require_tok_per_s=args.require_tok_per_s,
         require_memory=args.require_memory,
+        require_ttft_us=args.require_ttft_us,
         min_tokens=args.min_tokens,
         min_tok_per_s=args.min_tok_per_s,
+        max_ttft_us=args.max_ttft_us,
         environment=host_environment(args.qemu_bin),
     )
     report = json.loads(output.read_text(encoding="utf-8"))

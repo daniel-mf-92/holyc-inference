@@ -249,10 +249,11 @@ findings are written into the JSON and Markdown reports as
 `qemu_prompt_bench_junit_latest.xml` so CI can surface failed prompt launches
 and variability gate failures directly from the benchmark job.
 Use `--require-tokens`, `--require-tok-per-s`, `--require-memory`,
-`--min-tokens`, and `--min-tok-per-s` to fail measured runs that omit required
-telemetry or produce too little work for a trustworthy throughput sample.
-Telemetry gate failures are written as `telemetry_findings` in JSON/Markdown and
-as `benchmark_telemetry` failures in the JUnit report.
+`--require-ttft-us`, `--min-tokens`, `--min-tok-per-s`, and `--max-ttft-us` to
+fail measured runs that omit required telemetry, produce too little work for a
+trustworthy throughput sample, or exceed a first-token latency budget. Telemetry
+gate failures are written as `telemetry_findings` in JSON/Markdown and as
+`benchmark_telemetry` failures in the JUnit report.
 
 Example:
 
@@ -267,7 +268,9 @@ python3 bench/qemu_prompt_bench.py \
   --max-prompt-cv-pct 5 \
   --require-tokens \
   --require-tok-per-s \
+  --require-ttft-us \
   --min-tokens 16 \
+  --max-ttft-us 1000000 \
   --qemu-args-file bench/fixtures/local-qemu.args \
   -- -m 512M
 ```

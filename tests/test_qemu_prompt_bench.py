@@ -506,6 +506,58 @@ print("tokens=4 elapsed_us=100000")
     assert {failure.attrib["type"] for failure in failures} == {"benchmark_telemetry"}
 
 
+def test_cli_ttft_gate_fails_missing_or_high_latency(tmp_path: Path) -> None:
+    fake_qemu = tmp_path / "fake-qemu.py"
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    output_dir = tmp_path / "results"
+    prompts.write_text(
+        '{"prompt_id":"missing","prompt":"Missing TTFT"}\n{"prompt_id":"slow","prompt":"Slow TTFT"}\n',
+        encoding="utf-8",
+    )
+    fake_qemu.write_text(
+        """#!/usr/bin/env python3
+import os
+prompt_id = os.environ["HOLYC_BENCH_PROMPT_ID"]
+if prompt_id == "slow":
+    print("tokens=12 elapsed_us=100000 ttft_us=75000")
+else:
+    print("tokens=12 elapsed_us=100000")
+""",
+        encoding="utf-8",
+    )
+    fake_qemu.chmod(0o755)
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--qemu-bin",
+            str(fake_qemu),
+            "--output-dir",
+            str(output_dir),
+            "--require-ttft-us",
+            "--max-ttft-us",
+            "50000",
+        ]
+    )
+
+    assert status == 1
+    report = json.loads((output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8"))
+    markdown = (output_dir / "qemu_prompt_bench_latest.md").read_text(encoding="utf-8")
+    junit_root = ET.parse(output_dir / "qemu_prompt_bench_junit_latest.xml").getroot()
+
+    assert report["status"] == "fail"
+    assert report["telemetry_gates"]["require_ttft_us"] is True
+    assert report["telemetry_gates"]["max_ttft_us"] == 50000
+    assert [finding["metric"] for finding in report["telemetry_findings"]] == ["ttft_us", "ttft_us", "ttft_us"]
+    assert {finding["prompt"] for finding in report["telemetry_findings"]} == {"missing", "slow"}
+    assert "Telemetry Gate Findings" in markdown
+    assert junit_root.attrib["failures"] == "3"
+
+
 def test_cli_junit_reports_failed_qemu_run(tmp_path: Path) -> None:
     fake_qemu = tmp_path / "fake-qemu.py"
     prompts = tmp_path / "prompts.jsonl"
@@ -601,6 +653,20 @@ def test_cli_rejects_negative_telemetry_gate(tmp_path: Path) -> None:
             str(prompts),
             "--dry-run",
             "--min-tokens",
+            "-1",
+        ]
+    )
+
+    assert status == 2
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--dry-run",
+            "--max-ttft-us",
             "-1",
         ]
     )

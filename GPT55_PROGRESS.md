@@ -89,3 +89,4 @@
 2026-04-28T04:24:57Z | Added eval_compare paired correctness and exact McNemar reporting with refreshed smoke artifacts.
 2026-04-28T04:31:49Z | Added stdlib dataset CI smoke gate covering curate, pack, inspect, leak audit, index, and leakage rejection.
 2026-04-28T04:37:49Z | Added per-dataset eval comparison breakdowns with refreshed smoke reports and focused coverage.
+2026-04-28T04:45:52Z | Added opt-in QEMU TTFT telemetry gates with refreshed synthetic benchmark, index, and air-gap audit artifacts.
