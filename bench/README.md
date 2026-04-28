@@ -509,12 +509,13 @@ python3 bench/perplexity_compare.py \
 
 `perf_regression.py` scans host-side benchmark result files and writes dashboards
 to `bench/dashboards/`. It accepts JSON, JSONL, and CSV records with `tok_per_s`
-or `tok_per_s_milli`, optional `wall_tok_per_s` or `wall_tok_per_s_milli`, plus
-optional memory fields such as `memory_bytes` or `max_rss_bytes`. Regression
-checks compare commit-level aggregates, so repeated runs and duplicate
-latest/stamped result files are collapsed by benchmark key and commit before the
-latest distinct commits are compared. Outputs include JSON, Markdown, JUnit XML,
-commit-point CSV, regression CSV, sample-coverage CSV, commit-coverage CSV, and
+or `tok_per_s_milli`, optional `wall_tok_per_s` or `wall_tok_per_s_milli`,
+optional first-token latency fields such as `ttft_us` or `ttft_ms`, plus memory
+fields such as `memory_bytes` or `max_rss_bytes`. Regression checks compare
+commit-level aggregates, so repeated runs and duplicate latest/stamped result
+files are collapsed by benchmark key and commit before the latest distinct
+commits are compared. Outputs include JSON, Markdown, JUnit XML, commit-point
+CSV, regression CSV, sample-coverage CSV, commit-coverage CSV, and
 comparison-coverage CSV, prompt-suite drift CSV, telemetry-coverage CSV, and
 tok/s variability CSV artifacts.
 
@@ -524,12 +525,15 @@ Example:
 python3 bench/perf_regression.py --input bench/results --output-dir bench/dashboards
 ```
 
-CI can fail on throughput, host wall-clock throughput, or memory regressions with:
+CI can fail on throughput, host wall-clock throughput, first-token latency, or
+memory regressions with:
 
 ```bash
 python3 bench/perf_regression.py \
   --max-tok-cv-pct 7.5 \
   --wall-tok-regression-pct 7.5 \
+  --ttft-regression-pct 15 \
+  --require-ttft-us \
   --fail-on-regression
 ```
 

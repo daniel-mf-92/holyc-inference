@@ -38,6 +38,7 @@ class PerfRecord:
     tok_per_s: float | None
     wall_tok_per_s: float | None
     memory_bytes: int | None
+    ttft_us: int | None = None
     prompt_suite_sha256: str = ""
 
     @property
@@ -67,8 +68,10 @@ class CommitPoint:
     tok_per_s_records: int
     wall_tok_per_s_records: int
     memory_records: int
+    ttft_us_records: int
     median_tok_per_s: float | None
     median_wall_tok_per_s: float | None
+    median_ttft_us: float | None
     tok_per_s_cv_pct: float | None
     max_memory_bytes: int | None
     prompt_suite_sha256: str
@@ -146,6 +149,20 @@ def parse_int(value: Any) -> int | None:
         return None
 
 
+def parse_duration_us(row: dict[str, Any], *names: str) -> int | None:
+    for name in names:
+        value = parse_float(row.get(name))
+        if value is not None:
+            return int(value)
+        value = parse_float(row.get(f"{name}_ms"))
+        if value is not None:
+            return int(value * 1000.0)
+        value = parse_float(row.get(f"{name}_s"))
+        if value is not None:
+            return int(value * 1_000_000.0)
+    return None
+
+
 def first_present(row: dict[str, Any], names: Iterable[str], default: str = "") -> str:
     for name in names:
         value = row.get(name)
@@ -189,7 +206,17 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
         or row.get("peak_memory_bytes")
     )
 
-    if tok_per_s is None and wall_tok_per_s is None and memory_bytes is None:
+    ttft_us = parse_duration_us(
+        row,
+        "ttft_us",
+        "ttft",
+        "time_to_first_token_us",
+        "time_to_first_token",
+        "first_token_us",
+        "first_token",
+    )
+
+    if tok_per_s is None and wall_tok_per_s is None and memory_bytes is None and ttft_us is None:
         return None
 
     return PerfRecord(
@@ -204,6 +231,7 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
         tok_per_s=tok_per_s,
         wall_tok_per_s=wall_tok_per_s,
         memory_bytes=memory_bytes,
+        ttft_us=ttft_us,
         prompt_suite_sha256=prompt_suite_sha256(row),
     )
 
@@ -304,11 +332,13 @@ def summarize(records: list[PerfRecord]) -> dict[str, dict[str, Any]]:
             record.wall_tok_per_s for record in key_records if record.wall_tok_per_s is not None
         ]
         memory_values = [record.memory_bytes for record in key_records if record.memory_bytes is not None]
+        ttft_values = [record.ttft_us for record in key_records if record.ttft_us is not None]
         summaries[key] = {
             "records": len(key_records),
             "latest_commit": sorted(key_records, key=record_sort_key)[-1].commit,
             "median_tok_per_s": statistics.median(tps_values) if tps_values else None,
             "median_wall_tok_per_s": statistics.median(wall_tps_values) if wall_tps_values else None,
+            "median_ttft_us": statistics.median(ttft_values) if ttft_values else None,
             "max_memory_bytes": max(memory_values) if memory_values else None,
         }
     return summaries
@@ -326,6 +356,7 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
             record.wall_tok_per_s for record in commit_records if record.wall_tok_per_s is not None
         ]
         memory_values = [record.memory_bytes for record in commit_records if record.memory_bytes is not None]
+        ttft_values = [record.ttft_us for record in commit_records if record.ttft_us is not None]
         tps_cv_pct = coefficient_of_variation_pct(tps_values)
         prompt_hashes = sorted(
             {record.prompt_suite_sha256 for record in commit_records if record.prompt_suite_sha256}
@@ -339,8 +370,10 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                 tok_per_s_records=len(tps_values),
                 wall_tok_per_s_records=len(wall_tps_values),
                 memory_records=len(memory_values),
+                ttft_us_records=len(ttft_values),
                 median_tok_per_s=statistics.median(tps_values) if tps_values else None,
                 median_wall_tok_per_s=statistics.median(wall_tps_values) if wall_tps_values else None,
+                median_ttft_us=statistics.median(ttft_values) if ttft_values else None,
                 tok_per_s_cv_pct=tps_cv_pct,
                 max_memory_bytes=max(memory_values) if memory_values else None,
                 prompt_suite_sha256=";".join(prompt_hashes),
@@ -383,6 +416,7 @@ def detect_regressions(
     tok_threshold_pct: float,
     memory_threshold_pct: float,
     wall_tok_threshold_pct: float | None = None,
+    ttft_threshold_pct: float | None = None,
     baseline_commit: str | None = None,
     candidate_commit: str | None = None,
 ) -> list[Regression]:
@@ -458,6 +492,30 @@ def detect_regressions(
                         candidate_value=float(candidate.max_memory_bytes),
                         delta_pct=delta_pct,
                         threshold_pct=memory_threshold_pct,
+                    )
+                )
+
+        if (
+            ttft_threshold_pct is not None
+            and baseline.median_ttft_us
+            and candidate.median_ttft_us is not None
+        ):
+            delta_pct = (
+                (candidate.median_ttft_us - baseline.median_ttft_us)
+                * 100.0
+                / baseline.median_ttft_us
+            )
+            if delta_pct > ttft_threshold_pct:
+                regressions.append(
+                    Regression(
+                        key=key,
+                        metric="ttft_us",
+                        baseline_commit=baseline.commit,
+                        candidate_commit=candidate.commit,
+                        baseline_value=baseline.median_ttft_us,
+                        candidate_value=candidate.median_ttft_us,
+                        delta_pct=delta_pct,
+                        threshold_pct=ttft_threshold_pct,
                     )
                 )
     return regressions
@@ -586,11 +644,13 @@ def detect_telemetry_coverage_violations(
     require_tok_per_s: bool = False,
     require_wall_tok_per_s: bool = False,
     require_memory: bool = False,
+    require_ttft_us: bool = False,
 ) -> list[TelemetryCoverageViolation]:
     required = [
         ("tok_per_s", require_tok_per_s, "tok_per_s_records"),
         ("wall_tok_per_s", require_wall_tok_per_s, "wall_tok_per_s_records"),
         ("memory_bytes", require_memory, "memory_records"),
+        ("ttft_us", require_ttft_us, "ttft_us_records"),
     ]
     violations: list[TelemetryCoverageViolation] = []
     for point in points:
@@ -719,42 +779,46 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(["", "## Commit Points", ""])
     if report["commit_points"]:
         lines.append(
-            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | Memory Records | Median tok/s | Median wall tok/s | Tok/s CV | Max Memory Bytes | Prompt Suite |"
+            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | Memory Records | TTFT Records | Median tok/s | Median wall tok/s | Median TTFT us | Tok/s CV | Max Memory Bytes | Prompt Suite |"
         )
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
         for point in report["commit_points"]:
             tps = point["median_tok_per_s"]
             wall_tps = point["median_wall_tok_per_s"]
+            ttft = point["median_ttft_us"]
             tps_cv = point["tok_per_s_cv_pct"]
             memory = point["max_memory_bytes"]
             prompt_suite = point["prompt_suite_sha256"] or "-"
             tps_cell = f"{tps:.3f}" if tps is not None else "-"
             wall_tps_cell = f"{wall_tps:.3f}" if wall_tps is not None else "-"
+            ttft_cell = f"{ttft:.1f}" if ttft is not None else "-"
             tps_cv_cell = f"{tps_cv:.2f}%" if tps_cv is not None else "-"
             memory_cell = str(memory) if memory is not None else "-"
             lines.append(
                 f"| {point['key']} | {point['commit']} | {point['records']} | "
                 f"{point['tok_per_s_records']} | {point['wall_tok_per_s_records']} | "
-                f"{point['memory_records']} | {tps_cell} | {wall_tps_cell} | {tps_cv_cell} | "
-                f"{memory_cell} | {prompt_suite} |"
+                f"{point['memory_records']} | {point['ttft_us_records']} | {tps_cell} | "
+                f"{wall_tps_cell} | {ttft_cell} | {tps_cv_cell} | {memory_cell} | {prompt_suite} |"
             )
     else:
         lines.append("No commit-level performance points found.")
 
     lines.extend(["", "## Latest Summary", ""])
     if report["summaries"]:
-        lines.append("| Key | Records | Latest Commit | Median tok/s | Median wall tok/s | Max Memory Bytes |")
-        lines.append("| --- | ---: | --- | ---: | ---: | ---: |")
+        lines.append("| Key | Records | Latest Commit | Median tok/s | Median wall tok/s | Median TTFT us | Max Memory Bytes |")
+        lines.append("| --- | ---: | --- | ---: | ---: | ---: | ---: |")
         for key, summary in report["summaries"].items():
             tps = summary["median_tok_per_s"]
             wall_tps = summary["median_wall_tok_per_s"]
+            ttft = summary["median_ttft_us"]
             memory = summary["max_memory_bytes"]
             tps_cell = f"{tps:.3f}" if tps is not None else "-"
             wall_tps_cell = f"{wall_tps:.3f}" if wall_tps is not None else "-"
+            ttft_cell = f"{ttft:.1f}" if ttft is not None else "-"
             memory_cell = str(memory) if memory is not None else "-"
             lines.append(
                 f"| {key} | {summary['records']} | {summary['latest_commit']} | "
-                f"{tps_cell} | {wall_tps_cell} | {memory_cell} |"
+                f"{tps_cell} | {wall_tps_cell} | {ttft_cell} | {memory_cell} |"
             )
     else:
         lines.append("No performance records found.")
@@ -1026,8 +1090,10 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "tok_per_s_records",
             "wall_tok_per_s_records",
             "memory_records",
+            "ttft_us_records",
             "median_tok_per_s",
             "median_wall_tok_per_s",
+            "median_ttft_us",
             "tok_per_s_cv_pct",
             "max_memory_bytes",
             "prompt_suite_sha256",
@@ -1100,10 +1166,12 @@ def build_report(
     min_records_per_point: int = 1,
     max_tok_cv_pct: float | None = None,
     wall_tok_threshold_pct: float | None = None,
+    ttft_threshold_pct: float | None = None,
     min_commits_per_key: int = 1,
     require_tok_per_s: bool = False,
     require_wall_tok_per_s: bool = False,
     require_memory: bool = False,
+    require_ttft_us: bool = False,
 ) -> dict[str, Any]:
     points = commit_points(records)
     regressions = detect_regressions(
@@ -1111,6 +1179,7 @@ def build_report(
         tok_threshold_pct,
         memory_threshold_pct,
         wall_tok_threshold_pct=wall_tok_threshold_pct,
+        ttft_threshold_pct=ttft_threshold_pct,
         baseline_commit=baseline_commit,
         candidate_commit=candidate_commit,
     )
@@ -1126,6 +1195,7 @@ def build_report(
         require_tok_per_s=require_tok_per_s,
         require_wall_tok_per_s=require_wall_tok_per_s,
         require_memory=require_memory,
+        require_ttft_us=require_ttft_us,
     )
     return {
         "generated_at": iso_now(),
@@ -1150,12 +1220,14 @@ def build_report(
             "tok_regression_pct": tok_threshold_pct,
             "memory_regression_pct": memory_threshold_pct,
             "wall_tok_regression_pct": wall_tok_threshold_pct,
+            "ttft_regression_pct": ttft_threshold_pct,
             "min_records_per_point": min_records_per_point,
             "max_tok_cv_pct": max_tok_cv_pct,
             "min_commits_per_key": min_commits_per_key,
             "require_tok_per_s": require_tok_per_s,
             "require_wall_tok_per_s": require_wall_tok_per_s,
             "require_memory": require_memory,
+            "require_ttft_us": require_ttft_us,
         },
         "summaries": summarize(records),
         "commit_points": [asdict(point) for point in points],
@@ -1195,6 +1267,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         help="Fail when host wall-clock median tok/s drops by more than this percent",
     )
+    parser.add_argument(
+        "--ttft-regression-pct",
+        type=float,
+        help="Fail when median first-token latency increases by more than this percent",
+    )
     parser.add_argument("--baseline-commit", help="Commit SHA/name to use as the comparison baseline")
     parser.add_argument("--candidate-commit", help="Commit SHA/name to compare against the baseline")
     parser.add_argument(
@@ -1229,6 +1306,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fail when any benchmark key/commit point lacks memory telemetry",
     )
+    parser.add_argument(
+        "--require-ttft-us",
+        action="store_true",
+        help="Fail when any benchmark key/commit point lacks first-token latency telemetry",
+    )
     parser.add_argument("--fail-on-regression", action="store_true")
     return parser
 
@@ -1246,10 +1328,12 @@ def main(argv: list[str] | None = None) -> int:
         min_records_per_point=args.min_records_per_point,
         max_tok_cv_pct=args.max_tok_cv_pct,
         wall_tok_threshold_pct=args.wall_tok_regression_pct,
+        ttft_threshold_pct=args.ttft_regression_pct,
         min_commits_per_key=args.min_commits_per_key,
         require_tok_per_s=args.require_tok_per_s,
         require_wall_tok_per_s=args.require_wall_tok_per_s,
         require_memory=args.require_memory,
+        require_ttft_us=args.require_ttft_us,
     )
 
     write_dashboard_outputs(report, args.output_dir)

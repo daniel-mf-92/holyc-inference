@@ -101,6 +101,47 @@ def test_detects_optional_wall_tok_per_s_regressions(tmp_path: Path) -> None:
     assert regressions[0].candidate_value == 70.0
 
 
+def test_detects_optional_ttft_us_latency_regressions(tmp_path: Path) -> None:
+    result = tmp_path / "perf.jsonl"
+    write_jsonl(
+        result,
+        [
+            {
+                "timestamp": "2026-04-27T10:00:00Z",
+                "commit": "base",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "ttft_ms": 50.0,
+            },
+            {
+                "timestamp": "2026-04-27T11:00:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "time_to_first_token_us": 60000,
+            },
+        ],
+    )
+
+    records = perf_regression.load_records([result])
+    assert [record.ttft_us for record in records] == [50000, 60000]
+    assert perf_regression.detect_regressions(records, 5.0, 10.0) == []
+
+    regressions = perf_regression.detect_regressions(
+        records,
+        5.0,
+        10.0,
+        ttft_threshold_pct=10.0,
+    )
+
+    assert len(regressions) == 1
+    assert regressions[0].metric == "ttft_us"
+    assert regressions[0].baseline_value == 50000.0
+    assert regressions[0].candidate_value == 60000.0
+
+
 def test_regression_detection_compares_latest_distinct_commits(tmp_path: Path) -> None:
     result = tmp_path / "perf.jsonl"
     write_jsonl(
@@ -575,15 +616,18 @@ def test_required_telemetry_flags_missing_commit_point_metrics(tmp_path: Path) -
         require_tok_per_s=True,
         require_wall_tok_per_s=True,
         require_memory=True,
+        require_ttft_us=True,
     )
 
     assert report["status"] == "fail"
     assert report["thresholds"]["require_tok_per_s"] is True
     assert report["thresholds"]["require_wall_tok_per_s"] is True
     assert report["thresholds"]["require_memory"] is True
+    assert report["thresholds"]["require_ttft_us"] is True
     assert report["commit_points"][0]["tok_per_s_records"] == 1
     assert report["commit_points"][0]["wall_tok_per_s_records"] == 0
     assert report["commit_points"][0]["memory_records"] == 0
+    assert report["commit_points"][0]["ttft_us_records"] == 0
     assert report["telemetry_coverage_violations"] == [
         {
             "key": "decode/secure-local/-/Q4_0/short",
@@ -599,12 +643,20 @@ def test_required_telemetry_flags_missing_commit_point_metrics(tmp_path: Path) -
             "records": 1,
             "present_records": 0,
         },
+        {
+            "key": "decode/secure-local/-/Q4_0/short",
+            "commit": "head",
+            "metric": "ttft_us",
+            "records": 1,
+            "present_records": 0,
+        },
     ]
-    assert "Telemetry coverage violations: 2" in perf_regression.markdown_report(report)
+    assert "Telemetry coverage violations: 3" in perf_regression.markdown_report(report)
 
     junit_root = ET.fromstring(perf_regression.junit_report(report))
-    assert junit_root.attrib["failures"] == "2"
+    assert junit_root.attrib["failures"] == "3"
     assert [failure.attrib["type"] for failure in junit_root.findall(".//failure")] == [
+        "telemetry_coverage",
         "telemetry_coverage",
         "telemetry_coverage",
     ]
@@ -704,6 +756,7 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
                         "benchmark": "prompt",
                         "profile": "dev-local",
                         "tok_per_s": 42.0,
+                        "ttft_us": 12000,
                     }
                 ],
             }
@@ -759,10 +812,10 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
         output_dir / "perf_regression_telemetry_coverage_violations_latest.csv"
     ).read_text(encoding="utf-8")
     assert (
-        "key,commit,latest_timestamp,records,tok_per_s_records,wall_tok_per_s_records,memory_records,median_tok_per_s,median_wall_tok_per_s,tok_per_s_cv_pct,max_memory_bytes,prompt_suite_sha256"
+        "key,commit,latest_timestamp,records,tok_per_s_records,wall_tok_per_s_records,memory_records,ttft_us_records,median_tok_per_s,median_wall_tok_per_s,median_ttft_us,tok_per_s_cv_pct,max_memory_bytes,prompt_suite_sha256"
         in commit_points_csv
     )
-    assert "prompt/dev-local/-/-/-,abc,2026-04-27T10:00:00Z,1,1,0,0,42.0,,,," in commit_points_csv
+    assert "prompt/dev-local/-/-/-,abc,2026-04-27T10:00:00Z,1,1,0,0,1,42.0,,12000," in commit_points_csv
     assert "key,metric,baseline_commit,candidate_commit,baseline_value,candidate_value" in regressions_csv
     assert "key,commit,records,minimum_records" in sample_violations_csv
     assert "key,commit,records,tok_per_s_cv_pct,threshold_pct" in variability_violations_csv

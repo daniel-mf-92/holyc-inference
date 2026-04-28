@@ -79,3 +79,4 @@
 2026-04-28T02:47:15Z | Added opt-in QEMU prompt benchmark telemetry gates with refreshed synthetic smoke/index artifacts.
 2026-04-28T02:55:32Z | Added benchmark artifact manifest commit provenance and opt-in stale-commit gating with refreshed manifest artifacts.
 2026-04-28T03:01:36Z | Added perf regression telemetry coverage gates with CSV/JUnit/dashboard output and refreshed smoke artifacts.
+2026-04-28T03:11:14Z | Added perf regression first-token latency tracking with TTFT gates, CI fixture coverage, and refreshed dashboard artifacts.

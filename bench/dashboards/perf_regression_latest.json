@@ -2,17 +2,51 @@
   "commit_coverage_violations": [],
   "commit_points": [
     {
+      "commit": "ci-base",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/ci-short",
+      "latest_timestamp": "2026-04-27T14:00:00Z",
+      "max_memory_bytes": 1000000,
+      "median_tok_per_s": 100.0,
+      "median_ttft_us": 50000,
+      "median_wall_tok_per_s": 95.0,
+      "memory_records": 1,
+      "prompt_suite_sha256": "",
+      "records": 1,
+      "tok_per_s_cv_pct": null,
+      "tok_per_s_records": 1,
+      "ttft_us_records": 1,
+      "wall_tok_per_s_records": 1
+    },
+    {
+      "commit": "ci-head",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/ci-short",
+      "latest_timestamp": "2026-04-27T14:05:00Z",
+      "max_memory_bytes": 1000000,
+      "median_tok_per_s": 101.0,
+      "median_ttft_us": 49000,
+      "median_wall_tok_per_s": 96.0,
+      "memory_records": 1,
+      "prompt_suite_sha256": "",
+      "records": 1,
+      "tok_per_s_cv_pct": null,
+      "tok_per_s_records": 1,
+      "ttft_us_records": 1,
+      "wall_tok_per_s_records": 1
+    },
+    {
       "commit": "21ad93152049",
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-27T18:29:11Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -21,12 +55,14 @@
       "latest_timestamp": "2026-04-27T18:40:01Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -35,12 +71,14 @@
       "latest_timestamp": "2026-04-27T20:02:50Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -49,12 +87,14 @@
       "latest_timestamp": "2026-04-27T23:07:34Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -63,12 +103,14 @@
       "latest_timestamp": "2026-04-27T23:47:38Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -77,12 +119,14 @@
       "latest_timestamp": "2026-04-28T00:01:10Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 12400.0,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 6,
       "wall_tok_per_s_records": 0
     },
     {
@@ -91,12 +135,14 @@
       "latest_timestamp": "2026-04-28T02:33:36Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 12400.0,
       "median_wall_tok_per_s": 810.3154805956073,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 6,
       "wall_tok_per_s_records": 6
     },
     {
@@ -105,12 +151,14 @@
       "latest_timestamp": "2026-04-27T18:29:10Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -119,12 +167,14 @@
       "latest_timestamp": "2026-04-27T18:40:01Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -133,12 +183,14 @@
       "latest_timestamp": "2026-04-27T20:02:50Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -147,12 +199,14 @@
       "latest_timestamp": "2026-04-27T23:07:33Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -161,12 +215,14 @@
       "latest_timestamp": "2026-04-27T23:47:38Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -175,12 +231,14 @@
       "latest_timestamp": "2026-04-28T00:01:10Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 11600.0,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 6,
       "wall_tok_per_s_records": 0
     },
     {
@@ -189,12 +247,14 @@
       "latest_timestamp": "2026-04-28T02:33:36Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 11600.0,
       "median_wall_tok_per_s": 653.3543001033054,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 6,
       "wall_tok_per_s_records": 6
     },
     {
@@ -203,12 +263,14 @@
       "latest_timestamp": "2026-04-27T18:29:11Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -217,12 +279,14 @@
       "latest_timestamp": "2026-04-27T18:40:01Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -231,12 +295,14 @@
       "latest_timestamp": "2026-04-27T20:02:50Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -245,12 +311,14 @@
       "latest_timestamp": "2026-04-27T23:07:34Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -259,12 +327,14 @@
       "latest_timestamp": "2026-04-27T23:47:38Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -273,12 +343,14 @@
       "latest_timestamp": "2026-04-28T00:01:11Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 12400.0,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 6,
       "wall_tok_per_s_records": 0
     },
     {
@@ -287,12 +359,14 @@
       "latest_timestamp": "2026-04-28T02:33:37Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 12400.0,
       "median_wall_tok_per_s": 574.5490675958367,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 6,
       "wall_tok_per_s_records": 6
     },
     {
@@ -301,12 +375,14 @@
       "latest_timestamp": "2026-04-27T18:29:11Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -315,12 +391,14 @@
       "latest_timestamp": "2026-04-27T18:40:01Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -329,12 +407,14 @@
       "latest_timestamp": "2026-04-27T20:02:50Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -343,12 +423,14 @@
       "latest_timestamp": "2026-04-27T23:07:34Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -357,12 +439,14 @@
       "latest_timestamp": "2026-04-27T23:47:38Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -371,12 +455,14 @@
       "latest_timestamp": "2026-04-28T00:01:11Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 11600.0,
       "median_wall_tok_per_s": null,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 6,
       "wall_tok_per_s_records": 0
     },
     {
@@ -385,12 +471,14 @@
       "latest_timestamp": "2026-04-28T02:33:37Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 11600.0,
       "median_wall_tok_per_s": 441.89054398868643,
       "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 6,
+      "ttft_us_records": 6,
       "wall_tok_per_s_records": 6
     },
     {
@@ -399,12 +487,14 @@
       "latest_timestamp": "2026-04-27T14:41:37Z",
       "max_memory_bytes": null,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 0,
       "prompt_suite_sha256": "",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -413,12 +503,14 @@
       "latest_timestamp": "2026-04-27T16:12:59Z",
       "max_memory_bytes": null,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 0,
       "prompt_suite_sha256": "",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -427,12 +519,14 @@
       "latest_timestamp": "2026-04-27T17:04:37Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -441,12 +535,14 @@
       "latest_timestamp": "2026-04-27T17:20:21Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -455,12 +551,14 @@
       "latest_timestamp": "2026-04-27T18:02:19Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -469,12 +567,14 @@
       "latest_timestamp": "2026-04-27T19:22:32Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -483,12 +583,14 @@
       "latest_timestamp": "2026-04-27T20:02:33Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -497,12 +599,14 @@
       "latest_timestamp": "2026-04-27T22:08:28Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -511,12 +615,14 @@
       "latest_timestamp": "2026-04-27T22:19:51Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -525,12 +631,14 @@
       "latest_timestamp": "2026-04-27T23:19:04Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -539,12 +647,14 @@
       "latest_timestamp": "2026-04-27T23:32:53Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -553,12 +663,14 @@
       "latest_timestamp": "2026-04-27T23:40:33Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -567,12 +679,14 @@
       "latest_timestamp": "2026-04-28T00:01:10Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 12400,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 3,
       "wall_tok_per_s_records": 0
     },
     {
@@ -581,12 +695,14 @@
       "latest_timestamp": "2026-04-28T00:06:50Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 12400,
       "median_wall_tok_per_s": 815.6329651656755,
       "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 3,
       "wall_tok_per_s_records": 3
     },
     {
@@ -595,12 +711,14 @@
       "latest_timestamp": "2026-04-28T02:46:00Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 12400,
       "median_wall_tok_per_s": 591.3660555884093,
       "memory_records": 9,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 9,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 9,
+      "ttft_us_records": 9,
       "wall_tok_per_s_records": 9
     },
     {
@@ -609,12 +727,14 @@
       "latest_timestamp": "2026-04-27T14:41:37Z",
       "max_memory_bytes": null,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 0,
       "prompt_suite_sha256": "",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -623,12 +743,14 @@
       "latest_timestamp": "2026-04-27T16:12:59Z",
       "max_memory_bytes": null,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 0,
       "prompt_suite_sha256": "",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -637,12 +759,14 @@
       "latest_timestamp": "2026-04-27T17:04:37Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -651,12 +775,14 @@
       "latest_timestamp": "2026-04-27T17:20:21Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -665,12 +791,14 @@
       "latest_timestamp": "2026-04-27T18:02:19Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -679,12 +807,14 @@
       "latest_timestamp": "2026-04-27T19:22:32Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -693,12 +823,14 @@
       "latest_timestamp": "2026-04-27T20:02:33Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -707,12 +839,14 @@
       "latest_timestamp": "2026-04-27T22:08:28Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -721,12 +855,14 @@
       "latest_timestamp": "2026-04-27T22:19:51Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -735,12 +871,14 @@
       "latest_timestamp": "2026-04-27T23:19:04Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -749,12 +887,14 @@
       "latest_timestamp": "2026-04-27T23:32:53Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -763,12 +903,14 @@
       "latest_timestamp": "2026-04-27T23:40:33Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": null,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 0,
       "wall_tok_per_s_records": 0
     },
     {
@@ -777,12 +919,14 @@
       "latest_timestamp": "2026-04-28T00:01:10Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 11600,
       "median_wall_tok_per_s": null,
       "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 3,
       "wall_tok_per_s_records": 0
     },
     {
@@ -791,12 +935,14 @@
       "latest_timestamp": "2026-04-28T00:06:50Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 11600,
       "median_wall_tok_per_s": 365.8271695265968,
       "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 3,
+      "ttft_us_records": 3,
       "wall_tok_per_s_records": 3
     },
     {
@@ -805,12 +951,14 @@
       "latest_timestamp": "2026-04-28T02:46:00Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 11600,
       "median_wall_tok_per_s": 401.0427110487267,
       "memory_records": 9,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 9,
       "tok_per_s_cv_pct": 0.0,
       "tok_per_s_records": 9,
+      "ttft_us_records": 9,
       "wall_tok_per_s_records": 9
     }
   ],
@@ -820,12 +968,42 @@
     "mode": "latest-distinct-commits"
   },
   "comparison_coverage_violations": [],
-  "generated_at": "2026-04-28T03:02:56Z",
+  "generated_at": "2026-04-28T03:09:48Z",
   "prompt_suite_drift_violations": [],
-  "record_count": 270,
+  "record_count": 272,
   "records": [
     {
       "benchmark": "qemu_prompt",
+      "commit": "ci-base",
+      "memory_bytes": 1000000,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "ci-short",
+      "prompt_suite_sha256": "",
+      "quantization": "Q4_0",
+      "source": "bench/fixtures/perf_regression/ci_pass.jsonl",
+      "timestamp": "2026-04-27T14:00:00Z",
+      "tok_per_s": 100.0,
+      "ttft_us": 50000,
+      "wall_tok_per_s": 95.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ci-head",
+      "memory_bytes": 1000000,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "ci-short",
+      "prompt_suite_sha256": "",
+      "quantization": "Q4_0",
+      "source": "bench/fixtures/perf_regression/ci_pass.jsonl",
+      "timestamp": "2026-04-27T14:05:00Z",
+      "tok_per_s": 101.0,
+      "ttft_us": 49000,
+      "wall_tok_per_s": 96.0
+    },
+    {
+      "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
@@ -836,6 +1014,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T182911Z.json",
       "timestamp": "2026-04-27T18:29:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -850,6 +1029,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T18:29:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -864,6 +1044,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T18:29:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -878,6 +1059,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T182911Z.json",
       "timestamp": "2026-04-27T18:29:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -892,6 +1074,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T18:29:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -906,6 +1089,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T18:29:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -920,6 +1104,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T184001Z.json",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -934,6 +1119,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T184001Z.json",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -948,6 +1134,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -962,6 +1149,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -976,6 +1164,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -990,6 +1179,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1004,6 +1194,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T200250Z.json",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1018,6 +1209,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T200250Z.json",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1032,6 +1224,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1046,6 +1239,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1060,6 +1254,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1074,6 +1269,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1088,6 +1284,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T230734Z.json",
       "timestamp": "2026-04-27T23:07:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1102,6 +1299,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T23:07:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1116,6 +1314,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T23:07:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1130,6 +1329,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T230734Z.json",
       "timestamp": "2026-04-27T23:07:34Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1144,6 +1344,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T23:07:34Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1158,6 +1359,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T23:07:34Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1172,6 +1374,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T234738Z.json",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1186,6 +1389,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T234738Z.json",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1200,6 +1404,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1214,6 +1419,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1228,6 +1434,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1242,6 +1449,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1256,6 +1464,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T000110Z.json",
       "timestamp": "2026-04-28T00:01:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": null
     },
     {
@@ -1270,6 +1479,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T000110Z.json",
       "timestamp": "2026-04-28T00:01:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": null
     },
     {
@@ -1284,6 +1494,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T00:01:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": null
     },
     {
@@ -1298,6 +1509,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T00:01:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": null
     },
     {
@@ -1312,6 +1524,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T00:01:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": null
     },
     {
@@ -1326,6 +1539,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T00:01:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": null
     },
     {
@@ -1340,6 +1554,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T023336Z.json",
       "timestamp": "2026-04-28T02:33:36Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 728.9183155912591
     },
     {
@@ -1354,6 +1569,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T023336Z.json",
       "timestamp": "2026-04-28T02:33:36Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 891.7126455999554
     },
     {
@@ -1368,6 +1584,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T02:33:36Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 728.9183155912591
     },
     {
@@ -1382,6 +1599,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T02:33:36Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 891.7126455999554
     },
     {
@@ -1396,6 +1614,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T02:33:36Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 728.9183155912591
     },
     {
@@ -1410,6 +1629,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T02:33:36Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 891.7126455999554
     },
     {
@@ -1424,6 +1644,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T182911Z.json",
       "timestamp": "2026-04-27T18:29:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1438,6 +1659,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T182911Z.json",
       "timestamp": "2026-04-27T18:29:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1452,6 +1674,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T18:29:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1466,6 +1689,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T18:29:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1480,6 +1704,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T18:29:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1494,6 +1719,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T18:29:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1508,6 +1734,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T184001Z.json",
       "timestamp": "2026-04-27T18:40:00Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1522,6 +1749,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T18:40:00Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1536,6 +1764,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T18:40:00Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1550,6 +1779,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T184001Z.json",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1564,6 +1794,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1578,6 +1809,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1592,6 +1824,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T200250Z.json",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1606,6 +1839,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T200250Z.json",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1620,6 +1854,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1634,6 +1869,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1648,6 +1884,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1662,6 +1899,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1676,6 +1914,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T230734Z.json",
       "timestamp": "2026-04-27T23:07:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1690,6 +1929,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T230734Z.json",
       "timestamp": "2026-04-27T23:07:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1704,6 +1944,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T23:07:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1718,6 +1959,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T23:07:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1732,6 +1974,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T23:07:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1746,6 +1989,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T23:07:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1760,6 +2004,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T234738Z.json",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1774,6 +2019,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T234738Z.json",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1788,6 +2034,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1802,6 +2049,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1816,6 +2064,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1830,6 +2079,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -1844,6 +2094,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T000110Z.json",
       "timestamp": "2026-04-28T00:01:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": null
     },
     {
@@ -1858,6 +2109,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T000110Z.json",
       "timestamp": "2026-04-28T00:01:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": null
     },
     {
@@ -1872,6 +2124,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T00:01:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": null
     },
     {
@@ -1886,6 +2139,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T00:01:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": null
     },
     {
@@ -1900,6 +2154,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T00:01:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": null
     },
     {
@@ -1914,6 +2169,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T00:01:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": null
     },
     {
@@ -1928,6 +2184,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T023336Z.json",
       "timestamp": "2026-04-28T02:33:35Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 588.5273941110478
     },
     {
@@ -1942,6 +2199,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T02:33:35Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 588.5273941110478
     },
     {
@@ -1956,6 +2214,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T02:33:35Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 588.5273941110478
     },
     {
@@ -1970,6 +2229,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T023336Z.json",
       "timestamp": "2026-04-28T02:33:36Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 718.181206095563
     },
     {
@@ -1984,6 +2244,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T02:33:36Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 718.181206095563
     },
     {
@@ -1998,6 +2259,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T02:33:36Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 718.181206095563
     },
     {
@@ -2012,6 +2274,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T182911Z.json",
       "timestamp": "2026-04-27T18:29:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2026,6 +2289,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T182911Z.json",
       "timestamp": "2026-04-27T18:29:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2040,6 +2304,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T18:29:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2054,6 +2319,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T18:29:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2068,6 +2334,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T18:29:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2082,6 +2349,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T18:29:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2096,6 +2364,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T184001Z.json",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2110,6 +2379,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T184001Z.json",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2124,6 +2394,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2138,6 +2409,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2152,6 +2424,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2166,6 +2439,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2180,6 +2454,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T200250Z.json",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2194,6 +2469,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T200250Z.json",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2208,6 +2484,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2222,6 +2499,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2236,6 +2514,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2250,6 +2529,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2264,6 +2544,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T230734Z.json",
       "timestamp": "2026-04-27T23:07:34Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2278,6 +2559,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T230734Z.json",
       "timestamp": "2026-04-27T23:07:34Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2292,6 +2574,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T23:07:34Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2306,6 +2589,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T23:07:34Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2320,6 +2604,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T23:07:34Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2334,6 +2619,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T23:07:34Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2348,6 +2634,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T234738Z.json",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2362,6 +2649,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T234738Z.json",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2376,6 +2664,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2390,6 +2679,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2404,6 +2694,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2418,6 +2709,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2432,6 +2724,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T000111Z.json",
       "timestamp": "2026-04-28T00:01:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": null
     },
     {
@@ -2446,6 +2739,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T000111Z.json",
       "timestamp": "2026-04-28T00:01:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": null
     },
     {
@@ -2460,6 +2754,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T00:01:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": null
     },
     {
@@ -2474,6 +2769,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T00:01:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": null
     },
     {
@@ -2488,6 +2784,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T00:01:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": null
     },
     {
@@ -2502,6 +2799,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T00:01:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": null
     },
     {
@@ -2516,6 +2814,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T023337Z.json",
       "timestamp": "2026-04-28T02:33:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 452.60815449025006
     },
     {
@@ -2530,6 +2829,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T023337Z.json",
       "timestamp": "2026-04-28T02:33:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 696.4899807014234
     },
     {
@@ -2544,6 +2844,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T02:33:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 452.60815449025006
     },
     {
@@ -2558,6 +2859,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T02:33:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 696.4899807014234
     },
     {
@@ -2572,6 +2874,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T02:33:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 452.60815449025006
     },
     {
@@ -2586,6 +2889,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T02:33:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 696.4899807014234
     },
     {
@@ -2600,6 +2904,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T182911Z.json",
       "timestamp": "2026-04-27T18:29:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2614,6 +2919,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T182911Z.json",
       "timestamp": "2026-04-27T18:29:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2628,6 +2934,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T18:29:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2642,6 +2949,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T18:29:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2656,6 +2964,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T18:29:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2670,6 +2979,7 @@
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T18:29:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2684,6 +2994,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T184001Z.json",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2698,6 +3009,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T184001Z.json",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2712,6 +3024,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2726,6 +3039,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2740,6 +3054,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2754,6 +3069,7 @@
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T18:40:01Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2768,6 +3084,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T200250Z.json",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2782,6 +3099,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T200250Z.json",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2796,6 +3114,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2810,6 +3129,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2824,6 +3144,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2838,6 +3159,7 @@
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T20:02:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2852,6 +3174,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T230734Z.json",
       "timestamp": "2026-04-27T23:07:34Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2866,6 +3189,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T230734Z.json",
       "timestamp": "2026-04-27T23:07:34Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2880,6 +3204,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T23:07:34Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2894,6 +3219,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T23:07:34Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2908,6 +3234,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T23:07:34Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2922,6 +3249,7 @@
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T23:07:34Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2936,6 +3264,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T234738Z.json",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2950,6 +3279,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T234738Z.json",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2964,6 +3294,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2978,6 +3309,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -2992,6 +3324,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3006,6 +3339,7 @@
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T23:47:38Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3020,6 +3354,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T000111Z.json",
       "timestamp": "2026-04-28T00:01:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": null
     },
     {
@@ -3034,6 +3369,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T000111Z.json",
       "timestamp": "2026-04-28T00:01:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": null
     },
     {
@@ -3048,6 +3384,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T00:01:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": null
     },
     {
@@ -3062,6 +3399,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T00:01:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": null
     },
     {
@@ -3076,6 +3414,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T00:01:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": null
     },
     {
@@ -3090,6 +3429,7 @@
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T00:01:11Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": null
     },
     {
@@ -3104,6 +3444,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T023337Z.json",
       "timestamp": "2026-04-28T02:33:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 529.959259381935
     },
     {
@@ -3118,6 +3459,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T023337Z.json",
       "timestamp": "2026-04-28T02:33:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 353.8218285954379
     },
     {
@@ -3132,6 +3474,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T02:33:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 529.959259381935
     },
     {
@@ -3146,6 +3489,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T02:33:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 353.8218285954379
     },
     {
@@ -3160,6 +3504,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T02:33:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 529.959259381935
     },
     {
@@ -3174,6 +3519,7 @@
       "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T02:33:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 353.8218285954379
     },
     {
@@ -3188,6 +3534,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T144137Z.json",
       "timestamp": "2026-04-27T14:41:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3202,6 +3549,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T144137Z.json",
       "timestamp": "2026-04-27T14:41:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3216,6 +3564,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T144137Z.json",
       "timestamp": "2026-04-27T14:41:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3230,6 +3579,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T161259Z.json",
       "timestamp": "2026-04-27T16:12:59Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3244,6 +3594,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T161259Z.json",
       "timestamp": "2026-04-27T16:12:59Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3258,6 +3609,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T161259Z.json",
       "timestamp": "2026-04-27T16:12:59Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3272,6 +3624,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T170437Z.json",
       "timestamp": "2026-04-27T17:04:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3286,6 +3639,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T170437Z.json",
       "timestamp": "2026-04-27T17:04:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3300,6 +3654,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T170437Z.json",
       "timestamp": "2026-04-27T17:04:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3314,6 +3669,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T172021Z.json",
       "timestamp": "2026-04-27T17:20:21Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3328,6 +3684,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T172021Z.json",
       "timestamp": "2026-04-27T17:20:21Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3342,6 +3699,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T172021Z.json",
       "timestamp": "2026-04-27T17:20:21Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3356,6 +3714,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T180219Z.json",
       "timestamp": "2026-04-27T18:02:19Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3370,6 +3729,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T180219Z.json",
       "timestamp": "2026-04-27T18:02:19Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3384,6 +3744,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T180219Z.json",
       "timestamp": "2026-04-27T18:02:19Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3398,6 +3759,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T192232Z.json",
       "timestamp": "2026-04-27T19:22:32Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3412,6 +3774,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T192232Z.json",
       "timestamp": "2026-04-27T19:22:32Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3426,6 +3789,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T192232Z.json",
       "timestamp": "2026-04-27T19:22:32Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3440,6 +3804,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T200233Z.json",
       "timestamp": "2026-04-27T20:02:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3454,6 +3819,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T200233Z.json",
       "timestamp": "2026-04-27T20:02:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3468,6 +3834,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T200233Z.json",
       "timestamp": "2026-04-27T20:02:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3482,6 +3849,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T220828Z.json",
       "timestamp": "2026-04-27T22:08:28Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3496,6 +3864,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T220828Z.json",
       "timestamp": "2026-04-27T22:08:28Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3510,6 +3879,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T220828Z.json",
       "timestamp": "2026-04-27T22:08:28Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3524,6 +3894,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T221951Z.json",
       "timestamp": "2026-04-27T22:19:51Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3538,6 +3909,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T221951Z.json",
       "timestamp": "2026-04-27T22:19:51Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3552,6 +3924,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T221951Z.json",
       "timestamp": "2026-04-27T22:19:51Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3566,6 +3939,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T231904Z.json",
       "timestamp": "2026-04-27T23:19:04Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3580,6 +3954,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T231904Z.json",
       "timestamp": "2026-04-27T23:19:04Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3594,6 +3969,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T231904Z.json",
       "timestamp": "2026-04-27T23:19:04Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3608,6 +3984,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T233253Z.json",
       "timestamp": "2026-04-27T23:32:53Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3622,6 +3999,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T233253Z.json",
       "timestamp": "2026-04-27T23:32:53Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3636,6 +4014,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T233253Z.json",
       "timestamp": "2026-04-27T23:32:53Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3650,6 +4029,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T234033Z.json",
       "timestamp": "2026-04-27T23:40:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3664,6 +4044,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T234033Z.json",
       "timestamp": "2026-04-27T23:40:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3678,6 +4059,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T234033Z.json",
       "timestamp": "2026-04-27T23:40:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3692,6 +4074,7 @@
       "source": "bench/results/qemu_prompt_bench_20260428T000110Z.json",
       "timestamp": "2026-04-28T00:01:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": null
     },
     {
@@ -3706,6 +4089,7 @@
       "source": "bench/results/qemu_prompt_bench_20260428T000110Z.json",
       "timestamp": "2026-04-28T00:01:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": null
     },
     {
@@ -3720,6 +4104,7 @@
       "source": "bench/results/qemu_prompt_bench_20260428T000110Z.json",
       "timestamp": "2026-04-28T00:01:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": null
     },
     {
@@ -3734,6 +4119,7 @@
       "source": "bench/results/qemu_prompt_bench_20260428T000650Z.json",
       "timestamp": "2026-04-28T00:06:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 650.5122784192552
     },
     {
@@ -3748,6 +4134,7 @@
       "source": "bench/results/qemu_prompt_bench_20260428T000650Z.json",
       "timestamp": "2026-04-28T00:06:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 815.6329651656755
     },
     {
@@ -3762,6 +4149,7 @@
       "source": "bench/results/qemu_prompt_bench_20260428T000650Z.json",
       "timestamp": "2026-04-28T00:06:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 868.9040947105464
     },
     {
@@ -3776,6 +4164,7 @@
       "source": "bench/results/qemu_prompt_bench_20260428T024600Z.json",
       "timestamp": "2026-04-28T02:46:00Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 382.09867698333096
     },
     {
@@ -3790,6 +4179,7 @@
       "source": "bench/results/qemu_prompt_bench_20260428T024600Z.json",
       "timestamp": "2026-04-28T02:46:00Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 591.3660555884093
     },
     {
@@ -3804,6 +4194,7 @@
       "source": "bench/results/qemu_prompt_bench_20260428T024600Z.json",
       "timestamp": "2026-04-28T02:46:00Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 592.3951275500759
     },
     {
@@ -3818,6 +4209,7 @@
       "source": "bench/results/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T02:46:00Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 382.09867698333096
     },
     {
@@ -3832,6 +4224,7 @@
       "source": "bench/results/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T02:46:00Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 591.3660555884093
     },
     {
@@ -3846,6 +4239,7 @@
       "source": "bench/results/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T02:46:00Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 592.3951275500759
     },
     {
@@ -3860,6 +4254,7 @@
       "source": "bench/results/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T02:46:00Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 382.09867698333096
     },
     {
@@ -3874,6 +4269,7 @@
       "source": "bench/results/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T02:46:00Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 591.3660555884093
     },
     {
@@ -3888,6 +4284,7 @@
       "source": "bench/results/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T02:46:00Z",
       "tok_per_s": 160.0,
+      "ttft_us": 12400,
       "wall_tok_per_s": 592.3951275500759
     },
     {
@@ -3902,6 +4299,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T144137Z.json",
       "timestamp": "2026-04-27T14:41:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3916,6 +4314,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T144137Z.json",
       "timestamp": "2026-04-27T14:41:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3930,6 +4329,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T144137Z.json",
       "timestamp": "2026-04-27T14:41:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3944,6 +4344,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T161259Z.json",
       "timestamp": "2026-04-27T16:12:58Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3958,6 +4359,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T161259Z.json",
       "timestamp": "2026-04-27T16:12:58Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3972,6 +4374,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T161259Z.json",
       "timestamp": "2026-04-27T16:12:59Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -3986,6 +4389,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T170437Z.json",
       "timestamp": "2026-04-27T17:04:36Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4000,6 +4404,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T170437Z.json",
       "timestamp": "2026-04-27T17:04:36Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4014,6 +4419,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T170437Z.json",
       "timestamp": "2026-04-27T17:04:37Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4028,6 +4434,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T172021Z.json",
       "timestamp": "2026-04-27T17:20:21Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4042,6 +4449,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T172021Z.json",
       "timestamp": "2026-04-27T17:20:21Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4056,6 +4464,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T172021Z.json",
       "timestamp": "2026-04-27T17:20:21Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4070,6 +4479,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T180219Z.json",
       "timestamp": "2026-04-27T18:02:18Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4084,6 +4494,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T180219Z.json",
       "timestamp": "2026-04-27T18:02:18Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4098,6 +4509,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T180219Z.json",
       "timestamp": "2026-04-27T18:02:19Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4112,6 +4524,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T192232Z.json",
       "timestamp": "2026-04-27T19:22:32Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4126,6 +4539,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T192232Z.json",
       "timestamp": "2026-04-27T19:22:32Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4140,6 +4554,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T192232Z.json",
       "timestamp": "2026-04-27T19:22:32Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4154,6 +4569,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T200233Z.json",
       "timestamp": "2026-04-27T20:02:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4168,6 +4584,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T200233Z.json",
       "timestamp": "2026-04-27T20:02:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4182,6 +4599,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T200233Z.json",
       "timestamp": "2026-04-27T20:02:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4196,6 +4614,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T220828Z.json",
       "timestamp": "2026-04-27T22:08:28Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4210,6 +4629,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T220828Z.json",
       "timestamp": "2026-04-27T22:08:28Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4224,6 +4644,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T220828Z.json",
       "timestamp": "2026-04-27T22:08:28Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4238,6 +4659,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T221951Z.json",
       "timestamp": "2026-04-27T22:19:51Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4252,6 +4674,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T221951Z.json",
       "timestamp": "2026-04-27T22:19:51Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4266,6 +4689,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T221951Z.json",
       "timestamp": "2026-04-27T22:19:51Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4280,6 +4704,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T231904Z.json",
       "timestamp": "2026-04-27T23:19:04Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4294,6 +4719,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T231904Z.json",
       "timestamp": "2026-04-27T23:19:04Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4308,6 +4734,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T231904Z.json",
       "timestamp": "2026-04-27T23:19:04Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4322,6 +4749,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T233253Z.json",
       "timestamp": "2026-04-27T23:32:52Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4336,6 +4764,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T233253Z.json",
       "timestamp": "2026-04-27T23:32:53Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4350,6 +4779,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T233253Z.json",
       "timestamp": "2026-04-27T23:32:53Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4364,6 +4794,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T234033Z.json",
       "timestamp": "2026-04-27T23:40:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4378,6 +4809,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T234033Z.json",
       "timestamp": "2026-04-27T23:40:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4392,6 +4824,7 @@
       "source": "bench/results/qemu_prompt_bench_20260427T234033Z.json",
       "timestamp": "2026-04-27T23:40:33Z",
       "tok_per_s": 160.0,
+      "ttft_us": null,
       "wall_tok_per_s": null
     },
     {
@@ -4406,6 +4839,7 @@
       "source": "bench/results/qemu_prompt_bench_20260428T000110Z.json",
       "timestamp": "2026-04-28T00:01:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": null
     },
     {
@@ -4420,6 +4854,7 @@
       "source": "bench/results/qemu_prompt_bench_20260428T000110Z.json",
       "timestamp": "2026-04-28T00:01:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": null
     },
     {
@@ -4434,6 +4869,7 @@
       "source": "bench/results/qemu_prompt_bench_20260428T000110Z.json",
       "timestamp": "2026-04-28T00:01:10Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": null
     },
     {
@@ -4448,6 +4884,7 @@
       "source": "bench/results/qemu_prompt_bench_20260428T000650Z.json",
       "timestamp": "2026-04-28T00:06:49Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 341.20594977874924
     },
     {
@@ -4462,6 +4899,7 @@
       "source": "bench/results/qemu_prompt_bench_20260428T000650Z.json",
       "timestamp": "2026-04-28T00:06:49Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 365.8271695265968
     },
     {
@@ -4476,6 +4914,7 @@
       "source": "bench/results/qemu_prompt_bench_20260428T000650Z.json",
       "timestamp": "2026-04-28T00:06:50Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 510.45637990716074
     },
     {
@@ -4490,6 +4929,7 @@
       "source": "bench/results/qemu_prompt_bench_20260428T024600Z.json",
       "timestamp": "2026-04-28T02:45:59Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 401.0427110487267
     },
     {
@@ -4504,6 +4944,7 @@
       "source": "bench/results/qemu_prompt_bench_20260428T024600Z.json",
       "timestamp": "2026-04-28T02:45:59Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 491.06868823276653
     },
     {
@@ -4518,6 +4959,7 @@
       "source": "bench/results/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T02:45:59Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 401.0427110487267
     },
     {
@@ -4532,6 +4974,7 @@
       "source": "bench/results/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T02:45:59Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 491.06868823276653
     },
     {
@@ -4546,6 +4989,7 @@
       "source": "bench/results/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T02:45:59Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 401.0427110487267
     },
     {
@@ -4560,6 +5004,7 @@
       "source": "bench/results/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T02:45:59Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 491.06868823276653
     },
     {
@@ -4574,6 +5019,7 @@
       "source": "bench/results/qemu_prompt_bench_20260428T024600Z.json",
       "timestamp": "2026-04-28T02:46:00Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 396.6483216817889
     },
     {
@@ -4588,6 +5034,7 @@
       "source": "bench/results/qemu_prompt_bench_latest.csv",
       "timestamp": "2026-04-28T02:46:00Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 396.6483216817889
     },
     {
@@ -4602,6 +5049,7 @@
       "source": "bench/results/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-28T02:46:00Z",
       "tok_per_s": 160.0,
+      "ttft_us": 11600,
       "wall_tok_per_s": 396.6483216817889
     }
   ],
@@ -4609,10 +5057,19 @@
   "sample_violations": [],
   "status": "pass",
   "summaries": {
+    "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/ci-short": {
+      "latest_commit": "ci-head",
+      "max_memory_bytes": 1000000,
+      "median_tok_per_s": 100.5,
+      "median_ttft_us": 49500.0,
+      "median_wall_tok_per_s": 95.5,
+      "records": 2
+    },
     "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code": {
       "latest_commit": "3b7e701e8a6b",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 12400.0,
       "median_wall_tok_per_s": 810.3154805956073,
       "records": 42
     },
@@ -4620,6 +5077,7 @@
       "latest_commit": "3b7e701e8a6b",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 11600.0,
       "median_wall_tok_per_s": 653.3543001033054,
       "records": 42
     },
@@ -4627,6 +5085,7 @@
       "latest_commit": "3b7e701e8a6b",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 12400.0,
       "median_wall_tok_per_s": 574.5490675958367,
       "records": 42
     },
@@ -4634,6 +5093,7 @@
       "latest_commit": "3b7e701e8a6b",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 11600.0,
       "median_wall_tok_per_s": 441.89054398868643,
       "records": 42
     },
@@ -4641,6 +5101,7 @@
       "latest_commit": "ba875d39995e",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 12400,
       "median_wall_tok_per_s": 591.8805915692426,
       "records": 51
     },
@@ -4648,6 +5109,7 @@
       "latest_commit": "ba875d39995e",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
+      "median_ttft_us": 11600,
       "median_wall_tok_per_s": 401.0427110487267,
       "records": 51
     }
@@ -4660,8 +5122,10 @@
     "min_records_per_point": 1,
     "require_memory": false,
     "require_tok_per_s": false,
+    "require_ttft_us": false,
     "require_wall_tok_per_s": false,
     "tok_regression_pct": 5.0,
+    "ttft_regression_pct": null,
     "wall_tok_regression_pct": null
   },
   "variability_violations": []

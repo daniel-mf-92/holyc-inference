@@ -92,6 +92,9 @@ def main() -> int:
         if fixture_summary.get("median_wall_tok_per_s") != 95.5:
             print("missing_wall_tok_summary=true", file=sys.stderr)
             return 1
+        if fixture_summary.get("median_ttft_us") != 49500.0:
+            print("missing_ttft_summary=true", file=sys.stderr)
+            return 1
         if "Perf Regression Dashboard" not in markdown_path.read_text(encoding="utf-8"):
             print("missing_markdown_dashboard=true", file=sys.stderr)
             return 1
