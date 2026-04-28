@@ -64,6 +64,8 @@ def test_smoke_eval_inputs_pass() -> None:
         assert report["prediction_audits"]["holyc"]["majority_prediction_pct"] == 100.0
         assert report["prediction_audits"]["holyc"]["scored_predictions"] == 1
         assert abs(report["prediction_audits"]["holyc"]["score_coverage_pct"] - (100.0 / 3.0)) < 0.001
+        assert report["prediction_audits"]["holyc"]["top_score_ties"] == 0
+        assert report["prediction_audits"]["holyc"]["top_score_tie_pct"] == 0.0
         assert report["prediction_audits"]["holyc"]["score_length_histogram"] == {"4": 1}
         assert (tmp_path / "audit.md").exists()
         assert list(csv.DictReader((tmp_path / "audit.csv").open(newline="", encoding="utf-8"))) == []
@@ -146,10 +148,40 @@ def test_score_coverage_gate_fails() -> None:
         assert any("score vector coverage is 33.33% of valid predictions" in message for message in messages)
 
 
+def test_top_score_tie_gate_fails() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        holyc = tmp_path / "holyc_tied_scores.jsonl"
+        holyc.write_text(
+            "\n".join(
+                [
+                    '{"id":"smoke-hellaswag-1","scores":[4.0,4.0,1.0,0.0]}',
+                    '{"id":"smoke-arc-1","scores":[9.0,1.0,0.5,0.25]}',
+                    '{"id":"smoke-truthfulqa-1","prediction":"A"}',
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        args = smoke_args(tmp_path, "score_ties")
+        args[args.index(str(BENCH_PATH / "eval" / "samples" / "holyc_smoke_predictions.jsonl"))] = str(holyc)
+        args.extend(["--max-top-score-tie-pct", "40"])
+        assert eval_input_audit.main(args) == 2
+
+        report = json.loads((tmp_path / "score_ties.json").read_text(encoding="utf-8"))
+        messages = [issue["message"] for issue in report["issues"]]
+        assert report["prediction_audits"]["holyc"]["scored_predictions"] == 2
+        assert report["prediction_audits"]["holyc"]["top_score_ties"] == 1
+        assert report["prediction_audits"]["holyc"]["top_score_tie_pct"] == 50.0
+        assert any("top score ties cover 50.00% of scored predictions" in message for message in messages)
+
+
 if __name__ == "__main__":
     test_smoke_eval_inputs_pass()
     test_missing_prediction_fails_with_structured_report()
     test_prediction_metadata_mismatch_fails()
     test_majority_prediction_gate_fails()
     test_score_coverage_gate_fails()
+    test_top_score_tie_gate_fails()
     print("eval_input_audit_tests=ok")

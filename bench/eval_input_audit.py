@@ -46,6 +46,8 @@ class PredictionAudit:
     valid_predictions: int
     scored_predictions: int
     score_coverage_pct: float | None
+    top_score_ties: int
+    top_score_tie_pct: float | None
     score_length_histogram: dict[str, int]
     prediction_histogram: dict[str, int]
     majority_prediction: str
@@ -129,6 +131,7 @@ def audit_predictions(
     expected_split: str,
     max_majority_prediction_pct: float | None,
     min_score_coverage_pct: float | None,
+    max_top_score_tie_pct: float | None,
     issues: list[Issue],
 ) -> PredictionAudit:
     rows = read_rows_with_issues(path, source_name, issues)
@@ -137,6 +140,7 @@ def audit_predictions(
     extra_ids: set[str] = set()
     valid_predictions = 0
     scored_predictions = 0
+    top_score_ties = 0
     score_lengths: list[int] = []
     prediction_labels: list[str] = []
     metadata = collect_metadata(rows)
@@ -169,6 +173,9 @@ def audit_predictions(
         if prediction.scores is not None:
             scored_predictions += 1
             score_lengths.append(len(prediction.scores))
+            top_score = max(prediction.scores)
+            if sum(1 for score in prediction.scores if score == top_score) > 1:
+                top_score_ties += 1
         prediction_labels.append(str(prediction.predicted_index))
 
         row_dataset = metadata_value(row, "dataset")
@@ -213,6 +220,7 @@ def audit_predictions(
             ),
         )
     score_coverage_pct = (scored_predictions / valid_predictions * 100.0) if valid_predictions else None
+    top_score_tie_pct = (top_score_ties / scored_predictions * 100.0) if scored_predictions else None
     if (
         min_score_coverage_pct is not None
         and score_coverage_pct is not None
@@ -227,6 +235,20 @@ def audit_predictions(
                 f"{min_score_coverage_pct:.2f}% gate"
             ),
         )
+    if (
+        max_top_score_tie_pct is not None
+        and top_score_tie_pct is not None
+        and top_score_tie_pct > max_top_score_tie_pct
+    ):
+        append_issue(
+            issues,
+            "error",
+            source_name,
+            (
+                f"top score ties cover {top_score_tie_pct:.2f}% of scored predictions, above "
+                f"{max_top_score_tie_pct:.2f}% gate"
+            ),
+        )
 
     return PredictionAudit(
         source=source_name,
@@ -234,6 +256,8 @@ def audit_predictions(
         valid_predictions=valid_predictions,
         scored_predictions=scored_predictions,
         score_coverage_pct=score_coverage_pct,
+        top_score_ties=top_score_ties,
+        top_score_tie_pct=top_score_tie_pct,
         score_length_histogram=sorted_counts(score_lengths),
         prediction_histogram=prediction_histogram,
         majority_prediction=majority_prediction,
@@ -330,6 +354,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         args.split,
         args.max_majority_prediction_pct,
         args.min_score_coverage_pct,
+        args.max_top_score_tie_pct,
         issues,
     )
     llama = audit_predictions(
@@ -342,6 +367,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         args.split,
         args.max_majority_prediction_pct,
         args.min_score_coverage_pct,
+        args.max_top_score_tie_pct,
         issues,
     )
     for key in ("model", "quantization"):
@@ -443,16 +469,19 @@ def markdown_report(report: dict[str, Any]) -> str:
             "",
             "## Score Coverage",
             "",
-            "| Engine | Scored predictions | Coverage % | Score lengths |",
-            "| --- | ---: | ---: | --- |",
+            "| Engine | Scored predictions | Coverage % | Top-score ties | Tie % | Score lengths |",
+            "| --- | ---: | ---: | ---: | ---: | --- |",
         ]
     )
     for name, audit in report["prediction_audits"].items():
         coverage_pct = audit["score_coverage_pct"]
         coverage_pct_text = "-" if coverage_pct is None else f"{coverage_pct:.2f}"
+        tie_pct = audit["top_score_tie_pct"]
+        tie_pct_text = "-" if tie_pct is None else f"{tie_pct:.2f}"
         lines.append(
             f"| {name} | {audit['scored_predictions']}/{audit['valid_predictions']} | "
-            f"{coverage_pct_text} | {json.dumps(audit['score_length_histogram'], sort_keys=True)} |"
+            f"{coverage_pct_text} | {audit['top_score_ties']} | {tie_pct_text} | "
+            f"{json.dumps(audit['score_length_histogram'], sort_keys=True)} |"
         )
     lines.extend(
         [
@@ -551,6 +580,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         help="Fail when either engine has score vectors for less than this percentage of valid rows",
     )
+    parser.add_argument(
+        "--max-top-score-tie-pct",
+        type=float,
+        help="Fail when tied maximum scores exceed this percentage of scored prediction rows for either engine",
+    )
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--output-stem", default="eval_input_audit_latest")
     return parser
@@ -566,6 +600,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.min_score_coverage_pct is not None and not 0.0 <= args.min_score_coverage_pct <= 100.0:
         print("error: --min-score-coverage-pct must be between 0 and 100", file=sys.stderr)
+        return 2
+    if args.max_top_score_tie_pct is not None and not 0.0 <= args.max_top_score_tie_pct <= 100.0:
+        print("error: --max-top-score-tie-pct must be between 0 and 100", file=sys.stderr)
         return 2
     report = build_report(args)
     json_path, md_path, csv_path, junit_path = write_report(report, args.output_dir, args.output_stem)

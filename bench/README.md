@@ -777,9 +777,11 @@ Before comparing, `eval_input_audit.py` can gate apples-to-apples inputs. It
 checks gold/prediction record coverage, duplicates, invalid prediction indexes,
 dataset/split metadata, optional model/quantization metadata drift, and gold
 answer distribution. Use `--max-majority-gold-answer-pct` to fail early when a
-gold file is too label-skewed for a useful paired comparison. The audit writes
-JSON, Markdown, CSV, and JUnit XML reports and exits non-zero when it finds
-errors:
+gold file is too label-skewed for a useful paired comparison. It also records
+score-vector coverage and top-score ties; use `--min-score-coverage-pct` and
+`--max-top-score-tie-pct` to catch missing or ambiguous score vectors before
+running quality comparisons. The audit writes JSON, Markdown, CSV, and JUnit XML
+reports and exits non-zero when it finds errors:
 
 ```bash
 python3 bench/eval_input_audit.py \

@@ -167,3 +167,4 @@
 2026-04-28T20:38:38Z | Added QEMU command alias coverage to air-gap audits and benchmark indexing with smoke validation.
 2026-04-28T20:53:30Z | Added perf regression wall-clock tok/s variability gate with smoke coverage and refreshed dashboards.
 2026-04-28T22:03:40Z | Added benchmark artifact manifest CI smoke gate for air-gapped pass/reject coverage and refreshed manifest artifacts.
+2026-04-28T22:17:38Z | Added eval input top-score tie telemetry/gate with smoke audit artifacts and coverage.
