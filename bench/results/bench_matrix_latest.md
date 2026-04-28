@@ -1,10 +1,10 @@
 # Benchmark Matrix
 
-Generated: 2026-04-27T23:47:38Z
+Generated: 2026-04-28T00:01:11Z
 Status: pass
 Matrix: synthetic-smoke-matrix
 Cells: 2
-Variability gates: suite CV <= -, prompt CV <= 0.1
+Variability gates: suite CV <= 0.1, prompt CV <= 0.1
 
 ## Cells
 

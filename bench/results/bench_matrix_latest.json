@@ -20,12 +20,12 @@
       "measured_runs": 4,
       "median_tok_per_s": 160.0,
       "model": "synthetic-smoke",
-      "output_dir": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0",
+      "output_dir": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0",
       "profile": "ci-airgap-smoke",
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "prompts": 2,
       "quantization": "Q4_0",
-      "report": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "report": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "status": "pass",
       "variability_findings": 0,
       "warmup_runs": 2
@@ -50,25 +50,25 @@
       "measured_runs": 4,
       "median_tok_per_s": 160.0,
       "model": "synthetic-smoke",
-      "output_dir": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0",
+      "output_dir": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0",
       "profile": "ci-airgap-smoke",
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "prompts": 2,
       "quantization": "Q8_0",
-      "report": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "report": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "status": "pass",
       "variability_findings": 0,
       "warmup_runs": 2
     }
   ],
   "dry_run": false,
-  "generated_at": "2026-04-27T23:47:38Z",
-  "matrix_dir": "bench/results/bench_matrix_20260427T234738Z",
+  "generated_at": "2026-04-28T00:01:11Z",
+  "matrix_dir": "bench/results/bench_matrix_20260428T000109Z",
   "matrix_file": "bench/fixtures/bench_matrix_smoke.json",
   "matrix_name": "synthetic-smoke-matrix",
   "status": "pass",
   "variability_gates": {
     "max_prompt_cv_pct": 0.1,
-    "max_suite_cv_pct": null
+    "max_suite_cv_pct": 0.1
   }
 }

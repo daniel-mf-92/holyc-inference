@@ -183,7 +183,10 @@ Markdown. The suite summary includes measured prompt count, run count, total
 prompt bytes launched, total tokens, total elapsed time, median/P95 tok/s, tok/s
 standard deviation, coefficient of variation, and max memory. Per-run and
 per-prompt reports include UTF-8 prompt byte counts so benchmark changes can be
-separated from prompt-suite size drift. The runner also writes a deterministic
+separated from prompt-suite size drift. Optional first-token latency telemetry is
+normalized from `ttft_us`, `time_to_first_token_us`, `first_token_us`, and their
+`_ms` or `_s` variants into `ttft_us`; suite and per-prompt reports include
+median and P95 TTFT when present. The runner also writes a deterministic
 prompt-suite SHA256 matching `prompt_audit.py`, plus
 `qemu_prompt_bench_latest.csv` with one row per measured run for CI artifact
 upload, spreadsheets, and simple shell comparisons. JSON and Markdown reports
@@ -194,7 +197,7 @@ Prompt files can be JSON, JSONL, or plain text split with `---`. Guest output ma
 include a JSON line such as:
 
 ```text
-BENCH_RESULT: {"tokens": 128, "elapsed_us": 500000, "tok_per_s": 256.0}
+BENCH_RESULT: {"tokens": 128, "elapsed_us": 500000, "ttft_us": 42000, "tok_per_s": 256.0}
 ```
 
 Memory telemetry is optional. The runner normalizes `memory_bytes`,
