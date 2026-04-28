@@ -58,6 +58,17 @@ def count_by(records: list[dataset_pack.EvalRecord], field: str) -> dict[str, in
     return dict(sorted(counts.items()))
 
 
+def count_by_dataset_split(records: list[dataset_pack.EvalRecord]) -> dict[str, dict[str, int]]:
+    counts: dict[str, dict[str, int]] = {}
+    for record in records:
+        dataset_counts = counts.setdefault(record.dataset, {})
+        dataset_counts[record.split] = dataset_counts.get(record.split, 0) + 1
+    return {
+        dataset: dict(sorted(split_counts.items()))
+        for dataset, split_counts in sorted(counts.items())
+    }
+
+
 def apply_filters(
     records: list[dataset_pack.EvalRecord],
     include_dataset: set[str],
@@ -100,6 +111,25 @@ def cap_records_by_field(
     groups: dict[str, list[dataset_pack.EvalRecord]] = {}
     for record in records:
         groups.setdefault(str(getattr(record, field)), []).append(record)
+
+    selected: list[dataset_pack.EvalRecord] = []
+    for key in sorted(groups):
+        group = sorted(groups[key], key=lambda record: stable_sample_key(record, seed))
+        selected.extend(group[:max_per_group])
+    return selected
+
+
+def cap_records_by_dataset_split(
+    records: list[dataset_pack.EvalRecord],
+    max_per_group: int | None,
+    seed: str,
+) -> list[dataset_pack.EvalRecord]:
+    if max_per_group is None:
+        return list(records)
+
+    groups: dict[tuple[str, str], list[dataset_pack.EvalRecord]] = {}
+    for record in records:
+        groups.setdefault((record.dataset, record.split), []).append(record)
 
     selected: list[dataset_pack.EvalRecord] = []
     for key in sorted(groups):
@@ -169,11 +199,13 @@ def build_manifest(
         "answer_histogram": answer_histogram(selected),
         "created_at": iso_now(),
         "dataset_counts": count_by(selected, "dataset"),
+        "dataset_split_counts": count_by_dataset_split(selected),
         "filters": {
             "include_dataset": sorted(args.include_dataset),
             "include_split": sorted(args.include_split),
             "balance_answer_index": args.balance_answer_index,
             "max_records_per_dataset": args.max_records_per_dataset,
+            "max_records_per_dataset_split": args.max_records_per_dataset_split,
             "max_records_per_split": args.max_records_per_split,
             "max_records": args.max_records,
             "require_provenance": args.require_provenance,
@@ -220,6 +252,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Deterministically keep at most this many records from each split before global sampling",
     )
+    parser.add_argument(
+        "--max-records-per-dataset-split",
+        type=int,
+        help="Deterministically keep at most this many records from each dataset/split pair before global sampling",
+    )
     parser.add_argument("--seed", default="holyc-eval-v1", help="Stable sampling seed")
     parser.add_argument(
         "--balance-answer-index",
@@ -249,6 +286,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.max_records_per_split is not None and args.max_records_per_split < 1:
         print("error: --max-records-per-split must be >= 1", file=sys.stderr)
         return 2
+    if args.max_records_per_dataset_split is not None and args.max_records_per_dataset_split < 1:
+        print("error: --max-records-per-dataset-split must be >= 1", file=sys.stderr)
+        return 2
     if args.pack_manifest and not args.pack_output:
         print("error: --pack-manifest requires --pack-output", file=sys.stderr)
         return 2
@@ -265,6 +305,7 @@ def main(argv: list[str] | None = None) -> int:
         reject_duplicate_ids(filtered)
         capped = cap_records_by_field(filtered, "dataset", args.max_records_per_dataset, args.seed)
         capped = cap_records_by_field(capped, "split", args.max_records_per_split, args.seed)
+        capped = cap_records_by_dataset_split(capped, args.max_records_per_dataset_split, args.seed)
         selected = select_records(capped, args.max_records, args.seed, args.balance_answer_index)
         if not selected:
             raise ValueError("no records selected after filters")

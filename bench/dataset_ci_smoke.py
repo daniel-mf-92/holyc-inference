@@ -69,6 +69,8 @@ def main() -> int:
             "synthetic-smoke",
             "--max-records",
             "3",
+            "--max-records-per-dataset-split",
+            "1",
             "--balance-answer-index",
             "--pack-output",
             str(packed),
@@ -92,6 +94,20 @@ def main() -> int:
         ):
             return rc
         if rc := require(curated_report["filters"]["balance_answer_index"] is True, "missing_balance_flag"):
+            return rc
+        if rc := require(
+            curated_report["filters"]["max_records_per_dataset_split"] == 1,
+            "missing_dataset_split_cap",
+        ):
+            return rc
+        if rc := require(
+            all(
+                split_count <= 1
+                for split_counts in curated_report["dataset_split_counts"].values()
+                for split_count in split_counts.values()
+            ),
+            "unexpected_dataset_split_cap_count",
+        ):
             return rc
 
         inspect_command = [

@@ -167,8 +167,58 @@ def test_per_dataset_and_split_caps_are_deterministic() -> None:
         assert curated_rows == sorted(curated_rows, key=lambda row: (row["dataset"], row["split"], row["record_id"]))
 
 
+def test_per_dataset_split_cap_limits_each_pair() -> None:
+    rows = [
+        {
+            "id": f"{dataset}-{split}-{index}",
+            "dataset": dataset,
+            "split": split,
+            "prompt": f"Question {dataset} {split} {index}",
+            "choices": ["A", "B"],
+            "answer_index": index % 2,
+            "provenance": "synthetic dataset split cap curation test",
+        }
+        for dataset in ("arc", "hellaswag")
+        for split in ("train", "validation")
+        for index in range(5)
+    ]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        source = Path(tmp) / "source.jsonl"
+        output = Path(tmp) / "curated.jsonl"
+        manifest = Path(tmp) / "curated.manifest.json"
+        write_jsonl(source, rows)
+
+        status = dataset_curate.main(
+            [
+                "--input",
+                str(source),
+                "--output",
+                str(output),
+                "--manifest",
+                str(manifest),
+                "--source-name",
+                "synthetic-dataset-split",
+                "--max-records-per-dataset-split",
+                "2",
+            ]
+        )
+
+        assert status == 0
+        manifest_json = json.loads(manifest.read_text(encoding="utf-8"))
+
+        assert manifest_json["filters"]["max_records_per_dataset_split"] == 2
+        assert manifest_json["total_after_filters"] == 20
+        assert manifest_json["total_after_group_caps"] == 8
+        assert manifest_json["dataset_split_counts"] == {
+            "arc": {"train": 2, "validation": 2},
+            "hellaswag": {"train": 2, "validation": 2},
+        }
+
+
 if __name__ == "__main__":
     test_balanced_answer_index_sampling_limits_label_skew()
     test_duplicate_ids_fail_after_filtering()
     test_per_dataset_and_split_caps_are_deterministic()
+    test_per_dataset_split_cap_limits_each_pair()
     print("eval_dataset_curate_tests=ok")

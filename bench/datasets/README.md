@@ -35,6 +35,8 @@ python3 bench/dataset_curate.py \
 Add `--balance-answer-index` when capping a larger local source to round-robin
 the deterministic sample across answer labels. The manifest records the flag and
 the resulting answer histogram for downstream eval reproducibility checks.
+Use `--max-records-per-dataset-split` when combining multiple datasets and
+splits so one large dataset/split pair cannot dominate the curated subset.
 
 ## Binary Format
 

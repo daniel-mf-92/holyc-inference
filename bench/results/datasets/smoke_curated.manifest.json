@@ -2,11 +2,22 @@
   "answer_histogram": {
     "0": 3
   },
-  "created_at": "2026-04-28T08:39:59Z",
+  "created_at": "2026-04-28T08:54:02Z",
   "dataset_counts": {
     "arc-smoke": 1,
     "hellaswag-smoke": 1,
     "truthfulqa-smoke": 1
+  },
+  "dataset_split_counts": {
+    "arc-smoke": {
+      "validation": 1
+    },
+    "hellaswag-smoke": {
+      "validation": 1
+    },
+    "truthfulqa-smoke": {
+      "validation": 1
+    }
   },
   "filters": {
     "balance_answer_index": true,
@@ -14,6 +25,7 @@
     "include_split": [],
     "max_records": 3,
     "max_records_per_dataset": null,
+    "max_records_per_dataset_split": 1,
     "max_records_per_split": null,
     "require_provenance": false,
     "seed": "holyc-eval-v1"
