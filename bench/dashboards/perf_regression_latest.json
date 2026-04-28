@@ -3,9 +3,11 @@
   "commit_points": [
     {
       "commit": "ci-base",
+      "host_overhead_records": 1,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/ci-short",
       "latest_timestamp": "2026-04-27T14:00:00Z",
       "max_memory_bytes": 1000000,
+      "median_host_overhead_pct": 5.0,
       "median_tok_per_s": 100.0,
       "median_ttft_us": 50000,
       "median_wall_tok_per_s": 95.0,
@@ -21,9 +23,11 @@
     },
     {
       "commit": "ci-head",
+      "host_overhead_records": 1,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/ci-short",
       "latest_timestamp": "2026-04-27T14:05:00Z",
       "max_memory_bytes": 1000000,
+      "median_host_overhead_pct": 4.0,
       "median_tok_per_s": 101.0,
       "median_ttft_us": 49000,
       "median_wall_tok_per_s": 96.0,
@@ -39,9 +43,11 @@
     },
     {
       "commit": "21ad93152049",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-27T18:29:11Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -57,9 +63,11 @@
     },
     {
       "commit": "5bf1fd7158fd",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-27T18:40:01Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -75,9 +83,11 @@
     },
     {
       "commit": "786eee1bfa27",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-27T20:02:50Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -93,9 +103,11 @@
     },
     {
       "commit": "bf852f741851",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-27T23:07:34Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -111,9 +123,11 @@
     },
     {
       "commit": "bb8266801970",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-27T23:47:38Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -129,9 +143,11 @@
     },
     {
       "commit": "1588059f2388",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-28T00:01:10Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400.0,
       "median_wall_tok_per_s": null,
@@ -147,9 +163,11 @@
     },
     {
       "commit": "3b7e701e8a6b",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-28T02:33:36Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400.0,
       "median_wall_tok_per_s": 810.3154805956073,
@@ -165,9 +183,11 @@
     },
     {
       "commit": "a0126ad2c367",
+      "host_overhead_records": 8,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-28T03:52:03Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": -77.97383333333333,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400.0,
       "median_wall_tok_per_s": 726.8827992531955,
@@ -183,9 +203,11 @@
     },
     {
       "commit": "a3d460c2276c",
+      "host_overhead_records": 2,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-28T05:32:08Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": -70.03683333333333,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400.0,
       "median_wall_tok_per_s": 536.1978911092583,
@@ -201,9 +223,11 @@
     },
     {
       "commit": "d1ee8f0158c3",
+      "host_overhead_records": 6,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-28T06:20:14Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": -77.61283333333333,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400.0,
       "median_wall_tok_per_s": 747.2510092454531,
@@ -219,9 +243,11 @@
     },
     {
       "commit": "e4311d1fe5fa",
+      "host_overhead_records": 6,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-28T06:47:51Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": -81.83833333333334,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400.0,
       "median_wall_tok_per_s": 881.0248547292583,
@@ -237,9 +263,11 @@
     },
     {
       "commit": "21ad93152049",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-27T18:29:10Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -255,9 +283,11 @@
     },
     {
       "commit": "5bf1fd7158fd",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-27T18:40:01Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -273,9 +303,11 @@
     },
     {
       "commit": "786eee1bfa27",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-27T20:02:50Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -291,9 +323,11 @@
     },
     {
       "commit": "bf852f741851",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-27T23:07:33Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -309,9 +343,11 @@
     },
     {
       "commit": "bb8266801970",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-27T23:47:38Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -327,9 +363,11 @@
     },
     {
       "commit": "1588059f2388",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-28T00:01:10Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600.0,
       "median_wall_tok_per_s": null,
@@ -345,9 +383,11 @@
     },
     {
       "commit": "3b7e701e8a6b",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-28T02:33:36Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600.0,
       "median_wall_tok_per_s": 653.3543001033054,
@@ -363,9 +403,11 @@
     },
     {
       "commit": "a0126ad2c367",
+      "host_overhead_records": 8,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-28T03:52:03Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": 109.41850000000001,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600.0,
       "median_wall_tok_per_s": 164.30686984593953,
@@ -381,9 +423,11 @@
     },
     {
       "commit": "a3d460c2276c",
+      "host_overhead_records": 2,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-28T05:32:07Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": -67.99074999999999,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600.0,
       "median_wall_tok_per_s": 499.8555778714043,
@@ -399,9 +443,11 @@
     },
     {
       "commit": "d1ee8f0158c3",
+      "host_overhead_records": 6,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-28T06:20:14Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": -46.93425,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600.0,
       "median_wall_tok_per_s": 340.9180447753622,
@@ -417,9 +463,11 @@
     },
     {
       "commit": "e4311d1fe5fa",
+      "host_overhead_records": 6,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-28T06:47:51Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": -72.10300000000001,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600.0,
       "median_wall_tok_per_s": 574.0010184598402,
@@ -435,9 +483,11 @@
     },
     {
       "commit": "21ad93152049",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-code",
       "latest_timestamp": "2026-04-27T18:29:11Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -453,9 +503,11 @@
     },
     {
       "commit": "5bf1fd7158fd",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-code",
       "latest_timestamp": "2026-04-27T18:40:01Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -471,9 +523,11 @@
     },
     {
       "commit": "786eee1bfa27",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-code",
       "latest_timestamp": "2026-04-27T20:02:50Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -489,9 +543,11 @@
     },
     {
       "commit": "bf852f741851",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-code",
       "latest_timestamp": "2026-04-27T23:07:34Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -507,9 +563,11 @@
     },
     {
       "commit": "bb8266801970",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-code",
       "latest_timestamp": "2026-04-27T23:47:38Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -525,9 +583,11 @@
     },
     {
       "commit": "1588059f2388",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-code",
       "latest_timestamp": "2026-04-28T00:01:11Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400.0,
       "median_wall_tok_per_s": null,
@@ -543,9 +603,11 @@
     },
     {
       "commit": "3b7e701e8a6b",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-code",
       "latest_timestamp": "2026-04-28T02:33:37Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400.0,
       "median_wall_tok_per_s": 574.5490675958367,
@@ -561,9 +623,11 @@
     },
     {
       "commit": "a0126ad2c367",
+      "host_overhead_records": 6,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-code",
       "latest_timestamp": "2026-04-28T03:52:04Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": -74.89716666666666,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400.0,
       "median_wall_tok_per_s": 659.1427849329189,
@@ -579,9 +643,11 @@
     },
     {
       "commit": "d1ee8f0158c3",
+      "host_overhead_records": 6,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-code",
       "latest_timestamp": "2026-04-28T06:20:15Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": -71.631,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400.0,
       "median_wall_tok_per_s": 580.8421946307187,
@@ -597,9 +663,11 @@
     },
     {
       "commit": "21ad93152049",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-short",
       "latest_timestamp": "2026-04-27T18:29:11Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -615,9 +683,11 @@
     },
     {
       "commit": "5bf1fd7158fd",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-short",
       "latest_timestamp": "2026-04-27T18:40:01Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -633,9 +703,11 @@
     },
     {
       "commit": "786eee1bfa27",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-short",
       "latest_timestamp": "2026-04-27T20:02:50Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -651,9 +723,11 @@
     },
     {
       "commit": "bf852f741851",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-short",
       "latest_timestamp": "2026-04-27T23:07:34Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -669,9 +743,11 @@
     },
     {
       "commit": "bb8266801970",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-short",
       "latest_timestamp": "2026-04-27T23:47:38Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -687,9 +763,11 @@
     },
     {
       "commit": "1588059f2388",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-short",
       "latest_timestamp": "2026-04-28T00:01:11Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600.0,
       "median_wall_tok_per_s": null,
@@ -705,9 +783,11 @@
     },
     {
       "commit": "3b7e701e8a6b",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-short",
       "latest_timestamp": "2026-04-28T02:33:37Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600.0,
       "median_wall_tok_per_s": 441.89054398868643,
@@ -723,9 +803,11 @@
     },
     {
       "commit": "a0126ad2c367",
+      "host_overhead_records": 6,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-short",
       "latest_timestamp": "2026-04-28T03:52:04Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": -58.1535,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600.0,
       "median_wall_tok_per_s": 434.41033544992433,
@@ -741,9 +823,11 @@
     },
     {
       "commit": "d1ee8f0158c3",
+      "host_overhead_records": 6,
       "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-short",
       "latest_timestamp": "2026-04-28T06:20:15Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": -42.99775,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600.0,
       "median_wall_tok_per_s": 313.57670246771875,
@@ -759,9 +843,11 @@
     },
     {
       "commit": "5b98f2570b1c",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-27T14:41:37Z",
       "max_memory_bytes": null,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -777,9 +863,11 @@
     },
     {
       "commit": "85cce7c2f224",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-27T16:12:59Z",
       "max_memory_bytes": null,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -795,9 +883,11 @@
     },
     {
       "commit": "3f9df4f0bd7a",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-27T17:04:37Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -813,9 +903,11 @@
     },
     {
       "commit": "e71bfc15a184",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-27T17:20:21Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -831,9 +923,11 @@
     },
     {
       "commit": "7f007ced1a84",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-27T18:02:19Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -849,9 +943,11 @@
     },
     {
       "commit": "708be92b565a",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-27T19:22:32Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -867,9 +963,11 @@
     },
     {
       "commit": "786eee1bfa27",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-27T20:02:33Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -885,9 +983,11 @@
     },
     {
       "commit": "b5c013b1b596",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-27T22:08:28Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -903,9 +1003,11 @@
     },
     {
       "commit": "ea55b6ea98dd",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-27T22:19:51Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -921,9 +1023,11 @@
     },
     {
       "commit": "36f90ed16742",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-27T23:19:04Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -939,9 +1043,11 @@
     },
     {
       "commit": "b1e55ed7d43f",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-27T23:32:53Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -957,9 +1063,11 @@
     },
     {
       "commit": "4981d42b1a52",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-27T23:40:33Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -975,9 +1083,11 @@
     },
     {
       "commit": "1588059f2388",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-28T00:01:10Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400,
       "median_wall_tok_per_s": null,
@@ -993,9 +1103,11 @@
     },
     {
       "commit": "ec4b6dde4fd6",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-28T00:06:50Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400,
       "median_wall_tok_per_s": 815.6329651656755,
@@ -1011,9 +1123,11 @@
     },
     {
       "commit": "ba875d39995e",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-28T02:46:00Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400,
       "median_wall_tok_per_s": 591.3660555884093,
@@ -1029,9 +1143,11 @@
     },
     {
       "commit": "9305c9617dbe",
+      "host_overhead_records": 3,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-28T04:45:19Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": -86.26233333333333,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400,
       "median_wall_tok_per_s": 1164.681047242375,
@@ -1047,9 +1163,11 @@
     },
     {
       "commit": "cd2ef624364d",
+      "host_overhead_records": 3,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-28T04:53:36Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": -80.52,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400,
       "median_wall_tok_per_s": 821.3552361396304,
@@ -1065,9 +1183,11 @@
     },
     {
       "commit": "e4b0c6c494ee",
+      "host_overhead_records": 3,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-28T05:17:23Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": -80.46766666666667,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400,
       "median_wall_tok_per_s": 819.1545642268376,
@@ -1083,9 +1203,11 @@
     },
     {
       "commit": "d1ee8f0158c3",
+      "host_overhead_records": 3,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
       "latest_timestamp": "2026-04-28T06:19:52Z",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": -36.083666666666666,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400,
       "median_wall_tok_per_s": 250.32725072881735,
@@ -1101,9 +1223,11 @@
     },
     {
       "commit": "5b98f2570b1c",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-27T14:41:37Z",
       "max_memory_bytes": null,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -1119,9 +1243,11 @@
     },
     {
       "commit": "85cce7c2f224",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-27T16:12:59Z",
       "max_memory_bytes": null,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -1137,9 +1263,11 @@
     },
     {
       "commit": "3f9df4f0bd7a",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-27T17:04:37Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -1155,9 +1283,11 @@
     },
     {
       "commit": "e71bfc15a184",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-27T17:20:21Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -1173,9 +1303,11 @@
     },
     {
       "commit": "7f007ced1a84",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-27T18:02:19Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -1191,9 +1323,11 @@
     },
     {
       "commit": "708be92b565a",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-27T19:22:32Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -1209,9 +1343,11 @@
     },
     {
       "commit": "786eee1bfa27",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-27T20:02:33Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -1227,9 +1363,11 @@
     },
     {
       "commit": "b5c013b1b596",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-27T22:08:28Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -1245,9 +1383,11 @@
     },
     {
       "commit": "ea55b6ea98dd",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-27T22:19:51Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -1263,9 +1403,11 @@
     },
     {
       "commit": "36f90ed16742",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-27T23:19:04Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -1281,9 +1423,11 @@
     },
     {
       "commit": "b1e55ed7d43f",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-27T23:32:53Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -1299,9 +1443,11 @@
     },
     {
       "commit": "4981d42b1a52",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-27T23:40:33Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": null,
       "median_wall_tok_per_s": null,
@@ -1317,9 +1463,11 @@
     },
     {
       "commit": "1588059f2388",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-28T00:01:10Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600,
       "median_wall_tok_per_s": null,
@@ -1335,9 +1483,11 @@
     },
     {
       "commit": "ec4b6dde4fd6",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-28T00:06:50Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600,
       "median_wall_tok_per_s": 365.8271695265968,
@@ -1353,9 +1503,11 @@
     },
     {
       "commit": "ba875d39995e",
+      "host_overhead_records": 0,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-28T02:46:00Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": null,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600,
       "median_wall_tok_per_s": 401.0427110487267,
@@ -1371,9 +1523,11 @@
     },
     {
       "commit": "9305c9617dbe",
+      "host_overhead_records": 3,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-28T04:45:19Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": -78.7385,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600,
       "median_wall_tok_per_s": 752.5339228182395,
@@ -1389,9 +1543,11 @@
     },
     {
       "commit": "cd2ef624364d",
+      "host_overhead_records": 3,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-28T04:53:36Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": -65.925,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600,
       "median_wall_tok_per_s": 469.55245781364636,
@@ -1407,9 +1563,11 @@
     },
     {
       "commit": "e4b0c6c494ee",
+      "host_overhead_records": 3,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-28T05:17:23Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": -50.0145,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600,
       "median_wall_tok_per_s": 320.0928269198067,
@@ -1425,9 +1583,11 @@
     },
     {
       "commit": "d1ee8f0158c3",
+      "host_overhead_records": 3,
       "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
       "latest_timestamp": "2026-04-28T06:19:51Z",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": -72.4635,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600,
       "median_wall_tok_per_s": 581.0469740163056,
@@ -1460,6 +1620,9 @@
       "max_memory_bytes_baseline": 1000000,
       "max_memory_bytes_candidate": 1000000,
       "max_memory_bytes_delta_pct": 0.0,
+      "median_host_overhead_pct_baseline": 5.0,
+      "median_host_overhead_pct_candidate": 4.0,
+      "median_host_overhead_pct_delta_pct": -20.0,
       "median_tok_per_s_baseline": 100.0,
       "median_tok_per_s_candidate": 101.0,
       "median_tok_per_s_delta_pct": -1.0,
@@ -1487,6 +1650,9 @@
       "max_memory_bytes_baseline": 67207168,
       "max_memory_bytes_candidate": 67207168,
       "max_memory_bytes_delta_pct": 0.0,
+      "median_host_overhead_pct_baseline": -77.61283333333333,
+      "median_host_overhead_pct_candidate": -81.83833333333334,
+      "median_host_overhead_pct_delta_pct": null,
       "median_tok_per_s_baseline": 160.0,
       "median_tok_per_s_candidate": 160.0,
       "median_tok_per_s_delta_pct": 0.0,
@@ -1514,6 +1680,9 @@
       "max_memory_bytes_baseline": 67174400,
       "max_memory_bytes_candidate": 67174400,
       "max_memory_bytes_delta_pct": 0.0,
+      "median_host_overhead_pct_baseline": -46.93425,
+      "median_host_overhead_pct_candidate": -72.10300000000001,
+      "median_host_overhead_pct_delta_pct": null,
       "median_tok_per_s_baseline": 160.0,
       "median_tok_per_s_candidate": 160.0,
       "median_tok_per_s_delta_pct": 0.0,
@@ -1541,6 +1710,9 @@
       "max_memory_bytes_baseline": 67207168,
       "max_memory_bytes_candidate": 67207168,
       "max_memory_bytes_delta_pct": 0.0,
+      "median_host_overhead_pct_baseline": -74.89716666666666,
+      "median_host_overhead_pct_candidate": -71.631,
+      "median_host_overhead_pct_delta_pct": null,
       "median_tok_per_s_baseline": 160.0,
       "median_tok_per_s_candidate": 160.0,
       "median_tok_per_s_delta_pct": 0.0,
@@ -1568,6 +1740,9 @@
       "max_memory_bytes_baseline": 67174400,
       "max_memory_bytes_candidate": 67174400,
       "max_memory_bytes_delta_pct": 0.0,
+      "median_host_overhead_pct_baseline": -58.1535,
+      "median_host_overhead_pct_candidate": -42.99775,
+      "median_host_overhead_pct_delta_pct": null,
       "median_tok_per_s_baseline": 160.0,
       "median_tok_per_s_candidate": 160.0,
       "median_tok_per_s_delta_pct": 0.0,
@@ -1595,6 +1770,9 @@
       "max_memory_bytes_baseline": 67207168,
       "max_memory_bytes_candidate": 67207168,
       "max_memory_bytes_delta_pct": 0.0,
+      "median_host_overhead_pct_baseline": -80.46766666666667,
+      "median_host_overhead_pct_candidate": -36.083666666666666,
+      "median_host_overhead_pct_delta_pct": null,
       "median_tok_per_s_baseline": 160.0,
       "median_tok_per_s_candidate": 160.0,
       "median_tok_per_s_delta_pct": 0.0,
@@ -1622,6 +1800,9 @@
       "max_memory_bytes_baseline": 67174400,
       "max_memory_bytes_candidate": 67174400,
       "max_memory_bytes_delta_pct": 0.0,
+      "median_host_overhead_pct_baseline": -50.0145,
+      "median_host_overhead_pct_candidate": -72.4635,
+      "median_host_overhead_pct_delta_pct": null,
       "median_tok_per_s_baseline": 160.0,
       "median_tok_per_s_candidate": 160.0,
       "median_tok_per_s_delta_pct": 0.0,
@@ -1639,13 +1820,14 @@
       "p95_ttft_us_delta_pct": 0.0
     }
   ],
-  "generated_at": "2026-04-28T10:17:41Z",
+  "generated_at": "2026-04-28T10:27:29Z",
   "prompt_suite_drift_violations": [],
   "record_count": 352,
   "records": [
     {
       "benchmark": "qemu_prompt",
       "commit": "ci-base",
+      "host_overhead_pct": 5.0,
       "memory_bytes": 1000000,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1661,6 +1843,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ci-head",
+      "host_overhead_pct": 4.0,
       "memory_bytes": 1000000,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1676,6 +1859,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1691,6 +1875,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1706,6 +1891,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1721,6 +1907,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1736,6 +1923,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1751,6 +1939,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1766,6 +1955,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1781,6 +1971,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1796,6 +1987,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1811,6 +2003,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1826,6 +2019,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1841,6 +2035,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1856,6 +2051,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1871,6 +2067,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1886,6 +2083,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1901,6 +2099,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1916,6 +2115,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1931,6 +2131,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1946,6 +2147,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1961,6 +2163,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1976,6 +2179,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -1991,6 +2195,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2006,6 +2211,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2021,6 +2227,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2036,6 +2243,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2051,6 +2259,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2066,6 +2275,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2081,6 +2291,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2096,6 +2307,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2111,6 +2323,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2126,6 +2339,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2141,6 +2355,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2156,6 +2371,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2171,6 +2387,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2186,6 +2403,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2201,6 +2419,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2216,6 +2435,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2231,6 +2451,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2246,6 +2467,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2261,6 +2483,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2276,6 +2499,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2291,6 +2515,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2306,6 +2531,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -78.55933333333333,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2321,6 +2547,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -77.40866666666666,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2336,6 +2563,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -78.55933333333333,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2351,6 +2579,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -77.40866666666666,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2366,6 +2595,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -78.55933333333333,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2381,6 +2611,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -77.40866666666666,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2396,6 +2627,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -78.53633333333333,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2411,6 +2643,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -77.41133333333333,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2426,6 +2659,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a3d460c2276c",
+      "host_overhead_pct": -68.11366666666666,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2441,6 +2675,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a3d460c2276c",
+      "host_overhead_pct": -71.96,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2456,6 +2691,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -72.94,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2471,6 +2707,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -82.28566666666667,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2486,6 +2723,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -72.94,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2501,6 +2739,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -82.28566666666667,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2516,6 +2755,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -72.94,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2531,6 +2771,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -82.28566666666667,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2546,6 +2787,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e4311d1fe5fa",
+      "host_overhead_pct": -81.70366666666666,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2561,6 +2803,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e4311d1fe5fa",
+      "host_overhead_pct": -81.973,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2576,6 +2819,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e4311d1fe5fa",
+      "host_overhead_pct": -81.70366666666666,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2591,6 +2835,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e4311d1fe5fa",
+      "host_overhead_pct": -81.973,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2606,6 +2851,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e4311d1fe5fa",
+      "host_overhead_pct": -81.70366666666666,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2621,6 +2867,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e4311d1fe5fa",
+      "host_overhead_pct": -81.973,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2636,6 +2883,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2651,6 +2899,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2666,6 +2915,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2681,6 +2931,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2696,6 +2947,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2711,6 +2963,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2726,6 +2979,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2741,6 +2995,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2756,6 +3011,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2771,6 +3027,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2786,6 +3043,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2801,6 +3059,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2816,6 +3075,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2831,6 +3091,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2846,6 +3107,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2861,6 +3123,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2876,6 +3139,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2891,6 +3155,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2906,6 +3171,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2921,6 +3187,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2936,6 +3203,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2951,6 +3219,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2966,6 +3235,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2981,6 +3251,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -2996,6 +3267,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3011,6 +3283,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3026,6 +3299,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3041,6 +3315,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3056,6 +3331,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3071,6 +3347,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3086,6 +3363,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3101,6 +3379,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3116,6 +3395,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3131,6 +3411,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3146,6 +3427,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3161,6 +3443,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3176,6 +3459,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3191,6 +3475,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3206,6 +3491,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3221,6 +3507,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3236,6 +3523,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3251,6 +3539,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3266,6 +3555,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": 262.5955,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3281,6 +3571,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -43.7585,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3296,6 +3587,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": 262.5955,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3311,6 +3603,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -43.7585,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3326,6 +3619,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": 262.5955,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3341,6 +3635,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -43.7585,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3356,6 +3651,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": 267.1165,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3371,6 +3667,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -43.81,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3386,6 +3683,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a3d460c2276c",
+      "host_overhead_pct": -68.0025,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3401,6 +3699,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a3d460c2276c",
+      "host_overhead_pct": -67.979,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3416,6 +3715,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -64.9755,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3431,6 +3731,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -28.893,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3446,6 +3747,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -64.9755,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3461,6 +3763,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -28.893,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3476,6 +3779,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -64.9755,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3491,6 +3795,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -28.893,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3506,6 +3811,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e4311d1fe5fa",
+      "host_overhead_pct": -72.895,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3521,6 +3827,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e4311d1fe5fa",
+      "host_overhead_pct": -71.311,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3536,6 +3843,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e4311d1fe5fa",
+      "host_overhead_pct": -72.895,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3551,6 +3859,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e4311d1fe5fa",
+      "host_overhead_pct": -71.311,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3566,6 +3875,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e4311d1fe5fa",
+      "host_overhead_pct": -72.895,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3581,6 +3891,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e4311d1fe5fa",
+      "host_overhead_pct": -71.311,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3596,6 +3907,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3611,6 +3923,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3626,6 +3939,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3641,6 +3955,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3656,6 +3971,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3671,6 +3987,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3686,6 +4003,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3701,6 +4019,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3716,6 +4035,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3731,6 +4051,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3746,6 +4067,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3761,6 +4083,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3776,6 +4099,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3791,6 +4115,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3806,6 +4131,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3821,6 +4147,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3836,6 +4163,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3851,6 +4179,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3866,6 +4195,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3881,6 +4211,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3896,6 +4227,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3911,6 +4243,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3926,6 +4259,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3941,6 +4275,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3956,6 +4291,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3971,6 +4307,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -3986,6 +4323,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4001,6 +4339,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4016,6 +4355,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4031,6 +4371,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4046,6 +4387,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4061,6 +4403,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4076,6 +4419,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4091,6 +4435,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4106,6 +4451,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4121,6 +4467,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4136,6 +4483,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4151,6 +4499,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4166,6 +4515,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4181,6 +4531,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4196,6 +4547,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4211,6 +4563,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4226,6 +4579,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -70.33566666666667,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4241,6 +4595,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -79.45866666666667,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4256,6 +4611,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -70.33566666666667,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4271,6 +4627,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -79.45866666666667,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4286,6 +4643,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -70.33566666666667,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4301,6 +4659,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -79.45866666666667,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4316,6 +4675,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -66.79966666666667,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4331,6 +4691,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -76.46233333333333,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4346,6 +4707,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -66.79966666666667,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4361,6 +4723,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -76.46233333333333,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4376,6 +4739,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -66.79966666666667,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4391,6 +4755,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -76.46233333333333,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4406,6 +4771,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4421,6 +4787,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4436,6 +4803,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4451,6 +4819,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4466,6 +4835,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4481,6 +4851,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4496,6 +4867,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4511,6 +4883,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4526,6 +4899,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4541,6 +4915,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4556,6 +4931,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4571,6 +4947,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5bf1fd7158fd",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4586,6 +4963,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4601,6 +4979,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4616,6 +4995,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4631,6 +5011,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4646,6 +5027,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4661,6 +5043,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4676,6 +5059,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4691,6 +5075,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4706,6 +5091,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4721,6 +5107,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4736,6 +5123,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4751,6 +5139,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bf852f741851",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4766,6 +5155,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4781,6 +5171,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4796,6 +5187,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4811,6 +5203,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4826,6 +5219,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4841,6 +5235,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "bb8266801970",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4856,6 +5251,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4871,6 +5267,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4886,6 +5283,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4901,6 +5299,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4916,6 +5315,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4931,6 +5331,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4946,6 +5347,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4961,6 +5363,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4976,6 +5379,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -4991,6 +5395,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -5006,6 +5411,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -5021,6 +5427,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3b7e701e8a6b",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -5036,6 +5443,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -72.64,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -5051,6 +5459,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -43.667,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -5066,6 +5475,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -72.64,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -5081,6 +5491,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -43.667,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -5096,6 +5507,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -72.64,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -5111,6 +5523,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "a0126ad2c367",
+      "host_overhead_pct": -43.667,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -5126,6 +5539,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -61.4575,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -5141,6 +5555,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -61.4575,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -5156,6 +5571,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -61.4575,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -5171,6 +5587,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -24.538,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -5186,6 +5603,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -24.538,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -5201,6 +5619,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -24.538,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "ci-airgap-smoke",
@@ -5216,6 +5635,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5b98f2570b1c",
+      "host_overhead_pct": null,
       "memory_bytes": null,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5231,6 +5651,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5b98f2570b1c",
+      "host_overhead_pct": null,
       "memory_bytes": null,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5246,6 +5667,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5b98f2570b1c",
+      "host_overhead_pct": null,
       "memory_bytes": null,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5261,6 +5683,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "85cce7c2f224",
+      "host_overhead_pct": null,
       "memory_bytes": null,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5276,6 +5699,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "85cce7c2f224",
+      "host_overhead_pct": null,
       "memory_bytes": null,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5291,6 +5715,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "85cce7c2f224",
+      "host_overhead_pct": null,
       "memory_bytes": null,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5306,6 +5731,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3f9df4f0bd7a",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5321,6 +5747,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3f9df4f0bd7a",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5336,6 +5763,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3f9df4f0bd7a",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5351,6 +5779,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e71bfc15a184",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5366,6 +5795,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e71bfc15a184",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5381,6 +5811,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e71bfc15a184",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5396,6 +5827,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "7f007ced1a84",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5411,6 +5843,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "7f007ced1a84",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5426,6 +5859,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "7f007ced1a84",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5441,6 +5875,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "708be92b565a",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5456,6 +5891,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "708be92b565a",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5471,6 +5907,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "708be92b565a",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5486,6 +5923,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5501,6 +5939,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5516,6 +5955,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5531,6 +5971,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "b5c013b1b596",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5546,6 +5987,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "b5c013b1b596",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5561,6 +6003,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "b5c013b1b596",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5576,6 +6019,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ea55b6ea98dd",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5591,6 +6035,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ea55b6ea98dd",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5606,6 +6051,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ea55b6ea98dd",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5621,6 +6067,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "36f90ed16742",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5636,6 +6083,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "36f90ed16742",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5651,6 +6099,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "36f90ed16742",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5666,6 +6115,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "b1e55ed7d43f",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5681,6 +6131,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "b1e55ed7d43f",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5696,6 +6147,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "b1e55ed7d43f",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5711,6 +6163,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "4981d42b1a52",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5726,6 +6179,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "4981d42b1a52",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5741,6 +6195,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "4981d42b1a52",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5756,6 +6211,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5771,6 +6227,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5786,6 +6243,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5801,6 +6259,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ec4b6dde4fd6",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5816,6 +6275,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ec4b6dde4fd6",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5831,6 +6291,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ec4b6dde4fd6",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5846,6 +6307,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ba875d39995e",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5861,6 +6323,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ba875d39995e",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5876,6 +6339,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ba875d39995e",
+      "host_overhead_pct": null,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5891,6 +6355,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "9305c9617dbe",
+      "host_overhead_pct": -86.709,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5906,6 +6371,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "9305c9617dbe",
+      "host_overhead_pct": -86.26233333333333,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5921,6 +6387,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "9305c9617dbe",
+      "host_overhead_pct": -85.908,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5936,6 +6403,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "cd2ef624364d",
+      "host_overhead_pct": -79.89433333333334,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5951,6 +6419,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "cd2ef624364d",
+      "host_overhead_pct": -80.52,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5966,6 +6435,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "cd2ef624364d",
+      "host_overhead_pct": -81.61266666666667,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5981,6 +6451,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e4b0c6c494ee",
+      "host_overhead_pct": -74.59933333333333,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -5996,6 +6467,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e4b0c6c494ee",
+      "host_overhead_pct": -81.631,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6011,6 +6483,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e4b0c6c494ee",
+      "host_overhead_pct": -80.46766666666667,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6026,6 +6499,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -78.97266666666667,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6041,6 +6515,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -22.298666666666666,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6056,6 +6531,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -36.083666666666666,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6071,6 +6547,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5b98f2570b1c",
+      "host_overhead_pct": null,
       "memory_bytes": null,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6086,6 +6563,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5b98f2570b1c",
+      "host_overhead_pct": null,
       "memory_bytes": null,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6101,6 +6579,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "5b98f2570b1c",
+      "host_overhead_pct": null,
       "memory_bytes": null,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6116,6 +6595,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "85cce7c2f224",
+      "host_overhead_pct": null,
       "memory_bytes": null,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6131,6 +6611,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "85cce7c2f224",
+      "host_overhead_pct": null,
       "memory_bytes": null,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6146,6 +6627,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "85cce7c2f224",
+      "host_overhead_pct": null,
       "memory_bytes": null,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6161,6 +6643,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3f9df4f0bd7a",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6176,6 +6659,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3f9df4f0bd7a",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6191,6 +6675,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "3f9df4f0bd7a",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6206,6 +6691,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e71bfc15a184",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6221,6 +6707,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e71bfc15a184",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6236,6 +6723,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e71bfc15a184",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6251,6 +6739,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "7f007ced1a84",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6266,6 +6755,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "7f007ced1a84",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6281,6 +6771,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "7f007ced1a84",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6296,6 +6787,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "708be92b565a",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6311,6 +6803,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "708be92b565a",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6326,6 +6819,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "708be92b565a",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6341,6 +6835,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6356,6 +6851,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6371,6 +6867,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "786eee1bfa27",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6386,6 +6883,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "b5c013b1b596",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6401,6 +6899,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "b5c013b1b596",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6416,6 +6915,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "b5c013b1b596",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6431,6 +6931,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ea55b6ea98dd",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6446,6 +6947,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ea55b6ea98dd",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6461,6 +6963,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ea55b6ea98dd",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6476,6 +6979,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "36f90ed16742",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6491,6 +6995,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "36f90ed16742",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6506,6 +7011,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "36f90ed16742",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6521,6 +7027,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "b1e55ed7d43f",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6536,6 +7043,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "b1e55ed7d43f",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6551,6 +7059,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "b1e55ed7d43f",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6566,6 +7075,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "4981d42b1a52",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6581,6 +7091,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "4981d42b1a52",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6596,6 +7107,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "4981d42b1a52",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6611,6 +7123,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6626,6 +7139,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6641,6 +7155,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "1588059f2388",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6656,6 +7171,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ec4b6dde4fd6",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6671,6 +7187,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ec4b6dde4fd6",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6686,6 +7203,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ec4b6dde4fd6",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6701,6 +7219,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ba875d39995e",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6716,6 +7235,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ba875d39995e",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6731,6 +7251,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "ba875d39995e",
+      "host_overhead_pct": null,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6746,6 +7267,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "9305c9617dbe",
+      "host_overhead_pct": -77.167,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6761,6 +7283,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "9305c9617dbe",
+      "host_overhead_pct": -79.573,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6776,6 +7299,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "9305c9617dbe",
+      "host_overhead_pct": -78.7385,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6791,6 +7315,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "cd2ef624364d",
+      "host_overhead_pct": -65.925,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6806,6 +7331,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "cd2ef624364d",
+      "host_overhead_pct": -69.6695,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6821,6 +7347,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "cd2ef624364d",
+      "host_overhead_pct": -60.7585,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6836,6 +7363,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e4b0c6c494ee",
+      "host_overhead_pct": -49.654,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6851,6 +7379,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e4b0c6c494ee",
+      "host_overhead_pct": -50.0145,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6866,6 +7395,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "e4b0c6c494ee",
+      "host_overhead_pct": -50.597,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6881,6 +7411,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -71.526,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6896,6 +7427,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -73.1805,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6911,6 +7443,7 @@
     {
       "benchmark": "qemu_prompt",
       "commit": "d1ee8f0158c3",
+      "host_overhead_pct": -72.4635,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -6931,6 +7464,7 @@
     "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/ci-short": {
       "latest_commit": "ci-head",
       "max_memory_bytes": 1000000,
+      "median_host_overhead_pct": 4.5,
       "median_tok_per_s": 100.5,
       "median_ttft_us": 49500.0,
       "median_wall_tok_per_s": 95.5,
@@ -6941,6 +7475,7 @@
     "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code": {
       "latest_commit": "e4311d1fe5fa",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": -78.55933333333333,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400.0,
       "median_wall_tok_per_s": 746.2454525667735,
@@ -6951,6 +7486,7 @@
     "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short": {
       "latest_commit": "e4311d1fe5fa",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": -54.39275,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600.0,
       "median_wall_tok_per_s": 478.2475855884895,
@@ -6961,6 +7497,7 @@
     "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-code": {
       "latest_commit": "d1ee8f0158c3",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": -73.399,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400.0,
       "median_wall_tok_per_s": 609.5648909604158,
@@ -6971,6 +7508,7 @@
     "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-short": {
       "latest_commit": "d1ee8f0158c3",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": -52.562250000000006,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600.0,
       "median_wall_tok_per_s": 384.4739940149143,
@@ -6981,6 +7519,7 @@
     "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code": {
       "latest_commit": "d1ee8f0158c3",
       "max_memory_bytes": 67207168,
+      "median_host_overhead_pct": -80.49383333333333,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 12400,
       "median_wall_tok_per_s": 805.7142560132139,
@@ -6991,6 +7530,7 @@
     "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short": {
       "latest_commit": "d1ee8f0158c3",
       "max_memory_bytes": 67174400,
+      "median_host_overhead_pct": -70.59774999999999,
       "median_tok_per_s": 160.0,
       "median_ttft_us": 11600,
       "median_wall_tok_per_s": 480.3105730232064,
@@ -7001,12 +7541,14 @@
   },
   "telemetry_coverage_violations": [],
   "thresholds": {
+    "host_overhead_regression_pct": null,
     "max_tok_cv_pct": null,
     "memory_regression_pct": 10.0,
     "min_commits_per_key": 1,
     "min_records_per_point": 1,
     "p05_tok_regression_pct": null,
     "p95_ttft_regression_pct": null,
+    "require_host_overhead_pct": false,
     "require_memory": false,
     "require_tok_per_s": false,
     "require_ttft_us": false,

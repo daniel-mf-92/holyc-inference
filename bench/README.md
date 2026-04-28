@@ -466,8 +466,9 @@ python3 bench/bench_artifact_manifest.py \
 
 `perf_regression.py` scans JSON, JSONL, and CSV benchmark artifacts, groups
 results by benchmark/profile/model/quantization/prompt plus commit, and writes
-guest tok/s, host wall-clock tok/s, memory, first-token latency, and
-sample-coverage dashboards under `bench/dashboards/`. The dashboard also emits
+guest tok/s, host wall-clock tok/s, QEMU host overhead percentage, memory,
+first-token latency, and sample-coverage dashboards under `bench/dashboards/`.
+The dashboard also emits
 `perf_regression_comparisons_latest.csv` so CI can archive baseline-vs-candidate
 metric deltas even when no regression threshold is crossed.
 
@@ -483,9 +484,11 @@ python3 bench/perf_regression.py \
   --p05-tok-regression-pct 7.5 \
   --wall-tok-regression-pct 7.5 \
   --p95-ttft-regression-pct 15 \
+  --host-overhead-regression-pct 25 \
   --require-tok-per-s \
   --require-wall-tok-per-s \
   --require-ttft-us \
+  --require-host-overhead-pct \
   --require-memory \
   --fail-on-regression
 ```
@@ -503,11 +506,13 @@ catches slow individual runs that median throughput can hide.
 `--wall-tok-regression-pct` optionally gates host-observed wall-clock tok/s
 drops, which is useful when guest-side timing looks suspicious.
 `--ttft-regression-pct` and `--p95-ttft-regression-pct` optionally gate median
-and tail first-token latency growth. `--require-tok-per-s`,
-`--require-wall-tok-per-s`, `--require-ttft-us`, and `--require-memory` fail the
-dashboard when any benchmark key/commit point has zero samples for that telemetry
-field. This catches malformed or partially uploaded artifacts before CI treats
-missing metrics as merely non-comparable.
+and tail first-token latency growth. `--host-overhead-regression-pct`
+optionally gates increases in QEMU host overhead. `--require-tok-per-s`,
+`--require-wall-tok-per-s`, `--require-ttft-us`,
+`--require-host-overhead-pct`, and `--require-memory` fail the dashboard when
+any benchmark key/commit point has zero samples for that telemetry field. This
+catches malformed or partially uploaded artifacts before CI treats missing
+metrics as merely non-comparable.
 Prompt-suite hashes from QEMU benchmark reports are carried into commit points;
 the dashboard fails when comparable benchmark/profile/model/quantization/prompt
 records contain multiple non-empty prompt-suite hashes, preventing accidental
@@ -637,8 +642,9 @@ python3 bench/perplexity_compare.py \
 `perf_regression.py` scans host-side benchmark result files and writes dashboards
 to `bench/dashboards/`. It accepts JSON, JSONL, and CSV records with `tok_per_s`
 or `tok_per_s_milli`, optional `wall_tok_per_s` or `wall_tok_per_s_milli`,
-optional first-token latency fields such as `ttft_us` or `ttft_ms`, plus memory
-fields such as `memory_bytes` or `max_rss_bytes`. Regression checks compare
+optional first-token latency fields such as `ttft_us` or `ttft_ms`, optional
+`host_overhead_pct`, plus memory fields such as `memory_bytes` or
+`max_rss_bytes`. Regression checks compare
 commit-level aggregates, so repeated runs and duplicate latest/stamped result
 files are collapsed by benchmark key and commit before the latest distinct
 commits are compared. Outputs include JSON, Markdown, JUnit XML, commit-point
@@ -653,7 +659,8 @@ python3 bench/perf_regression.py --input bench/results --output-dir bench/dashbo
 ```
 
 CI can fail on median throughput, low-tail throughput, host wall-clock
-throughput, median or P95 first-token latency, or memory regressions with:
+throughput, median or P95 first-token latency, QEMU host overhead, or memory
+regressions with:
 
 ```bash
 python3 bench/perf_regression.py \
@@ -662,7 +669,9 @@ python3 bench/perf_regression.py \
   --wall-tok-regression-pct 7.5 \
   --ttft-regression-pct 15 \
   --p95-ttft-regression-pct 15 \
+  --host-overhead-regression-pct 25 \
   --require-ttft-us \
+  --require-host-overhead-pct \
   --fail-on-regression
 ```
 

@@ -103,6 +103,9 @@ def main() -> int:
         if fixture_summary.get("p95_ttft_us") != 49950.0:
             print("missing_p95_ttft_summary=true", file=sys.stderr)
             return 1
+        if fixture_summary.get("median_host_overhead_pct") != 4.5:
+            print("missing_host_overhead_summary=true", file=sys.stderr)
+            return 1
         if "Perf Regression Dashboard" not in markdown_path.read_text(encoding="utf-8"):
             print("missing_markdown_dashboard=true", file=sys.stderr)
             return 1
@@ -114,7 +117,7 @@ def main() -> int:
             print("unexpected_junit_failures=true", file=sys.stderr)
             return 1
         if (
-            "key,commit,latest_timestamp,records,tok_per_s_records,wall_tok_per_s_records,memory_records,ttft_us_records,p05_tok_per_s,median_tok_per_s,median_wall_tok_per_s,median_ttft_us,p95_ttft_us"
+            "key,commit,latest_timestamp,records,tok_per_s_records,wall_tok_per_s_records,memory_records,ttft_us_records,host_overhead_records,p05_tok_per_s,median_tok_per_s,median_wall_tok_per_s,median_ttft_us,p95_ttft_us,median_host_overhead_pct"
             not in commit_points_path.read_text(encoding="utf-8")
         ):
             print("missing_commit_points_csv=true", file=sys.stderr)
@@ -125,6 +128,9 @@ def main() -> int:
             return 1
         if "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/ci-short,ci-base,ci-head" not in comparisons_csv:
             print("missing_ci_fixture_comparison=true", file=sys.stderr)
+            return 1
+        if "median_host_overhead_pct_baseline,median_host_overhead_pct_candidate,median_host_overhead_pct_delta_pct" not in comparisons_csv:
+            print("missing_host_overhead_comparison=true", file=sys.stderr)
             return 1
 
         ttft_regression_fixture = tmp_path / "p95_ttft_regression.jsonl"
@@ -182,6 +188,63 @@ def main() -> int:
         )
         if completed.returncode == 0:
             print("p95_ttft_regression_not_rejected=true", file=sys.stderr)
+            return 1
+
+        overhead_regression_fixture = tmp_path / "host_overhead_regression.jsonl"
+        overhead_regression_fixture.write_text(
+            "\n".join(
+                [
+                    json.dumps(
+                        {
+                            "timestamp": "2026-04-27T15:00:00Z",
+                            "commit": "overhead-base",
+                            "benchmark": "qemu_prompt",
+                            "profile": "ci-airgap-smoke",
+                            "model": "synthetic-smoke",
+                            "quantization": "Q4_0",
+                            "prompt": "ci-overhead",
+                            "tok_per_s": 100.0,
+                            "host_overhead_pct": 5.0,
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "timestamp": "2026-04-27T15:05:00Z",
+                            "commit": "overhead-head",
+                            "benchmark": "qemu_prompt",
+                            "profile": "ci-airgap-smoke",
+                            "model": "synthetic-smoke",
+                            "quantization": "Q4_0",
+                            "prompt": "ci-overhead",
+                            "tok_per_s": 100.0,
+                            "host_overhead_pct": 8.0,
+                        }
+                    ),
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        overhead_regression_command = [
+            sys.executable,
+            str(ROOT / "bench" / "perf_regression.py"),
+            "--input",
+            str(overhead_regression_fixture),
+            "--output-dir",
+            str(tmp_path / "host_overhead_regression_dashboard"),
+            "--host-overhead-regression-pct",
+            "10",
+            "--fail-on-regression",
+        ]
+        completed = subprocess.run(
+            overhead_regression_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("host_overhead_regression_not_rejected=true", file=sys.stderr)
             return 1
         if "key,commit,records,minimum_records" not in sample_violations_path.read_text(
             encoding="utf-8"
