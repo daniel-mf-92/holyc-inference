@@ -239,6 +239,46 @@ def test_qemu_prompt_report_checks_every_recorded_command(tmp_path: Path) -> Non
     assert bench_result_index.index_status(summaries) == "fail"
 
 
+def test_qemu_prompt_report_recomputes_command_hash_metadata(tmp_path: Path) -> None:
+    command = [
+        "qemu-system-x86_64",
+        "-nic",
+        "none",
+        "-drive",
+        "file=TempleOS.img,format=raw,if=ide",
+    ]
+    report = tmp_path / "qemu_prompt_bench_latest.json"
+    report.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-04-27T20:00:00Z",
+                "status": "pass",
+                "command_sha256": "0" * 64,
+                "prompt_suite": {"suite_sha256": "0" * 64, "prompt_count": 1},
+                "suite_summary": {"tok_per_s_median": 123.0},
+                "benchmarks": [
+                    {
+                        "benchmark": "qemu_prompt",
+                        "profile": "secure",
+                        "model": "tiny",
+                        "quantization": "Q4_0",
+                        "command_sha256": "0" * 64,
+                        "command": command,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summary = bench_result_index.load_summaries([tmp_path])[0]
+
+    assert summary.command_hash_status == "fail"
+    assert summary.command_sha256 == "0" * 64
+    assert any("command_sha256 mismatch" in finding for finding in summary.command_hash_findings)
+    assert bench_result_index.index_status([summary]) == "fail"
+
+
 def test_qemu_prompt_report_marks_stale_commit_and_cli_can_fail(tmp_path: Path) -> None:
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"
@@ -330,7 +370,7 @@ def test_mixed_commit_metadata_fails_index_and_junit(tmp_path: Path) -> None:
 
     assert summaries[0].commit_status == "fail"
     assert bench_result_index.index_status(summaries) == "fail"
-    assert root.attrib["tests"] == "8"
+    assert root.attrib["tests"] == "9"
     assert root.attrib["failures"] == "1"
     failure = root.find("./testcase[@name='commit_metadata']/failure")
     assert failure is not None

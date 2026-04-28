@@ -259,13 +259,37 @@ def commit_status(artifact_type: str, commit_values: Iterable[Any]) -> tuple[str
     return "pass", commits[0], []
 
 
-def command_hash_status(artifact_type: str, hash_values: Iterable[Any]) -> tuple[str, str, list[str]]:
+def command_hash(command: list[str]) -> str:
+    encoded = json.dumps(command, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def command_hash_status(
+    artifact_type: str,
+    hash_values: Iterable[Any],
+    commands: Iterable[tuple[str, Any]] = (),
+) -> tuple[str, str, list[str]]:
     hashes = sorted({str(value) for value in hash_values if value})
     if not hashes:
         return "unknown", "", [f"{artifact_type}: missing command_sha256 metadata"]
     if len(hashes) > 1:
         return "fail", ",".join(hashes), [f"{artifact_type}: mixed command_sha256 values: {','.join(hashes)}"]
-    return "pass", hashes[0], []
+
+    recorded_hash = hashes[0]
+    findings: list[str] = []
+    for label, command in commands:
+        normalized = airgap_audit.normalize_command(command)
+        if normalized is None:
+            continue
+        actual_hash = command_hash(normalized)
+        if actual_hash != recorded_hash:
+            findings.append(
+                f"{artifact_type}: {label} command_sha256 mismatch: "
+                f"recorded {recorded_hash}, computed {actual_hash}"
+            )
+    if findings:
+        return "fail", recorded_hash, findings
+    return "pass", recorded_hash, []
 
 
 def normalized_environment(environment: Any) -> dict[str, Any]:
@@ -379,6 +403,8 @@ def summarize_qemu_report(
         "qemu_prompt",
         [report.get("command_sha256")]
         + [row.get("command_sha256") for row in runs + warmups if isinstance(row, dict)],
+        [(f"measured[{index}]", row.get("command")) for index, row in enumerate(runs)]
+        + [(f"warmup[{index}]", row.get("command")) for index, row in enumerate(warmups)],
     )
     if command_hash_state == "fail":
         findings.extend(command_hash_findings)
@@ -473,6 +499,7 @@ def summarize_matrix_report(
         command_hash_state, command_sha256, command_hash_findings = command_hash_status(
             "bench_matrix_cell",
             [cell.get("command_sha256")],
+            [("cell", cell.get("command"))],
         )
         if command_hash_state == "fail":
             findings.extend(command_hash_findings)

@@ -478,6 +478,9 @@ as valid data. The drift findings are also written to
 `bench_result_index_junit_latest.xml` exposes artifact failures, air-gap
 violations, missing telemetry, inconsistent commit metadata, inconsistent
 command hash metadata, prompt drift, command drift, and environment drift as CI test failures. It
+also recomputes `command_sha256` from each recorded command and treats mismatches
+as inconsistent command hash metadata, which catches stale or hand-edited
+benchmark artifacts before they reach dashboards. It
 never launches QEMU. The index also records per-artifact commit metadata and can
 optionally fail when benchmark artifacts were produced from a different commit
 than the current checkout. It can also enforce freshness with

@@ -147,3 +147,4 @@
 2026-04-28T16:17:08Z | Added split-level eval dataset answer histograms and split skew gating with refreshed dataset artifacts.
 2026-04-28T16:52:40Z | Added perf regression emitted-token telemetry/drop gates with smoke coverage and refreshed dashboards.
 2026-04-28T17:04:58Z | Added build_compare host latency, child CPU/RSS, and CPU-efficiency deltas/gates with smoke coverage.
+2026-04-28T17:31:31Z | Added benchmark result command_sha256 recomputation gate and refreshed synthetic air-gap bench artifacts
