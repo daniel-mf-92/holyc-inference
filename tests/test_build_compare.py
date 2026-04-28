@@ -21,28 +21,30 @@ def write_report(
     commit: str,
     tok_per_s: float,
     elapsed_us: int,
+    wall_tok_per_s: float | None = None,
     memory_bytes: int = 4096,
 ) -> None:
+    row = {
+        "commit": commit,
+        "benchmark": "qemu_prompt",
+        "profile": "secure-local",
+        "model": "tiny",
+        "quantization": "Q4_0",
+        "prompt": "smoke",
+        "tokens": 32,
+        "elapsed_us": elapsed_us,
+        "tok_per_s": tok_per_s,
+        "memory_bytes": memory_bytes,
+        "returncode": 0,
+        "timed_out": False,
+    }
+    if wall_tok_per_s is not None:
+        row["wall_tok_per_s"] = wall_tok_per_s
     path.write_text(
         json.dumps(
             {
                 "generated_at": "2026-04-27T10:00:00Z",
-                "benchmarks": [
-                    {
-                        "commit": commit,
-                        "benchmark": "qemu_prompt",
-                        "profile": "secure-local",
-                        "model": "tiny",
-                        "quantization": "Q4_0",
-                        "prompt": "smoke",
-                        "tokens": 32,
-                        "elapsed_us": elapsed_us,
-                        "tok_per_s": tok_per_s,
-                        "memory_bytes": memory_bytes,
-                        "returncode": 0,
-                        "timed_out": False,
-                    }
-                ],
+                "benchmarks": [row],
             }
         ),
         encoding="utf-8",
@@ -52,8 +54,8 @@ def write_report(
 def test_compare_builds_computes_tok_per_s_and_elapsed_deltas(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     candidate = tmp_path / "candidate.json"
-    write_report(baseline, "base", 100.0, 200000)
-    write_report(candidate, "head", 125.0, 160000, memory_bytes=5120)
+    write_report(baseline, "base", 100.0, 200000, wall_tok_per_s=80.0)
+    write_report(candidate, "head", 125.0, 160000, wall_tok_per_s=100.0, memory_bytes=5120)
 
     metrics = build_compare.load_build_metrics([f"base={baseline}", f"head={candidate}"])
     deltas = build_compare.compare_builds(metrics, "base")
@@ -62,6 +64,7 @@ def test_compare_builds_computes_tok_per_s_and_elapsed_deltas(tmp_path: Path) ->
     assert len(deltas) == 1
     assert deltas[0].candidate_build == "head"
     assert deltas[0].tok_per_s_delta_pct == 25.0
+    assert deltas[0].wall_tok_per_s_delta_pct == 25.0
     assert deltas[0].elapsed_delta_pct == -20.0
     assert deltas[0].baseline_memory_bytes == 4096
     assert deltas[0].candidate_memory_bytes == 5120
@@ -73,8 +76,8 @@ def test_cli_writes_json_markdown_and_csv_reports(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     candidate = tmp_path / "candidate.json"
     output_dir = tmp_path / "results"
-    write_report(baseline, "base", 100.0, 200000)
-    write_report(candidate, "head", 90.0, 220000, memory_bytes=6144)
+    write_report(baseline, "base", 100.0, 200000, wall_tok_per_s=50.0)
+    write_report(candidate, "head", 90.0, 220000, wall_tok_per_s=45.0, memory_bytes=6144)
 
     status = build_compare.main(
         [
@@ -96,10 +99,12 @@ def test_cli_writes_json_markdown_and_csv_reports(tmp_path: Path) -> None:
     assert payload["status"] == "fail"
     assert payload["baseline_build"] == "base"
     assert payload["deltas"][0]["tok_per_s_delta_pct"] == -10.0
+    assert payload["deltas"][0]["wall_tok_per_s_delta_pct"] == -10.0
     assert payload["deltas"][0]["memory_delta_pct"] == 50.0
     assert payload["regressions"][0]["candidate_build"] == "head"
     assert payload["regressions"][0]["metric"] == "tok_per_s"
     assert csv_rows[0]["tok_per_s_delta_pct"] == "-10.0"
+    assert csv_rows[0]["wall_tok_per_s_delta_pct"] == "-10.0"
     assert csv_rows[0]["memory_delta_pct"] == "50.0"
     assert junit_root.attrib["name"] == "holyc_build_compare"
     assert junit_root.attrib["tests"] == "1"
@@ -107,7 +112,10 @@ def test_cli_writes_json_markdown_and_csv_reports(tmp_path: Path) -> None:
     assert junit_root.find("./testcase/failure") is not None
     assert "Build Benchmark Compare" in markdown
     assert "Status: fail" in markdown
-    assert "| head | qemu_prompt/secure-local/tiny/Q4_0/smoke | 100.000 | 90.000 | -10.000 |" in markdown
+    assert (
+        "| head | qemu_prompt/secure-local/tiny/Q4_0/smoke | 100.000 | 90.000 | -10.000 | "
+        "50.000 | 45.000 | -10.000 |"
+    ) in markdown
 
 
 def test_cli_can_gate_memory_growth(tmp_path: Path) -> None:
@@ -139,6 +147,38 @@ def test_cli_can_gate_memory_growth(tmp_path: Path) -> None:
     assert payload["regressions"][0]["metric"] == "memory_bytes"
     assert payload["regressions"][0]["delta_pct"] == 25.0
     assert "memory_bytes changed by 25.000%" in junit_root.find("./testcase/failure").attrib["message"]
+
+
+def test_cli_can_gate_wall_clock_throughput_regression(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    candidate = tmp_path / "candidate.json"
+    output_dir = tmp_path / "results"
+    write_report(baseline, "base", 100.0, 200000, wall_tok_per_s=80.0)
+    write_report(candidate, "head", 100.0, 200000, wall_tok_per_s=70.0)
+
+    status = build_compare.main(
+        [
+            "--input",
+            f"base={baseline}",
+            "--input",
+            f"head={candidate}",
+            "--output-dir",
+            str(output_dir),
+            "--max-wall-tok-regression-pct",
+            "5",
+            "--fail-on-regression",
+        ]
+    )
+
+    payload = json.loads((output_dir / "build_compare_latest.json").read_text(encoding="utf-8"))
+    junit_root = ET.parse(output_dir / "build_compare_junit_latest.xml").getroot()
+
+    assert status == 1
+    assert payload["status"] == "fail"
+    assert payload["max_wall_tok_regression_pct"] == 5.0
+    assert payload["regressions"][0]["metric"] == "wall_tok_per_s"
+    assert payload["regressions"][0]["delta_pct"] == -12.5
+    assert "wall_tok_per_s changed by -12.500%" in junit_root.find("./testcase/failure").attrib["message"]
 
 
 def test_cli_can_fail_on_throughput_regression(tmp_path: Path) -> None:
@@ -192,6 +232,7 @@ if __name__ == "__main__":
         test_compare_builds_computes_tok_per_s_and_elapsed_deltas(tmp_path)
         test_cli_writes_json_markdown_and_csv_reports(tmp_path)
         test_cli_can_gate_memory_growth(tmp_path)
+        test_cli_can_gate_wall_clock_throughput_regression(tmp_path)
         test_cli_can_fail_on_throughput_regression(tmp_path)
         test_missing_baseline_returns_error(tmp_path)
     print("build_compare_tests=ok")

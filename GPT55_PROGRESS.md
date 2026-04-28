@@ -66,3 +66,4 @@
 2026-04-28T00:38:33Z | Added score-vector calibration metrics to offline HolyC vs llama.cpp eval reports with refreshed smoke artifacts.
 2026-04-28T00:45:59Z | Added JUnit XML export for offline eval dataset artifact indexing with refreshed dataset index artifacts.
 2026-04-28T00:55:23Z | Added perf regression host wall-clock tok/s tracking and optional regression gate with refreshed dashboard artifacts.
+2026-04-28T01:02:00Z | Added host wall-clock tok/s build comparison deltas and optional regression gate with refreshed build compare artifacts.

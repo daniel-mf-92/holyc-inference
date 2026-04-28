@@ -367,10 +367,11 @@ failures as test failures.
 `build_compare.py` compares multiple `qemu_prompt_bench.py` JSON reports by
 prompt/profile/model/quantization and writes per-build throughput and elapsed
 time deltas to `bench/results/` as JSON, Markdown, CSV, and JUnit XML. It also
-compares max memory bytes when benchmark reports include memory telemetry. Use
-`--fail-on-regression` with `--max-tok-regression-pct` to gate median tok/s
-drops in CI without launching QEMU, and add `--max-memory-growth-pct` to gate
-peak memory growth.
+compares host wall-clock tok/s and max memory bytes when benchmark reports
+include that telemetry. Use `--fail-on-regression` with
+`--max-tok-regression-pct` to gate median guest tok/s drops in CI without
+launching QEMU, add `--max-wall-tok-regression-pct` to gate host-observed tok/s
+drops, and add `--max-memory-growth-pct` to gate peak memory growth.
 
 Example:
 
@@ -381,6 +382,7 @@ python3 bench/build_compare.py \
   --baseline base \
   --fail-on-regression \
   --max-tok-regression-pct 5 \
+  --max-wall-tok-regression-pct 5 \
   --max-memory-growth-pct 10
 ```
 

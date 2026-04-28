@@ -38,6 +38,7 @@ class BuildMetric:
     median_tokens: float | None
     median_elapsed_us: float | None
     median_tok_per_s: float | None
+    median_wall_tok_per_s: float | None
     max_memory_bytes: int | None
 
     @property
@@ -56,6 +57,9 @@ class BuildDelta:
     baseline_tok_per_s: float | None
     candidate_tok_per_s: float | None
     tok_per_s_delta_pct: float | None
+    baseline_wall_tok_per_s: float | None
+    candidate_wall_tok_per_s: float | None
+    wall_tok_per_s_delta_pct: float | None
     baseline_elapsed_us: float | None
     candidate_elapsed_us: float | None
     elapsed_delta_pct: float | None
@@ -105,6 +109,14 @@ def first_present(row: dict[str, Any], names: Iterable[str], default: str = "") 
     return default
 
 
+def first_float(row: dict[str, Any], names: Iterable[str]) -> float | None:
+    for name in names:
+        value = parse_float(row.get(name))
+        if value is not None:
+            return value
+    return None
+
+
 def flatten_payload(payload: Any) -> Iterable[dict[str, Any]]:
     if isinstance(payload, list):
         for item in payload:
@@ -143,6 +155,17 @@ def metric_from_rows(build: str, source: Path, rows: list[dict[str, Any]]) -> li
         if tok_per_s is None and tok_per_s_milli is not None:
             row = dict(row)
             row["tok_per_s"] = tok_per_s_milli / 1000.0
+        wall_tok_per_s = first_float(
+            row,
+            ("wall_tok_per_s", "host_tok_per_s", "host_wall_tok_per_s"),
+        )
+        wall_tok_per_s_milli = first_float(
+            row,
+            ("wall_tok_per_s_milli", "host_tok_per_s_milli", "host_wall_tok_per_s_milli"),
+        )
+        if wall_tok_per_s is None and wall_tok_per_s_milli is not None:
+            row = dict(row)
+            row["wall_tok_per_s"] = wall_tok_per_s_milli / 1000.0
 
         key_parts = (
             first_present(row, ("benchmark", "bench", "name", "suite"), source.stem),
@@ -164,6 +187,12 @@ def metric_from_rows(build: str, source: Path, rows: list[dict[str, Any]]) -> li
             is not None
         ]
         tok_values = [value for row in key_rows if (value := parse_float(row.get("tok_per_s"))) is not None]
+        wall_tok_values = [
+            value
+            for row in key_rows
+            if (value := first_float(row, ("wall_tok_per_s", "host_tok_per_s", "host_wall_tok_per_s")))
+            is not None
+        ]
         memory_values = [
             value for row in key_rows if (value := parse_int(row.get("memory_bytes"))) is not None and value >= 0
         ]
@@ -187,6 +216,7 @@ def metric_from_rows(build: str, source: Path, rows: list[dict[str, Any]]) -> li
                 median_tokens=statistics.median(token_values) if token_values else None,
                 median_elapsed_us=statistics.median(elapsed_values) if elapsed_values else None,
                 median_tok_per_s=statistics.median(tok_values) if tok_values else None,
+                median_wall_tok_per_s=statistics.median(wall_tok_values) if wall_tok_values else None,
                 max_memory_bytes=max(memory_values) if memory_values else None,
             )
         )
@@ -240,6 +270,12 @@ def compare_builds(metrics: list[BuildMetric], baseline_build: str) -> list[Buil
                     baseline_tok_per_s=baseline.median_tok_per_s,
                     candidate_tok_per_s=candidate.median_tok_per_s,
                     tok_per_s_delta_pct=pct_delta(candidate.median_tok_per_s, baseline.median_tok_per_s),
+                    baseline_wall_tok_per_s=baseline.median_wall_tok_per_s,
+                    candidate_wall_tok_per_s=candidate.median_wall_tok_per_s,
+                    wall_tok_per_s_delta_pct=pct_delta(
+                        candidate.median_wall_tok_per_s,
+                        baseline.median_wall_tok_per_s,
+                    ),
                     baseline_elapsed_us=baseline.median_elapsed_us,
                     candidate_elapsed_us=candidate.median_elapsed_us,
                     elapsed_delta_pct=pct_delta(candidate.median_elapsed_us, baseline.median_elapsed_us),
@@ -257,8 +293,11 @@ def find_regressions(
     deltas: list[BuildDelta],
     max_tok_regression_pct: float,
     max_memory_growth_pct: float | None = None,
+    *,
+    max_wall_tok_regression_pct: float | None = None,
 ) -> list[BuildRegression]:
     threshold = -abs(max_tok_regression_pct)
+    wall_threshold = -abs(max_wall_tok_regression_pct) if max_wall_tok_regression_pct is not None else None
     regressions: list[BuildRegression] = []
     for delta in deltas:
         if delta.tok_per_s_delta_pct is not None and delta.tok_per_s_delta_pct <= threshold:
@@ -269,6 +308,20 @@ def find_regressions(
                     metric="tok_per_s",
                     delta_pct=delta.tok_per_s_delta_pct,
                     allowed_pct=abs(max_tok_regression_pct),
+                )
+            )
+        if (
+            wall_threshold is not None
+            and delta.wall_tok_per_s_delta_pct is not None
+            and delta.wall_tok_per_s_delta_pct <= wall_threshold
+        ):
+            regressions.append(
+                BuildRegression(
+                    key=delta.key,
+                    candidate_build=delta.candidate_build,
+                    metric="wall_tok_per_s",
+                    delta_pct=delta.wall_tok_per_s_delta_pct,
+                    allowed_pct=abs(max_wall_tok_regression_pct),
                 )
             )
         if (
@@ -313,6 +366,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Baseline: {report['baseline_build']}",
         f"Builds: {', '.join(report['builds'])}",
         f"Throughput regressions: {len([row for row in report['regressions'] if row['metric'] == 'tok_per_s'])}",
+        f"Wall throughput regressions: {len([row for row in report['regressions'] if row['metric'] == 'wall_tok_per_s'])}",
         f"Memory regressions: {len([row for row in report['regressions'] if row['metric'] == 'memory_bytes'])}",
         "",
         "## Deltas",
@@ -320,13 +374,14 @@ def markdown_report(report: dict[str, Any]) -> str:
     ]
     if report["deltas"]:
         lines.append(
-            "| Candidate | Prompt key | Base tok/s | Candidate tok/s | Tok/s delta % | Base elapsed us | Candidate elapsed us | Elapsed delta % | Base memory bytes | Candidate memory bytes | Memory delta % |"
+            "| Candidate | Prompt key | Base tok/s | Candidate tok/s | Tok/s delta % | Base wall tok/s | Candidate wall tok/s | Wall tok/s delta % | Base elapsed us | Candidate elapsed us | Elapsed delta % | Base memory bytes | Candidate memory bytes | Memory delta % |"
         )
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for delta in report["deltas"]:
             lines.append(
                 "| {candidate_build} | {key} | {baseline_tok_per_s} | {candidate_tok_per_s} | "
-                "{tok_per_s_delta_pct} | {baseline_elapsed_us} | {candidate_elapsed_us} | {elapsed_delta_pct} | "
+                "{tok_per_s_delta_pct} | {baseline_wall_tok_per_s} | {candidate_wall_tok_per_s} | "
+                "{wall_tok_per_s_delta_pct} | {baseline_elapsed_us} | {candidate_elapsed_us} | {elapsed_delta_pct} | "
                 "{baseline_memory_bytes} | {candidate_memory_bytes} | {memory_delta_pct} |".format(
                     **{key: format_value(value) for key, value in delta.items()}
                 )
@@ -346,6 +401,9 @@ def write_csv(deltas: list[BuildDelta], path: Path) -> None:
         "baseline_tok_per_s",
         "candidate_tok_per_s",
         "tok_per_s_delta_pct",
+        "baseline_wall_tok_per_s",
+        "candidate_wall_tok_per_s",
+        "wall_tok_per_s_delta_pct",
         "baseline_elapsed_us",
         "candidate_elapsed_us",
         "elapsed_delta_pct",
@@ -406,6 +464,9 @@ def write_junit(deltas: list[BuildDelta], regressions: list[BuildRegression], pa
                 f"baseline_tok_per_s={format_value(delta.baseline_tok_per_s)}\n"
                 f"candidate_tok_per_s={format_value(delta.candidate_tok_per_s)}\n"
                 f"tok_per_s_delta_pct={format_value(delta.tok_per_s_delta_pct)}\n"
+                f"baseline_wall_tok_per_s={format_value(delta.baseline_wall_tok_per_s)}\n"
+                f"candidate_wall_tok_per_s={format_value(delta.candidate_wall_tok_per_s)}\n"
+                f"wall_tok_per_s_delta_pct={format_value(delta.wall_tok_per_s_delta_pct)}\n"
                 f"baseline_memory_bytes={format_value(delta.baseline_memory_bytes)}\n"
                 f"candidate_memory_bytes={format_value(delta.candidate_memory_bytes)}\n"
                 f"memory_delta_pct={format_value(delta.memory_delta_pct)}\n"
@@ -425,16 +486,25 @@ def write_report(
     output_dir: Path,
     *,
     max_tok_regression_pct: float,
+    max_wall_tok_regression_pct: float | None = None,
     max_memory_growth_pct: float | None = None,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
-    regressions = find_regressions(deltas, max_tok_regression_pct, max_memory_growth_pct)
+    regressions = find_regressions(
+        deltas,
+        max_tok_regression_pct,
+        max_memory_growth_pct,
+        max_wall_tok_regression_pct=max_wall_tok_regression_pct,
+    )
     report = {
         "generated_at": iso_now(),
         "status": "fail" if regressions else "pass",
         "baseline_build": baseline_build,
         "builds": sorted({metric.build for metric in metrics}),
         "max_tok_regression_pct": abs(max_tok_regression_pct),
+        "max_wall_tok_regression_pct": abs(max_wall_tok_regression_pct)
+        if max_wall_tok_regression_pct is not None
+        else None,
         "max_memory_growth_pct": abs(max_memory_growth_pct) if max_memory_growth_pct is not None else None,
         "metrics": [asdict(metric) for metric in metrics],
         "deltas": [asdict(delta) for delta in deltas],
@@ -472,6 +542,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         help="Allowed max memory growth before a regression is reported; omitted disables memory gating",
     )
+    parser.add_argument(
+        "--max-wall-tok-regression-pct",
+        type=float,
+        help="Allowed host wall-clock median tok/s drop before a regression is reported; omitted disables wall-time gating",
+    )
     parser.add_argument("--fail-on-regression", action="store_true", help="Return non-zero on benchmark regression")
     return parser
 
@@ -497,9 +572,15 @@ def main(argv: list[str] | None = None) -> int:
         baseline,
         args.output_dir,
         max_tok_regression_pct=args.max_tok_regression_pct,
+        max_wall_tok_regression_pct=args.max_wall_tok_regression_pct,
         max_memory_growth_pct=args.max_memory_growth_pct,
     )
-    regressions = find_regressions(deltas, args.max_tok_regression_pct, args.max_memory_growth_pct)
+    regressions = find_regressions(
+        deltas,
+        args.max_tok_regression_pct,
+        args.max_memory_growth_pct,
+        max_wall_tok_regression_pct=args.max_wall_tok_regression_pct,
+    )
     print(f"wrote_json={output}")
     print(f"compared_deltas={len(deltas)}")
     print(f"regressions={len(regressions)}")
