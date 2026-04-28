@@ -91,3 +91,4 @@
 2026-04-28T04:37:49Z | Added per-dataset eval comparison breakdowns with refreshed smoke reports and focused coverage.
 2026-04-28T04:45:52Z | Added opt-in QEMU TTFT telemetry gates with refreshed synthetic benchmark, index, and air-gap audit artifacts.
 2026-04-28T04:54:14Z | Added QEMU prompt benchmark per-token latency metrics with refreshed smoke, index, manifest, and air-gap artifacts.
+2026-04-28T05:11:53Z | Added static QEMU source air-gap audit with JSON/Markdown/CSV/JUnit reports, docs, smoke coverage, and latest artifact.

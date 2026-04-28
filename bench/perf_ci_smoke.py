@@ -226,6 +226,98 @@ def main() -> int:
             print("unsafe_qemu_command_not_rejected=true", file=sys.stderr)
             return 1
 
+        source_audit_fixture = tmp_path / "qemu_source_audit.md"
+        source_audit_fixture.write_text(
+            "\n".join(
+                [
+                    "```bash",
+                    "qemu-system-x86_64 \\",
+                    "  -nic none \\",
+                    "  -m 512M \\",
+                    "  -drive file=/tmp/TempleOS.img,format=raw,if=ide",
+                    "```",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        source_audit_output = tmp_path / "qemu_source_audit.json"
+        source_audit_markdown = tmp_path / "qemu_source_audit.md.out"
+        source_audit_csv = tmp_path / "qemu_source_audit.csv"
+        source_audit_junit = tmp_path / "qemu_source_audit.xml"
+        source_audit_command = [
+            sys.executable,
+            str(ROOT / "bench" / "qemu_source_audit.py"),
+            "--input",
+            str(source_audit_fixture),
+            "--output",
+            str(source_audit_output),
+            "--markdown",
+            str(source_audit_markdown),
+            "--csv",
+            str(source_audit_csv),
+            "--junit",
+            str(source_audit_junit),
+        ]
+        completed = subprocess.run(
+            source_audit_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode != 0:
+            sys.stdout.write(completed.stdout)
+            sys.stderr.write(completed.stderr)
+            return completed.returncode
+        source_audit_report = json.loads(source_audit_output.read_text(encoding="utf-8"))
+        if source_audit_report["status"] != "pass":
+            print(
+                f"unexpected_qemu_source_audit_status={source_audit_report['status']}",
+                file=sys.stderr,
+            )
+            return 1
+        if source_audit_report["commands_checked"] != 1:
+            print("missing_qemu_source_command_audit=true", file=sys.stderr)
+            return 1
+        if "QEMU Source Air-Gap Audit" not in source_audit_markdown.read_text(encoding="utf-8"):
+            print("missing_qemu_source_audit_markdown=true", file=sys.stderr)
+            return 1
+        if "source,line,reason,command,text" not in source_audit_csv.read_text(encoding="utf-8"):
+            print("missing_qemu_source_audit_csv=true", file=sys.stderr)
+            return 1
+        source_audit_junit_root = ET.parse(source_audit_junit).getroot()
+        if source_audit_junit_root.attrib.get("name") != "holyc_qemu_source_airgap_audit":
+            print("missing_qemu_source_audit_junit_suite=true", file=sys.stderr)
+            return 1
+        if source_audit_junit_root.attrib.get("failures") != "0":
+            print("unexpected_qemu_source_audit_junit_failures=true", file=sys.stderr)
+            return 1
+
+        unsafe_source_fixture = tmp_path / "unsafe_qemu_source.md"
+        unsafe_source_fixture.write_text(
+            "qemu-system-x86_64 -m 512M -drive file=/tmp/TempleOS.img,format=raw,if=ide\n",
+            encoding="utf-8",
+        )
+        unsafe_source_command = [
+            sys.executable,
+            str(ROOT / "bench" / "qemu_source_audit.py"),
+            "--input",
+            str(unsafe_source_fixture),
+            "--output",
+            str(tmp_path / "unsafe_qemu_source_audit.json"),
+        ]
+        completed = subprocess.run(
+            unsafe_source_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("unsafe_qemu_source_command_not_rejected=true", file=sys.stderr)
+            return 1
+
         bench_output_dir = tmp_path / "qemu_prompt_bench"
         bench_command = [
             sys.executable,

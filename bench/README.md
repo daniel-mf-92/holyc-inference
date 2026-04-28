@@ -293,6 +293,28 @@ prompt-suite hash, warmup count, repeat count, and planned launch totals for CI
 review without booting a guest, plus the same host/QEMU provenance fields used
 by measured benchmark reports.
 
+`qemu_source_audit.py` statically scans host-side docs/config/shell-like files
+for literal `qemu-system*` launch snippets and applies the same air-gap command
+rules. This catches unsafe copied commands before they become benchmark scripts
+or operator runbooks. Raw QEMU examples must keep `-nic none` explicit:
+
+```bash
+qemu-system-x86_64 \
+  -nic none \
+  -m 512M \
+  -drive file=/tmp/TempleOS.img,format=raw,if=ide
+```
+
+Run the source audit with JSON, Markdown, CSV, and JUnit output:
+
+```bash
+python3 bench/qemu_source_audit.py \
+  --output bench/results/qemu_source_audit_latest.json \
+  --markdown bench/results/qemu_source_audit_latest.md \
+  --csv bench/results/qemu_source_audit_latest.csv \
+  --junit bench/results/qemu_source_audit_junit_latest.xml
+```
+
 Refresh the committed smoke report without booting a guest:
 
 ```bash
