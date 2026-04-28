@@ -341,14 +341,18 @@ python3 bench/perf_regression.py \
   --input bench/results \
   --output-dir bench/dashboards \
   --min-records-per-point 3 \
+  --max-tok-cv-pct 7.5 \
   --fail-on-regression
 ```
 
 `--min-records-per-point` fails the dashboard when any benchmark key/commit
 point has fewer samples than required. This catches partial matrix uploads and
 single-run artifacts before noisy throughput medians are accepted.
+`--max-tok-cv-pct` fails the dashboard when repeated tok/s samples inside a
+benchmark key/commit point are too variable to trust as a baseline.
 The dashboard also writes `perf_regression_junit_latest.xml` so CI systems can
-surface throughput regressions and sample-coverage failures as test failures.
+surface throughput regressions, sample-coverage failures, and variability
+failures as test failures.
 
 ## Build Benchmark Compare
 
@@ -440,7 +444,8 @@ or `tok_per_s_milli`, plus optional memory fields such as `memory_bytes` or
 `max_rss_bytes`. Regression checks compare commit-level aggregates, so repeated
 runs and duplicate latest/stamped result files are collapsed by benchmark key and
 commit before the latest distinct commits are compared. Outputs include JSON,
-Markdown, JUnit XML, commit-point CSV, and regression CSV artifacts.
+Markdown, JUnit XML, commit-point CSV, regression CSV, sample-coverage CSV, and
+tok/s variability CSV artifacts.
 
 Example:
 
@@ -451,7 +456,7 @@ python3 bench/perf_regression.py --input bench/results --output-dir bench/dashbo
 CI can fail on throughput or memory regressions with:
 
 ```bash
-python3 bench/perf_regression.py --fail-on-regression
+python3 bench/perf_regression.py --max-tok-cv-pct 7.5 --fail-on-regression
 ```
 
 Pin an explicit baseline/candidate pair when CI provides known SHAs:

@@ -226,6 +226,51 @@ def test_min_records_per_point_flags_under_sampled_commit_points(tmp_path: Path)
     ]
 
 
+def test_max_tok_cv_pct_flags_noisy_commit_points(tmp_path: Path) -> None:
+    result = tmp_path / "perf.jsonl"
+    write_jsonl(
+        result,
+        [
+            {
+                "timestamp": "2026-04-27T10:00:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "prompt": "short",
+                "tok_per_s": 100.0,
+            },
+            {
+                "timestamp": "2026-04-27T10:01:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "prompt": "short",
+                "tok_per_s": 140.0,
+            },
+            {
+                "timestamp": "2026-04-27T10:02:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "prompt": "short",
+                "tok_per_s": 80.0,
+            },
+        ],
+    )
+
+    records = perf_regression.load_records([result])
+    report = perf_regression.build_report(records, 5.0, 10.0, max_tok_cv_pct=10.0)
+
+    assert report["status"] == "fail"
+    assert report["thresholds"]["max_tok_cv_pct"] == 10.0
+    assert len(report["variability_violations"]) == 1
+    assert report["variability_violations"][0]["key"] == "decode/secure-local/-/Q4_0/short"
+    assert report["variability_violations"][0]["tok_per_s_cv_pct"] > 10.0
+
+
 def test_junit_report_marks_perf_failures() -> None:
     report = {
         "generated_at": "2026-04-27T20:00:00Z",
@@ -249,16 +294,26 @@ def test_junit_report_marks_perf_failures() -> None:
                 "minimum_records": 3,
             }
         ],
+        "variability_violations": [
+            {
+                "key": "decode/secure-local/-/Q4_0/-",
+                "commit": "head",
+                "records": 3,
+                "tok_per_s_cv_pct": 14.5,
+                "threshold_pct": 10.0,
+            }
+        ],
     }
 
     root = ET.fromstring(perf_regression.junit_report(report))
     failures = root.findall(".//failure")
 
-    assert root.attrib["tests"] == "2"
-    assert root.attrib["failures"] == "2"
+    assert root.attrib["tests"] == "3"
+    assert root.attrib["failures"] == "3"
     assert failures[0].attrib["type"] == "perf_regression"
     assert "tok_per_s changed 10.00%" in failures[0].attrib["message"]
     assert failures[1].attrib["type"] == "sample_coverage"
+    assert failures[2].attrib["type"] == "tok_per_s_variability"
 
 
 def test_write_dashboard_outputs_includes_junit(tmp_path: Path) -> None:
@@ -314,10 +369,12 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
     assert (output_dir / "perf_regression_commit_points_latest.csv").exists()
     assert (output_dir / "perf_regression_regressions_latest.csv").exists()
     assert (output_dir / "perf_regression_sample_violations_latest.csv").exists()
+    assert (output_dir / "perf_regression_variability_violations_latest.csv").exists()
     markdown = (output_dir / "perf_regression_latest.md").read_text(encoding="utf-8")
     assert "Perf Regression Dashboard" in markdown
     assert "Commit Points" in markdown
     assert "Sample Coverage" in markdown
+    assert "Variability" in markdown
     assert "prompt/dev-local/-/-/-" in markdown
     commit_points_csv = (output_dir / "perf_regression_commit_points_latest.csv").read_text(
         encoding="utf-8"
@@ -328,7 +385,14 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
     sample_violations_csv = (output_dir / "perf_regression_sample_violations_latest.csv").read_text(
         encoding="utf-8"
     )
-    assert "key,commit,latest_timestamp,records,median_tok_per_s,max_memory_bytes" in commit_points_csv
-    assert "prompt/dev-local/-/-/-,abc,2026-04-27T10:00:00Z,1,42.0," in commit_points_csv
+    variability_violations_csv = (
+        output_dir / "perf_regression_variability_violations_latest.csv"
+    ).read_text(encoding="utf-8")
+    assert (
+        "key,commit,latest_timestamp,records,median_tok_per_s,tok_per_s_cv_pct,max_memory_bytes"
+        in commit_points_csv
+    )
+    assert "prompt/dev-local/-/-/-,abc,2026-04-27T10:00:00Z,1,42.0,," in commit_points_csv
     assert "key,metric,baseline_commit,candidate_commit,baseline_value,candidate_value" in regressions_csv
     assert "key,commit,records,minimum_records" in sample_violations_csv
+    assert "key,commit,records,tok_per_s_cv_pct,threshold_pct" in variability_violations_csv

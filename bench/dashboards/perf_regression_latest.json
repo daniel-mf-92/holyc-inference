@@ -6,7 +6,8 @@
       "latest_timestamp": "2026-04-27T14:00:00Z",
       "max_memory_bytes": 1000000,
       "median_tok_per_s": 100.0,
-      "records": 1
+      "records": 1,
+      "tok_per_s_cv_pct": null
     },
     {
       "commit": "ci-head",
@@ -14,7 +15,8 @@
       "latest_timestamp": "2026-04-27T14:05:00Z",
       "max_memory_bytes": 1000000,
       "median_tok_per_s": 101.0,
-      "records": 1
+      "records": 1,
+      "tok_per_s_cv_pct": null
     },
     {
       "commit": "21ad93152049",
@@ -22,7 +24,8 @@
       "latest_timestamp": "2026-04-27T18:29:11Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
-      "records": 6
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "5bf1fd7158fd",
@@ -30,7 +33,8 @@
       "latest_timestamp": "2026-04-27T18:40:01Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
-      "records": 6
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "786eee1bfa27",
@@ -38,7 +42,35 @@
       "latest_timestamp": "2026-04-27T20:02:50Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
-      "records": 6
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "bf852f741851",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
+      "latest_timestamp": "2026-04-27T23:07:34Z",
+      "max_memory_bytes": 67207168,
+      "median_tok_per_s": 160.0,
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "bb8266801970",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
+      "latest_timestamp": "2026-04-27T23:47:38Z",
+      "max_memory_bytes": 67207168,
+      "median_tok_per_s": 160.0,
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "1588059f2388",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
+      "latest_timestamp": "2026-04-28T00:01:10Z",
+      "max_memory_bytes": 67207168,
+      "median_tok_per_s": 160.0,
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "21ad93152049",
@@ -46,7 +78,8 @@
       "latest_timestamp": "2026-04-27T18:29:10Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
-      "records": 6
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "5bf1fd7158fd",
@@ -54,7 +87,8 @@
       "latest_timestamp": "2026-04-27T18:40:01Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
-      "records": 6
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "786eee1bfa27",
@@ -62,7 +96,35 @@
       "latest_timestamp": "2026-04-27T20:02:50Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
-      "records": 6
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "bf852f741851",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
+      "latest_timestamp": "2026-04-27T23:07:33Z",
+      "max_memory_bytes": 67174400,
+      "median_tok_per_s": 160.0,
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "bb8266801970",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
+      "latest_timestamp": "2026-04-27T23:47:38Z",
+      "max_memory_bytes": 67174400,
+      "median_tok_per_s": 160.0,
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "1588059f2388",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
+      "latest_timestamp": "2026-04-28T00:01:10Z",
+      "max_memory_bytes": 67174400,
+      "median_tok_per_s": 160.0,
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "21ad93152049",
@@ -70,7 +132,8 @@
       "latest_timestamp": "2026-04-27T18:29:11Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
-      "records": 6
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "5bf1fd7158fd",
@@ -78,7 +141,8 @@
       "latest_timestamp": "2026-04-27T18:40:01Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
-      "records": 6
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "786eee1bfa27",
@@ -86,7 +150,35 @@
       "latest_timestamp": "2026-04-27T20:02:50Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
-      "records": 6
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "bf852f741851",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-code",
+      "latest_timestamp": "2026-04-27T23:07:34Z",
+      "max_memory_bytes": 67207168,
+      "median_tok_per_s": 160.0,
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "bb8266801970",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-code",
+      "latest_timestamp": "2026-04-27T23:47:38Z",
+      "max_memory_bytes": 67207168,
+      "median_tok_per_s": 160.0,
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "1588059f2388",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-code",
+      "latest_timestamp": "2026-04-28T00:01:11Z",
+      "max_memory_bytes": 67207168,
+      "median_tok_per_s": 160.0,
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "21ad93152049",
@@ -94,7 +186,8 @@
       "latest_timestamp": "2026-04-27T18:29:11Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
-      "records": 6
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "5bf1fd7158fd",
@@ -102,7 +195,8 @@
       "latest_timestamp": "2026-04-27T18:40:01Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
-      "records": 6
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "786eee1bfa27",
@@ -110,7 +204,35 @@
       "latest_timestamp": "2026-04-27T20:02:50Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
-      "records": 6
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "bf852f741851",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-short",
+      "latest_timestamp": "2026-04-27T23:07:34Z",
+      "max_memory_bytes": 67174400,
+      "median_tok_per_s": 160.0,
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "bb8266801970",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-short",
+      "latest_timestamp": "2026-04-27T23:47:38Z",
+      "max_memory_bytes": 67174400,
+      "median_tok_per_s": 160.0,
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "1588059f2388",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-short",
+      "latest_timestamp": "2026-04-28T00:01:11Z",
+      "max_memory_bytes": 67174400,
+      "median_tok_per_s": 160.0,
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "5b98f2570b1c",
@@ -118,7 +240,8 @@
       "latest_timestamp": "2026-04-27T14:41:37Z",
       "max_memory_bytes": null,
       "median_tok_per_s": 160.0,
-      "records": 3
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "85cce7c2f224",
@@ -126,7 +249,8 @@
       "latest_timestamp": "2026-04-27T16:12:59Z",
       "max_memory_bytes": null,
       "median_tok_per_s": 160.0,
-      "records": 3
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "3f9df4f0bd7a",
@@ -134,7 +258,8 @@
       "latest_timestamp": "2026-04-27T17:04:37Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
-      "records": 3
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "e71bfc15a184",
@@ -142,7 +267,8 @@
       "latest_timestamp": "2026-04-27T17:20:21Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
-      "records": 3
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "7f007ced1a84",
@@ -150,7 +276,8 @@
       "latest_timestamp": "2026-04-27T18:02:19Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
-      "records": 3
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "708be92b565a",
@@ -158,7 +285,8 @@
       "latest_timestamp": "2026-04-27T19:22:32Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
-      "records": 3
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "786eee1bfa27",
@@ -166,7 +294,71 @@
       "latest_timestamp": "2026-04-27T20:02:33Z",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
-      "records": 9
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "b5c013b1b596",
+      "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
+      "latest_timestamp": "2026-04-27T22:08:28Z",
+      "max_memory_bytes": 67207168,
+      "median_tok_per_s": 160.0,
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "ea55b6ea98dd",
+      "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
+      "latest_timestamp": "2026-04-27T22:19:51Z",
+      "max_memory_bytes": 67207168,
+      "median_tok_per_s": 160.0,
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "36f90ed16742",
+      "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
+      "latest_timestamp": "2026-04-27T23:19:04Z",
+      "max_memory_bytes": 67207168,
+      "median_tok_per_s": 160.0,
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "b1e55ed7d43f",
+      "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
+      "latest_timestamp": "2026-04-27T23:32:53Z",
+      "max_memory_bytes": 67207168,
+      "median_tok_per_s": 160.0,
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "4981d42b1a52",
+      "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
+      "latest_timestamp": "2026-04-27T23:40:33Z",
+      "max_memory_bytes": 67207168,
+      "median_tok_per_s": 160.0,
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "1588059f2388",
+      "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
+      "latest_timestamp": "2026-04-28T00:01:10Z",
+      "max_memory_bytes": 67207168,
+      "median_tok_per_s": 160.0,
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "ec4b6dde4fd6",
+      "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
+      "latest_timestamp": "2026-04-28T00:06:50Z",
+      "max_memory_bytes": 67207168,
+      "median_tok_per_s": 160.0,
+      "records": 9,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "5b98f2570b1c",
@@ -174,7 +366,8 @@
       "latest_timestamp": "2026-04-27T14:41:37Z",
       "max_memory_bytes": null,
       "median_tok_per_s": 160.0,
-      "records": 3
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "85cce7c2f224",
@@ -182,7 +375,8 @@
       "latest_timestamp": "2026-04-27T16:12:59Z",
       "max_memory_bytes": null,
       "median_tok_per_s": 160.0,
-      "records": 3
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "3f9df4f0bd7a",
@@ -190,7 +384,8 @@
       "latest_timestamp": "2026-04-27T17:04:37Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
-      "records": 3
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "e71bfc15a184",
@@ -198,7 +393,8 @@
       "latest_timestamp": "2026-04-27T17:20:21Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
-      "records": 3
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "7f007ced1a84",
@@ -206,7 +402,8 @@
       "latest_timestamp": "2026-04-27T18:02:19Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
-      "records": 3
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "708be92b565a",
@@ -214,7 +411,8 @@
       "latest_timestamp": "2026-04-27T19:22:32Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
-      "records": 3
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
     },
     {
       "commit": "786eee1bfa27",
@@ -222,7 +420,71 @@
       "latest_timestamp": "2026-04-27T20:02:33Z",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
-      "records": 9
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "b5c013b1b596",
+      "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
+      "latest_timestamp": "2026-04-27T22:08:28Z",
+      "max_memory_bytes": 67174400,
+      "median_tok_per_s": 160.0,
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "ea55b6ea98dd",
+      "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
+      "latest_timestamp": "2026-04-27T22:19:51Z",
+      "max_memory_bytes": 67174400,
+      "median_tok_per_s": 160.0,
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "36f90ed16742",
+      "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
+      "latest_timestamp": "2026-04-27T23:19:04Z",
+      "max_memory_bytes": 67174400,
+      "median_tok_per_s": 160.0,
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "b1e55ed7d43f",
+      "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
+      "latest_timestamp": "2026-04-27T23:32:53Z",
+      "max_memory_bytes": 67174400,
+      "median_tok_per_s": 160.0,
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "4981d42b1a52",
+      "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
+      "latest_timestamp": "2026-04-27T23:40:33Z",
+      "max_memory_bytes": 67174400,
+      "median_tok_per_s": 160.0,
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "1588059f2388",
+      "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
+      "latest_timestamp": "2026-04-28T00:01:10Z",
+      "max_memory_bytes": 67174400,
+      "median_tok_per_s": 160.0,
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0
+    },
+    {
+      "commit": "ec4b6dde4fd6",
+      "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
+      "latest_timestamp": "2026-04-28T00:06:50Z",
+      "max_memory_bytes": 67174400,
+      "median_tok_per_s": 160.0,
+      "records": 9,
+      "tok_per_s_cv_pct": 0.0
     }
   ],
   "comparison": {
@@ -230,8 +492,8 @@
     "candidate_commit": null,
     "mode": "latest-distinct-commits"
   },
-  "generated_at": "2026-04-27T21:02:51Z",
-  "record_count": 128,
+  "generated_at": "2026-04-28T00:26:41Z",
+  "record_count": 242,
   "records": [
     {
       "benchmark": "qemu_prompt",
@@ -475,6 +737,222 @@
     },
     {
       "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T230734Z.json",
+      "timestamp": "2026-04-27T23:07:33Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-27T23:07:33Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-27T23:07:33Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T230734Z.json",
+      "timestamp": "2026-04-27T23:07:34Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-27T23:07:34Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-27T23:07:34Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T234738Z.json",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T234738Z.json",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T000110Z.json",
+      "timestamp": "2026-04-28T00:01:10Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T000110Z.json",
+      "timestamp": "2026-04-28T00:01:10Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-28T00:01:10Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-28T00:01:10Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T00:01:10Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T00:01:10Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
@@ -691,6 +1169,222 @@
     },
     {
       "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T230734Z.json",
+      "timestamp": "2026-04-27T23:07:33Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T230734Z.json",
+      "timestamp": "2026-04-27T23:07:33Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-27T23:07:33Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-27T23:07:33Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-27T23:07:33Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-27T23:07:33Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T234738Z.json",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T234738Z.json",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T000110Z.json",
+      "timestamp": "2026-04-28T00:01:10Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T000110Z.json",
+      "timestamp": "2026-04-28T00:01:10Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-28T00:01:10Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-28T00:01:10Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T00:01:10Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T00:01:10Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
@@ -907,6 +1601,222 @@
     },
     {
       "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T230734Z.json",
+      "timestamp": "2026-04-27T23:07:34Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T230734Z.json",
+      "timestamp": "2026-04-27T23:07:34Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-27T23:07:34Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-27T23:07:34Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-27T23:07:34Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-27T23:07:34Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T234738Z.json",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T234738Z.json",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T000111Z.json",
+      "timestamp": "2026-04-28T00:01:11Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T000111Z.json",
+      "timestamp": "2026-04-28T00:01:11Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-28T00:01:11Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-28T00:01:11Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T00:01:11Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T00:01:11Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
@@ -1119,6 +2029,222 @@
       "quantization": "Q8_0",
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "timestamp": "2026-04-27T20:02:50Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T230734Z.json",
+      "timestamp": "2026-04-27T23:07:34Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T230734Z.json",
+      "timestamp": "2026-04-27T23:07:34Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-27T23:07:34Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-27T23:07:34Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-27T23:07:34Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bf852f741851",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-27T23:07:34Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T234738Z.json",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T234738Z.json",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "bb8266801970",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-27T23:47:38Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T000111Z.json",
+      "timestamp": "2026-04-28T00:01:11Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T000111Z.json",
+      "timestamp": "2026-04-28T00:01:11Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-28T00:01:11Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-28T00:01:11Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T00:01:11Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T00:01:11Z",
       "tok_per_s": 160.0
     },
     {
@@ -1375,74 +2501,326 @@
     },
     {
       "benchmark": "qemu_prompt",
-      "commit": "786eee1bfa27",
+      "commit": "b5c013b1b596",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T220828Z.json",
+      "timestamp": "2026-04-27T22:08:28Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "b5c013b1b596",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T220828Z.json",
+      "timestamp": "2026-04-27T22:08:28Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "b5c013b1b596",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T220828Z.json",
+      "timestamp": "2026-04-27T22:08:28Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ea55b6ea98dd",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T221951Z.json",
+      "timestamp": "2026-04-27T22:19:51Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ea55b6ea98dd",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T221951Z.json",
+      "timestamp": "2026-04-27T22:19:51Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ea55b6ea98dd",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T221951Z.json",
+      "timestamp": "2026-04-27T22:19:51Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "36f90ed16742",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T231904Z.json",
+      "timestamp": "2026-04-27T23:19:04Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "36f90ed16742",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T231904Z.json",
+      "timestamp": "2026-04-27T23:19:04Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "36f90ed16742",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T231904Z.json",
+      "timestamp": "2026-04-27T23:19:04Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "b1e55ed7d43f",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T233253Z.json",
+      "timestamp": "2026-04-27T23:32:53Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "b1e55ed7d43f",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T233253Z.json",
+      "timestamp": "2026-04-27T23:32:53Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "b1e55ed7d43f",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T233253Z.json",
+      "timestamp": "2026-04-27T23:32:53Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "4981d42b1a52",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T234033Z.json",
+      "timestamp": "2026-04-27T23:40:33Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "4981d42b1a52",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T234033Z.json",
+      "timestamp": "2026-04-27T23:40:33Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "4981d42b1a52",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T234033Z.json",
+      "timestamp": "2026-04-27T23:40:33Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260428T000110Z.json",
+      "timestamp": "2026-04-28T00:01:10Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260428T000110Z.json",
+      "timestamp": "2026-04-28T00:01:10Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260428T000110Z.json",
+      "timestamp": "2026-04-28T00:01:10Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ec4b6dde4fd6",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260428T000650Z.json",
+      "timestamp": "2026-04-28T00:06:50Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ec4b6dde4fd6",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260428T000650Z.json",
+      "timestamp": "2026-04-28T00:06:50Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ec4b6dde4fd6",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260428T000650Z.json",
+      "timestamp": "2026-04-28T00:06:50Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ec4b6dde4fd6",
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
       "prompt": "smoke-code",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_latest.csv",
-      "timestamp": "2026-04-27T20:02:33Z",
+      "timestamp": "2026-04-28T00:06:50Z",
       "tok_per_s": 160.0
     },
     {
       "benchmark": "qemu_prompt",
-      "commit": "786eee1bfa27",
+      "commit": "ec4b6dde4fd6",
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
       "prompt": "smoke-code",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_latest.csv",
-      "timestamp": "2026-04-27T20:02:33Z",
+      "timestamp": "2026-04-28T00:06:50Z",
       "tok_per_s": 160.0
     },
     {
       "benchmark": "qemu_prompt",
-      "commit": "786eee1bfa27",
+      "commit": "ec4b6dde4fd6",
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
       "prompt": "smoke-code",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_latest.csv",
-      "timestamp": "2026-04-27T20:02:33Z",
+      "timestamp": "2026-04-28T00:06:50Z",
       "tok_per_s": 160.0
     },
     {
       "benchmark": "qemu_prompt",
-      "commit": "786eee1bfa27",
+      "commit": "ec4b6dde4fd6",
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
       "prompt": "smoke-code",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_latest.json",
-      "timestamp": "2026-04-27T20:02:33Z",
+      "timestamp": "2026-04-28T00:06:50Z",
       "tok_per_s": 160.0
     },
     {
       "benchmark": "qemu_prompt",
-      "commit": "786eee1bfa27",
+      "commit": "ec4b6dde4fd6",
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
       "prompt": "smoke-code",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_latest.json",
-      "timestamp": "2026-04-27T20:02:33Z",
+      "timestamp": "2026-04-28T00:06:50Z",
       "tok_per_s": 160.0
     },
     {
       "benchmark": "qemu_prompt",
-      "commit": "786eee1bfa27",
+      "commit": "ec4b6dde4fd6",
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
       "prompt": "smoke-code",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_latest.json",
-      "timestamp": "2026-04-27T20:02:33Z",
+      "timestamp": "2026-04-28T00:06:50Z",
       "tok_per_s": 160.0
     },
     {
@@ -1699,74 +3077,326 @@
     },
     {
       "benchmark": "qemu_prompt",
-      "commit": "786eee1bfa27",
+      "commit": "b5c013b1b596",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T220828Z.json",
+      "timestamp": "2026-04-27T22:08:28Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "b5c013b1b596",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T220828Z.json",
+      "timestamp": "2026-04-27T22:08:28Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "b5c013b1b596",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T220828Z.json",
+      "timestamp": "2026-04-27T22:08:28Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ea55b6ea98dd",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T221951Z.json",
+      "timestamp": "2026-04-27T22:19:51Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ea55b6ea98dd",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T221951Z.json",
+      "timestamp": "2026-04-27T22:19:51Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ea55b6ea98dd",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T221951Z.json",
+      "timestamp": "2026-04-27T22:19:51Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "36f90ed16742",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T231904Z.json",
+      "timestamp": "2026-04-27T23:19:04Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "36f90ed16742",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T231904Z.json",
+      "timestamp": "2026-04-27T23:19:04Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "36f90ed16742",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T231904Z.json",
+      "timestamp": "2026-04-27T23:19:04Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "b1e55ed7d43f",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T233253Z.json",
+      "timestamp": "2026-04-27T23:32:52Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "b1e55ed7d43f",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T233253Z.json",
+      "timestamp": "2026-04-27T23:32:53Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "b1e55ed7d43f",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T233253Z.json",
+      "timestamp": "2026-04-27T23:32:53Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "4981d42b1a52",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T234033Z.json",
+      "timestamp": "2026-04-27T23:40:33Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "4981d42b1a52",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T234033Z.json",
+      "timestamp": "2026-04-27T23:40:33Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "4981d42b1a52",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260427T234033Z.json",
+      "timestamp": "2026-04-27T23:40:33Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260428T000110Z.json",
+      "timestamp": "2026-04-28T00:01:10Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260428T000110Z.json",
+      "timestamp": "2026-04-28T00:01:10Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "1588059f2388",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260428T000110Z.json",
+      "timestamp": "2026-04-28T00:01:10Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ec4b6dde4fd6",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260428T000650Z.json",
+      "timestamp": "2026-04-28T00:06:49Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ec4b6dde4fd6",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260428T000650Z.json",
+      "timestamp": "2026-04-28T00:06:49Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ec4b6dde4fd6",
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
       "prompt": "smoke-short",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_latest.csv",
-      "timestamp": "2026-04-27T20:02:33Z",
+      "timestamp": "2026-04-28T00:06:49Z",
       "tok_per_s": 160.0
     },
     {
       "benchmark": "qemu_prompt",
-      "commit": "786eee1bfa27",
+      "commit": "ec4b6dde4fd6",
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
       "prompt": "smoke-short",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_latest.csv",
-      "timestamp": "2026-04-27T20:02:33Z",
+      "timestamp": "2026-04-28T00:06:49Z",
       "tok_per_s": 160.0
     },
     {
       "benchmark": "qemu_prompt",
-      "commit": "786eee1bfa27",
+      "commit": "ec4b6dde4fd6",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T00:06:49Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ec4b6dde4fd6",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T00:06:49Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ec4b6dde4fd6",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260428T000650Z.json",
+      "timestamp": "2026-04-28T00:06:50Z",
+      "tok_per_s": 160.0
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ec4b6dde4fd6",
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
       "prompt": "smoke-short",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_latest.csv",
-      "timestamp": "2026-04-27T20:02:33Z",
+      "timestamp": "2026-04-28T00:06:50Z",
       "tok_per_s": 160.0
     },
     {
       "benchmark": "qemu_prompt",
-      "commit": "786eee1bfa27",
+      "commit": "ec4b6dde4fd6",
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
       "prompt": "smoke-short",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_latest.json",
-      "timestamp": "2026-04-27T20:02:33Z",
-      "tok_per_s": 160.0
-    },
-    {
-      "benchmark": "qemu_prompt",
-      "commit": "786eee1bfa27",
-      "memory_bytes": 67174400,
-      "model": "synthetic-smoke",
-      "profile": "synthetic-airgap-smoke",
-      "prompt": "smoke-short",
-      "quantization": "Q4_0",
-      "source": "bench/results/qemu_prompt_bench_latest.json",
-      "timestamp": "2026-04-27T20:02:33Z",
-      "tok_per_s": 160.0
-    },
-    {
-      "benchmark": "qemu_prompt",
-      "commit": "786eee1bfa27",
-      "memory_bytes": 67174400,
-      "model": "synthetic-smoke",
-      "profile": "synthetic-airgap-smoke",
-      "prompt": "smoke-short",
-      "quantization": "Q4_0",
-      "source": "bench/results/qemu_prompt_bench_latest.json",
-      "timestamp": "2026-04-27T20:02:33Z",
+      "timestamp": "2026-04-28T00:06:50Z",
       "tok_per_s": 160.0
     }
   ],
@@ -1781,45 +3411,47 @@
       "records": 2
     },
     "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code": {
-      "latest_commit": "786eee1bfa27",
+      "latest_commit": "1588059f2388",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
-      "records": 18
+      "records": 36
     },
     "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short": {
-      "latest_commit": "786eee1bfa27",
+      "latest_commit": "1588059f2388",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
-      "records": 18
+      "records": 36
     },
     "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-code": {
-      "latest_commit": "786eee1bfa27",
+      "latest_commit": "1588059f2388",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
-      "records": 18
+      "records": 36
     },
     "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-short": {
-      "latest_commit": "786eee1bfa27",
+      "latest_commit": "1588059f2388",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
-      "records": 18
+      "records": 36
     },
     "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code": {
-      "latest_commit": "786eee1bfa27",
+      "latest_commit": "ec4b6dde4fd6",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
-      "records": 27
+      "records": 48
     },
     "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short": {
-      "latest_commit": "786eee1bfa27",
+      "latest_commit": "ec4b6dde4fd6",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
-      "records": 27
+      "records": 48
     }
   },
   "thresholds": {
+    "max_tok_cv_pct": null,
     "memory_regression_pct": 10.0,
     "min_records_per_point": 1,
     "tok_regression_pct": 5.0
-  }
+  },
+  "variability_violations": []
 }

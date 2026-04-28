@@ -63,6 +63,7 @@ class CommitPoint:
     latest_timestamp: str
     records: int
     median_tok_per_s: float | None
+    tok_per_s_cv_pct: float | None
     max_memory_bytes: int | None
 
 
@@ -72,6 +73,15 @@ class SampleViolation:
     commit: str
     records: int
     minimum_records: int
+
+
+@dataclass(frozen=True)
+class VariabilityViolation:
+    key: str
+    commit: str
+    records: int
+    tok_per_s_cv_pct: float
+    threshold_pct: float
 
 
 def iso_now() -> str:
@@ -245,6 +255,7 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
     for (key, commit), commit_records in sorted(by_key_commit.items()):
         tps_values = [record.tok_per_s for record in commit_records if record.tok_per_s is not None]
         memory_values = [record.memory_bytes for record in commit_records if record.memory_bytes is not None]
+        tps_cv_pct = coefficient_of_variation_pct(tps_values)
         points.append(
             CommitPoint(
                 key=key,
@@ -252,10 +263,20 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                 latest_timestamp=max(record.timestamp for record in commit_records),
                 records=len(commit_records),
                 median_tok_per_s=statistics.median(tps_values) if tps_values else None,
+                tok_per_s_cv_pct=tps_cv_pct,
                 max_memory_bytes=max(memory_values) if memory_values else None,
             )
         )
     return sorted(points, key=lambda point: (point.key, point.latest_timestamp, point.commit))
+
+
+def coefficient_of_variation_pct(values: list[float]) -> float | None:
+    if len(values) < 2:
+        return None
+    mean = statistics.fmean(values)
+    if mean <= 0.0:
+        return None
+    return statistics.stdev(values) * 100.0 / mean
 
 
 def select_comparison_points(
@@ -355,6 +376,28 @@ def detect_sample_violations(points: list[CommitPoint], minimum_records: int) ->
     return violations
 
 
+def detect_variability_violations(
+    points: list[CommitPoint], max_tok_cv_pct: float | None
+) -> list[VariabilityViolation]:
+    if max_tok_cv_pct is None:
+        return []
+    violations: list[VariabilityViolation] = []
+    for point in points:
+        if point.tok_per_s_cv_pct is None:
+            continue
+        if point.tok_per_s_cv_pct > max_tok_cv_pct:
+            violations.append(
+                VariabilityViolation(
+                    key=point.key,
+                    commit=point.commit,
+                    records=point.records,
+                    tok_per_s_cv_pct=point.tok_per_s_cv_pct,
+                    threshold_pct=max_tok_cv_pct,
+                )
+            )
+    return violations
+
+
 def markdown_report(report: dict[str, Any]) -> str:
     lines = [
         "# Perf Regression Dashboard",
@@ -364,6 +407,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Records: {report['record_count']}",
         f"Regressions: {len(report['regressions'])}",
         f"Sample violations: {len(report['sample_violations'])}",
+        f"Variability violations: {len(report['variability_violations'])}",
         "",
         "## Regressions",
         "",
@@ -391,18 +435,32 @@ def markdown_report(report: dict[str, Any]) -> str:
     else:
         lines.append("Sample coverage requirements satisfied.")
 
+    lines.extend(["", "## Variability", ""])
+    if report["variability_violations"]:
+        lines.append("| Key | Commit | Records | Tok/s CV | Threshold |")
+        lines.append("| --- | --- | ---: | ---: | ---: |")
+        for violation in report["variability_violations"]:
+            lines.append(
+                "| {key} | {commit} | {records} | {tok_per_s_cv_pct:.2f}% | "
+                "{threshold_pct:.2f}% |".format(**violation)
+            )
+    else:
+        lines.append("Variability requirements satisfied.")
+
     lines.extend(["", "## Commit Points", ""])
     if report["commit_points"]:
-        lines.append("| Key | Commit | Records | Median tok/s | Max Memory Bytes |")
-        lines.append("| --- | --- | ---: | ---: | ---: |")
+        lines.append("| Key | Commit | Records | Median tok/s | Tok/s CV | Max Memory Bytes |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: |")
         for point in report["commit_points"]:
             tps = point["median_tok_per_s"]
+            tps_cv = point["tok_per_s_cv_pct"]
             memory = point["max_memory_bytes"]
             tps_cell = f"{tps:.3f}" if tps is not None else "-"
+            tps_cv_cell = f"{tps_cv:.2f}%" if tps_cv is not None else "-"
             memory_cell = str(memory) if memory is not None else "-"
             lines.append(
                 f"| {point['key']} | {point['commit']} | {point['records']} | "
-                f"{tps_cell} | {memory_cell} |"
+                f"{tps_cell} | {tps_cv_cell} | {memory_cell} |"
             )
     else:
         lines.append("No commit-level performance points found.")
@@ -435,7 +493,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]], fields: list[str]) -> None
 
 
 def junit_report(report: dict[str, Any]) -> str:
-    failures = len(report["regressions"]) + len(report["sample_violations"])
+    variability_violations = report.get("variability_violations", [])
+    failures = len(report["regressions"]) + len(report["sample_violations"]) + len(variability_violations)
     tests = failures or 1
     suite = ET.Element(
         "testsuite",
@@ -511,6 +570,34 @@ def junit_report(report: dict[str, Any]) -> str:
                 f"key={violation['key']}"
             )
 
+        for violation in variability_violations:
+            case = ET.SubElement(
+                suite,
+                "testcase",
+                {
+                    "classname": "perf_regression.variability",
+                    "name": f"{violation['commit']}:{violation['key']}",
+                },
+            )
+            failure = ET.SubElement(
+                case,
+                "failure",
+                {
+                    "type": "tok_per_s_variability",
+                    "message": (
+                        f"tok/s CV {violation['tok_per_s_cv_pct']:.2f}% exceeds "
+                        f"{violation['threshold_pct']:.2f}% threshold"
+                    ),
+                },
+            )
+            failure.text = (
+                f"commit={violation['commit']}\n"
+                f"records={violation['records']}\n"
+                f"tok_per_s_cv_pct={violation['tok_per_s_cv_pct']:.3f}\n"
+                f"threshold_pct={violation['threshold_pct']:.3f}\n"
+                f"key={violation['key']}"
+            )
+
     ET.indent(suite, space="  ")
     return ET.tostring(suite, encoding="unicode", xml_declaration=True) + "\n"
 
@@ -523,6 +610,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
     commit_points_csv = output_dir / "perf_regression_commit_points_latest.csv"
     regressions_csv = output_dir / "perf_regression_regressions_latest.csv"
     sample_violations_csv = output_dir / "perf_regression_sample_violations_latest.csv"
+    variability_violations_csv = output_dir / "perf_regression_variability_violations_latest.csv"
 
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
@@ -536,6 +624,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "latest_timestamp",
             "records",
             "median_tok_per_s",
+            "tok_per_s_cv_pct",
             "max_memory_bytes",
         ],
     )
@@ -558,6 +647,11 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
         report["sample_violations"],
         ["key", "commit", "records", "minimum_records"],
     )
+    write_csv(
+        variability_violations_csv,
+        report["variability_violations"],
+        ["key", "commit", "records", "tok_per_s_cv_pct", "threshold_pct"],
+    )
 
     print(f"wrote_json={json_path}")
     print(f"wrote_markdown={md_path}")
@@ -565,6 +659,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
     print(f"wrote_commit_points_csv={commit_points_csv}")
     print(f"wrote_regressions_csv={regressions_csv}")
     print(f"wrote_sample_violations_csv={sample_violations_csv}")
+    print(f"wrote_variability_violations_csv={variability_violations_csv}")
 
 
 def build_report(
@@ -574,6 +669,7 @@ def build_report(
     baseline_commit: str | None = None,
     candidate_commit: str | None = None,
     min_records_per_point: int = 1,
+    max_tok_cv_pct: float | None = None,
 ) -> dict[str, Any]:
     points = commit_points(records)
     regressions = detect_regressions(
@@ -584,10 +680,11 @@ def build_report(
         candidate_commit=candidate_commit,
     )
     sample_violations = detect_sample_violations(points, min_records_per_point)
+    variability_violations = detect_variability_violations(points, max_tok_cv_pct)
     return {
         "generated_at": iso_now(),
         "record_count": len(records),
-        "status": "fail" if regressions or sample_violations else "pass",
+        "status": "fail" if regressions or sample_violations or variability_violations else "pass",
         "comparison": {
             "baseline_commit": baseline_commit,
             "candidate_commit": candidate_commit,
@@ -597,11 +694,13 @@ def build_report(
             "tok_regression_pct": tok_threshold_pct,
             "memory_regression_pct": memory_threshold_pct,
             "min_records_per_point": min_records_per_point,
+            "max_tok_cv_pct": max_tok_cv_pct,
         },
         "summaries": summarize(records),
         "commit_points": [asdict(point) for point in points],
         "regressions": [asdict(regression) for regression in regressions],
         "sample_violations": [asdict(violation) for violation in sample_violations],
+        "variability_violations": [asdict(violation) for violation in variability_violations],
         "records": [asdict(record) for record in sorted(records, key=lambda item: (item.key, item.timestamp))],
     }
 
@@ -626,6 +725,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=1,
         help="Minimum samples required for each benchmark key/commit point before the dashboard passes",
     )
+    parser.add_argument(
+        "--max-tok-cv-pct",
+        type=float,
+        help="Fail when a benchmark key/commit point has tok/s coefficient of variation above this percent",
+    )
     parser.add_argument("--fail-on-regression", action="store_true")
     return parser
 
@@ -641,6 +745,7 @@ def main(argv: list[str] | None = None) -> int:
         baseline_commit=args.baseline_commit,
         candidate_commit=args.candidate_commit,
         min_records_per_point=args.min_records_per_point,
+        max_tok_cv_pct=args.max_tok_cv_pct,
     )
 
     write_dashboard_outputs(report, args.output_dir)
