@@ -62,6 +62,9 @@ def test_smoke_eval_inputs_pass() -> None:
         assert report["prediction_audits"]["holyc"]["prediction_histogram"] == {"0": 3}
         assert report["prediction_audits"]["holyc"]["majority_prediction"] == "0"
         assert report["prediction_audits"]["holyc"]["majority_prediction_pct"] == 100.0
+        assert report["prediction_audits"]["holyc"]["scored_predictions"] == 1
+        assert abs(report["prediction_audits"]["holyc"]["score_coverage_pct"] - (100.0 / 3.0)) < 0.001
+        assert report["prediction_audits"]["holyc"]["score_length_histogram"] == {"4": 1}
         assert (tmp_path / "audit.md").exists()
         assert list(csv.DictReader((tmp_path / "audit.csv").open(newline="", encoding="utf-8"))) == []
         junit_root = ET.parse(tmp_path / "audit_junit.xml").getroot()
@@ -129,9 +132,24 @@ def test_majority_prediction_gate_fails() -> None:
         assert any("majority prediction index '0' covers 100.00%" in message for message in messages)
 
 
+def test_score_coverage_gate_fails() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        args = smoke_args(tmp_path, "score_coverage")
+        args.extend(["--min-score-coverage-pct", "50"])
+        assert eval_input_audit.main(args) == 2
+
+        report = json.loads((tmp_path / "score_coverage.json").read_text(encoding="utf-8"))
+        messages = [issue["message"] for issue in report["issues"]]
+        assert abs(report["prediction_audits"]["holyc"]["score_coverage_pct"] - (100.0 / 3.0)) < 0.001
+        assert abs(report["prediction_audits"]["llama"]["score_coverage_pct"] - (100.0 / 3.0)) < 0.001
+        assert any("score vector coverage is 33.33% of valid predictions" in message for message in messages)
+
+
 if __name__ == "__main__":
     test_smoke_eval_inputs_pass()
     test_missing_prediction_fails_with_structured_report()
     test_prediction_metadata_mismatch_fails()
     test_majority_prediction_gate_fails()
+    test_score_coverage_gate_fails()
     print("eval_input_audit_tests=ok")

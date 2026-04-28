@@ -44,6 +44,9 @@ class PredictionAudit:
     source: str
     rows: int
     valid_predictions: int
+    scored_predictions: int
+    score_coverage_pct: float | None
+    score_length_histogram: dict[str, int]
     prediction_histogram: dict[str, int]
     majority_prediction: str
     majority_prediction_count: int
@@ -125,6 +128,7 @@ def audit_predictions(
     expected_dataset: str,
     expected_split: str,
     max_majority_prediction_pct: float | None,
+    min_score_coverage_pct: float | None,
     issues: list[Issue],
 ) -> PredictionAudit:
     rows = read_rows_with_issues(path, source_name, issues)
@@ -132,6 +136,8 @@ def audit_predictions(
     duplicate_ids: set[str] = set()
     extra_ids: set[str] = set()
     valid_predictions = 0
+    scored_predictions = 0
+    score_lengths: list[int] = []
     prediction_labels: list[str] = []
     metadata = collect_metadata(rows)
 
@@ -160,6 +166,9 @@ def audit_predictions(
             append_issue(issues, "error", source_name, str(exc))
             continue
         valid_predictions += 1
+        if prediction.scores is not None:
+            scored_predictions += 1
+            score_lengths.append(len(prediction.scores))
         prediction_labels.append(str(prediction.predicted_index))
 
         row_dataset = metadata_value(row, "dataset")
@@ -203,11 +212,29 @@ def audit_predictions(
                 f"{max_majority_prediction_pct:.2f}% gate"
             ),
         )
+    score_coverage_pct = (scored_predictions / valid_predictions * 100.0) if valid_predictions else None
+    if (
+        min_score_coverage_pct is not None
+        and score_coverage_pct is not None
+        and score_coverage_pct < min_score_coverage_pct
+    ):
+        append_issue(
+            issues,
+            "error",
+            source_name,
+            (
+                f"score vector coverage is {score_coverage_pct:.2f}% of valid predictions, below "
+                f"{min_score_coverage_pct:.2f}% gate"
+            ),
+        )
 
     return PredictionAudit(
         source=source_name,
         rows=len(rows),
         valid_predictions=valid_predictions,
+        scored_predictions=scored_predictions,
+        score_coverage_pct=score_coverage_pct,
+        score_length_histogram=sorted_counts(score_lengths),
         prediction_histogram=prediction_histogram,
         majority_prediction=majority_prediction,
         majority_prediction_count=majority_prediction_count,
@@ -286,6 +313,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         args.dataset,
         args.split,
         args.max_majority_prediction_pct,
+        args.min_score_coverage_pct,
         issues,
     )
     llama = audit_predictions(
@@ -297,6 +325,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         args.dataset,
         args.split,
         args.max_majority_prediction_pct,
+        args.min_score_coverage_pct,
         issues,
     )
     for key in ("model", "quantization"):
@@ -368,6 +397,22 @@ def markdown_report(report: dict[str, Any]) -> str:
         lines.append(
             f"| {name} | {json.dumps(audit['prediction_histogram'], sort_keys=True)} | "
             f"{audit['majority_prediction'] or '-'} | {majority_pct_text} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Score Coverage",
+            "",
+            "| Engine | Scored predictions | Coverage % | Score lengths |",
+            "| --- | ---: | ---: | --- |",
+        ]
+    )
+    for name, audit in report["prediction_audits"].items():
+        coverage_pct = audit["score_coverage_pct"]
+        coverage_pct_text = "-" if coverage_pct is None else f"{coverage_pct:.2f}"
+        lines.append(
+            f"| {name} | {audit['scored_predictions']}/{audit['valid_predictions']} | "
+            f"{coverage_pct_text} | {json.dumps(audit['score_length_histogram'], sort_keys=True)} |"
         )
     lines.extend(
         [
@@ -455,6 +500,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-majority-prediction-pct",
         type=float,
         help="Fail when either engine predicts one answer index for more than this percentage of valid rows",
+    )
+    parser.add_argument(
+        "--min-score-coverage-pct",
+        type=float,
+        help="Fail when either engine has score vectors for less than this percentage of valid rows",
     )
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--output-stem", default="eval_input_audit_latest")

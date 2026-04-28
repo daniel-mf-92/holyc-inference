@@ -1,6 +1,6 @@
 # Eval Input Audit
 
-Generated: 2026-04-28T11:56:32Z
+Generated: 2026-04-28T12:02:21Z
 Status: pass
 Dataset: smoke-eval
 Split: validation
@@ -23,6 +23,13 @@ Quantization: Q4_0
 | --- | --- | --- | ---: |
 | holyc | {"0": 3} | 0 | 100.00 |
 | llama | {"0": 3} | 0 | 100.00 |
+
+## Score Coverage
+
+| Engine | Scored predictions | Coverage % | Score lengths |
+| --- | ---: | ---: | --- |
+| holyc | 1/3 | 33.33 | {"4": 1} |
+| llama | 1/3 | 33.33 | {"4": 1} |
 
 ## Issues
 
