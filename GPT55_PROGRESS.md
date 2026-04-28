@@ -70,3 +70,4 @@
 2026-04-28T01:09:23Z | Added perf regression commit-coverage gate with dashboard/JUnit/CSV output and CI smoke coverage.
 2026-04-28T01:15:40Z | Added perf regression explicit comparison-coverage gate with dashboard/JUnit/CSV output and CI smoke coverage.
 2026-04-28T01:29:28Z | Added eval input audit CSV/JUnit CI artifacts with smoke coverage and refreshed reports.
+2026-04-28T01:44:14Z | Added perplexity comparison quality gates with JUnit output, smoke coverage, and refreshed reports.

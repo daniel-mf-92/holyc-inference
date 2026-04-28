@@ -1,10 +1,11 @@
 # Perplexity Compare Report
 
-Generated: 2026-04-27T20:20:11Z
+Generated: 2026-04-28T01:41:49Z
 Dataset: smoke-eval
 Split: validation
 Quantization: Q4_0
 Model: synthetic-smoke
+Status: pass
 
 ## Summary
 
@@ -14,7 +15,13 @@ Model: synthetic-smoke
 | Tokens | 11 | 11 | - |
 | NLL/token | 0.361818 | 0.356364 | 0.005454 |
 | Perplexity | 1.435938 | 1.428127 | 0.007811 |
+| Perplexity ratio | 1.005469 | 1.000000 | - |
 | Token count mismatches | 0 | - | - |
+| Max abs record NLL delta | 0.010000 | - | - |
+
+## Quality Gates
+
+No quality gate regressions.
 
 ## Largest NLL Deltas
 

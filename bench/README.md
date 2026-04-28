@@ -439,8 +439,11 @@ python3 bench/eval_compare.py \
 
 `perplexity_compare.py` compares offline token logprob or aggregate NLL outputs
 from HolyC and llama.cpp. It aligns rows by record id, computes token-weighted
-NLL/token and perplexity, writes JSON, Markdown, and per-record CSV reports, and
-fails on token-count mismatches unless `--allow-token-count-mismatch` is passed.
+NLL/token and perplexity, writes JSON, Markdown, per-record CSV, and JUnit XML
+reports, and fails on token-count mismatches unless
+`--allow-token-count-mismatch` is passed. Optional quality gates can fail CI
+when aggregate NLL drift, HolyC/llama.cpp perplexity ratio, or per-record NLL
+delta exceed configured bounds.
 
 Example:
 
@@ -452,6 +455,10 @@ python3 bench/perplexity_compare.py \
   --split validation \
   --model synthetic-smoke \
   --quantization Q4_0 \
+  --max-nll-delta 0.02 \
+  --max-perplexity-ratio 1.05 \
+  --max-record-nll-delta 0.10 \
+  --fail-on-regression \
   --output-stem perplexity_compare_smoke_latest
 ```
 

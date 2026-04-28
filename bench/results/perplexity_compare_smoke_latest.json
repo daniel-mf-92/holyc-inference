@@ -1,10 +1,14 @@
 {
   "dataset": "smoke-eval",
-  "generated_at": "2026-04-27T20:20:11Z",
+  "generated_at": "2026-04-28T01:41:49Z",
   "holyc_sha256": "62a0452c5c9cdd713620f356dc5c11ef960949b5b4ddd1b7ca25c7f47074d7c4",
   "llama_sha256": "a7cf9c18443e9a35af2d090404fb1c964eb316ca87c4d66eb6253fe1e93b9f79",
+  "max_nll_delta": 0.02,
+  "max_perplexity_ratio": 1.05,
+  "max_record_nll_delta": 0.1,
   "model": "synthetic-smoke",
   "quantization": "Q4_0",
+  "regressions": [],
   "rows": [
     {
       "holyc_nll_per_token": 0.35000000000000003,
@@ -41,6 +45,7 @@
     }
   ],
   "split": "validation",
+  "status": "pass",
   "summary": {
     "holyc": {
       "nll_per_token": 0.3618181818181818,
@@ -59,6 +64,7 @@
     "max_abs_record_nll_delta": 0.010000000000000009,
     "nll_delta_holyc_minus_llama": 0.005454496131887809,
     "perplexity_delta_holyc_minus_llama": 0.007810995498259254,
+    "perplexity_ratio_holyc_over_llama": 1.0054693989794348,
     "record_count": 3,
     "token_count_mismatches": 0
   },

@@ -3,8 +3,9 @@
 
 The comparator consumes local HolyC and llama.cpp JSON, JSONL, or CSV records,
 aligns rows by record id, computes token-weighted negative log likelihood and
-perplexity, and writes JSON plus Markdown reports under bench/results. It is
-host-side only and does not launch QEMU or use network services.
+perplexity, and writes JSON, Markdown, CSV, and JUnit reports under
+bench/results. It is host-side only and does not launch QEMU or use network
+services.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import hashlib
 import json
 import math
 import sys
+import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -55,6 +57,14 @@ class CompareRow:
     holyc_perplexity: float
     llama_perplexity: float
     perplexity_delta_holyc_minus_llama: float
+
+
+@dataclass(frozen=True)
+class PerplexityRegression:
+    metric: str
+    value: float
+    threshold: float
+    message: str
 
 
 def iso_now() -> str:
@@ -295,9 +305,65 @@ def compare(
         "llama": llama_summary,
         "nll_delta_holyc_minus_llama": holyc_summary["nll_per_token"] - llama_summary["nll_per_token"],
         "perplexity_delta_holyc_minus_llama": holyc_summary["perplexity"] - llama_summary["perplexity"],
+        "perplexity_ratio_holyc_over_llama": (
+            holyc_summary["perplexity"] / llama_summary["perplexity"]
+            if llama_summary["perplexity"]
+            else math.inf
+        ),
         "max_abs_record_nll_delta": max((abs(row.nll_delta_holyc_minus_llama) for row in rows), default=0.0),
     }
     return rows, summary
+
+
+def find_regressions(
+    summary: dict[str, Any],
+    *,
+    max_nll_delta: float | None = None,
+    max_perplexity_ratio: float | None = None,
+    max_record_nll_delta: float | None = None,
+) -> list[PerplexityRegression]:
+    regressions: list[PerplexityRegression] = []
+    if max_nll_delta is not None and summary["nll_delta_holyc_minus_llama"] > max_nll_delta:
+        regressions.append(
+            PerplexityRegression(
+                metric="nll_delta_holyc_minus_llama",
+                value=summary["nll_delta_holyc_minus_llama"],
+                threshold=max_nll_delta,
+                message=(
+                    f"HolyC NLL/token delta {summary['nll_delta_holyc_minus_llama']:.6f} "
+                    f"exceeds maximum {max_nll_delta:.6f}"
+                ),
+            )
+        )
+    if (
+        max_perplexity_ratio is not None
+        and summary["perplexity_ratio_holyc_over_llama"] > max_perplexity_ratio
+    ):
+        regressions.append(
+            PerplexityRegression(
+                metric="perplexity_ratio_holyc_over_llama",
+                value=summary["perplexity_ratio_holyc_over_llama"],
+                threshold=max_perplexity_ratio,
+                message=(
+                    f"HolyC/llama.cpp perplexity ratio "
+                    f"{summary['perplexity_ratio_holyc_over_llama']:.6f} exceeds maximum "
+                    f"{max_perplexity_ratio:.6f}"
+                ),
+            )
+        )
+    if max_record_nll_delta is not None and summary["max_abs_record_nll_delta"] > max_record_nll_delta:
+        regressions.append(
+            PerplexityRegression(
+                metric="max_abs_record_nll_delta",
+                value=summary["max_abs_record_nll_delta"],
+                threshold=max_record_nll_delta,
+                message=(
+                    f"max absolute record NLL/token delta {summary['max_abs_record_nll_delta']:.6f} "
+                    f"exceeds maximum {max_record_nll_delta:.6f}"
+                ),
+            )
+        )
+    return regressions
 
 
 def markdown_report(report: dict[str, Any]) -> str:
@@ -310,6 +376,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Split: {report['split'] or '-'}",
         f"Quantization: {report['quantization'] or '-'}",
         f"Model: {report['model'] or '-'}",
+        f"Status: {report['status']}",
         "",
         "## Summary",
         "",
@@ -321,11 +388,30 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"{summary['llama']['nll_per_token']:.6f} | {summary['nll_delta_holyc_minus_llama']:.6f} |",
         f"| Perplexity | {summary['holyc']['perplexity']:.6f} | "
         f"{summary['llama']['perplexity']:.6f} | {summary['perplexity_delta_holyc_minus_llama']:.6f} |",
+        f"| Perplexity ratio | {summary['perplexity_ratio_holyc_over_llama']:.6f} | 1.000000 | - |",
         f"| Token count mismatches | {summary['token_count_mismatches']} | - | - |",
+        f"| Max abs record NLL delta | {summary['max_abs_record_nll_delta']:.6f} | - | - |",
         "",
-        "## Largest NLL Deltas",
+        "## Quality Gates",
         "",
     ]
+    if report["regressions"]:
+        lines.append("| Metric | Value | Threshold | Finding |")
+        lines.append("| --- | ---: | ---: | --- |")
+        for regression in report["regressions"]:
+            lines.append(
+                f"| {regression['metric']} | {regression['value']:.6f} | "
+                f"{regression['threshold']:.6f} | {regression['message']} |"
+            )
+    else:
+        lines.append("No quality gate regressions.")
+    lines.extend(
+        [
+            "",
+            "## Largest NLL Deltas",
+            "",
+        ]
+    )
     rows = sorted(report["rows"], key=lambda row: abs(row["nll_delta_holyc_minus_llama"]), reverse=True)
     if rows:
         lines.append("| ID | HolyC NLL/token | llama.cpp NLL/token | Delta |")
@@ -361,33 +447,76 @@ def write_csv_report(path: Path, rows: list[CompareRow]) -> None:
             writer.writerow(asdict(row))
 
 
+def write_junit(regressions: list[PerplexityRegression], path: Path) -> None:
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": "holyc_perplexity_compare",
+            "tests": "1",
+            "failures": str(len(regressions)),
+            "errors": "0",
+        },
+    )
+    case = ET.SubElement(suite, "testcase", {"classname": "perplexity_compare", "name": "quality_gates"})
+    if regressions:
+        failure = ET.SubElement(
+            case,
+            "failure",
+            {
+                "type": "perplexity_regression",
+                "message": "; ".join(regression.message for regression in regressions),
+            },
+        )
+        failure.text = "\n".join(
+            f"{regression.metric}: value={regression.value:.6f} threshold={regression.threshold:.6f}"
+            for regression in regressions
+        )
+    ET.indent(suite)
+    ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
+    with path.open("ab") as handle:
+        handle.write(b"\n")
+
+
 def write_report(
     rows: list[CompareRow],
     summary: dict[str, Any],
     args: argparse.Namespace,
     holyc_path: Path,
     llama_path: Path,
-) -> tuple[Path, Path, Path]:
+) -> tuple[Path, Path, Path, Path]:
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    regressions = find_regressions(
+        summary,
+        max_nll_delta=args.max_nll_delta,
+        max_perplexity_ratio=args.max_perplexity_ratio,
+        max_record_nll_delta=args.max_record_nll_delta,
+    )
     report = {
         "dataset": args.dataset,
         "generated_at": iso_now(),
         "holyc_sha256": file_sha256(holyc_path),
         "llama_sha256": file_sha256(llama_path),
+        "max_nll_delta": args.max_nll_delta,
+        "max_perplexity_ratio": args.max_perplexity_ratio,
+        "max_record_nll_delta": args.max_record_nll_delta,
         "model": args.model,
         "quantization": args.quantization,
+        "regressions": [asdict(regression) for regression in regressions],
         "rows": [asdict(row) for row in rows],
         "split": args.split,
+        "status": "fail" if regressions else "pass",
         "summary": summary,
         "top_n": args.top_n,
     }
     json_path = args.output_dir / f"{args.output_stem}.json"
     md_path = args.output_dir / f"{args.output_stem}.md"
     csv_path = args.output_dir / f"{args.output_stem}.csv"
+    junit_path = args.output_dir / f"{args.output_stem}_junit.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
     write_csv_report(csv_path, rows)
-    return json_path, md_path, csv_path
+    write_junit(regressions, junit_path)
+    return json_path, md_path, csv_path, junit_path
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -399,6 +528,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model", default="")
     parser.add_argument("--quantization", default="")
     parser.add_argument("--allow-token-count-mismatch", action="store_true")
+    parser.add_argument(
+        "--max-nll-delta",
+        type=float,
+        help="Maximum allowed HolyC NLL/token increase versus llama.cpp before CI gate failure",
+    )
+    parser.add_argument(
+        "--max-perplexity-ratio",
+        type=float,
+        help="Maximum allowed HolyC perplexity divided by llama.cpp perplexity before CI gate failure",
+    )
+    parser.add_argument(
+        "--max-record-nll-delta",
+        type=float,
+        help="Maximum allowed absolute per-record NLL/token delta before CI gate failure",
+    )
+    parser.add_argument("--fail-on-regression", action="store_true", help="Return non-zero when quality gates fail")
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--output-stem", default="perplexity_compare_latest")
     parser.add_argument("--top-n", type=int, default=10)
@@ -411,7 +556,7 @@ def main(argv: list[str] | None = None) -> int:
         holyc = load_records(args.holyc)
         llama = load_records(args.llama)
         rows, summary = compare(holyc, llama, args.allow_token_count_mismatch)
-        json_path, md_path, csv_path = write_report(rows, summary, args, args.holyc, args.llama)
+        json_path, md_path, csv_path, junit_path = write_report(rows, summary, args, args.holyc, args.llama)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -419,9 +564,19 @@ def main(argv: list[str] | None = None) -> int:
     print(f"wrote_json={json_path}")
     print(f"wrote_markdown={md_path}")
     print(f"wrote_csv={csv_path}")
+    print(f"wrote_junit={junit_path}")
     print(f"holyc_perplexity={summary['holyc']['perplexity']:.6f}")
     print(f"llama_perplexity={summary['llama']['perplexity']:.6f}")
     print(f"ppl_delta_holyc_minus_llama={summary['perplexity_delta_holyc_minus_llama']:.6f}")
+    regressions = find_regressions(
+        summary,
+        max_nll_delta=args.max_nll_delta,
+        max_perplexity_ratio=args.max_perplexity_ratio,
+        max_record_nll_delta=args.max_record_nll_delta,
+    )
+    print(f"regressions={len(regressions)}")
+    if args.fail_on_regression and regressions:
+        return 1
     return 0
 
 

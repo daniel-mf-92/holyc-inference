@@ -8,6 +8,7 @@ import csv
 import json
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -67,11 +68,75 @@ def test_cli_writes_json_and_markdown_report() -> None:
         )
         payload = json.loads((Path(tmp) / "ppl.json").read_text(encoding="utf-8"))
         csv_rows = list(csv.DictReader((Path(tmp) / "ppl.csv").open(newline="", encoding="utf-8")))
+        junit_root = ET.parse(Path(tmp) / "ppl_junit.xml").getroot()
         assert payload["summary"]["record_count"] == 3
-        assert "Perplexity Compare Report" in (Path(tmp) / "ppl.md").read_text(encoding="utf-8")
+        assert payload["status"] == "pass"
+        assert payload["regressions"] == []
+        markdown = (Path(tmp) / "ppl.md").read_text(encoding="utf-8")
+        assert "Perplexity Compare Report" in markdown
+        assert "No quality gate regressions." in markdown
         assert len(csv_rows) == 3
         assert csv_rows[0]["record_id"] == "smoke-arc-1"
         assert "nll_delta_holyc_minus_llama" in csv_rows[0]
+        assert junit_root.attrib["name"] == "holyc_perplexity_compare"
+        assert junit_root.attrib["failures"] == "0"
+
+
+def test_cli_can_fail_on_perplexity_quality_gate_regression(tmp_path: Path) -> None:
+    holyc = tmp_path / "holyc.jsonl"
+    llama = tmp_path / "llama.jsonl"
+    holyc.write_text(
+        "\n".join(
+            [
+                '{"id":"one","token_count":2,"mean_nll":1.25}',
+                '{"id":"two","token_count":2,"mean_nll":1.00}',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    llama.write_text(
+        "\n".join(
+            [
+                '{"id":"one","token_count":2,"mean_nll":0.50}',
+                '{"id":"two","token_count":2,"mean_nll":0.50}',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    status = perplexity_compare.main(
+        [
+            "--holyc",
+            str(holyc),
+            "--llama",
+            str(llama),
+            "--output-dir",
+            str(tmp_path),
+            "--output-stem",
+            "gated",
+            "--max-nll-delta",
+            "0.1",
+            "--max-perplexity-ratio",
+            "1.1",
+            "--max-record-nll-delta",
+            "0.2",
+            "--fail-on-regression",
+        ]
+    )
+    payload = json.loads((tmp_path / "gated.json").read_text(encoding="utf-8"))
+    junit_root = ET.parse(tmp_path / "gated_junit.xml").getroot()
+
+    assert status == 1
+    assert payload["status"] == "fail"
+    assert {row["metric"] for row in payload["regressions"]} == {
+        "max_abs_record_nll_delta",
+        "nll_delta_holyc_minus_llama",
+        "perplexity_ratio_holyc_over_llama",
+    }
+    assert junit_root.attrib["failures"] == "3"
+    assert junit_root.find("./testcase/failure") is not None
 
 
 def test_token_count_mismatch_fails_by_default(tmp_path: Path) -> None:
@@ -100,6 +165,8 @@ def test_token_count_mismatch_fails_by_default(tmp_path: Path) -> None:
 if __name__ == "__main__":
     test_smoke_logprobs_compare_cleanly()
     test_cli_writes_json_and_markdown_report()
+    with tempfile.TemporaryDirectory() as tmp:
+        test_cli_can_fail_on_perplexity_quality_gate_regression(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:
         test_token_count_mismatch_fails_by_default(Path(tmp))
     print("perplexity_compare_tests=ok")
