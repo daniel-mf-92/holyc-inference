@@ -36,6 +36,7 @@ class ArtifactSummary:
     model: str
     quantization: str
     prompt_suite_sha256: str
+    command_sha256: str
     prompts: int | None
     measured_runs: int
     warmup_runs: int
@@ -43,6 +44,8 @@ class ArtifactSummary:
     max_memory_bytes: int | None
     telemetry_status: str
     telemetry_findings: list[str]
+    command_hash_status: str
+    command_hash_findings: list[str]
     command_airgap_status: str
     command_findings: list[str]
     commit: str
@@ -56,6 +59,13 @@ class ArtifactSummary:
 
 @dataclass(frozen=True)
 class PromptSuiteDrift:
+    key: str
+    hashes: list[str]
+    sources: list[str]
+
+
+@dataclass(frozen=True)
+class CommandDrift:
     key: str
     hashes: list[str]
     sources: list[str]
@@ -218,6 +228,15 @@ def commit_status(artifact_type: str, commit_values: Iterable[Any]) -> tuple[str
     return "pass", commits[0], []
 
 
+def command_hash_status(artifact_type: str, hash_values: Iterable[Any]) -> tuple[str, str, list[str]]:
+    hashes = sorted({str(value) for value in hash_values if value})
+    if not hashes:
+        return "unknown", "", [f"{artifact_type}: missing command_sha256 metadata"]
+    if len(hashes) > 1:
+        return "fail", ",".join(hashes), [f"{artifact_type}: mixed command_sha256 values: {','.join(hashes)}"]
+    return "pass", hashes[0], []
+
+
 def current_commit_match(commit: str, current_commit: str) -> bool | None:
     if not commit or current_commit == "unknown":
         return None
@@ -293,6 +312,13 @@ def summarize_qemu_report(
         "qemu_prompt",
         [row.get("commit") for row in runs + warmups if isinstance(row, dict)],
     )
+    command_hash_state, command_sha256, command_hash_findings = command_hash_status(
+        "qemu_prompt",
+        [report.get("command_sha256")]
+        + [row.get("command_sha256") for row in runs + warmups if isinstance(row, dict)],
+    )
+    if command_hash_state == "fail":
+        findings.extend(command_hash_findings)
     generated_at = str(report.get("generated_at", ""))
     generated_age = artifact_age_seconds(generated_at, now)
     fresh_state, fresh_findings = freshness_status(
@@ -312,6 +338,7 @@ def summarize_qemu_report(
         model=first_present(first_run, ("model",), str(report.get("model", ""))),
         quantization=first_present(first_run, ("quantization",), str(report.get("quantization", ""))),
         prompt_suite_sha256=str(prompt_suite.get("suite_sha256", "")),
+        command_sha256=command_sha256,
         prompts=prompts,
         measured_runs=len(runs),
         warmup_runs=len(warmups),
@@ -319,6 +346,8 @@ def summarize_qemu_report(
         max_memory_bytes=max_memory_bytes,
         telemetry_status=telem_status,
         telemetry_findings=telem_findings,
+        command_hash_status=command_hash_state,
+        command_hash_findings=command_hash_findings,
         command_airgap_status=airgap_status,
         command_findings=findings,
         commit=commit,
@@ -363,6 +392,12 @@ def summarize_matrix_report(
             "bench_matrix_cell",
             [cell.get("commit")],
         )
+        command_hash_state, command_sha256, command_hash_findings = command_hash_status(
+            "bench_matrix_cell",
+            [cell.get("command_sha256")],
+        )
+        if command_hash_state == "fail":
+            findings.extend(command_hash_findings)
         summaries.append(
             ArtifactSummary(
                 source=str(path),
@@ -374,6 +409,7 @@ def summarize_matrix_report(
                 model=str(cell.get("model", "")),
                 quantization=str(cell.get("quantization", "")),
                 prompt_suite_sha256=str(cell.get("prompt_suite_sha256", "")),
+                command_sha256=command_sha256,
                 prompts=prompts,
                 measured_runs=measured_runs,
                 warmup_runs=parse_int(cell.get("warmup_runs")) or 0,
@@ -381,6 +417,8 @@ def summarize_matrix_report(
                 max_memory_bytes=parse_int(cell.get("max_memory_bytes")),
                 telemetry_status=telem_status,
                 telemetry_findings=telem_findings,
+                command_hash_status=command_hash_state,
+                command_hash_findings=command_hash_findings,
                 command_airgap_status=airgap_status,
                 command_findings=findings,
                 commit=commit,
@@ -435,6 +473,8 @@ def index_status(summaries: list[ArtifactSummary]) -> str:
         return "fail"
     if any(summary.commit_status == "fail" for summary in summaries):
         return "fail"
+    if any(summary.command_hash_status == "fail" for summary in summaries):
+        return "fail"
     if any(summary.freshness_status == "fail" for summary in summaries):
         return "fail"
     if any(summary.status == "fail" for summary in summaries):
@@ -452,6 +492,10 @@ def has_telemetry_failures(summaries: list[ArtifactSummary]) -> bool:
 
 def has_commit_metadata_failures(summaries: list[ArtifactSummary]) -> bool:
     return any(summary.commit_status == "fail" for summary in summaries)
+
+
+def has_command_hash_metadata_failures(summaries: list[ArtifactSummary]) -> bool:
+    return any(summary.command_hash_status == "fail" for summary in summaries)
 
 
 def has_freshness_failures(summaries: list[ArtifactSummary]) -> bool:
@@ -490,6 +534,35 @@ def prompt_suite_drift(summaries: list[ArtifactSummary]) -> list[PromptSuiteDrif
     return findings
 
 
+def command_drift(summaries: list[ArtifactSummary]) -> list[CommandDrift]:
+    by_key: dict[str, dict[str, set[str]]] = {}
+    for summary in summaries:
+        if not summary.command_sha256:
+            continue
+        key = "/".join(
+            (
+                summary.profile or "-",
+                summary.model or "-",
+                summary.quantization or "-",
+                summary.prompt_suite_sha256 or "no-suite",
+            )
+        )
+        by_key.setdefault(key, {}).setdefault(summary.command_sha256, set()).add(summary.source)
+
+    findings: list[CommandDrift] = []
+    for key, hash_sources in sorted(by_key.items()):
+        if len(hash_sources) <= 1:
+            continue
+        findings.append(
+            CommandDrift(
+                key=key,
+                hashes=sorted(hash_sources),
+                sources=sorted(source for sources in hash_sources.values() for source in sources),
+            )
+        )
+    return findings
+
+
 def format_value(value: Any) -> str:
     if value is None or value == "":
         return "-"
@@ -505,19 +578,20 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Generated: {report['generated_at']}",
         f"Status: {report['status']}",
         f"Artifacts: {len(report['artifacts'])}",
+        f"Command drift: {len(report['command_drift'])}",
         "",
     ]
     if report["artifacts"]:
         lines.extend(
             [
-                "| Type | Status | Air-gap | Telemetry | Freshness | Commit | Profile | Model | Quant | Prompts | Runs | Warmups | Age seconds | Median tok/s | Max memory bytes | Source |",
-                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+                "| Type | Status | Air-gap | Telemetry | Freshness | Commit | Profile | Model | Quant | Prompt suite | Command SHA256 | Prompts | Runs | Warmups | Age seconds | Median tok/s | Max memory bytes | Source |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
             ]
         )
         for artifact in report["artifacts"]:
             lines.append(
                 "| {artifact_type} | {status} | {command_airgap_status} | {telemetry_status} | {freshness_status} | {commit_status}:{commit} | {profile} | {model} | "
-                "{quantization} | {prompts} | {measured_runs} | {warmup_runs} | "
+                "{quantization} | {prompt_suite_sha256} | {command_sha256} | {prompts} | {measured_runs} | {warmup_runs} | "
                 "{generated_age_seconds} | {median_tok_per_s} | {max_memory_bytes} | {source} |".format(
                     **{key: format_value(value) for key, value in artifact.items()}
                 )
@@ -545,31 +619,56 @@ def markdown_report(report: dict[str, Any]) -> str:
             )
     else:
         lines.extend(["", "Prompt suite drift: none detected."])
+
+    if report["command_drift"]:
+        lines.extend(
+            [
+                "",
+                "## Command Drift",
+                "",
+                "| Profile/Model/Quant/Prompt suite | Command hashes | Sources |",
+                "| --- | ---: | ---: |",
+            ]
+        )
+        for finding in report["command_drift"]:
+            lines.append(
+                "| {key} | {hashes} | {sources} |".format(
+                    key=finding["key"],
+                    hashes=len(finding["hashes"]),
+                    sources=len(finding["sources"]),
+                )
+            )
+    else:
+        lines.extend(["", "Command drift: none detected."])
     return "\n".join(lines) + "\n"
 
 
 def junit_report(report: dict[str, Any]) -> str:
     artifacts = [row for row in report["artifacts"] if isinstance(row, dict)]
-    drift = [row for row in report["prompt_suite_drift"] if isinstance(row, dict)]
+    drift = [row for row in report.get("prompt_suite_drift", []) if isinstance(row, dict)]
+    command_drift_rows = [row for row in report.get("command_drift", []) if isinstance(row, dict)]
     failed_artifacts = [row for row in artifacts if row.get("status") == "fail"]
     airgap_failures = [row for row in artifacts if row.get("command_airgap_status") == "fail"]
     telemetry_failures = [row for row in artifacts if row.get("telemetry_status") == "fail"]
     commit_failures = [row for row in artifacts if row.get("commit_status") == "fail"]
+    command_hash_failures = [row for row in artifacts if row.get("command_hash_status") == "fail"]
     freshness_failures = [row for row in artifacts if row.get("freshness_status") == "fail"]
     failures = (
         int(bool(failed_artifacts))
         + int(bool(airgap_failures))
         + int(bool(telemetry_failures))
         + int(bool(commit_failures))
+        + int(bool(command_hash_failures))
         + int(bool(freshness_failures))
         + int(bool(drift))
+        + int(bool(command_drift_rows))
     )
 
     suite = ET.Element(
         "testsuite",
         {
             "name": "holyc_bench_result_index",
-            "tests": "6",
+            "tests": "8",
             "failures": str(failures),
         },
     )
@@ -628,6 +727,21 @@ def junit_report(report: dict[str, Any]) -> str:
             for row in commit_failures
         )
 
+    command_hash_case = ET.SubElement(suite, "testcase", {"name": "command_hash_metadata"})
+    if command_hash_failures:
+        failure = ET.SubElement(
+            command_hash_case,
+            "failure",
+            {
+                "type": "benchmark_command_hash_metadata_failure",
+                "message": f"{len(command_hash_failures)} benchmark artifact(s) have inconsistent command hashes",
+            },
+        )
+        failure.text = "\n".join(
+            f"{row.get('source', '')}: {json.dumps(row.get('command_hash_findings', []), separators=(',', ':'))}"
+            for row in command_hash_failures
+        )
+
     freshness_case = ET.SubElement(suite, "testcase", {"name": "artifact_freshness"})
     if freshness_failures:
         failure = ET.SubElement(
@@ -655,6 +769,18 @@ def junit_report(report: dict[str, Any]) -> str:
         )
         failure.text = "\n".join(str(row.get("key", "")) for row in drift)
 
+    command_drift_case = ET.SubElement(suite, "testcase", {"name": "command_drift"})
+    if command_drift_rows:
+        failure = ET.SubElement(
+            command_drift_case,
+            "failure",
+            {
+                "type": "command_drift",
+                "message": f"{len(command_drift_rows)} comparable benchmark key(s) have command-hash drift",
+            },
+        )
+        failure.text = "\n".join(str(row.get("key", "")) for row in command_drift_rows)
+
     return ET.tostring(suite, encoding="unicode") + "\n"
 
 
@@ -669,6 +795,7 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
         "model",
         "quantization",
         "prompt_suite_sha256",
+        "command_sha256",
         "prompts",
         "measured_runs",
         "warmup_runs",
@@ -676,6 +803,8 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
         "max_memory_bytes",
         "telemetry_status",
         "telemetry_findings",
+        "command_hash_status",
+        "command_hash_findings",
         "command_airgap_status",
         "command_findings",
         "commit",
@@ -692,6 +821,7 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
         for summary in summaries:
             row = asdict(summary)
             row["telemetry_findings"] = json.dumps(summary.telemetry_findings, separators=(",", ":"))
+            row["command_hash_findings"] = json.dumps(summary.command_hash_findings, separators=(",", ":"))
             row["command_findings"] = json.dumps(summary.command_findings, separators=(",", ":"))
             row["commit_findings"] = json.dumps(summary.commit_findings, separators=(",", ":"))
             row["freshness_findings"] = json.dumps(summary.freshness_findings, separators=(",", ":"))
@@ -715,26 +845,47 @@ def write_drift_csv(findings: list[PromptSuiteDrift], path: Path) -> None:
             )
 
 
-def write_report(summaries: list[ArtifactSummary], output_dir: Path) -> tuple[Path, list[PromptSuiteDrift]]:
+def write_command_drift_csv(findings: list[CommandDrift], path: Path) -> None:
+    fields = ["key", "hash_count", "source_count", "hashes", "sources"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for finding in findings:
+            writer.writerow(
+                {
+                    "key": finding.key,
+                    "hash_count": len(finding.hashes),
+                    "source_count": len(finding.sources),
+                    "hashes": json.dumps(finding.hashes, separators=(",", ":")),
+                    "sources": json.dumps(finding.sources, separators=(",", ":")),
+                }
+            )
+
+
+def write_report(summaries: list[ArtifactSummary], output_dir: Path) -> tuple[Path, list[PromptSuiteDrift], list[CommandDrift]]:
     output_dir.mkdir(parents=True, exist_ok=True)
     drift = prompt_suite_drift(summaries)
+    command_drift_findings = command_drift(summaries)
     report = {
         "generated_at": iso_now(),
         "status": index_status(summaries),
         "artifacts": [asdict(summary) for summary in summaries],
         "prompt_suite_drift": [asdict(finding) for finding in drift],
+        "command_drift": [asdict(finding) for finding in command_drift_findings],
     }
     json_path = output_dir / "bench_result_index_latest.json"
     md_path = output_dir / "bench_result_index_latest.md"
     csv_path = output_dir / "bench_result_index_latest.csv"
     drift_csv_path = output_dir / "bench_result_index_prompt_suite_drift_latest.csv"
+    command_drift_csv_path = output_dir / "bench_result_index_command_drift_latest.csv"
     junit_path = output_dir / "bench_result_index_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
     junit_path.write_text(junit_report(report), encoding="utf-8")
     write_csv(summaries, csv_path)
     write_drift_csv(drift, drift_csv_path)
-    return json_path, drift
+    write_command_drift_csv(command_drift_findings, command_drift_csv_path)
+    return json_path, drift, command_drift_findings
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -763,9 +914,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Return non-zero if any artifact has missing or inconsistent commit metadata",
     )
     parser.add_argument(
+        "--fail-on-command-hash-metadata",
+        action="store_true",
+        help="Return non-zero if any artifact has inconsistent command_sha256 metadata",
+    )
+    parser.add_argument(
         "--fail-on-drift",
         action="store_true",
         help="Return non-zero if comparable artifacts use different prompt-suite hashes",
+    )
+    parser.add_argument(
+        "--fail-on-command-drift",
+        action="store_true",
+        help="Return non-zero if comparable artifacts use different command_sha256 hashes",
     )
     parser.add_argument(
         "--fail-on-stale-commit",
@@ -799,7 +960,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         summaries = load_summaries(inputs, max_artifact_age_seconds=max_artifact_age_seconds)
-        output, drift = write_report(summaries, args.output_dir)
+        output, drift, command_drift_findings = write_report(summaries, args.output_dir)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -809,6 +970,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"status={status}")
     print(f"artifacts={len(summaries)}")
     print(f"prompt_suite_drift={len(drift)}")
+    print(f"command_drift={len(command_drift_findings)}")
     print(f"freshness_failures={sum(1 for summary in summaries if summary.freshness_status == 'fail')}")
     if args.fail_on_airgap and has_airgap_failures(summaries):
         return 1
@@ -816,7 +978,11 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if args.fail_on_commit_metadata and has_commit_metadata_failures(summaries):
         return 1
+    if args.fail_on_command_hash_metadata and has_command_hash_metadata_failures(summaries):
+        return 1
     if args.fail_on_drift and drift:
+        return 1
+    if args.fail_on_command_drift and command_drift_findings:
         return 1
     if args.fail_on_stale_commit and commit_drift(summaries):
         return 1

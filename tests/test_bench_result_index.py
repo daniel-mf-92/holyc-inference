@@ -319,7 +319,7 @@ def test_mixed_commit_metadata_fails_index_and_junit(tmp_path: Path) -> None:
 
     assert summaries[0].commit_status == "fail"
     assert bench_result_index.index_status(summaries) == "fail"
-    assert root.attrib["tests"] == "6"
+    assert root.attrib["tests"] == "8"
     assert root.attrib["failures"] == "1"
     failure = root.find("./testcase[@name='commit_metadata']/failure")
     assert failure is not None
@@ -449,8 +449,11 @@ def test_cli_writes_json_markdown_and_csv(tmp_path: Path) -> None:
     assert payload["status"] == "pass"
     assert payload["artifacts"][0]["prompt_suite_sha256"] == "c" * 64
     assert payload["prompt_suite_drift"] == []
+    assert payload["command_drift"] == []
     assert "Benchmark Result Index" in markdown
     assert "Prompt suite drift: none detected." in markdown
+    assert "Command drift: none detected." in markdown
+    assert "command_sha256" in rows[0]
     assert rows[0]["command_airgap_status"] == "pass"
     assert rows[0]["telemetry_status"] == "pass"
     assert rows[0]["freshness_status"] == "unchecked"
@@ -541,6 +544,116 @@ def test_cli_writes_drift_csv_and_can_fail_on_drift(tmp_path: Path) -> None:
     assert rows[0]["hash_count"] == "2"
 
 
+def test_command_hash_drift_is_indexed_and_can_fail_gate(tmp_path: Path) -> None:
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    input_dir.mkdir()
+    for index, command_hash in enumerate(("a" * 64, "b" * 64), 1):
+        report_dir = input_dir / f"run{index}"
+        report_dir.mkdir()
+        (report_dir / "qemu_prompt_bench_latest.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": f"2026-04-27T20:2{index}:00Z",
+                    "status": "pass",
+                    "command_sha256": command_hash,
+                    "prompt_suite": {"suite_sha256": "c" * 64, "prompt_count": 1},
+                    "suite_summary": {"tok_per_s_median": 160.0},
+                    "benchmarks": [
+                        {
+                            "profile": "synthetic",
+                            "model": "smoke",
+                            "quantization": "Q4_0",
+                            "command_sha256": command_hash,
+                            "command": [
+                                "qemu-system-x86_64",
+                                "-nic",
+                                "none",
+                                "-drive",
+                                "file=TempleOS.img,format=raw,if=ide",
+                            ],
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    summaries = bench_result_index.load_summaries([input_dir])
+    drift = bench_result_index.command_drift(summaries)
+    status = bench_result_index.main(
+        ["--input", str(input_dir), "--output-dir", str(output_dir), "--fail-on-command-drift"]
+    )
+
+    assert len(drift) == 1
+    assert drift[0].key == f"synthetic/smoke/Q4_0/{'c' * 64}"
+    assert drift[0].hashes == ["a" * 64, "b" * 64]
+    assert status == 1
+    payload = json.loads((output_dir / "bench_result_index_latest.json").read_text(encoding="utf-8"))
+    markdown = (output_dir / "bench_result_index_latest.md").read_text(encoding="utf-8")
+    rows = list(
+        csv.DictReader((output_dir / "bench_result_index_command_drift_latest.csv").open(encoding="utf-8"))
+    )
+    junit_root = ET.parse(output_dir / "bench_result_index_junit_latest.xml").getroot()
+
+    assert payload["command_drift"][0]["key"] == f"synthetic/smoke/Q4_0/{'c' * 64}"
+    assert "## Command Drift" in markdown
+    assert rows[0]["hash_count"] == "2"
+    failure = junit_root.find("./testcase[@name='command_drift']/failure")
+    assert failure is not None
+    assert failure.attrib["type"] == "command_drift"
+
+
+def test_mixed_command_hash_metadata_fails_index_and_junit(tmp_path: Path) -> None:
+    report = tmp_path / "qemu_prompt_bench_latest.json"
+    report.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-04-27T20:00:00Z",
+                "status": "pass",
+                "command_sha256": "a" * 64,
+                "prompt_suite": {"suite_sha256": "d" * 64, "prompt_count": 2},
+                "suite_summary": {"tok_per_s_median": 123.0},
+                "benchmarks": [
+                    {
+                        "benchmark": "qemu_prompt",
+                        "profile": "secure",
+                        "model": "tiny",
+                        "quantization": "Q4_0",
+                        "command_sha256": "a" * 64,
+                        "command": ["qemu-system-x86_64", "-nic", "none"],
+                    },
+                    {
+                        "benchmark": "qemu_prompt",
+                        "profile": "secure",
+                        "model": "tiny",
+                        "quantization": "Q4_0",
+                        "command_sha256": "b" * 64,
+                        "command": ["qemu-system-x86_64", "-nic", "none"],
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summaries = bench_result_index.load_summaries([tmp_path])
+    report_payload = {
+        "artifacts": [summary.__dict__ for summary in summaries],
+        "prompt_suite_drift": [],
+        "command_drift": [],
+    }
+    root = ET.fromstring(bench_result_index.junit_report(report_payload))
+
+    assert summaries[0].command_hash_status == "fail"
+    assert bench_result_index.index_status(summaries) == "fail"
+    assert root.attrib["tests"] == "8"
+    assert root.attrib["failures"] == "1"
+    failure = root.find("./testcase[@name='command_hash_metadata']/failure")
+    assert failure is not None
+    assert failure.attrib["type"] == "benchmark_command_hash_metadata_failure"
+
+
 def test_junit_report_marks_artifact_airgap_and_drift_failures() -> None:
     report = {
         "artifacts": [
@@ -556,18 +669,20 @@ def test_junit_report_marks_artifact_airgap_and_drift_failures() -> None:
             },
         ],
         "prompt_suite_drift": [{"key": "secure/tiny/Q4_0"}],
+        "command_drift": [{"key": "secure/tiny/Q4_0/aaaaaaaa"}],
     }
 
     root = ET.fromstring(bench_result_index.junit_report(report))
 
     assert root.attrib["name"] == "holyc_bench_result_index"
-    assert root.attrib["tests"] == "6"
-    assert root.attrib["failures"] == "3"
+    assert root.attrib["tests"] == "8"
+    assert root.attrib["failures"] == "4"
     failures = root.findall("./testcase/failure")
     assert {failure.attrib["type"] for failure in failures} == {
         "benchmark_artifact_failure",
         "airgap_violation",
         "prompt_suite_drift",
+        "command_drift",
     }
 
 
