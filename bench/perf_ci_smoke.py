@@ -46,6 +46,7 @@ def main() -> int:
         report_path = output_dir / "perf_regression_latest.json"
         markdown_path = output_dir / "perf_regression_latest.md"
         junit_path = output_dir / "perf_regression_junit_latest.xml"
+        commit_points_path = output_dir / "perf_regression_commit_points_latest.csv"
         sample_violations_path = output_dir / "perf_regression_sample_violations_latest.csv"
         variability_violations_path = output_dir / "perf_regression_variability_violations_latest.csv"
         commit_coverage_violations_path = (
@@ -92,6 +93,9 @@ def main() -> int:
         if fixture_summary.get("median_wall_tok_per_s") != 95.5:
             print("missing_wall_tok_summary=true", file=sys.stderr)
             return 1
+        if fixture_summary.get("p05_tok_per_s") != 100.05:
+            print("missing_p05_tok_summary=true", file=sys.stderr)
+            return 1
         if fixture_summary.get("median_ttft_us") != 49500.0:
             print("missing_ttft_summary=true", file=sys.stderr)
             return 1
@@ -104,6 +108,12 @@ def main() -> int:
             return 1
         if junit_root.attrib.get("failures") != "0":
             print("unexpected_junit_failures=true", file=sys.stderr)
+            return 1
+        if (
+            "key,commit,latest_timestamp,records,tok_per_s_records,wall_tok_per_s_records,memory_records,ttft_us_records,p05_tok_per_s,median_tok_per_s"
+            not in commit_points_path.read_text(encoding="utf-8")
+        ):
+            print("missing_commit_points_csv=true", file=sys.stderr)
             return 1
         if "key,commit,records,minimum_records" not in sample_violations_path.read_text(
             encoding="utf-8"

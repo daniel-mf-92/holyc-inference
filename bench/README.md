@@ -466,6 +466,7 @@ python3 bench/perf_regression.py \
   --min-records-per-point 3 \
   --min-commits-per-key 2 \
   --max-tok-cv-pct 7.5 \
+  --p05-tok-regression-pct 7.5 \
   --wall-tok-regression-pct 7.5 \
   --require-tok-per-s \
   --require-wall-tok-per-s \
@@ -481,6 +482,8 @@ than required. This catches head-only perf uploads where there is no baseline to
 compare against.
 `--max-tok-cv-pct` fails the dashboard when repeated tok/s samples inside a
 benchmark key/commit point are too variable to trust as a baseline.
+`--p05-tok-regression-pct` optionally gates low-tail guest tok/s drops, which
+catches slow individual runs that median throughput can hide.
 `--wall-tok-regression-pct` optionally gates host-observed wall-clock tok/s
 drops, which is useful when guest-side timing looks suspicious.
 `--require-tok-per-s`, `--require-wall-tok-per-s`, and `--require-memory` fail
@@ -625,12 +628,13 @@ Example:
 python3 bench/perf_regression.py --input bench/results --output-dir bench/dashboards
 ```
 
-CI can fail on throughput, host wall-clock throughput, first-token latency, or
-memory regressions with:
+CI can fail on median throughput, low-tail throughput, host wall-clock
+throughput, first-token latency, or memory regressions with:
 
 ```bash
 python3 bench/perf_regression.py \
   --max-tok-cv-pct 7.5 \
+  --p05-tok-regression-pct 7.5 \
   --wall-tok-regression-pct 7.5 \
   --ttft-regression-pct 15 \
   --require-ttft-us \

@@ -101,6 +101,78 @@ def test_detects_optional_wall_tok_per_s_regressions(tmp_path: Path) -> None:
     assert regressions[0].candidate_value == 70.0
 
 
+def test_detects_optional_p05_tok_per_s_regressions(tmp_path: Path) -> None:
+    result = tmp_path / "perf.jsonl"
+    write_jsonl(
+        result,
+        [
+            {
+                "timestamp": "2026-04-27T10:00:00Z",
+                "commit": "base",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "tok_per_s": 100.0,
+            },
+            {
+                "timestamp": "2026-04-27T10:01:00Z",
+                "commit": "base",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "tok_per_s": 100.0,
+            },
+            {
+                "timestamp": "2026-04-27T10:02:00Z",
+                "commit": "base",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "tok_per_s": 100.0,
+            },
+            {
+                "timestamp": "2026-04-27T11:00:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "tok_per_s": 40.0,
+            },
+            {
+                "timestamp": "2026-04-27T11:01:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "tok_per_s": 100.0,
+            },
+            {
+                "timestamp": "2026-04-27T11:02:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "tok_per_s": 100.0,
+            },
+        ],
+    )
+
+    records = perf_regression.load_records([result])
+    assert perf_regression.detect_regressions(records, 5.0, 10.0) == []
+
+    regressions = perf_regression.detect_regressions(
+        records,
+        5.0,
+        10.0,
+        p05_tok_threshold_pct=5.0,
+    )
+
+    assert len(regressions) == 1
+    assert regressions[0].metric == "tok_per_s_p05"
+    assert regressions[0].baseline_value == 100.0
+    assert regressions[0].candidate_value == 46.0
+
+
 def test_detects_optional_ttft_us_latency_regressions(tmp_path: Path) -> None:
     result = tmp_path / "perf.jsonl"
     write_jsonl(
@@ -494,6 +566,7 @@ def test_min_records_per_point_flags_under_sampled_commit_points(tmp_path: Path)
     report = perf_regression.build_report(records, 5.0, 10.0, min_records_per_point=2)
 
     assert report["status"] == "fail"
+    assert report["commit_points"][0]["p05_tok_per_s"] == 100.0
     assert report["thresholds"]["min_records_per_point"] == 2
     assert report["sample_violations"] == [
         {
