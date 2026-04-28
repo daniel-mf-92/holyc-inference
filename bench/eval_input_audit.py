@@ -44,6 +44,10 @@ class PredictionAudit:
     source: str
     rows: int
     valid_predictions: int
+    prediction_histogram: dict[str, int]
+    majority_prediction: str
+    majority_prediction_count: int
+    majority_prediction_pct: float | None
     duplicate_ids: list[str]
     missing_ids: list[str]
     extra_ids: list[str]
@@ -65,6 +69,20 @@ def file_sha256(path: Path) -> str:
 def sorted_counts(values: Iterable[int]) -> dict[str, int]:
     counter = collections.Counter(values)
     return {str(key): counter[key] for key in sorted(counter)}
+
+
+def sorted_label_counts(values: Iterable[str]) -> dict[str, int]:
+    counter = collections.Counter(values)
+    return {key: counter[key] for key in sorted(counter)}
+
+
+def majority_label(histogram: dict[str, int]) -> tuple[str, int, float | None]:
+    if not histogram:
+        return "", 0, None
+    label, count = max(histogram.items(), key=lambda item: (item[1], item[0]))
+    total = sum(histogram.values())
+    pct = (count / total * 100.0) if total else None
+    return label, count, pct
 
 
 def append_issue(issues: list[Issue], severity: str, source: str, message: str) -> None:
@@ -106,6 +124,7 @@ def audit_predictions(
     expected_quantization: str,
     expected_dataset: str,
     expected_split: str,
+    max_majority_prediction_pct: float | None,
     issues: list[Issue],
 ) -> PredictionAudit:
     rows = read_rows_with_issues(path, source_name, issues)
@@ -113,6 +132,7 @@ def audit_predictions(
     duplicate_ids: set[str] = set()
     extra_ids: set[str] = set()
     valid_predictions = 0
+    prediction_labels: list[str] = []
     metadata = collect_metadata(rows)
 
     for index, row in enumerate(rows):
@@ -135,11 +155,12 @@ def audit_predictions(
             continue
 
         try:
-            eval_compare.normalize_prediction(row, gold[record_id], path, index)
+            prediction = eval_compare.normalize_prediction(row, gold[record_id], path, index)
         except ValueError as exc:
             append_issue(issues, "error", source_name, str(exc))
             continue
         valid_predictions += 1
+        prediction_labels.append(str(prediction.predicted_index))
 
         row_dataset = metadata_value(row, "dataset")
         row_split = metadata_value(row, "split")
@@ -165,10 +186,32 @@ def audit_predictions(
     check_metadata_values(metadata, source_name, "model", expected_model, issues)
     check_metadata_values(metadata, source_name, "quantization", expected_quantization, issues)
 
+    prediction_histogram = sorted_label_counts(prediction_labels)
+    majority_prediction, majority_prediction_count, majority_prediction_pct = majority_label(prediction_histogram)
+    if (
+        max_majority_prediction_pct is not None
+        and majority_prediction_pct is not None
+        and majority_prediction_pct > max_majority_prediction_pct
+    ):
+        append_issue(
+            issues,
+            "error",
+            source_name,
+            (
+                f"majority prediction index {majority_prediction!r} covers "
+                f"{majority_prediction_pct:.2f}% of valid predictions, above "
+                f"{max_majority_prediction_pct:.2f}% gate"
+            ),
+        )
+
     return PredictionAudit(
         source=source_name,
         rows=len(rows),
         valid_predictions=valid_predictions,
+        prediction_histogram=prediction_histogram,
+        majority_prediction=majority_prediction,
+        majority_prediction_count=majority_prediction_count,
+        majority_prediction_pct=majority_prediction_pct,
         duplicate_ids=sorted(duplicate_ids),
         missing_ids=missing_ids,
         extra_ids=sorted(extra_ids),
@@ -242,6 +285,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         args.quantization,
         args.dataset,
         args.split,
+        args.max_majority_prediction_pct,
         issues,
     )
     llama = audit_predictions(
@@ -252,6 +296,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         args.quantization,
         args.dataset,
         args.split,
+        args.max_majority_prediction_pct,
         issues,
     )
     for key in ("model", "quantization"):
@@ -312,9 +357,25 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"| Errors | {summary['errors']} |",
         f"| Warnings | {summary['warnings']} |",
         "",
-        "## Issues",
+        "## Prediction Distribution",
         "",
+        "| Engine | Histogram | Majority | Majority % |",
+        "| --- | --- | --- | ---: |",
     ]
+    for name, audit in report["prediction_audits"].items():
+        majority_pct = audit["majority_prediction_pct"]
+        majority_pct_text = "-" if majority_pct is None else f"{majority_pct:.2f}"
+        lines.append(
+            f"| {name} | {json.dumps(audit['prediction_histogram'], sort_keys=True)} | "
+            f"{audit['majority_prediction'] or '-'} | {majority_pct_text} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Issues",
+            "",
+        ]
+    )
     if report["issues"]:
         lines.append("| Severity | Source | Message |")
         lines.append("| --- | --- | --- |")
@@ -390,6 +451,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--split", default="validation")
     parser.add_argument("--model", default="")
     parser.add_argument("--quantization", default="")
+    parser.add_argument(
+        "--max-majority-prediction-pct",
+        type=float,
+        help="Fail when either engine predicts one answer index for more than this percentage of valid rows",
+    )
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--output-stem", default="eval_input_audit_latest")
     return parser

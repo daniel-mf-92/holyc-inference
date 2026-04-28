@@ -121,3 +121,4 @@
 2026-04-28T11:10:38Z | Added eval dataset choice-count curation filters with smoke gate coverage and refreshed dataset artifacts.
 2026-04-28T11:41:20Z | Added eval dataset byte-budget curation filters with smoke gate coverage and refreshed dataset artifacts.
 2026-04-28T11:49:31Z | Added focused eval dataset provenance audit with JSON/Markdown/CSV/JUnit artifacts and smoke gate coverage.
+2026-04-28T11:56:45Z | Added eval input prediction-distribution telemetry and opt-in majority-prediction collapse gate with refreshed smoke artifacts.

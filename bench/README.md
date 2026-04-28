@@ -161,6 +161,9 @@ reports. Optional quality gates can fail CI when HolyC accuracy, engine
 agreement, or accuracy delta versus llama.cpp falls outside configured bounds.
 Prediction score vectors are treated as choice-aligned logits/logprobs: every
 score must be finite and the score count must match the gold choice count.
+`eval_input_audit.py` also records per-engine prediction histograms and can fail
+early with `--max-majority-prediction-pct` when either engine collapses onto one
+answer index before quality metrics are computed.
 When score vectors are present, reports include per-row confidence/margin plus
 score coverage, mean confidence, Brier score, and expected calibration error.
 Reports also rank the gold answer within each score vector and summarize top-1,
