@@ -178,3 +178,4 @@
 2026-04-28T23:28:23Z | Added dataset provenance license allow/deny gates with smoke coverage and refreshed provenance artifacts.
 2026-04-28T23:38:05Z | Added perf regression host child peak RSS telemetry/gates with smoke coverage and refreshed dashboards.
 2026-04-28T23:47:44Z | Added perf regression host child tok/CPU-s telemetry gates with smoke coverage and refreshed dashboards.
+2026-04-28T23:54:51Z | Added perplexity_compare dataset/split breakdown reports and metadata mismatch gating with smoke coverage.

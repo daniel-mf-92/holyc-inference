@@ -36,6 +36,8 @@ class PerplexityRecord:
     record_id: str
     token_count: int
     total_nll: float
+    dataset: str = ""
+    split: str = ""
 
     @property
     def nll_per_token(self) -> float:
@@ -49,6 +51,8 @@ class PerplexityRecord:
 @dataclass(frozen=True)
 class CompareRow:
     record_id: str
+    dataset: str
+    split: str
     holyc_token_count: int
     llama_token_count: int
     holyc_nll_per_token: float
@@ -97,6 +101,15 @@ def case_id(row: dict[str, Any], row_label: str) -> str:
     value = row.get("id") or row.get("record_id") or row.get("question_id") or row.get("prompt_id")
     if value is None or str(value).strip() == "":
         raise ValueError(f"{row_label}: missing record id")
+    return str(value).strip()
+
+
+def metadata_value(row: dict[str, Any], key: str) -> str:
+    value = row.get(key)
+    if value is None and isinstance(row.get("metadata"), dict):
+        value = row["metadata"].get(key)
+    if value is None:
+        return ""
     return str(value).strip()
 
 
@@ -187,6 +200,8 @@ def parse_float_list(value: Any, row_label: str, field: str) -> list[float] | No
 def normalize_record(row: dict[str, Any], source: Path, index: int) -> PerplexityRecord:
     row_label = f"{source}:{index + 1}"
     record_id = case_id(row, row_label)
+    dataset = metadata_value(row, "dataset")
+    split = metadata_value(row, "split")
     logprobs = parse_float_list(first_present(row, LOGPROB_KEYS), row_label, "token_logprobs")
     token_count = parse_int(first_present(row, TOKEN_COUNT_KEYS), row_label, "token_count")
 
@@ -195,7 +210,13 @@ def normalize_record(row: dict[str, Any], source: Path, index: int) -> Perplexit
             raise ValueError(
                 f"{row_label}: token_count {token_count} does not match {len(logprobs)} logprobs"
             )
-        return PerplexityRecord(record_id=record_id, token_count=len(logprobs), total_nll=-sum(logprobs))
+        return PerplexityRecord(
+            record_id=record_id,
+            token_count=len(logprobs),
+            total_nll=-sum(logprobs),
+            dataset=dataset,
+            split=split,
+        )
 
     if token_count is None:
         raise ValueError(f"{row_label}: missing token_logprobs or token_count")
@@ -205,14 +226,26 @@ def normalize_record(row: dict[str, Any], source: Path, index: int) -> Perplexit
         total_nll = parse_float(total_nll_value, row_label, "total_nll")
         if total_nll < 0:
             raise ValueError(f"{row_label}: total_nll must be non-negative")
-        return PerplexityRecord(record_id=record_id, token_count=token_count, total_nll=total_nll)
+        return PerplexityRecord(
+            record_id=record_id,
+            token_count=token_count,
+            total_nll=total_nll,
+            dataset=dataset,
+            split=split,
+        )
 
     mean_nll_value = first_present(row, MEAN_NLL_KEYS)
     if mean_nll_value is not None:
         mean_nll = parse_float(mean_nll_value, row_label, "mean_nll")
         if mean_nll < 0:
             raise ValueError(f"{row_label}: mean_nll must be non-negative")
-        return PerplexityRecord(record_id=record_id, token_count=token_count, total_nll=mean_nll * token_count)
+        return PerplexityRecord(
+            record_id=record_id,
+            token_count=token_count,
+            total_nll=mean_nll * token_count,
+            dataset=dataset,
+            split=split,
+        )
 
     perplexity_value = first_present(row, PERPLEXITY_KEYS)
     if perplexity_value is not None:
@@ -223,6 +256,8 @@ def normalize_record(row: dict[str, Any], source: Path, index: int) -> Perplexit
             record_id=record_id,
             token_count=token_count,
             total_nll=math.log(perplexity) * token_count,
+            dataset=dataset,
+            split=split,
         )
 
     raise ValueError(f"{row_label}: missing token_logprobs, total_nll, mean_nll, or perplexity")
@@ -286,6 +321,26 @@ def compare(
             "pass --allow-token-count-mismatch to report anyway"
         )
 
+    metadata_mismatches = [
+        record_id
+        for record_id in sorted(holyc)
+        if (
+            holyc[record_id].dataset
+            and llama[record_id].dataset
+            and holyc[record_id].dataset != llama[record_id].dataset
+        )
+        or (
+            holyc[record_id].split
+            and llama[record_id].split
+            and holyc[record_id].split != llama[record_id].split
+        )
+    ]
+    if metadata_mismatches:
+        raise ValueError(
+            "dataset/split metadata mismatch for "
+            f"{len(metadata_mismatches)} ids: {', '.join(metadata_mismatches[:5])}"
+        )
+
     rows: list[CompareRow] = []
     for record_id in sorted(holyc):
         holyc_row = holyc[record_id]
@@ -293,6 +348,8 @@ def compare(
         rows.append(
             CompareRow(
                 record_id=record_id,
+                dataset=holyc_row.dataset or llama_row.dataset,
+                split=holyc_row.split or llama_row.split,
                 holyc_token_count=holyc_row.token_count,
                 llama_token_count=llama_row.token_count,
                 holyc_nll_per_token=holyc_row.nll_per_token,
@@ -327,6 +384,44 @@ def compare(
         "max_abs_record_nll_delta": max((abs(row.nll_delta_holyc_minus_llama) for row in rows), default=0.0),
     }
     return rows, summary
+
+
+def summarize_compare_rows(rows: list[CompareRow]) -> dict[str, Any]:
+    holyc_tokens = sum(row.holyc_token_count for row in rows)
+    llama_tokens = sum(row.llama_token_count for row in rows)
+    holyc_total_nll = sum(row.holyc_nll_per_token * row.holyc_token_count for row in rows)
+    llama_total_nll = sum(row.llama_nll_per_token * row.llama_token_count for row in rows)
+    holyc_nll = holyc_total_nll / holyc_tokens if holyc_tokens else 0.0
+    llama_nll = llama_total_nll / llama_tokens if llama_tokens else 0.0
+    return {
+        "record_count": len(rows),
+        "holyc_token_count": holyc_tokens,
+        "llama_token_count": llama_tokens,
+        "holyc_nll_per_token": holyc_nll,
+        "llama_nll_per_token": llama_nll,
+        "nll_delta_holyc_minus_llama": holyc_nll - llama_nll,
+        "holyc_perplexity": safe_exp(holyc_nll),
+        "llama_perplexity": safe_exp(llama_nll),
+        "perplexity_delta_holyc_minus_llama": safe_exp(holyc_nll) - safe_exp(llama_nll),
+    }
+
+
+def breakdown_rows(rows: list[CompareRow], default_dataset: str, default_split: str) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, str], list[CompareRow]] = {}
+    for row in rows:
+        key = (row.dataset or default_dataset, row.split or default_split)
+        grouped.setdefault(key, []).append(row)
+
+    breakdowns: list[dict[str, Any]] = []
+    for (dataset, split), group_rows in sorted(grouped.items()):
+        breakdowns.append(
+            {
+                "dataset": dataset,
+                "split": split,
+                **summarize_compare_rows(group_rows),
+            }
+        )
+    return breakdowns
 
 
 def find_regressions(
@@ -460,6 +555,25 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(
         [
             "",
+            "## Dataset/Split Breakdown",
+            "",
+        ]
+    )
+    if report["breakdowns"]:
+        lines.append("| Dataset | Split | Records | HolyC NLL/token | llama.cpp NLL/token | Delta | HolyC PPL | llama.cpp PPL |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |")
+        for row in report["breakdowns"]:
+            lines.append(
+                f"| {row['dataset'] or '-'} | {row['split'] or '-'} | {row['record_count']} | "
+                f"{row['holyc_nll_per_token']:.6f} | {row['llama_nll_per_token']:.6f} | "
+                f"{row['nll_delta_holyc_minus_llama']:.6f} | {row['holyc_perplexity']:.6f} | "
+                f"{row['llama_perplexity']:.6f} |"
+            )
+    else:
+        lines.append("No dataset/split rows.")
+    lines.extend(
+        [
+            "",
             "## Largest NLL Deltas",
             "",
         ]
@@ -484,6 +598,8 @@ def write_csv_report(path: Path, rows: list[CompareRow]) -> None:
             handle,
             fieldnames=[
                 "record_id",
+                "dataset",
+                "split",
                 "holyc_token_count",
                 "llama_token_count",
                 "holyc_nll_per_token",
@@ -497,6 +613,29 @@ def write_csv_report(path: Path, rows: list[CompareRow]) -> None:
         writer.writeheader()
         for row in rows:
             writer.writerow(asdict(row))
+
+
+def write_breakdown_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "dataset",
+                "split",
+                "record_count",
+                "holyc_token_count",
+                "llama_token_count",
+                "holyc_nll_per_token",
+                "llama_nll_per_token",
+                "nll_delta_holyc_minus_llama",
+                "holyc_perplexity",
+                "llama_perplexity",
+                "perplexity_delta_holyc_minus_llama",
+            ],
+        )
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
 
 
 def write_junit(regressions: list[PerplexityRegression], path: Path) -> None:
@@ -535,7 +674,7 @@ def write_report(
     args: argparse.Namespace,
     holyc_path: Path,
     llama_path: Path,
-) -> tuple[Path, Path, Path, Path]:
+) -> tuple[Path, Path, Path, Path, Path]:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     regressions = find_regressions(
         summary,
@@ -545,7 +684,9 @@ def write_report(
         max_p95_record_nll_delta=args.max_p95_record_nll_delta,
         max_record_nll_delta=args.max_record_nll_delta,
     )
+    breakdowns = breakdown_rows(rows, args.dataset, args.split)
     report = {
+        "breakdowns": breakdowns,
         "dataset": args.dataset,
         "generated_at": iso_now(),
         "holyc_sha256": file_sha256(holyc_path),
@@ -567,12 +708,14 @@ def write_report(
     json_path = args.output_dir / f"{args.output_stem}.json"
     md_path = args.output_dir / f"{args.output_stem}.md"
     csv_path = args.output_dir / f"{args.output_stem}.csv"
+    breakdown_csv_path = args.output_dir / f"{args.output_stem}_breakdown.csv"
     junit_path = args.output_dir / f"{args.output_stem}_junit.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
     write_csv_report(csv_path, rows)
+    write_breakdown_csv(breakdown_csv_path, breakdowns)
     write_junit(regressions, junit_path)
-    return json_path, md_path, csv_path, junit_path
+    return json_path, md_path, csv_path, breakdown_csv_path, junit_path
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -625,7 +768,9 @@ def main(argv: list[str] | None = None) -> int:
         holyc = load_records(args.holyc)
         llama = load_records(args.llama)
         rows, summary = compare(holyc, llama, args.allow_token_count_mismatch)
-        json_path, md_path, csv_path, junit_path = write_report(rows, summary, args, args.holyc, args.llama)
+        json_path, md_path, csv_path, breakdown_csv_path, junit_path = write_report(
+            rows, summary, args, args.holyc, args.llama
+        )
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -633,6 +778,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"wrote_json={json_path}")
     print(f"wrote_markdown={md_path}")
     print(f"wrote_csv={csv_path}")
+    print(f"wrote_breakdown_csv={breakdown_csv_path}")
     print(f"wrote_junit={junit_path}")
     print(f"holyc_perplexity={summary['holyc']['perplexity']:.6f}")
     print(f"llama_perplexity={summary['llama']['perplexity']:.6f}")

@@ -1,6 +1,6 @@
 # Perplexity Compare Report
 
-Generated: 2026-04-28T20:28:10Z
+Generated: 2026-04-28T23:53:59Z
 Dataset: smoke-eval
 Split: validation
 Quantization: Q4_0
@@ -26,6 +26,12 @@ Status: pass
 ## Quality Gates
 
 No quality gate regressions.
+
+## Dataset/Split Breakdown
+
+| Dataset | Split | Records | HolyC NLL/token | llama.cpp NLL/token | Delta | HolyC PPL | llama.cpp PPL |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| smoke-eval | validation | 3 | 0.361818 | 0.356364 | 0.005454 | 1.435938 | 1.428127 |
 
 ## Largest NLL Deltas
 

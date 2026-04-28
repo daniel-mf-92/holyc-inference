@@ -1,0 +1,2 @@
+dataset,split,record_count,holyc_token_count,llama_token_count,holyc_nll_per_token,llama_nll_per_token,nll_delta_holyc_minus_llama,holyc_perplexity,llama_perplexity,perplexity_delta_holyc_minus_llama
+smoke-eval,validation,3,11,11,0.3618181818181818,0.356363685686294,0.005454496131887809,1.4359378386173822,1.428126843119123,0.007810995498259254

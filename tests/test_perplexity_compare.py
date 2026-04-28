@@ -68,18 +68,91 @@ def test_cli_writes_json_and_markdown_report() -> None:
         )
         payload = json.loads((Path(tmp) / "ppl.json").read_text(encoding="utf-8"))
         csv_rows = list(csv.DictReader((Path(tmp) / "ppl.csv").open(newline="", encoding="utf-8")))
+        breakdown_rows = list(csv.DictReader((Path(tmp) / "ppl_breakdown.csv").open(newline="", encoding="utf-8")))
         junit_root = ET.parse(Path(tmp) / "ppl_junit.xml").getroot()
         assert payload["summary"]["record_count"] == 3
         assert payload["status"] == "pass"
         assert payload["regressions"] == []
+        assert payload["breakdowns"][0]["dataset"] == "smoke-eval"
+        assert payload["breakdowns"][0]["split"] == "validation"
         markdown = (Path(tmp) / "ppl.md").read_text(encoding="utf-8")
         assert "Perplexity Compare Report" in markdown
+        assert "Dataset/Split Breakdown" in markdown
         assert "No quality gate regressions." in markdown
         assert len(csv_rows) == 3
         assert csv_rows[0]["record_id"] == "smoke-arc-1"
         assert "nll_delta_holyc_minus_llama" in csv_rows[0]
+        assert len(breakdown_rows) == 1
+        assert breakdown_rows[0]["dataset"] == "smoke-eval"
         assert junit_root.attrib["name"] == "holyc_perplexity_compare"
         assert junit_root.attrib["failures"] == "0"
+
+
+def test_dataset_split_metadata_breakdown_and_mismatch_gate(tmp_path: Path) -> None:
+    holyc = tmp_path / "holyc.jsonl"
+    llama = tmp_path / "llama.jsonl"
+    holyc.write_text(
+        "\n".join(
+            [
+                '{"id":"arc-one","dataset":"arc","split":"validation","token_count":2,"mean_nll":0.50}',
+                '{"id":"truth-one","metadata":{"dataset":"truthfulqa","split":"validation"},"token_count":3,"mean_nll":0.75}',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    llama.write_text(
+        "\n".join(
+            [
+                '{"id":"arc-one","dataset":"arc","split":"validation","token_count":2,"mean_nll":0.40}',
+                '{"id":"truth-one","metadata":{"dataset":"truthfulqa","split":"validation"},"token_count":3,"mean_nll":0.70}',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert (
+        perplexity_compare.main(
+            [
+                "--holyc",
+                str(holyc),
+                "--llama",
+                str(llama),
+                "--output-dir",
+                str(tmp_path),
+                "--output-stem",
+                "metadata",
+            ]
+        )
+        == 0
+    )
+    payload = json.loads((tmp_path / "metadata.json").read_text(encoding="utf-8"))
+    breakdown_rows = list(csv.DictReader((tmp_path / "metadata_breakdown.csv").open(newline="", encoding="utf-8")))
+    assert [(row["dataset"], row["split"]) for row in payload["breakdowns"]] == [
+        ("arc", "validation"),
+        ("truthfulqa", "validation"),
+    ]
+    assert [row["record_count"] for row in breakdown_rows] == ["1", "1"]
+
+    llama.write_text(
+        '{"id":"arc-one","dataset":"hellaswag","split":"validation","token_count":2,"mean_nll":0.40}\n'
+        '{"id":"truth-one","metadata":{"dataset":"truthfulqa","split":"validation"},"token_count":3,"mean_nll":0.70}\n',
+        encoding="utf-8",
+    )
+    assert (
+        perplexity_compare.main(
+            [
+                "--holyc",
+                str(holyc),
+                "--llama",
+                str(llama),
+                "--output-dir",
+                str(tmp_path),
+            ]
+        )
+        == 2
+    )
 
 
 def test_cli_can_fail_on_perplexity_quality_gate_regression(tmp_path: Path) -> None:
@@ -216,6 +289,8 @@ def test_token_count_mismatch_fails_by_default(tmp_path: Path) -> None:
 if __name__ == "__main__":
     test_smoke_logprobs_compare_cleanly()
     test_cli_writes_json_and_markdown_report()
+    with tempfile.TemporaryDirectory() as tmp:
+        test_dataset_split_metadata_breakdown_and_mismatch_gate(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:
         test_cli_can_fail_on_perplexity_quality_gate_regression(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:
