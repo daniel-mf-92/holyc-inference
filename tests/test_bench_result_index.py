@@ -29,6 +29,8 @@ def test_indexes_qemu_prompt_report_with_airgap_status(tmp_path: Path) -> None:
                     "memory_bytes_max": 4096,
                     "host_child_cpu_us_median": 5000,
                     "host_child_cpu_pct_median": 75.5,
+                    "host_child_tok_per_cpu_s_median": 2500.0,
+                    "host_child_peak_rss_bytes_max": 123456,
                 },
                 "warmups": [],
                 "benchmarks": [
@@ -64,6 +66,8 @@ def test_indexes_qemu_prompt_report_with_airgap_status(tmp_path: Path) -> None:
     assert summary.median_tok_per_s == 123.0
     assert summary.host_child_cpu_us_median == 5000.0
     assert summary.host_child_cpu_pct_median == 75.5
+    assert summary.host_child_tok_per_cpu_s_median == 2500.0
+    assert summary.host_child_peak_rss_bytes_max == 123456
     assert summary.max_memory_bytes == 4096
 
 
@@ -460,7 +464,10 @@ def test_cli_writes_json_markdown_and_csv(tmp_path: Path) -> None:
     assert "Benchmark Result Index" in markdown
     assert "Prompt suite drift: none detected." in markdown
     assert "Command drift: none detected." in markdown
+    assert "Host child tok/CPU s" in markdown
     assert "command_sha256" in rows[0]
+    assert "host_child_tok_per_cpu_s_median" in rows[0]
+    assert "host_child_peak_rss_bytes_max" in rows[0]
     assert rows[0]["command_airgap_status"] == "pass"
     assert rows[0]["telemetry_status"] == "pass"
     assert rows[0]["freshness_status"] == "unchecked"

@@ -420,6 +420,9 @@ comparisons can reject accidental prompt drift.
 Matrix rollups also preserve each cell's guest tok/s, host wall-clock tok/s,
 P95 TTFT, median host-overhead percentage, and guest/wall us-per-token latency
 from the underlying prompt benchmark report.
+Host child CPU rollups include median CPU time, CPU utilization, tok/CPU-second
+efficiency, and peak sampled direct-child RSS so matrix dashboards can separate
+guest throughput changes from host saturation.
 They also include total, minimum, and maximum prompt byte counts for each cell
 so prompt-size changes are visible next to tok/s, RSS, and latency rollups.
 `bench_matrix_summary_latest.csv` adds one matrix-wide aggregate row plus one
@@ -449,7 +452,7 @@ python3 bench/bench_matrix.py \
 
 `bench_result_index.py` scans existing QEMU prompt and matrix JSON reports,
 rolls their tok/s, wall-clock tok/s, TTFT, host-overhead, per-token latency,
-memory, prompt-suite, and run-count metadata into a single
+host child CPU efficiency/RSS, memory, prompt-suite, and run-count metadata into a single
 JSON/Markdown/CSV/JUnit XML index, and checks each recorded QEMU command for
 explicit `-nic none` air-gap compliance. It also reports prompt-suite drift when
 comparable profile/model/quantization artifacts carry different non-empty suite

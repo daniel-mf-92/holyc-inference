@@ -74,6 +74,7 @@ class MatrixCellResult:
     host_overhead_pct_median: float | None
     host_child_cpu_us_median: float | None
     host_child_cpu_pct_median: float | None
+    host_child_tok_per_cpu_s_median: float | None
     host_child_peak_rss_bytes_max: int | None
     us_per_token_median: float | None
     wall_us_per_token_median: float | None
@@ -296,6 +297,7 @@ def run_cell(
             host_overhead_pct_median=None,
             host_child_cpu_us_median=None,
             host_child_cpu_pct_median=None,
+            host_child_tok_per_cpu_s_median=None,
             host_child_peak_rss_bytes_max=None,
             us_per_token_median=None,
             wall_us_per_token_median=None,
@@ -365,6 +367,7 @@ def run_cell(
         host_overhead_pct_median=suite_float(report, "host_overhead_pct_median"),
         host_child_cpu_us_median=suite_float(report, "host_child_cpu_us_median"),
         host_child_cpu_pct_median=suite_float(report, "host_child_cpu_pct_median"),
+        host_child_tok_per_cpu_s_median=suite_float(report, "host_child_tok_per_cpu_s_median"),
         host_child_peak_rss_bytes_max=(
             int(suite_float(report, "host_child_peak_rss_bytes_max"))
             if suite_float(report, "host_child_peak_rss_bytes_max") is not None
@@ -395,9 +398,9 @@ def markdown_report(report: dict[str, Any]) -> str:
     ]
     if report["cells"]:
         lines.append(
-            "| Profile | Model | Quantization | Commit | Status | Prompts | Prompt bytes | Prompt byte range | Prompt suite | Command SHA256 | Runs | Warmups | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Max host child RSS bytes | Guest us/token | Wall us/token | Max memory bytes | Variability findings |"
+            "| Profile | Model | Quantization | Commit | Status | Prompts | Prompt bytes | Prompt byte range | Prompt suite | Command SHA256 | Runs | Warmups | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Max memory bytes | Variability findings |"
         )
-        lines.append("| --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for cell in report["cells"]:
             median = cell["median_tok_per_s"]
             memory = cell["max_memory_bytes"]
@@ -412,6 +415,8 @@ def markdown_report(report: dict[str, Any]) -> str:
             child_cpu_us_cell = f"{child_cpu_us:.3f}" if child_cpu_us is not None else "-"
             child_cpu_pct = cell["host_child_cpu_pct_median"]
             child_cpu_pct_cell = f"{child_cpu_pct:.3f}" if child_cpu_pct is not None else "-"
+            child_tok_per_cpu = cell["host_child_tok_per_cpu_s_median"]
+            child_tok_per_cpu_cell = f"{child_tok_per_cpu:.3f}" if child_tok_per_cpu is not None else "-"
             child_rss = cell["host_child_peak_rss_bytes_max"]
             child_rss_cell = str(child_rss) if child_rss is not None else "-"
             us_per_token = cell["us_per_token_median"]
@@ -430,7 +435,7 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"{cell['prompt_suite_sha256']} | {cell['command_sha256']} | "
                 f"{cell['measured_runs']} | {cell['warmup_runs']} | "
                 f"{median_cell} | {wall_tok_cell} | {ttft_cell} | {overhead_cell} | "
-                f"{child_cpu_us_cell} | {child_cpu_pct_cell} | {child_rss_cell} | {us_per_token_cell} | "
+                f"{child_cpu_us_cell} | {child_cpu_pct_cell} | {child_tok_per_cpu_cell} | {child_rss_cell} | {us_per_token_cell} | "
                 f"{wall_us_per_token_cell} | {memory_cell} | {cell['variability_findings']} |"
             )
     else:
@@ -503,6 +508,7 @@ def write_matrix_csv(cells: list[MatrixCellResult], path: Path) -> None:
         "host_overhead_pct_median",
         "host_child_cpu_us_median",
         "host_child_cpu_pct_median",
+        "host_child_tok_per_cpu_s_median",
         "host_child_peak_rss_bytes_max",
         "us_per_token_median",
         "wall_us_per_token_median",
@@ -578,6 +584,7 @@ def matrix_summary_row(cells: list[MatrixCellResult]) -> dict[str, Any]:
         "ttft_us_p95_max": max_field(cells, "ttft_us_p95"),
         "host_overhead_pct_median": median_field(cells, "host_overhead_pct_median"),
         "host_child_cpu_pct_median": median_field(cells, "host_child_cpu_pct_median"),
+        "host_child_tok_per_cpu_s_median": median_field(cells, "host_child_tok_per_cpu_s_median"),
         "host_child_peak_rss_bytes_max": max(
             (cell.host_child_peak_rss_bytes_max for cell in cells if cell.host_child_peak_rss_bytes_max is not None),
             default=None,
@@ -616,6 +623,7 @@ def cell_summary_row(cell: MatrixCellResult) -> dict[str, Any]:
         "ttft_us_p95_max": cell.ttft_us_p95,
         "host_overhead_pct_median": cell.host_overhead_pct_median,
         "host_child_cpu_pct_median": cell.host_child_cpu_pct_median,
+        "host_child_tok_per_cpu_s_median": cell.host_child_tok_per_cpu_s_median,
         "host_child_peak_rss_bytes_max": cell.host_child_peak_rss_bytes_max,
         "us_per_token_median": cell.us_per_token_median,
         "wall_us_per_token_median": cell.wall_us_per_token_median,
@@ -648,6 +656,7 @@ def write_matrix_summary_csv(cells: list[MatrixCellResult], path: Path) -> None:
         "ttft_us_p95_max",
         "host_overhead_pct_median",
         "host_child_cpu_pct_median",
+        "host_child_tok_per_cpu_s_median",
         "host_child_peak_rss_bytes_max",
         "us_per_token_median",
         "wall_us_per_token_median",
@@ -717,6 +726,7 @@ def write_matrix_junit(cells: list[MatrixCellResult], path: Path) -> None:
                 f"host_overhead_pct_median={cell.host_overhead_pct_median}",
                 f"host_child_cpu_us_median={cell.host_child_cpu_us_median}",
                 f"host_child_cpu_pct_median={cell.host_child_cpu_pct_median}",
+                f"host_child_tok_per_cpu_s_median={cell.host_child_tok_per_cpu_s_median}",
                 f"host_child_peak_rss_bytes_max={cell.host_child_peak_rss_bytes_max}",
                 f"us_per_token_median={cell.us_per_token_median}",
                 f"wall_us_per_token_median={cell.wall_us_per_token_median}",

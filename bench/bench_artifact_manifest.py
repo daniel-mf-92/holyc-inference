@@ -40,6 +40,8 @@ class ManifestArtifact:
     measured_runs: int
     warmup_runs: int
     median_tok_per_s: float | None
+    host_child_tok_per_cpu_s_median: float | None
+    host_child_peak_rss_bytes_max: int | None
     max_memory_bytes: int | None
     telemetry_status: str
     telemetry_findings: list[str]
@@ -96,6 +98,8 @@ def to_manifest_artifact(summary: bench_result_index.ArtifactSummary) -> Manifes
         measured_runs=summary.measured_runs,
         warmup_runs=summary.warmup_runs,
         median_tok_per_s=summary.median_tok_per_s,
+        host_child_tok_per_cpu_s_median=summary.host_child_tok_per_cpu_s_median,
+        host_child_peak_rss_bytes_max=summary.host_child_peak_rss_bytes_max,
         max_memory_bytes=summary.max_memory_bytes,
         telemetry_status=summary.telemetry_status,
         telemetry_findings=summary.telemetry_findings,
@@ -189,14 +193,15 @@ def markdown_report(report: dict[str, object]) -> str:
     if latest:
         lines.extend(
             [
-                "| Key | Status | Air-gap | Telemetry | Command Hash | Freshness | Commit | Runs | Warmups | Age seconds | Median tok/s | Max memory bytes | Command SHA256 | Artifact SHA256 | Source |",
-                "| --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |",
+                "| Key | Status | Air-gap | Telemetry | Command Hash | Freshness | Commit | Runs | Warmups | Age seconds | Median tok/s | Host child tok/CPU s | Max host child RSS bytes | Max memory bytes | Command SHA256 | Artifact SHA256 | Source |",
+                "| --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |",
             ]
         )
         for artifact in latest:
             lines.append(
                 "| {key} | {status} | {command_airgap_status} | {telemetry_status} | {command_hash_status} | {freshness_status} | {commit_status}:{commit} | {measured_runs} | "
-                "{warmup_runs} | {generated_age_seconds} | {median_tok_per_s} | {max_memory_bytes} | {command_sha256} | {sha256} | "
+                "{warmup_runs} | {generated_age_seconds} | {median_tok_per_s} | {host_child_tok_per_cpu_s_median} | "
+                "{host_child_peak_rss_bytes_max} | {max_memory_bytes} | {command_sha256} | {sha256} | "
                 "{source} |".format(
                     **{key: format_value(value) for key, value in artifact.items()}
                 )
@@ -222,6 +227,8 @@ def write_csv(artifacts: list[ManifestArtifact], path: Path) -> None:
         "measured_runs",
         "warmup_runs",
         "median_tok_per_s",
+        "host_child_tok_per_cpu_s_median",
+        "host_child_peak_rss_bytes_max",
         "max_memory_bytes",
         "telemetry_status",
         "telemetry_findings",

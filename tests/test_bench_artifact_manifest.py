@@ -37,6 +37,8 @@ def make_summary(source: Path, **overrides: object) -> bench_result_index.Artifa
         "host_overhead_pct_median": None,
         "host_child_cpu_us_median": None,
         "host_child_cpu_pct_median": None,
+        "host_child_tok_per_cpu_s_median": None,
+        "host_child_peak_rss_bytes_max": None,
         "us_per_token_median": None,
         "wall_us_per_token_median": None,
         "max_memory_bytes": 4096,
@@ -78,6 +80,36 @@ def test_manifest_includes_commit_metadata_in_json_markdown_and_csv(tmp_path: Pa
 
     rows = list(csv.DictReader((tmp_path / "bench_artifact_manifest_latest.csv").open(encoding="utf-8")))
     assert rows[0]["commit"] == "abc123"
+
+
+def test_manifest_carries_host_child_efficiency_and_rss(tmp_path: Path) -> None:
+    source = tmp_path / "qemu_prompt_bench_latest.json"
+    source.write_text('{"status":"pass"}\n', encoding="utf-8")
+
+    output_path, status, _history = bench_artifact_manifest.write_manifest(
+        [
+            make_summary(
+                source,
+                host_child_tok_per_cpu_s_median=640.5,
+                host_child_peak_rss_bytes_max=123456,
+            )
+        ],
+        tmp_path,
+    )
+
+    assert status == "pass"
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    latest = payload["latest_artifacts"][0]
+    assert latest["host_child_tok_per_cpu_s_median"] == 640.5
+    assert latest["host_child_peak_rss_bytes_max"] == 123456
+
+    markdown = (tmp_path / "bench_artifact_manifest_latest.md").read_text(encoding="utf-8")
+    assert "Host child tok/CPU s" in markdown
+    assert "640.500" in markdown
+
+    rows = list(csv.DictReader((tmp_path / "bench_artifact_manifest_latest.csv").open(encoding="utf-8")))
+    assert rows[0]["host_child_tok_per_cpu_s_median"] == "640.5"
+    assert rows[0]["host_child_peak_rss_bytes_max"] == "123456"
     assert rows[0]["current_commit_match"] == "True"
     history_rows = list(
         csv.DictReader((tmp_path / "bench_artifact_manifest_history_latest.csv").open(encoding="utf-8"))

@@ -131,6 +131,9 @@ def test_cli_runs_synthetic_matrix(tmp_path: Path) -> None:
     report = json.loads((output_dir / "bench_matrix_latest.json").read_text(encoding="utf-8"))
     markdown = (output_dir / "bench_matrix_latest.md").read_text(encoding="utf-8")
     csv_rows = list(csv.DictReader((output_dir / "bench_matrix_latest.csv").open(newline="", encoding="utf-8")))
+    summary_rows = list(
+        csv.DictReader((output_dir / "bench_matrix_summary_latest.csv").open(newline="", encoding="utf-8"))
+    )
     junit_root = ET.parse(output_dir / "bench_matrix_junit_latest.xml").getroot()
 
     assert report["status"] == "pass"
@@ -156,11 +159,16 @@ def test_cli_runs_synthetic_matrix(tmp_path: Path) -> None:
     assert all(cell["median_tok_per_s"] == 160.0 for cell in report["cells"])
     assert all(cell["host_child_cpu_us_median"] is not None for cell in report["cells"])
     assert all(cell["host_child_cpu_pct_median"] is not None for cell in report["cells"])
+    assert all(cell["host_child_tok_per_cpu_s_median"] is not None for cell in report["cells"])
     assert all(row["host_child_cpu_us_median"] != "" for row in csv_rows)
     assert all(row["host_child_cpu_pct_median"] != "" for row in csv_rows)
+    assert all(row["host_child_tok_per_cpu_s_median"] != "" for row in csv_rows)
+    assert summary_rows[0]["scope"] == "matrix"
+    assert summary_rows[0]["host_child_tok_per_cpu_s_median"] != ""
     assert all(cell["command"][1:3] == ["-nic", "none"] for cell in report["cells"])
     assert "Benchmark Matrix" in markdown
     assert "Host child CPU %" in markdown
+    assert "Host child tok/CPU s" in markdown
     assert "Prompt suite" in markdown
     assert "Command SHA256" in markdown
 
@@ -180,6 +188,9 @@ def test_junit_marks_failed_matrix_cells(tmp_path: Path) -> None:
             command_sha256="c" * 64,
             prompts=1,
             prompt_suite_sha256="a" * 64,
+            prompt_bytes_total=16,
+            prompt_bytes_min=16,
+            prompt_bytes_max=16,
             measured_runs=3,
             warmup_runs=1,
             median_tok_per_s=120.0,
@@ -188,6 +199,8 @@ def test_junit_marks_failed_matrix_cells(tmp_path: Path) -> None:
             host_overhead_pct_median=None,
             host_child_cpu_us_median=None,
             host_child_cpu_pct_median=None,
+            host_child_tok_per_cpu_s_median=None,
+            host_child_peak_rss_bytes_max=None,
             us_per_token_median=None,
             wall_us_per_token_median=None,
             max_memory_bytes=4096,
@@ -205,6 +218,9 @@ def test_junit_marks_failed_matrix_cells(tmp_path: Path) -> None:
             command_sha256="d" * 64,
             prompts=1,
             prompt_suite_sha256="b" * 64,
+            prompt_bytes_total=16,
+            prompt_bytes_min=16,
+            prompt_bytes_max=16,
             measured_runs=3,
             warmup_runs=1,
             median_tok_per_s=90.0,
@@ -213,6 +229,8 @@ def test_junit_marks_failed_matrix_cells(tmp_path: Path) -> None:
             host_overhead_pct_median=None,
             host_child_cpu_us_median=12000.0,
             host_child_cpu_pct_median=85.0,
+            host_child_tok_per_cpu_s_median=750.0,
+            host_child_peak_rss_bytes_max=123456,
             us_per_token_median=None,
             wall_us_per_token_median=None,
             max_memory_bytes=8192,
@@ -232,3 +250,4 @@ def test_junit_marks_failed_matrix_cells(tmp_path: Path) -> None:
     assert "variability_findings=1" in (failure.text or "")
     assert "command_sha256=" in (failure.text or "")
     assert "host_child_cpu_pct_median=85.0" in (failure.text or "")
+    assert "host_child_tok_per_cpu_s_median=750.0" in (failure.text or "")
