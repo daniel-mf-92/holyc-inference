@@ -66,6 +66,8 @@ class MatrixCellResult:
     prompt_bytes_total: int
     prompt_bytes_min: int | None
     prompt_bytes_max: int | None
+    total_tokens: int | None
+    total_elapsed_us: int | None
     measured_runs: int
     warmup_runs: int
     median_tok_per_s: float | None
@@ -225,6 +227,11 @@ def suite_float(report: dict[str, Any], key: str) -> float | None:
         return None
 
 
+def suite_int(report: dict[str, Any], key: str) -> int | None:
+    value = suite_float(report, key)
+    return int(value) if value is not None else None
+
+
 def report_commit(report: dict[str, Any]) -> str:
     commits = sorted(
         {
@@ -289,6 +296,8 @@ def run_cell(
             prompt_bytes_total=prompt_bytes_total,
             prompt_bytes_min=prompt_bytes_min,
             prompt_bytes_max=prompt_bytes_max,
+            total_tokens=None,
+            total_elapsed_us=None,
             measured_runs=0,
             warmup_runs=0,
             median_tok_per_s=None,
@@ -359,6 +368,8 @@ def run_cell(
         prompt_bytes_total=prompt_bytes_total,
         prompt_bytes_min=prompt_bytes_min,
         prompt_bytes_max=prompt_bytes_max,
+        total_tokens=suite_int(report, "total_tokens"),
+        total_elapsed_us=suite_int(report, "total_elapsed_us"),
         measured_runs=len(report.get("benchmarks", [])),
         warmup_runs=len(report.get("warmups", [])),
         median_tok_per_s=median_cell_tok_per_s(report),
@@ -398,9 +409,9 @@ def markdown_report(report: dict[str, Any]) -> str:
     ]
     if report["cells"]:
         lines.append(
-            "| Profile | Model | Quantization | Commit | Status | Prompts | Prompt bytes | Prompt byte range | Prompt suite | Command SHA256 | Runs | Warmups | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Max memory bytes | Variability findings |"
+            "| Profile | Model | Quantization | Commit | Status | Prompts | Prompt bytes | Prompt byte range | Total tokens | Total elapsed us | Prompt suite | Command SHA256 | Runs | Warmups | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Max memory bytes | Variability findings |"
         )
-        lines.append("| --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | --- | --- | --- | ---: | ---: | --- | ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for cell in report["cells"]:
             median = cell["median_tok_per_s"]
             memory = cell["max_memory_bytes"]
@@ -432,6 +443,7 @@ def markdown_report(report: dict[str, Any]) -> str:
             lines.append(
                 f"| {cell['profile']} | {cell['model']} | {cell['quantization']} | {cell['commit'] or '-'} | {cell['status']} | "
                 f"{cell['prompts']} | {cell['prompt_bytes_total']} | {prompt_byte_range} | "
+                f"{format_gate(cell['total_tokens'])} | {format_gate(cell['total_elapsed_us'])} | "
                 f"{cell['prompt_suite_sha256']} | {cell['command_sha256']} | "
                 f"{cell['measured_runs']} | {cell['warmup_runs']} | "
                 f"{median_cell} | {wall_tok_cell} | {ttft_cell} | {overhead_cell} | "
@@ -500,6 +512,8 @@ def write_matrix_csv(cells: list[MatrixCellResult], path: Path) -> None:
         "prompt_bytes_total",
         "prompt_bytes_min",
         "prompt_bytes_max",
+        "total_tokens",
+        "total_elapsed_us",
         "measured_runs",
         "warmup_runs",
         "median_tok_per_s",
@@ -575,6 +589,16 @@ def matrix_summary_row(cells: list[MatrixCellResult]) -> dict[str, Any]:
         "prompt_bytes_total": sum(cell.prompt_bytes_total for cell in cells),
         "prompt_bytes_min": min(prompt_mins) if prompt_mins else None,
         "prompt_bytes_max": max(prompt_maxes) if prompt_maxes else None,
+        "total_tokens": sum(
+            cell.total_tokens for cell in cells if cell.total_tokens is not None
+        )
+        if any(cell.total_tokens is not None for cell in cells)
+        else None,
+        "total_elapsed_us": sum(
+            cell.total_elapsed_us for cell in cells if cell.total_elapsed_us is not None
+        )
+        if any(cell.total_elapsed_us is not None for cell in cells)
+        else None,
         "measured_runs": sum(cell.measured_runs for cell in cells),
         "warmup_runs": sum(cell.warmup_runs for cell in cells),
         "median_tok_per_s_min": min_field(cells, "median_tok_per_s"),
@@ -614,6 +638,8 @@ def cell_summary_row(cell: MatrixCellResult) -> dict[str, Any]:
         "prompt_bytes_total": cell.prompt_bytes_total,
         "prompt_bytes_min": cell.prompt_bytes_min,
         "prompt_bytes_max": cell.prompt_bytes_max,
+        "total_tokens": cell.total_tokens,
+        "total_elapsed_us": cell.total_elapsed_us,
         "measured_runs": cell.measured_runs,
         "warmup_runs": cell.warmup_runs,
         "median_tok_per_s_min": cell.median_tok_per_s,
@@ -647,6 +673,8 @@ def write_matrix_summary_csv(cells: list[MatrixCellResult], path: Path) -> None:
         "prompt_bytes_total",
         "prompt_bytes_min",
         "prompt_bytes_max",
+        "total_tokens",
+        "total_elapsed_us",
         "measured_runs",
         "warmup_runs",
         "median_tok_per_s_min",

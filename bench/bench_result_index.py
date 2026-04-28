@@ -44,6 +44,8 @@ class ArtifactSummary:
     qemu_version: str
     qemu_bin: str
     prompts: int | None
+    total_tokens: int | None
+    total_elapsed_us: int | None
     measured_runs: int
     warmup_runs: int
     median_tok_per_s: float | None
@@ -434,6 +436,8 @@ def summarize_qemu_report(
         qemu_version=environment_field(environment, "qemu_version"),
         qemu_bin=environment_field(environment, "qemu_bin"),
         prompts=prompts,
+        total_tokens=parse_int(suite_summary.get("total_tokens")),
+        total_elapsed_us=parse_int(suite_summary.get("total_elapsed_us")),
         measured_runs=len(runs),
         warmup_runs=len(warmups),
         median_tok_per_s=median_tok_per_s,
@@ -521,6 +525,8 @@ def summarize_matrix_report(
                 qemu_version=environment_field(environment, "qemu_version"),
                 qemu_bin=environment_field(environment, "qemu_bin"),
                 prompts=prompts,
+                total_tokens=parse_int(cell.get("total_tokens")),
+                total_elapsed_us=parse_int(cell.get("total_elapsed_us")),
                 measured_runs=measured_runs,
                 warmup_runs=parse_int(cell.get("warmup_runs")) or 0,
                 median_tok_per_s=median_tok_per_s,
@@ -734,8 +740,8 @@ def markdown_report(report: dict[str, Any]) -> str:
     if report["artifacts"]:
         lines.extend(
             [
-                "| Type | Status | Air-gap | Telemetry | Freshness | Commit | Profile | Model | Quant | Prompt suite | Command SHA256 | Env SHA256 | Host | QEMU | Prompts | Runs | Warmups | Age seconds | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Max memory bytes | Source |",
-                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+                "| Type | Status | Air-gap | Telemetry | Freshness | Commit | Profile | Model | Quant | Prompt suite | Command SHA256 | Env SHA256 | Host | QEMU | Prompts | Total tokens | Total elapsed us | Runs | Warmups | Age seconds | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Max memory bytes | Source |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
             ]
         )
         for artifact in report["artifacts"]:
@@ -744,7 +750,7 @@ def markdown_report(report: dict[str, Any]) -> str:
             lines.append(
                 "| {artifact_type} | {status} | {command_airgap_status} | {telemetry_status} | {freshness_status} | {commit_status}:{commit} | {profile} | {model} | "
                 "{quantization} | {prompt_suite_sha256} | {command_sha256} | {environment_sha256} | {host_platform}/{host_machine} | {qemu} | "
-                "{prompts} | {measured_runs} | {warmup_runs} | "
+                "{prompts} | {total_tokens} | {total_elapsed_us} | {measured_runs} | {warmup_runs} | "
                 "{generated_age_seconds} | {median_tok_per_s} | {wall_tok_per_s_median} | {ttft_us_p95} | "
                 "{host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | "
                 "{host_child_tok_per_cpu_s_median} | {host_child_peak_rss_bytes_max} | "
@@ -992,6 +998,8 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
         "qemu_version",
         "qemu_bin",
         "prompts",
+        "total_tokens",
+        "total_elapsed_us",
         "measured_runs",
         "warmup_runs",
         "median_tok_per_s",

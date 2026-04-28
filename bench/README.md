@@ -473,10 +473,12 @@ Host child CPU rollups include median CPU time, CPU utilization, tok/CPU-second
 efficiency, and peak sampled direct-child RSS so matrix dashboards can separate
 guest throughput changes from host saturation.
 They also include total, minimum, and maximum prompt byte counts for each cell
-so prompt-size changes are visible next to tok/s, RSS, and latency rollups.
+plus total emitted tokens and total guest elapsed time so prompt-size and
+generation-volume changes are visible next to tok/s, RSS, and latency rollups.
 `bench_matrix_summary_latest.csv` adds one matrix-wide aggregate row plus one
 compact row per cell for CI dashboards that only need pass/fail counts,
-throughput ranges, prompt-byte totals, latency, RSS, and variability findings.
+throughput ranges, prompt-byte and token totals, latency, RSS, and variability
+findings.
 Use `max_suite_cv_pct` and `max_prompt_cv_pct` in the matrix JSON, or the
 matching CLI flags, to pass tok/s variability gates through to every cell. A
 cell that fails a variability gate still writes its prompt-benchmark report and
@@ -501,7 +503,8 @@ python3 bench/bench_matrix.py \
 
 `bench_result_index.py` scans existing QEMU prompt and matrix JSON reports,
 rolls their tok/s, wall-clock tok/s, TTFT, host-overhead, per-token latency,
-host child CPU efficiency/RSS, memory, prompt-suite, and run-count metadata into a single
+host child CPU efficiency/RSS, memory, prompt-suite, emitted-token, elapsed-time,
+and run-count metadata into a single
 JSON/Markdown/CSV/JUnit XML index, and checks each recorded QEMU command for
 explicit `-nic none` air-gap compliance. It also reports prompt-suite drift when
 comparable profile/model/quantization artifacts carry different non-empty suite
@@ -562,7 +565,8 @@ deterministic latest-artifact manifest for CI upload/download consumers. It
 records SHA256 and byte size for each benchmark JSON, retains compact history,
 selects the newest artifact for each profile/model/quantization/prompt-suite
 key, preserves prompt count, wall-clock throughput, TTFT, host overhead,
-host child CPU/RSS, and guest/wall per-token latency telemetry, writes both
+host child CPU/RSS, emitted-token totals, elapsed guest time, and guest/wall
+per-token latency telemetry, writes both
 latest-key and full-history CSV exports, keeps the same recorded-command
 air-gap, command SHA256, and commit
 metadata checks while preserving environment fingerprints, and writes

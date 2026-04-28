@@ -43,6 +43,8 @@ class ManifestArtifact:
     qemu_version: str
     qemu_bin: str
     prompts: int | None
+    total_tokens: int | None
+    total_elapsed_us: int | None
     measured_runs: int
     warmup_runs: int
     median_tok_per_s: float | None
@@ -114,6 +116,8 @@ def to_manifest_artifact(summary: bench_result_index.ArtifactSummary) -> Manifes
         qemu_version=summary.qemu_version,
         qemu_bin=summary.qemu_bin,
         prompts=summary.prompts,
+        total_tokens=summary.total_tokens,
+        total_elapsed_us=summary.total_elapsed_us,
         measured_runs=summary.measured_runs,
         warmup_runs=summary.warmup_runs,
         median_tok_per_s=summary.median_tok_per_s,
@@ -219,8 +223,8 @@ def markdown_report(report: dict[str, object]) -> str:
     if latest:
         lines.extend(
             [
-                "| Key | Status | Air-gap | Telemetry | Command Hash | Freshness | Commit | Host | QEMU | Prompts | Runs | Warmups | Age seconds | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Max memory bytes | Command SHA256 | Env SHA256 | Artifact SHA256 | Source |",
-                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- |",
+                "| Key | Status | Air-gap | Telemetry | Command Hash | Freshness | Commit | Host | QEMU | Prompts | Total tokens | Total elapsed us | Runs | Warmups | Age seconds | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Max memory bytes | Command SHA256 | Env SHA256 | Artifact SHA256 | Source |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- |",
             ]
         )
         for artifact in latest:
@@ -228,7 +232,7 @@ def markdown_report(report: dict[str, object]) -> str:
             values["qemu"] = format_value(artifact.get("qemu_version") or artifact.get("qemu_bin"))
             lines.append(
                 "| {key} | {status} | {command_airgap_status} | {telemetry_status} | {command_hash_status} | {freshness_status} | {commit_status}:{commit} | "
-                "{host_platform}/{host_machine} | {qemu} | {prompts} | {measured_runs} | "
+                "{host_platform}/{host_machine} | {qemu} | {prompts} | {total_tokens} | {total_elapsed_us} | {measured_runs} | "
                 "{warmup_runs} | {generated_age_seconds} | {median_tok_per_s} | {wall_tok_per_s_median} | "
                 "{ttft_us_p95} | {host_overhead_pct_median} | {host_child_cpu_us_median} | "
                 "{host_child_cpu_pct_median} | {host_child_tok_per_cpu_s_median} | "
@@ -260,6 +264,8 @@ def write_csv(artifacts: list[ManifestArtifact], path: Path) -> None:
         "qemu_version",
         "qemu_bin",
         "prompts",
+        "total_tokens",
+        "total_elapsed_us",
         "measured_runs",
         "warmup_runs",
         "median_tok_per_s",
