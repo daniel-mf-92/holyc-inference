@@ -15,6 +15,26 @@
   "magic": "HCEVAL1\u0000",
   "output": "bench/results/datasets/smoke_curated.hceval",
   "record_count": 3,
+  "record_spans": [
+    {
+      "length": 160,
+      "offset": 147,
+      "payload_bytes": 136,
+      "record_id": "smoke-arc-1"
+    },
+    {
+      "length": 328,
+      "offset": 307,
+      "payload_bytes": 304,
+      "record_id": "smoke-hellaswag-1"
+    },
+    {
+      "length": 290,
+      "offset": 635,
+      "payload_bytes": 266,
+      "record_id": "smoke-truthfulqa-1"
+    }
+  ],
   "records": [
     {
       "answer_index": 0,

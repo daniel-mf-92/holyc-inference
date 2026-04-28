@@ -117,7 +117,9 @@ deterministic HolyC-loadable binary plus a provenance manifest. It accepts a
 normalized schema as well as HellaSwag-, ARC-, and TruthfulQA-shaped rows. It is
 offline-only; place source data on disk first and document provenance.
 Manifests include UTF-8 prompt/choice/record byte statistics, and optional size
-gates can fail packing before writing oversized artifacts.
+gates can fail packing before writing oversized artifacts. Manifests also include
+`record_spans` with each record's binary offset, length, and payload bytes for
+loader-bound audits without changing the `.hceval` bytes.
 For HellaSwag-shaped rows, `ctx` is preferred when present; locally staged rows
 that only carry `ctx_a`/`ctx_b` are normalized by joining those context parts
 before packing.
@@ -139,7 +141,8 @@ python3 bench/dataset_pack.py \
 `hceval_inspect.py` independently parses `.hceval` binaries, validates record
 bounds, verifies source/binary hashes against a companion manifest, and writes
 JSON, Markdown, or JUnit XML inspection reports:
-It can re-apply the same byte-size gates to already packed binaries.
+It can re-apply the same byte-size gates to already packed binaries and verifies
+manifest `record_spans` when present.
 
 ```bash
 python3 bench/hceval_inspect.py \

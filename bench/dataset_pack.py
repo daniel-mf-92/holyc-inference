@@ -277,18 +277,39 @@ def canonical_rows(records: list[EvalRecord]) -> bytes:
     return json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
-def pack_records(records: list[EvalRecord], dataset: str, split: str) -> bytes:
+def metadata_bytes(dataset: str, split: str, record_count: int) -> bytes:
     metadata = {
         "dataset": dataset,
         "format": "hceval-mc",
-        "record_count": len(records),
+        "record_count": record_count,
         "split": split,
         "version": VERSION,
     }
-    metadata_bytes = json.dumps(metadata, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return json.dumps(metadata, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def record_spans(records: list[EvalRecord], dataset: str, split: str) -> list[dict[str, int | str]]:
+    spans: list[dict[str, int | str]] = []
+    cursor = HEADER.size + len(metadata_bytes(dataset, split, len(records)))
+    for record in records:
+        payload = record_bytes(record)
+        spans.append(
+            {
+                "record_id": record.record_id,
+                "offset": cursor,
+                "length": len(payload),
+                "payload_bytes": len(payload) - RECORD_HEADER.size,
+            }
+        )
+        cursor += len(payload)
+    return spans
+
+
+def pack_records(records: list[EvalRecord], dataset: str, split: str) -> bytes:
+    packed_metadata = metadata_bytes(dataset, split, len(records))
     body = b"".join(record_bytes(record) for record in records)
     source_digest = hashlib.sha256(canonical_rows(records)).digest()
-    return HEADER.pack(MAGIC, VERSION, 0, len(records), len(metadata_bytes), source_digest) + metadata_bytes + body
+    return HEADER.pack(MAGIC, VERSION, 0, len(records), len(packed_metadata), source_digest) + packed_metadata + body
 
 
 def write_outputs(records: list[EvalRecord], output: Path, manifest_path: Path, dataset: str, split: str) -> None:
@@ -305,6 +326,7 @@ def write_outputs(records: list[EvalRecord], output: Path, manifest_path: Path, 
         "magic": MAGIC.decode("ascii"),
         "output": str(output),
         "record_count": len(records),
+        "record_spans": record_spans(records, dataset, split),
         "records": [asdict(record) for record in records],
         "split": split,
         "source_sha256": hashlib.sha256(canonical_rows(records)).hexdigest(),

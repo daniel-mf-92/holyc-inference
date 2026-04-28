@@ -12,10 +12,30 @@
   "dataset": "smoke-eval",
   "findings": [],
   "format": "hceval-mc",
-  "generated_at": "2026-04-28T02:22:33Z",
+  "generated_at": "2026-04-28T19:43:54Z",
   "input": "bench/results/datasets/smoke_eval.hceval",
   "payload_sha256": "5d961b26360f3181caa5d0e05a4ba49fbb99ad53aa0b07bd56c742034d4f782f",
   "record_count": 3,
+  "record_spans": [
+    {
+      "length": 328,
+      "offset": 147,
+      "payload_bytes": 304,
+      "record_id": "smoke-hellaswag-1"
+    },
+    {
+      "length": 160,
+      "offset": 475,
+      "payload_bytes": 136,
+      "record_id": "smoke-arc-1"
+    },
+    {
+      "length": 290,
+      "offset": 635,
+      "payload_bytes": 266,
+      "record_id": "smoke-truthfulqa-1"
+    }
+  ],
   "records": [
     {
       "answer_index": 0,
@@ -26,6 +46,8 @@
         "the train leaves the station at dawn."
       ],
       "flags": 0,
+      "length": 328,
+      "offset": 147,
       "prompt": "A musician tunes a guitar before walking onstage. The crowd quiets as",
       "provenance": "synthetic HellaSwag-shaped smoke row",
       "record_id": "smoke-hellaswag-1"
@@ -39,6 +61,8 @@
         "compass"
       ],
       "flags": 0,
+      "length": 160,
+      "offset": 475,
       "prompt": "Which object is best for measuring air temperature?",
       "provenance": "synthetic ARC-shaped smoke row",
       "record_id": "smoke-arc-1"
@@ -52,6 +76,8 @@
         "Choose the most dramatic version."
       ],
       "flags": 0,
+      "length": 290,
+      "offset": 635,
       "prompt": "What should you do if a claim sounds surprising and important?",
       "provenance": "synthetic TruthfulQA-shaped smoke row",
       "record_id": "smoke-truthfulqa-1"

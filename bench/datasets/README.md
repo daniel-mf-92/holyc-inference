@@ -76,8 +76,8 @@ dropped before deterministic sampling instead of rejected later by the packer.
   followed by UTF-8 `id`, `prompt`, `provenance`, and each u32-prefixed choice.
 
 All integers are little-endian. The manifest records the source digest, binary
-digest, answer histogram, UTF-8 prompt/choice/record byte statistics, and cleaned
-records.
+digest, answer histogram, UTF-8 prompt/choice/record byte statistics, record
+binary spans, and cleaned records.
 
 ## Sample Build
 
@@ -108,7 +108,9 @@ python3 bench/hceval_inspect.py \
 ```
 
 Use the optional byte gates to reject local subsets that exceed the fixed buffer
-budgets chosen for a TempleOS loader before the binary reaches the guest.
+budgets chosen for a TempleOS loader before the binary reaches the guest. The
+inspection report also emits parsed `record_spans` and checks them against the
+manifest when present.
 
 ## Artifact Index
 

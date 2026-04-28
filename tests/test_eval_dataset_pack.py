@@ -110,6 +110,13 @@ def test_cli_writes_binary_and_manifest() -> None:
         assert manifest_json["binary_sha256"] == dataset_pack.hashlib.sha256(payload).hexdigest()
         assert manifest_json["byte_stats"]["max_prompt_bytes"] > 0
         assert manifest_json["byte_stats"]["max_record_payload_bytes"] > 0
+        assert manifest_json["record_spans"] == dataset_pack.record_spans(
+            dataset_pack.normalize_records(dataset_pack.read_jsonl(sample), "smoke-eval", "validation"),
+            "smoke-eval",
+            "validation",
+        )
+        assert manifest_json["record_spans"][0]["offset"] > dataset_pack.HEADER.size
+        assert manifest_json["record_spans"][-1]["offset"] + manifest_json["record_spans"][-1]["length"] == len(payload)
 
 
 def test_cli_size_gates_fail_before_writing() -> None:

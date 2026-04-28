@@ -35,6 +35,8 @@ class InspectRecord:
     answer_index: int
     provenance: str
     flags: int
+    offset: int
+    length: int
 
 
 @dataclass(frozen=True)
@@ -100,6 +102,7 @@ def parse_hceval(path: Path) -> HCEvalDataset:
     records: list[InspectRecord] = []
     for record_index in range(record_count):
         label = f"record {record_index + 1}"
+        record_offset = cursor
         require_span(payload, cursor, dataset_pack.RECORD_HEADER.size, f"{label} header")
         id_len, prompt_len, choice_count, answer_index, provenance_len, record_flags = (
             dataset_pack.RECORD_HEADER.unpack_from(payload, cursor)
@@ -122,6 +125,8 @@ def parse_hceval(path: Path) -> HCEvalDataset:
                 answer_index=answer_index,
                 provenance=provenance,
                 flags=record_flags,
+                offset=record_offset,
+                length=cursor - record_offset,
             )
         )
 
@@ -159,6 +164,18 @@ def answer_histogram(records: list[InspectRecord]) -> dict[str, int]:
         key = str(record.answer_index)
         histogram[key] = histogram.get(key, 0) + 1
     return histogram
+
+
+def record_spans(records: list[InspectRecord]) -> list[dict[str, int | str]]:
+    return [
+        {
+            "record_id": record.record_id,
+            "offset": record.offset,
+            "length": record.length,
+            "payload_bytes": record.length - dataset_pack.RECORD_HEADER.size,
+        }
+        for record in records
+    ]
 
 
 def byte_stats(records: list[InspectRecord]) -> dict[str, int]:
@@ -240,6 +257,8 @@ def validate_dataset(
             findings.append("manifest split does not match metadata")
         if "byte_stats" in manifest and manifest.get("byte_stats") != byte_stats(records):
             findings.append("manifest byte_stats does not match parsed records")
+        if "record_spans" in manifest and manifest.get("record_spans") != record_spans(records):
+            findings.append("manifest record_spans does not match parsed binary")
         manifest_records = manifest.get("records")
         if isinstance(manifest_records, list):
             source_verified = hashlib.sha256(
@@ -268,6 +287,7 @@ def build_report(path: Path, dataset: HCEvalDataset, findings: list[str]) -> dic
         "input": str(path),
         "payload_sha256": dataset.payload_sha256,
         "record_count": len(dataset.records),
+        "record_spans": record_spans(dataset.records),
         "records": [asdict(record) for record in dataset.records],
         "source_sha256": dataset.source_digest,
         "split": dataset.metadata.get("split", ""),
