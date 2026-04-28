@@ -550,6 +550,66 @@ def test_min_commits_per_key_flags_missing_baselines(tmp_path: Path) -> None:
     ]
 
 
+def test_required_telemetry_flags_missing_commit_point_metrics(tmp_path: Path) -> None:
+    result = tmp_path / "perf.jsonl"
+    write_jsonl(
+        result,
+        [
+            {
+                "timestamp": "2026-04-27T10:00:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "prompt": "short",
+                "tok_per_s": 100.0,
+            }
+        ],
+    )
+
+    records = perf_regression.load_records([result])
+    report = perf_regression.build_report(
+        records,
+        5.0,
+        10.0,
+        require_tok_per_s=True,
+        require_wall_tok_per_s=True,
+        require_memory=True,
+    )
+
+    assert report["status"] == "fail"
+    assert report["thresholds"]["require_tok_per_s"] is True
+    assert report["thresholds"]["require_wall_tok_per_s"] is True
+    assert report["thresholds"]["require_memory"] is True
+    assert report["commit_points"][0]["tok_per_s_records"] == 1
+    assert report["commit_points"][0]["wall_tok_per_s_records"] == 0
+    assert report["commit_points"][0]["memory_records"] == 0
+    assert report["telemetry_coverage_violations"] == [
+        {
+            "key": "decode/secure-local/-/Q4_0/short",
+            "commit": "head",
+            "metric": "wall_tok_per_s",
+            "records": 1,
+            "present_records": 0,
+        },
+        {
+            "key": "decode/secure-local/-/Q4_0/short",
+            "commit": "head",
+            "metric": "memory_bytes",
+            "records": 1,
+            "present_records": 0,
+        },
+    ]
+    assert "Telemetry coverage violations: 2" in perf_regression.markdown_report(report)
+
+    junit_root = ET.fromstring(perf_regression.junit_report(report))
+    assert junit_root.attrib["failures"] == "2"
+    assert [failure.attrib["type"] for failure in junit_root.findall(".//failure")] == [
+        "telemetry_coverage",
+        "telemetry_coverage",
+    ]
+
+
 def test_junit_report_marks_perf_failures() -> None:
     report = {
         "generated_at": "2026-04-27T20:00:00Z",
@@ -672,6 +732,7 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
     assert "Commit Coverage" in markdown
     assert "Comparison Coverage" in markdown
     assert "Prompt Suite Drift" in markdown
+    assert "Telemetry Coverage" in markdown
     assert "prompt/dev-local/-/-/-" in markdown
     commit_points_csv = (output_dir / "perf_regression_commit_points_latest.csv").read_text(
         encoding="utf-8"
@@ -694,14 +755,18 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
     prompt_suite_drift_csv = (
         output_dir / "perf_regression_prompt_suite_drift_latest.csv"
     ).read_text(encoding="utf-8")
+    telemetry_coverage_csv = (
+        output_dir / "perf_regression_telemetry_coverage_violations_latest.csv"
+    ).read_text(encoding="utf-8")
     assert (
-        "key,commit,latest_timestamp,records,median_tok_per_s,median_wall_tok_per_s,tok_per_s_cv_pct,max_memory_bytes,prompt_suite_sha256"
+        "key,commit,latest_timestamp,records,tok_per_s_records,wall_tok_per_s_records,memory_records,median_tok_per_s,median_wall_tok_per_s,tok_per_s_cv_pct,max_memory_bytes,prompt_suite_sha256"
         in commit_points_csv
     )
-    assert "prompt/dev-local/-/-/-,abc,2026-04-27T10:00:00Z,1,42.0,,,," in commit_points_csv
+    assert "prompt/dev-local/-/-/-,abc,2026-04-27T10:00:00Z,1,1,0,0,42.0,,,," in commit_points_csv
     assert "key,metric,baseline_commit,candidate_commit,baseline_value,candidate_value" in regressions_csv
     assert "key,commit,records,minimum_records" in sample_violations_csv
     assert "key,commit,records,tok_per_s_cv_pct,threshold_pct" in variability_violations_csv
     assert "key,commits,minimum_commits,latest_commit" in commit_coverage_violations_csv
     assert "key,baseline_commit,candidate_commit,missing_commits" in comparison_coverage_violations_csv
     assert "key,hashes,commits,sources" in prompt_suite_drift_csv
+    assert "key,commit,metric,records,present_records" in telemetry_coverage_csv

@@ -64,6 +64,9 @@ class CommitPoint:
     commit: str
     latest_timestamp: str
     records: int
+    tok_per_s_records: int
+    wall_tok_per_s_records: int
+    memory_records: int
     median_tok_per_s: float | None
     median_wall_tok_per_s: float | None
     tok_per_s_cv_pct: float | None
@@ -110,6 +113,15 @@ class PromptSuiteDriftViolation:
     hashes: list[str]
     commits: list[str]
     sources: list[str]
+
+
+@dataclass(frozen=True)
+class TelemetryCoverageViolation:
+    key: str
+    commit: str
+    metric: str
+    records: int
+    present_records: int
 
 
 def iso_now() -> str:
@@ -324,6 +336,9 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                 commit=commit,
                 latest_timestamp=max(record.timestamp for record in commit_records),
                 records=len(commit_records),
+                tok_per_s_records=len(tps_values),
+                wall_tok_per_s_records=len(wall_tps_values),
+                memory_records=len(memory_values),
                 median_tok_per_s=statistics.median(tps_values) if tps_values else None,
                 median_wall_tok_per_s=statistics.median(wall_tps_values) if wall_tps_values else None,
                 tok_per_s_cv_pct=tps_cv_pct,
@@ -565,6 +580,37 @@ def detect_prompt_suite_drift(records: list[PerfRecord]) -> list[PromptSuiteDrif
     return violations
 
 
+def detect_telemetry_coverage_violations(
+    points: list[CommitPoint],
+    *,
+    require_tok_per_s: bool = False,
+    require_wall_tok_per_s: bool = False,
+    require_memory: bool = False,
+) -> list[TelemetryCoverageViolation]:
+    required = [
+        ("tok_per_s", require_tok_per_s, "tok_per_s_records"),
+        ("wall_tok_per_s", require_wall_tok_per_s, "wall_tok_per_s_records"),
+        ("memory_bytes", require_memory, "memory_records"),
+    ]
+    violations: list[TelemetryCoverageViolation] = []
+    for point in points:
+        for metric, enabled, field in required:
+            if not enabled:
+                continue
+            present_records = int(getattr(point, field))
+            if present_records == 0:
+                violations.append(
+                    TelemetryCoverageViolation(
+                        key=point.key,
+                        commit=point.commit,
+                        metric=metric,
+                        records=point.records,
+                        present_records=present_records,
+                    )
+                )
+    return violations
+
+
 def markdown_report(report: dict[str, Any]) -> str:
     lines = [
         "# Perf Regression Dashboard",
@@ -578,6 +624,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Commit coverage violations: {len(report['commit_coverage_violations'])}",
         f"Comparison coverage violations: {len(report['comparison_coverage_violations'])}",
         f"Prompt-suite drift violations: {len(report['prompt_suite_drift_violations'])}",
+        f"Telemetry coverage violations: {len(report['telemetry_coverage_violations'])}",
         "",
         "## Regressions",
         "",
@@ -656,12 +703,25 @@ def markdown_report(report: dict[str, Any]) -> str:
     else:
         lines.append("Prompt-suite hashes are consistent for comparable benchmark keys.")
 
+    lines.extend(["", "## Telemetry Coverage", ""])
+    if report["telemetry_coverage_violations"]:
+        lines.append("| Key | Commit | Metric | Records | Present Records |")
+        lines.append("| --- | --- | --- | ---: | ---: |")
+        for violation in report["telemetry_coverage_violations"]:
+            lines.append(
+                "| {key} | {commit} | {metric} | {records} | {present_records} |".format(
+                    **violation
+                )
+            )
+    else:
+        lines.append("Required telemetry fields are present for every commit point.")
+
     lines.extend(["", "## Commit Points", ""])
     if report["commit_points"]:
         lines.append(
-            "| Key | Commit | Records | Median tok/s | Median wall tok/s | Tok/s CV | Max Memory Bytes | Prompt Suite |"
+            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | Memory Records | Median tok/s | Median wall tok/s | Tok/s CV | Max Memory Bytes | Prompt Suite |"
         )
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
         for point in report["commit_points"]:
             tps = point["median_tok_per_s"]
             wall_tps = point["median_wall_tok_per_s"]
@@ -674,7 +734,9 @@ def markdown_report(report: dict[str, Any]) -> str:
             memory_cell = str(memory) if memory is not None else "-"
             lines.append(
                 f"| {point['key']} | {point['commit']} | {point['records']} | "
-                f"{tps_cell} | {wall_tps_cell} | {tps_cv_cell} | {memory_cell} | {prompt_suite} |"
+                f"{point['tok_per_s_records']} | {point['wall_tok_per_s_records']} | "
+                f"{point['memory_records']} | {tps_cell} | {wall_tps_cell} | {tps_cv_cell} | "
+                f"{memory_cell} | {prompt_suite} |"
             )
     else:
         lines.append("No commit-level performance points found.")
@@ -713,6 +775,7 @@ def junit_report(report: dict[str, Any]) -> str:
     commit_coverage_violations = report.get("commit_coverage_violations", [])
     comparison_coverage_violations = report.get("comparison_coverage_violations", [])
     prompt_suite_drift_violations = report.get("prompt_suite_drift_violations", [])
+    telemetry_coverage_violations = report.get("telemetry_coverage_violations", [])
     failures = (
         len(report["regressions"])
         + len(report["sample_violations"])
@@ -720,6 +783,7 @@ def junit_report(report: dict[str, Any]) -> str:
         + len(commit_coverage_violations)
         + len(comparison_coverage_violations)
         + len(prompt_suite_drift_violations)
+        + len(telemetry_coverage_violations)
     )
     tests = failures or 1
     suite = ET.Element(
@@ -901,6 +965,31 @@ def junit_report(report: dict[str, Any]) -> str:
                 f"key={violation['key']}"
             )
 
+        for violation in telemetry_coverage_violations:
+            case = ET.SubElement(
+                suite,
+                "testcase",
+                {
+                    "classname": "perf_regression.telemetry_coverage",
+                    "name": f"{violation['metric']}:{violation['commit']}:{violation['key']}",
+                },
+            )
+            failure = ET.SubElement(
+                case,
+                "failure",
+                {
+                    "type": "telemetry_coverage",
+                    "message": f"missing required {violation['metric']} telemetry",
+                },
+            )
+            failure.text = (
+                f"commit={violation['commit']}\n"
+                f"metric={violation['metric']}\n"
+                f"records={violation['records']}\n"
+                f"present_records={violation['present_records']}\n"
+                f"key={violation['key']}"
+            )
+
     ET.indent(suite, space="  ")
     return ET.tostring(suite, encoding="unicode", xml_declaration=True) + "\n"
 
@@ -921,6 +1010,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
         output_dir / "perf_regression_comparison_coverage_violations_latest.csv"
     )
     prompt_suite_drift_csv = output_dir / "perf_regression_prompt_suite_drift_latest.csv"
+    telemetry_coverage_csv = output_dir / "perf_regression_telemetry_coverage_violations_latest.csv"
 
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
@@ -933,6 +1023,9 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "commit",
             "latest_timestamp",
             "records",
+            "tok_per_s_records",
+            "wall_tok_per_s_records",
+            "memory_records",
             "median_tok_per_s",
             "median_wall_tok_per_s",
             "tok_per_s_cv_pct",
@@ -979,6 +1072,11 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
         report["prompt_suite_drift_violations"],
         ["key", "hashes", "commits", "sources"],
     )
+    write_csv(
+        telemetry_coverage_csv,
+        report["telemetry_coverage_violations"],
+        ["key", "commit", "metric", "records", "present_records"],
+    )
 
     print(f"wrote_json={json_path}")
     print(f"wrote_markdown={md_path}")
@@ -990,6 +1088,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
     print(f"wrote_commit_coverage_violations_csv={commit_coverage_violations_csv}")
     print(f"wrote_comparison_coverage_violations_csv={comparison_coverage_violations_csv}")
     print(f"wrote_prompt_suite_drift_csv={prompt_suite_drift_csv}")
+    print(f"wrote_telemetry_coverage_csv={telemetry_coverage_csv}")
 
 
 def build_report(
@@ -1002,6 +1101,9 @@ def build_report(
     max_tok_cv_pct: float | None = None,
     wall_tok_threshold_pct: float | None = None,
     min_commits_per_key: int = 1,
+    require_tok_per_s: bool = False,
+    require_wall_tok_per_s: bool = False,
+    require_memory: bool = False,
 ) -> dict[str, Any]:
     points = commit_points(records)
     regressions = detect_regressions(
@@ -1019,6 +1121,12 @@ def build_report(
         points, baseline_commit, candidate_commit
     )
     prompt_suite_drift_violations = detect_prompt_suite_drift(records)
+    telemetry_coverage_violations = detect_telemetry_coverage_violations(
+        points,
+        require_tok_per_s=require_tok_per_s,
+        require_wall_tok_per_s=require_wall_tok_per_s,
+        require_memory=require_memory,
+    )
     return {
         "generated_at": iso_now(),
         "record_count": len(records),
@@ -1030,6 +1138,7 @@ def build_report(
             or commit_coverage_violations
             or comparison_coverage_violations
             or prompt_suite_drift_violations
+            or telemetry_coverage_violations
             else "pass"
         ),
         "comparison": {
@@ -1044,6 +1153,9 @@ def build_report(
             "min_records_per_point": min_records_per_point,
             "max_tok_cv_pct": max_tok_cv_pct,
             "min_commits_per_key": min_commits_per_key,
+            "require_tok_per_s": require_tok_per_s,
+            "require_wall_tok_per_s": require_wall_tok_per_s,
+            "require_memory": require_memory,
         },
         "summaries": summarize(records),
         "commit_points": [asdict(point) for point in points],
@@ -1058,6 +1170,9 @@ def build_report(
         ],
         "prompt_suite_drift_violations": [
             asdict(violation) for violation in prompt_suite_drift_violations
+        ],
+        "telemetry_coverage_violations": [
+            asdict(violation) for violation in telemetry_coverage_violations
         ],
         "records": [asdict(record) for record in sorted(records, key=lambda item: (item.key, item.timestamp))],
     }
@@ -1099,6 +1214,21 @@ def build_parser() -> argparse.ArgumentParser:
         default=1,
         help="Minimum distinct commits required for each benchmark key before the dashboard passes",
     )
+    parser.add_argument(
+        "--require-tok-per-s",
+        action="store_true",
+        help="Fail when any benchmark key/commit point lacks guest tok/s telemetry",
+    )
+    parser.add_argument(
+        "--require-wall-tok-per-s",
+        action="store_true",
+        help="Fail when any benchmark key/commit point lacks host wall-clock tok/s telemetry",
+    )
+    parser.add_argument(
+        "--require-memory",
+        action="store_true",
+        help="Fail when any benchmark key/commit point lacks memory telemetry",
+    )
     parser.add_argument("--fail-on-regression", action="store_true")
     return parser
 
@@ -1117,6 +1247,9 @@ def main(argv: list[str] | None = None) -> int:
         max_tok_cv_pct=args.max_tok_cv_pct,
         wall_tok_threshold_pct=args.wall_tok_regression_pct,
         min_commits_per_key=args.min_commits_per_key,
+        require_tok_per_s=args.require_tok_per_s,
+        require_wall_tok_per_s=args.require_wall_tok_per_s,
+        require_memory=args.require_memory,
     )
 
     write_dashboard_outputs(report, args.output_dir)

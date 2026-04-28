@@ -381,6 +381,9 @@ python3 bench/perf_regression.py \
   --min-commits-per-key 2 \
   --max-tok-cv-pct 7.5 \
   --wall-tok-regression-pct 7.5 \
+  --require-tok-per-s \
+  --require-wall-tok-per-s \
+  --require-memory \
   --fail-on-regression
 ```
 
@@ -394,6 +397,10 @@ compare against.
 benchmark key/commit point are too variable to trust as a baseline.
 `--wall-tok-regression-pct` optionally gates host-observed wall-clock tok/s
 drops, which is useful when guest-side timing looks suspicious.
+`--require-tok-per-s`, `--require-wall-tok-per-s`, and `--require-memory` fail
+the dashboard when any benchmark key/commit point has zero samples for that
+telemetry field. This catches malformed or partially uploaded artifacts before
+CI treats missing metrics as merely non-comparable.
 Prompt-suite hashes from QEMU benchmark reports are carried into commit points;
 the dashboard fails when comparable benchmark/profile/model/quantization/prompt
 records contain multiple non-empty prompt-suite hashes, preventing accidental
@@ -508,8 +515,8 @@ checks compare commit-level aggregates, so repeated runs and duplicate
 latest/stamped result files are collapsed by benchmark key and commit before the
 latest distinct commits are compared. Outputs include JSON, Markdown, JUnit XML,
 commit-point CSV, regression CSV, sample-coverage CSV, commit-coverage CSV, and
-comparison-coverage CSV, prompt-suite drift CSV, and tok/s variability CSV
-artifacts.
+comparison-coverage CSV, prompt-suite drift CSV, telemetry-coverage CSV, and
+tok/s variability CSV artifacts.
 
 Example:
 

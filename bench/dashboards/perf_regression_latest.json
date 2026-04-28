@@ -8,9 +8,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "5bf1fd7158fd",
@@ -19,9 +22,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "786eee1bfa27",
@@ -30,9 +36,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "bf852f741851",
@@ -41,9 +50,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "bb8266801970",
@@ -52,9 +64,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "1588059f2388",
@@ -63,9 +78,26 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
+    },
+    {
+      "commit": "3b7e701e8a6b",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
+      "latest_timestamp": "2026-04-28T02:33:36Z",
+      "max_memory_bytes": 67207168,
+      "median_tok_per_s": 160.0,
+      "median_wall_tok_per_s": 810.3154805956073,
+      "memory_records": 6,
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 6
     },
     {
       "commit": "21ad93152049",
@@ -74,9 +106,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "5bf1fd7158fd",
@@ -85,9 +120,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "786eee1bfa27",
@@ -96,9 +134,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "bf852f741851",
@@ -107,9 +148,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "bb8266801970",
@@ -118,9 +162,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "1588059f2388",
@@ -129,9 +176,26 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
+    },
+    {
+      "commit": "3b7e701e8a6b",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
+      "latest_timestamp": "2026-04-28T02:33:36Z",
+      "max_memory_bytes": 67174400,
+      "median_tok_per_s": 160.0,
+      "median_wall_tok_per_s": 653.3543001033054,
+      "memory_records": 6,
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 6
     },
     {
       "commit": "21ad93152049",
@@ -140,9 +204,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "5bf1fd7158fd",
@@ -151,9 +218,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "786eee1bfa27",
@@ -162,9 +232,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "bf852f741851",
@@ -173,9 +246,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "bb8266801970",
@@ -184,9 +260,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "1588059f2388",
@@ -195,9 +274,26 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
+    },
+    {
+      "commit": "3b7e701e8a6b",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-code",
+      "latest_timestamp": "2026-04-28T02:33:37Z",
+      "max_memory_bytes": 67207168,
+      "median_tok_per_s": 160.0,
+      "median_wall_tok_per_s": 574.5490675958367,
+      "memory_records": 6,
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 6
     },
     {
       "commit": "21ad93152049",
@@ -206,9 +302,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "5bf1fd7158fd",
@@ -217,9 +316,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "786eee1bfa27",
@@ -228,9 +330,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "bf852f741851",
@@ -239,9 +344,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "bb8266801970",
@@ -250,9 +358,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "1588059f2388",
@@ -261,9 +372,26 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 6,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 6,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 0
+    },
+    {
+      "commit": "3b7e701e8a6b",
+      "key": "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-short",
+      "latest_timestamp": "2026-04-28T02:33:37Z",
+      "max_memory_bytes": 67174400,
+      "median_tok_per_s": 160.0,
+      "median_wall_tok_per_s": 441.89054398868643,
+      "memory_records": 6,
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "records": 6,
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 6,
+      "wall_tok_per_s_records": 6
     },
     {
       "commit": "5b98f2570b1c",
@@ -272,9 +400,12 @@
       "max_memory_bytes": null,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 0,
       "prompt_suite_sha256": "",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "85cce7c2f224",
@@ -283,9 +414,12 @@
       "max_memory_bytes": null,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 0,
       "prompt_suite_sha256": "",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "3f9df4f0bd7a",
@@ -294,9 +428,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "e71bfc15a184",
@@ -305,9 +442,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "7f007ced1a84",
@@ -316,9 +456,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "708be92b565a",
@@ -327,9 +470,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "786eee1bfa27",
@@ -338,9 +484,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "b5c013b1b596",
@@ -349,9 +498,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "ea55b6ea98dd",
@@ -360,9 +512,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "36f90ed16742",
@@ -371,9 +526,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "b1e55ed7d43f",
@@ -382,9 +540,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "4981d42b1a52",
@@ -393,9 +554,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "1588059f2388",
@@ -404,9 +568,12 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "ec4b6dde4fd6",
@@ -415,9 +582,26 @@
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": 815.6329651656755,
+      "memory_records": 3,
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 3
+    },
+    {
+      "commit": "ba875d39995e",
+      "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code",
+      "latest_timestamp": "2026-04-28T02:46:00Z",
+      "max_memory_bytes": 67207168,
+      "median_tok_per_s": 160.0,
+      "median_wall_tok_per_s": 591.3660555884093,
+      "memory_records": 9,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 9,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 9,
+      "wall_tok_per_s_records": 9
     },
     {
       "commit": "5b98f2570b1c",
@@ -426,9 +610,12 @@
       "max_memory_bytes": null,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 0,
       "prompt_suite_sha256": "",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "85cce7c2f224",
@@ -437,9 +624,12 @@
       "max_memory_bytes": null,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 0,
       "prompt_suite_sha256": "",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "3f9df4f0bd7a",
@@ -448,9 +638,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "e71bfc15a184",
@@ -459,9 +652,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "7f007ced1a84",
@@ -470,9 +666,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "708be92b565a",
@@ -481,9 +680,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "786eee1bfa27",
@@ -492,9 +694,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "b5c013b1b596",
@@ -503,9 +708,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "ea55b6ea98dd",
@@ -514,9 +722,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "36f90ed16742",
@@ -525,9 +736,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "b1e55ed7d43f",
@@ -536,9 +750,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "4981d42b1a52",
@@ -547,9 +764,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "1588059f2388",
@@ -558,9 +778,12 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": null,
+      "memory_records": 3,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 3,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 0
     },
     {
       "commit": "ec4b6dde4fd6",
@@ -569,9 +792,26 @@
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
       "median_wall_tok_per_s": 365.8271695265968,
+      "memory_records": 3,
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "records": 3,
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 3,
+      "wall_tok_per_s_records": 3
+    },
+    {
+      "commit": "ba875d39995e",
+      "key": "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short",
+      "latest_timestamp": "2026-04-28T02:46:00Z",
+      "max_memory_bytes": 67174400,
+      "median_tok_per_s": 160.0,
+      "median_wall_tok_per_s": 401.0427110487267,
+      "memory_records": 9,
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "records": 9,
-      "tok_per_s_cv_pct": 0.0
+      "tok_per_s_cv_pct": 0.0,
+      "tok_per_s_records": 9,
+      "wall_tok_per_s_records": 9
     }
   ],
   "comparison": {
@@ -580,9 +820,9 @@
     "mode": "latest-distinct-commits"
   },
   "comparison_coverage_violations": [],
-  "generated_at": "2026-04-28T02:10:45Z",
+  "generated_at": "2026-04-28T03:02:56Z",
   "prompt_suite_drift_violations": [],
-  "record_count": 240,
+  "record_count": 270,
   "records": [
     {
       "benchmark": "qemu_prompt",
@@ -1090,6 +1330,90 @@
     },
     {
       "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T023336Z.json",
+      "timestamp": "2026-04-28T02:33:36Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 728.9183155912591
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T023336Z.json",
+      "timestamp": "2026-04-28T02:33:36Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 891.7126455999554
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "prompt_suite_sha256": "",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-28T02:33:36Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 728.9183155912591
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "prompt_suite_sha256": "",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-28T02:33:36Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 891.7126455999554
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T02:33:36Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 728.9183155912591
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T02:33:36Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 891.7126455999554
+    },
+    {
+      "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
@@ -1594,6 +1918,90 @@
     },
     {
       "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T023336Z.json",
+      "timestamp": "2026-04-28T02:33:35Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 588.5273941110478
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-28T02:33:35Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 588.5273941110478
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T02:33:35Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 588.5273941110478
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T023336Z.json",
+      "timestamp": "2026-04-28T02:33:36Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 718.181206095563
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-28T02:33:36Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 718.181206095563
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T02:33:36Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 718.181206095563
+    },
+    {
+      "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
@@ -2098,6 +2506,90 @@
     },
     {
       "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T023337Z.json",
+      "timestamp": "2026-04-28T02:33:37Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 452.60815449025006
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T023337Z.json",
+      "timestamp": "2026-04-28T02:33:37Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 696.4899807014234
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "prompt_suite_sha256": "",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-28T02:33:37Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 452.60815449025006
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "prompt_suite_sha256": "",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-28T02:33:37Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 696.4899807014234
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T02:33:37Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 452.60815449025006
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T02:33:37Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 696.4899807014234
+    },
+    {
+      "benchmark": "qemu_prompt",
       "commit": "21ad93152049",
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
@@ -2599,6 +3091,90 @@
       "timestamp": "2026-04-28T00:01:11Z",
       "tok_per_s": 160.0,
       "wall_tok_per_s": null
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T023337Z.json",
+      "timestamp": "2026-04-28T02:33:37Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 529.959259381935
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T023337Z.json",
+      "timestamp": "2026-04-28T02:33:37Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 353.8218285954379
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-28T02:33:37Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 529.959259381935
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-28T02:33:37Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 353.8218285954379
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T02:33:37Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 529.959259381935
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "3b7e701e8a6b",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q8_0",
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T02:33:37Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 353.8218285954379
     },
     {
       "benchmark": "qemu_prompt",
@@ -3190,7 +3766,49 @@
     },
     {
       "benchmark": "qemu_prompt",
-      "commit": "ec4b6dde4fd6",
+      "commit": "ba875d39995e",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260428T024600Z.json",
+      "timestamp": "2026-04-28T02:46:00Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 382.09867698333096
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ba875d39995e",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260428T024600Z.json",
+      "timestamp": "2026-04-28T02:46:00Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 591.3660555884093
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ba875d39995e",
+      "memory_bytes": 67207168,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-code",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260428T024600Z.json",
+      "timestamp": "2026-04-28T02:46:00Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 592.3951275500759
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ba875d39995e",
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -3198,13 +3816,13 @@
       "prompt_suite_sha256": "",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_latest.csv",
-      "timestamp": "2026-04-28T00:06:50Z",
+      "timestamp": "2026-04-28T02:46:00Z",
       "tok_per_s": 160.0,
-      "wall_tok_per_s": 650.5122784192552
+      "wall_tok_per_s": 382.09867698333096
     },
     {
       "benchmark": "qemu_prompt",
-      "commit": "ec4b6dde4fd6",
+      "commit": "ba875d39995e",
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -3212,13 +3830,13 @@
       "prompt_suite_sha256": "",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_latest.csv",
-      "timestamp": "2026-04-28T00:06:50Z",
+      "timestamp": "2026-04-28T02:46:00Z",
       "tok_per_s": 160.0,
-      "wall_tok_per_s": 815.6329651656755
+      "wall_tok_per_s": 591.3660555884093
     },
     {
       "benchmark": "qemu_prompt",
-      "commit": "ec4b6dde4fd6",
+      "commit": "ba875d39995e",
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -3226,13 +3844,13 @@
       "prompt_suite_sha256": "",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_latest.csv",
-      "timestamp": "2026-04-28T00:06:50Z",
+      "timestamp": "2026-04-28T02:46:00Z",
       "tok_per_s": 160.0,
-      "wall_tok_per_s": 868.9040947105464
+      "wall_tok_per_s": 592.3951275500759
     },
     {
       "benchmark": "qemu_prompt",
-      "commit": "ec4b6dde4fd6",
+      "commit": "ba875d39995e",
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -3240,13 +3858,13 @@
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_latest.json",
-      "timestamp": "2026-04-28T00:06:50Z",
+      "timestamp": "2026-04-28T02:46:00Z",
       "tok_per_s": 160.0,
-      "wall_tok_per_s": 650.5122784192552
+      "wall_tok_per_s": 382.09867698333096
     },
     {
       "benchmark": "qemu_prompt",
-      "commit": "ec4b6dde4fd6",
+      "commit": "ba875d39995e",
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -3254,13 +3872,13 @@
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_latest.json",
-      "timestamp": "2026-04-28T00:06:50Z",
+      "timestamp": "2026-04-28T02:46:00Z",
       "tok_per_s": 160.0,
-      "wall_tok_per_s": 815.6329651656755
+      "wall_tok_per_s": 591.3660555884093
     },
     {
       "benchmark": "qemu_prompt",
-      "commit": "ec4b6dde4fd6",
+      "commit": "ba875d39995e",
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -3268,9 +3886,9 @@
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_latest.json",
-      "timestamp": "2026-04-28T00:06:50Z",
+      "timestamp": "2026-04-28T02:46:00Z",
       "tok_per_s": 160.0,
-      "wall_tok_per_s": 868.9040947105464
+      "wall_tok_per_s": 592.3951275500759
     },
     {
       "benchmark": "qemu_prompt",
@@ -3853,62 +4471,6 @@
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
       "prompt": "smoke-short",
-      "prompt_suite_sha256": "",
-      "quantization": "Q4_0",
-      "source": "bench/results/qemu_prompt_bench_latest.csv",
-      "timestamp": "2026-04-28T00:06:49Z",
-      "tok_per_s": 160.0,
-      "wall_tok_per_s": 341.20594977874924
-    },
-    {
-      "benchmark": "qemu_prompt",
-      "commit": "ec4b6dde4fd6",
-      "memory_bytes": 67174400,
-      "model": "synthetic-smoke",
-      "profile": "synthetic-airgap-smoke",
-      "prompt": "smoke-short",
-      "prompt_suite_sha256": "",
-      "quantization": "Q4_0",
-      "source": "bench/results/qemu_prompt_bench_latest.csv",
-      "timestamp": "2026-04-28T00:06:49Z",
-      "tok_per_s": 160.0,
-      "wall_tok_per_s": 365.8271695265968
-    },
-    {
-      "benchmark": "qemu_prompt",
-      "commit": "ec4b6dde4fd6",
-      "memory_bytes": 67174400,
-      "model": "synthetic-smoke",
-      "profile": "synthetic-airgap-smoke",
-      "prompt": "smoke-short",
-      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
-      "quantization": "Q4_0",
-      "source": "bench/results/qemu_prompt_bench_latest.json",
-      "timestamp": "2026-04-28T00:06:49Z",
-      "tok_per_s": 160.0,
-      "wall_tok_per_s": 341.20594977874924
-    },
-    {
-      "benchmark": "qemu_prompt",
-      "commit": "ec4b6dde4fd6",
-      "memory_bytes": 67174400,
-      "model": "synthetic-smoke",
-      "profile": "synthetic-airgap-smoke",
-      "prompt": "smoke-short",
-      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
-      "quantization": "Q4_0",
-      "source": "bench/results/qemu_prompt_bench_latest.json",
-      "timestamp": "2026-04-28T00:06:49Z",
-      "tok_per_s": 160.0,
-      "wall_tok_per_s": 365.8271695265968
-    },
-    {
-      "benchmark": "qemu_prompt",
-      "commit": "ec4b6dde4fd6",
-      "memory_bytes": 67174400,
-      "model": "synthetic-smoke",
-      "profile": "synthetic-airgap-smoke",
-      "prompt": "smoke-short",
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_20260428T000650Z.json",
@@ -3918,7 +4480,35 @@
     },
     {
       "benchmark": "qemu_prompt",
-      "commit": "ec4b6dde4fd6",
+      "commit": "ba875d39995e",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260428T024600Z.json",
+      "timestamp": "2026-04-28T02:45:59Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 401.0427110487267
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ba875d39995e",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260428T024600Z.json",
+      "timestamp": "2026-04-28T02:45:59Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 491.06868823276653
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ba875d39995e",
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -3926,13 +4516,27 @@
       "prompt_suite_sha256": "",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_latest.csv",
-      "timestamp": "2026-04-28T00:06:50Z",
+      "timestamp": "2026-04-28T02:45:59Z",
       "tok_per_s": 160.0,
-      "wall_tok_per_s": 510.45637990716074
+      "wall_tok_per_s": 401.0427110487267
     },
     {
       "benchmark": "qemu_prompt",
-      "commit": "ec4b6dde4fd6",
+      "commit": "ba875d39995e",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-28T02:45:59Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 491.06868823276653
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ba875d39995e",
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
       "profile": "synthetic-airgap-smoke",
@@ -3940,9 +4544,65 @@
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "quantization": "Q4_0",
       "source": "bench/results/qemu_prompt_bench_latest.json",
-      "timestamp": "2026-04-28T00:06:50Z",
+      "timestamp": "2026-04-28T02:45:59Z",
       "tok_per_s": 160.0,
-      "wall_tok_per_s": 510.45637990716074
+      "wall_tok_per_s": 401.0427110487267
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ba875d39995e",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T02:45:59Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 491.06868823276653
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ba875d39995e",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_20260428T024600Z.json",
+      "timestamp": "2026-04-28T02:46:00Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 396.6483216817889
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ba875d39995e",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_latest.csv",
+      "timestamp": "2026-04-28T02:46:00Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 396.6483216817889
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "commit": "ba875d39995e",
+      "memory_bytes": 67174400,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "timestamp": "2026-04-28T02:46:00Z",
+      "tok_per_s": 160.0,
+      "wall_tok_per_s": 396.6483216817889
     }
   ],
   "regressions": [],
@@ -3950,53 +4610,57 @@
   "status": "pass",
   "summaries": {
     "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code": {
-      "latest_commit": "1588059f2388",
+      "latest_commit": "3b7e701e8a6b",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
-      "median_wall_tok_per_s": null,
-      "records": 36
+      "median_wall_tok_per_s": 810.3154805956073,
+      "records": 42
     },
     "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short": {
-      "latest_commit": "1588059f2388",
+      "latest_commit": "3b7e701e8a6b",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
-      "median_wall_tok_per_s": null,
-      "records": 36
+      "median_wall_tok_per_s": 653.3543001033054,
+      "records": 42
     },
     "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-code": {
-      "latest_commit": "1588059f2388",
+      "latest_commit": "3b7e701e8a6b",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
-      "median_wall_tok_per_s": null,
-      "records": 36
+      "median_wall_tok_per_s": 574.5490675958367,
+      "records": 42
     },
     "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-short": {
-      "latest_commit": "1588059f2388",
+      "latest_commit": "3b7e701e8a6b",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
-      "median_wall_tok_per_s": null,
-      "records": 36
+      "median_wall_tok_per_s": 441.89054398868643,
+      "records": 42
     },
     "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code": {
-      "latest_commit": "ec4b6dde4fd6",
+      "latest_commit": "ba875d39995e",
       "max_memory_bytes": 67207168,
       "median_tok_per_s": 160.0,
-      "median_wall_tok_per_s": 815.6329651656755,
-      "records": 48
+      "median_wall_tok_per_s": 591.8805915692426,
+      "records": 51
     },
     "qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short": {
-      "latest_commit": "ec4b6dde4fd6",
+      "latest_commit": "ba875d39995e",
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 160.0,
-      "median_wall_tok_per_s": 365.8271695265968,
-      "records": 48
+      "median_wall_tok_per_s": 401.0427110487267,
+      "records": 51
     }
   },
+  "telemetry_coverage_violations": [],
   "thresholds": {
     "max_tok_cv_pct": null,
     "memory_regression_pct": 10.0,
     "min_commits_per_key": 1,
     "min_records_per_point": 1,
+    "require_memory": false,
+    "require_tok_per_s": false,
+    "require_wall_tok_per_s": false,
     "tok_regression_pct": 5.0,
     "wall_tok_regression_pct": null
   },
