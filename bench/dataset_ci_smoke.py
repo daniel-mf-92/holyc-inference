@@ -108,6 +108,15 @@ def main() -> int:
             "unexpected_curated_answer_histogram",
         ):
             return rc
+        if rc := require(
+            curated_report["dataset_answer_histograms"] == {
+                "arc-smoke": {"0": 1},
+                "hellaswag-smoke": {"0": 1},
+                "truthfulqa-smoke": {"0": 1},
+            },
+            "unexpected_curated_dataset_answer_histograms",
+        ):
+            return rc
         if rc := require(curated_report["filters"]["balance_answer_index"] is True, "missing_balance_flag"):
             return rc
         if rc := require(
@@ -240,6 +249,8 @@ def main() -> int:
             str(datasets_dir),
             "--max-majority-answer-pct",
             "100",
+            "--max-dataset-majority-answer-pct",
+            "100",
             "--fail-on-findings",
         ]
         completed = run_command(provenance_command)
@@ -267,6 +278,15 @@ def main() -> int:
         if rc := require(
             json.loads(provenance_rows[0]["answer_histogram"]) == {"0": 3},
             "missing_provenance_answer_histogram",
+        ):
+            return rc
+        if rc := require(
+            json.loads(provenance_rows[0]["dataset_answer_histograms"]) == {
+                "arc-smoke": {"0": 1},
+                "hellaswag-smoke": {"0": 1},
+                "truthfulqa-smoke": {"0": 1},
+            },
+            "missing_provenance_dataset_answer_histograms",
         ):
             return rc
         provenance_root = ET.parse(provenance_junit).getroot()
@@ -384,6 +404,48 @@ def main() -> int:
             for finding in artifact["findings"]
         }
         if rc := require("answer_histogram_mismatch" in stale_answer_kinds, "missing_answer_histogram_finding"):
+            return rc
+
+        stale_dataset_answer_manifest = tmp_path / "stale_dataset_answer_histogram.manifest.json"
+        stale_dataset_answer_report = dict(curated_report)
+        stale_dataset_answer_report["dataset_answer_histograms"] = {"arc-smoke": {"1": 1}}
+        stale_dataset_answer_manifest.write_text(
+            json.dumps(stale_dataset_answer_report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        stale_dataset_answer_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_provenance_audit.py"),
+            "--input",
+            str(stale_dataset_answer_manifest),
+            "--output-dir",
+            str(tmp_path / "stale-dataset-answer-provenance"),
+            "--fail-on-findings",
+        ]
+        completed = subprocess.run(
+            stale_dataset_answer_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("stale_dataset_answer_histogram_not_rejected=true", file=sys.stderr)
+            return 1
+        stale_dataset_answer_failure = json.loads(
+            (tmp_path / "stale-dataset-answer-provenance" / "dataset_provenance_audit_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        stale_dataset_answer_kinds = {
+            finding["kind"]
+            for artifact in stale_dataset_answer_failure["artifacts"]
+            for finding in artifact["findings"]
+        }
+        if rc := require(
+            "dataset_answer_histograms_mismatch" in stale_dataset_answer_kinds,
+            "missing_dataset_answer_histogram_finding",
+        ):
             return rc
 
         leak_fixture = tmp_path / "leaky.jsonl"

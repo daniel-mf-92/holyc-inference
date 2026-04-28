@@ -50,6 +50,18 @@ def answer_histogram(records: list[dataset_pack.EvalRecord]) -> dict[str, int]:
     return histogram
 
 
+def answer_histograms_by_dataset(records: list[dataset_pack.EvalRecord]) -> dict[str, dict[str, int]]:
+    grouped: dict[str, dict[str, int]] = {}
+    for record in records:
+        histogram = grouped.setdefault(record.dataset, {})
+        key = str(record.answer_index)
+        histogram[key] = histogram.get(key, 0) + 1
+    return {
+        dataset: dict(sorted(histogram.items(), key=lambda item: int(item[0])))
+        for dataset, histogram in sorted(grouped.items())
+    }
+
+
 def count_by(records: list[dataset_pack.EvalRecord], field: str) -> dict[str, int]:
     counts: dict[str, int] = {}
     for record in records:
@@ -219,6 +231,7 @@ def build_manifest(
         "answer_histogram": answer_histogram(selected),
         "created_at": iso_now(),
         "dataset_counts": count_by(selected, "dataset"),
+        "dataset_answer_histograms": answer_histograms_by_dataset(selected),
         "dataset_split_counts": count_by_dataset_split(selected),
         "filters": {
             "include_dataset": sorted(args.include_dataset),

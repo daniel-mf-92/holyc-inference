@@ -4,6 +4,34 @@
       "answer_histogram": {
         "0": 3
       },
+      "dataset_answer_histograms": {
+        "arc-smoke": {
+          "0": 1
+        },
+        "hellaswag-smoke": {
+          "0": 1
+        },
+        "truthfulqa-smoke": {
+          "0": 1
+        }
+      },
+      "dataset_majority_answers": {
+        "arc-smoke": {
+          "answer_index": "0",
+          "pct": 100.0,
+          "records": 1
+        },
+        "hellaswag-smoke": {
+          "answer_index": "0",
+          "pct": 100.0,
+          "records": 1
+        },
+        "truthfulqa-smoke": {
+          "answer_index": "0",
+          "pct": 100.0,
+          "records": 1
+        }
+      },
       "findings": [],
       "license": "synthetic-smoke",
       "majority_answer_index": "0",
@@ -19,6 +47,6 @@
       "status": "pass"
     }
   ],
-  "generated_at": "2026-04-28T12:08:24Z",
+  "generated_at": "2026-04-28T12:17:22Z",
   "status": "pass"
 }

@@ -153,6 +153,21 @@ python3 bench/dataset_leak_audit.py \
   --fail-on-leaks
 ```
 
+`dataset_provenance_audit.py` checks curated JSONL manifests for source/license
+metadata, source and output hashes, selected IDs, dataset/split counts, and
+answer histograms. Reports include overall and per-dataset answer-majority
+telemetry; `--max-majority-answer-pct` and
+`--max-dataset-majority-answer-pct` can fail CI when curated subsets are label
+skewed.
+
+```bash
+python3 bench/dataset_provenance_audit.py \
+  --input bench/results/datasets \
+  --output-dir bench/results/datasets \
+  --max-dataset-majority-answer-pct 80 \
+  --fail-on-findings
+```
+
 ## Offline Eval Comparator
 
 `eval_compare.py` compares local HolyC and llama.cpp multiple-choice predictions

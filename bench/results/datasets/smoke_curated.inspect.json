@@ -12,7 +12,7 @@
   "dataset": "smoke-eval",
   "findings": [],
   "format": "hceval-mc",
-  "generated_at": "2026-04-28T11:40:55Z",
+  "generated_at": "2026-04-28T12:17:22Z",
   "input": "bench/results/datasets/smoke_curated.hceval",
   "payload_sha256": "7673822187499c96fc823bf5ab164e118a99b0d796c7460f47060b426af5aac4",
   "record_count": 3,
