@@ -114,3 +114,4 @@
 2026-04-28T09:43:31Z | Added perf regression P95 first-token latency tracking and opt-in tail-latency gating with refreshed dashboard artifacts.
 2026-04-28T09:50:00Z | Added command-hash metadata propagation and opt-in gating to benchmark artifact manifests with refreshed reports.
 2026-04-28T09:57:13Z | Added full-history CSV export to benchmark artifact manifests with docs, tests, and refreshed reports.
+2026-04-28T10:06:08Z | Added eval_compare per-dataset/split breakdown CSV output and opt-in breakdown quality gates with refreshed smoke artifacts.

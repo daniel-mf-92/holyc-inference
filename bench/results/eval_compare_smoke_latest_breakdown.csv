@@ -1,0 +1,4 @@
+dataset,split,record_count,holyc_correct,llama_correct,agreement_count,holyc_accuracy,llama_accuracy,accuracy_delta_holyc_minus_llama,agreement
+arc-smoke,validation,1,1,1,1,1.0,1.0,0.0,1.0
+hellaswag-smoke,validation,1,1,1,1,1.0,1.0,0.0,1.0
+truthfulqa-smoke,validation,1,1,1,1,1.0,1.0,0.0,1.0

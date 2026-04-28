@@ -90,6 +90,7 @@ def test_cli_writes_json_and_markdown_report() -> None:
         )
         payload = json.loads((Path(tmp) / "smoke.json").read_text(encoding="utf-8"))
         csv_rows = list(csv.DictReader((Path(tmp) / "smoke.csv").open(newline="", encoding="utf-8")))
+        breakdown_rows = list(csv.DictReader((Path(tmp) / "smoke_breakdown.csv").open(newline="", encoding="utf-8")))
         junit_root = ET.parse(Path(tmp) / "smoke_junit.xml").getroot()
         assert payload["summary"]["record_count"] == 3
         assert payload["status"] == "pass"
@@ -114,6 +115,9 @@ def test_cli_writes_json_and_markdown_report() -> None:
         assert "## Score Ranking" in markdown
         assert "No quality gate regressions." in markdown
         assert len(csv_rows) == 3
+        assert len(breakdown_rows) == 3
+        assert breakdown_rows[0]["dataset"] == "arc-smoke"
+        assert breakdown_rows[0]["record_count"] == "1"
         assert csv_rows[0]["record_id"] == "smoke-arc-1"
         assert csv_rows[0]["holyc_correct"] == "True"
         assert csv_rows[0]["engines_agree"] == "True"
@@ -334,6 +338,83 @@ def test_cli_can_fail_on_quality_gate_regression() -> None:
         assert junit_root.find("./testcase/failure") is not None
 
 
+def test_cli_can_gate_dataset_breakdown_regressions() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        gold = tmp_path / "gold.jsonl"
+        holyc = tmp_path / "holyc.jsonl"
+        llama = tmp_path / "llama.jsonl"
+        gold.write_text(
+            "\n".join(
+                [
+                    '{"id":"a1","dataset":"alpha","split":"validation","prompt":"A1?","choices":["A","B"],"answer_index":0}',
+                    '{"id":"a2","dataset":"alpha","split":"validation","prompt":"A2?","choices":["A","B"],"answer_index":0}',
+                    '{"id":"a3","dataset":"alpha","split":"validation","prompt":"A3?","choices":["A","B"],"answer_index":0}',
+                    '{"id":"b1","dataset":"beta","split":"validation","prompt":"B1?","choices":["A","B"],"answer_index":0}',
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        holyc.write_text(
+            "\n".join(
+                [
+                    '{"id":"a1","prediction":0}',
+                    '{"id":"a2","prediction":0}',
+                    '{"id":"a3","prediction":0}',
+                    '{"id":"b1","prediction":1}',
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        llama.write_text(
+            "\n".join(
+                [
+                    '{"id":"a1","prediction":0}',
+                    '{"id":"a2","prediction":0}',
+                    '{"id":"a3","prediction":0}',
+                    '{"id":"b1","prediction":0}',
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        status = eval_compare.main(
+            [
+                "--gold",
+                str(gold),
+                "--holyc",
+                str(holyc),
+                "--llama",
+                str(llama),
+                "--dataset",
+                "mixed",
+                "--split",
+                "validation",
+                "--output-dir",
+                tmp,
+                "--output-stem",
+                "breakdown_gated",
+                "--min-holyc-accuracy",
+                "0.7",
+                "--gate-dataset-breakdowns",
+                "--fail-on-regression",
+            ]
+        )
+        payload = json.loads((tmp_path / "breakdown_gated.json").read_text(encoding="utf-8"))
+        junit_root = ET.parse(tmp_path / "breakdown_gated_junit.xml").getroot()
+
+        assert status == 1
+        assert payload["summary"]["holyc_accuracy"] == 0.75
+        assert payload["status"] == "fail"
+        assert len(payload["regressions"]) == 1
+        assert payload["regressions"][0]["scope"] == "dataset_split"
+        assert payload["regressions"][0]["dataset"] == "beta"
+        assert junit_root.attrib["failures"] == "1"
+
+
 if __name__ == "__main__":
     test_smoke_predictions_compare_cleanly()
     test_cli_writes_json_and_markdown_report()
@@ -341,6 +422,9 @@ if __name__ == "__main__":
     test_compare_reports_score_vector_calibration()
     test_confidence_level_can_be_configured()
     test_invalid_confidence_level_fails_fast()
+    test_score_vector_must_match_choice_count()
+    test_score_vector_rejects_non_finite_values()
     test_missing_prediction_fails_fast()
     test_cli_can_fail_on_quality_gate_regression()
+    test_cli_can_gate_dataset_breakdown_regressions()
     print("eval_compare_tests=ok")

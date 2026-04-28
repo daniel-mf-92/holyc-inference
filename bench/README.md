@@ -563,11 +563,14 @@ python3 bench/build_compare.py \
 `eval_compare.py` compares offline multiple-choice predictions from HolyC and
 llama.cpp against the same local gold JSONL dataset. It aligns by record id,
 supports prediction indexes, labels, exact choice text, or score arrays, and
-writes JSON, Markdown, and per-record CSV reports to `bench/results/`. Reports
-include accuracy, agreement, macro-F1, per-answer F1, and confusion matrices
+writes JSON, Markdown, per-record CSV, per-dataset/split breakdown CSV, and
+JUnit XML reports to `bench/results/`. Reports include accuracy, agreement,
+macro-F1, per-answer F1, per-dataset/split breakdowns, and confusion matrices
 for each engine. Accuracy and agreement summaries also include stdlib-only
 Wilson confidence intervals; use `--confidence-level` to select 0.80, 0.90,
-0.95, 0.98, or 0.99.
+0.95, 0.98, or 0.99. Add `--gate-dataset-breakdowns` to apply the same quality
+gates to each dataset/split bucket, which prevents mixed eval suites from hiding
+small-subset regressions behind healthy aggregate scores.
 
 Before comparing, `eval_input_audit.py` can gate apples-to-apples inputs. It
 checks gold/prediction record coverage, duplicates, invalid prediction indexes,
@@ -598,6 +601,7 @@ python3 bench/eval_compare.py \
   --split validation \
   --model synthetic-smoke \
   --quantization Q4_0 \
+  --gate-dataset-breakdowns \
   --output-stem eval_compare_smoke_latest
 ```
 
