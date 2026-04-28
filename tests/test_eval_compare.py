@@ -94,6 +94,9 @@ def test_cli_writes_json_and_markdown_report() -> None:
         calibration_rows = list(
             csv.DictReader((Path(tmp) / "smoke_calibration_bins.csv").open(newline="", encoding="utf-8"))
         )
+        disagreement_rows = list(
+            csv.DictReader((Path(tmp) / "smoke_disagreements.csv").open(newline="", encoding="utf-8"))
+        )
         junit_root = ET.parse(Path(tmp) / "smoke_junit.xml").getroot()
         assert payload["summary"]["record_count"] == 3
         assert payload["status"] == "pass"
@@ -125,6 +128,7 @@ def test_cli_writes_json_and_markdown_report() -> None:
         assert calibration_rows[-1]["bin_index"] == "9"
         assert breakdown_rows[0]["dataset"] == "arc-smoke"
         assert breakdown_rows[0]["record_count"] == "1"
+        assert disagreement_rows == []
         assert csv_rows[0]["record_id"] == "smoke-arc-1"
         assert csv_rows[0]["holyc_correct"] == "True"
         assert csv_rows[0]["engines_agree"] == "True"
@@ -345,6 +349,53 @@ def test_cli_can_fail_on_quality_gate_regression() -> None:
         assert junit_root.find("./testcase/failure") is not None
 
 
+def test_cli_writes_disagreement_csv_for_engine_mismatches() -> None:
+    gold = BENCH_PATH / "datasets" / "samples" / "smoke_eval.jsonl"
+    llama = BENCH_PATH / "eval" / "samples" / "llama_smoke_predictions.jsonl"
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        holyc = tmp_path / "wrong.jsonl"
+        holyc.write_text(
+            "\n".join(
+                [
+                    '{"id":"smoke-arc-1","prediction":1}',
+                    '{"id":"smoke-hellaswag-1","prediction":0}',
+                    '{"id":"smoke-truthfulqa-1","prediction":0}',
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        status = eval_compare.main(
+            [
+                "--gold",
+                str(gold),
+                "--holyc",
+                str(holyc),
+                "--llama",
+                str(llama),
+                "--dataset",
+                "smoke-eval",
+                "--split",
+                "validation",
+                "--output-dir",
+                tmp,
+                "--output-stem",
+                "mismatched",
+            ]
+        )
+        rows = list(csv.DictReader((tmp_path / "mismatched_disagreements.csv").open(newline="", encoding="utf-8")))
+
+        assert status == 0
+        assert len(rows) == 1
+        assert rows[0]["record_id"] == "smoke-arc-1"
+        assert rows[0]["answer_index"] == "0"
+        assert rows[0]["holyc_prediction"] == "1"
+        assert rows[0]["llama_prediction"] == "0"
+        assert rows[0]["holyc_correct"] == "False"
+        assert rows[0]["llama_correct"] == "True"
+
+
 def test_cli_can_gate_dataset_breakdown_regressions() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
@@ -433,5 +484,6 @@ if __name__ == "__main__":
     test_score_vector_rejects_non_finite_values()
     test_missing_prediction_fails_fast()
     test_cli_can_fail_on_quality_gate_regression()
+    test_cli_writes_disagreement_csv_for_engine_mismatches()
     test_cli_can_gate_dataset_breakdown_regressions()
     print("eval_compare_tests=ok")

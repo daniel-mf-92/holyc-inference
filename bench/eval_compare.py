@@ -1002,6 +1002,33 @@ def write_calibration_bins_csv_report(path: Path, summary: dict[str, Any]) -> No
                 )
 
 
+def write_disagreements_csv_report(path: Path, rows: list[EvalRow]) -> None:
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        fields = [
+            "record_id",
+            "dataset",
+            "split",
+            "answer_index",
+            "holyc_prediction",
+            "llama_prediction",
+            "holyc_correct",
+            "llama_correct",
+            "holyc_confidence",
+            "llama_confidence",
+            "holyc_margin",
+            "llama_margin",
+            "holyc_gold_rank",
+            "llama_gold_rank",
+        ]
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for row in rows:
+            if row.engines_agree:
+                continue
+            payload = asdict(row)
+            writer.writerow({field: payload.get(field, "") for field in fields})
+
+
 def write_report(
     rows: list[EvalRow],
     summary: dict[str, Any],
@@ -1009,7 +1036,7 @@ def write_report(
     gold_path: Path,
     holyc_path: Path,
     llama_path: Path,
-) -> tuple[Path, Path, Path, Path, Path, Path]:
+) -> tuple[Path, Path, Path, Path, Path, Path, Path]:
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     regressions = find_all_regressions(summary, args)
@@ -1038,6 +1065,7 @@ def write_report(
     breakdown_csv_path = output_dir / f"{stem}_breakdown.csv"
     confusion_csv_path = output_dir / f"{stem}_confusion.csv"
     calibration_bins_csv_path = output_dir / f"{stem}_calibration_bins.csv"
+    disagreements_csv_path = output_dir / f"{stem}_disagreements.csv"
     junit_path = output_dir / f"{stem}_junit.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
@@ -1045,8 +1073,17 @@ def write_report(
     write_breakdown_csv_report(breakdown_csv_path, summary.get("dataset_breakdown", []))
     write_confusion_csv_report(confusion_csv_path, summary)
     write_calibration_bins_csv_report(calibration_bins_csv_path, summary)
+    write_disagreements_csv_report(disagreements_csv_path, rows)
     write_junit(regressions, junit_path)
-    return json_path, md_path, csv_path, breakdown_csv_path, confusion_csv_path, calibration_bins_csv_path
+    return (
+        json_path,
+        md_path,
+        csv_path,
+        breakdown_csv_path,
+        confusion_csv_path,
+        calibration_bins_csv_path,
+        disagreements_csv_path,
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1097,6 +1134,7 @@ def main(argv: list[str] | None = None) -> int:
             breakdown_csv_path,
             confusion_csv_path,
             calibration_bins_csv_path,
+            disagreements_csv_path,
         ) = write_report(
             rows, summary, args, args.gold, args.holyc, args.llama
         )
@@ -1110,6 +1148,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"wrote_breakdown_csv={breakdown_csv_path}")
     print(f"wrote_confusion_csv={confusion_csv_path}")
     print(f"wrote_calibration_bins_csv={calibration_bins_csv_path}")
+    print(f"wrote_disagreements_csv={disagreements_csv_path}")
     print(f"holyc_accuracy={summary['holyc_accuracy']:.4f}")
     print(f"llama_accuracy={summary['llama_accuracy']:.4f}")
     print(f"agreement={summary['agreement']:.4f}")
