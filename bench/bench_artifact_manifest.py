@@ -36,12 +36,15 @@ class ManifestArtifact:
     model: str
     quantization: str
     prompt_suite_sha256: str
+    command_sha256: str
     measured_runs: int
     warmup_runs: int
     median_tok_per_s: float | None
     max_memory_bytes: int | None
     telemetry_status: str
     telemetry_findings: list[str]
+    command_hash_status: str
+    command_hash_findings: list[str]
     command_airgap_status: str
     commit: str
     current_commit: str
@@ -89,12 +92,15 @@ def to_manifest_artifact(summary: bench_result_index.ArtifactSummary) -> Manifes
         model=summary.model,
         quantization=summary.quantization,
         prompt_suite_sha256=summary.prompt_suite_sha256,
+        command_sha256=summary.command_sha256,
         measured_runs=summary.measured_runs,
         warmup_runs=summary.warmup_runs,
         median_tok_per_s=summary.median_tok_per_s,
         max_memory_bytes=summary.max_memory_bytes,
         telemetry_status=summary.telemetry_status,
         telemetry_findings=summary.telemetry_findings,
+        command_hash_status=summary.command_hash_status,
+        command_hash_findings=summary.command_hash_findings,
         command_airgap_status=summary.command_airgap_status,
         commit=summary.commit,
         current_commit=summary.current_commit,
@@ -127,6 +133,7 @@ def manifest_status(artifacts: list[ManifestArtifact]) -> str:
         item.status == "fail"
         or item.command_airgap_status == "fail"
         or item.telemetry_status == "fail"
+        or item.command_hash_status == "fail"
         or item.commit_status == "fail"
         or item.freshness_status == "fail"
         for item in artifacts
@@ -145,6 +152,10 @@ def has_telemetry_failures(artifacts: Iterable[ManifestArtifact]) -> bool:
 
 def has_commit_metadata_failures(artifacts: Iterable[ManifestArtifact]) -> bool:
     return any(artifact.commit_status == "fail" for artifact in artifacts)
+
+
+def has_command_hash_metadata_failures(artifacts: Iterable[ManifestArtifact]) -> bool:
+    return any(artifact.command_hash_status == "fail" for artifact in artifacts)
 
 
 def has_stale_commits(artifacts: Iterable[ManifestArtifact]) -> bool:
@@ -178,14 +189,14 @@ def markdown_report(report: dict[str, object]) -> str:
     if latest:
         lines.extend(
             [
-                "| Key | Status | Air-gap | Telemetry | Freshness | Commit | Runs | Warmups | Age seconds | Median tok/s | Max memory bytes | SHA256 | Source |",
-                "| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |",
+                "| Key | Status | Air-gap | Telemetry | Command Hash | Freshness | Commit | Runs | Warmups | Age seconds | Median tok/s | Max memory bytes | Command SHA256 | Artifact SHA256 | Source |",
+                "| --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |",
             ]
         )
         for artifact in latest:
             lines.append(
-                "| {key} | {status} | {command_airgap_status} | {telemetry_status} | {freshness_status} | {commit_status}:{commit} | {measured_runs} | "
-                "{warmup_runs} | {generated_age_seconds} | {median_tok_per_s} | {max_memory_bytes} | {sha256} | "
+                "| {key} | {status} | {command_airgap_status} | {telemetry_status} | {command_hash_status} | {freshness_status} | {commit_status}:{commit} | {measured_runs} | "
+                "{warmup_runs} | {generated_age_seconds} | {median_tok_per_s} | {max_memory_bytes} | {command_sha256} | {sha256} | "
                 "{source} |".format(
                     **{key: format_value(value) for key, value in artifact.items()}
                 )
@@ -207,12 +218,15 @@ def write_csv(artifacts: list[ManifestArtifact], path: Path) -> None:
         "model",
         "quantization",
         "prompt_suite_sha256",
+        "command_sha256",
         "measured_runs",
         "warmup_runs",
         "median_tok_per_s",
         "max_memory_bytes",
         "telemetry_status",
         "telemetry_findings",
+        "command_hash_status",
+        "command_hash_findings",
         "command_airgap_status",
         "commit",
         "current_commit",
@@ -230,6 +244,7 @@ def write_csv(artifacts: list[ManifestArtifact], path: Path) -> None:
         for artifact in artifacts:
             row = asdict(artifact)
             row["telemetry_findings"] = json.dumps(artifact.telemetry_findings, separators=(",", ":"))
+            row["command_hash_findings"] = json.dumps(artifact.command_hash_findings, separators=(",", ":"))
             row["commit_findings"] = json.dumps(artifact.commit_findings, separators=(",", ":"))
             row["freshness_findings"] = json.dumps(artifact.freshness_findings, separators=(",", ":"))
             writer.writerow({field: row[field] for field in fields})
@@ -240,6 +255,7 @@ def junit_report(report: dict[str, object]) -> str:
     failed_artifacts = [row for row in history if row.get("status") == "fail"]
     airgap_failures = [row for row in history if row.get("command_airgap_status") == "fail"]
     telemetry_failures = [row for row in history if row.get("telemetry_status") == "fail"]
+    command_hash_failures = [row for row in history if row.get("command_hash_status") == "fail"]
     commit_failures = [row for row in history if row.get("commit_status") == "fail"]
     freshness_failures = [row for row in history if row.get("freshness_status") == "fail"]
     missing_latest = not report["latest_artifacts"]
@@ -247,6 +263,7 @@ def junit_report(report: dict[str, object]) -> str:
         int(bool(failed_artifacts))
         + int(bool(airgap_failures))
         + int(bool(telemetry_failures))
+        + int(bool(command_hash_failures))
         + int(bool(commit_failures))
         + int(bool(freshness_failures))
         + int(missing_latest)
@@ -256,7 +273,7 @@ def junit_report(report: dict[str, object]) -> str:
         "testsuite",
         {
             "name": "holyc_bench_artifact_manifest",
-            "tests": "6",
+            "tests": "7",
             "failures": str(failures),
         },
     )
@@ -298,6 +315,21 @@ def junit_report(report: dict[str, object]) -> str:
         failure.text = "\n".join(
             f"{row.get('source', '')}: {json.dumps(row.get('telemetry_findings', []), separators=(',', ':'))}"
             for row in telemetry_failures
+        )
+
+    command_hash_case = ET.SubElement(suite, "testcase", {"name": "command_hash_metadata"})
+    if command_hash_failures:
+        failure = ET.SubElement(
+            command_hash_case,
+            "failure",
+            {
+                "type": "benchmark_command_hash_metadata_failure",
+                "message": f"{len(command_hash_failures)} benchmark artifact(s) have inconsistent command hashes",
+            },
+        )
+        failure.text = "\n".join(
+            f"{row.get('source', '')}: {json.dumps(row.get('command_hash_findings', []), separators=(',', ':'))}"
+            for row in command_hash_failures
         )
 
     latest_case = ET.SubElement(suite, "testcase", {"name": "latest_artifacts_present"})
@@ -399,6 +431,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Return non-zero if any manifest artifact has missing or inconsistent commit metadata",
     )
     parser.add_argument(
+        "--fail-on-command-hash-metadata",
+        action="store_true",
+        help="Return non-zero if any manifest artifact has inconsistent command_sha256 metadata",
+    )
+    parser.add_argument(
         "--fail-on-stale-commit",
         action="store_true",
         help="Return non-zero if any manifest artifact commit differs from the current git commit",
@@ -441,12 +478,15 @@ def main(argv: list[str] | None = None) -> int:
     print(f"wrote_json={output}")
     print(f"status={status}")
     print(f"artifacts={len(summaries)}")
+    print(f"command_hash_failures={sum(1 for artifact in artifacts if artifact.command_hash_status == 'fail')}")
     print(f"freshness_failures={sum(1 for artifact in artifacts if artifact.freshness_status == 'fail')}")
     if args.fail_on_airgap and has_airgap_failures(artifacts):
         return 1
     if args.fail_on_telemetry and has_telemetry_failures(artifacts):
         return 1
     if args.fail_on_commit_metadata and has_commit_metadata_failures(artifacts):
+        return 1
+    if args.fail_on_command_hash_metadata and has_command_hash_metadata_failures(artifacts):
         return 1
     if args.fail_on_stale_commit and has_stale_commits(artifacts):
         return 1

@@ -668,6 +668,59 @@ def main() -> int:
             print("manifest_commit_gate_failed_on_stale_only=true", file=sys.stderr)
             return completed.returncode
 
+        command_hash_fixture_dir = tmp_path / "command_hash_manifest_fixture"
+        command_hash_fixture_dir.mkdir()
+        command_hash_report = command_hash_fixture_dir / "qemu_prompt_bench_command_hash_mixed.json"
+        command_hash_payload = json.loads(incomplete_report.read_text(encoding="utf-8"))
+        command_hash_payload["command_sha256"] = "report-command-hash"
+        command_hash_payload["benchmarks"][0]["command_sha256"] = "run-command-hash"
+        command_hash_report.write_text(json.dumps(command_hash_payload) + "\n", encoding="utf-8")
+        manifest_command_hash_output_dir = tmp_path / "manifest_command_hash_output"
+        manifest_command_hash_command = [
+            sys.executable,
+            str(ROOT / "bench" / "bench_artifact_manifest.py"),
+            "--input",
+            str(command_hash_fixture_dir),
+            "--output-dir",
+            str(manifest_command_hash_output_dir),
+            "--fail-on-command-hash-metadata",
+        ]
+        completed = subprocess.run(
+            manifest_command_hash_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("manifest_command_hash_gate_did_not_fail=true", file=sys.stderr)
+            return 1
+        command_hash_manifest = json.loads(
+            (manifest_command_hash_output_dir / "bench_artifact_manifest_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        command_hash_artifact = command_hash_manifest["latest_artifacts"][0]
+        if command_hash_artifact.get("command_hash_status") != "fail":
+            print("missing_manifest_command_hash_failure=true", file=sys.stderr)
+            return 1
+        if "Command Hash" not in (
+            manifest_command_hash_output_dir / "bench_artifact_manifest_latest.md"
+        ).read_text(encoding="utf-8"):
+            print("missing_manifest_command_hash_markdown=true", file=sys.stderr)
+            return 1
+        if "command_hash_status" not in (
+            manifest_command_hash_output_dir / "bench_artifact_manifest_latest.csv"
+        ).read_text(encoding="utf-8"):
+            print("missing_manifest_command_hash_csv=true", file=sys.stderr)
+            return 1
+        command_hash_junit_root = ET.parse(
+            manifest_command_hash_output_dir / "bench_artifact_manifest_junit_latest.xml"
+        ).getroot()
+        if command_hash_junit_root.attrib.get("failures") == "0":
+            print("missing_manifest_command_hash_junit_failure=true", file=sys.stderr)
+            return 1
+
         complete_manifest_fixture_dir = tmp_path / "complete_manifest_fixture"
         complete_manifest_fixture_dir.mkdir()
         complete_report = complete_manifest_fixture_dir / "qemu_prompt_bench_complete.json"
