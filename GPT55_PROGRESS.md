@@ -75,3 +75,4 @@
 2026-04-28T02:07:03Z | Added perf regression prompt-suite drift gating with CSV/JUnit/dashboard output and refreshed smoke artifacts.
 2026-04-28T02:17:48Z | Added benchmark artifact manifest JUnit CI output with empty-manifest failure handling and refreshed reports.
 2026-04-28T02:22:39Z | Added HCEval inspection JUnit output with refreshed smoke dataset inspection artifacts.
+2026-04-28T02:36:16Z | Added benchmark artifact commit metadata and opt-in stale-commit gating with refreshed matrix/index artifacts.

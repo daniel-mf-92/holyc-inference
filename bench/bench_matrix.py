@@ -55,6 +55,7 @@ class MatrixCellResult:
     profile: str
     model: str
     quantization: str
+    commit: str
     status: str
     output_dir: str
     report: str
@@ -172,6 +173,18 @@ def max_cell_memory_bytes(report: dict[str, Any]) -> int | None:
     return max(int(value) for value in values) if values else None
 
 
+def report_commit(report: dict[str, Any]) -> str:
+    commits = sorted(
+        {
+            str(row.get("commit"))
+            for section in ("benchmarks", "warmups")
+            for row in report.get(section, [])
+            if isinstance(row, dict) and row.get("commit")
+        }
+    )
+    return commits[0] if len(commits) == 1 else ""
+
+
 def cell_command(
     qemu_bin: str,
     image: Path,
@@ -209,6 +222,7 @@ def run_cell(
             profile=cell.profile.name,
             model=cell.model.name,
             quantization=cell.quantization.name,
+            commit="",
             status="planned",
             output_dir=str(cell_output_dir),
             report=str(report_path),
@@ -263,6 +277,7 @@ def run_cell(
         profile=cell.profile.name,
         model=cell.model.name,
         quantization=cell.quantization.name,
+        commit=report_commit(report),
         status=str(report.get("status", "unknown")),
         output_dir=str(cell_output_dir),
         report=str(report_path),
@@ -297,16 +312,16 @@ def markdown_report(report: dict[str, Any]) -> str:
     ]
     if report["cells"]:
         lines.append(
-            "| Profile | Model | Quantization | Status | Prompts | Prompt suite | Runs | Warmups | Median tok/s | Max memory bytes | Variability findings |"
+            "| Profile | Model | Quantization | Commit | Status | Prompts | Prompt suite | Runs | Warmups | Median tok/s | Max memory bytes | Variability findings |"
         )
-        lines.append("| --- | --- | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | --- | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |")
         for cell in report["cells"]:
             median = cell["median_tok_per_s"]
             memory = cell["max_memory_bytes"]
             median_cell = f"{median:.3f}" if median is not None else "-"
             memory_cell = str(memory) if memory is not None else "-"
             lines.append(
-                f"| {cell['profile']} | {cell['model']} | {cell['quantization']} | {cell['status']} | "
+                f"| {cell['profile']} | {cell['model']} | {cell['quantization']} | {cell['commit'] or '-'} | {cell['status']} | "
                 f"{cell['prompts']} | {cell['prompt_suite_sha256']} | "
                 f"{cell['measured_runs']} | {cell['warmup_runs']} | "
                 f"{median_cell} | {memory_cell} | {cell['variability_findings']} |"
@@ -361,6 +376,7 @@ def write_matrix_csv(cells: list[MatrixCellResult], path: Path) -> None:
         "profile",
         "model",
         "quantization",
+        "commit",
         "status",
         "output_dir",
         "report",

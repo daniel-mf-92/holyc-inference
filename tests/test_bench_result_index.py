@@ -225,6 +225,56 @@ def test_qemu_prompt_report_checks_every_recorded_command(tmp_path: Path) -> Non
     assert bench_result_index.index_status(summaries) == "fail"
 
 
+def test_qemu_prompt_report_marks_stale_commit_and_cli_can_fail(tmp_path: Path) -> None:
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    input_dir.mkdir()
+    stale_commit = "deadbeef0000"
+    report = input_dir / "qemu_prompt_bench_latest.json"
+    report.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-04-27T20:00:00Z",
+                "status": "pass",
+                "prompt_suite": {"suite_sha256": "a" * 64, "prompt_count": 1},
+                "suite_summary": {"tok_per_s_median": 123.0},
+                "benchmarks": [
+                    {
+                        "benchmark": "qemu_prompt",
+                        "profile": "secure",
+                        "model": "tiny",
+                        "quantization": "Q4_0",
+                        "commit": stale_commit,
+                        "command": [
+                            "qemu-system-x86_64",
+                            "-nic",
+                            "none",
+                            "-drive",
+                            "file=TempleOS.img,format=raw,if=ide",
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summaries = bench_result_index.load_summaries([input_dir])
+
+    assert summaries[0].commit == stale_commit
+    assert summaries[0].commit_status == "pass"
+    assert summaries[0].current_commit_match is False
+    assert summaries[0] in bench_result_index.commit_drift(summaries)
+    assert (
+        bench_result_index.main(
+            ["--input", str(input_dir), "--output-dir", str(output_dir), "--fail-on-stale-commit"]
+        )
+        == 1
+    )
+    payload = json.loads((output_dir / "bench_result_index_latest.json").read_text(encoding="utf-8"))
+    assert payload["artifacts"][0]["current_commit_match"] is False
+
+
 def test_indexes_matrix_cells_and_flags_network_devices(tmp_path: Path) -> None:
     report = tmp_path / "bench_matrix_latest.json"
     report.write_text(

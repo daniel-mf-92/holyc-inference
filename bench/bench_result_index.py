@@ -12,6 +12,7 @@ import argparse
 import csv
 import json
 import statistics
+import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
@@ -43,6 +44,11 @@ class ArtifactSummary:
     telemetry_findings: list[str]
     command_airgap_status: str
     command_findings: list[str]
+    commit: str
+    current_commit: str
+    current_commit_match: bool | None
+    commit_status: str
+    commit_findings: list[str]
 
 
 @dataclass(frozen=True)
@@ -54,6 +60,21 @@ class PromptSuiteDrift:
 
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def git_commit(root: Path) -> str:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short=12", "HEAD"],
+            cwd=root,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+    return result.stdout.strip() or "unknown"
 
 
 def parse_float(value: Any) -> float | None:
@@ -166,7 +187,22 @@ def telemetry_status(
     return ("fail" if findings else "pass"), [f"{artifact_type}: {finding}" for finding in findings]
 
 
-def summarize_qemu_report(path: Path, report: dict[str, Any]) -> ArtifactSummary:
+def commit_status(artifact_type: str, commit_values: Iterable[Any]) -> tuple[str, str, list[str]]:
+    commits = sorted({str(value) for value in commit_values if value})
+    if not commits:
+        return "unknown", "", [f"{artifact_type}: missing commit metadata"]
+    if len(commits) > 1:
+        return "fail", ",".join(commits), [f"{artifact_type}: mixed commits: {','.join(commits)}"]
+    return "pass", commits[0], []
+
+
+def current_commit_match(commit: str, current_commit: str) -> bool | None:
+    if not commit or current_commit == "unknown":
+        return None
+    return commit == current_commit
+
+
+def summarize_qemu_report(path: Path, report: dict[str, Any], current_commit: str) -> ArtifactSummary:
     runs = [row for row in report.get("benchmarks", []) if isinstance(row, dict)]
     warmups = [row for row in report.get("warmups", []) if isinstance(row, dict)]
     summaries = [row for row in report.get("summaries", []) if isinstance(row, dict)]
@@ -204,6 +240,10 @@ def summarize_qemu_report(path: Path, report: dict[str, Any]) -> ArtifactSummary
         len(runs),
         median_tok_per_s,
     )
+    commit_state, commit, commit_findings = commit_status(
+        "qemu_prompt",
+        [row.get("commit") for row in runs + warmups if isinstance(row, dict)],
+    )
 
     return ArtifactSummary(
         source=str(path),
@@ -223,10 +263,15 @@ def summarize_qemu_report(path: Path, report: dict[str, Any]) -> ArtifactSummary
         telemetry_findings=telem_findings,
         command_airgap_status=airgap_status,
         command_findings=findings,
+        commit=commit,
+        current_commit=current_commit,
+        current_commit_match=current_commit_match(commit, current_commit),
+        commit_status=commit_state,
+        commit_findings=commit_findings,
     )
 
 
-def summarize_matrix_report(path: Path, report: dict[str, Any]) -> list[ArtifactSummary]:
+def summarize_matrix_report(path: Path, report: dict[str, Any], current_commit: str) -> list[ArtifactSummary]:
     cells = [row for row in report.get("cells", []) if isinstance(row, dict)]
     summaries: list[ArtifactSummary] = []
     for cell in cells:
@@ -239,6 +284,10 @@ def summarize_matrix_report(path: Path, report: dict[str, Any]) -> list[Artifact
             prompts,
             measured_runs,
             median_tok_per_s,
+        )
+        commit_state, commit, commit_findings = commit_status(
+            "bench_matrix_cell",
+            [cell.get("commit")],
         )
         summaries.append(
             ArtifactSummary(
@@ -259,6 +308,11 @@ def summarize_matrix_report(path: Path, report: dict[str, Any]) -> list[Artifact
                 telemetry_findings=telem_findings,
                 command_airgap_status=airgap_status,
                 command_findings=findings,
+                commit=commit,
+                current_commit=current_commit,
+                current_commit_match=current_commit_match(commit, current_commit),
+                commit_status=commit_state,
+                commit_findings=commit_findings,
             )
         )
     return summaries
@@ -266,14 +320,15 @@ def summarize_matrix_report(path: Path, report: dict[str, Any]) -> list[Artifact
 
 def load_summaries(paths: Iterable[Path]) -> list[ArtifactSummary]:
     summaries: list[ArtifactSummary] = []
+    current_commit = git_commit(Path.cwd())
     for path in sorted(set(iter_report_files(paths))):
         report = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(report, dict):
             continue
         if isinstance(report.get("benchmarks"), list):
-            summaries.append(summarize_qemu_report(path, report))
+            summaries.append(summarize_qemu_report(path, report, current_commit))
         elif isinstance(report.get("cells"), list):
-            summaries.extend(summarize_matrix_report(path, report))
+            summaries.extend(summarize_matrix_report(path, report, current_commit))
     return sorted(
         summaries,
         key=lambda item: (
@@ -295,6 +350,10 @@ def index_status(summaries: list[ArtifactSummary]) -> str:
     if any(summary.status == "fail" for summary in summaries):
         return "fail"
     return "pass"
+
+
+def commit_drift(summaries: list[ArtifactSummary]) -> list[ArtifactSummary]:
+    return [summary for summary in summaries if summary.current_commit_match is False]
 
 
 def prompt_suite_drift(summaries: list[ArtifactSummary]) -> list[PromptSuiteDrift]:
@@ -345,13 +404,13 @@ def markdown_report(report: dict[str, Any]) -> str:
     if report["artifacts"]:
         lines.extend(
             [
-                "| Type | Status | Air-gap | Telemetry | Profile | Model | Quant | Prompts | Runs | Warmups | Median tok/s | Max memory bytes | Source |",
-                "| --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |",
+                "| Type | Status | Air-gap | Telemetry | Commit | Profile | Model | Quant | Prompts | Runs | Warmups | Median tok/s | Max memory bytes | Source |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |",
             ]
         )
         for artifact in report["artifacts"]:
             lines.append(
-                "| {artifact_type} | {status} | {command_airgap_status} | {telemetry_status} | {profile} | {model} | "
+                "| {artifact_type} | {status} | {command_airgap_status} | {telemetry_status} | {commit_status}:{commit} | {profile} | {model} | "
                 "{quantization} | {prompts} | {measured_runs} | {warmup_runs} | "
                 "{median_tok_per_s} | {max_memory_bytes} | {source} |".format(
                     **{key: format_value(value) for key, value in artifact.items()}
@@ -478,6 +537,11 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
         "telemetry_findings",
         "command_airgap_status",
         "command_findings",
+        "commit",
+        "current_commit",
+        "current_commit_match",
+        "commit_status",
+        "commit_findings",
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
@@ -486,6 +550,7 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
             row = asdict(summary)
             row["telemetry_findings"] = json.dumps(summary.telemetry_findings, separators=(",", ":"))
             row["command_findings"] = json.dumps(summary.command_findings, separators=(",", ":"))
+            row["commit_findings"] = json.dumps(summary.commit_findings, separators=(",", ":"))
             writer.writerow({field: row[field] for field in fields})
 
 
@@ -548,6 +613,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Return non-zero if comparable artifacts use different prompt-suite hashes",
     )
+    parser.add_argument(
+        "--fail-on-stale-commit",
+        action="store_true",
+        help="Return non-zero if any artifact commit differs from the current git commit",
+    )
     return parser
 
 
@@ -569,6 +639,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.fail_on_airgap and status == "fail":
         return 1
     if args.fail_on_drift and drift:
+        return 1
+    if args.fail_on_stale_commit and commit_drift(summaries):
         return 1
     return 0
 
