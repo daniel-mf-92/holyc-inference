@@ -184,13 +184,17 @@ def test_cli_dry_run_validates_without_launching_qemu(tmp_path: Path, capsys) ->
     assert payload["planned_measured_launches"] == 2
     assert payload["planned_total_launches"] == 3
     assert payload["command"][1:3] == ["-nic", "none"]
+    assert payload["command_sha256"] == qemu_prompt_bench.command_hash(payload["command"])
+    assert len(payload["command_sha256"]) == 64
     assert payload["environment"]["qemu_bin"] == "qemu-system-x86_64"
     assert payload["environment"]["python"]
     assert payload["dry_run_report"] == str(output_dir / "qemu_prompt_bench_dry_run_latest.json")
     assert report["status"] == "planned"
     assert report["command"][1:3] == ["-nic", "none"]
+    assert report["command_sha256"] == payload["command_sha256"]
     assert report["environment"]["qemu_bin"] == "qemu-system-x86_64"
     assert "QEMU Prompt Benchmark Dry Run" in markdown
+    assert f"Command SHA256: {payload['command_sha256']}" in markdown
     assert "Total launches: 3" in markdown
     assert "Environment" in markdown
 
@@ -270,6 +274,8 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
     assert report["benchmarks"][0]["wall_us_per_token"] > 0
     assert report["benchmarks"][0]["memory_bytes"] == 8388608
     assert report["benchmarks"][0]["command"][1:3] == ["-nic", "none"]
+    assert report["command_sha256"] == report["benchmarks"][0]["command_sha256"]
+    assert report["command_sha256"] == qemu_prompt_bench.command_hash(report["benchmarks"][0]["command"])
     assert report["environment"]["qemu_bin"] == str(fake_qemu)
     assert report["environment"]["qemu_path"] == str(fake_qemu)
     assert report["environment"]["qemu_version"] is None
@@ -278,6 +284,7 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
     assert "host_overhead_us,host_overhead_pct" in csv_report
     assert "wall_tok_per_s" in csv_report
     assert "us_per_token,wall_us_per_token" in csv_report
+    assert "timed_out,command_sha256" in csv_report
     assert "qemu_prompt,default,,,prompt-1" in csv_report
 
 
@@ -358,6 +365,7 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
     assert report["summaries"][0]["memory_bytes_max"] == 1000
     assert "QEMU Prompt Benchmark" in markdown
     assert f"Prompt suite: {report['prompt_suite']['suite_sha256']}" in markdown
+    assert f"Command SHA256: {report['command_sha256']}" in markdown
     assert "Median host overhead us" in markdown
     assert "Median wall tok/s" in markdown
     assert "Median us/token" in markdown

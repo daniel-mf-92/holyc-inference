@@ -70,6 +70,8 @@ def test_dry_run_writes_planned_air_gapped_commands(tmp_path: Path) -> None:
     assert junit_root.attrib["failures"] == "0"
     assert len(cell["prompt_suite_sha256"]) == 64
     assert csv_rows[0]["prompt_suite_sha256"] == cell["prompt_suite_sha256"]
+    assert cell["command_sha256"] == bench_matrix.qemu_prompt_bench.command_hash(cell["command"])
+    assert csv_rows[0]["command_sha256"] == cell["command_sha256"]
     assert json.loads(csv_rows[0]["command"])[1:3] == ["-nic", "none"]
     assert cell["command"][1:3] == ["-nic", "none"]
     assert "-m" in cell["command"]
@@ -140,8 +142,13 @@ def test_cli_runs_synthetic_matrix(tmp_path: Path) -> None:
     assert {row["quantization"] for row in csv_rows} == {"Q4_0", "Q8_0"}
     assert all(cell["measured_runs"] == 4 for cell in report["cells"])
     assert all(len(cell["prompt_suite_sha256"]) == 64 for cell in report["cells"])
+    assert all(len(cell["command_sha256"]) == 64 for cell in report["cells"])
     assert all(
         row["prompt_suite_sha256"] == report["cells"][index]["prompt_suite_sha256"]
+        for index, row in enumerate(csv_rows)
+    )
+    assert all(
+        row["command_sha256"] == report["cells"][index]["command_sha256"]
         for index, row in enumerate(csv_rows)
     )
     assert all(row["measured_runs"] == "4" for row in csv_rows)
@@ -150,6 +157,7 @@ def test_cli_runs_synthetic_matrix(tmp_path: Path) -> None:
     assert all(cell["command"][1:3] == ["-nic", "none"] for cell in report["cells"])
     assert "Benchmark Matrix" in markdown
     assert "Prompt suite" in markdown
+    assert "Command SHA256" in markdown
 
 
 def test_junit_marks_failed_matrix_cells(tmp_path: Path) -> None:
@@ -164,6 +172,7 @@ def test_junit_marks_failed_matrix_cells(tmp_path: Path) -> None:
             output_dir=str(tmp_path / "pass"),
             report=str(tmp_path / "pass" / "qemu_prompt_bench_latest.json"),
             command=["qemu-system-x86_64", "-nic", "none"],
+            command_sha256="c" * 64,
             prompts=1,
             prompt_suite_sha256="a" * 64,
             measured_runs=3,
@@ -181,6 +190,7 @@ def test_junit_marks_failed_matrix_cells(tmp_path: Path) -> None:
             output_dir=str(tmp_path / "fail"),
             report=str(tmp_path / "fail" / "qemu_prompt_bench_latest.json"),
             command=["qemu-system-x86_64", "-nic", "none"],
+            command_sha256="d" * 64,
             prompts=1,
             prompt_suite_sha256="b" * 64,
             measured_runs=3,
@@ -201,3 +211,4 @@ def test_junit_marks_failed_matrix_cells(tmp_path: Path) -> None:
     assert failure is not None
     assert failure.attrib["type"] == "benchmark_matrix_cell_failure"
     assert "variability_findings=1" in (failure.text or "")
+    assert "command_sha256=" in (failure.text or "")

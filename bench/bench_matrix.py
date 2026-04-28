@@ -60,6 +60,7 @@ class MatrixCellResult:
     output_dir: str
     report: str
     command: list[str]
+    command_sha256: str
     prompts: int
     prompt_suite_sha256: str
     measured_runs: int
@@ -253,6 +254,7 @@ def run_cell(
             output_dir=str(cell_output_dir),
             report=str(report_path),
             command=command,
+            command_sha256=qemu_prompt_bench.command_hash(command),
             prompts=prompt_count,
             prompt_suite_sha256=prompt_suite_sha256,
             measured_runs=0,
@@ -308,6 +310,7 @@ def run_cell(
         output_dir=str(cell_output_dir),
         report=str(report_path),
         command=command,
+        command_sha256=str(report.get("command_sha256") or qemu_prompt_bench.command_hash(command)),
         prompts=prompt_count,
         prompt_suite_sha256=str(
             (report.get("prompt_suite") or {}).get("suite_sha256") or prompt_suite_sha256
@@ -338,9 +341,9 @@ def markdown_report(report: dict[str, Any]) -> str:
     ]
     if report["cells"]:
         lines.append(
-            "| Profile | Model | Quantization | Commit | Status | Prompts | Prompt suite | Runs | Warmups | Median tok/s | Max memory bytes | Variability findings |"
+            "| Profile | Model | Quantization | Commit | Status | Prompts | Prompt suite | Command SHA256 | Runs | Warmups | Median tok/s | Max memory bytes | Variability findings |"
         )
-        lines.append("| --- | --- | --- | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: |")
         for cell in report["cells"]:
             median = cell["median_tok_per_s"]
             memory = cell["max_memory_bytes"]
@@ -348,7 +351,7 @@ def markdown_report(report: dict[str, Any]) -> str:
             memory_cell = str(memory) if memory is not None else "-"
             lines.append(
                 f"| {cell['profile']} | {cell['model']} | {cell['quantization']} | {cell['commit'] or '-'} | {cell['status']} | "
-                f"{cell['prompts']} | {cell['prompt_suite_sha256']} | "
+                f"{cell['prompts']} | {cell['prompt_suite_sha256']} | {cell['command_sha256']} | "
                 f"{cell['measured_runs']} | {cell['warmup_runs']} | "
                 f"{median_cell} | {memory_cell} | {cell['variability_findings']} |"
             )
@@ -406,6 +409,7 @@ def write_matrix_csv(cells: list[MatrixCellResult], path: Path) -> None:
         "status",
         "output_dir",
         "report",
+        "command_sha256",
         "prompts",
         "prompt_suite_sha256",
         "measured_runs",
@@ -467,6 +471,7 @@ def write_matrix_junit(cells: list[MatrixCellResult], path: Path) -> None:
                 f"report={cell.report}",
                 f"output_dir={cell.output_dir}",
                 f"prompt_suite_sha256={cell.prompt_suite_sha256}",
+                f"command_sha256={cell.command_sha256}",
                 f"measured_runs={cell.measured_runs}",
                 f"warmup_runs={cell.warmup_runs}",
                 f"median_tok_per_s={cell.median_tok_per_s}",

@@ -224,7 +224,8 @@ prompt-suite SHA256 matching `prompt_audit.py`, plus
 `qemu_prompt_bench_latest.csv` with one row per measured run for CI artifact
 upload, spreadsheets, and simple shell comparisons. JSON and Markdown reports
 also include host provenance for reproducibility: platform, machine, Python
-version, CPU count, QEMU binary/path, and QEMU version when discoverable.
+version, CPU count, QEMU binary/path, QEMU version when discoverable, and a
+stable SHA256 fingerprint of the QEMU command line.
 
 Prompt files can be JSON, JSONL, or plain text split with `---`. Guest output may
 include a JSON line such as:
@@ -299,9 +300,9 @@ python3 bench/qemu_prompt_bench.py \
 
 Dry-runs also write `qemu_prompt_bench_dry_run_latest.json` and `.md` under the
 selected output directory. These artifacts record the exact `-nic none` command,
-prompt-suite hash, warmup count, repeat count, and planned launch totals for CI
-review without booting a guest, plus the same host/QEMU provenance fields used
-by measured benchmark reports.
+the command SHA256 fingerprint, prompt-suite hash, warmup count, repeat count,
+and planned launch totals for CI review without booting a guest, plus the same
+host/QEMU provenance fields used by measured benchmark reports.
 
 `qemu_source_audit.py` statically scans host-side docs/config/shell-like files
 for literal `qemu-system*` launch snippets and applies the same air-gap command
@@ -348,7 +349,9 @@ matrix summary is written to `bench/results/bench_matrix_latest.json`, `.md`,
 the air-gap guard that injects `-nic none` and rejects NIC/network arguments.
 Matrix-level and per-axis QEMU options may be declared with `qemu_args`,
 `qemu_args_file`, or `qemu_args_files`; file paths are resolved relative to the
-matrix JSON file and are validated before cells are launched.
+matrix JSON file and are validated before cells are launched. Matrix summaries
+carry each cell's command SHA256 fingerprint so CI artifacts can detect QEMU
+argument drift independently from prompt-suite drift.
 Each matrix cell records the
 prompt-suite SHA256 from its underlying prompt benchmark report so matrix
 comparisons can reject accidental prompt drift.

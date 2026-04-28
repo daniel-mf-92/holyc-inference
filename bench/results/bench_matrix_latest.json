@@ -16,17 +16,18 @@
         "-smp",
         "1"
       ],
-      "commit": "a0126ad2c367",
+      "command_sha256": "b38e17f8fe6b79397ba9c4cb6dc68ad1d24ed501d479195500b1d8eaf615640d",
+      "commit": "d1ee8f0158c3",
       "max_memory_bytes": 67207168,
       "measured_runs": 4,
       "median_tok_per_s": 160.0,
       "model": "synthetic-smoke",
-      "output_dir": "bench/results/bench_matrix_20260428T035157Z/ci-airgap-smoke_synthetic-smoke_Q4_0",
+      "output_dir": "bench/results/bench_matrix_20260428T062013Z/ci-airgap-smoke_synthetic-smoke_Q4_0",
       "profile": "ci-airgap-smoke",
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "prompts": 2,
       "quantization": "Q4_0",
-      "report": "bench/results/bench_matrix_20260428T035157Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "report": "bench/results/bench_matrix_20260428T062013Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "status": "pass",
       "variability_findings": 0,
       "warmup_runs": 2
@@ -47,30 +48,31 @@
         "-smp",
         "1"
       ],
-      "commit": "a0126ad2c367",
+      "command_sha256": "b38e17f8fe6b79397ba9c4cb6dc68ad1d24ed501d479195500b1d8eaf615640d",
+      "commit": "d1ee8f0158c3",
       "max_memory_bytes": 67207168,
       "measured_runs": 4,
       "median_tok_per_s": 160.0,
       "model": "synthetic-smoke",
-      "output_dir": "bench/results/bench_matrix_20260428T035157Z/ci-airgap-smoke_synthetic-smoke_Q8_0",
+      "output_dir": "bench/results/bench_matrix_20260428T062013Z/ci-airgap-smoke_synthetic-smoke_Q8_0",
       "profile": "ci-airgap-smoke",
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "prompts": 2,
       "quantization": "Q8_0",
-      "report": "bench/results/bench_matrix_20260428T035157Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "report": "bench/results/bench_matrix_20260428T062013Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "status": "pass",
       "variability_findings": 0,
       "warmup_runs": 2
     }
   ],
   "dry_run": false,
-  "generated_at": "2026-04-28T03:52:04Z",
-  "matrix_dir": "bench/results/bench_matrix_20260428T035157Z",
+  "generated_at": "2026-04-28T06:20:15Z",
+  "matrix_dir": "bench/results/bench_matrix_20260428T062013Z",
   "matrix_file": "bench/fixtures/bench_matrix_smoke.json",
   "matrix_name": "synthetic-smoke-matrix",
   "status": "pass",
   "variability_gates": {
     "max_prompt_cv_pct": 0.1,
-    "max_suite_cv_pct": null
+    "max_suite_cv_pct": 0.1
   }
 }

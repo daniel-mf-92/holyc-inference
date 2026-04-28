@@ -81,6 +81,7 @@ class BenchRun:
     returncode: int
     timed_out: bool
     command: list[str]
+    command_sha256: str
     stdout_tail: str
     stderr_tail: str
 
@@ -91,6 +92,11 @@ def iso_now() -> str:
 
 def prompt_hash(prompt: str) -> str:
     return hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+
+
+def command_hash(command: list[str]) -> str:
+    encoded = json.dumps(command, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def prompt_bytes(prompt: str) -> int:
@@ -505,6 +511,7 @@ def run_prompt(
         returncode=returncode,
         timed_out=timed_out,
         command=command,
+        command_sha256=command_hash(command),
         stdout_tail=tail_text(stdout),
         stderr_tail=tail_text(stderr),
     )
@@ -784,6 +791,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Generated: {report['generated_at']}",
         f"Status: {report['status']}",
         f"Prompt suite: {report.get('prompt_suite', {}).get('suite_sha256', '-')}",
+        f"Command SHA256: {report.get('command_sha256', '-')}",
         f"Warmup runs: {len(report['warmups'])}",
         f"Runs: {len(report['benchmarks'])}",
         "",
@@ -893,6 +901,7 @@ def markdown_dry_run_report(report: dict[str, Any]) -> str:
         f"Generated: {report['generated_at']}",
         f"Status: {report['status']}",
         f"Prompt suite: {prompt_suite.get('suite_sha256', '-')}",
+        f"Command SHA256: {report.get('command_sha256', '-')}",
         f"Prompt count: {report['prompt_count']}",
         f"Warmup launches: {report['planned_warmup_launches']}",
         f"Measured launches: {report['planned_measured_launches']}",
@@ -948,6 +957,7 @@ def dry_run_payload(
         "generated_at": iso_now(),
         "status": "planned",
         "command": command,
+        "command_sha256": command_hash(command),
         "prompt_count": prompt_count,
         "prompt_suite": prompt_suite_metadata(prompts_path, prompts),
         "environment": environment or {},
@@ -1021,6 +1031,7 @@ def write_report(
         "status": report_status(all_runs, findings + telemetry),
         "prompt_suite": prompt_suite or {},
         "environment": environment or {},
+        "command_sha256": command_hash(all_runs[0].command) if all_runs else command_hash([]),
         "warmups": [asdict(run) for run in warmup_runs],
         "suite_summary": suite,
         "summaries": summaries,
@@ -1083,6 +1094,7 @@ def write_csv_report(runs: list[BenchRun], path: Path) -> None:
         "memory_bytes",
         "returncode",
         "timed_out",
+        "command_sha256",
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
@@ -1147,6 +1159,7 @@ def write_junit_report(
                 f"wall_tok_per_s={format_summary_value(run.wall_tok_per_s)}\n"
                 f"us_per_token={format_summary_value(run.us_per_token)}\n"
                 f"wall_us_per_token={format_summary_value(run.wall_us_per_token)}\n"
+                f"command_sha256={run.command_sha256}\n"
                 f"stdout_tail={run.stdout_tail}\n"
                 f"stderr_tail={run.stderr_tail}\n"
             )
