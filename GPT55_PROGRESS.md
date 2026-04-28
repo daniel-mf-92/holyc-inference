@@ -142,3 +142,4 @@
 2026-04-28T14:50:07Z | Added benchmark matrix aggregate summary CSV output with smoke coverage and refreshed matrix artifacts.
 2026-04-28T15:21:02Z | Added result-index and artifact-manifest host child CPU efficiency/RSS rollups with refreshed benchmark artifacts.
 2026-04-28T15:39:29Z | Added qemu_prompt_bench failure-count rollups for failed, timeout, and nonzero-exit runs with refreshed smoke artifacts.
+2026-04-28T15:56:34Z | Added benchmark environment fingerprints and env-drift gating with refreshed index/manifest artifacts.

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import statistics
 import subprocess
@@ -37,6 +38,11 @@ class ArtifactSummary:
     quantization: str
     prompt_suite_sha256: str
     command_sha256: str
+    environment_sha256: str
+    host_platform: str
+    host_machine: str
+    qemu_version: str
+    qemu_bin: str
     prompts: int | None
     measured_runs: int
     warmup_runs: int
@@ -75,6 +81,13 @@ class PromptSuiteDrift:
 
 @dataclass(frozen=True)
 class CommandDrift:
+    key: str
+    hashes: list[str]
+    sources: list[str]
+
+
+@dataclass(frozen=True)
+class EnvironmentDrift:
     key: str
     hashes: list[str]
     sources: list[str]
@@ -255,6 +268,37 @@ def command_hash_status(artifact_type: str, hash_values: Iterable[Any]) -> tuple
     return "pass", hashes[0], []
 
 
+def normalized_environment(environment: Any) -> dict[str, Any]:
+    if not isinstance(environment, dict):
+        return {}
+    keys = (
+        "platform",
+        "machine",
+        "processor",
+        "python",
+        "cpu_count",
+        "qemu_bin",
+        "qemu_path",
+        "qemu_version",
+    )
+    return {key: environment.get(key) for key in keys if environment.get(key) not in (None, "")}
+
+
+def environment_hash(environment: Any) -> str:
+    normalized = normalized_environment(environment)
+    if not normalized:
+        return ""
+    encoded = json.dumps(normalized, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def environment_field(environment: Any, name: str) -> str:
+    if not isinstance(environment, dict):
+        return ""
+    value = environment.get(name)
+    return "" if value is None else str(value)
+
+
 def current_commit_match(commit: str, current_commit: str) -> bool | None:
     if not commit or current_commit == "unknown":
         return None
@@ -295,6 +339,7 @@ def summarize_qemu_report(
     suite_summary = report.get("suite_summary") if isinstance(report.get("suite_summary"), dict) else {}
     first_run = runs[0] if runs else {}
     prompt_suite = report.get("prompt_suite") if isinstance(report.get("prompt_suite"), dict) else {}
+    environment = report.get("environment") if isinstance(report.get("environment"), dict) else {}
 
     tok_values = [
         value
@@ -357,6 +402,11 @@ def summarize_qemu_report(
         quantization=first_present(first_run, ("quantization",), str(report.get("quantization", ""))),
         prompt_suite_sha256=str(prompt_suite.get("suite_sha256", "")),
         command_sha256=command_sha256,
+        environment_sha256=environment_hash(environment),
+        host_platform=environment_field(environment, "platform"),
+        host_machine=environment_field(environment, "machine"),
+        qemu_version=environment_field(environment, "qemu_version"),
+        qemu_bin=environment_field(environment, "qemu_bin"),
         prompts=prompts,
         measured_runs=len(runs),
         warmup_runs=len(warmups),
@@ -404,6 +454,7 @@ def summarize_matrix_report(
         generated_age,
         max_artifact_age_seconds,
     )
+    environment = report.get("environment") if isinstance(report.get("environment"), dict) else {}
     for cell in cells:
         airgap_status, findings = command_status(cell.get("command"))
         prompts = parse_int(cell.get("prompts"))
@@ -437,6 +488,11 @@ def summarize_matrix_report(
                 quantization=str(cell.get("quantization", "")),
                 prompt_suite_sha256=str(cell.get("prompt_suite_sha256", "")),
                 command_sha256=command_sha256,
+                environment_sha256=environment_hash(environment),
+                host_platform=environment_field(environment, "platform"),
+                host_machine=environment_field(environment, "machine"),
+                qemu_version=environment_field(environment, "qemu_version"),
+                qemu_bin=environment_field(environment, "qemu_bin"),
                 prompts=prompts,
                 measured_runs=measured_runs,
                 warmup_runs=parse_int(cell.get("warmup_runs")) or 0,
@@ -599,6 +655,36 @@ def command_drift(summaries: list[ArtifactSummary]) -> list[CommandDrift]:
     return findings
 
 
+def environment_drift(summaries: list[ArtifactSummary]) -> list[EnvironmentDrift]:
+    by_key: dict[str, dict[str, set[str]]] = {}
+    for summary in summaries:
+        if not summary.environment_sha256 or not summary.command_sha256:
+            continue
+        key = "/".join(
+            (
+                summary.profile or "-",
+                summary.model or "-",
+                summary.quantization or "-",
+                summary.prompt_suite_sha256 or "no-suite",
+                summary.command_sha256 or "no-command",
+            )
+        )
+        by_key.setdefault(key, {}).setdefault(summary.environment_sha256, set()).add(summary.source)
+
+    findings: list[EnvironmentDrift] = []
+    for key, hash_sources in sorted(by_key.items()):
+        if len(hash_sources) <= 1:
+            continue
+        findings.append(
+            EnvironmentDrift(
+                key=key,
+                hashes=sorted(hash_sources),
+                sources=sorted(source for sources in hash_sources.values() for source in sources),
+            )
+        )
+    return findings
+
+
 def format_value(value: Any) -> str:
     if value is None or value == "":
         return "-"
@@ -615,26 +701,28 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Status: {report['status']}",
         f"Artifacts: {len(report['artifacts'])}",
         f"Command drift: {len(report['command_drift'])}",
+        f"Environment drift: {len(report['environment_drift'])}",
         "",
     ]
     if report["artifacts"]:
         lines.extend(
             [
-                "| Type | Status | Air-gap | Telemetry | Freshness | Commit | Profile | Model | Quant | Prompt suite | Command SHA256 | Prompts | Runs | Warmups | Age seconds | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Max memory bytes | Source |",
-                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+                "| Type | Status | Air-gap | Telemetry | Freshness | Commit | Profile | Model | Quant | Prompt suite | Command SHA256 | Env SHA256 | Host | QEMU | Prompts | Runs | Warmups | Age seconds | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Max memory bytes | Source |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
             ]
         )
         for artifact in report["artifacts"]:
+            values = {key: format_value(value) for key, value in artifact.items()}
+            values["qemu"] = format_value(artifact.get("qemu_version") or artifact.get("qemu_bin"))
             lines.append(
                 "| {artifact_type} | {status} | {command_airgap_status} | {telemetry_status} | {freshness_status} | {commit_status}:{commit} | {profile} | {model} | "
-                "{quantization} | {prompt_suite_sha256} | {command_sha256} | {prompts} | {measured_runs} | {warmup_runs} | "
+                "{quantization} | {prompt_suite_sha256} | {command_sha256} | {environment_sha256} | {host_platform}/{host_machine} | {qemu} | "
+                "{prompts} | {measured_runs} | {warmup_runs} | "
                 "{generated_age_seconds} | {median_tok_per_s} | {wall_tok_per_s_median} | {ttft_us_p95} | "
                 "{host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | "
                 "{host_child_tok_per_cpu_s_median} | {host_child_peak_rss_bytes_max} | "
                 "{us_per_token_median} | {wall_us_per_token_median} | "
-                "{max_memory_bytes} | {source} |".format(
-                    **{key: format_value(value) for key, value in artifact.items()}
-                )
+                "{max_memory_bytes} | {source} |".format(**values)
             )
     else:
         lines.append("No supported benchmark artifacts found.")
@@ -680,6 +768,27 @@ def markdown_report(report: dict[str, Any]) -> str:
             )
     else:
         lines.extend(["", "Command drift: none detected."])
+
+    if report["environment_drift"]:
+        lines.extend(
+            [
+                "",
+                "## Environment Drift",
+                "",
+                "| Profile/Model/Quant/Prompt suite/Command | Environment hashes | Sources |",
+                "| --- | ---: | ---: |",
+            ]
+        )
+        for finding in report["environment_drift"]:
+            lines.append(
+                "| {key} | {hashes} | {sources} |".format(
+                    key=finding["key"],
+                    hashes=len(finding["hashes"]),
+                    sources=len(finding["sources"]),
+                )
+            )
+    else:
+        lines.extend(["", "Environment drift: none detected."])
     return "\n".join(lines) + "\n"
 
 
@@ -687,6 +796,7 @@ def junit_report(report: dict[str, Any]) -> str:
     artifacts = [row for row in report["artifacts"] if isinstance(row, dict)]
     drift = [row for row in report.get("prompt_suite_drift", []) if isinstance(row, dict)]
     command_drift_rows = [row for row in report.get("command_drift", []) if isinstance(row, dict)]
+    environment_drift_rows = [row for row in report.get("environment_drift", []) if isinstance(row, dict)]
     failed_artifacts = [row for row in artifacts if row.get("status") == "fail"]
     airgap_failures = [row for row in artifacts if row.get("command_airgap_status") == "fail"]
     telemetry_failures = [row for row in artifacts if row.get("telemetry_status") == "fail"]
@@ -702,13 +812,14 @@ def junit_report(report: dict[str, Any]) -> str:
         + int(bool(freshness_failures))
         + int(bool(drift))
         + int(bool(command_drift_rows))
+        + int(bool(environment_drift_rows))
     )
 
     suite = ET.Element(
         "testsuite",
         {
             "name": "holyc_bench_result_index",
-            "tests": "8",
+            "tests": "9",
             "failures": str(failures),
         },
     )
@@ -821,6 +932,18 @@ def junit_report(report: dict[str, Any]) -> str:
         )
         failure.text = "\n".join(str(row.get("key", "")) for row in command_drift_rows)
 
+    environment_drift_case = ET.SubElement(suite, "testcase", {"name": "environment_drift"})
+    if environment_drift_rows:
+        failure = ET.SubElement(
+            environment_drift_case,
+            "failure",
+            {
+                "type": "environment_drift",
+                "message": f"{len(environment_drift_rows)} comparable benchmark key(s) have host/QEMU environment drift",
+            },
+        )
+        failure.text = "\n".join(str(row.get("key", "")) for row in environment_drift_rows)
+
     return ET.tostring(suite, encoding="unicode") + "\n"
 
 
@@ -836,6 +959,11 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
         "quantization",
         "prompt_suite_sha256",
         "command_sha256",
+        "environment_sha256",
+        "host_platform",
+        "host_machine",
+        "qemu_version",
+        "qemu_bin",
         "prompts",
         "measured_runs",
         "warmup_runs",
@@ -911,22 +1039,44 @@ def write_command_drift_csv(findings: list[CommandDrift], path: Path) -> None:
             )
 
 
-def write_report(summaries: list[ArtifactSummary], output_dir: Path) -> tuple[Path, list[PromptSuiteDrift], list[CommandDrift]]:
+def write_environment_drift_csv(findings: list[EnvironmentDrift], path: Path) -> None:
+    fields = ["key", "hash_count", "source_count", "hashes", "sources"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for finding in findings:
+            writer.writerow(
+                {
+                    "key": finding.key,
+                    "hash_count": len(finding.hashes),
+                    "source_count": len(finding.sources),
+                    "hashes": json.dumps(finding.hashes, separators=(",", ":")),
+                    "sources": json.dumps(finding.sources, separators=(",", ":")),
+                }
+            )
+
+
+def write_report(
+    summaries: list[ArtifactSummary], output_dir: Path
+) -> tuple[Path, list[PromptSuiteDrift], list[CommandDrift], list[EnvironmentDrift]]:
     output_dir.mkdir(parents=True, exist_ok=True)
     drift = prompt_suite_drift(summaries)
     command_drift_findings = command_drift(summaries)
+    environment_drift_findings = environment_drift(summaries)
     report = {
         "generated_at": iso_now(),
         "status": index_status(summaries),
         "artifacts": [asdict(summary) for summary in summaries],
         "prompt_suite_drift": [asdict(finding) for finding in drift],
         "command_drift": [asdict(finding) for finding in command_drift_findings],
+        "environment_drift": [asdict(finding) for finding in environment_drift_findings],
     }
     json_path = output_dir / "bench_result_index_latest.json"
     md_path = output_dir / "bench_result_index_latest.md"
     csv_path = output_dir / "bench_result_index_latest.csv"
     drift_csv_path = output_dir / "bench_result_index_prompt_suite_drift_latest.csv"
     command_drift_csv_path = output_dir / "bench_result_index_command_drift_latest.csv"
+    environment_drift_csv_path = output_dir / "bench_result_index_environment_drift_latest.csv"
     junit_path = output_dir / "bench_result_index_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
@@ -934,7 +1084,8 @@ def write_report(summaries: list[ArtifactSummary], output_dir: Path) -> tuple[Pa
     write_csv(summaries, csv_path)
     write_drift_csv(drift, drift_csv_path)
     write_command_drift_csv(command_drift_findings, command_drift_csv_path)
-    return json_path, drift, command_drift_findings
+    write_environment_drift_csv(environment_drift_findings, environment_drift_csv_path)
+    return json_path, drift, command_drift_findings, environment_drift_findings
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -978,6 +1129,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Return non-zero if comparable artifacts use different command_sha256 hashes",
     )
     parser.add_argument(
+        "--fail-on-environment-drift",
+        action="store_true",
+        help="Return non-zero if comparable artifacts use different host/QEMU environment hashes",
+    )
+    parser.add_argument(
         "--fail-on-stale-commit",
         action="store_true",
         help="Return non-zero if any artifact commit differs from the current git commit",
@@ -1009,7 +1165,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         summaries = load_summaries(inputs, max_artifact_age_seconds=max_artifact_age_seconds)
-        output, drift, command_drift_findings = write_report(summaries, args.output_dir)
+        output, drift, command_drift_findings, environment_drift_findings = write_report(
+            summaries, args.output_dir
+        )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -1020,6 +1178,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"artifacts={len(summaries)}")
     print(f"prompt_suite_drift={len(drift)}")
     print(f"command_drift={len(command_drift_findings)}")
+    print(f"environment_drift={len(environment_drift_findings)}")
     print(f"freshness_failures={sum(1 for summary in summaries if summary.freshness_status == 'fail')}")
     if args.fail_on_airgap and has_airgap_failures(summaries):
         return 1
@@ -1032,6 +1191,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.fail_on_drift and drift:
         return 1
     if args.fail_on_command_drift and command_drift_findings:
+        return 1
+    if args.fail_on_environment_drift and environment_drift_findings:
         return 1
     if args.fail_on_stale_commit and commit_drift(summaries):
         return 1

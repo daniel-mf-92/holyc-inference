@@ -458,24 +458,29 @@ JSON/Markdown/CSV/JUnit XML index, and checks each recorded QEMU command for
 explicit `-nic none` air-gap compliance. It also reports prompt-suite drift when
 comparable profile/model/quantization artifacts carry different non-empty suite
 hashes, and command drift when comparable artifacts carry different
-`command_sha256` values. These drift checks catch accidental prompt or launch
-changes before throughput numbers are compared. The index marks artifacts with
+`command_sha256` values. It also fingerprints host/QEMU environment metadata and
+reports environment drift when comparable artifacts use the same prompt suite
+and command hash but were produced under different host or QEMU identities.
+These drift checks catch accidental prompt, launch, or host changes before
+throughput numbers are compared. The index marks artifacts with
 missing required telemetry, such as zero measured runs or absent median tok/s,
 as failures so empty or malformed benchmark reports do not enter CI dashboards
 as valid data. The drift findings are also written to
 `bench_result_index_prompt_suite_drift_latest.csv` and
-`bench_result_index_command_drift_latest.csv`, and
+`bench_result_index_command_drift_latest.csv`,
+`bench_result_index_environment_drift_latest.csv`, and
 `bench_result_index_junit_latest.xml` exposes artifact failures, air-gap
 violations, missing telemetry, inconsistent commit metadata, inconsistent
-command hash metadata, prompt drift, and command drift as CI test failures. It
+command hash metadata, prompt drift, command drift, and environment drift as CI test failures. It
 never launches QEMU. The index also records per-artifact commit metadata and can
 optionally fail when benchmark artifacts were produced from a different commit
 than the current checkout. It can also enforce freshness with
 `--max-artifact-age-hours`, marking artifacts stale when their `generated_at`
 timestamp is too old. Use `--fail-on-airgap`, `--fail-on-telemetry`,
 `--fail-on-commit-metadata`, `--fail-on-command-hash-metadata`,
-`--fail-on-drift`, `--fail-on-command-drift`, and `--fail-on-stale-artifact` to
-gate those failure classes independently.
+`--fail-on-drift`, `--fail-on-command-drift`,
+`--fail-on-environment-drift`, and `--fail-on-stale-artifact` to gate those
+failure classes independently.
 
 Example:
 
@@ -485,7 +490,8 @@ python3 bench/bench_result_index.py \
   --output-dir bench/results \
   --fail-on-airgap \
   --fail-on-drift \
-  --fail-on-command-drift
+  --fail-on-command-drift \
+  --fail-on-environment-drift
 ```
 
 For a single CI job output directory that should only contain artifacts from
@@ -506,7 +512,8 @@ records SHA256 and byte size for each benchmark JSON, retains compact history,
 selects the newest artifact for each profile/model/quantization/prompt-suite
 key, writes both latest-key and full-history CSV exports, keeps the same
 recorded-command air-gap, command SHA256, and commit
-metadata checks, and writes `bench_artifact_manifest_junit_latest.xml` so CI can
+metadata checks while preserving environment fingerprints, and writes
+`bench_artifact_manifest_junit_latest.xml` so CI can
 surface failed artifacts, air-gap violations, missing telemetry, stale
 artifacts, inconsistent command hashes, inconsistent commit metadata, and empty
 manifests directly. Empty manifests are marked failed so missing benchmark

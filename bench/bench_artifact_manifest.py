@@ -37,6 +37,11 @@ class ManifestArtifact:
     quantization: str
     prompt_suite_sha256: str
     command_sha256: str
+    environment_sha256: str
+    host_platform: str
+    host_machine: str
+    qemu_version: str
+    qemu_bin: str
     measured_runs: int
     warmup_runs: int
     median_tok_per_s: float | None
@@ -95,6 +100,11 @@ def to_manifest_artifact(summary: bench_result_index.ArtifactSummary) -> Manifes
         quantization=summary.quantization,
         prompt_suite_sha256=summary.prompt_suite_sha256,
         command_sha256=summary.command_sha256,
+        environment_sha256=summary.environment_sha256,
+        host_platform=summary.host_platform,
+        host_machine=summary.host_machine,
+        qemu_version=summary.qemu_version,
+        qemu_bin=summary.qemu_bin,
         measured_runs=summary.measured_runs,
         warmup_runs=summary.warmup_runs,
         median_tok_per_s=summary.median_tok_per_s,
@@ -193,18 +203,19 @@ def markdown_report(report: dict[str, object]) -> str:
     if latest:
         lines.extend(
             [
-                "| Key | Status | Air-gap | Telemetry | Command Hash | Freshness | Commit | Runs | Warmups | Age seconds | Median tok/s | Host child tok/CPU s | Max host child RSS bytes | Max memory bytes | Command SHA256 | Artifact SHA256 | Source |",
-                "| --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |",
+                "| Key | Status | Air-gap | Telemetry | Command Hash | Freshness | Commit | Host | QEMU | Runs | Warmups | Age seconds | Median tok/s | Host child tok/CPU s | Max host child RSS bytes | Max memory bytes | Command SHA256 | Env SHA256 | Artifact SHA256 | Source |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- |",
             ]
         )
         for artifact in latest:
+            values = {key: format_value(value) for key, value in artifact.items()}
+            values["qemu"] = format_value(artifact.get("qemu_version") or artifact.get("qemu_bin"))
             lines.append(
-                "| {key} | {status} | {command_airgap_status} | {telemetry_status} | {command_hash_status} | {freshness_status} | {commit_status}:{commit} | {measured_runs} | "
+                "| {key} | {status} | {command_airgap_status} | {telemetry_status} | {command_hash_status} | {freshness_status} | {commit_status}:{commit} | "
+                "{host_platform}/{host_machine} | {qemu} | {measured_runs} | "
                 "{warmup_runs} | {generated_age_seconds} | {median_tok_per_s} | {host_child_tok_per_cpu_s_median} | "
-                "{host_child_peak_rss_bytes_max} | {max_memory_bytes} | {command_sha256} | {sha256} | "
-                "{source} |".format(
-                    **{key: format_value(value) for key, value in artifact.items()}
-                )
+                "{host_child_peak_rss_bytes_max} | {max_memory_bytes} | {command_sha256} | {environment_sha256} | "
+                "{sha256} | {source} |".format(**values)
             )
     else:
         lines.append("No supported benchmark artifacts found.")
@@ -224,6 +235,11 @@ def write_csv(artifacts: list[ManifestArtifact], path: Path) -> None:
         "quantization",
         "prompt_suite_sha256",
         "command_sha256",
+        "environment_sha256",
+        "host_platform",
+        "host_machine",
+        "qemu_version",
+        "qemu_bin",
         "measured_runs",
         "warmup_runs",
         "median_tok_per_s",
