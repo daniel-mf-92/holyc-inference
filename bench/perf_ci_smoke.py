@@ -470,6 +470,21 @@ def main() -> int:
             ),
             encoding="utf-8",
         )
+        source_audit_matrix_fixture = tmp_path / "qemu_source_audit_matrix.json"
+        source_audit_matrix_fixture.write_text(
+            json.dumps(
+                {
+                    "profiles": [
+                        {
+                            "name": "safe-fragment",
+                            "qemu_args": ["-m", "512M", "-smp", "1"],
+                        }
+                    ]
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         source_audit_output = tmp_path / "qemu_source_audit.json"
         source_audit_markdown = tmp_path / "qemu_source_audit.md.out"
         source_audit_csv = tmp_path / "qemu_source_audit.csv"
@@ -479,6 +494,8 @@ def main() -> int:
             str(ROOT / "bench" / "qemu_source_audit.py"),
             "--input",
             str(source_audit_fixture),
+            "--input",
+            str(source_audit_matrix_fixture),
             "--output",
             str(source_audit_output),
             "--markdown",
@@ -506,7 +523,7 @@ def main() -> int:
                 file=sys.stderr,
             )
             return 1
-        if source_audit_report["commands_checked"] != 1:
+        if source_audit_report["commands_checked"] != 2:
             print("missing_qemu_source_command_audit=true", file=sys.stderr)
             return 1
         if "QEMU Source Air-Gap Audit" not in source_audit_markdown.read_text(encoding="utf-8"):
@@ -528,11 +545,28 @@ def main() -> int:
             "qemu-system-x86_64 -m 512M -drive file=/tmp/TempleOS.img,format=raw,if=ide\n",
             encoding="utf-8",
         )
+        unsafe_source_args_fixture = tmp_path / "unsafe_qemu_source_args.json"
+        unsafe_source_args_fixture.write_text(
+            json.dumps(
+                {
+                    "profiles": [
+                        {
+                            "name": "unsafe-fragment",
+                            "qemu_args": ["-netdev", "user,id=n0", "-device", "e1000,netdev=n0"],
+                        }
+                    ]
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         unsafe_source_command = [
             sys.executable,
             str(ROOT / "bench" / "qemu_source_audit.py"),
             "--input",
             str(unsafe_source_fixture),
+            "--input",
+            str(unsafe_source_args_fixture),
             "--output",
             str(tmp_path / "unsafe_qemu_source_audit.json"),
         ]

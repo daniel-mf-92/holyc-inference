@@ -1,4 +1,4 @@
 <?xml version='1.0' encoding='utf-8'?>
 <testsuite name="holyc_qemu_source_airgap_audit" tests="1" failures="0" errors="0">
-  <testcase classname="qemu_source_audit.commands" name="air_gapped_source_qemu_commands:1" />
+  <testcase classname="qemu_source_audit.commands" name="air_gapped_source_qemu_commands:3" />
 </testsuite>

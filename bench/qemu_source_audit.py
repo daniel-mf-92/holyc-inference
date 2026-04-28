@@ -18,7 +18,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -133,10 +133,119 @@ def command_from_text(text: str) -> list[str] | None:
     return None
 
 
+def fragment_violations(args: list[str]) -> list[str]:
+    """Return network violations for QEMU argument fragments.
+
+    Matrix/profile argument fragments normally do not contain the qemu-system
+    executable, and they do not need to include `-nic none` because the host
+    launcher injects it. They still must not add any networking back in.
+    """
+    violations: list[str] = []
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        next_arg = args[index + 1] if index + 1 < len(args) else ""
+
+        if arg == "-nic":
+            if next_arg != "none":
+                violations.append(f"non-air-gapped `-nic {next_arg}`")
+            index += 2
+            continue
+        if arg.startswith("-nic=") and arg != "-nic=none":
+            violations.append(f"non-air-gapped `{arg}`")
+
+        if arg == "-net":
+            if next_arg != "none":
+                violations.append(f"networking `-net {next_arg}`")
+            index += 2
+            continue
+        if arg.startswith("-net=") and arg != "-net=none":
+            violations.append(f"networking `{arg}`")
+
+        if arg == "-netdev" or arg.startswith("-netdev"):
+            violations.append(f"network backend `{arg}`")
+        if arg == "-device" and airgap_audit.is_network_device_arg(next_arg):
+            violations.append(f"network device `{next_arg}`")
+        if arg.startswith("-device=") and airgap_audit.is_network_device_arg(arg):
+            violations.append(f"network device `{arg}`")
+
+        index += 1
+    return violations
+
+
+def iter_json_arg_fragments(payload: Any, path: str = "$") -> Iterable[tuple[str, list[str]]]:
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            child_path = f"{path}.{key}"
+            if key in {"qemu_args", "qemu_extra_args", "qemu_flags"} and isinstance(value, list):
+                if all(isinstance(item, str) for item in value):
+                    yield child_path, list(value)
+            yield from iter_json_arg_fragments(value, child_path)
+    elif isinstance(payload, list):
+        for index, value in enumerate(payload):
+            yield from iter_json_arg_fragments(value, f"{path}[{index}]")
+
+
+def audit_json_arg_fragments(path: Path) -> tuple[int, list[SourceFinding]]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return 0, []
+    fragments_checked = 0
+    findings: list[SourceFinding] = []
+    for json_path, args in iter_json_arg_fragments(payload):
+        fragments_checked += 1
+        for violation in fragment_violations(args):
+            findings.append(
+                SourceFinding(
+                    source=str(path),
+                    line=1,
+                    reason=f"{json_path}: {violation}",
+                    command=args,
+                    text=json.dumps(args, separators=(",", ":")),
+                )
+            )
+    return fragments_checked, findings
+
+
+def audit_args_file_fragments(path: Path) -> tuple[int, list[SourceFinding]]:
+    fragments_checked = 0
+    findings: list[SourceFinding] = []
+    for line_number, text in logical_lines(path):
+        stripped = text.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        try:
+            args = shlex.split(stripped)
+        except ValueError:
+            args = stripped.split()
+        fragments_checked += 1
+        for violation in fragment_violations(args):
+            findings.append(
+                SourceFinding(
+                    source=str(path),
+                    line=line_number,
+                    reason=violation,
+                    command=args,
+                    text=text,
+                )
+            )
+    return fragments_checked, findings
+
+
 def audit(paths: Iterable[Path], excludes: set[str]) -> tuple[int, list[SourceFinding]]:
     commands_checked = 0
     findings: list[SourceFinding] = []
     for path in iter_source_files(paths, excludes):
+        if path.suffix.lower() == ".json":
+            fragments_checked, json_findings = audit_json_arg_fragments(path)
+            commands_checked += fragments_checked
+            findings.extend(json_findings)
+        elif path.suffix.lower() == ".args":
+            fragments_checked, args_findings = audit_args_file_fragments(path)
+            commands_checked += fragments_checked
+            findings.extend(args_findings)
+
         for line_number, text in logical_lines(path):
             command = command_from_text(text)
             if command is None:
