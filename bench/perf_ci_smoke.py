@@ -715,6 +715,57 @@ def main() -> int:
             print("unsafe_qemu_source_command_not_rejected=true", file=sys.stderr)
             return 1
 
+        dry_run_output_dir = tmp_path / "qemu_prompt_bench_dry_run"
+        dry_run_command = [
+            sys.executable,
+            str(ROOT / "bench" / "qemu_prompt_bench.py"),
+            "--image",
+            "/tmp/TempleOS.synthetic.img",
+            "--prompts",
+            str(ROOT / "bench" / "prompts" / "smoke.jsonl"),
+            "--qemu-bin",
+            str(ROOT / "bench" / "fixtures" / "qemu_synthetic_bench.py"),
+            "--warmup",
+            "1",
+            "--repeat",
+            "2",
+            "--max-launches",
+            "10",
+            "--output-dir",
+            str(dry_run_output_dir),
+            "--dry-run",
+        ]
+        completed = subprocess.run(
+            dry_run_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode != 0:
+            sys.stdout.write(completed.stdout)
+            sys.stderr.write(completed.stderr)
+            return completed.returncode
+        dry_run_report = json.loads(
+            (dry_run_output_dir / "qemu_prompt_bench_dry_run_latest.json").read_text(encoding="utf-8")
+        )
+        if dry_run_report.get("planned_total_launches") != 6:
+            print("dry_run_launch_count_mismatch=true", file=sys.stderr)
+            return 1
+        dry_run_csv = (dry_run_output_dir / "qemu_prompt_bench_dry_run_latest.csv").read_text(
+            encoding="utf-8"
+        )
+        if "planned_total_launches" not in dry_run_csv or "-nic" not in dry_run_csv:
+            print("missing_dry_run_csv_fields=true", file=sys.stderr)
+            return 1
+        dry_run_junit = ET.parse(dry_run_output_dir / "qemu_prompt_bench_dry_run_junit_latest.xml").getroot()
+        if dry_run_junit.attrib.get("name") != "holyc_qemu_prompt_bench_dry_run":
+            print("missing_dry_run_junit_suite=true", file=sys.stderr)
+            return 1
+        if dry_run_junit.attrib.get("failures") != "0":
+            print("unexpected_dry_run_junit_failures=true", file=sys.stderr)
+            return 1
+
         bench_output_dir = tmp_path / "qemu_prompt_bench"
         bench_command = [
             sys.executable,

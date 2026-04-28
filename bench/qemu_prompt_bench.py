@@ -1273,11 +1273,100 @@ def write_dry_run_report(report: dict[str, Any], output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     latest = output_dir / "qemu_prompt_bench_dry_run_latest.json"
     latest_md = output_dir / "qemu_prompt_bench_dry_run_latest.md"
+    latest_csv = output_dir / "qemu_prompt_bench_dry_run_latest.csv"
+    latest_junit = output_dir / "qemu_prompt_bench_dry_run_junit_latest.xml"
     latest.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     latest_md.write_text(markdown_dry_run_report(report), encoding="utf-8")
+    write_dry_run_csv_report(report, latest_csv)
+    write_dry_run_junit_report(report, latest_junit)
     stamped = output_dir / f"qemu_prompt_bench_dry_run_{report['generated_at'].replace(':', '').replace('-', '')}.json"
     stamped.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return latest
+
+
+def write_dry_run_csv_report(report: dict[str, Any], path: Path) -> None:
+    prompt_suite = report.get("prompt_suite") or {}
+    command = report.get("command") or []
+    fields = [
+        "generated_at",
+        "status",
+        "command_sha256",
+        "prompt_count",
+        "prompt_suite_sha256",
+        "prompt_bytes_total",
+        "prompt_bytes_min",
+        "prompt_bytes_max",
+        "warmup",
+        "repeat",
+        "planned_warmup_launches",
+        "planned_measured_launches",
+        "planned_total_launches",
+        "max_launches",
+        "command",
+    ]
+    row = {
+        "generated_at": report.get("generated_at"),
+        "status": report.get("status"),
+        "command_sha256": report.get("command_sha256"),
+        "prompt_count": report.get("prompt_count"),
+        "prompt_suite_sha256": prompt_suite.get("suite_sha256"),
+        "prompt_bytes_total": prompt_suite.get("prompt_bytes_total"),
+        "prompt_bytes_min": prompt_suite.get("prompt_bytes_min"),
+        "prompt_bytes_max": prompt_suite.get("prompt_bytes_max"),
+        "warmup": report.get("warmup"),
+        "repeat": report.get("repeat"),
+        "planned_warmup_launches": report.get("planned_warmup_launches"),
+        "planned_measured_launches": report.get("planned_measured_launches"),
+        "planned_total_launches": report.get("planned_total_launches"),
+        "max_launches": report.get("max_launches"),
+        "command": json.dumps(command, separators=(",", ":")),
+    }
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        writer.writerow(row)
+
+
+def write_dry_run_junit_report(report: dict[str, Any], path: Path) -> None:
+    command = report.get("command") or []
+    command_text = " ".join(command) if isinstance(command, list) else str(command)
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": "holyc_qemu_prompt_bench_dry_run",
+            "tests": "1",
+            "failures": "0",
+            "errors": "0",
+        },
+    )
+    case = ET.SubElement(
+        suite,
+        "testcase",
+        {
+            "classname": "qemu_prompt_bench.dry_run",
+            "name": str(report.get("command_sha256") or "planned-command"),
+        },
+    )
+    properties = ET.SubElement(case, "properties")
+    for name in (
+        "status",
+        "prompt_count",
+        "planned_warmup_launches",
+        "planned_measured_launches",
+        "planned_total_launches",
+        "max_launches",
+        "command_sha256",
+    ):
+        ET.SubElement(
+            properties,
+            "property",
+            {"name": name, "value": format_summary_value(report.get(name))},
+        )
+    ET.SubElement(properties, "property", {"name": "command", "value": command_text})
+    ET.indent(suite)
+    ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
+    with path.open("ab") as handle:
+        handle.write(b"\n")
 
 
 def write_report(

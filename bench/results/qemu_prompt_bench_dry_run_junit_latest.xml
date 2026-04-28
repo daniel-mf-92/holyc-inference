@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="holyc_qemu_prompt_bench_dry_run" tests="1" failures="0" errors="0">
+  <testcase classname="qemu_prompt_bench.dry_run" name="1f08e65115fc8d318ef7726804d26085b1c556e5cee8743249e52ecae3581d74">
+    <properties>
+      <property name="status" value="planned" />
+      <property name="prompt_count" value="2" />
+      <property name="planned_warmup_launches" value="2" />
+      <property name="planned_measured_launches" value="4" />
+      <property name="planned_total_launches" value="6" />
+      <property name="max_launches" value="10" />
+      <property name="command_sha256" value="1f08e65115fc8d318ef7726804d26085b1c556e5cee8743249e52ecae3581d74" />
+      <property name="command" value="qemu-system-x86_64 -nic none -serial stdio -display none -drive file=/tmp/TempleOS.synthetic.img,format=raw,if=ide" />
+    </properties>
+  </testcase>
+</testsuite>
