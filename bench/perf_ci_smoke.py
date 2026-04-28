@@ -54,6 +54,7 @@ def main() -> int:
         comparison_coverage_violations_path = (
             output_dir / "perf_regression_comparison_coverage_violations_latest.csv"
         )
+        prompt_suite_drift_path = output_dir / "perf_regression_prompt_suite_drift_latest.csv"
         report = json.loads(report_path.read_text(encoding="utf-8"))
         if report["status"] != "pass":
             print(f"unexpected_status={report['status']}", file=sys.stderr)
@@ -72,6 +73,9 @@ def main() -> int:
             return 1
         if report["comparison_coverage_violations"]:
             print("unexpected_comparison_coverage_violations=true", file=sys.stderr)
+            return 1
+        if report["prompt_suite_drift_violations"]:
+            print("unexpected_prompt_suite_drift=true", file=sys.stderr)
             return 1
         if "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/ci-short" not in report["summaries"]:
             print("missing_ci_fixture_summary=true", file=sys.stderr)
@@ -112,6 +116,9 @@ def main() -> int:
             not in comparison_coverage_violations_path.read_text(encoding="utf-8")
         ):
             print("missing_comparison_coverage_violations_csv=true", file=sys.stderr)
+            return 1
+        if "key,hashes,commits,sources" not in prompt_suite_drift_path.read_text(encoding="utf-8"):
+            print("missing_prompt_suite_drift_csv=true", file=sys.stderr)
             return 1
 
         audit_output = tmp_path / "airgap_audit.json"

@@ -38,6 +38,7 @@ class PerfRecord:
     tok_per_s: float | None
     wall_tok_per_s: float | None
     memory_bytes: int | None
+    prompt_suite_sha256: str = ""
 
     @property
     def key(self) -> str:
@@ -67,6 +68,7 @@ class CommitPoint:
     median_wall_tok_per_s: float | None
     tok_per_s_cv_pct: float | None
     max_memory_bytes: int | None
+    prompt_suite_sha256: str
 
 
 @dataclass(frozen=True)
@@ -102,6 +104,14 @@ class ComparisonCoverageViolation:
     missing_commits: str
 
 
+@dataclass(frozen=True)
+class PromptSuiteDriftViolation:
+    key: str
+    hashes: list[str]
+    commits: list[str]
+    sources: list[str]
+
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -130,6 +140,18 @@ def first_present(row: dict[str, Any], names: Iterable[str], default: str = "") 
         if value is not None and value != "":
             return str(value)
     return default
+
+
+def prompt_suite_sha256(row: dict[str, Any]) -> str:
+    value = first_present(row, ("prompt_suite_sha256", "suite_sha256", "prompt_suite_hash"))
+    if value:
+        return value
+    prompt_suite = row.get("prompt_suite")
+    if isinstance(prompt_suite, dict):
+        nested = prompt_suite.get("suite_sha256") or prompt_suite.get("sha256")
+        if nested:
+            return str(nested)
+    return ""
 
 
 def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str) -> PerfRecord | None:
@@ -170,6 +192,7 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
         tok_per_s=tok_per_s,
         wall_tok_per_s=wall_tok_per_s,
         memory_bytes=memory_bytes,
+        prompt_suite_sha256=prompt_suite_sha256(row),
     )
 
 
@@ -292,6 +315,9 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
         ]
         memory_values = [record.memory_bytes for record in commit_records if record.memory_bytes is not None]
         tps_cv_pct = coefficient_of_variation_pct(tps_values)
+        prompt_hashes = sorted(
+            {record.prompt_suite_sha256 for record in commit_records if record.prompt_suite_sha256}
+        )
         points.append(
             CommitPoint(
                 key=key,
@@ -302,6 +328,7 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                 median_wall_tok_per_s=statistics.median(wall_tps_values) if wall_tps_values else None,
                 tok_per_s_cv_pct=tps_cv_pct,
                 max_memory_bytes=max(memory_values) if memory_values else None,
+                prompt_suite_sha256=";".join(prompt_hashes),
             )
         )
     return sorted(points, key=lambda point: (point.key, point.latest_timestamp, point.commit))
@@ -516,6 +543,28 @@ def detect_comparison_coverage_violations(
     return violations
 
 
+def detect_prompt_suite_drift(records: list[PerfRecord]) -> list[PromptSuiteDriftViolation]:
+    by_key: dict[str, list[PerfRecord]] = {}
+    for record in records:
+        if record.prompt_suite_sha256:
+            by_key.setdefault(record.key, []).append(record)
+
+    violations: list[PromptSuiteDriftViolation] = []
+    for key, key_records in sorted(by_key.items()):
+        hashes = sorted({record.prompt_suite_sha256 for record in key_records})
+        if len(hashes) <= 1:
+            continue
+        violations.append(
+            PromptSuiteDriftViolation(
+                key=key,
+                hashes=hashes,
+                commits=sorted({record.commit for record in key_records}),
+                sources=sorted({record.source for record in key_records}),
+            )
+        )
+    return violations
+
+
 def markdown_report(report: dict[str, Any]) -> str:
     lines = [
         "# Perf Regression Dashboard",
@@ -528,6 +577,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Variability violations: {len(report['variability_violations'])}",
         f"Commit coverage violations: {len(report['commit_coverage_violations'])}",
         f"Comparison coverage violations: {len(report['comparison_coverage_violations'])}",
+        f"Prompt-suite drift violations: {len(report['prompt_suite_drift_violations'])}",
         "",
         "## Regressions",
         "",
@@ -594,24 +644,37 @@ def markdown_report(report: dict[str, Any]) -> str:
     else:
         lines.append("Explicit comparison commits were present for all benchmark keys.")
 
+    lines.extend(["", "## Prompt Suite Drift", ""])
+    if report["prompt_suite_drift_violations"]:
+        lines.append("| Key | Hashes | Commits | Sources |")
+        lines.append("| --- | ---: | ---: | ---: |")
+        for violation in report["prompt_suite_drift_violations"]:
+            lines.append(
+                f"| {violation['key']} | {len(violation['hashes'])} | "
+                f"{len(violation['commits'])} | {len(violation['sources'])} |"
+            )
+    else:
+        lines.append("Prompt-suite hashes are consistent for comparable benchmark keys.")
+
     lines.extend(["", "## Commit Points", ""])
     if report["commit_points"]:
         lines.append(
-            "| Key | Commit | Records | Median tok/s | Median wall tok/s | Tok/s CV | Max Memory Bytes |"
+            "| Key | Commit | Records | Median tok/s | Median wall tok/s | Tok/s CV | Max Memory Bytes | Prompt Suite |"
         )
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |")
         for point in report["commit_points"]:
             tps = point["median_tok_per_s"]
             wall_tps = point["median_wall_tok_per_s"]
             tps_cv = point["tok_per_s_cv_pct"]
             memory = point["max_memory_bytes"]
+            prompt_suite = point["prompt_suite_sha256"] or "-"
             tps_cell = f"{tps:.3f}" if tps is not None else "-"
             wall_tps_cell = f"{wall_tps:.3f}" if wall_tps is not None else "-"
             tps_cv_cell = f"{tps_cv:.2f}%" if tps_cv is not None else "-"
             memory_cell = str(memory) if memory is not None else "-"
             lines.append(
                 f"| {point['key']} | {point['commit']} | {point['records']} | "
-                f"{tps_cell} | {wall_tps_cell} | {tps_cv_cell} | {memory_cell} |"
+                f"{tps_cell} | {wall_tps_cell} | {tps_cv_cell} | {memory_cell} | {prompt_suite} |"
             )
     else:
         lines.append("No commit-level performance points found.")
@@ -649,12 +712,14 @@ def junit_report(report: dict[str, Any]) -> str:
     variability_violations = report.get("variability_violations", [])
     commit_coverage_violations = report.get("commit_coverage_violations", [])
     comparison_coverage_violations = report.get("comparison_coverage_violations", [])
+    prompt_suite_drift_violations = report.get("prompt_suite_drift_violations", [])
     failures = (
         len(report["regressions"])
         + len(report["sample_violations"])
         + len(variability_violations)
         + len(commit_coverage_violations)
         + len(comparison_coverage_violations)
+        + len(prompt_suite_drift_violations)
     )
     tests = failures or 1
     suite = ET.Element(
@@ -812,6 +877,30 @@ def junit_report(report: dict[str, Any]) -> str:
                 f"key={violation['key']}"
             )
 
+        for violation in prompt_suite_drift_violations:
+            case = ET.SubElement(
+                suite,
+                "testcase",
+                {
+                    "classname": "perf_regression.prompt_suite_drift",
+                    "name": violation["key"],
+                },
+            )
+            failure = ET.SubElement(
+                case,
+                "failure",
+                {
+                    "type": "prompt_suite_drift",
+                    "message": f"{len(violation['hashes'])} prompt-suite hashes for comparable key",
+                },
+            )
+            failure.text = (
+                f"hashes={json.dumps(violation['hashes'], separators=(',', ':'))}\n"
+                f"commits={json.dumps(violation['commits'], separators=(',', ':'))}\n"
+                f"sources={json.dumps(violation['sources'], separators=(',', ':'))}\n"
+                f"key={violation['key']}"
+            )
+
     ET.indent(suite, space="  ")
     return ET.tostring(suite, encoding="unicode", xml_declaration=True) + "\n"
 
@@ -831,6 +920,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
     comparison_coverage_violations_csv = (
         output_dir / "perf_regression_comparison_coverage_violations_latest.csv"
     )
+    prompt_suite_drift_csv = output_dir / "perf_regression_prompt_suite_drift_latest.csv"
 
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
@@ -847,6 +937,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "median_wall_tok_per_s",
             "tok_per_s_cv_pct",
             "max_memory_bytes",
+            "prompt_suite_sha256",
         ],
     )
     write_csv(
@@ -883,6 +974,11 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
         report["comparison_coverage_violations"],
         ["key", "baseline_commit", "candidate_commit", "missing_commits"],
     )
+    write_csv(
+        prompt_suite_drift_csv,
+        report["prompt_suite_drift_violations"],
+        ["key", "hashes", "commits", "sources"],
+    )
 
     print(f"wrote_json={json_path}")
     print(f"wrote_markdown={md_path}")
@@ -893,6 +989,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
     print(f"wrote_variability_violations_csv={variability_violations_csv}")
     print(f"wrote_commit_coverage_violations_csv={commit_coverage_violations_csv}")
     print(f"wrote_comparison_coverage_violations_csv={comparison_coverage_violations_csv}")
+    print(f"wrote_prompt_suite_drift_csv={prompt_suite_drift_csv}")
 
 
 def build_report(
@@ -921,6 +1018,7 @@ def build_report(
     comparison_coverage_violations = detect_comparison_coverage_violations(
         points, baseline_commit, candidate_commit
     )
+    prompt_suite_drift_violations = detect_prompt_suite_drift(records)
     return {
         "generated_at": iso_now(),
         "record_count": len(records),
@@ -931,6 +1029,7 @@ def build_report(
             or variability_violations
             or commit_coverage_violations
             or comparison_coverage_violations
+            or prompt_suite_drift_violations
             else "pass"
         ),
         "comparison": {
@@ -956,6 +1055,9 @@ def build_report(
         ],
         "comparison_coverage_violations": [
             asdict(violation) for violation in comparison_coverage_violations
+        ],
+        "prompt_suite_drift_violations": [
+            asdict(violation) for violation in prompt_suite_drift_violations
         ],
         "records": [asdict(record) for record in sorted(records, key=lambda item: (item.key, item.timestamp))],
     }

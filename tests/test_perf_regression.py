@@ -289,6 +289,87 @@ def test_explicit_comparison_commits_must_exist_for_each_key() -> None:
     assert failure.attrib["type"] == "comparison_coverage"
 
 
+def test_prompt_suite_drift_fails_comparable_perf_key() -> None:
+    records = [
+        perf_regression.PerfRecord(
+            source="base.json",
+            commit="base",
+            timestamp="2026-04-28T00:00:00Z",
+            benchmark="qemu_prompt",
+            profile="ci",
+            model="synthetic",
+            quantization="Q4_0",
+            prompt="short",
+            tok_per_s=100.0,
+            wall_tok_per_s=90.0,
+            memory_bytes=1024,
+            prompt_suite_sha256="a" * 64,
+        ),
+        perf_regression.PerfRecord(
+            source="head.json",
+            commit="head",
+            timestamp="2026-04-28T00:01:00Z",
+            benchmark="qemu_prompt",
+            profile="ci",
+            model="synthetic",
+            quantization="Q4_0",
+            prompt="short",
+            tok_per_s=101.0,
+            wall_tok_per_s=91.0,
+            memory_bytes=1024,
+            prompt_suite_sha256="b" * 64,
+        ),
+    ]
+
+    report = perf_regression.build_report(records, 5.0, 10.0)
+
+    assert report["status"] == "fail"
+    assert report["prompt_suite_drift_violations"] == [
+        {
+            "key": "qemu_prompt/ci/synthetic/Q4_0/short",
+            "hashes": ["a" * 64, "b" * 64],
+            "commits": ["base", "head"],
+            "sources": ["base.json", "head.json"],
+        }
+    ]
+    assert "Prompt-suite drift violations: 1" in perf_regression.markdown_report(report)
+
+    junit_root = ET.fromstring(perf_regression.junit_report(report))
+    assert junit_root.attrib["failures"] == "1"
+    failure = junit_root.find("./testcase/failure")
+    assert failure is not None
+    assert failure.attrib["type"] == "prompt_suite_drift"
+
+
+def test_load_records_extracts_nested_prompt_suite_hash(tmp_path: Path) -> None:
+    result = tmp_path / "qemu_prompt_bench_latest.json"
+    result.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-04-28T00:00:00Z",
+                "prompt_suite": {"suite_sha256": "c" * 64},
+                "benchmarks": [
+                    {
+                        "commit": "head",
+                        "benchmark": "qemu_prompt",
+                        "profile": "ci",
+                        "model": "synthetic",
+                        "quantization": "Q4_0",
+                        "prompt": "short",
+                        "tok_per_s": 100.0,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    records = perf_regression.load_records([result])
+
+    assert len(records) == 1
+    assert records[0].prompt_suite_sha256 == "c" * 64
+
+
 def test_cli_writes_comparison_coverage_csv(tmp_path: Path) -> None:
     input_path = tmp_path / "perf.jsonl"
     output_dir = tmp_path / "dashboards"
@@ -582,6 +663,7 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
     assert (
         output_dir / "perf_regression_comparison_coverage_violations_latest.csv"
     ).exists()
+    assert (output_dir / "perf_regression_prompt_suite_drift_latest.csv").exists()
     markdown = (output_dir / "perf_regression_latest.md").read_text(encoding="utf-8")
     assert "Perf Regression Dashboard" in markdown
     assert "Commit Points" in markdown
@@ -589,6 +671,7 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
     assert "Variability" in markdown
     assert "Commit Coverage" in markdown
     assert "Comparison Coverage" in markdown
+    assert "Prompt Suite Drift" in markdown
     assert "prompt/dev-local/-/-/-" in markdown
     commit_points_csv = (output_dir / "perf_regression_commit_points_latest.csv").read_text(
         encoding="utf-8"
@@ -608,13 +691,17 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
     comparison_coverage_violations_csv = (
         output_dir / "perf_regression_comparison_coverage_violations_latest.csv"
     ).read_text(encoding="utf-8")
+    prompt_suite_drift_csv = (
+        output_dir / "perf_regression_prompt_suite_drift_latest.csv"
+    ).read_text(encoding="utf-8")
     assert (
-        "key,commit,latest_timestamp,records,median_tok_per_s,median_wall_tok_per_s,tok_per_s_cv_pct,max_memory_bytes"
+        "key,commit,latest_timestamp,records,median_tok_per_s,median_wall_tok_per_s,tok_per_s_cv_pct,max_memory_bytes,prompt_suite_sha256"
         in commit_points_csv
     )
-    assert "prompt/dev-local/-/-/-,abc,2026-04-27T10:00:00Z,1,42.0,,," in commit_points_csv
+    assert "prompt/dev-local/-/-/-,abc,2026-04-27T10:00:00Z,1,42.0,,,," in commit_points_csv
     assert "key,metric,baseline_commit,candidate_commit,baseline_value,candidate_value" in regressions_csv
     assert "key,commit,records,minimum_records" in sample_violations_csv
     assert "key,commit,records,tok_per_s_cv_pct,threshold_pct" in variability_violations_csv
     assert "key,commits,minimum_commits,latest_commit" in commit_coverage_violations_csv
     assert "key,baseline_commit,candidate_commit,missing_commits" in comparison_coverage_violations_csv
+    assert "key,hashes,commits,sources" in prompt_suite_drift_csv

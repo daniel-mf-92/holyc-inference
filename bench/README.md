@@ -366,12 +366,16 @@ compare against.
 benchmark key/commit point are too variable to trust as a baseline.
 `--wall-tok-regression-pct` optionally gates host-observed wall-clock tok/s
 drops, which is useful when guest-side timing looks suspicious.
+Prompt-suite hashes from QEMU benchmark reports are carried into commit points;
+the dashboard fails when comparable benchmark/profile/model/quantization/prompt
+records contain multiple non-empty prompt-suite hashes, preventing accidental
+throughput comparisons across different prompt sets.
 The dashboard also writes `perf_regression_junit_latest.xml` so CI systems can
 surface throughput regressions, sample-coverage failures, commit-coverage
-failures, comparison-coverage failures, and variability failures as test
-failures. When `--baseline-commit` or `--candidate-commit` is provided, every
-benchmark key must contain the requested commit before the dashboard passes;
-missing explicit comparison commits are written to
+failures, comparison-coverage failures, prompt-suite drift, and variability
+failures as test failures. When `--baseline-commit` or `--candidate-commit` is
+provided, every benchmark key must contain the requested commit before the
+dashboard passes; missing explicit comparison commits are written to
 `perf_regression_comparison_coverage_violations_latest.csv`.
 
 ## Build Benchmark Compare
@@ -476,7 +480,8 @@ checks compare commit-level aggregates, so repeated runs and duplicate
 latest/stamped result files are collapsed by benchmark key and commit before the
 latest distinct commits are compared. Outputs include JSON, Markdown, JUnit XML,
 commit-point CSV, regression CSV, sample-coverage CSV, commit-coverage CSV, and
-comparison-coverage CSV, and tok/s variability CSV artifacts.
+comparison-coverage CSV, prompt-suite drift CSV, and tok/s variability CSV
+artifacts.
 
 Example:
 
