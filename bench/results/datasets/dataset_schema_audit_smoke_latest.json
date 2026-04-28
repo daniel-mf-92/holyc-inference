@@ -12,6 +12,23 @@
   "choice_count_histogram": {
     "4": 3
   },
+  "dataset_split_answer_histograms": {
+    "arc-smoke": {
+      "validation": {
+        "0": 1
+      }
+    },
+    "hellaswag-smoke": {
+      "validation": {
+        "0": 1
+      }
+    },
+    "truthfulqa-smoke": {
+      "validation": {
+        "0": 1
+      }
+    }
+  },
   "dataset_split_counts": {
     "arc-smoke": {
       "validation": 1
@@ -23,11 +40,34 @@
       "validation": 1
     }
   },
+  "dataset_split_majority_answers": {
+    "arc-smoke": {
+      "validation": {
+        "answer_index": "0",
+        "pct": 100.0,
+        "records": 1
+      }
+    },
+    "hellaswag-smoke": {
+      "validation": {
+        "answer_index": "0",
+        "pct": 100.0,
+        "records": 1
+      }
+    },
+    "truthfulqa-smoke": {
+      "validation": {
+        "answer_index": "0",
+        "pct": 100.0,
+        "records": 1
+      }
+    }
+  },
   "duplicate_record_ids": [],
   "error_count": 0,
   "findings": [],
   "format": "hceval-schema-audit",
-  "generated_at": "2026-04-28T18:59:16Z",
+  "generated_at": "2026-04-28T19:11:22Z",
   "input_row_count": 3,
   "inputs": [
     {
@@ -36,6 +76,11 @@
       "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
     }
   ],
+  "majority_answer": {
+    "answer_index": "0",
+    "pct": 100.0,
+    "records": 3
+  },
   "normalized_record_count": 3,
   "status": "pass",
   "warning_count": 0

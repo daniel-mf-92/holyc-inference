@@ -16,7 +16,8 @@ be placed on disk with provenance notes before packing.
 Run `bench/dataset_schema_audit.py` before curation when staging new local
 sources. It verifies that every row can normalize into the packer schema, emits
 dataset/split counts, answer and choice histograms, duplicate ID warnings, UTF-8
-byte telemetry, and can enforce provenance and fixed loader-size budgets:
+byte telemetry, and can enforce provenance, answer-skew, and fixed loader-size
+budgets:
 
 ```bash
 python3 bench/dataset_schema_audit.py \
@@ -31,6 +32,8 @@ python3 bench/dataset_schema_audit.py \
   --max-prompt-bytes 4096 \
   --max-choice-bytes 1024 \
   --max-record-payload-bytes 8192 \
+  --max-majority-answer-pct 80 \
+  --max-dataset-split-majority-answer-pct 90 \
   --fail-on-duplicate-ids \
   --fail-on-findings
 ```

@@ -90,6 +90,10 @@ def main() -> int:
             "1024",
             "--max-record-payload-bytes",
             "8192",
+            "--max-majority-answer-pct",
+            "100",
+            "--max-dataset-split-majority-answer-pct",
+            "100",
             "--fail-on-duplicate-ids",
             "--fail-on-findings",
         ]
@@ -105,6 +109,20 @@ def main() -> int:
         if rc := require(schema_report["choice_count_histogram"] == {"4": 3}, "unexpected_schema_choice_histogram"):
             return rc
         if rc := require(schema_report["answer_histogram"] == {"0": 3}, "unexpected_schema_answer_histogram"):
+            return rc
+        if rc := require(
+            schema_report["majority_answer"] == {"answer_index": "0", "pct": 100.0, "records": 3},
+            "unexpected_schema_majority_answer",
+        ):
+            return rc
+        if rc := require(
+            schema_report["dataset_split_answer_histograms"] == {
+                "arc-smoke": {"validation": {"0": 1}},
+                "hellaswag-smoke": {"validation": {"0": 1}},
+                "truthfulqa-smoke": {"validation": {"0": 1}},
+            },
+            "unexpected_schema_dataset_split_answer_histograms",
+        ):
             return rc
         if rc := require(
             "Eval Dataset Schema Audit" in schema_md.read_text(encoding="utf-8"),
@@ -719,6 +737,37 @@ def main() -> int:
         )
         schema_kinds = {finding["kind"] for finding in missing_provenance_failure["findings"]}
         if rc := require("missing_provenance" in schema_kinds, "missing_schema_provenance_finding"):
+            return rc
+
+        skewed_schema_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_schema_audit.py"),
+            "--input",
+            str(SAMPLE),
+            "--output",
+            str(tmp_path / "skewed_schema.json"),
+            "--max-majority-answer-pct",
+            "90",
+            "--max-dataset-split-majority-answer-pct",
+            "90",
+            "--fail-on-findings",
+        ]
+        completed = subprocess.run(
+            skewed_schema_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("schema_answer_skew_not_rejected=true", file=sys.stderr)
+            return 1
+        skewed_schema_failure = json.loads((tmp_path / "skewed_schema.json").read_text(encoding="utf-8"))
+        skewed_schema_kinds = {finding["kind"] for finding in skewed_schema_failure["findings"]}
+        if rc := require(
+            {"majority_answer_skew", "dataset_split_majority_answer_skew"}.issubset(skewed_schema_kinds),
+            "missing_schema_answer_skew_finding",
+        ):
             return rc
 
         conflict_fixture = tmp_path / "conflicting_duplicate_payloads.jsonl"

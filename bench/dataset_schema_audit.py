@@ -119,6 +119,54 @@ def sorted_counts(values: Iterable[Any]) -> dict[str, int]:
     return {key: counter[key] for key in sorted(counter)}
 
 
+def answer_histogram(records: list[dataset_pack.EvalRecord]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for record in records:
+        key = str(record.answer_index)
+        counts[key] = counts.get(key, 0) + 1
+    return dict(sorted(counts.items(), key=lambda item: int(item[0])))
+
+
+def answer_histograms_by_dataset_split(records: list[LoadedRecord]) -> dict[str, dict[str, dict[str, int]]]:
+    grouped: dict[str, dict[str, dict[str, int]]] = {}
+    for loaded in records:
+        record = loaded.record
+        split_counts = grouped.setdefault(record.dataset, {}).setdefault(record.split, {})
+        key = str(record.answer_index)
+        split_counts[key] = split_counts.get(key, 0) + 1
+    return {
+        dataset: {
+            split: dict(sorted(histogram.items(), key=lambda item: int(item[0])))
+            for split, histogram in sorted(split_histograms.items())
+        }
+        for dataset, split_histograms in sorted(grouped.items())
+    }
+
+
+def majority_answer(histogram: dict[str, int]) -> dict[str, Any]:
+    if not histogram:
+        return {"answer_index": "", "pct": None, "records": 0}
+    answer_index, count = max(histogram.items(), key=lambda item: (item[1], item[0]))
+    total = sum(histogram.values())
+    return {
+        "answer_index": answer_index,
+        "pct": count / total * 100.0 if total else None,
+        "records": total,
+    }
+
+
+def majority_answers_by_dataset_split(
+    histograms: dict[str, dict[str, dict[str, int]]]
+) -> dict[str, dict[str, dict[str, Any]]]:
+    return {
+        dataset: {
+            split: majority_answer(histogram)
+            for split, histogram in sorted(split_histograms.items())
+        }
+        for dataset, split_histograms in sorted(histograms.items())
+    }
+
+
 def nested_counts(records: list[LoadedRecord]) -> dict[str, dict[str, int]]:
     counts: dict[str, dict[str, int]] = {}
     for loaded in records:
@@ -152,6 +200,8 @@ def apply_record_gates(
     max_prompt_bytes: int | None,
     max_choice_bytes: int | None,
     max_record_payload_bytes: int | None,
+    max_majority_answer_pct: float | None,
+    max_dataset_split_majority_answer_pct: float | None,
     fail_on_duplicate_ids: bool,
     findings: list[Finding],
 ) -> None:
@@ -192,6 +242,44 @@ def apply_record_gates(
     ):
         append_finding(findings, "error", "byte_limit", "records", message)
 
+    overall_majority = majority_answer(answer_histogram([loaded.record for loaded in records]))
+    if (
+        max_majority_answer_pct is not None
+        and overall_majority["pct"] is not None
+        and overall_majority["pct"] > max_majority_answer_pct
+    ):
+        append_finding(
+            findings,
+            "error",
+            "majority_answer_skew",
+            "records",
+            (
+                f"answer index {overall_majority['answer_index']} covers "
+                f"{overall_majority['pct']:.2f}% of records, above {max_majority_answer_pct:.2f}% gate"
+            ),
+        )
+
+    for dataset, split_majorities in majority_answers_by_dataset_split(
+        answer_histograms_by_dataset_split(records)
+    ).items():
+        for split, majority in split_majorities.items():
+            if (
+                max_dataset_split_majority_answer_pct is not None
+                and majority["pct"] is not None
+                and majority["pct"] > max_dataset_split_majority_answer_pct
+            ):
+                append_finding(
+                    findings,
+                    "error",
+                    "dataset_split_majority_answer_skew",
+                    f"{dataset}:{split}",
+                    (
+                        f"answer index {majority['answer_index']} covers {majority['pct']:.2f}% "
+                        f"of {dataset}/{split} records, above "
+                        f"{max_dataset_split_majority_answer_pct:.2f}% gate"
+                    ),
+                )
+
 
 def build_report(
     inputs: list[dict[str, Any]],
@@ -199,6 +287,7 @@ def build_report(
     findings: list[Finding],
 ) -> dict[str, Any]:
     normalized = [loaded.record for loaded in records]
+    dataset_split_answer_histograms = answer_histograms_by_dataset_split(records)
     error_count = sum(1 for finding in findings if finding.severity == "error")
     warning_count = sum(1 for finding in findings if finding.severity == "warning")
     return {
@@ -210,7 +299,10 @@ def build_report(
         "normalized_record_count": len(records),
         "dataset_split_counts": nested_counts(records),
         "choice_count_histogram": sorted_counts(len(record.choices) for record in normalized),
-        "answer_histogram": dataset_pack.answer_histogram(normalized),
+        "answer_histogram": answer_histogram(normalized),
+        "majority_answer": majority_answer(answer_histogram(normalized)),
+        "dataset_split_answer_histograms": dataset_split_answer_histograms,
+        "dataset_split_majority_answers": majority_answers_by_dataset_split(dataset_split_answer_histograms),
         "byte_stats": dataset_pack.byte_stats(normalized),
         "duplicate_record_ids": duplicate_ids(records),
         "error_count": error_count,
@@ -245,6 +337,7 @@ def markdown_report(report: dict[str, Any]) -> str:
             "",
             f"- Choice counts: `{json.dumps(report['choice_count_histogram'], sort_keys=True)}`",
             f"- Answer indexes: `{json.dumps(report['answer_histogram'], sort_keys=True)}`",
+            f"- Majority answer: `{json.dumps(report['majority_answer'], sort_keys=True)}`",
             "",
             "## Findings",
             "",
@@ -340,6 +433,16 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Fail if any record payload excluding the fixed record header exceeds this byte limit",
     )
+    parser.add_argument(
+        "--max-majority-answer-pct",
+        type=float,
+        help="Fail if one answer index covers more than this percentage of all normalized records",
+    )
+    parser.add_argument(
+        "--max-dataset-split-majority-answer-pct",
+        type=float,
+        help="Fail if one answer index covers more than this percentage within any dataset/split group",
+    )
     parser.add_argument("--fail-on-duplicate-ids", action="store_true", help="Treat duplicate record IDs as errors")
     parser.add_argument("--fail-on-findings", action="store_true", help="Exit nonzero when errors are present")
     return parser
@@ -347,6 +450,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    for name in ("max_majority_answer_pct", "max_dataset_split_majority_answer_pct"):
+        value = getattr(args, name)
+        if value is not None and not 0.0 <= value <= 100.0:
+            print(f"error: --{name.replace('_', '-')} must be between 0 and 100", file=sys.stderr)
+            return 2
+
     findings: list[Finding] = []
     records, inputs = load_records(
         args.input,
@@ -362,6 +471,8 @@ def main(argv: list[str] | None = None) -> int:
         args.max_prompt_bytes,
         args.max_choice_bytes,
         args.max_record_payload_bytes,
+        args.max_majority_answer_pct,
+        args.max_dataset_split_majority_answer_pct,
         args.fail_on_duplicate_ids,
         findings,
     )
