@@ -216,9 +216,68 @@ def test_per_dataset_split_cap_limits_each_pair() -> None:
         }
 
 
+def test_choice_count_filters_keep_homogeneous_multiple_choice_rows() -> None:
+    rows = [
+        {
+            "id": "two-choice",
+            "prompt": "Binary question",
+            "choices": ["yes", "no"],
+            "answer_index": 0,
+            "provenance": "synthetic choice count curation test",
+        },
+        {
+            "id": "four-choice",
+            "prompt": "Four-way question",
+            "choices": ["A", "B", "C", "D"],
+            "answer_index": 2,
+            "provenance": "synthetic choice count curation test",
+        },
+        {
+            "id": "five-choice",
+            "prompt": "Five-way question",
+            "choices": ["A", "B", "C", "D", "E"],
+            "answer_index": 4,
+            "provenance": "synthetic choice count curation test",
+        },
+    ]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        source = Path(tmp) / "source.jsonl"
+        output = Path(tmp) / "curated.jsonl"
+        manifest = Path(tmp) / "curated.manifest.json"
+        write_jsonl(source, rows)
+
+        status = dataset_curate.main(
+            [
+                "--input",
+                str(source),
+                "--output",
+                str(output),
+                "--manifest",
+                str(manifest),
+                "--source-name",
+                "synthetic-choice-counts",
+                "--min-choices",
+                "4",
+                "--max-choices",
+                "4",
+            ]
+        )
+
+        assert status == 0
+        manifest_json = json.loads(manifest.read_text(encoding="utf-8"))
+        curated_rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+
+        assert manifest_json["filters"]["min_choices"] == 4
+        assert manifest_json["filters"]["max_choices"] == 4
+        assert manifest_json["total_after_filters"] == 1
+        assert [row["record_id"] for row in curated_rows] == ["four-choice"]
+
+
 if __name__ == "__main__":
     test_balanced_answer_index_sampling_limits_label_skew()
     test_duplicate_ids_fail_after_filtering()
     test_per_dataset_and_split_caps_are_deterministic()
     test_per_dataset_split_cap_limits_each_pair()
+    test_choice_count_filters_keep_homogeneous_multiple_choice_rows()
     print("eval_dataset_curate_tests=ok")

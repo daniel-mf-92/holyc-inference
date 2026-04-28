@@ -74,6 +74,8 @@ def apply_filters(
     include_dataset: set[str],
     include_split: set[str],
     require_provenance: bool,
+    min_choices: int | None,
+    max_choices: int | None,
 ) -> list[dataset_pack.EvalRecord]:
     filtered = []
     for record in records:
@@ -82,6 +84,10 @@ def apply_filters(
         if include_split and record.split not in include_split:
             continue
         if require_provenance and not record.provenance:
+            continue
+        if min_choices is not None and len(record.choices) < min_choices:
+            continue
+        if max_choices is not None and len(record.choices) > max_choices:
             continue
         filtered.append(record)
     return filtered
@@ -208,6 +214,8 @@ def build_manifest(
             "max_records_per_dataset_split": args.max_records_per_dataset_split,
             "max_records_per_split": args.max_records_per_split,
             "max_records": args.max_records,
+            "max_choices": args.max_choices,
+            "min_choices": args.min_choices,
             "require_provenance": args.require_provenance,
             "seed": args.seed,
         },
@@ -242,6 +250,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--include-dataset", action="append", default=[], help="Keep only this dataset; repeatable")
     parser.add_argument("--include-split", action="append", default=[], help="Keep only this split; repeatable")
     parser.add_argument("--max-records", type=int, help="Deterministically sample at most this many records")
+    parser.add_argument("--min-choices", type=int, help="Keep only records with at least this many answer choices")
+    parser.add_argument("--max-choices", type=int, help="Keep only records with no more than this many answer choices")
     parser.add_argument(
         "--max-records-per-dataset",
         type=int,
@@ -280,6 +290,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.max_records is not None and args.max_records < 1:
         print("error: --max-records must be >= 1", file=sys.stderr)
         return 2
+    if args.min_choices is not None and args.min_choices < 2:
+        print("error: --min-choices must be >= 2", file=sys.stderr)
+        return 2
+    if args.max_choices is not None and args.max_choices < 2:
+        print("error: --max-choices must be >= 2", file=sys.stderr)
+        return 2
+    if args.min_choices is not None and args.max_choices is not None and args.min_choices > args.max_choices:
+        print("error: --min-choices cannot exceed --max-choices", file=sys.stderr)
+        return 2
     if args.max_records_per_dataset is not None and args.max_records_per_dataset < 1:
         print("error: --max-records-per-dataset must be >= 1", file=sys.stderr)
         return 2
@@ -301,6 +320,8 @@ def main(argv: list[str] | None = None) -> int:
             set(args.include_dataset),
             set(args.include_split),
             args.require_provenance,
+            args.min_choices,
+            args.max_choices,
         )
         reject_duplicate_ids(filtered)
         capped = cap_records_by_field(filtered, "dataset", args.max_records_per_dataset, args.seed)
