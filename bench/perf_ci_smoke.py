@@ -665,6 +665,11 @@ def main() -> int:
             "us_per_token_median",
             "wall_us_per_token_median",
         }
+        matrix_prompt_size_fields = {
+            "prompt_bytes_total",
+            "prompt_bytes_min",
+            "prompt_bytes_max",
+        }
         for cell in matrix_report["cells"]:
             missing_fields = [
                 field for field in matrix_metric_fields if cell.get(field) is None
@@ -676,16 +681,34 @@ def main() -> int:
                     file=sys.stderr,
                 )
                 return 1
+            missing_prompt_size_fields = [
+                field for field in matrix_prompt_size_fields if cell.get(field) is None
+            ]
+            if missing_prompt_size_fields:
+                print(
+                    "missing_matrix_prompt_size_fields="
+                    + ",".join(sorted(missing_prompt_size_fields)),
+                    file=sys.stderr,
+                )
+                return 1
         matrix_csv = (matrix_output_dir / "bench_matrix_latest.csv").read_text(
             encoding="utf-8"
         )
         if not matrix_metric_fields.issubset(set(matrix_csv.splitlines()[0].split(","))):
             print("missing_matrix_metric_csv_fields=true", file=sys.stderr)
             return 1
+        if not matrix_prompt_size_fields.issubset(set(matrix_csv.splitlines()[0].split(","))):
+            print("missing_matrix_prompt_size_csv_fields=true", file=sys.stderr)
+            return 1
         if "Wall tok/s" not in (matrix_output_dir / "bench_matrix_latest.md").read_text(
             encoding="utf-8"
         ):
             print("missing_matrix_metric_markdown=true", file=sys.stderr)
+            return 1
+        if "Prompt bytes" not in (matrix_output_dir / "bench_matrix_latest.md").read_text(
+            encoding="utf-8"
+        ):
+            print("missing_matrix_prompt_size_markdown=true", file=sys.stderr)
             return 1
 
         result_index_output_dir = tmp_path / "bench_result_index"

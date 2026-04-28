@@ -408,6 +408,8 @@ comparisons can reject accidental prompt drift.
 Matrix rollups also preserve each cell's guest tok/s, host wall-clock tok/s,
 P95 TTFT, median host-overhead percentage, and guest/wall us-per-token latency
 from the underlying prompt benchmark report.
+They also include total, minimum, and maximum prompt byte counts for each cell
+so prompt-size changes are visible next to tok/s and latency rollups.
 Use `max_suite_cv_pct` and `max_prompt_cv_pct` in the matrix JSON, or the
 matching CLI flags, to pass tok/s variability gates through to every cell. A
 cell that fails a variability gate still writes its prompt-benchmark report and

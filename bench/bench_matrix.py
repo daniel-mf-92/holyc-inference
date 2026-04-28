@@ -63,6 +63,9 @@ class MatrixCellResult:
     command_sha256: str
     prompts: int
     prompt_suite_sha256: str
+    prompt_bytes_total: int
+    prompt_bytes_min: int | None
+    prompt_bytes_max: int | None
     measured_runs: int
     warmup_runs: int
     median_tok_per_s: float | None
@@ -261,6 +264,10 @@ def run_cell(
     prompt_cases = qemu_prompt_bench.load_prompt_cases(prompts)
     prompt_count = len(prompt_cases)
     prompt_suite_sha256 = qemu_prompt_bench.prompt_suite_hash(prompt_cases)
+    prompt_byte_counts = [qemu_prompt_bench.prompt_bytes(case.prompt) for case in prompt_cases]
+    prompt_bytes_total = sum(prompt_byte_counts)
+    prompt_bytes_min = min(prompt_byte_counts) if prompt_byte_counts else None
+    prompt_bytes_max = max(prompt_byte_counts) if prompt_byte_counts else None
     cell_output_dir = matrix_dir / cell.slug
     report_path = cell_output_dir / "qemu_prompt_bench_latest.json"
 
@@ -277,6 +284,9 @@ def run_cell(
             command_sha256=qemu_prompt_bench.command_hash(command),
             prompts=prompt_count,
             prompt_suite_sha256=prompt_suite_sha256,
+            prompt_bytes_total=prompt_bytes_total,
+            prompt_bytes_min=prompt_bytes_min,
+            prompt_bytes_max=prompt_bytes_max,
             measured_runs=0,
             warmup_runs=0,
             median_tok_per_s=None,
@@ -342,6 +352,9 @@ def run_cell(
         prompt_suite_sha256=str(
             (report.get("prompt_suite") or {}).get("suite_sha256") or prompt_suite_sha256
         ),
+        prompt_bytes_total=prompt_bytes_total,
+        prompt_bytes_min=prompt_bytes_min,
+        prompt_bytes_max=prompt_bytes_max,
         measured_runs=len(report.get("benchmarks", [])),
         warmup_runs=len(report.get("warmups", [])),
         median_tok_per_s=median_cell_tok_per_s(report),
@@ -375,9 +388,9 @@ def markdown_report(report: dict[str, Any]) -> str:
     ]
     if report["cells"]:
         lines.append(
-            "| Profile | Model | Quantization | Commit | Status | Prompts | Prompt suite | Command SHA256 | Runs | Warmups | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Guest us/token | Wall us/token | Max memory bytes | Variability findings |"
+            "| Profile | Model | Quantization | Commit | Status | Prompts | Prompt bytes | Prompt byte range | Prompt suite | Command SHA256 | Runs | Warmups | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Guest us/token | Wall us/token | Max memory bytes | Variability findings |"
         )
-        lines.append("| --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for cell in report["cells"]:
             median = cell["median_tok_per_s"]
             memory = cell["max_memory_bytes"]
@@ -397,9 +410,15 @@ def markdown_report(report: dict[str, Any]) -> str:
             wall_us_per_token = cell["wall_us_per_token_median"]
             wall_us_per_token_cell = f"{wall_us_per_token:.3f}" if wall_us_per_token is not None else "-"
             memory_cell = str(memory) if memory is not None else "-"
+            prompt_byte_range = (
+                f"{cell['prompt_bytes_min']}-{cell['prompt_bytes_max']}"
+                if cell["prompt_bytes_min"] is not None and cell["prompt_bytes_max"] is not None
+                else "-"
+            )
             lines.append(
                 f"| {cell['profile']} | {cell['model']} | {cell['quantization']} | {cell['commit'] or '-'} | {cell['status']} | "
-                f"{cell['prompts']} | {cell['prompt_suite_sha256']} | {cell['command_sha256']} | "
+                f"{cell['prompts']} | {cell['prompt_bytes_total']} | {prompt_byte_range} | "
+                f"{cell['prompt_suite_sha256']} | {cell['command_sha256']} | "
                 f"{cell['measured_runs']} | {cell['warmup_runs']} | "
                 f"{median_cell} | {wall_tok_cell} | {ttft_cell} | {overhead_cell} | "
                 f"{child_cpu_us_cell} | {child_cpu_pct_cell} | {us_per_token_cell} | "
@@ -462,6 +481,9 @@ def write_matrix_csv(cells: list[MatrixCellResult], path: Path) -> None:
         "command_sha256",
         "prompts",
         "prompt_suite_sha256",
+        "prompt_bytes_total",
+        "prompt_bytes_min",
+        "prompt_bytes_max",
         "measured_runs",
         "warmup_runs",
         "median_tok_per_s",
@@ -528,6 +550,9 @@ def write_matrix_junit(cells: list[MatrixCellResult], path: Path) -> None:
                 f"report={cell.report}",
                 f"output_dir={cell.output_dir}",
                 f"prompt_suite_sha256={cell.prompt_suite_sha256}",
+                f"prompt_bytes_total={cell.prompt_bytes_total}",
+                f"prompt_bytes_min={cell.prompt_bytes_min}",
+                f"prompt_bytes_max={cell.prompt_bytes_max}",
                 f"command_sha256={cell.command_sha256}",
                 f"measured_runs={cell.measured_runs}",
                 f"warmup_runs={cell.warmup_runs}",
