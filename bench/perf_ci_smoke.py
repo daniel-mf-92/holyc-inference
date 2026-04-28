@@ -591,6 +591,15 @@ def main() -> int:
         if suite_summary.get("tok_per_s_stdev") is None:
             print("missing_suite_tok_stdev=true", file=sys.stderr)
             return 1
+        if suite_summary.get("failed_runs") != 0:
+            print("unexpected_suite_failed_runs=true", file=sys.stderr)
+            return 1
+        if suite_summary.get("timed_out_runs") != 0:
+            print("unexpected_suite_timed_out_runs=true", file=sys.stderr)
+            return 1
+        if suite_summary.get("nonzero_exit_runs") != 0:
+            print("unexpected_suite_nonzero_exit_runs=true", file=sys.stderr)
+            return 1
         if suite_summary.get("tok_per_s_cv_pct") is None:
             print("missing_suite_tok_cv=true", file=sys.stderr)
             return 1
@@ -611,6 +620,14 @@ def main() -> int:
             return 1
         if not all("tok_per_s_cv_pct" in row for row in bench_report["summaries"]):
             print("missing_prompt_tok_cv=true", file=sys.stderr)
+            return 1
+        if not all(
+            row.get("failed_runs") == 0
+            and row.get("timed_out_runs") == 0
+            and row.get("nonzero_exit_runs") == 0
+            for row in bench_report["summaries"]
+        ):
+            print("unexpected_prompt_failure_counts=true", file=sys.stderr)
             return 1
         if not all(
             "host_overhead_us_median" in row and "host_overhead_pct_median" in row

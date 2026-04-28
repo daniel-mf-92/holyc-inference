@@ -730,12 +730,17 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
         ttft_values = [run.ttft_us for run in prompt_runs if run.ttft_us is not None]
         memory_values = [run.memory_bytes for run in prompt_runs if run.memory_bytes is not None]
         ok_runs = [run for run in prompt_runs if run.returncode == 0 and not run.timed_out]
+        timed_out_runs = [run for run in prompt_runs if run.timed_out]
+        nonzero_exit_runs = [run for run in prompt_runs if run.returncode != 0]
         summaries.append(
             {
                 "prompt": prompt_id,
                 "prompt_bytes": prompt_runs[0].prompt_bytes,
                 "runs": len(prompt_runs),
                 "ok_runs": len(ok_runs),
+                "failed_runs": len(prompt_runs) - len(ok_runs),
+                "timed_out_runs": len(timed_out_runs),
+                "nonzero_exit_runs": len(nonzero_exit_runs),
                 "tokens_median": statistics.median(
                     [run.tokens for run in prompt_runs if run.tokens is not None]
                 )
@@ -999,12 +1004,17 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
     token_values = [run.tokens for run in runs if run.tokens is not None]
     prompts = sorted({run.prompt for run in runs})
     ok_runs = [run for run in runs if run.returncode == 0 and not run.timed_out]
+    timed_out_runs = [run for run in runs if run.timed_out]
+    nonzero_exit_runs = [run for run in runs if run.returncode != 0]
     prompt_byte_values = [run.prompt_bytes for run in runs]
 
     return {
         "prompts": len(prompts),
         "runs": len(runs),
         "ok_runs": len(ok_runs),
+        "failed_runs": len(runs) - len(ok_runs),
+        "timed_out_runs": len(timed_out_runs),
+        "nonzero_exit_runs": len(nonzero_exit_runs),
         "measured_prompt_bytes_total": sum(prompt_byte_values) if prompt_byte_values else None,
         "prompt_bytes_min": min(prompt_byte_values) if prompt_byte_values else None,
         "prompt_bytes_max": max(prompt_byte_values) if prompt_byte_values else None,
@@ -1072,9 +1082,9 @@ def markdown_report(report: dict[str, Any]) -> str:
             [
                 "## Suite Summary",
                 "",
-                "| Prompts | Runs | OK | Measured prompt bytes | Total tokens | Total elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | P05 tok/s | Median tok/s | P95 tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |",
-                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
-                "| {prompts} | {runs} | {ok_runs} | {measured_prompt_bytes_total} | {total_tokens} | {total_elapsed_us} | "
+                "| Prompts | Runs | OK | Failed | Timed out | Nonzero exit | Measured prompt bytes | Total tokens | Total elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | P05 tok/s | Median tok/s | P95 tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| {prompts} | {runs} | {ok_runs} | {failed_runs} | {timed_out_runs} | {nonzero_exit_runs} | {measured_prompt_bytes_total} | {total_tokens} | {total_elapsed_us} | "
                 "{host_overhead_us_median} | {host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | {host_child_tok_per_cpu_s_median} | {host_child_peak_rss_bytes_max} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_p95} | "
                 "{wall_tok_per_s_median} | {wall_tok_per_s_p95} | {us_per_token_median} | {us_per_token_p95} | "
                 "{wall_us_per_token_median} | {wall_us_per_token_p95} | {memory_bytes_max} |".format(
@@ -1093,12 +1103,12 @@ def markdown_report(report: dict[str, Any]) -> str:
         )
     if report["summaries"]:
         lines.append(
-            "| Prompt | Prompt bytes | Runs | OK | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | Min tok/s | P05 tok/s | Median tok/s | tok/s stdev | tok/s CV % | P05-P95 spread % | Max tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |"
+            "| Prompt | Prompt bytes | Runs | OK | Failed | Timed out | Nonzero exit | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | Min tok/s | P05 tok/s | Median tok/s | tok/s stdev | tok/s CV % | P05-P95 spread % | Max tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |"
         )
-        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for summary in report["summaries"]:
             lines.append(
-                "| {prompt} | {prompt_bytes} | {runs} | {ok_runs} | {tokens_median} | {elapsed_us_median} | "
+                "| {prompt} | {prompt_bytes} | {runs} | {ok_runs} | {failed_runs} | {timed_out_runs} | {nonzero_exit_runs} | {tokens_median} | {elapsed_us_median} | "
                 "{host_overhead_us_median} | {host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | {host_child_tok_per_cpu_s_median} | {host_child_peak_rss_bytes_max} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_min} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_stdev} | {tok_per_s_cv_pct} | {tok_per_s_p05_p95_spread_pct} | "
                 "{tok_per_s_max} | {wall_tok_per_s_median} | {wall_tok_per_s_p95} | {us_per_token_median} | {us_per_token_p95} | "
                 "{wall_us_per_token_median} | {wall_us_per_token_p95} | {memory_bytes_max} |".format(
@@ -1424,6 +1434,9 @@ def write_summary_csv_report(report: dict[str, Any], path: Path) -> None:
         "prompts",
         "runs",
         "ok_runs",
+        "failed_runs",
+        "timed_out_runs",
+        "nonzero_exit_runs",
         "tokens_median",
         "total_tokens",
         "elapsed_us_median",

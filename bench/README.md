@@ -251,14 +251,15 @@ runs into throughput dashboards, and `--repeat N` to run every prompt multiple
 times. Use `--max-launches N` to fail before booting QEMU when
 `prompts * (warmup + repeat)` would exceed the expected launch budget. Reports
 include separate warmup records, raw measured per-run records, an overall suite
-summary, and per-prompt medians, min/max tok/s, P05/P95 tok/s, and
-P05-to-P95 spread percentages in JSON and
+summary, and per-prompt medians, OK/failed/timeout/nonzero-exit counts,
+min/max tok/s, P05/P95 tok/s, and P05-to-P95 spread percentages in JSON and
 Markdown. The suite summary includes measured prompt count, run count, total
-prompt bytes launched, total tokens, total elapsed time, P05/median/P95 tok/s,
-tok/s standard deviation, coefficient of variation, P05-to-P95 spread
-percentage, and max memory. Per-run and per-prompt reports include UTF-8 prompt
-byte counts so benchmark changes can be
-separated from prompt-suite size drift. Optional first-token latency telemetry is
+prompt bytes launched, total tokens, total elapsed time,
+OK/failed/timeout/nonzero-exit counts, P05/median/P95 tok/s, tok/s standard
+deviation, coefficient of variation, P05-to-P95 spread percentage, and max
+memory. Per-run and per-prompt reports include UTF-8 prompt byte counts so
+benchmark changes can be separated from prompt-suite size drift. Optional
+first-token latency telemetry is
 normalized from `ttft_us`, `time_to_first_token_us`, `first_token_us`, and their
 `_ms` or `_s` variants into `ttft_us`; suite and per-prompt reports include
 median and P95 TTFT when present. The runner also writes a deterministic
