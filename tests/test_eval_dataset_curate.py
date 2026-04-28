@@ -114,7 +114,61 @@ def test_duplicate_ids_fail_after_filtering() -> None:
         assert not output.exists()
 
 
+def test_per_dataset_and_split_caps_are_deterministic() -> None:
+    rows = [
+        {
+            "id": f"{dataset}-{split}-{index}",
+            "dataset": dataset,
+            "split": split,
+            "prompt": f"Question {dataset} {split} {index}",
+            "choices": ["A", "B"],
+            "answer_index": index % 2,
+            "provenance": "synthetic grouped curation test",
+        }
+        for dataset in ("arc", "hellaswag")
+        for split in ("train", "validation")
+        for index in range(4)
+    ]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        source = Path(tmp) / "source.jsonl"
+        output = Path(tmp) / "curated.jsonl"
+        manifest = Path(tmp) / "curated.manifest.json"
+        write_jsonl(source, rows)
+
+        status = dataset_curate.main(
+            [
+                "--input",
+                str(source),
+                "--output",
+                str(output),
+                "--manifest",
+                str(manifest),
+                "--source-name",
+                "synthetic-grouped",
+                "--max-records-per-dataset",
+                "3",
+                "--max-records-per-split",
+                "2",
+            ]
+        )
+
+        assert status == 0
+        manifest_json = json.loads(manifest.read_text(encoding="utf-8"))
+        curated_rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+
+        assert manifest_json["filters"]["max_records_per_dataset"] == 3
+        assert manifest_json["filters"]["max_records_per_split"] == 2
+        assert manifest_json["total_after_filters"] == 16
+        assert manifest_json["total_after_group_caps"] == manifest_json["record_count"]
+        assert manifest_json["record_count"] <= 4
+        assert all(count <= 3 for count in manifest_json["dataset_counts"].values())
+        assert all(count <= 2 for count in manifest_json["split_counts"].values())
+        assert curated_rows == sorted(curated_rows, key=lambda row: (row["dataset"], row["split"], row["record_id"]))
+
+
 if __name__ == "__main__":
     test_balanced_answer_index_sampling_limits_label_skew()
     test_duplicate_ids_fail_after_filtering()
+    test_per_dataset_and_split_caps_are_deterministic()
     print("eval_dataset_curate_tests=ok")

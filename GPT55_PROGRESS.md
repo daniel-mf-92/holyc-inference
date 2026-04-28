@@ -107,3 +107,4 @@
 2026-04-28T07:46:07Z | Added quant audit per-block distribution gates for low diversity and saturation with refreshed source audit artifacts.
 2026-04-28T07:53:59Z | Added perf regression P05 tok/s tracking and opt-in low-tail throughput gating with refreshed dashboard artifacts.
 2026-04-28T08:23:52Z | Added benchmark result command-hash drift indexing, CSV/JUnit outputs, opt-in gates, and refreshed result index artifacts.
+2026-04-28T08:42:47Z | Added deterministic per-dataset and per-split caps to local eval dataset curation with refreshed smoke artifacts.

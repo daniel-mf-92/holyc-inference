@@ -2,7 +2,7 @@
   "answer_histogram": {
     "0": 3
   },
-  "created_at": "2026-04-27T23:13:11Z",
+  "created_at": "2026-04-28T08:39:59Z",
   "dataset_counts": {
     "arc-smoke": 1,
     "hellaswag-smoke": 1,
@@ -13,6 +13,8 @@
     "include_dataset": [],
     "include_split": [],
     "max_records": 3,
+    "max_records_per_dataset": null,
+    "max_records_per_split": null,
     "require_provenance": false,
     "seed": "holyc-eval-v1"
   },
@@ -38,5 +40,6 @@
   "split_counts": {
     "validation": 3
   },
-  "total_after_filters": 3
+  "total_after_filters": 3,
+  "total_after_group_caps": 3
 }

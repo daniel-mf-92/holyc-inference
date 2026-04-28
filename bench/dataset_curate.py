@@ -88,6 +88,26 @@ def reject_duplicate_ids(records: list[dataset_pack.EvalRecord]) -> None:
         raise ValueError(f"duplicate record ids after filtering: {preview}")
 
 
+def cap_records_by_field(
+    records: list[dataset_pack.EvalRecord],
+    field: str,
+    max_per_group: int | None,
+    seed: str,
+) -> list[dataset_pack.EvalRecord]:
+    if max_per_group is None:
+        return list(records)
+
+    groups: dict[str, list[dataset_pack.EvalRecord]] = {}
+    for record in records:
+        groups.setdefault(str(getattr(record, field)), []).append(record)
+
+    selected: list[dataset_pack.EvalRecord] = []
+    for key in sorted(groups):
+        group = sorted(groups[key], key=lambda record: stable_sample_key(record, seed))
+        selected.extend(group[:max_per_group])
+    return selected
+
+
 def select_records(
     records: list[dataset_pack.EvalRecord],
     max_records: int | None,
@@ -141,6 +161,7 @@ def build_manifest(
     args: argparse.Namespace,
     source_count: int,
     filtered_count: int,
+    capped_count: int,
     selected: list[dataset_pack.EvalRecord],
 ) -> dict[str, Any]:
     normalized_digest = hashlib.sha256(dataset_pack.canonical_rows(selected)).hexdigest()
@@ -152,6 +173,8 @@ def build_manifest(
             "include_dataset": sorted(args.include_dataset),
             "include_split": sorted(args.include_split),
             "balance_answer_index": args.balance_answer_index,
+            "max_records_per_dataset": args.max_records_per_dataset,
+            "max_records_per_split": args.max_records_per_split,
             "max_records": args.max_records,
             "require_provenance": args.require_provenance,
             "seed": args.seed,
@@ -173,6 +196,7 @@ def build_manifest(
         "source_version": args.source_version,
         "split_counts": count_by(selected, "split"),
         "total_after_filters": filtered_count,
+        "total_after_group_caps": capped_count,
     }
 
 
@@ -186,6 +210,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--include-dataset", action="append", default=[], help="Keep only this dataset; repeatable")
     parser.add_argument("--include-split", action="append", default=[], help="Keep only this split; repeatable")
     parser.add_argument("--max-records", type=int, help="Deterministically sample at most this many records")
+    parser.add_argument(
+        "--max-records-per-dataset",
+        type=int,
+        help="Deterministically keep at most this many records from each dataset before global sampling",
+    )
+    parser.add_argument(
+        "--max-records-per-split",
+        type=int,
+        help="Deterministically keep at most this many records from each split before global sampling",
+    )
     parser.add_argument("--seed", default="holyc-eval-v1", help="Stable sampling seed")
     parser.add_argument(
         "--balance-answer-index",
@@ -209,6 +243,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.max_records is not None and args.max_records < 1:
         print("error: --max-records must be >= 1", file=sys.stderr)
         return 2
+    if args.max_records_per_dataset is not None and args.max_records_per_dataset < 1:
+        print("error: --max-records-per-dataset must be >= 1", file=sys.stderr)
+        return 2
+    if args.max_records_per_split is not None and args.max_records_per_split < 1:
+        print("error: --max-records-per-split must be >= 1", file=sys.stderr)
+        return 2
     if args.pack_manifest and not args.pack_output:
         print("error: --pack-manifest requires --pack-output", file=sys.stderr)
         return 2
@@ -223,12 +263,14 @@ def main(argv: list[str] | None = None) -> int:
             args.require_provenance,
         )
         reject_duplicate_ids(filtered)
-        selected = select_records(filtered, args.max_records, args.seed, args.balance_answer_index)
+        capped = cap_records_by_field(filtered, "dataset", args.max_records_per_dataset, args.seed)
+        capped = cap_records_by_field(capped, "split", args.max_records_per_split, args.seed)
+        selected = select_records(capped, args.max_records, args.seed, args.balance_answer_index)
         if not selected:
             raise ValueError("no records selected after filters")
 
         write_jsonl(selected, args.output)
-        manifest = build_manifest(args, len(records), len(filtered), selected)
+        manifest = build_manifest(args, len(records), len(filtered), len(capped), selected)
         args.manifest.parent.mkdir(parents=True, exist_ok=True)
         args.manifest.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
