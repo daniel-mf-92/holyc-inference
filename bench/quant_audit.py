@@ -4,7 +4,8 @@
 The audit intentionally runs outside TempleOS. It validates two invariants:
 
 * quant HolyC sources do not introduce float runtime types or math helpers
-* raw Q4_0/Q8_0 block streams have valid sizes and sane fp16/Q16 scale fields
+* raw Q4_0/Q8_0 block streams have valid sizes, sane fp16/Q16 scale fields,
+  and optional quant-payload distribution gates
 """
 
 from __future__ import annotations
@@ -67,6 +68,10 @@ class BlockAudit:
     quant_min: int
     quant_max: int
     quant_zero_count: int
+    quant_nonzero_count: int
+    quant_used_value_count: int
+    quant_saturation_count: int
+    quant_saturation_pct: float
     quant_histogram: dict[str, int]
     findings: list[str]
 
@@ -253,12 +258,44 @@ def empty_histogram(min_value: int, max_value: int) -> dict[str, int]:
     return {str(value): 0 for value in range(min_value, max_value + 1)}
 
 
+def check_quant_distribution(
+    findings: list[str],
+    quant_histogram: dict[str, int],
+    saturation_values: tuple[int, int],
+    min_used_quant_values: int | None,
+    max_saturation_pct: float | None,
+) -> tuple[int, int, int, float]:
+    used_value_count = sum(1 for count in quant_histogram.values() if count)
+    nonzero_count = sum(
+        count for value, count in quant_histogram.items() if int(value) != 0
+    )
+    total_count = sum(quant_histogram.values())
+    saturation_count = sum(quant_histogram[str(value)] for value in saturation_values)
+    saturation_pct = (saturation_count * 100.0 / total_count) if total_count else 0.0
+
+    if min_used_quant_values is not None and used_value_count < min_used_quant_values:
+        findings.append(
+            f"used quant values {used_value_count} below minimum {min_used_quant_values}"
+        )
+    if max_saturation_pct is not None and saturation_pct > max_saturation_pct:
+        findings.append(
+            "saturated quant values {pct:.3f}% exceeds limit {limit:.3f}%".format(
+                pct=saturation_pct,
+                limit=max_saturation_pct,
+            )
+        )
+
+    return nonzero_count, used_value_count, saturation_count, saturation_pct
+
+
 def audit_q4_0_blocks(
     path: Path,
     allow_inf_nan_scale: bool,
     expect_blocks: int | None = None,
     expect_elements: int | None = None,
     max_abs_scale_q16: int | None = None,
+    min_used_quant_values: int | None = None,
+    max_saturation_pct: float | None = None,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -314,6 +351,19 @@ def audit_q4_0_blocks(
         quant_min = 0
         quant_max = 0
 
+    (
+        quant_nonzero_count,
+        quant_used_value_count,
+        quant_saturation_count,
+        quant_saturation_pct,
+    ) = check_quant_distribution(
+        findings,
+        quant_histogram,
+        (-8, 7),
+        min_used_quant_values,
+        max_saturation_pct,
+    )
+
     return BlockAudit(
         format="q4_0",
         path=str(path),
@@ -332,6 +382,10 @@ def audit_q4_0_blocks(
         quant_min=int(quant_min),
         quant_max=int(quant_max),
         quant_zero_count=quant_zero_count,
+        quant_nonzero_count=quant_nonzero_count,
+        quant_used_value_count=quant_used_value_count,
+        quant_saturation_count=quant_saturation_count,
+        quant_saturation_pct=quant_saturation_pct,
         quant_histogram=quant_histogram,
         findings=findings,
     )
@@ -343,6 +397,8 @@ def audit_q8_0_blocks(
     expect_blocks: int | None = None,
     expect_elements: int | None = None,
     max_abs_scale_q16: int | None = None,
+    min_used_quant_values: int | None = None,
+    max_saturation_pct: float | None = None,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -396,6 +452,19 @@ def audit_q8_0_blocks(
         quant_min = 0
         quant_max = 0
 
+    (
+        quant_nonzero_count,
+        quant_used_value_count,
+        quant_saturation_count,
+        quant_saturation_pct,
+    ) = check_quant_distribution(
+        findings,
+        quant_histogram,
+        (-128, 127),
+        min_used_quant_values,
+        max_saturation_pct,
+    )
+
     return BlockAudit(
         format="q8_0",
         path=str(path),
@@ -414,6 +483,10 @@ def audit_q8_0_blocks(
         quant_min=int(quant_min),
         quant_max=int(quant_max),
         quant_zero_count=quant_zero_count,
+        quant_nonzero_count=quant_nonzero_count,
+        quant_used_value_count=quant_used_value_count,
+        quant_saturation_count=quant_saturation_count,
+        quant_saturation_pct=quant_saturation_pct,
         quant_histogram=quant_histogram,
         findings=findings,
     )
@@ -426,6 +499,8 @@ def audit_blocks(
     expect_blocks: int | None = None,
     expect_elements: int | None = None,
     max_abs_scale_q16: int | None = None,
+    min_used_quant_values: int | None = None,
+    max_saturation_pct: float | None = None,
 ) -> BlockAudit:
     if quant_format == "q4_0":
         return audit_q4_0_blocks(
@@ -434,6 +509,8 @@ def audit_blocks(
             expect_blocks,
             expect_elements,
             max_abs_scale_q16,
+            min_used_quant_values,
+            max_saturation_pct,
         )
     if quant_format == "q8_0":
         return audit_q8_0_blocks(
@@ -442,6 +519,8 @@ def audit_blocks(
             expect_blocks,
             expect_elements,
             max_abs_scale_q16,
+            min_used_quant_values,
+            max_saturation_pct,
         )
     raise ValueError(f"unsupported quant format: {quant_format}")
 
@@ -472,8 +551,9 @@ def markdown_report(report: dict) -> str:
         lines.extend(
             [
                 "| Format | Path | Blocks | Capacity | Scale zero/subnormal/normal/inf_nan "
-                "| Scale Q16 min/max/absmax/zero/overlimit | Quant min/max | Zero quants | Findings |",
-                "| --- | --- | ---: | ---: | --- | --- | --- | ---: | ---: |",
+                "| Scale Q16 min/max/absmax/zero/overlimit | Quant min/max | Used values | Zero/nonzero quants "
+                "| Saturated quants | Findings |",
+                "| --- | --- | ---: | ---: | --- | --- | --- | ---: | ---: | ---: | ---: |",
             ]
         )
         for audit in block_audits:
@@ -496,7 +576,9 @@ def markdown_report(report: dict) -> str:
             lines.append(
                 (
                     "| {format} | `{path}` | {block_count} | {element_capacity} | "
-                    "{scales} | {scale_q16} | {quant_min}/{quant_max} | {quant_zero_count} | {findings} |"
+                    "{scales} | {scale_q16} | {quant_min}/{quant_max} | {quant_used_value_count} | "
+                    "{quant_zero_count}/{quant_nonzero_count} | {quant_saturation_count} ({quant_saturation_pct:.3f}%) | "
+                    "{findings} |"
                 ).format(
                     format=audit["format"],
                     path=audit["path"],
@@ -506,7 +588,11 @@ def markdown_report(report: dict) -> str:
                     scale_q16=scale_q16,
                     quant_min=audit["quant_min"],
                     quant_max=audit["quant_max"],
+                    quant_used_value_count=audit["quant_used_value_count"],
                     quant_zero_count=audit["quant_zero_count"],
+                    quant_nonzero_count=audit["quant_nonzero_count"],
+                    quant_saturation_count=audit["quant_saturation_count"],
+                    quant_saturation_pct=audit["quant_saturation_pct"],
                     findings=len(audit["findings"]),
                 )
             )
@@ -577,6 +663,16 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Fail any finite fp16 scale whose rounded Q16 magnitude exceeds this limit",
     )
+    parser.add_argument(
+        "--min-used-quant-values",
+        type=int,
+        help="Fail any block file whose quant payload uses fewer distinct values than this",
+    )
+    parser.add_argument(
+        "--max-saturation-pct",
+        type=float,
+        help="Fail any block file whose min/max quant values exceed this percentage of payload entries",
+    )
     parser.add_argument("--allow-inf-nan-scale", action="store_true", help="Do not fail on fp16 inf/nan scales")
     parser.add_argument("--output", type=Path, help="Write JSON report to this path")
     parser.add_argument("--markdown", type=Path, help="Write Markdown report to this path")
@@ -600,6 +696,8 @@ def main(argv: list[str] | None = None) -> int:
             args.expect_blocks,
             args.expect_elements,
             args.max_abs_scale_q16,
+            args.min_used_quant_values,
+            args.max_saturation_pct,
         )
         for path, quant_format in block_specs
     ]

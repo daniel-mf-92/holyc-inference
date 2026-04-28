@@ -70,6 +70,10 @@ def test_q4_0_block_audit_reports_signed_nibble_range(tmp_path: Path) -> None:
     assert audit.quant_histogram["-8"] == 1
     assert audit.quant_histogram["0"] == 30
     assert audit.quant_histogram["7"] == 1
+    assert audit.quant_nonzero_count == 2
+    assert audit.quant_used_value_count == 3
+    assert audit.quant_saturation_count == 2
+    assert audit.quant_saturation_pct == 6.25
     assert audit.scale_normal_count == 1
     assert audit.scale_q16_min == 65536
     assert audit.scale_q16_max == 65536
@@ -138,6 +142,25 @@ def test_block_audit_counts_zero_q16_scales(tmp_path: Path) -> None:
     assert audit.scale_q16_zero_count == 1
 
 
+def test_block_audit_checks_quant_distribution_gates(tmp_path: Path) -> None:
+    block_file = tmp_path / "q4.bin"
+    block_file.write_bytes(half_bits(1.0) + bytes([0x0F] * 16))
+
+    audit = quant_audit.audit_q4_0_blocks(
+        block_file,
+        allow_inf_nan_scale=False,
+        min_used_quant_values=3,
+        max_saturation_pct=90.0,
+    )
+
+    assert audit.quant_nonzero_count == 32
+    assert audit.quant_used_value_count == 2
+    assert audit.quant_saturation_count == 32
+    assert audit.quant_saturation_pct == 100.0
+    assert "used quant values 2 below minimum 3" in audit.findings
+    assert "saturated quant values 100.000% exceeds limit 90.000%" in audit.findings
+
+
 def test_cli_writes_pass_report(tmp_path: Path) -> None:
     source = tmp_path / "ok.HC"
     output = tmp_path / "report.json"
@@ -170,6 +193,8 @@ def test_cli_fails_on_q16_scale_limit(tmp_path: Path) -> None:
             str(q4_file),
             "--max-abs-scale-q16",
             "32768",
+            "--min-used-quant-values",
+            "1",
             "--output",
             str(output),
             "--markdown",
@@ -181,7 +206,9 @@ def test_cli_fails_on_q16_scale_limit(tmp_path: Path) -> None:
     report = output.read_text(encoding="utf-8")
     assert '"scale_q16_abs_max": 65536' in report
     assert '"scale_q16_over_limit_count": 1' in report
-    assert "Scale Q16 min/max/absmax/zero/overlimit" in markdown.read_text(encoding="utf-8")
+    markdown_text = markdown.read_text(encoding="utf-8")
+    assert "Scale Q16 min/max/absmax/zero/overlimit" in markdown_text
+    assert "Used values" in markdown_text
 
 
 def test_cli_audits_mixed_q4_and_q8_block_files(tmp_path: Path) -> None:
