@@ -14,6 +14,7 @@ import hashlib
 import json
 import re
 import sys
+import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -253,7 +254,78 @@ def write_csv(report: dict[str, Any], path: Path) -> None:
             )
 
 
-def write_outputs(report: dict[str, Any], output: Path, markdown: Path | None, csv_path: Path | None) -> None:
+def write_junit(report: dict[str, Any], path: Path) -> None:
+    error_findings = [finding for finding in report["findings"] if finding["severity"] == "error"]
+    warning_findings = [finding for finding in report["findings"] if finding["severity"] == "warning"]
+    testcase_count = len(error_findings) + (1 if not error_findings else 0)
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": "holyc_dataset_leak_audit",
+            "tests": str(testcase_count),
+            "failures": str(len(error_findings)),
+            "errors": "0",
+        },
+    )
+
+    if not error_findings:
+        case = ET.SubElement(
+            suite,
+            "testcase",
+            {
+                "classname": "dataset_leak_audit",
+                "name": "split_leakage",
+            },
+        )
+        if warning_findings:
+            system_out = ET.SubElement(case, "system-out")
+            system_out.text = "\n".join(
+                f"{finding['kind']} {finding['dataset']} {','.join(finding['splits'])}: {finding['detail']}"
+                for finding in warning_findings
+            )
+    else:
+        for index, finding in enumerate(error_findings, 1):
+            case = ET.SubElement(
+                suite,
+                "testcase",
+                {
+                    "classname": f"dataset_leak_audit.{finding['kind']}",
+                    "name": f"{finding['dataset']}:{finding['key_sha256'][:12]}:{index}",
+                },
+            )
+            failure = ET.SubElement(
+                case,
+                "failure",
+                {
+                    "type": finding["kind"],
+                    "message": finding["detail"],
+                },
+            )
+            failure.text = "\n".join(
+                [
+                    f"dataset={finding['dataset']}",
+                    f"splits={','.join(finding['splits'])}",
+                    f"record_ids={','.join(finding['record_ids'])}",
+                    f"sources={','.join(finding['sources'])}",
+                    f"key_sha256={finding['key_sha256']}",
+                    finding["detail"],
+                ]
+            )
+
+    ET.indent(suite)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
+    with path.open("ab") as handle:
+        handle.write(b"\n")
+
+
+def write_outputs(
+    report: dict[str, Any],
+    output: Path,
+    markdown: Path | None,
+    csv_path: Path | None,
+    junit: Path | None,
+) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     if markdown:
@@ -261,6 +333,8 @@ def write_outputs(report: dict[str, Any], output: Path, markdown: Path | None, c
         markdown.write_text(markdown_report(report), encoding="utf-8")
     if csv_path:
         write_csv(report, csv_path)
+    if junit:
+        write_junit(report, junit)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -269,6 +343,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, required=True, help="JSON report output")
     parser.add_argument("--markdown", type=Path, help="Optional Markdown report output")
     parser.add_argument("--csv", type=Path, help="Optional CSV findings output")
+    parser.add_argument("--junit", type=Path, help="Optional JUnit XML findings output")
     parser.add_argument("--default-dataset", default="eval", help="Dataset name for rows missing dataset")
     parser.add_argument("--default-split", default="validation", help="Split name for rows missing split")
     parser.add_argument("--fail-on-leaks", action="store_true", help="Exit non-zero when error-level leaks are found")
@@ -283,7 +358,7 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("no records loaded")
         findings = audit_records(records)
         report = build_report(args.input, records, findings)
-        write_outputs(report, args.output, args.markdown, args.csv)
+        write_outputs(report, args.output, args.markdown, args.csv, args.junit)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -293,6 +368,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"wrote_markdown={args.markdown}")
     if args.csv:
         print(f"wrote_csv={args.csv}")
+    if args.junit:
+        print(f"wrote_junit={args.junit}")
     print(f"status={report['status']}")
     print(f"records={report['record_count']}")
     print(f"findings={len(report['findings'])}")

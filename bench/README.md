@@ -129,6 +129,7 @@ python3 bench/dataset_leak_audit.py \
   --output bench/results/datasets/dataset_leak_audit_smoke_latest.json \
   --markdown bench/results/datasets/dataset_leak_audit_smoke_latest.md \
   --csv bench/results/datasets/dataset_leak_audit_smoke_latest.csv \
+  --junit bench/results/datasets/dataset_leak_audit_smoke_latest_junit.xml \
   --fail-on-leaks
 ```
 

@@ -7,6 +7,7 @@ import importlib.util
 import json
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -54,6 +55,7 @@ def test_detects_prompt_and_payload_leak_across_splits() -> None:
         output = Path(tmp) / "leak.json"
         markdown = Path(tmp) / "leak.md"
         csv_path = Path(tmp) / "leak.csv"
+        junit = Path(tmp) / "leak.xml"
         write_jsonl(source, rows)
 
         status = dataset_leak_audit.main(
@@ -66,6 +68,8 @@ def test_detects_prompt_and_payload_leak_across_splits() -> None:
                 str(markdown),
                 "--csv",
                 str(csv_path),
+                "--junit",
+                str(junit),
                 "--fail-on-leaks",
             ]
         )
@@ -79,6 +83,10 @@ def test_detects_prompt_and_payload_leak_across_splits() -> None:
         }
         assert "payload_split_leak" in markdown.read_text(encoding="utf-8")
         assert "prompt_split_leak" in csv_path.read_text(encoding="utf-8")
+        junit_root = ET.parse(junit).getroot()
+        assert junit_root.attrib["name"] == "holyc_dataset_leak_audit"
+        assert junit_root.attrib["failures"] == "2"
+        assert junit_root.find("./testcase/failure") is not None
 
 
 def test_duplicate_id_within_split_is_warning_only() -> None:
@@ -106,15 +114,23 @@ def test_duplicate_id_within_split_is_warning_only() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         source = Path(tmp) / "source.jsonl"
         output = Path(tmp) / "audit.json"
+        junit = Path(tmp) / "audit.xml"
         write_jsonl(source, rows)
 
-        status = dataset_leak_audit.main(["--input", str(source), "--output", str(output), "--fail-on-leaks"])
+        status = dataset_leak_audit.main(
+            ["--input", str(source), "--output", str(output), "--junit", str(junit), "--fail-on-leaks"]
+        )
 
         assert status == 0
         report = json.loads(output.read_text(encoding="utf-8"))
         assert report["status"] == "pass"
         assert report["warning_count"] == 1
         assert report["findings"][0]["kind"] == "duplicate_record_id"
+        junit_root = ET.parse(junit).getroot()
+        assert junit_root.attrib["failures"] == "0"
+        system_out = junit_root.find("./testcase/system-out")
+        assert system_out is not None
+        assert "duplicate_record_id" in (system_out.text or "")
 
 
 if __name__ == "__main__":
