@@ -174,12 +174,17 @@ def fragment_violations(args: list[str]) -> list[str]:
 
 
 def iter_json_arg_fragments(payload: Any, path: str = "$") -> Iterable[tuple[str, list[str]]]:
+    if path == "$" and isinstance(payload, list) and all(isinstance(item, str) for item in payload):
+        yield path, list(payload)
+        return
+
     if isinstance(payload, dict):
         for key, value in payload.items():
             child_path = f"{path}.{key}"
             if key in {"qemu_args", "qemu_extra_args", "qemu_flags"} and isinstance(value, list):
                 if all(isinstance(item, str) for item in value):
                     yield child_path, list(value)
+                    continue
             yield from iter_json_arg_fragments(value, child_path)
     elif isinstance(payload, list):
         for index, value in enumerate(payload):

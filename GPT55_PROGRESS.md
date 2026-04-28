@@ -174,3 +174,4 @@
 2026-04-28T22:53:10Z | Added qemu_prompt_bench IQR tok/s variability telemetry/gates with matrix passthrough and refreshed smoke artifacts.
 2026-04-28T23:03:45Z | Added dataset schema duplicate payload/conflicting-answer gates with smoke coverage and refreshed artifacts.
 2026-04-28T23:15:37Z | Added qemu_prompt_bench input artifact metadata with optional image hashing and refreshed air-gapped smoke artifacts.
+2026-04-28T23:22:50Z | Added qemu_source_audit coverage for standalone JSON QEMU args arrays with smoke validation and refreshed artifacts.

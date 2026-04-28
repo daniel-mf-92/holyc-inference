@@ -446,9 +446,9 @@ launch plans reproducible before a VM is started.
 for literal `qemu-system*` launch snippets and applies the same air-gap command
 rules. This catches unsafe copied commands before they become benchmark scripts
 or operator runbooks. It also checks JSON `qemu_args`/`qemu_extra_args`/
-`qemu_flags` fragments and `.args` files for network-enabling options such as
-`-netdev`, non-`none` `-nic`, and virtual NIC devices. Raw QEMU examples must
-keep `-nic none` explicit:
+`qemu_flags` fragments, standalone JSON QEMU args arrays, and `.args` files for
+network-enabling options such as `-netdev`, non-`none` `-nic`, and virtual NIC
+devices. Raw QEMU examples must keep `-nic none` explicit:
 
 ```bash
 qemu-system-x86_64 \
