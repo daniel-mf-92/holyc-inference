@@ -384,6 +384,58 @@ print(f"tokens=100 elapsed_us={elapsed_us}")
     assert failure.attrib["type"] == "benchmark_variability"
 
 
+def test_cli_telemetry_gate_fails_missing_or_low_metrics(tmp_path: Path) -> None:
+    fake_qemu = tmp_path / "fake-qemu.py"
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    output_dir = tmp_path / "results"
+    prompts.write_text('{"prompt_id":"one","prompt":"Sparse telemetry"}\n', encoding="utf-8")
+    fake_qemu.write_text(
+        """#!/usr/bin/env python3
+print("tokens=4 elapsed_us=100000")
+""",
+        encoding="utf-8",
+    )
+    fake_qemu.chmod(0o755)
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--qemu-bin",
+            str(fake_qemu),
+            "--output-dir",
+            str(output_dir),
+            "--require-memory",
+            "--min-tokens",
+            "8",
+            "--min-tok-per-s",
+            "100",
+        ]
+    )
+
+    assert status == 1
+    report = json.loads((output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8"))
+    markdown = (output_dir / "qemu_prompt_bench_latest.md").read_text(encoding="utf-8")
+    junit_root = ET.parse(output_dir / "qemu_prompt_bench_junit_latest.xml").getroot()
+    failures = junit_root.findall(".//failure")
+
+    assert report["status"] == "fail"
+    assert report["telemetry_gates"]["require_memory"] is True
+    assert report["telemetry_gates"]["min_tokens"] == 8
+    assert len(report["telemetry_findings"]) == 3
+    assert {finding["metric"] for finding in report["telemetry_findings"]} == {
+        "tokens",
+        "tok_per_s",
+        "memory_bytes",
+    }
+    assert "Telemetry Gate Findings" in markdown
+    assert junit_root.attrib["failures"] == "3"
+    assert {failure.attrib["type"] for failure in failures} == {"benchmark_telemetry"}
+
+
 def test_cli_junit_reports_failed_qemu_run(tmp_path: Path) -> None:
     fake_qemu = tmp_path / "fake-qemu.py"
     prompts = tmp_path / "prompts.jsonl"
@@ -459,6 +511,26 @@ def test_cli_rejects_negative_variability_gate(tmp_path: Path) -> None:
             str(prompts),
             "--dry-run",
             "--max-suite-cv-pct",
+            "-1",
+        ]
+    )
+
+    assert status == 2
+
+
+def test_cli_rejects_negative_telemetry_gate(tmp_path: Path) -> None:
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    prompts.write_text('{"prompt_id":"one","prompt":"A"}\n', encoding="utf-8")
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--dry-run",
+            "--min-tokens",
             "-1",
         ]
     )

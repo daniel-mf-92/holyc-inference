@@ -1,6 +1,6 @@
 # QEMU Prompt Benchmark
 
-Generated: 2026-04-28T00:06:50Z
+Generated: 2026-04-28T02:46:00Z
 Status: pass
 Prompt suite: 68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a
 Warmup runs: 0
@@ -10,7 +10,7 @@ Runs: 6
 
 | Prompts | Runs | OK | Measured prompt bytes | Total tokens | Total elapsed us | Median TTFT us | P95 TTFT us | Median tok/s | P95 tok/s | Median wall tok/s | P95 wall tok/s | Max memory bytes |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 2 | 6 | 6 | 360 | 240 | 1500000 | 12000.000 | 12400.000 | 160.000 | 160.000 | 580.484 | 855.586 | 67207168 |
+| 2 | 6 | 6 | 360 | 240 | 1500000 | 12000.000 | 12400.000 | 160.000 | 160.000 | 446.056 | 592.138 | 67207168 |
 
 | tok/s stdev | tok/s CV % |
 | ---: | ---: |
@@ -20,8 +20,8 @@ Runs: 6
 
 | Prompt | Prompt bytes | Runs | OK | Median tokens | Median elapsed us | Median TTFT us | P95 TTFT us | Min tok/s | Median tok/s | tok/s stdev | tok/s CV % | Max tok/s | Median wall tok/s | P95 wall tok/s | Max memory bytes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| smoke-code | 71 | 3 | 3 | 48 | 300000 | 12400 | 12400.000 | 160.000 | 160.000 | 0.000 | 0.000 | 160.000 | 815.633 | 863.577 | 67207168 |
-| smoke-short | 49 | 3 | 3 | 32 | 200000 | 11600 | 11600.000 | 160.000 | 160.000 | 0.000 | 0.000 | 160.000 | 365.827 | 495.993 | 67174400 |
+| smoke-code | 71 | 3 | 3 | 48 | 300000 | 12400 | 12400.000 | 160.000 | 160.000 | 0.000 | 0.000 | 160.000 | 591.366 | 592.292 | 67207168 |
+| smoke-short | 49 | 3 | 3 | 32 | 200000 | 11600 | 11600.000 | 160.000 | 160.000 | 0.000 | 0.000 | 160.000 | 401.043 | 482.066 | 67174400 |
 
 ## Environment
 

@@ -578,6 +578,35 @@ def variability_findings(
     return findings
 
 
+def telemetry_findings(
+    runs: list[BenchRun],
+    *,
+    require_tokens: bool = False,
+    require_tok_per_s: bool = False,
+    require_memory: bool = False,
+    min_tokens: int | None = None,
+    min_tok_per_s: float | None = None,
+) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    for run in runs:
+        base = {
+            "scope": "measured_run",
+            "prompt": run.prompt,
+            "iteration": run.iteration,
+        }
+        if require_tokens and run.tokens is None:
+            findings.append({**base, "metric": "tokens", "value": None, "limit": "present"})
+        if min_tokens is not None and (run.tokens is None or run.tokens < min_tokens):
+            findings.append({**base, "metric": "tokens", "value": run.tokens, "limit": min_tokens})
+        if require_tok_per_s and run.tok_per_s is None:
+            findings.append({**base, "metric": "tok_per_s", "value": None, "limit": "present"})
+        if min_tok_per_s is not None and (run.tok_per_s is None or run.tok_per_s < min_tok_per_s):
+            findings.append({**base, "metric": "tok_per_s", "value": run.tok_per_s, "limit": min_tok_per_s})
+        if require_memory and run.memory_bytes is None:
+            findings.append({**base, "metric": "memory_bytes", "value": None, "limit": "present"})
+    return findings
+
+
 def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
     tok_values = [run.tok_per_s for run in runs if run.tok_per_s is not None]
     wall_tok_values = [run.wall_tok_per_s for run in runs if run.wall_tok_per_s is not None]
@@ -682,6 +711,22 @@ def markdown_report(report: dict[str, Any]) -> str:
         for finding in report["variability_findings"]:
             lines.append(
                 "| {scope} | {prompt} | {metric} | {value} | {limit} |".format(
+                    **{key: format_summary_value(value) for key, value in finding.items()}
+                )
+            )
+    if report.get("telemetry_findings"):
+        lines.extend(
+            [
+                "",
+                "## Telemetry Gate Findings",
+                "",
+                "| Scope | Prompt | Iteration | Metric | Value | Limit |",
+                "| --- | --- | ---: | --- | ---: | --- |",
+            ]
+        )
+        for finding in report["telemetry_findings"]:
+            lines.append(
+                "| {scope} | {prompt} | {iteration} | {metric} | {value} | {limit} |".format(
                     **{key: format_summary_value(value) for key, value in finding.items()}
                 )
             )
@@ -801,6 +846,11 @@ def write_report(
     warmups: list[BenchRun] | None = None,
     max_suite_cv_pct: float | None = None,
     max_prompt_cv_pct: float | None = None,
+    require_tokens: bool = False,
+    require_tok_per_s: bool = False,
+    require_memory: bool = False,
+    min_tokens: int | None = None,
+    min_tok_per_s: float | None = None,
     environment: dict[str, Any] | None = None,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -814,9 +864,17 @@ def write_report(
         max_suite_cv_pct=max_suite_cv_pct,
         max_prompt_cv_pct=max_prompt_cv_pct,
     )
+    telemetry = telemetry_findings(
+        runs,
+        require_tokens=require_tokens,
+        require_tok_per_s=require_tok_per_s,
+        require_memory=require_memory,
+        min_tokens=min_tokens,
+        min_tok_per_s=min_tok_per_s,
+    )
     report = {
         "generated_at": iso_now(),
-        "status": report_status(all_runs, findings),
+        "status": report_status(all_runs, findings + telemetry),
         "prompt_suite": prompt_suite or {},
         "environment": environment or {},
         "warmups": [asdict(run) for run in warmup_runs],
@@ -827,6 +885,14 @@ def write_report(
             "max_prompt_cv_pct": max_prompt_cv_pct,
         },
         "variability_findings": findings,
+        "telemetry_gates": {
+            "require_tokens": require_tokens,
+            "require_tok_per_s": require_tok_per_s,
+            "require_memory": require_memory,
+            "min_tokens": min_tokens,
+            "min_tok_per_s": min_tok_per_s,
+        },
+        "telemetry_findings": telemetry,
         "benchmarks": [asdict(run) for run in runs],
     }
     latest = output_dir / "qemu_prompt_bench_latest.json"
@@ -836,7 +902,7 @@ def write_report(
     latest.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     latest_md.write_text(markdown_report(report), encoding="utf-8")
     write_csv_report(runs, latest_csv)
-    write_junit_report(runs, warmup_runs, findings, latest_junit)
+    write_junit_report(runs, warmup_runs, findings, telemetry, latest_junit)
     stamped = output_dir / f"qemu_prompt_bench_{report['generated_at'].replace(':', '').replace('-', '')}.json"
     stamped.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return latest
@@ -876,16 +942,17 @@ def write_junit_report(
     runs: list[BenchRun],
     warmups: list[BenchRun],
     variability_findings: list[dict[str, Any]],
+    telemetry_findings: list[dict[str, Any]],
     path: Path,
 ) -> None:
     all_runs = [("warmup", run) for run in warmups] + [("measured", run) for run in runs]
     failed_runs = [run for _, run in all_runs if run.returncode != 0 or run.timed_out]
-    failures = len(failed_runs) + len(variability_findings)
+    failures = len(failed_runs) + len(variability_findings) + len(telemetry_findings)
     suite = ET.Element(
         "testsuite",
         {
             "name": "holyc_qemu_prompt_bench",
-            "tests": str(len(all_runs) + len(variability_findings)),
+            "tests": str(len(all_runs) + len(variability_findings) + len(telemetry_findings)),
             "failures": str(failures),
             "errors": "0",
         },
@@ -951,6 +1018,32 @@ def write_junit_report(
         )
         failure.text = "\n".join(f"{key}={format_summary_value(value)}" for key, value in sorted(finding.items()))
 
+    for index, finding in enumerate(telemetry_findings, 1):
+        prompt = str(finding.get("prompt") or "unknown")
+        iteration = str(finding.get("iteration") or "unknown")
+        metric = str(finding.get("metric", "unknown"))
+        case = ET.SubElement(
+            suite,
+            "testcase",
+            {
+                "classname": "qemu_prompt_bench.telemetry",
+                "name": f"{prompt}:{iteration}:{metric}:{index}",
+            },
+        )
+        message = (
+            f"{metric}={format_summary_value(finding.get('value'))} "
+            f"limit={format_summary_value(finding.get('limit'))}"
+        )
+        failure = ET.SubElement(
+            case,
+            "failure",
+            {
+                "type": "benchmark_telemetry",
+                "message": message,
+            },
+        )
+        failure.text = "\n".join(f"{key}={format_summary_value(value)}" for key, value in sorted(finding.items()))
+
     ET.indent(suite)
     ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
     with path.open("ab") as handle:
@@ -988,6 +1081,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Fail if any prompt tok/s coefficient of variation exceeds this percentage",
     )
+    parser.add_argument("--require-tokens", action="store_true", help="Fail if any measured run omits token count")
+    parser.add_argument("--require-tok-per-s", action="store_true", help="Fail if any measured run omits tok/s")
+    parser.add_argument("--require-memory", action="store_true", help="Fail if any measured run omits memory telemetry")
+    parser.add_argument("--min-tokens", type=int, default=None, help="Fail if any measured run emits fewer tokens")
+    parser.add_argument("--min-tok-per-s", type=float, default=None, help="Fail if any measured run is below tok/s")
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--profile", default="default")
     parser.add_argument("--model", default="")
@@ -1010,6 +1108,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.max_prompt_cv_pct is not None and args.max_prompt_cv_pct < 0:
         print("error: --max-prompt-cv-pct must be >= 0", file=sys.stderr)
+        return 2
+    if args.min_tokens is not None and args.min_tokens < 0:
+        print("error: --min-tokens must be >= 0", file=sys.stderr)
+        return 2
+    if args.min_tok_per_s is not None and args.min_tok_per_s < 0:
+        print("error: --min-tok-per-s must be >= 0", file=sys.stderr)
         return 2
 
     root = Path(__file__).resolve().parents[1]
@@ -1058,12 +1162,18 @@ def main(argv: list[str] | None = None) -> int:
         warmups=warmups,
         max_suite_cv_pct=args.max_suite_cv_pct,
         max_prompt_cv_pct=args.max_prompt_cv_pct,
+        require_tokens=args.require_tokens,
+        require_tok_per_s=args.require_tok_per_s,
+        require_memory=args.require_memory,
+        min_tokens=args.min_tokens,
+        min_tok_per_s=args.min_tok_per_s,
         environment=host_environment(args.qemu_bin),
     )
     report = json.loads(output.read_text(encoding="utf-8"))
     print(f"wrote_json={output}")
     print(f"status={report['status']}")
     print(f"variability_findings={len(report['variability_findings'])}")
+    print(f"telemetry_findings={len(report['telemetry_findings'])}")
     return 0 if report["status"] == "pass" else 1
 
 
