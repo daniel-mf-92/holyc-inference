@@ -651,6 +651,8 @@ def telemetry_findings(
     require_ttft_us: bool = False,
     min_tokens: int | None = None,
     min_tok_per_s: float | None = None,
+    min_wall_tok_per_s: float | None = None,
+    max_memory_bytes: int | None = None,
     max_ttft_us: int | None = None,
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
@@ -668,8 +670,30 @@ def telemetry_findings(
             findings.append({**base, "metric": "tok_per_s", "value": None, "limit": "present"})
         if min_tok_per_s is not None and (run.tok_per_s is None or run.tok_per_s < min_tok_per_s):
             findings.append({**base, "metric": "tok_per_s", "value": run.tok_per_s, "limit": min_tok_per_s})
+        if min_wall_tok_per_s is not None and (
+            run.wall_tok_per_s is None or run.wall_tok_per_s < min_wall_tok_per_s
+        ):
+            findings.append(
+                {
+                    **base,
+                    "metric": "wall_tok_per_s",
+                    "value": run.wall_tok_per_s,
+                    "limit": min_wall_tok_per_s,
+                }
+            )
         if require_memory and run.memory_bytes is None:
             findings.append({**base, "metric": "memory_bytes", "value": None, "limit": "present"})
+        if max_memory_bytes is not None and (
+            run.memory_bytes is None or run.memory_bytes > max_memory_bytes
+        ):
+            findings.append(
+                {
+                    **base,
+                    "metric": "memory_bytes",
+                    "value": run.memory_bytes,
+                    "limit": max_memory_bytes,
+                }
+            )
         if require_ttft_us and run.ttft_us is None:
             findings.append({**base, "metric": "ttft_us", "value": None, "limit": "present"})
         if max_ttft_us is not None and (run.ttft_us is None or run.ttft_us > max_ttft_us):
@@ -938,6 +962,8 @@ def write_report(
     require_ttft_us: bool = False,
     min_tokens: int | None = None,
     min_tok_per_s: float | None = None,
+    min_wall_tok_per_s: float | None = None,
+    max_memory_bytes: int | None = None,
     max_ttft_us: int | None = None,
     environment: dict[str, Any] | None = None,
 ) -> Path:
@@ -960,6 +986,8 @@ def write_report(
         require_ttft_us=require_ttft_us,
         min_tokens=min_tokens,
         min_tok_per_s=min_tok_per_s,
+        min_wall_tok_per_s=min_wall_tok_per_s,
+        max_memory_bytes=max_memory_bytes,
         max_ttft_us=max_ttft_us,
     )
     report = {
@@ -982,6 +1010,8 @@ def write_report(
             "require_ttft_us": require_ttft_us,
             "min_tokens": min_tokens,
             "min_tok_per_s": min_tok_per_s,
+            "min_wall_tok_per_s": min_wall_tok_per_s,
+            "max_memory_bytes": max_memory_bytes,
             "max_ttft_us": max_ttft_us,
         },
         "telemetry_findings": telemetry,
@@ -1195,6 +1225,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--require-ttft-us", action="store_true", help="Fail if any measured run omits TTFT telemetry")
     parser.add_argument("--min-tokens", type=int, default=None, help="Fail if any measured run emits fewer tokens")
     parser.add_argument("--min-tok-per-s", type=float, default=None, help="Fail if any measured run is below tok/s")
+    parser.add_argument(
+        "--min-wall-tok-per-s",
+        type=float,
+        default=None,
+        help="Fail if any measured run is below host wall-clock tok/s",
+    )
+    parser.add_argument(
+        "--max-memory-bytes",
+        type=int,
+        default=None,
+        help="Fail if any measured run exceeds peak memory bytes or omits memory telemetry",
+    )
     parser.add_argument("--max-ttft-us", type=int, default=None, help="Fail if any measured run exceeds TTFT in us")
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--profile", default="default")
@@ -1224,6 +1266,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.min_tok_per_s is not None and args.min_tok_per_s < 0:
         print("error: --min-tok-per-s must be >= 0", file=sys.stderr)
+        return 2
+    if args.min_wall_tok_per_s is not None and args.min_wall_tok_per_s < 0:
+        print("error: --min-wall-tok-per-s must be >= 0", file=sys.stderr)
+        return 2
+    if args.max_memory_bytes is not None and args.max_memory_bytes < 0:
+        print("error: --max-memory-bytes must be >= 0", file=sys.stderr)
         return 2
     if args.max_ttft_us is not None and args.max_ttft_us < 0:
         print("error: --max-ttft-us must be >= 0", file=sys.stderr)
@@ -1282,6 +1330,8 @@ def main(argv: list[str] | None = None) -> int:
         require_ttft_us=args.require_ttft_us,
         min_tokens=args.min_tokens,
         min_tok_per_s=args.min_tok_per_s,
+        min_wall_tok_per_s=args.min_wall_tok_per_s,
+        max_memory_bytes=args.max_memory_bytes,
         max_ttft_us=args.max_ttft_us,
         environment=host_environment(args.qemu_bin),
     )

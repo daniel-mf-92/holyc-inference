@@ -338,6 +338,10 @@ def main() -> int:
             "3",
             "--max-prompt-cv-pct",
             "0.1",
+            "--min-wall-tok-per-s",
+            "1",
+            "--max-memory-bytes",
+            "100000000",
             "--output-dir",
             str(bench_output_dir),
         ]
@@ -357,6 +361,13 @@ def main() -> int:
             (bench_output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8")
         )
         suite_summary = bench_report["suite_summary"]
+        telemetry_gates = bench_report["telemetry_gates"]
+        if telemetry_gates.get("min_wall_tok_per_s") != 1.0:
+            print("missing_min_wall_tok_gate=true", file=sys.stderr)
+            return 1
+        if telemetry_gates.get("max_memory_bytes") != 100000000:
+            print("missing_max_memory_gate=true", file=sys.stderr)
+            return 1
         if suite_summary.get("tok_per_s_stdev") is None:
             print("missing_suite_tok_stdev=true", file=sys.stderr)
             return 1
@@ -389,6 +400,50 @@ def main() -> int:
             return 1
         if bench_report.get("variability_findings"):
             print("unexpected_variability_findings=true", file=sys.stderr)
+            return 1
+        if bench_report.get("telemetry_findings"):
+            print("unexpected_bench_telemetry_findings=true", file=sys.stderr)
+            return 1
+
+        bench_gate_fail_dir = tmp_path / "qemu_prompt_bench_gate_fail"
+        bench_gate_fail_command = [
+            sys.executable,
+            str(ROOT / "bench" / "qemu_prompt_bench.py"),
+            "--image",
+            "/tmp/TempleOS.synthetic.img",
+            "--prompts",
+            str(ROOT / "bench" / "prompts" / "smoke.jsonl"),
+            "--qemu-bin",
+            str(ROOT / "bench" / "fixtures" / "qemu_synthetic_bench.py"),
+            "--profile",
+            "ci-airgap-smoke",
+            "--model",
+            "synthetic-smoke",
+            "--quantization",
+            "Q4_0",
+            "--min-wall-tok-per-s",
+            "1000000",
+            "--max-memory-bytes",
+            "1",
+            "--output-dir",
+            str(bench_gate_fail_dir),
+        ]
+        completed = subprocess.run(
+            bench_gate_fail_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("bench_telemetry_gates_did_not_fail=true", file=sys.stderr)
+            return 1
+        bench_gate_fail_report = json.loads(
+            (bench_gate_fail_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8")
+        )
+        gate_metrics = {finding.get("metric") for finding in bench_gate_fail_report["telemetry_findings"]}
+        if not {"wall_tok_per_s", "memory_bytes"}.issubset(gate_metrics):
+            print("missing_bench_gate_failure_metrics=true", file=sys.stderr)
             return 1
 
         matrix_output_dir = tmp_path / "bench_matrix"
