@@ -1,0 +1,19 @@
+{
+  "artifacts": [
+    {
+      "findings": [],
+      "license": "synthetic-smoke",
+      "output": "bench/results/datasets/smoke_curated.jsonl",
+      "record_count": 3,
+      "selected_records": 3,
+      "source": "bench/results/datasets/smoke_curated.manifest.json",
+      "source_name": "smoke-eval",
+      "source_records": 3,
+      "source_url": "",
+      "source_version": "synthetic",
+      "status": "pass"
+    }
+  ],
+  "generated_at": "2026-04-28T11:49:14Z",
+  "status": "pass"
+}

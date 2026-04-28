@@ -97,6 +97,22 @@ python3 bench/dataset_index.py \
   --fail-on-findings
 ```
 
+## Provenance Audit
+
+Run the focused provenance audit on curated manifests before promoting an eval
+subset. It verifies source/license metadata, source and normalized hashes,
+selected record IDs, count rollups, pack outputs, and non-empty row provenance.
+Synthetic smoke manifests are allowed to omit `source_url`; real dataset
+manifests should record one, and `--require-source-url` turns that policy into a
+hard gate.
+
+```bash
+python3 bench/dataset_provenance_audit.py \
+  --input bench/results/datasets \
+  --output-dir bench/results/datasets \
+  --fail-on-findings
+```
+
 For a complete local smoke gate of the dataset toolchain, run:
 
 ```bash

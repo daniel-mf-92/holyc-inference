@@ -1,0 +1,2 @@
+source,status,source_name,source_version,license,source_url,output,record_count,source_records,selected_records,findings
+bench/results/datasets/smoke_curated.manifest.json,pass,smoke-eval,synthetic,synthetic-smoke,,bench/results/datasets/smoke_curated.jsonl,3,3,3,[]

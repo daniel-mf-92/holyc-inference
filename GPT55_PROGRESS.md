@@ -120,3 +120,4 @@
 2026-04-28T10:57:07Z | Added matrix/result-index latency and host-overhead rollups with smoke coverage and refreshed benchmark artifacts.
 2026-04-28T11:10:38Z | Added eval dataset choice-count curation filters with smoke gate coverage and refreshed dataset artifacts.
 2026-04-28T11:41:20Z | Added eval dataset byte-budget curation filters with smoke gate coverage and refreshed dataset artifacts.
+2026-04-28T11:49:31Z | Added focused eval dataset provenance audit with JSON/Markdown/CSV/JUnit artifacts and smoke gate coverage.

@@ -51,6 +51,10 @@ def main() -> int:
         leak_md = datasets_dir / "dataset_leak_audit_smoke_latest.md"
         leak_csv = datasets_dir / "dataset_leak_audit_smoke_latest.csv"
         leak_junit = datasets_dir / "dataset_leak_audit_smoke_latest_junit.xml"
+        provenance_json = datasets_dir / "dataset_provenance_audit_latest.json"
+        provenance_md = datasets_dir / "dataset_provenance_audit_latest.md"
+        provenance_csv = datasets_dir / "dataset_provenance_audit_latest.csv"
+        provenance_junit = datasets_dir / "dataset_provenance_audit_junit_latest.xml"
 
         curate_command = [
             sys.executable,
@@ -224,6 +228,81 @@ def main() -> int:
         if rc := require(index_root.attrib.get("name") == "holyc_dataset_index", "missing_index_junit"):
             return rc
         if rc := require(index_root.attrib.get("failures") == "0", "unexpected_index_junit_failures"):
+            return rc
+
+        provenance_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_provenance_audit.py"),
+            "--input",
+            str(datasets_dir),
+            "--output-dir",
+            str(datasets_dir),
+            "--fail-on-findings",
+        ]
+        completed = run_command(provenance_command)
+        if completed.returncode != 0:
+            return completed.returncode
+
+        provenance_report = json.loads(provenance_json.read_text(encoding="utf-8"))
+        if rc := require(provenance_report["status"] == "pass", "unexpected_provenance_status"):
+            return rc
+        if rc := require(len(provenance_report["artifacts"]) == 1, "unexpected_provenance_artifact_count"):
+            return rc
+        if rc := require(
+            "Eval Dataset Provenance Audit" in provenance_md.read_text(encoding="utf-8"),
+            "missing_provenance_markdown",
+        ):
+            return rc
+        if rc := require(
+            "source,status,source_name,source_version,license,source_url,output"
+            in provenance_csv.read_text(encoding="utf-8"),
+            "missing_provenance_csv_header",
+        ):
+            return rc
+        provenance_root = ET.parse(provenance_junit).getroot()
+        if rc := require(
+            provenance_root.attrib.get("name") == "holyc_dataset_provenance_audit",
+            "missing_provenance_junit",
+        ):
+            return rc
+        if rc := require(
+            provenance_root.attrib.get("failures") == "0",
+            "unexpected_provenance_junit_failures",
+        ):
+            return rc
+
+        stale_manifest = tmp_path / "stale_selected_ids.manifest.json"
+        stale_report = dict(curated_report)
+        stale_report["selected_record_ids"] = ["wrong-id"]
+        stale_manifest.write_text(json.dumps(stale_report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        stale_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_provenance_audit.py"),
+            "--input",
+            str(stale_manifest),
+            "--output-dir",
+            str(tmp_path / "stale-provenance"),
+            "--fail-on-findings",
+        ]
+        completed = subprocess.run(
+            stale_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("stale_provenance_not_rejected=true", file=sys.stderr)
+            return 1
+        stale_failure = json.loads(
+            (tmp_path / "stale-provenance" / "dataset_provenance_audit_latest.json").read_text(encoding="utf-8")
+        )
+        stale_kinds = {
+            finding["kind"]
+            for artifact in stale_failure["artifacts"]
+            for finding in artifact["findings"]
+        }
+        if rc := require("selected_record_ids_mismatch" in stale_kinds, "missing_stale_selected_id_finding"):
             return rc
 
         leak_fixture = tmp_path / "leaky.jsonl"
