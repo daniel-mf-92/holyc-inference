@@ -178,6 +178,15 @@ known leaky fixture is rejected:
 python3 bench/dataset_ci_smoke.py
 ```
 
+`bench_artifact_manifest_ci_smoke.py` is a stdlib-only CI gate for benchmark
+artifact manifests. It builds synthetic QEMU benchmark reports, verifies the
+latest/history JSON, Markdown, CSV, and JUnit outputs, and checks that a
+NIC-enabled QEMU command is rejected:
+
+```bash
+python3 bench/bench_artifact_manifest_ci_smoke.py
+```
+
 `dataset_leak_audit.py` checks local eval JSONL before packing for duplicate
 record IDs, normalized prompt reuse across splits, repeated prompt+choice
 payloads across splits, and conflicting answers for the same payload. It never

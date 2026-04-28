@@ -1,0 +1,214 @@
+#!/usr/bin/env python3
+"""Stdlib-only CI smoke gate for benchmark artifact manifests."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import subprocess
+import sys
+import tempfile
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def iso_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def command_sha256(command: list[str]) -> str:
+    encoded = json.dumps(command, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def write_qemu_report(path: Path, command: list[str]) -> None:
+    command_hash = command_sha256(command)
+    generated_at = iso_now()
+    path.write_text(
+        json.dumps(
+            {
+                "status": "pass",
+                "generated_at": generated_at,
+                "command_sha256": command_hash,
+                "prompt_suite": {
+                    "name": "manifest-smoke",
+                    "prompt_count": 1,
+                    "suite_sha256": "manifest-smoke-suite",
+                },
+                "environment": {
+                    "platform": "ci-smoke",
+                    "machine": "host",
+                    "qemu_bin": command[0],
+                    "qemu_version": "synthetic",
+                },
+                "benchmarks": [
+                    {
+                        "benchmark": "qemu_prompt",
+                        "command": command,
+                        "command_sha256": command_hash,
+                        "commit": "manifest-smoke",
+                        "profile": "ci-airgap-smoke",
+                        "model": "synthetic-smoke",
+                        "quantization": "Q4_0",
+                        "prompt": "manifest-smoke",
+                        "tokens": 32,
+                        "elapsed_us": 200000,
+                        "tok_per_s": 160.0,
+                        "returncode": 0,
+                        "timed_out": False,
+                    }
+                ],
+                "summaries": [
+                    {
+                        "prompt": "manifest-smoke",
+                        "tok_per_s_median": 160.0,
+                        "wall_tok_per_s_median": 150.0,
+                        "ttft_us_p95": 12000.0,
+                        "memory_bytes_max": 67174400,
+                    }
+                ],
+                "suite_summary": {
+                    "prompts": 1,
+                    "total_tokens": 32,
+                    "total_elapsed_us": 200000,
+                    "tok_per_s_median": 160.0,
+                    "wall_tok_per_s_median": 150.0,
+                    "ttft_us_p95": 12000.0,
+                    "memory_bytes_max": 67174400,
+                },
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def run_manifest(input_path: Path, output_dir: Path, *extra_args: str) -> subprocess.CompletedProcess[str]:
+    command = [
+        sys.executable,
+        str(ROOT / "bench" / "bench_artifact_manifest.py"),
+        "--input",
+        str(input_path),
+        "--output-dir",
+        str(output_dir),
+        *extra_args,
+    ]
+    return subprocess.run(
+        command,
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+
+def main() -> int:
+    with tempfile.TemporaryDirectory(prefix="holyc-manifest-ci-") as tmp:
+        tmp_path = Path(tmp)
+        safe_report = tmp_path / "qemu_prompt_bench_safe.json"
+        safe_command = [
+            "qemu-system-x86_64",
+            "-nic",
+            "none",
+            "-display",
+            "none",
+            "-drive",
+            "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide",
+        ]
+        write_qemu_report(safe_report, safe_command)
+
+        safe_output_dir = tmp_path / "safe_manifest"
+        completed = run_manifest(
+            safe_report,
+            safe_output_dir,
+            "--fail-on-airgap",
+            "--fail-on-telemetry",
+            "--fail-on-command-hash-metadata",
+            "--fail-on-commit-metadata",
+        )
+        if completed.returncode != 0:
+            sys.stdout.write(completed.stdout)
+            sys.stderr.write(completed.stderr)
+            return completed.returncode
+
+        report_path = safe_output_dir / "bench_artifact_manifest_latest.json"
+        markdown_path = safe_output_dir / "bench_artifact_manifest_latest.md"
+        csv_path = safe_output_dir / "bench_artifact_manifest_latest.csv"
+        history_csv_path = safe_output_dir / "bench_artifact_manifest_history_latest.csv"
+        junit_path = safe_output_dir / "bench_artifact_manifest_junit_latest.xml"
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        if report["status"] != "pass":
+            print(f"unexpected_manifest_status={report['status']}", file=sys.stderr)
+            return 1
+        if len(report["latest_artifacts"]) != 1 or len(report["history"]) != 1:
+            print("unexpected_manifest_artifact_counts=true", file=sys.stderr)
+            return 1
+        artifact = report["latest_artifacts"][0]
+        if artifact.get("command_airgap_status") != "pass":
+            print("safe_artifact_airgap_not_pass=true", file=sys.stderr)
+            return 1
+        if artifact.get("telemetry_status") != "pass":
+            print("safe_artifact_telemetry_not_pass=true", file=sys.stderr)
+            return 1
+        if artifact.get("command_hash_status") != "pass":
+            print("safe_artifact_command_hash_not_pass=true", file=sys.stderr)
+            return 1
+        if artifact.get("sha256") != hashlib.sha256(safe_report.read_bytes()).hexdigest():
+            print("manifest_artifact_hash_mismatch=true", file=sys.stderr)
+            return 1
+        if "Benchmark Artifact Manifest" not in markdown_path.read_text(encoding="utf-8"):
+            print("missing_manifest_markdown=true", file=sys.stderr)
+            return 1
+        if "key,source,artifact_type,status" not in csv_path.read_text(encoding="utf-8"):
+            print("missing_manifest_csv=true", file=sys.stderr)
+            return 1
+        if "key,source,artifact_type,status" not in history_csv_path.read_text(encoding="utf-8"):
+            print("missing_manifest_history_csv=true", file=sys.stderr)
+            return 1
+        junit_root = ET.parse(junit_path).getroot()
+        if junit_root.attrib.get("name") != "holyc_bench_artifact_manifest":
+            print("missing_manifest_junit_suite=true", file=sys.stderr)
+            return 1
+        if junit_root.attrib.get("failures") != "0":
+            print("unexpected_manifest_junit_failures=true", file=sys.stderr)
+            return 1
+
+        unsafe_report = tmp_path / "qemu_prompt_bench_unsafe.json"
+        unsafe_command = [
+            "qemu-system-x86_64",
+            "-display",
+            "none",
+            "-drive",
+            "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide",
+            "-device",
+            "e1000",
+        ]
+        write_qemu_report(unsafe_report, unsafe_command)
+        unsafe_output_dir = tmp_path / "unsafe_manifest"
+        completed = run_manifest(unsafe_report, unsafe_output_dir, "--fail-on-airgap")
+        if completed.returncode == 0:
+            print("unsafe_manifest_airgap_not_rejected=true", file=sys.stderr)
+            return 1
+        unsafe_manifest = json.loads(
+            (unsafe_output_dir / "bench_artifact_manifest_latest.json").read_text(encoding="utf-8")
+        )
+        unsafe_artifact = unsafe_manifest["history"][0]
+        if unsafe_artifact.get("command_airgap_status") != "fail":
+            print("unsafe_artifact_airgap_not_fail=true", file=sys.stderr)
+            return 1
+        findings = "\n".join(unsafe_artifact.get("command_hash_findings", []))
+        if findings:
+            print("unsafe_artifact_command_hash_unexpected_fail=true", file=sys.stderr)
+            return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

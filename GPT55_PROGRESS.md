@@ -165,3 +165,4 @@
 2026-04-28T20:28:19Z | Added perplexity_compare signed P95 record NLL tail gate with smoke coverage and refreshed reports.
 2026-04-28T20:38:38Z | Added QEMU command alias coverage to air-gap audits and benchmark indexing with smoke validation.
 2026-04-28T20:53:30Z | Added perf regression wall-clock tok/s variability gate with smoke coverage and refreshed dashboards.
+2026-04-28T22:03:40Z | Added benchmark artifact manifest CI smoke gate for air-gapped pass/reject coverage and refreshed manifest artifacts.
