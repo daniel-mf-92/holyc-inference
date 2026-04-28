@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="holyc_prompt_audit" tests="1" failures="0" errors="0">
+  <testcase classname="prompt_audit" name="prompt_suite:68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a" />
+</testsuite>

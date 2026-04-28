@@ -163,7 +163,9 @@ python3 bench/eval_compare.py \
 `prompt_audit.py` validates benchmark prompt files before a guest run. It
 checks prompt ID uniqueness, duplicate prompt text, byte/line stats, optional
 minimum prompt count and maximum prompt byte limits, then writes a stable suite
-hash so benchmark artifacts can name the exact prompt set they used.
+hash so benchmark artifacts can name the exact prompt set they used. It can
+also write CSV and JUnit XML artifacts so CI can upload prompt stats and fail
+directly on prompt-suite errors.
 
 Example:
 
@@ -172,6 +174,8 @@ python3 bench/prompt_audit.py \
   --prompts bench/prompts/smoke.jsonl \
   --output bench/results/prompt_audit_smoke_latest.json \
   --markdown bench/results/prompt_audit_smoke_latest.md \
+  --csv bench/results/prompt_audit_smoke_latest.csv \
+  --junit bench/results/prompt_audit_smoke_latest_junit.xml \
   --min-prompts 2 \
   --max-prompt-bytes 1024
 ```

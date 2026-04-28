@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import importlib.util
+import csv
 import json
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -88,6 +90,8 @@ def test_cli_writes_json_and_markdown(tmp_path: Path) -> None:
     prompts = BENCH_PATH / "prompts" / "smoke.jsonl"
     output = tmp_path / "prompt_audit.json"
     markdown = tmp_path / "prompt_audit.md"
+    csv_path = tmp_path / "prompt_audit.csv"
+    junit = tmp_path / "prompt_audit_junit.xml"
 
     status = prompt_audit.main(
         [
@@ -97,6 +101,10 @@ def test_cli_writes_json_and_markdown(tmp_path: Path) -> None:
             str(output),
             "--markdown",
             str(markdown),
+            "--csv",
+            str(csv_path),
+            "--junit",
+            str(junit),
             "--min-prompts",
             "2",
             "--max-prompt-bytes",
@@ -107,9 +115,44 @@ def test_cli_writes_json_and_markdown(tmp_path: Path) -> None:
     assert status == 0
     payload = json.loads(output.read_text(encoding="utf-8"))
     md = markdown.read_text(encoding="utf-8")
+    csv_rows = list(csv.DictReader(csv_path.open(encoding="utf-8")))
+    junit_root = ET.parse(junit).getroot()
     assert payload["status"] == "pass"
     assert "Prompt Audit" in md
     assert "smoke-short" in md
+    assert {row["prompt_id"] for row in csv_rows if row["row_type"] == "prompt"} == {
+        "smoke-short",
+        "smoke-code",
+    }
+    assert junit_root.attrib["failures"] == "0"
+    assert junit_root.find("testcase") is not None
+
+
+def test_junit_marks_errors_as_failures(tmp_path: Path) -> None:
+    prompts = tmp_path / "prompts.jsonl"
+    prompts.write_text('{"prompt_id":"one","prompt":"too short"}\n', encoding="utf-8")
+    output = tmp_path / "prompt_audit.json"
+    junit = tmp_path / "prompt_audit_junit.xml"
+
+    status = prompt_audit.main(
+        [
+            "--prompts",
+            str(prompts),
+            "--output",
+            str(output),
+            "--junit",
+            str(junit),
+            "--min-prompts",
+            "2",
+        ]
+    )
+
+    junit_root = ET.parse(junit).getroot()
+    assert status == 1
+    assert junit_root.attrib["failures"] == "1"
+    failure = junit_root.find("testcase/failure")
+    assert failure is not None
+    assert "prompt count 1 is below required minimum 2" in (failure.text or "")
 
 
 if __name__ == "__main__":

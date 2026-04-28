@@ -9,9 +9,11 @@ does not launch QEMU.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import statistics
 import sys
+import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -222,11 +224,89 @@ def markdown_report(report: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def write_csv(report: dict[str, Any], path: Path) -> None:
+    fields = ["row_type", "prompt_id", "sha256", "bytes", "chars", "lines", "severity", "message"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for stat in report["prompts"]:
+            writer.writerow(
+                {
+                    "row_type": "prompt",
+                    "prompt_id": stat["prompt_id"],
+                    "sha256": stat["sha256"],
+                    "bytes": stat["bytes"],
+                    "chars": stat["chars"],
+                    "lines": stat["lines"],
+                    "severity": "",
+                    "message": "",
+                }
+            )
+        for issue in report["issues"]:
+            writer.writerow(
+                {
+                    "row_type": "issue",
+                    "prompt_id": issue["prompt_id"],
+                    "sha256": "",
+                    "bytes": "",
+                    "chars": "",
+                    "lines": "",
+                    "severity": issue["severity"],
+                    "message": issue["message"],
+                }
+            )
+
+
+def write_junit(report: dict[str, Any], path: Path) -> None:
+    errors = [issue for issue in report["issues"] if issue["severity"] == "error"]
+    warnings = [issue for issue in report["issues"] if issue["severity"] == "warning"]
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": "holyc_prompt_audit",
+            "tests": "1",
+            "failures": "1" if errors else "0",
+            "errors": "0",
+        },
+    )
+    case = ET.SubElement(
+        suite,
+        "testcase",
+        {
+            "classname": "prompt_audit",
+            "name": f"prompt_suite:{report['summary']['suite_sha256']}",
+        },
+    )
+    if errors:
+        failure = ET.SubElement(
+            case,
+            "failure",
+            {
+                "type": "prompt_audit_error",
+                "message": f"{len(errors)} prompt audit error(s), {len(warnings)} warning(s)",
+            },
+        )
+        failure.text = "\n".join(
+            f"{issue['prompt_id'] or report['source']}: {issue['message']}" for issue in errors
+        )
+    elif warnings:
+        system_out = ET.SubElement(case, "system-out")
+        system_out.text = "\n".join(
+            f"{issue['prompt_id'] or report['source']}: {issue['message']}" for issue in warnings
+        )
+    ET.indent(suite)
+    ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
+    with path.open("ab") as handle:
+        handle.write(b"\n")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prompts", type=Path, required=True, help="Prompt JSON, JSONL, or text file")
     parser.add_argument("--output", type=Path, default=Path("bench/results/prompt_audit_latest.json"))
     parser.add_argument("--markdown", type=Path, help="Optional Markdown report path")
+    parser.add_argument("--csv", type=Path, help="Optional CSV prompt/issue report path")
+    parser.add_argument("--junit", type=Path, help="Optional JUnit XML audit report path")
     parser.add_argument("--min-prompts", type=int, default=1)
     parser.add_argument("--max-prompt-bytes", type=int)
     parser.add_argument(
@@ -262,10 +342,20 @@ def main(argv: list[str] | None = None) -> int:
     if args.markdown:
         args.markdown.parent.mkdir(parents=True, exist_ok=True)
         args.markdown.write_text(markdown_report(report), encoding="utf-8")
+    if args.csv:
+        args.csv.parent.mkdir(parents=True, exist_ok=True)
+        write_csv(report, args.csv)
+    if args.junit:
+        args.junit.parent.mkdir(parents=True, exist_ok=True)
+        write_junit(report, args.junit)
 
     print(f"wrote_json={args.output}")
     if args.markdown:
         print(f"wrote_markdown={args.markdown}")
+    if args.csv:
+        print(f"wrote_csv={args.csv}")
+    if args.junit:
+        print(f"wrote_junit={args.junit}")
     print(f"status={report['status']}")
     print(f"prompt_count={report['summary']['prompt_count']}")
     print(f"suite_sha256={report['summary']['suite_sha256']}")
