@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import ctypes
 import hashlib
 import json
 import os
@@ -20,6 +21,7 @@ import shutil
 import statistics
 import subprocess
 import sys
+import threading
 import time
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
@@ -52,6 +54,36 @@ NETWORK_DEVICE_MARKERS = (
 )
 RESULT_LINE_RE = re.compile(r"(?:BENCH_RESULT|bench_result)\s*[:=]\s*(\{.*\})")
 KV_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)=([^,\s]+)")
+PROC_PIDTASKINFO = 4
+
+
+class DarwinProcTaskInfo(ctypes.Structure):
+    _fields_ = [
+        ("pti_virtual_size", ctypes.c_uint64),
+        ("pti_resident_size", ctypes.c_uint64),
+        ("pti_total_user", ctypes.c_uint64),
+        ("pti_total_system", ctypes.c_uint64),
+        ("pti_threads_user", ctypes.c_uint64),
+        ("pti_threads_system", ctypes.c_uint64),
+        ("pti_policy", ctypes.c_int32),
+        ("pti_faults", ctypes.c_int32),
+        ("pti_pageins", ctypes.c_int32),
+        ("pti_cow_faults", ctypes.c_int32),
+        ("pti_messages_sent", ctypes.c_int32),
+        ("pti_messages_received", ctypes.c_int32),
+        ("pti_syscalls_mach", ctypes.c_int32),
+        ("pti_syscalls_unix", ctypes.c_int32),
+        ("pti_csw", ctypes.c_int32),
+        ("pti_threadnum", ctypes.c_int32),
+        ("pti_numrunning", ctypes.c_int32),
+        ("pti_priority", ctypes.c_int32),
+    ]
+
+
+try:
+    DARWIN_LIBC = ctypes.CDLL("libc.dylib") if sys.platform == "darwin" else None
+except OSError:
+    DARWIN_LIBC = None
 
 
 @dataclass(frozen=True)
@@ -82,6 +114,7 @@ class BenchRun:
     host_child_cpu_us: int | None
     host_child_cpu_pct: float | None
     host_child_tok_per_cpu_s: float | None
+    host_child_peak_rss_bytes: int | None
     ttft_us: int | None
     tok_per_s: float | None
     wall_tok_per_s: float | None
@@ -427,6 +460,110 @@ def tokens_per_cpu_s(tokens: int | None, cpu_us: int | None) -> float | None:
     return tokens * 1_000_000.0 / cpu_us
 
 
+def process_rss_bytes(pid: int) -> int | None:
+    """Return current resident set size for a direct child process when available."""
+    if sys.platform == "darwin":
+        info = DarwinProcTaskInfo()
+        proc_pidinfo = getattr(DARWIN_LIBC, "proc_pidinfo", None) if DARWIN_LIBC is not None else None
+        if proc_pidinfo is not None:
+            size = proc_pidinfo(
+                ctypes.c_int(pid),
+                ctypes.c_int(PROC_PIDTASKINFO),
+                ctypes.c_uint64(0),
+                ctypes.byref(info),
+                ctypes.sizeof(info),
+            )
+            if size == ctypes.sizeof(info):
+                return int(info.pti_resident_size)
+
+    status_path = Path(f"/proc/{pid}/status")
+    try:
+        for line in status_path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("VmRSS:"):
+                parts = line.split()
+                if len(parts) >= 2:
+                    return int(parts[1]) * 1024
+    except (OSError, ValueError):
+        pass
+
+    try:
+        result = subprocess.run(
+            ["ps", "-o", "rss=", "-p", str(pid)],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=1.0,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    stripped = result.stdout.strip()
+    if not stripped:
+        return None
+    try:
+        return int(stripped.splitlines()[-1].strip()) * 1024
+    except ValueError:
+        return None
+
+
+def run_command_with_rss_sample(
+    command: list[str],
+    *,
+    prompt: str,
+    env: dict[str, str],
+    timeout: float,
+) -> tuple[int, str, str, bool, int | None]:
+    """Run a child process while sampling direct-child RSS from the host."""
+    process = subprocess.Popen(
+        command,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env,
+    )
+    peak_rss = process_rss_bytes(process.pid)
+    stop_sampling = threading.Event()
+    lock = threading.Lock()
+
+    def sample_rss() -> None:
+        nonlocal peak_rss
+        while not stop_sampling.wait(0.01):
+            rss = process_rss_bytes(process.pid)
+            if rss is None:
+                if process.poll() is not None:
+                    break
+                continue
+            with lock:
+                peak_rss = rss if peak_rss is None else max(peak_rss, rss)
+
+    sampler = threading.Thread(target=sample_rss, daemon=True)
+    sampler.start()
+    timed_out = False
+    try:
+        stdout, stderr = process.communicate(input=prompt, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        timed_out = True
+        process.kill()
+        stdout, stderr = process.communicate()
+        if exc.stdout:
+            stdout = exc.stdout if isinstance(exc.stdout, str) else exc.stdout.decode("utf-8", errors="replace")
+        if exc.stderr:
+            stderr = exc.stderr if isinstance(exc.stderr, str) else exc.stderr.decode("utf-8", errors="replace")
+    finally:
+        final_rss = process_rss_bytes(process.pid)
+        with lock:
+            if final_rss is not None:
+                peak_rss = final_rss if peak_rss is None else max(peak_rss, final_rss)
+        stop_sampling.set()
+        sampler.join(timeout=1.0)
+
+    with lock:
+        sampled_peak_rss = peak_rss
+    returncode = 124 if timed_out else (process.returncode if process.returncode is not None else 124)
+    return returncode, stdout, stderr, timed_out, sampled_peak_rss
+
+
 def extract_ttft_us(payload: dict[str, Any]) -> int | None:
     for key in ("ttft_us", "time_to_first_token_us", "first_token_us"):
         parsed = parse_int(payload.get(key))
@@ -488,29 +625,19 @@ def run_prompt(
     env["HOLYC_BENCH_PROMPT"] = prompt_case.prompt
     env["HOLYC_BENCH_PROMPT_ID"] = prompt_case.prompt_id
 
-    timed_out = False
     try:
-        completed = subprocess.run(
+        returncode, stdout, stderr, timed_out, host_child_peak_rss_bytes = run_command_with_rss_sample(
             command,
-            input=prompt_case.prompt,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=timeout,
-            text=True,
+            prompt=prompt_case.prompt,
             env=env,
+            timeout=timeout,
         )
-        returncode = completed.returncode
-        stdout = completed.stdout
-        stderr = completed.stderr
-    except subprocess.TimeoutExpired as exc:
-        timed_out = True
-        returncode = 124
-        stdout = exc.stdout or ""
-        stderr = exc.stderr or ""
-        if isinstance(stdout, bytes):
-            stdout = stdout.decode("utf-8", errors="replace")
-        if isinstance(stderr, bytes):
-            stderr = stderr.decode("utf-8", errors="replace")
+    except OSError as exc:
+        returncode = 127
+        stdout = ""
+        stderr = str(exc)
+        timed_out = False
+        host_child_peak_rss_bytes = None
 
     wall_elapsed_us = max(1, (time.monotonic_ns() - started) // 1000)
     child_cpu_after = child_rusage()
@@ -550,6 +677,7 @@ def run_prompt(
         host_child_cpu_us=child_total_cpu_us,
         host_child_cpu_pct=cpu_pct(child_total_cpu_us, wall_elapsed_us),
         host_child_tok_per_cpu_s=tokens_per_cpu_s(tokens, child_total_cpu_us),
+        host_child_peak_rss_bytes=host_child_peak_rss_bytes,
         ttft_us=ttft_us,
         tok_per_s=tok_per_s,
         wall_tok_per_s=wall_tok_per_s,
@@ -594,6 +722,11 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
             for run in prompt_runs
             if run.host_child_tok_per_cpu_s is not None
         ]
+        host_child_peak_rss_values = [
+            run.host_child_peak_rss_bytes
+            for run in prompt_runs
+            if run.host_child_peak_rss_bytes is not None
+        ]
         ttft_values = [run.ttft_us for run in prompt_runs if run.ttft_us is not None]
         memory_values = [run.memory_bytes for run in prompt_runs if run.memory_bytes is not None]
         ok_runs = [run for run in prompt_runs if run.returncode == 0 and not run.timed_out]
@@ -623,6 +756,9 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
                 else None,
                 "host_child_tok_per_cpu_s_median": statistics.median(host_child_tok_per_cpu_s_values)
                 if host_child_tok_per_cpu_s_values
+                else None,
+                "host_child_peak_rss_bytes_max": max(host_child_peak_rss_values)
+                if host_child_peak_rss_values
                 else None,
                 "ttft_us_median": statistics.median(ttft_values) if ttft_values else None,
                 "ttft_us_p95": percentile([float(value) for value in ttft_values], 95.0),
@@ -745,6 +881,8 @@ def telemetry_findings(
     max_host_overhead_us: int | None = None,
     max_host_overhead_pct: float | None = None,
     min_host_child_tok_per_cpu_s: float | None = None,
+    require_host_child_rss: bool = False,
+    max_host_child_rss_bytes: int | None = None,
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     for run in runs:
@@ -821,6 +959,22 @@ def telemetry_findings(
                     "limit": min_host_child_tok_per_cpu_s,
                 }
             )
+        if require_host_child_rss and run.host_child_peak_rss_bytes is None:
+            findings.append(
+                {**base, "metric": "host_child_peak_rss_bytes", "value": None, "limit": "present"}
+            )
+        if max_host_child_rss_bytes is not None and (
+            run.host_child_peak_rss_bytes is None
+            or run.host_child_peak_rss_bytes > max_host_child_rss_bytes
+        ):
+            findings.append(
+                {
+                    **base,
+                    "metric": "host_child_peak_rss_bytes",
+                    "value": run.host_child_peak_rss_bytes,
+                    "limit": max_host_child_rss_bytes,
+                }
+            )
     return findings
 
 
@@ -836,6 +990,9 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
     host_child_cpu_pct_values = [run.host_child_cpu_pct for run in runs if run.host_child_cpu_pct is not None]
     host_child_tok_per_cpu_s_values = [
         run.host_child_tok_per_cpu_s for run in runs if run.host_child_tok_per_cpu_s is not None
+    ]
+    host_child_peak_rss_values = [
+        run.host_child_peak_rss_bytes for run in runs if run.host_child_peak_rss_bytes is not None
     ]
     ttft_values = [run.ttft_us for run in runs if run.ttft_us is not None]
     memory_values = [run.memory_bytes for run in runs if run.memory_bytes is not None]
@@ -863,6 +1020,9 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
         else None,
         "host_child_tok_per_cpu_s_median": statistics.median(host_child_tok_per_cpu_s_values)
         if host_child_tok_per_cpu_s_values
+        else None,
+        "host_child_peak_rss_bytes_max": max(host_child_peak_rss_values)
+        if host_child_peak_rss_values
         else None,
         "ttft_us_median": statistics.median(ttft_values) if ttft_values else None,
         "ttft_us_p95": percentile([float(value) for value in ttft_values], 95.0),
@@ -912,10 +1072,10 @@ def markdown_report(report: dict[str, Any]) -> str:
             [
                 "## Suite Summary",
                 "",
-                "| Prompts | Runs | OK | Measured prompt bytes | Total tokens | Total elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Median TTFT us | P95 TTFT us | P05 tok/s | Median tok/s | P95 tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |",
-                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| Prompts | Runs | OK | Measured prompt bytes | Total tokens | Total elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | P05 tok/s | Median tok/s | P95 tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
                 "| {prompts} | {runs} | {ok_runs} | {measured_prompt_bytes_total} | {total_tokens} | {total_elapsed_us} | "
-                "{host_overhead_us_median} | {host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | {host_child_tok_per_cpu_s_median} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_p95} | "
+                "{host_overhead_us_median} | {host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | {host_child_tok_per_cpu_s_median} | {host_child_peak_rss_bytes_max} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_p95} | "
                 "{wall_tok_per_s_median} | {wall_tok_per_s_p95} | {us_per_token_median} | {us_per_token_p95} | "
                 "{wall_us_per_token_median} | {wall_us_per_token_p95} | {memory_bytes_max} |".format(
                     **{key: format_summary_value(value) for key, value in suite.items()}
@@ -933,13 +1093,13 @@ def markdown_report(report: dict[str, Any]) -> str:
         )
     if report["summaries"]:
         lines.append(
-            "| Prompt | Prompt bytes | Runs | OK | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Median TTFT us | P95 TTFT us | Min tok/s | P05 tok/s | Median tok/s | tok/s stdev | tok/s CV % | P05-P95 spread % | Max tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |"
+            "| Prompt | Prompt bytes | Runs | OK | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | Min tok/s | P05 tok/s | Median tok/s | tok/s stdev | tok/s CV % | P05-P95 spread % | Max tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |"
         )
-        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for summary in report["summaries"]:
             lines.append(
                 "| {prompt} | {prompt_bytes} | {runs} | {ok_runs} | {tokens_median} | {elapsed_us_median} | "
-                "{host_overhead_us_median} | {host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | {host_child_tok_per_cpu_s_median} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_min} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_stdev} | {tok_per_s_cv_pct} | {tok_per_s_p05_p95_spread_pct} | "
+                "{host_overhead_us_median} | {host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | {host_child_tok_per_cpu_s_median} | {host_child_peak_rss_bytes_max} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_min} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_stdev} | {tok_per_s_cv_pct} | {tok_per_s_p05_p95_spread_pct} | "
                 "{tok_per_s_max} | {wall_tok_per_s_median} | {wall_tok_per_s_p95} | {us_per_token_median} | {us_per_token_p95} | "
                 "{wall_us_per_token_median} | {wall_us_per_token_p95} | {memory_bytes_max} |".format(
                     **{key: format_summary_value(value) for key, value in summary.items()}
@@ -1130,6 +1290,8 @@ def write_report(
     max_host_overhead_us: int | None = None,
     max_host_overhead_pct: float | None = None,
     min_host_child_tok_per_cpu_s: float | None = None,
+    require_host_child_rss: bool = False,
+    max_host_child_rss_bytes: int | None = None,
     max_launches: int | None = None,
     environment: dict[str, Any] | None = None,
 ) -> Path:
@@ -1158,6 +1320,8 @@ def write_report(
         max_host_overhead_us=max_host_overhead_us,
         max_host_overhead_pct=max_host_overhead_pct,
         min_host_child_tok_per_cpu_s=min_host_child_tok_per_cpu_s,
+        require_host_child_rss=require_host_child_rss,
+        max_host_child_rss_bytes=max_host_child_rss_bytes,
     )
     report = {
         "generated_at": iso_now(),
@@ -1190,6 +1354,8 @@ def write_report(
             "max_host_overhead_us": max_host_overhead_us,
             "max_host_overhead_pct": max_host_overhead_pct,
             "min_host_child_tok_per_cpu_s": min_host_child_tok_per_cpu_s,
+            "require_host_child_rss": require_host_child_rss,
+            "max_host_child_rss_bytes": max_host_child_rss_bytes,
         },
         "telemetry_findings": telemetry,
         "benchmarks": [asdict(run) for run in runs],
@@ -1231,6 +1397,7 @@ def write_csv_report(runs: list[BenchRun], path: Path) -> None:
         "host_child_cpu_us",
         "host_child_cpu_pct",
         "host_child_tok_per_cpu_s",
+        "host_child_peak_rss_bytes",
         "ttft_us",
         "tok_per_s",
         "wall_tok_per_s",
@@ -1266,6 +1433,7 @@ def write_summary_csv_report(report: dict[str, Any], path: Path) -> None:
         "host_child_cpu_us_median",
         "host_child_cpu_pct_median",
         "host_child_tok_per_cpu_s_median",
+        "host_child_peak_rss_bytes_max",
         "ttft_us_median",
         "ttft_us_p95",
         "tok_per_s_min",
@@ -1361,6 +1529,7 @@ def write_junit_report(
                 f"host_child_cpu_us={format_summary_value(run.host_child_cpu_us)}\n"
                 f"host_child_cpu_pct={format_summary_value(run.host_child_cpu_pct)}\n"
                 f"host_child_tok_per_cpu_s={format_summary_value(run.host_child_tok_per_cpu_s)}\n"
+                f"host_child_peak_rss_bytes={format_summary_value(run.host_child_peak_rss_bytes)}\n"
                 f"ttft_us={format_summary_value(run.ttft_us)}\n"
                 f"tok_per_s={format_summary_value(run.tok_per_s)}\n"
                 f"wall_tok_per_s={format_summary_value(run.wall_tok_per_s)}\n"
@@ -1510,6 +1679,17 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Fail if any measured run is below host child-process tokens per CPU second",
     )
+    parser.add_argument(
+        "--require-host-child-rss",
+        action="store_true",
+        help="Fail if any measured run omits host-observed child peak RSS telemetry",
+    )
+    parser.add_argument(
+        "--max-host-child-rss-bytes",
+        type=int,
+        default=None,
+        help="Fail if any measured run exceeds host-observed child peak RSS bytes",
+    )
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--profile", default="default")
     parser.add_argument("--model", default="")
@@ -1559,6 +1739,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.min_host_child_tok_per_cpu_s is not None and args.min_host_child_tok_per_cpu_s < 0:
         print("error: --min-host-child-tok-per-cpu-s must be >= 0", file=sys.stderr)
+        return 2
+    if args.max_host_child_rss_bytes is not None and args.max_host_child_rss_bytes < 0:
+        print("error: --max-host-child-rss-bytes must be >= 0", file=sys.stderr)
         return 2
 
     try:
@@ -1627,6 +1810,8 @@ def main(argv: list[str] | None = None) -> int:
         max_host_overhead_us=args.max_host_overhead_us,
         max_host_overhead_pct=args.max_host_overhead_pct,
         min_host_child_tok_per_cpu_s=args.min_host_child_tok_per_cpu_s,
+        require_host_child_rss=args.require_host_child_rss,
+        max_host_child_rss_bytes=args.max_host_child_rss_bytes,
         max_launches=args.max_launches,
         environment=host_environment(args.qemu_bin),
     )

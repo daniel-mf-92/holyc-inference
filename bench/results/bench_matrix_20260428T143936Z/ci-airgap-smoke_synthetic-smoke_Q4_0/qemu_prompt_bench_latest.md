@@ -1,19 +1,19 @@
 # QEMU Prompt Benchmark
 
-Generated: 2026-04-28T14:39:01Z
+Generated: 2026-04-28T14:39:38Z
 Status: pass
 Prompt suite: 68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a
-Command SHA256: e415146c052b9f0baa23706ffde97548f2374f6601337823b4d810c39bed48e7
+Command SHA256: b38e17f8fe6b79397ba9c4cb6dc68ad1d24ed501d479195500b1d8eaf615640d
 Launch budget: -
 Total launches: 6
-Warmup runs: 0
-Runs: 6
+Warmup runs: 2
+Runs: 4
 
 ## Suite Summary
 
 | Prompts | Runs | OK | Measured prompt bytes | Total tokens | Total elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | P05 tok/s | Median tok/s | P95 tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 2 | 6 | 6 | 360 | 240 | 1500000 | -191619.000 | -75.889 | 48669.000 | 82.246 | 829.944 | 13303808 | 12000.000 | 12400.000 | 160.000 | 160.000 | 160.000 | 680.430 | 862.226 | 6250.000 | 6250.000 | 1506.911 | 14508.555 | 67207168 |
+| 2 | 4 | 4 | 240 | 160 | 1000000 | 18800.500 | 9.400 | 58104.000 | 37.987 | 675.445 | 15663104 | 12000.000 | 12400.000 | 160.000 | 160.000 | 160.000 | 221.100 | 731.805 | 6250.000 | 6250.000 | 6837.516 | 14510.032 | 67207168 |
 
 | tok/s stdev | tok/s CV % | tok/s P05-P95 spread % |
 | ---: | ---: | ---: |
@@ -23,11 +23,11 @@ Runs: 6
 
 | Prompt | Prompt bytes | Runs | OK | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | Min tok/s | P05 tok/s | Median tok/s | tok/s stdev | tok/s CV % | P05-P95 spread % | Max tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| smoke-code | 71 | 3 | 3 | 48 | 300000 | -243326 | -81.109 | 48111 | 84.891 | 997.693 | 4079616 | 12400 | 12400.000 | 160.000 | 160.000 | 160.000 | 0.000 | 0.000 | 0.000 | 160.000 | 846.949 | 865.281 | 6250.000 | 6250.000 | 1180.708 | 1261.052 | 67207168 |
-| smoke-short | 49 | 3 | 3 | 32 | 200000 | -75810 | -37.905 | 52971 | 42.653 | 604.104 | 13303808 | 11600 | 11600.000 | 160.000 | 160.000 | 160.000 | 0.000 | 0.000 | 0.000 | 160.000 | 257.670 | 541.868 | 6250.000 | 6250.000 | 3880.938 | 16634.078 | 67174400 |
+| smoke-code | 71 | 2 | 2 | 48.000 | 300000.000 | 93916.000 | 31.305 | 57245.500 | 46.041 | 852.225 | 13008896 | 12400.000 | 12400.000 | 160.000 | 160.000 | 160.000 | 0.000 | 0.000 | 0.000 | 160.000 | 432.591 | 762.564 | 6250.000 | 6250.000 | 8206.583 | 14466.421 | 67207168 |
+| smoke-short | 49 | 2 | 2 | 32.000 | 200000.000 | 18800.500 | 9.400 | 58104.000 | 37.987 | 555.485 | 15663104 | 11600.000 | 11600.000 | 160.000 | 160.000 | 160.000 | 0.000 | 0.000 | 0.000 | 160.000 | 221.100 | 336.878 | 6250.000 | 6250.000 | 6837.516 | 10417.955 | 67174400 |
 
 ## Environment
 
 | Platform | Machine | Python | CPU count | QEMU |
 | --- | --- | --- | ---: | --- |
-| macOS-26.2-arm64-arm-64bit-Mach-O | arm64 | 3.14.3 | 10 | bench/fixtures/qemu_synthetic_bench.py |
+| macOS-26.2-arm64-arm-64bit-Mach-O | arm64 | 3.14.3 | 10 | /Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/fixtures/qemu_synthetic_bench.py |
