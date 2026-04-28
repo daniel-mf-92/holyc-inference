@@ -128,11 +128,20 @@ def main() -> int:
         if junit_root.attrib.get("failures") != "0":
             print("unexpected_junit_failures=true", file=sys.stderr)
             return 1
-        if (
-            "key,commit,latest_timestamp,records,tok_per_s_records,wall_tok_per_s_records,us_per_token_records,wall_us_per_token_records,memory_records,ttft_us_records,host_overhead_records,p05_tok_per_s,median_tok_per_s,median_wall_tok_per_s,median_us_per_token,p95_us_per_token,median_wall_us_per_token,p95_wall_us_per_token,median_ttft_us,p95_ttft_us,median_host_overhead_pct"
-            not in commit_points_path.read_text(encoding="utf-8")
-        ):
-            print("missing_commit_points_csv=true", file=sys.stderr)
+        commit_points_header = commit_points_path.read_text(encoding="utf-8").splitlines()[0].split(",")
+        required_commit_points_columns = {
+            "key", "commit", "latest_timestamp", "records",
+            "tok_per_s_records", "wall_tok_per_s_records",
+            "us_per_token_records", "wall_us_per_token_records",
+            "memory_records", "ttft_us_records", "host_overhead_records",
+            "p05_tok_per_s", "median_tok_per_s", "median_wall_tok_per_s",
+            "median_us_per_token", "p95_us_per_token",
+            "median_wall_us_per_token", "p95_wall_us_per_token",
+            "median_ttft_us", "p95_ttft_us", "median_host_overhead_pct",
+        }
+        if not required_commit_points_columns.issubset(commit_points_header):
+            missing = sorted(required_commit_points_columns - set(commit_points_header))
+            print(f"missing_commit_points_csv=true missing={missing}", file=sys.stderr)
             return 1
         comparisons_csv = comparisons_path.read_text(encoding="utf-8")
         if "key,baseline_commit,candidate_commit,baseline_latest_timestamp" not in comparisons_csv:
