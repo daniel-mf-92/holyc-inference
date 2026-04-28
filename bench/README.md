@@ -143,6 +143,9 @@ Prediction score vectors are treated as choice-aligned logits/logprobs: every
 score must be finite and the score count must match the gold choice count.
 When score vectors are present, reports include per-row confidence/margin plus
 score coverage, mean confidence, Brier score, and expected calibration error.
+Reports also include paired correctness counts and an exact two-sided McNemar
+binomial p-value so HolyC-vs-llama quality deltas can be interpreted as paired
+eval outcomes on the same records.
 
 ```bash
 python3 bench/eval_compare.py \

@@ -1,6 +1,6 @@
 # Eval Compare Report
 
-Generated: 2026-04-28T00:39:15Z
+Generated: 2026-04-28T04:24:38Z
 Dataset: smoke-eval
 Split: validation
 Quantization: Q4_0
@@ -19,6 +19,12 @@ Status: pass
 | llama.cpp macro F1 | 1.0000 |
 | Macro F1 delta | 0.0000 |
 | Agreement | 1.0000 |
+
+## Paired Correctness
+
+| Both correct | Both wrong | HolyC only correct | llama.cpp only correct | Discordant | McNemar p-value | Method |
+| ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 3 | 0 | 0 | 0 | 0 | 1.000000 | exact_binomial_two_sided |
 
 ## Score Calibration
 

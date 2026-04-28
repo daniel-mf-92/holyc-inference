@@ -295,6 +295,28 @@ def wilson_interval(successes: int, total: int, confidence_level: float) -> dict
     }
 
 
+def exact_mcnemar_test(holyc_only_correct: int, llama_only_correct: int) -> dict[str, Any]:
+    discordant = holyc_only_correct + llama_only_correct
+    if discordant == 0:
+        return {
+            "discordant_count": 0,
+            "holyc_only_correct": holyc_only_correct,
+            "llama_only_correct": llama_only_correct,
+            "method": "exact_binomial_two_sided",
+            "p_value": 1.0,
+        }
+
+    tail = min(holyc_only_correct, llama_only_correct)
+    probability = sum(math.comb(discordant, index) for index in range(tail + 1)) / (2**discordant)
+    return {
+        "discordant_count": discordant,
+        "holyc_only_correct": holyc_only_correct,
+        "llama_only_correct": llama_only_correct,
+        "method": "exact_binomial_two_sided",
+        "p_value": min(1.0, 2.0 * probability),
+    }
+
+
 def add_confidence_intervals(summary: dict[str, Any], confidence_level: float) -> dict[str, Any]:
     total = int(summary["record_count"])
     enriched = dict(summary)
@@ -484,6 +506,10 @@ def compare(
     holyc_correct = sum(1 for row in rows if row.holyc_correct)
     llama_correct = sum(1 for row in rows if row.llama_correct)
     agreements = sum(1 for row in rows if row.engines_agree)
+    both_correct = sum(1 for row in rows if row.holyc_correct and row.llama_correct)
+    both_wrong = sum(1 for row in rows if not row.holyc_correct and not row.llama_correct)
+    holyc_only_correct = sum(1 for row in rows if row.holyc_correct and not row.llama_correct)
+    llama_only_correct = sum(1 for row in rows if row.llama_correct and not row.holyc_correct)
     labels = list(range(class_count(gold)))
     holyc_metrics = classification_metrics(rows, "holyc", labels)
     llama_metrics = classification_metrics(rows, "llama", labels)
@@ -505,6 +531,13 @@ def compare(
         "llama_correct": llama_correct,
         "llama_macro_f1": llama_metrics["macro_f1"],
         "llama_per_answer_index": llama_metrics["per_answer_index"],
+        "mcnemar_exact": exact_mcnemar_test(holyc_only_correct, llama_only_correct),
+        "paired_correctness": {
+            "both_correct": both_correct,
+            "both_wrong": both_wrong,
+            "holyc_only_correct": holyc_only_correct,
+            "llama_only_correct": llama_only_correct,
+        },
         "record_count": total,
     }
     summary["accuracy_delta_holyc_minus_llama"] = summary["holyc_accuracy"] - summary["llama_accuracy"]
@@ -538,6 +571,21 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"| Agreement | {summary['agreement']:.4f} |",
         "",
     ]
+    paired = summary.get("paired_correctness", {})
+    mcnemar = summary.get("mcnemar_exact", {})
+    if paired and mcnemar:
+        lines.extend(
+            [
+                "## Paired Correctness",
+                "",
+                "| Both correct | Both wrong | HolyC only correct | llama.cpp only correct | Discordant | McNemar p-value | Method |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+                f"| {paired['both_correct']} | {paired['both_wrong']} | "
+                f"{paired['holyc_only_correct']} | {paired['llama_only_correct']} | "
+                f"{mcnemar['discordant_count']} | {mcnemar['p_value']:.6f} | {mcnemar['method']} |",
+                "",
+            ]
+        )
     lines.extend(
         [
             "## Score Calibration",

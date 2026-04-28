@@ -86,3 +86,4 @@
 2026-04-28T04:00:04Z | Added QEMU prompt benchmark host overhead timing metrics with refreshed smoke/index artifacts.
 2026-04-28T04:10:03Z | Added class-specific benchmark artifact manifest gates with smoke coverage and refreshed manifest artifacts.
 2026-04-28T04:17:47Z | Added QEMU argument-file support to prompt benchmarks and matrix dry-runs with air-gap validation coverage.
+2026-04-28T04:24:57Z | Added eval_compare paired correctness and exact McNemar reporting with refreshed smoke artifacts.

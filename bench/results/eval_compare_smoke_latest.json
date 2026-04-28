@@ -1,6 +1,6 @@
 {
   "dataset": "smoke-eval",
-  "generated_at": "2026-04-28T00:39:15Z",
+  "generated_at": "2026-04-28T04:24:38Z",
   "gold_sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131",
   "holyc_predictions_sha256": "61bb69247c6343f53493b5febb5636780ed8c5d99d6114976164e1c7ecd1c4e9",
   "llama_predictions_sha256": "22a31f8ffa48784acd9645bf802ac0f3e0260d45e703a34c926a3331e643dfa1",
@@ -426,6 +426,19 @@
       }
     ],
     "macro_f1_delta_holyc_minus_llama": 0.0,
+    "mcnemar_exact": {
+      "discordant_count": 0,
+      "holyc_only_correct": 0,
+      "llama_only_correct": 0,
+      "method": "exact_binomial_two_sided",
+      "p_value": 1.0
+    },
+    "paired_correctness": {
+      "both_correct": 3,
+      "both_wrong": 0,
+      "holyc_only_correct": 0,
+      "llama_only_correct": 0
+    },
     "record_count": 3
   }
 }
