@@ -239,6 +239,7 @@ def build_manifest(
             "balance_answer_index": args.balance_answer_index,
             "max_records_per_dataset": args.max_records_per_dataset,
             "max_records_per_dataset_split": args.max_records_per_dataset_split,
+            "max_records_per_provenance": args.max_records_per_provenance,
             "max_records_per_split": args.max_records_per_split,
             "max_records": args.max_records,
             "max_choices": args.max_choices,
@@ -312,6 +313,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Deterministically keep at most this many records from each dataset/split pair before global sampling",
     )
+    parser.add_argument(
+        "--max-records-per-provenance",
+        type=int,
+        help="Deterministically keep at most this many records from each provenance/source string before global sampling",
+    )
     parser.add_argument("--seed", default="holyc-eval-v1", help="Stable sampling seed")
     parser.add_argument(
         "--balance-answer-index",
@@ -362,6 +368,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.max_records_per_dataset_split is not None and args.max_records_per_dataset_split < 1:
         print("error: --max-records-per-dataset-split must be >= 1", file=sys.stderr)
         return 2
+    if args.max_records_per_provenance is not None and args.max_records_per_provenance < 1:
+        print("error: --max-records-per-provenance must be >= 1", file=sys.stderr)
+        return 2
     if args.pack_manifest and not args.pack_output:
         print("error: --pack-manifest requires --pack-output", file=sys.stderr)
         return 2
@@ -383,6 +392,7 @@ def main(argv: list[str] | None = None) -> int:
         reject_duplicate_ids(filtered)
         capped = cap_records_by_field(filtered, "dataset", args.max_records_per_dataset, args.seed)
         capped = cap_records_by_field(capped, "split", args.max_records_per_split, args.seed)
+        capped = cap_records_by_field(capped, "provenance", args.max_records_per_provenance, args.seed)
         capped = cap_records_by_dataset_split(capped, args.max_records_per_dataset_split, args.seed)
         selected = select_records(capped, args.max_records, args.seed, args.balance_answer_index)
         if not selected:

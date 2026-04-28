@@ -216,6 +216,55 @@ def test_per_dataset_split_cap_limits_each_pair() -> None:
         }
 
 
+def test_per_provenance_cap_limits_source_shards() -> None:
+    rows = [
+        {
+            "id": f"{provenance}-{index}",
+            "dataset": "arc",
+            "split": "validation",
+            "prompt": f"Question {provenance} {index}",
+            "choices": ["A", "B"],
+            "answer_index": index % 2,
+            "provenance": provenance,
+        }
+        for provenance in ("arc-local-shard-a", "arc-local-shard-b")
+        for index in range(5)
+    ]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        source = Path(tmp) / "source.jsonl"
+        output = Path(tmp) / "curated.jsonl"
+        manifest = Path(tmp) / "curated.manifest.json"
+        write_jsonl(source, rows)
+
+        status = dataset_curate.main(
+            [
+                "--input",
+                str(source),
+                "--output",
+                str(output),
+                "--manifest",
+                str(manifest),
+                "--source-name",
+                "synthetic-provenance-cap",
+                "--max-records-per-provenance",
+                "2",
+            ]
+        )
+
+        assert status == 0
+        manifest_json = json.loads(manifest.read_text(encoding="utf-8"))
+        curated_rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+        provenance_counts: dict[str, int] = {}
+        for row in curated_rows:
+            provenance_counts[row["provenance"]] = provenance_counts.get(row["provenance"], 0) + 1
+
+        assert manifest_json["filters"]["max_records_per_provenance"] == 2
+        assert manifest_json["total_after_filters"] == 10
+        assert manifest_json["total_after_group_caps"] == 4
+        assert provenance_counts == {"arc-local-shard-a": 2, "arc-local-shard-b": 2}
+
+
 def test_choice_count_filters_keep_homogeneous_multiple_choice_rows() -> None:
     rows = [
         {

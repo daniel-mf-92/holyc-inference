@@ -67,6 +67,7 @@ python3 bench/dataset_curate.py \
   --source-license synthetic-smoke \
   --min-choices 4 \
   --max-choices 4 \
+  --max-records-per-provenance 1 \
   --max-records 3 \
   --balance-answer-index \
   --pack-output bench/results/datasets/smoke_curated.hceval \
@@ -79,6 +80,9 @@ This keeps compact multiple-choice subsets from accidentally overrepresenting a
 single answer index.
 Use `--min-choices` and `--max-choices` when a run needs homogeneous choice
 counts across HellaSwag-, ARC-, TruthfulQA-, and normalized local rows.
+Use `--max-records-per-provenance` when local source files combine multiple
+staged shards and each shard should contribute at most a fixed number of rows
+before the final global sample is selected.
 
 `dataset_pack.py` converts local JSONL multiple-choice evaluation rows into a
 deterministic HolyC-loadable binary plus a provenance manifest. It accepts a

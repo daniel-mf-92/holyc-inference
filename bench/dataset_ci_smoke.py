@@ -80,6 +80,8 @@ def main() -> int:
             "3",
             "--max-records-per-dataset-split",
             "1",
+            "--max-records-per-provenance",
+            "1",
             "--max-prompt-bytes",
             "4096",
             "--max-choice-bytes",
@@ -122,6 +124,11 @@ def main() -> int:
         if rc := require(
             curated_report["filters"]["max_records_per_dataset_split"] == 1,
             "missing_dataset_split_cap",
+        ):
+            return rc
+        if rc := require(
+            curated_report["filters"]["max_records_per_provenance"] == 1,
+            "missing_provenance_cap",
         ):
             return rc
         if rc := require(curated_report["filters"]["max_prompt_bytes"] == 4096, "missing_prompt_byte_filter"):
