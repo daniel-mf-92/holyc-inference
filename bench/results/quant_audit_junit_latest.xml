@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="holyc_quant_audit" tests="1" failures="0" errors="0">
+  <testcase classname="quant_audit.source" name="source_float_runtime_scan" />
+</testsuite>

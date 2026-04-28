@@ -21,7 +21,9 @@ Example:
 python3 bench/quant_audit.py \
   --source-root src/quant \
   --output bench/results/quant_audit_latest.json \
-  --markdown bench/results/quant_audit_latest.md
+  --markdown bench/results/quant_audit_latest.md \
+  --csv bench/results/quant_audit_latest.csv \
+  --junit bench/results/quant_audit_junit_latest.xml
 ```
 
 Raw block streams can be checked with:

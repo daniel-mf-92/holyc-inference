@@ -11,15 +11,17 @@ The audit intentionally runs outside TempleOS. It validates two invariants:
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import math
 import re
 import struct
 import sys
+import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 
 Q4_0_BLOCK_BYTES = 18
@@ -613,6 +615,126 @@ def markdown_report(report: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def iter_finding_rows(report: dict[str, Any]) -> Iterable[dict[str, str]]:
+    source_audit = report["source_audit"]
+    for finding in source_audit["findings"]:
+        yield {
+            "scope": "source",
+            "path": str(finding["path"]),
+            "line": str(finding["line"]),
+            "column": str(finding["column"]),
+            "format": "",
+            "kind": str(finding["kind"]),
+            "reason": f"{finding['kind']} {finding['text']}",
+            "text": str(finding["text"]),
+        }
+
+    for audit in report["block_audits"]:
+        for finding in audit["findings"]:
+            yield {
+                "scope": "block",
+                "path": str(audit["path"]),
+                "line": "",
+                "column": "",
+                "format": str(audit["format"]),
+                "kind": "block-finding",
+                "reason": str(finding),
+                "text": "",
+            }
+
+
+def write_csv(report: dict[str, Any], path: Path) -> None:
+    fields = ["scope", "path", "line", "column", "format", "kind", "reason", "text"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(iter_finding_rows(report))
+
+
+def write_junit(report: dict[str, Any], path: Path) -> None:
+    rows = list(iter_finding_rows(report))
+    passing_checks = 0
+    if not report["source_audit"]["findings"]:
+        passing_checks += 1
+    passing_checks += sum(1 for audit in report["block_audits"] if not audit["findings"])
+
+    testcase_count = len(rows) + passing_checks
+    if testcase_count == 0:
+        testcase_count = 1
+
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": "holyc_quant_audit",
+            "tests": str(testcase_count),
+            "failures": str(len(rows)),
+            "errors": "0",
+        },
+    )
+
+    if not report["source_audit"]["findings"]:
+        ET.SubElement(
+            suite,
+            "testcase",
+            {
+                "classname": "quant_audit.source",
+                "name": "source_float_runtime_scan",
+            },
+        )
+
+    for audit in report["block_audits"]:
+        if not audit["findings"]:
+            ET.SubElement(
+                suite,
+                "testcase",
+                {
+                    "classname": "quant_audit.blocks",
+                    "name": f"{Path(audit['path']).name}:{audit['format']}",
+                },
+            )
+
+    for index, row in enumerate(rows, 1):
+        classname = f"quant_audit.{row['scope']}"
+        name_parts = [Path(row["path"]).name or row["path"]]
+        if row["line"]:
+            name_parts.append(row["line"])
+        if row["format"]:
+            name_parts.append(row["format"])
+        name_parts.append(str(index))
+        case = ET.SubElement(
+            suite,
+            "testcase",
+            {
+                "classname": classname,
+                "name": ":".join(name_parts),
+            },
+        )
+        failure = ET.SubElement(
+            case,
+            "failure",
+            {
+                "type": "quant_audit_violation",
+                "message": row["reason"],
+            },
+        )
+        failure.text = "\n".join(
+            [
+                f"scope={row['scope']}",
+                f"path={row['path']}",
+                f"line={row['line']}",
+                f"column={row['column']}",
+                f"format={row['format']}",
+                f"kind={row['kind']}",
+                f"reason={row['reason']}",
+            ]
+        )
+
+    ET.indent(suite)
+    ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
+    with path.open("ab") as handle:
+        handle.write(b"\n")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -676,6 +798,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--allow-inf-nan-scale", action="store_true", help="Do not fail on fp16 inf/nan scales")
     parser.add_argument("--output", type=Path, help="Write JSON report to this path")
     parser.add_argument("--markdown", type=Path, help="Write Markdown report to this path")
+    parser.add_argument("--csv", type=Path, help="Write CSV findings report to this path")
+    parser.add_argument("--junit", type=Path, help="Write JUnit XML audit report to this path")
     return parser
 
 
@@ -723,6 +847,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.markdown:
         args.markdown.parent.mkdir(parents=True, exist_ok=True)
         args.markdown.write_text(markdown_report(report), encoding="utf-8")
+
+    if args.csv:
+        args.csv.parent.mkdir(parents=True, exist_ok=True)
+        write_csv(report, args.csv)
+
+    if args.junit:
+        args.junit.parent.mkdir(parents=True, exist_ok=True)
+        write_junit(report, args.junit)
 
     return 1 if failed else 0
 

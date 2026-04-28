@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import struct
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -182,6 +183,8 @@ def test_cli_fails_on_q16_scale_limit(tmp_path: Path) -> None:
     q4_file = tmp_path / "q4.bin"
     output = tmp_path / "report.json"
     markdown = tmp_path / "report.md"
+    csv_report = tmp_path / "report.csv"
+    junit = tmp_path / "report.xml"
     source.write_text("I64 Good(U16 d_fp16) { return d_fp16; }\n", encoding="utf-8")
     q4_file.write_bytes(half_bits(1.0) + bytes([0x88] * 16))
 
@@ -199,6 +202,10 @@ def test_cli_fails_on_q16_scale_limit(tmp_path: Path) -> None:
             str(output),
             "--markdown",
             str(markdown),
+            "--csv",
+            str(csv_report),
+            "--junit",
+            str(junit),
         ]
     )
 
@@ -209,6 +216,14 @@ def test_cli_fails_on_q16_scale_limit(tmp_path: Path) -> None:
     markdown_text = markdown.read_text(encoding="utf-8")
     assert "Scale Q16 min/max/absmax/zero/overlimit" in markdown_text
     assert "Used values" in markdown_text
+    assert "block," in csv_report.read_text(encoding="utf-8")
+    junit_root = ET.parse(junit).getroot()
+    assert junit_root.attrib["name"] == "holyc_quant_audit"
+    assert junit_root.attrib["tests"] == "2"
+    assert junit_root.attrib["failures"] == "1"
+    failure = junit_root.find("./testcase/failure")
+    assert failure is not None
+    assert "|scale_q16| 65536 exceeds limit 32768" in (failure.text or "")
 
 
 def test_cli_audits_mixed_q4_and_q8_block_files(tmp_path: Path) -> None:
