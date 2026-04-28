@@ -218,9 +218,12 @@ and `_mb` variants into `memory_bytes` so the perf regression dashboard can
 track peak memory alongside tok/s.
 
 Each measured run also records `wall_tok_per_s`, derived from host wall-clock
-elapsed time and emitted token count. This is reported next to guest telemetry
-in JSON, Markdown, and CSV so suspicious guest-side timing can be compared
-against the host-observed launch duration.
+elapsed time. Reports now include `host_overhead_us` and `host_overhead_pct`,
+computed as host wall elapsed time minus guest-reported elapsed time, so QEMU
+launch/serial/host orchestration overhead can be tracked separately from guest
+decode telemetry. This is reported next to guest telemetry in JSON, Markdown,
+and CSV so suspicious guest-side timing can be compared against the
+host-observed launch duration.
 
 Use `--max-suite-cv-pct` and `--max-prompt-cv-pct` to fail noisy benchmark runs
 when measured tok/s coefficient of variation exceeds a CI threshold. Gate

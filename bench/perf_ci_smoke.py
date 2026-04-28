@@ -277,8 +277,17 @@ def main() -> int:
         if suite_summary.get("ttft_us_p95") is None:
             print("missing_suite_ttft_p95=true", file=sys.stderr)
             return 1
+        if suite_summary.get("host_overhead_us_median") is None:
+            print("missing_suite_host_overhead=true", file=sys.stderr)
+            return 1
         if not all("tok_per_s_cv_pct" in row for row in bench_report["summaries"]):
             print("missing_prompt_tok_cv=true", file=sys.stderr)
+            return 1
+        if not all(
+            "host_overhead_us_median" in row and "host_overhead_pct_median" in row
+            for row in bench_report["summaries"]
+        ):
+            print("missing_prompt_host_overhead=true", file=sys.stderr)
             return 1
         if not all(
             "ttft_us_median" in row and "ttft_us_p95" in row

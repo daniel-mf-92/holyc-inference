@@ -10,7 +10,7 @@ Runs: 4
 
 | Prompts | Runs | OK | Measured prompt bytes | Total tokens | Total elapsed us | Median host overhead us | Median host overhead % | Median TTFT us | P95 TTFT us | Median tok/s | P95 tok/s | Median wall tok/s | P95 wall tok/s | Max memory bytes |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 2 | 4 | 4 | 240 | 160 | 1000000 | -159927.000 | -60.611 | 12000.000 | 12400.000 | 160.000 | 160.000 | 496.534 | 739.877 | 67207168 |
+| 2 | 4 | 4 | 240 | 160 | 1000000 | -159871.500 | -60.584 | 12000.000 | 12400.000 | 160.000 | 160.000 | 496.362 | 740.544 | 67207168 |
 
 | tok/s stdev | tok/s CV % |
 | ---: | ---: |
@@ -20,11 +20,11 @@ Runs: 4
 
 | Prompt | Prompt bytes | Runs | OK | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median TTFT us | P95 TTFT us | Min tok/s | Median tok/s | tok/s stdev | tok/s CV % | Max tok/s | Median wall tok/s | P95 wall tok/s | Max memory bytes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| smoke-code | 71 | 2 | 2 | 48.000 | 300000.000 | -233921.500 | -77.974 | 12400.000 | 12400.000 | 160.000 | 160.000 | 0.000 | 0.000 | 160.000 | 726.883 | 743.589 | 67207168 |
-| smoke-short | 49 | 2 | 2 | 32.000 | 200000.000 | 223306.500 | 111.653 | 11600.000 | 11600.000 | 160.000 | 160.000 | 0.000 | 0.000 | 160.000 | 164.166 | 272.690 | 67174400 |
+| smoke-code | 71 | 2 | 2 | 48.000 | 300000.000 | -233952.000 | -77.984 | 12400.000 | 12400.000 | 160.000 | 160.000 | 0.000 | 0.000 | 160.000 | 727.241 | 744.345 | 67207168 |
+| smoke-short | 49 | 2 | 2 | 32.000 | 200000.000 | 218837.000 | 109.419 | 11600.000 | 11600.000 | 160.000 | 160.000 | 0.000 | 0.000 | 160.000 | 164.307 | 272.469 | 67174400 |
 
 ## Environment
 
 | Platform | Machine | Python | CPU count | QEMU |
 | --- | --- | --- | ---: | --- |
-| macOS-26.2-arm64-arm-64bit-Mach-O | arm64 | 3.14.3 | 10 | bench/fixtures/qemu_synthetic_bench.py |
+| macOS-26.2-arm64-arm-64bit-Mach-O | arm64 | 3.14.3 | 10 | /Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/fixtures/qemu_synthetic_bench.py |

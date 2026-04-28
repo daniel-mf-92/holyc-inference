@@ -3,7 +3,7 @@
     {
       "benchmark": "qemu_prompt",
       "command": [
-        "bench/fixtures/qemu_synthetic_bench.py",
+        "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/fixtures/qemu_synthetic_bench.py",
         "-nic",
         "none",
         "-serial",
@@ -11,12 +11,16 @@
         "-display",
         "none",
         "-drive",
-        "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide"
+        "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide",
+        "-m",
+        "256M",
+        "-smp",
+        "1"
       ],
       "commit": "a0126ad2c367",
       "elapsed_us": 200000,
-      "host_overhead_pct": 267.1165,
-      "host_overhead_us": 534233,
+      "host_overhead_pct": 262.5955,
+      "host_overhead_us": 525191,
       "iteration": 1,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
@@ -33,13 +37,13 @@
       "tok_per_s": 160.0,
       "tokens": 32,
       "ttft_us": 11600,
-      "wall_elapsed_us": 734233,
-      "wall_tok_per_s": 43.58289534793451
+      "wall_elapsed_us": 725191,
+      "wall_tok_per_s": 44.12630603523761
     },
     {
       "benchmark": "qemu_prompt",
       "command": [
-        "bench/fixtures/qemu_synthetic_bench.py",
+        "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/fixtures/qemu_synthetic_bench.py",
         "-nic",
         "none",
         "-serial",
@@ -47,12 +51,16 @@
         "-display",
         "none",
         "-drive",
-        "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide"
+        "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide",
+        "-m",
+        "256M",
+        "-smp",
+        "1"
       ],
       "commit": "a0126ad2c367",
       "elapsed_us": 200000,
-      "host_overhead_pct": -43.81,
-      "host_overhead_us": -87620,
+      "host_overhead_pct": -43.7585,
+      "host_overhead_us": -87517,
       "iteration": 2,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
@@ -69,13 +77,13 @@
       "tok_per_s": 160.0,
       "tokens": 32,
       "ttft_us": 11600,
-      "wall_elapsed_us": 112380,
-      "wall_tok_per_s": 284.7481758319986
+      "wall_elapsed_us": 112483,
+      "wall_tok_per_s": 284.48743365664143
     },
     {
       "benchmark": "qemu_prompt",
       "command": [
-        "bench/fixtures/qemu_synthetic_bench.py",
+        "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/fixtures/qemu_synthetic_bench.py",
         "-nic",
         "none",
         "-serial",
@@ -83,12 +91,16 @@
         "-display",
         "none",
         "-drive",
-        "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide"
+        "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide",
+        "-m",
+        "256M",
+        "-smp",
+        "1"
       ],
       "commit": "a0126ad2c367",
       "elapsed_us": 300000,
-      "host_overhead_pct": -78.53633333333333,
-      "host_overhead_us": -235609,
+      "host_overhead_pct": -78.55933333333333,
+      "host_overhead_us": -235678,
       "iteration": 1,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
@@ -105,13 +117,13 @@
       "tok_per_s": 160.0,
       "tokens": 48,
       "ttft_us": 12400,
-      "wall_elapsed_us": 64391,
-      "wall_tok_per_s": 745.4457921138047
+      "wall_elapsed_us": 64322,
+      "wall_tok_per_s": 746.2454525667735
     },
     {
       "benchmark": "qemu_prompt",
       "command": [
-        "bench/fixtures/qemu_synthetic_bench.py",
+        "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/fixtures/qemu_synthetic_bench.py",
         "-nic",
         "none",
         "-serial",
@@ -119,12 +131,16 @@
         "-display",
         "none",
         "-drive",
-        "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide"
+        "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide",
+        "-m",
+        "256M",
+        "-smp",
+        "1"
       ],
       "commit": "a0126ad2c367",
       "elapsed_us": 300000,
-      "host_overhead_pct": -77.41133333333333,
-      "host_overhead_us": -232234,
+      "host_overhead_pct": -77.40866666666666,
+      "host_overhead_us": -232226,
       "iteration": 2,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
@@ -141,8 +157,8 @@
       "tok_per_s": 160.0,
       "tokens": 48,
       "ttft_us": 12400,
-      "wall_elapsed_us": 67766,
-      "wall_tok_per_s": 708.3198063925862
+      "wall_elapsed_us": 67774,
+      "wall_tok_per_s": 708.2361967716233
     }
   ],
   "environment": {
@@ -151,8 +167,8 @@
     "platform": "macOS-26.2-arm64-arm-64bit-Mach-O",
     "processor": "arm",
     "python": "3.14.3",
-    "qemu_bin": "bench/fixtures/qemu_synthetic_bench.py",
-    "qemu_path": "bench/fixtures/qemu_synthetic_bench.py",
+    "qemu_bin": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/fixtures/qemu_synthetic_bench.py",
+    "qemu_path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/fixtures/qemu_synthetic_bench.py",
     "qemu_version": null
   },
   "generated_at": "2026-04-28T03:52:03Z",
@@ -161,14 +177,14 @@
     "prompt_bytes_min": 49,
     "prompt_bytes_total": 120,
     "prompt_count": 2,
-    "source": "bench/prompts/smoke.jsonl",
+    "source": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/prompts/smoke.jsonl",
     "suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a"
   },
   "status": "pass",
   "suite_summary": {
     "elapsed_us_p95": 300000.0,
-    "host_overhead_pct_median": -60.61066666666667,
-    "host_overhead_us_median": -159927.0,
+    "host_overhead_pct_median": -60.58358333333333,
+    "host_overhead_us_median": -159871.5,
     "measured_prompt_bytes_total": 240,
     "memory_bytes_max": 67207168,
     "ok_runs": 4,
@@ -186,14 +202,14 @@
     "total_tokens": 160,
     "ttft_us_median": 12000.0,
     "ttft_us_p95": 12400.0,
-    "wall_tok_per_s_median": 496.53399111229237,
-    "wall_tok_per_s_p95": 739.8768942556219
+    "wall_tok_per_s_median": 496.3618152141324,
+    "wall_tok_per_s_p95": 740.5440641975009
   },
   "summaries": [
     {
       "elapsed_us_median": 300000.0,
-      "host_overhead_pct_median": -77.97383333333333,
-      "host_overhead_us_median": -233921.5,
+      "host_overhead_pct_median": -77.984,
+      "host_overhead_us_median": -233952.0,
       "memory_bytes_max": 67207168,
       "ok_runs": 2,
       "prompt": "smoke-code",
@@ -207,13 +223,13 @@
       "tokens_median": 48.0,
       "ttft_us_median": 12400.0,
       "ttft_us_p95": 12400.0,
-      "wall_tok_per_s_median": 726.8827992531955,
-      "wall_tok_per_s_p95": 743.5894928277438
+      "wall_tok_per_s_median": 727.2408246691984,
+      "wall_tok_per_s_p95": 744.3449897770159
     },
     {
       "elapsed_us_median": 200000.0,
-      "host_overhead_pct_median": 111.65324999999999,
-      "host_overhead_us_median": 223306.5,
+      "host_overhead_pct_median": 109.41850000000001,
+      "host_overhead_us_median": 218837.0,
       "memory_bytes_max": 67174400,
       "ok_runs": 2,
       "prompt": "smoke-short",
@@ -227,28 +243,28 @@
       "tokens_median": 32.0,
       "ttft_us_median": 11600.0,
       "ttft_us_p95": 11600.0,
-      "wall_tok_per_s_median": 164.16553558996657,
-      "wall_tok_per_s_p95": 272.6899118077954
+      "wall_tok_per_s_median": 164.30686984593953,
+      "wall_tok_per_s_p95": 272.4693772755712
     }
   ],
   "telemetry_findings": [],
   "telemetry_gates": {
     "min_tok_per_s": null,
     "min_tokens": null,
-    "require_memory": true,
-    "require_tok_per_s": true,
-    "require_tokens": true
+    "require_memory": false,
+    "require_tok_per_s": false,
+    "require_tokens": false
   },
   "variability_findings": [],
   "variability_gates": {
-    "max_prompt_cv_pct": null,
+    "max_prompt_cv_pct": 0.1,
     "max_suite_cv_pct": null
   },
   "warmups": [
     {
       "benchmark": "qemu_prompt",
       "command": [
-        "bench/fixtures/qemu_synthetic_bench.py",
+        "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/fixtures/qemu_synthetic_bench.py",
         "-nic",
         "none",
         "-serial",
@@ -256,12 +272,16 @@
         "-display",
         "none",
         "-drive",
-        "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide"
+        "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide",
+        "-m",
+        "256M",
+        "-smp",
+        "1"
       ],
       "commit": "a0126ad2c367",
       "elapsed_us": 200000,
-      "host_overhead_pct": 765.855,
-      "host_overhead_us": 1531710,
+      "host_overhead_pct": 654.6355,
+      "host_overhead_us": 1309271,
       "iteration": 1,
       "memory_bytes": 67174400,
       "model": "synthetic-smoke",
@@ -278,13 +298,13 @@
       "tok_per_s": 160.0,
       "tokens": 32,
       "ttft_us": 11600,
-      "wall_elapsed_us": 1731710,
-      "wall_tok_per_s": 18.478844610240746
+      "wall_elapsed_us": 1509271,
+      "wall_tok_per_s": 21.20228905213179
     },
     {
       "benchmark": "qemu_prompt",
       "command": [
-        "bench/fixtures/qemu_synthetic_bench.py",
+        "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/fixtures/qemu_synthetic_bench.py",
         "-nic",
         "none",
         "-serial",
@@ -292,12 +312,16 @@
         "-display",
         "none",
         "-drive",
-        "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide"
+        "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide",
+        "-m",
+        "256M",
+        "-smp",
+        "1"
       ],
       "commit": "a0126ad2c367",
       "elapsed_us": 300000,
-      "host_overhead_pct": 794.5603333333333,
-      "host_overhead_us": 2383681,
+      "host_overhead_pct": 777.082,
+      "host_overhead_us": 2331246,
       "iteration": 1,
       "memory_bytes": 67207168,
       "model": "synthetic-smoke",
@@ -314,8 +338,8 @@
       "tok_per_s": 160.0,
       "tokens": 48,
       "ttft_us": 12400,
-      "wall_elapsed_us": 2683681,
-      "wall_tok_per_s": 17.88588136965608
+      "wall_elapsed_us": 2631246,
+      "wall_tok_per_s": 18.242308016810288
     }
   ]
 }

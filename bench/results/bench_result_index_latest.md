@@ -1,8 +1,8 @@
 # Benchmark Result Index
 
-Generated: 2026-04-28T03:21:17Z
+Generated: 2026-04-28T03:53:03Z
 Status: pass
-Artifacts: 46
+Artifacts: 51
 
 | Type | Status | Air-gap | Telemetry | Commit | Profile | Model | Quant | Prompts | Runs | Warmups | Median tok/s | Max memory bytes | Source |
 | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
@@ -46,11 +46,16 @@ Artifacts: 46
 | qemu_prompt | pass | pass | pass | pass:ec4b6dde4fd6 | synthetic-airgap-smoke | synthetic-smoke | Q4_0 | 2 | 6 | 0 | 160.000 | 67207168 | bench/results/qemu_prompt_bench_20260428T000650Z.json |
 | qemu_prompt | pass | pass | pass | pass:3b7e701e8a6b | ci-airgap-smoke | synthetic-smoke | Q4_0 | 2 | 4 | 2 | 160.000 | 67207168 | bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T023336Z.json |
 | qemu_prompt | pass | pass | pass | pass:3b7e701e8a6b | ci-airgap-smoke | synthetic-smoke | Q4_0 | 2 | 4 | 2 | 160.000 | 67207168 | bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json |
-| bench_matrix_cell | pass | pass | pass | pass:3b7e701e8a6b | ci-airgap-smoke | synthetic-smoke | Q4_0 | 2 | 4 | 2 | 160.000 | 67207168 | bench/results/bench_matrix_latest.json |
-| bench_matrix_cell | pass | pass | pass | pass:3b7e701e8a6b | ci-airgap-smoke | synthetic-smoke | Q8_0 | 2 | 4 | 2 | 160.000 | 67207168 | bench/results/bench_matrix_latest.json |
 | qemu_prompt | pass | pass | pass | pass:3b7e701e8a6b | ci-airgap-smoke | synthetic-smoke | Q8_0 | 2 | 4 | 2 | 160.000 | 67207168 | bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T023337Z.json |
 | qemu_prompt | pass | pass | pass | pass:3b7e701e8a6b | ci-airgap-smoke | synthetic-smoke | Q8_0 | 2 | 4 | 2 | 160.000 | 67207168 | bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json |
 | qemu_prompt | pass | pass | pass | pass:ba875d39995e | synthetic-airgap-smoke | synthetic-smoke | Q4_0 | 2 | 6 | 0 | 160.000 | 67207168 | bench/results/qemu_prompt_bench_20260428T024600Z.json |
-| qemu_prompt | pass | pass | pass | pass:ba875d39995e | synthetic-airgap-smoke | synthetic-smoke | Q4_0 | 2 | 6 | 0 | 160.000 | 67207168 | bench/results/qemu_prompt_bench_latest.json |
+| qemu_prompt | pass | pass | pass | pass:a0126ad2c367 | ci-airgap-smoke | synthetic-smoke | Q4_0 | 2 | 4 | 2 | 160.000 | 67207168 | bench/results/bench_matrix_20260428T035157Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T035203Z.json |
+| qemu_prompt | pass | pass | pass | pass:a0126ad2c367 | ci-airgap-smoke | synthetic-smoke | Q4_0 | 2 | 4 | 2 | 160.000 | 67207168 | bench/results/bench_matrix_20260428T035157Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json |
+| qemu_prompt | pass | pass | pass | pass:a0126ad2c367 | ci-airgap-smoke | synthetic-smoke | Q4_0 | 2 | 4 | 2 | 160.000 | 67207168 | bench/results/qemu_prompt_bench_20260428T035203Z.json |
+| qemu_prompt | pass | pass | pass | pass:a0126ad2c367 | ci-airgap-smoke | synthetic-smoke | Q4_0 | 2 | 4 | 2 | 160.000 | 67207168 | bench/results/qemu_prompt_bench_latest.json |
+| bench_matrix_cell | pass | pass | pass | pass:a0126ad2c367 | ci-airgap-smoke | synthetic-smoke | Q4_0 | 2 | 4 | 2 | 160.000 | 67207168 | bench/results/bench_matrix_latest.json |
+| bench_matrix_cell | pass | pass | pass | pass:a0126ad2c367 | ci-airgap-smoke | synthetic-smoke | Q8_0 | 2 | 4 | 2 | 160.000 | 67207168 | bench/results/bench_matrix_latest.json |
+| qemu_prompt | pass | pass | pass | pass:a0126ad2c367 | ci-airgap-smoke | synthetic-smoke | Q8_0 | 2 | 4 | 2 | 160.000 | 67207168 | bench/results/bench_matrix_20260428T035157Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T035204Z.json |
+| qemu_prompt | pass | pass | pass | pass:a0126ad2c367 | ci-airgap-smoke | synthetic-smoke | Q8_0 | 2 | 4 | 2 | 160.000 | 67207168 | bench/results/bench_matrix_20260428T035157Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json |
 
 Prompt suite drift: none detected.
