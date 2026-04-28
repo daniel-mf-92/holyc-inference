@@ -687,6 +687,10 @@ Prompt-suite SHA256s are carried through from QEMU prompt benchmark reports;
 `--fail-on-prompt-suite-drift` rejects comparable build pairs whose prompt-suite
 hashes differ, with details written to
 `build_compare_prompt_suite_drift_latest.csv` and the JUnit report.
+QEMU command SHA256s are also carried through; `--fail-on-command-drift`
+rejects comparable build pairs whose launch command fingerprints differ, with
+details written to `build_compare_command_drift_latest.csv` and the JUnit
+report.
 
 Example:
 
@@ -707,7 +711,8 @@ python3 bench/build_compare.py \
   --max-host-child-rss-growth-pct 10 \
   --max-memory-growth-pct 10 \
   --min-ok-runs-per-build 3 \
-  --fail-on-coverage
+  --fail-on-coverage \
+  --fail-on-command-drift
 ```
 
 ## HolyC vs llama.cpp Eval Compare

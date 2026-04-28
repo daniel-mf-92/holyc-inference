@@ -25,6 +25,7 @@ def write_report(
     ttft_us: int | None = None,
     memory_bytes: int = 4096,
     prompt_suite_sha256: str = "suite-a",
+    command_sha256: str = "command-a",
 ) -> None:
     row = {
         "commit": commit,
@@ -37,6 +38,7 @@ def write_report(
         "elapsed_us": elapsed_us,
         "tok_per_s": tok_per_s,
         "memory_bytes": memory_bytes,
+        "command_sha256": command_sha256,
         "returncode": 0,
         "timed_out": False,
     }
@@ -76,6 +78,7 @@ def write_multi_report(
             "elapsed_us": elapsed_us + index,
             "tok_per_s": tok_per_s,
             "memory_bytes": 4096,
+            "command_sha256": "command-a",
             "returncode": 0,
             "timed_out": False,
         }
@@ -112,6 +115,7 @@ def write_metric_rows_report(path: Path, commit: str, rows: list[dict[str, objec
                         "tokens": 32,
                         "elapsed_us": 200000,
                         "memory_bytes": 4096,
+                        "command_sha256": "command-a",
                         "returncode": 0,
                         "timed_out": False,
                         **row,
@@ -569,6 +573,44 @@ def test_cli_can_gate_prompt_suite_drift(tmp_path: Path) -> None:
     assert "Prompt-suite drift: 1" in (output_dir / "build_compare_latest.md").read_text(encoding="utf-8")
 
 
+def test_cli_can_gate_command_drift(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    candidate = tmp_path / "candidate.json"
+    output_dir = tmp_path / "results"
+    write_report(baseline, "base", 100.0, 200000, command_sha256="command-a")
+    write_report(candidate, "head", 100.0, 200000, command_sha256="command-b")
+
+    status = build_compare.main(
+        [
+            "--input",
+            f"base={baseline}",
+            "--input",
+            f"head={candidate}",
+            "--output-dir",
+            str(output_dir),
+            "--fail-on-command-drift",
+        ]
+    )
+
+    payload = json.loads((output_dir / "build_compare_latest.json").read_text(encoding="utf-8"))
+    drift_rows = list(
+        csv.DictReader((output_dir / "build_compare_command_drift_latest.csv").open(newline="", encoding="utf-8"))
+    )
+    junit_root = ET.parse(output_dir / "build_compare_junit_latest.xml").getroot()
+    failure = junit_root.find("./testcase/failure")
+
+    assert status == 1
+    assert payload["status"] == "fail"
+    assert payload["deltas"][0]["baseline_command_sha256"] == "command-a"
+    assert payload["deltas"][0]["candidate_command_sha256"] == "command-b"
+    assert payload["command_drift"][0]["candidate_build"] == "head"
+    assert drift_rows[0]["baseline_command_sha256"] == "command-a"
+    assert junit_root.attrib["failures"] == "1"
+    assert failure is not None
+    assert failure.attrib["type"] == "build_compare_command_drift"
+    assert "Command drift: 1" in (output_dir / "build_compare_latest.md").read_text(encoding="utf-8")
+
+
 def test_cli_can_fail_on_throughput_regression(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     candidate = tmp_path / "candidate.json"
@@ -627,6 +669,7 @@ if __name__ == "__main__":
         test_cli_can_gate_host_latency_cpu_and_rss_drift(tmp_path)
         test_cli_can_gate_ok_run_coverage(tmp_path)
         test_cli_can_gate_prompt_suite_drift(tmp_path)
+        test_cli_can_gate_command_drift(tmp_path)
         test_cli_can_fail_on_throughput_regression(tmp_path)
         test_missing_baseline_returns_error(tmp_path)
     print("build_compare_tests=ok")
