@@ -134,6 +134,15 @@ def main() -> int:
             "unexpected_curated_split_answer_histograms",
         ):
             return rc
+        if rc := require(
+            curated_report["provenance_counts"] == {
+                "synthetic ARC-shaped smoke row": 1,
+                "synthetic HellaSwag-shaped smoke row": 1,
+                "synthetic TruthfulQA-shaped smoke row": 1,
+            },
+            "unexpected_curated_provenance_counts",
+        ):
+            return rc
         if rc := require(curated_report["filters"]["balance_answer_index"] is True, "missing_balance_flag"):
             return rc
         if rc := require(
@@ -276,6 +285,8 @@ def main() -> int:
             str(datasets_dir),
             "--max-majority-answer-pct",
             "100",
+            "--max-provenance-pct",
+            "100",
             "--max-dataset-majority-answer-pct",
             "100",
             "--max-split-majority-answer-pct",
@@ -321,6 +332,15 @@ def main() -> int:
         if rc := require(
             json.loads(provenance_rows[0]["split_answer_histograms"]) == {"validation": {"0": 3}},
             "missing_provenance_split_answer_histograms",
+        ):
+            return rc
+        if rc := require(
+            json.loads(provenance_rows[0]["provenance_counts"]) == {
+                "synthetic ARC-shaped smoke row": 1,
+                "synthetic HellaSwag-shaped smoke row": 1,
+                "synthetic TruthfulQA-shaped smoke row": 1,
+            },
+            "missing_provenance_counts",
         ):
             return rc
         provenance_root = ET.parse(provenance_junit).getroot()
@@ -399,6 +419,38 @@ def main() -> int:
             for finding in artifact["findings"]
         }
         if rc := require("majority_answer_skew" in skew_kinds, "missing_answer_skew_finding"):
+            return rc
+
+        provenance_skew_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_provenance_audit.py"),
+            "--input",
+            str(curated_manifest),
+            "--output-dir",
+            str(tmp_path / "provenance-skew"),
+            "--max-provenance-pct",
+            "30",
+            "--fail-on-findings",
+        ]
+        completed = subprocess.run(
+            provenance_skew_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("provenance_skew_not_rejected=true", file=sys.stderr)
+            return 1
+        provenance_skew_failure = json.loads(
+            (tmp_path / "provenance-skew" / "dataset_provenance_audit_latest.json").read_text(encoding="utf-8")
+        )
+        provenance_skew_kinds = {
+            finding["kind"]
+            for artifact in provenance_skew_failure["artifacts"]
+            for finding in artifact["findings"]
+        }
+        if rc := require("provenance_source_skew" in provenance_skew_kinds, "missing_provenance_skew_finding"):
             return rc
 
         stale_answer_manifest = tmp_path / "stale_answer_histogram.manifest.json"
@@ -521,6 +573,48 @@ def main() -> int:
         if rc := require(
             "split_answer_histograms_mismatch" in stale_split_answer_kinds,
             "missing_split_answer_histogram_finding",
+        ):
+            return rc
+
+        stale_provenance_manifest = tmp_path / "stale_provenance_counts.manifest.json"
+        stale_provenance_report = dict(curated_report)
+        stale_provenance_report["provenance_counts"] = {"synthetic stale source": 3}
+        stale_provenance_manifest.write_text(
+            json.dumps(stale_provenance_report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        stale_provenance_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_provenance_audit.py"),
+            "--input",
+            str(stale_provenance_manifest),
+            "--output-dir",
+            str(tmp_path / "stale-provenance-counts"),
+            "--fail-on-findings",
+        ]
+        completed = subprocess.run(
+            stale_provenance_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("stale_provenance_counts_not_rejected=true", file=sys.stderr)
+            return 1
+        stale_provenance_failure = json.loads(
+            (tmp_path / "stale-provenance-counts" / "dataset_provenance_audit_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        stale_provenance_kinds = {
+            finding["kind"]
+            for artifact in stale_provenance_failure["artifacts"]
+            for finding in artifact["findings"]
+        }
+        if rc := require(
+            "provenance_counts_mismatch" in stale_provenance_kinds,
+            "missing_provenance_counts_finding",
         ):
             return rc
 

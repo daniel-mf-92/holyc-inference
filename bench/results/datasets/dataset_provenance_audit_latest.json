@@ -36,7 +36,14 @@
       "license": "synthetic-smoke",
       "majority_answer_index": "0",
       "majority_answer_pct": 100.0,
+      "majority_provenance": "synthetic TruthfulQA-shaped smoke row",
+      "majority_provenance_pct": 33.33333333333333,
       "output": "bench/results/datasets/smoke_curated.jsonl",
+      "provenance_counts": {
+        "synthetic ARC-shaped smoke row": 1,
+        "synthetic HellaSwag-shaped smoke row": 1,
+        "synthetic TruthfulQA-shaped smoke row": 1
+      },
       "record_count": 3,
       "selected_records": 3,
       "source": "bench/results/datasets/smoke_curated.manifest.json",
@@ -59,6 +66,6 @@
       "status": "pass"
     }
   ],
-  "generated_at": "2026-04-28T16:16:12Z",
+  "generated_at": "2026-04-28T18:26:59Z",
   "status": "pass"
 }

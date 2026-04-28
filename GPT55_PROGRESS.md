@@ -150,3 +150,4 @@
 2026-04-28T17:31:31Z | Added benchmark result command_sha256 recomputation gate and refreshed synthetic air-gap bench artifacts
 2026-04-28T17:59:13Z | Added qemu_source_audit checks for JSON/.args QEMU argument fragments with smoke coverage and refreshed source audit artifacts.
 2026-04-28T18:14:26Z | Added perf regression P05 wall-clock tok/s rollups/gate with smoke coverage and refreshed dashboards.
+2026-04-28T18:27:23Z | Added eval dataset provenance contribution counts/skew gate with smoke coverage and refreshed dataset artifacts.

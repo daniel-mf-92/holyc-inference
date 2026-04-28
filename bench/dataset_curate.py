@@ -325,6 +325,7 @@ def build_manifest(
         "normalized_sha256": normalized_digest,
         "output": str(args.output),
         "pack_output": str(args.pack_output) if args.pack_output else None,
+        "provenance_counts": count_by(selected, "provenance"),
         "record_count": len(selected),
         "selected_record_ids": [record.record_id for record in selected],
         "source": {

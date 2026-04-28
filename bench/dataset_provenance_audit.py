@@ -53,8 +53,11 @@ class ProvenanceArtifact:
     answer_histogram: dict[str, int]
     dataset_answer_histograms: dict[str, dict[str, int]]
     split_answer_histograms: dict[str, dict[str, int]]
+    provenance_counts: dict[str, int]
     majority_answer_index: str
     majority_answer_pct: float | None
+    majority_provenance: str
+    majority_provenance_pct: float | None
     dataset_majority_answers: dict[str, dict[str, Any]]
     split_majority_answers: dict[str, dict[str, Any]]
     findings: list[ProvenanceFinding]
@@ -226,6 +229,7 @@ def audit_manifest(
     path: Path,
     require_source_url: bool,
     max_majority_answer_pct: float | None,
+    max_provenance_pct: float | None = None,
     max_dataset_majority_answer_pct: float | None = None,
     max_split_majority_answer_pct: float | None = None,
 ) -> ProvenanceArtifact | None:
@@ -284,8 +288,11 @@ def audit_manifest(
     observed_answer_histogram: dict[str, int] = {}
     observed_dataset_answer_histograms: dict[str, dict[str, int]] = {}
     observed_split_answer_histograms: dict[str, dict[str, int]] = {}
+    observed_provenance_counts: dict[str, int] = {}
     majority_answer_index = ""
     majority_answer_pct: float | None = None
+    majority_provenance = ""
+    majority_provenance_pct: float | None = None
     observed_dataset_majority_answers: dict[str, dict[str, Any]] = {}
     observed_split_majority_answers: dict[str, dict[str, Any]] = {}
     curated_output = output_path(manifest, path)
@@ -334,7 +341,9 @@ def audit_manifest(
             observed_answer_histogram = answer_histogram(records)
             observed_dataset_answer_histograms = answer_histograms_by_dataset(records)
             observed_split_answer_histograms = answer_histograms_by_split(records)
+            observed_provenance_counts = count_by(records, "provenance")
             majority_answer_index, majority_answer_pct = majority_answer(observed_answer_histogram)
+            majority_provenance, majority_provenance_pct = majority_answer(observed_provenance_counts)
             observed_dataset_majority_answers = majority_answers_by_dataset(observed_dataset_answer_histograms)
             observed_split_majority_answers = majority_answers_by_split(observed_split_answer_histograms)
             if observed_answer_histogram != manifest.get("answer_histogram"):
@@ -380,6 +389,27 @@ def audit_manifest(
                         (
                             f"answer index {majority_answer_index} covers {majority_answer_pct:.2f}% of records, "
                             f"above {max_majority_answer_pct:.2f}% gate"
+                        ),
+                    )
+                )
+            manifest_provenance_counts = manifest.get("provenance_counts")
+            if manifest_provenance_counts != observed_provenance_counts:
+                findings.append(
+                    finding(path, "error", "provenance_counts_mismatch", "provenance_counts does not match output")
+                )
+            if (
+                max_provenance_pct is not None
+                and majority_provenance_pct is not None
+                and majority_provenance_pct > max_provenance_pct
+            ):
+                findings.append(
+                    finding(
+                        path,
+                        "error",
+                        "provenance_source_skew",
+                        (
+                            f"provenance {majority_provenance!r} covers {majority_provenance_pct:.2f}% "
+                            f"of records, above {max_provenance_pct:.2f}% gate"
                         ),
                     )
                 )
@@ -447,8 +477,11 @@ def audit_manifest(
         answer_histogram=observed_answer_histogram,
         dataset_answer_histograms=observed_dataset_answer_histograms,
         split_answer_histograms=observed_split_answer_histograms,
+        provenance_counts=observed_provenance_counts,
         majority_answer_index=majority_answer_index,
         majority_answer_pct=majority_answer_pct,
+        majority_provenance=majority_provenance,
+        majority_provenance_pct=majority_provenance_pct,
         dataset_majority_answers=observed_dataset_majority_answers,
         split_majority_answers=observed_split_majority_answers,
         findings=findings,
@@ -459,6 +492,7 @@ def load_artifacts(
     paths: Iterable[Path],
     require_source_url: bool,
     max_majority_answer_pct: float | None,
+    max_provenance_pct: float | None = None,
     max_dataset_majority_answer_pct: float | None = None,
     max_split_majority_answer_pct: float | None = None,
 ) -> list[ProvenanceArtifact]:
@@ -468,6 +502,7 @@ def load_artifacts(
             path,
             require_source_url,
             max_majority_answer_pct,
+            max_provenance_pct,
             max_dataset_majority_answer_pct,
             max_split_majority_answer_pct,
         )
@@ -550,8 +585,11 @@ def write_csv(artifacts: list[ProvenanceArtifact], path: Path) -> None:
         "answer_histogram",
         "dataset_answer_histograms",
         "split_answer_histograms",
+        "provenance_counts",
         "majority_answer_index",
         "majority_answer_pct",
+        "majority_provenance",
+        "majority_provenance_pct",
         "dataset_majority_answers",
         "split_majority_answers",
         "findings",
@@ -568,6 +606,7 @@ def write_csv(artifacts: list[ProvenanceArtifact], path: Path) -> None:
             row["split_answer_histograms"] = json.dumps(
                 artifact.split_answer_histograms, separators=(",", ":")
             )
+            row["provenance_counts"] = json.dumps(artifact.provenance_counts, separators=(",", ":"))
             row["dataset_majority_answers"] = json.dumps(
                 artifact.dataset_majority_answers, separators=(",", ":")
             )
@@ -647,6 +686,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail when one answer index covers more than this percentage of curated records",
     )
     parser.add_argument(
+        "--max-provenance-pct",
+        type=float,
+        help="Fail when one provenance/source string covers more than this percentage of curated records",
+    )
+    parser.add_argument(
         "--max-dataset-majority-answer-pct",
         type=float,
         help="Fail when one answer index covers more than this percentage within any single dataset",
@@ -664,6 +708,9 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.max_majority_answer_pct is not None and not 0.0 <= args.max_majority_answer_pct <= 100.0:
         print("error: --max-majority-answer-pct must be between 0 and 100", file=sys.stderr)
+        return 2
+    if args.max_provenance_pct is not None and not 0.0 <= args.max_provenance_pct <= 100.0:
+        print("error: --max-provenance-pct must be between 0 and 100", file=sys.stderr)
         return 2
     if (
         args.max_dataset_majority_answer_pct is not None
@@ -683,6 +730,7 @@ def main(argv: list[str] | None = None) -> int:
             inputs,
             args.require_source_url,
             args.max_majority_answer_pct,
+            args.max_provenance_pct,
             args.max_dataset_majority_answer_pct,
             args.max_split_majority_answer_pct,
         )

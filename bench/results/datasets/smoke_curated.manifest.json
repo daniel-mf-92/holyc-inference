@@ -2,7 +2,7 @@
   "answer_histogram": {
     "0": 3
   },
-  "created_at": "2026-04-28T16:16:00Z",
+  "created_at": "2026-04-28T18:26:43Z",
   "dataset_answer_histograms": {
     "arc-smoke": {
       "0": 1
@@ -53,6 +53,11 @@
   "normalized_sha256": "a1389d4ed5197eb9db0bd39b60137dc3750e2ba9a9c1a151d836e9f0a28094f3",
   "output": "bench/results/datasets/smoke_curated.jsonl",
   "pack_output": "bench/results/datasets/smoke_curated.hceval",
+  "provenance_counts": {
+    "synthetic ARC-shaped smoke row": 1,
+    "synthetic HellaSwag-shaped smoke row": 1,
+    "synthetic TruthfulQA-shaped smoke row": 1
+  },
   "record_count": 3,
   "selected_record_ids": [
     "smoke-arc-1",
