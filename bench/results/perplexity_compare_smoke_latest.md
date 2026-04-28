@@ -1,6 +1,6 @@
 # Perplexity Compare Report
 
-Generated: 2026-04-28T01:41:49Z
+Generated: 2026-04-28T20:18:50Z
 Dataset: smoke-eval
 Split: validation
 Quantization: Q4_0
@@ -17,6 +17,10 @@ Status: pass
 | Perplexity | 1.435938 | 1.428127 | 0.007811 |
 | Perplexity ratio | 1.005469 | 1.000000 | - |
 | Token count mismatches | 0 | - | - |
+| Mean abs record NLL delta | 0.005833 | - | - |
+| Median abs record NLL delta | 0.007500 | - | - |
+| P95 abs record NLL delta | 0.010000 | - | - |
+| P95 signed record NLL delta | 0.010000 | - | - |
 | Max abs record NLL delta | 0.010000 | - | - |
 
 ## Quality Gates

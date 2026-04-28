@@ -254,6 +254,14 @@ def summarize(records: Iterable[PerplexityRecord]) -> dict[str, Any]:
     }
 
 
+def percentile(values: list[float], fraction: float) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    index = min(len(ordered) - 1, max(0, math.ceil(len(ordered) * fraction) - 1))
+    return ordered[index]
+
+
 def compare(
     holyc: dict[str, PerplexityRecord],
     llama: dict[str, PerplexityRecord],
@@ -298,6 +306,8 @@ def compare(
 
     holyc_summary = summarize(holyc.values())
     llama_summary = summarize(llama.values())
+    signed_deltas = [row.nll_delta_holyc_minus_llama for row in rows]
+    abs_deltas = [abs(delta) for delta in signed_deltas]
     summary = {
         "record_count": len(rows),
         "token_count_mismatches": len(mismatched_ids),
@@ -310,6 +320,10 @@ def compare(
             if llama_summary["perplexity"]
             else math.inf
         ),
+        "mean_abs_record_nll_delta": sum(abs_deltas) / len(abs_deltas) if abs_deltas else 0.0,
+        "median_abs_record_nll_delta": percentile(abs_deltas, 0.50),
+        "p95_abs_record_nll_delta": percentile(abs_deltas, 0.95),
+        "p95_record_nll_delta": percentile(signed_deltas, 0.95),
         "max_abs_record_nll_delta": max((abs(row.nll_delta_holyc_minus_llama) for row in rows), default=0.0),
     }
     return rows, summary
@@ -320,6 +334,7 @@ def find_regressions(
     *,
     max_nll_delta: float | None = None,
     max_perplexity_ratio: float | None = None,
+    max_p95_abs_record_nll_delta: float | None = None,
     max_record_nll_delta: float | None = None,
 ) -> list[PerplexityRegression]:
     regressions: list[PerplexityRegression] = []
@@ -348,6 +363,22 @@ def find_regressions(
                     f"HolyC/llama.cpp perplexity ratio "
                     f"{summary['perplexity_ratio_holyc_over_llama']:.6f} exceeds maximum "
                     f"{max_perplexity_ratio:.6f}"
+                ),
+            )
+        )
+    if (
+        max_p95_abs_record_nll_delta is not None
+        and summary["p95_abs_record_nll_delta"] > max_p95_abs_record_nll_delta
+    ):
+        regressions.append(
+            PerplexityRegression(
+                metric="p95_abs_record_nll_delta",
+                value=summary["p95_abs_record_nll_delta"],
+                threshold=max_p95_abs_record_nll_delta,
+                message=(
+                    f"P95 absolute per-record NLL/token delta "
+                    f"{summary['p95_abs_record_nll_delta']:.6f} exceeds maximum "
+                    f"{max_p95_abs_record_nll_delta:.6f}"
                 ),
             )
         )
@@ -390,6 +421,10 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"{summary['llama']['perplexity']:.6f} | {summary['perplexity_delta_holyc_minus_llama']:.6f} |",
         f"| Perplexity ratio | {summary['perplexity_ratio_holyc_over_llama']:.6f} | 1.000000 | - |",
         f"| Token count mismatches | {summary['token_count_mismatches']} | - | - |",
+        f"| Mean abs record NLL delta | {summary['mean_abs_record_nll_delta']:.6f} | - | - |",
+        f"| Median abs record NLL delta | {summary['median_abs_record_nll_delta']:.6f} | - | - |",
+        f"| P95 abs record NLL delta | {summary['p95_abs_record_nll_delta']:.6f} | - | - |",
+        f"| P95 signed record NLL delta | {summary['p95_record_nll_delta']:.6f} | - | - |",
         f"| Max abs record NLL delta | {summary['max_abs_record_nll_delta']:.6f} | - | - |",
         "",
         "## Quality Gates",
@@ -489,6 +524,7 @@ def write_report(
         summary,
         max_nll_delta=args.max_nll_delta,
         max_perplexity_ratio=args.max_perplexity_ratio,
+        max_p95_abs_record_nll_delta=args.max_p95_abs_record_nll_delta,
         max_record_nll_delta=args.max_record_nll_delta,
     )
     report = {
@@ -498,6 +534,7 @@ def write_report(
         "llama_sha256": file_sha256(llama_path),
         "max_nll_delta": args.max_nll_delta,
         "max_perplexity_ratio": args.max_perplexity_ratio,
+        "max_p95_abs_record_nll_delta": args.max_p95_abs_record_nll_delta,
         "max_record_nll_delta": args.max_record_nll_delta,
         "model": args.model,
         "quantization": args.quantization,
@@ -539,6 +576,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum allowed HolyC perplexity divided by llama.cpp perplexity before CI gate failure",
     )
     parser.add_argument(
+        "--max-p95-abs-record-nll-delta",
+        type=float,
+        help="Maximum allowed P95 absolute per-record NLL/token delta before CI gate failure",
+    )
+    parser.add_argument(
         "--max-record-nll-delta",
         type=float,
         help="Maximum allowed absolute per-record NLL/token delta before CI gate failure",
@@ -572,6 +614,7 @@ def main(argv: list[str] | None = None) -> int:
         summary,
         max_nll_delta=args.max_nll_delta,
         max_perplexity_ratio=args.max_perplexity_ratio,
+        max_p95_abs_record_nll_delta=args.max_p95_abs_record_nll_delta,
         max_record_nll_delta=args.max_record_nll_delta,
     )
     print(f"regressions={len(regressions)}")

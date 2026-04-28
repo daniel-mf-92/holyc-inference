@@ -161,3 +161,4 @@
 2026-04-28T19:49:43Z | Added HCEval record span telemetry to pack manifests and inspection reports with refreshed smoke dataset artifacts.
 2026-04-28T20:01:33Z | Added eval_compare score-vector NLL/perplexity telemetry and gates with refreshed smoke artifacts.
 2026-04-28T20:09:53Z | Added benchmark matrix/index/manifest emitted-token and elapsed-time rollups with refreshed smoke artifacts.
+2026-04-28T20:19:12Z | Added perplexity_compare P95 per-record NLL delta telemetry/gate with refreshed smoke artifacts.
