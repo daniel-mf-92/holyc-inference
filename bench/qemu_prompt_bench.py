@@ -15,6 +15,7 @@ import json
 import os
 import platform
 import re
+import shlex
 import shutil
 import statistics
 import subprocess
@@ -248,6 +249,24 @@ def reject_network_args(args: list[str]) -> None:
             raise ValueError(f"network device is not allowed: {arg}")
 
         index += 1
+
+
+def load_qemu_args_file(path: Path) -> list[str]:
+    """Load extra QEMU arguments from a local JSON string array or text file."""
+    text = path.read_text(encoding="utf-8")
+    if path.suffix.lower() == ".json":
+        payload = json.loads(text)
+        if not isinstance(payload, list) or not all(isinstance(item, str) for item in payload):
+            raise ValueError(f"{path} must contain a JSON array of strings")
+        return list(payload)
+    return shlex.split(text, comments=True, posix=True)
+
+
+def load_qemu_args_files(paths: Iterable[Path]) -> list[str]:
+    args: list[str] = []
+    for path in paths:
+        args.extend(load_qemu_args_file(path))
+    return args
 
 
 def build_command(qemu_bin: str, image: Path, qemu_args: list[str]) -> list[str]:
@@ -1093,6 +1112,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         help="Extra QEMU argument; repeat per token. Use --qemu-arg=-m for values beginning with '-'.",
     )
+    parser.add_argument(
+        "--qemu-args-file",
+        action="append",
+        type=Path,
+        default=[],
+        help="Local file of extra QEMU args: JSON string array or shell-style text with # comments",
+    )
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS)
     parser.add_argument(
         "--warmup",
@@ -1148,12 +1174,13 @@ def main(argv: list[str] | None = None) -> int:
         print("error: --min-tok-per-s must be >= 0", file=sys.stderr)
         return 2
 
-    root = Path(__file__).resolve().parents[1]
-    prompts = load_prompt_cases(args.prompts)
-    trailing_qemu_args = args.qemu_args[1:] if args.qemu_args[:1] == ["--"] else args.qemu_args
     try:
-        command = build_command(args.qemu_bin, args.image, args.qemu_arg + trailing_qemu_args)
-    except ValueError as exc:
+        root = Path(__file__).resolve().parents[1]
+        prompts = load_prompt_cases(args.prompts)
+        trailing_qemu_args = args.qemu_args[1:] if args.qemu_args[:1] == ["--"] else args.qemu_args
+        file_qemu_args = load_qemu_args_files(args.qemu_args_file)
+        command = build_command(args.qemu_bin, args.image, file_qemu_args + args.qemu_arg + trailing_qemu_args)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 

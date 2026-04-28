@@ -35,8 +35,10 @@ def test_expand_cells_cross_product() -> None:
 def test_dry_run_writes_planned_air_gapped_commands(tmp_path: Path) -> None:
     matrix = tmp_path / "matrix.json"
     prompts = tmp_path / "prompts.jsonl"
+    qemu_args = tmp_path / "qemu.args"
     output_dir = tmp_path / "results"
     prompts.write_text('{"prompt_id":"one","prompt":"A"}\n', encoding="utf-8")
+    qemu_args.write_text("-m 256M\n", encoding="utf-8")
     matrix.write_text(
         json.dumps(
             {
@@ -44,7 +46,7 @@ def test_dry_run_writes_planned_air_gapped_commands(tmp_path: Path) -> None:
                 "image": str(tmp_path / "TempleOS.img"),
                 "prompts": str(prompts),
                 "qemu_bin": "qemu-system-x86_64",
-                "qemu_args": ["-m", "256M"],
+                "qemu_args_files": ["qemu.args"],
                 "profiles": [{"name": "secure", "qemu_args": ["-smp", "1"]}],
                 "models": ["tiny"],
                 "quantizations": ["Q4_0"],
@@ -72,6 +74,33 @@ def test_dry_run_writes_planned_air_gapped_commands(tmp_path: Path) -> None:
     assert cell["command"][1:3] == ["-nic", "none"]
     assert "-m" in cell["command"]
     assert "-smp" in cell["command"]
+
+
+def test_matrix_axis_qemu_args_files_are_air_gap_checked(tmp_path: Path) -> None:
+    matrix = tmp_path / "matrix.json"
+    prompts = tmp_path / "prompts.jsonl"
+    output_dir = tmp_path / "results"
+    prompts.write_text('{"prompt_id":"one","prompt":"A"}\n', encoding="utf-8")
+    (tmp_path / "profile.args").write_text("-smp 2\n", encoding="utf-8")
+    (tmp_path / "bad.args").write_text("-netdev user,id=n0\n", encoding="utf-8")
+    matrix.write_text(
+        json.dumps(
+            {
+                "name": "dry-run",
+                "image": str(tmp_path / "TempleOS.img"),
+                "prompts": str(prompts),
+                "qemu_bin": "qemu-system-x86_64",
+                "profiles": [{"name": "secure", "qemu_args_file": "profile.args"}],
+                "models": ["tiny"],
+                "quantizations": [{"name": "Q4_0", "qemu_args_file": "bad.args"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    status = bench_matrix.main(["--matrix", str(matrix), "--output-dir", str(output_dir), "--dry-run"])
+
+    assert status == 2
 
 
 def test_cli_runs_synthetic_matrix(tmp_path: Path) -> None:

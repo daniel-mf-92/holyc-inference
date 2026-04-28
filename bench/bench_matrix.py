@@ -99,7 +99,32 @@ def as_args(value: Any, field: str) -> list[str]:
     return list(value)
 
 
-def axis_items(payload: dict[str, Any], key: str, default_name: str = "default") -> list[MatrixAxisItem]:
+def as_arg_files(value: Any, field: str, base_dir: Path) -> list[Path]:
+    if value is None:
+        return []
+    raw_paths = [value] if isinstance(value, str) else value
+    if not isinstance(raw_paths, list) or not all(isinstance(item, str) for item in raw_paths):
+        raise ValueError(f"{field} must be a string or list of strings")
+    paths = []
+    for item in raw_paths:
+        path = Path(item)
+        paths.append(path if path.is_absolute() else base_dir / path)
+    return paths
+
+
+def matrix_qemu_args(row: dict[str, Any], field: str, base_dir: Path) -> list[str]:
+    file_args = qemu_prompt_bench.load_qemu_args_files(
+        as_arg_files(row.get("qemu_args_file") or row.get("qemu_args_files"), f"{field}.qemu_args_files", base_dir)
+    )
+    return file_args + as_args(row.get("qemu_args"), f"{field}.qemu_args")
+
+
+def axis_items(
+    payload: dict[str, Any],
+    key: str,
+    default_name: str = "default",
+    base_dir: Path | None = None,
+) -> list[MatrixAxisItem]:
     rows = payload.get(key)
     if rows is None:
         return [MatrixAxisItem(default_name, [])]
@@ -117,16 +142,17 @@ def axis_items(payload: dict[str, Any], key: str, default_name: str = "default")
         items.append(
             MatrixAxisItem(
                 name=as_string(row.get("name"), f"{label}.name"),
-                qemu_args=as_args(row.get("qemu_args"), f"{label}.qemu_args"),
+                qemu_args=matrix_qemu_args(row, label, base_dir or Path.cwd()),
             )
         )
     return items
 
 
-def expand_cells(payload: dict[str, Any]) -> list[MatrixCell]:
-    profiles = axis_items(payload, "profiles")
-    models = axis_items(payload, "models", default_name="")
-    quantizations = axis_items(payload, "quantizations", default_name="")
+def expand_cells(payload: dict[str, Any], base_dir: Path | None = None) -> list[MatrixCell]:
+    base = base_dir or Path.cwd()
+    profiles = axis_items(payload, "profiles", base_dir=base)
+    models = axis_items(payload, "models", default_name="", base_dir=base)
+    quantizations = axis_items(payload, "quantizations", default_name="", base_dir=base)
     return [
         MatrixCell(profile=profile, model=model, quantization=quantization)
         for profile in profiles
@@ -512,8 +538,9 @@ def main(argv: list[str] | None = None) -> int:
         if max_prompt_cv_pct is not None and max_prompt_cv_pct < 0:
             raise ValueError("--max-prompt-cv-pct must be >= 0")
 
-        global_qemu_args = as_args(payload.get("qemu_args"), "qemu_args")
-        cells = expand_cells(payload)
+        matrix_base_dir = args.matrix.resolve().parent
+        global_qemu_args = matrix_qemu_args(payload, "matrix", matrix_base_dir)
+        cells = expand_cells(payload, base_dir=matrix_base_dir)
         matrix_dir = args.output_dir / f"bench_matrix_{iso_now().replace(':', '').replace('-', '')}"
         results = [
             run_cell(

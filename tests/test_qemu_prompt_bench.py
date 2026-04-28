@@ -57,6 +57,34 @@ def test_network_args_are_rejected(tmp_path: Path) -> None:
         raise AssertionError("expected network device rejection")
 
 
+def test_qemu_args_file_parsing_and_air_gap_validation(tmp_path: Path) -> None:
+    image = tmp_path / "temple.img"
+    text_args = tmp_path / "qemu.args"
+    json_args = tmp_path / "qemu_args.json"
+    bad_args = tmp_path / "bad.args"
+    text_args.write_text("-m 512M\n# comment\n-smp 2\n", encoding="utf-8")
+    json_args.write_text(json.dumps(["-cpu", "max"]), encoding="utf-8")
+    bad_args.write_text("-device virtio-net-pci\n", encoding="utf-8")
+
+    args = qemu_prompt_bench.load_qemu_args_files([text_args, json_args])
+    command = qemu_prompt_bench.build_command("qemu-system-x86_64", image, args)
+
+    assert args == ["-m", "512M", "-smp", "2", "-cpu", "max"]
+    assert command[1:3] == ["-nic", "none"]
+    assert "-cpu" in command
+
+    try:
+        qemu_prompt_bench.build_command(
+            "qemu-system-x86_64",
+            image,
+            qemu_prompt_bench.load_qemu_args_files([bad_args]),
+        )
+    except ValueError as exc:
+        assert "network device" in str(exc)
+    else:
+        raise AssertionError("expected args-file network device rejection")
+
+
 def test_load_prompt_cases_json_and_text(tmp_path: Path) -> None:
     prompt_json = tmp_path / "prompts.json"
     prompt_text = tmp_path / "prompts.txt"
@@ -162,6 +190,36 @@ def test_cli_dry_run_validates_without_launching_qemu(tmp_path: Path, capsys) ->
     assert "QEMU Prompt Benchmark Dry Run" in markdown
     assert "Total launches: 3" in markdown
     assert "Environment" in markdown
+
+
+def test_cli_dry_run_accepts_qemu_args_file(tmp_path: Path, capsys) -> None:
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    args_file = tmp_path / "qemu.args"
+    output_dir = tmp_path / "results"
+    prompts.write_text('{"prompt_id":"one","prompt":"A"}\n', encoding="utf-8")
+    args_file.write_text("-m 384M\n-smp 2\n", encoding="utf-8")
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--output-dir",
+            str(output_dir),
+            "--qemu-args-file",
+            str(args_file),
+            "--dry-run",
+        ]
+    )
+
+    assert status == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["command"][1:3] == ["-nic", "none"]
+    assert "-m" in payload["command"]
+    assert "384M" in payload["command"]
+    assert "-smp" in payload["command"]
 
 
 def test_cli_writes_result_file_with_fake_qemu(tmp_path: Path) -> None:

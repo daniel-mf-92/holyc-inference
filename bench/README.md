@@ -186,6 +186,11 @@ serial output, extracts token timing records, and writes normalized JSON to
 `bench/results/`. The runner always injects `-nic none` and rejects conflicting
 network flags such as `-netdev` or virtual NIC devices, including legacy QEMU
 NIC models such as e1000, ne2k, pcnet, rtl8139, usb-net, virtio-net, and vmxnet.
+Extra QEMU options can be passed one token at a time with `--qemu-arg`, after
+`--`, or from local `--qemu-args-file` files. Argument files are offline-only:
+`.json` files must contain a string array, while other files use shell-style
+tokenization with `#` comments. Loaded file tokens go through the same air-gap
+network rejection before any dry run or guest launch.
 
 Use `--warmup N` to launch each prompt before measurement without mixing those
 runs into throughput dashboards, and `--repeat N` to run every prompt multiple
@@ -251,6 +256,7 @@ python3 bench/qemu_prompt_bench.py \
   --require-tokens \
   --require-tok-per-s \
   --min-tokens 16 \
+  --qemu-args-file bench/fixtures/local-qemu.args \
   -- -m 512M
 ```
 
@@ -290,6 +296,9 @@ profiles, models, and quantization formats. Each cell writes an isolated
 matrix summary is written to `bench/results/bench_matrix_latest.json`, `.md`,
 `.csv`, and `bench_matrix_junit_latest.xml`. QEMU launches still flow through
 the air-gap guard that injects `-nic none` and rejects NIC/network arguments.
+Matrix-level and per-axis QEMU options may be declared with `qemu_args`,
+`qemu_args_file`, or `qemu_args_files`; file paths are resolved relative to the
+matrix JSON file and are validated before cells are launched.
 Each matrix cell records the
 prompt-suite SHA256 from its underlying prompt benchmark report so matrix
 comparisons can reject accidental prompt drift.
