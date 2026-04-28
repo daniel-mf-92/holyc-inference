@@ -338,7 +338,9 @@ prompt aggregate so CI can publish compact latency, throughput, prompt-byte,
 and memory rollups without parsing JSON. JSON and Markdown reports also include
 host provenance for reproducibility: platform, machine, Python version, CPU
 count, QEMU binary/path, QEMU version when discoverable, and a stable SHA256
-fingerprint of the QEMU command line.
+fingerprint of the QEMU command line. They also record input artifact metadata
+for the disk image path and any `--qemu-args-file` sources; pass `--hash-image`
+when the disk image digest should be recorded alongside size and mtime.
 
 Prompt files can be JSON, JSONL, or plain text split with `---`. Guest output may
 include a JSON line such as:
@@ -415,6 +417,7 @@ python3 bench/qemu_prompt_bench.py \
   --require-host-child-rss \
   --max-host-child-rss-bytes 1073741824 \
   --qemu-args-file bench/fixtures/local-qemu.args \
+  --hash-image \
   -- -m 512M
 ```
 
@@ -435,7 +438,9 @@ These artifacts record the exact `-nic none` command, the command SHA256
 fingerprint, prompt-suite hash, launch-plan SHA256, warmup count, repeat count,
 configured launch budget, and planned launch totals for CI review without
 booting a guest, plus the same host/QEMU provenance fields used by measured
-benchmark reports.
+benchmark reports. Dry-run JSON, Markdown, CSV, and JUnit also include disk
+image metadata and SHA256 hashes for any local QEMU args files, making reviewed
+launch plans reproducible before a VM is started.
 
 `qemu_source_audit.py` statically scans host-side docs/config/shell-like files
 for literal `qemu-system*` launch snippets and applies the same air-gap command

@@ -142,6 +142,36 @@ def command_hash(command: list[str]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def input_file_metadata(path: Path, *, include_sha256: bool = False) -> dict[str, Any]:
+    metadata: dict[str, Any] = {
+        "path": str(path),
+        "exists": path.exists(),
+        "size_bytes": None,
+        "mtime_ns": None,
+        "sha256": None,
+    }
+    if not path.exists():
+        return metadata
+    stat = path.stat()
+    metadata["size_bytes"] = stat.st_size
+    metadata["mtime_ns"] = stat.st_mtime_ns
+    if include_sha256:
+        metadata["sha256"] = file_sha256(path)
+    return metadata
+
+
+def qemu_args_files_metadata(paths: Iterable[Path]) -> list[dict[str, Any]]:
+    return [input_file_metadata(path, include_sha256=True) for path in paths]
+
+
 def prompt_bytes(prompt: str) -> int:
     return len(prompt.encode("utf-8"))
 
@@ -1136,6 +1166,8 @@ def report_status(all_runs: list[BenchRun], findings: list[dict[str, Any]]) -> s
 
 
 def markdown_report(report: dict[str, Any]) -> str:
+    image = report.get("image") or {}
+    qemu_args_files = report.get("qemu_args_files") if isinstance(report.get("qemu_args_files"), list) else []
     lines = [
         "# QEMU Prompt Benchmark",
         "",
@@ -1149,6 +1181,23 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Runs: {len(report['benchmarks'])}",
         "",
     ]
+    if image or qemu_args_files:
+        lines.extend(
+            [
+                "## Inputs",
+                "",
+                "| Image | Exists | Size bytes | SHA256 | QEMU args files |",
+                "| --- | --- | ---: | --- | ---: |",
+                "| {path} | {exists} | {size_bytes} | {sha256} | {args_files} |".format(
+                    path=format_summary_value(image.get("path")),
+                    exists=format_summary_value(image.get("exists")),
+                    size_bytes=format_summary_value(image.get("size_bytes")),
+                    sha256=format_summary_value(image.get("sha256")),
+                    args_files=len(qemu_args_files),
+                ),
+                "",
+            ]
+        )
     suite = report.get("suite_summary") or {}
     if suite:
         lines.extend(
@@ -1248,6 +1297,8 @@ def markdown_dry_run_report(report: dict[str, Any]) -> str:
     prompt_suite = report.get("prompt_suite") or {}
     command = report.get("command") or []
     environment = report.get("environment") or {}
+    image = report.get("image") or {}
+    qemu_args_files = report.get("qemu_args_files") if isinstance(report.get("qemu_args_files"), list) else []
     launch_plan = report.get("launch_plan") if isinstance(report.get("launch_plan"), list) else []
     lines = [
         "# QEMU Prompt Benchmark Dry Run",
@@ -1268,6 +1319,40 @@ def markdown_dry_run_report(report: dict[str, Any]) -> str:
         " ".join(command),
         "```",
     ]
+    if image or qemu_args_files:
+        lines.extend(
+            [
+                "",
+                "## Inputs",
+                "",
+                "| Image | Exists | Size bytes | SHA256 | QEMU args files |",
+                "| --- | --- | ---: | --- | ---: |",
+                "| {path} | {exists} | {size_bytes} | {sha256} | {args_files} |".format(
+                    path=format_summary_value(image.get("path")),
+                    exists=format_summary_value(image.get("exists")),
+                    size_bytes=format_summary_value(image.get("size_bytes")),
+                    sha256=format_summary_value(image.get("sha256")),
+                    args_files=len(qemu_args_files),
+                ),
+            ]
+        )
+        if qemu_args_files:
+            lines.extend(
+                [
+                    "",
+                    "| QEMU args file | Exists | Size bytes | SHA256 |",
+                    "| --- | --- | ---: | --- |",
+                ]
+            )
+            for item in qemu_args_files:
+                lines.append(
+                    "| {path} | {exists} | {size_bytes} | {sha256} |".format(
+                        path=format_summary_value(item.get("path")),
+                        exists=format_summary_value(item.get("exists")),
+                        size_bytes=format_summary_value(item.get("size_bytes")),
+                        sha256=format_summary_value(item.get("sha256")),
+                    )
+                )
     if launch_plan:
         lines.extend(
             [
@@ -1326,6 +1411,8 @@ def dry_run_payload(
     repeat: int,
     max_launches: int | None = None,
     environment: dict[str, Any] | None = None,
+    image: dict[str, Any] | None = None,
+    qemu_args_files: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     prompt_count = len(prompts)
     planned_warmups = prompt_count * warmup
@@ -1342,6 +1429,8 @@ def dry_run_payload(
         "prompt_count": prompt_count,
         "prompt_suite": prompt_suite_metadata(prompts_path, prompts),
         "environment": environment or {},
+        "image": image or {},
+        "qemu_args_files": qemu_args_files or [],
         "warmup": warmup,
         "repeat": repeat,
         "max_launches": max_launches,
@@ -1388,6 +1477,8 @@ def write_dry_run_report(report: dict[str, Any], output_dir: Path) -> Path:
 def write_dry_run_csv_report(report: dict[str, Any], path: Path) -> None:
     prompt_suite = report.get("prompt_suite") or {}
     command = report.get("command") or []
+    image = report.get("image") or {}
+    qemu_args_files = report.get("qemu_args_files") if isinstance(report.get("qemu_args_files"), list) else []
     fields = [
         "generated_at",
         "status",
@@ -1404,6 +1495,11 @@ def write_dry_run_csv_report(report: dict[str, Any], path: Path) -> None:
         "planned_measured_launches",
         "planned_total_launches",
         "max_launches",
+        "image_path",
+        "image_exists",
+        "image_size_bytes",
+        "image_sha256",
+        "qemu_args_file_count",
         "command",
     ]
     row = {
@@ -1422,6 +1518,11 @@ def write_dry_run_csv_report(report: dict[str, Any], path: Path) -> None:
         "planned_measured_launches": report.get("planned_measured_launches"),
         "planned_total_launches": report.get("planned_total_launches"),
         "max_launches": report.get("max_launches"),
+        "image_path": image.get("path"),
+        "image_exists": image.get("exists"),
+        "image_size_bytes": image.get("size_bytes"),
+        "image_sha256": image.get("sha256"),
+        "qemu_args_file_count": len(qemu_args_files),
         "command": json.dumps(command, separators=(",", ":")),
     }
     with path.open("w", newline="", encoding="utf-8") as handle:
@@ -1465,6 +1566,8 @@ def write_dry_run_launch_csv_report(report: dict[str, Any], path: Path) -> None:
 def write_dry_run_junit_report(report: dict[str, Any], path: Path) -> None:
     command = report.get("command") or []
     command_text = " ".join(command) if isinstance(command, list) else str(command)
+    image = report.get("image") or {}
+    qemu_args_files = report.get("qemu_args_files") if isinstance(report.get("qemu_args_files"), list) else []
     suite = ET.Element(
         "testsuite",
         {
@@ -1498,6 +1601,17 @@ def write_dry_run_junit_report(report: dict[str, Any], path: Path) -> None:
             "property",
             {"name": name, "value": format_summary_value(report.get(name))},
         )
+    for name in ("path", "exists", "size_bytes", "sha256"):
+        ET.SubElement(
+            properties,
+            "property",
+            {"name": f"image_{name}", "value": format_summary_value(image.get(name))},
+        )
+    ET.SubElement(
+        properties,
+        "property",
+        {"name": "qemu_args_file_count", "value": str(len(qemu_args_files))},
+    )
     ET.SubElement(properties, "property", {"name": "command", "value": command_text})
     ET.indent(suite)
     ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
@@ -1531,6 +1645,8 @@ def write_report(
     max_host_child_rss_bytes: int | None = None,
     max_launches: int | None = None,
     environment: dict[str, Any] | None = None,
+    image: dict[str, Any] | None = None,
+    qemu_args_files: list[dict[str, Any]] | None = None,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     warmup_runs = warmups or []
@@ -1567,6 +1683,8 @@ def write_report(
         "status": report_status(all_runs, findings + telemetry),
         "prompt_suite": prompt_suite or {},
         "environment": environment or {},
+        "image": image or {},
+        "qemu_args_files": qemu_args_files or [],
         "command_sha256": command_hash(all_runs[0].command) if all_runs else command_hash([]),
         "max_launches": max_launches,
         "planned_warmup_launches": len(warmup_runs),
@@ -1954,6 +2072,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--profile", default="default")
     parser.add_argument("--model", default="")
     parser.add_argument("--quantization", default="")
+    parser.add_argument(
+        "--hash-image",
+        action="store_true",
+        help="Record a SHA-256 digest for the QEMU disk image in benchmark artifacts",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Validate and print command without launching QEMU")
     parser.add_argument("qemu_args", nargs=argparse.REMAINDER, help="Extra QEMU arguments after --")
     return parser
@@ -2022,6 +2145,8 @@ def main(argv: list[str] | None = None) -> int:
         trailing_qemu_args = args.qemu_args[1:] if args.qemu_args[:1] == ["--"] else args.qemu_args
         file_qemu_args = load_qemu_args_files(args.qemu_args_file)
         command = build_command(args.qemu_bin, args.image, file_qemu_args + args.qemu_arg + trailing_qemu_args)
+        image = input_file_metadata(args.image, include_sha256=args.hash_image)
+        qemu_args_files = qemu_args_files_metadata(args.qemu_args_file)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -2035,6 +2160,8 @@ def main(argv: list[str] | None = None) -> int:
             repeat=args.repeat,
             max_launches=args.max_launches,
             environment=host_environment(args.qemu_bin),
+            image=image,
+            qemu_args_files=qemu_args_files,
         )
         output = write_dry_run_report(report, args.output_dir)
         report["dry_run_report"] = str(output)
@@ -2082,6 +2209,8 @@ def main(argv: list[str] | None = None) -> int:
         max_host_child_rss_bytes=args.max_host_child_rss_bytes,
         max_launches=args.max_launches,
         environment=host_environment(args.qemu_bin),
+        image=image,
+        qemu_args_files=qemu_args_files,
     )
     report = json.loads(output.read_text(encoding="utf-8"))
     print(f"wrote_json={output}")

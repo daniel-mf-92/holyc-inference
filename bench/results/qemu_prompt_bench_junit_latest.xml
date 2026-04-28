@@ -1,5 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
-<testsuite name="holyc_qemu_prompt_bench" tests="6" failures="0" errors="0">
+<testsuite name="holyc_qemu_prompt_bench" tests="8" failures="0" errors="0">
+  <testcase classname="qemu_prompt_bench.warmup" name="synthetic-airgap-smoke:synthetic-smoke:Q4_0:smoke-short:1" />
+  <testcase classname="qemu_prompt_bench.warmup" name="synthetic-airgap-smoke:synthetic-smoke:Q4_0:smoke-code:1" />
   <testcase classname="qemu_prompt_bench.measured" name="synthetic-airgap-smoke:synthetic-smoke:Q4_0:smoke-short:1" />
   <testcase classname="qemu_prompt_bench.measured" name="synthetic-airgap-smoke:synthetic-smoke:Q4_0:smoke-short:2" />
   <testcase classname="qemu_prompt_bench.measured" name="synthetic-airgap-smoke:synthetic-smoke:Q4_0:smoke-short:3" />

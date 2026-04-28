@@ -187,6 +187,10 @@ def test_cli_dry_run_validates_without_launching_qemu(tmp_path: Path, capsys) ->
     assert payload["command"][1:3] == ["-nic", "none"]
     assert payload["command_sha256"] == qemu_prompt_bench.command_hash(payload["command"])
     assert len(payload["command_sha256"]) == 64
+    assert payload["image"]["path"] == str(image)
+    assert payload["image"]["exists"] is False
+    assert payload["image"]["sha256"] is None
+    assert payload["qemu_args_files"] == []
     assert payload["environment"]["qemu_bin"] == "qemu-system-x86_64"
     assert payload["environment"]["python"]
     assert payload["dry_run_report"] == str(output_dir / "qemu_prompt_bench_dry_run_latest.json")
@@ -197,6 +201,7 @@ def test_cli_dry_run_validates_without_launching_qemu(tmp_path: Path, capsys) ->
     assert "QEMU Prompt Benchmark Dry Run" in markdown
     assert f"Command SHA256: {payload['command_sha256']}" in markdown
     assert "Total launches: 3" in markdown
+    assert "## Inputs" in markdown
     assert "Environment" in markdown
 
 
@@ -205,6 +210,7 @@ def test_cli_dry_run_accepts_qemu_args_file(tmp_path: Path, capsys) -> None:
     image = tmp_path / "temple.img"
     args_file = tmp_path / "qemu.args"
     output_dir = tmp_path / "results"
+    image.write_bytes(b"tiny image")
     prompts.write_text('{"prompt_id":"one","prompt":"A"}\n', encoding="utf-8")
     args_file.write_text("-m 384M\n-smp 2\n", encoding="utf-8")
 
@@ -218,16 +224,24 @@ def test_cli_dry_run_accepts_qemu_args_file(tmp_path: Path, capsys) -> None:
             str(output_dir),
             "--qemu-args-file",
             str(args_file),
+            "--hash-image",
             "--dry-run",
         ]
     )
 
     assert status == 0
     payload = json.loads(capsys.readouterr().out)
+    report = json.loads((output_dir / "qemu_prompt_bench_dry_run_latest.json").read_text(encoding="utf-8"))
     assert payload["command"][1:3] == ["-nic", "none"]
     assert "-m" in payload["command"]
     assert "384M" in payload["command"]
     assert "-smp" in payload["command"]
+    assert payload["image"]["exists"] is True
+    assert payload["image"]["size_bytes"] == len(b"tiny image")
+    assert payload["image"]["sha256"] == qemu_prompt_bench.file_sha256(image)
+    assert payload["qemu_args_files"][0]["path"] == str(args_file)
+    assert payload["qemu_args_files"][0]["sha256"] == qemu_prompt_bench.file_sha256(args_file)
+    assert report["image"]["sha256"] == payload["image"]["sha256"]
 
 
 def test_cli_writes_result_file_with_fake_qemu(tmp_path: Path) -> None:
@@ -279,6 +293,9 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
     assert report["benchmarks"][0]["command"][1:3] == ["-nic", "none"]
     assert report["command_sha256"] == report["benchmarks"][0]["command_sha256"]
     assert report["command_sha256"] == qemu_prompt_bench.command_hash(report["benchmarks"][0]["command"])
+    assert report["image"]["path"] == str(image)
+    assert report["image"]["exists"] is False
+    assert report["qemu_args_files"] == []
     assert report["environment"]["qemu_bin"] == str(fake_qemu)
     assert report["environment"]["qemu_path"] == str(fake_qemu)
     assert report["environment"]["qemu_version"] is None

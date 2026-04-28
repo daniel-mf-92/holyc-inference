@@ -1,16 +1,21 @@
 <?xml version='1.0' encoding='utf-8'?>
 <testsuite name="holyc_qemu_prompt_bench_dry_run" tests="1" failures="0" errors="0">
-  <testcase classname="qemu_prompt_bench.dry_run" name="72742a3c184093a30f9923158e9d8f9f87376e61ba1ff2368bef36920abe9755">
+  <testcase classname="qemu_prompt_bench.dry_run" name="cd63fce9b104ed8c38566a736230f0f586e388a4959cc554564571547acc6e6a">
     <properties>
       <property name="status" value="planned" />
       <property name="prompt_count" value="2" />
       <property name="planned_warmup_launches" value="2" />
-      <property name="planned_measured_launches" value="4" />
-      <property name="planned_total_launches" value="6" />
-      <property name="max_launches" value="6" />
-      <property name="command_sha256" value="72742a3c184093a30f9923158e9d8f9f87376e61ba1ff2368bef36920abe9755" />
-      <property name="launch_plan_sha256" value="b223f9a0e6d1633add356e01e86a8af33c00349530d3d8d9eba2b81b68013712" />
-      <property name="command" value="qemu-system-x86_64 -nic none -serial stdio -display none -drive file=/tmp/templeos.img,format=raw,if=ide -nic none -serial stdio" />
+      <property name="planned_measured_launches" value="6" />
+      <property name="planned_total_launches" value="8" />
+      <property name="max_launches" value="8" />
+      <property name="command_sha256" value="cd63fce9b104ed8c38566a736230f0f586e388a4959cc554564571547acc6e6a" />
+      <property name="launch_plan_sha256" value="9bf69bc6a6f70cc016dc9f5eb260948a2c5781fc504d397f36ac0e6992b91fff" />
+      <property name="image_path" value="/tmp/holyc-qemu-prompt-bench-smoke.img" />
+      <property name="image_exists" value="True" />
+      <property name="image_size_bytes" value="34" />
+      <property name="image_sha256" value="826b43bb0768a6f60e93d9a1bcc5e9aaef01185f91efc7c5df30b6c7c90349c4" />
+      <property name="qemu_args_file_count" value="0" />
+      <property name="command" value="bench/fixtures/qemu_synthetic_bench.py -nic none -serial stdio -display none -drive file=/tmp/holyc-qemu-prompt-bench-smoke.img,format=raw,if=ide -m 512M" />
     </properties>
   </testcase>
 </testsuite>
