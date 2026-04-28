@@ -31,6 +31,7 @@ class ManifestArtifact:
     artifact_type: str
     status: str
     generated_at: str
+    generated_age_seconds: int | None
     profile: str
     model: str
     quantization: str
@@ -47,6 +48,8 @@ class ManifestArtifact:
     current_commit_match: bool | None
     commit_status: str
     commit_findings: list[str]
+    freshness_status: str
+    freshness_findings: list[str]
     sha256: str
     bytes: int
 
@@ -81,6 +84,7 @@ def to_manifest_artifact(summary: bench_result_index.ArtifactSummary) -> Manifes
         artifact_type=summary.artifact_type,
         status=summary.status,
         generated_at=summary.generated_at,
+        generated_age_seconds=summary.generated_age_seconds,
         profile=summary.profile,
         model=summary.model,
         quantization=summary.quantization,
@@ -97,6 +101,8 @@ def to_manifest_artifact(summary: bench_result_index.ArtifactSummary) -> Manifes
         current_commit_match=summary.current_commit_match,
         commit_status=summary.commit_status,
         commit_findings=summary.commit_findings,
+        freshness_status=summary.freshness_status,
+        freshness_findings=summary.freshness_findings,
         sha256=file_sha256(path),
         bytes=path.stat().st_size,
     )
@@ -122,6 +128,7 @@ def manifest_status(artifacts: list[ManifestArtifact]) -> str:
         or item.command_airgap_status == "fail"
         or item.telemetry_status == "fail"
         or item.commit_status == "fail"
+        or item.freshness_status == "fail"
         for item in artifacts
     ):
         return "fail"
@@ -142,6 +149,10 @@ def has_commit_metadata_failures(artifacts: Iterable[ManifestArtifact]) -> bool:
 
 def has_stale_commits(artifacts: Iterable[ManifestArtifact]) -> bool:
     return any(artifact.current_commit_match is False for artifact in artifacts)
+
+
+def has_stale_artifacts(artifacts: Iterable[ManifestArtifact]) -> bool:
+    return any(artifact.freshness_status == "fail" for artifact in artifacts)
 
 
 def format_value(value: object) -> str:
@@ -167,14 +178,14 @@ def markdown_report(report: dict[str, object]) -> str:
     if latest:
         lines.extend(
             [
-                "| Key | Status | Air-gap | Telemetry | Commit | Runs | Warmups | Median tok/s | Max memory bytes | SHA256 | Source |",
-                "| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |",
+                "| Key | Status | Air-gap | Telemetry | Freshness | Commit | Runs | Warmups | Age seconds | Median tok/s | Max memory bytes | SHA256 | Source |",
+                "| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |",
             ]
         )
         for artifact in latest:
             lines.append(
-                "| {key} | {status} | {command_airgap_status} | {telemetry_status} | {commit_status}:{commit} | {measured_runs} | "
-                "{warmup_runs} | {median_tok_per_s} | {max_memory_bytes} | {sha256} | "
+                "| {key} | {status} | {command_airgap_status} | {telemetry_status} | {freshness_status} | {commit_status}:{commit} | {measured_runs} | "
+                "{warmup_runs} | {generated_age_seconds} | {median_tok_per_s} | {max_memory_bytes} | {sha256} | "
                 "{source} |".format(
                     **{key: format_value(value) for key, value in artifact.items()}
                 )
@@ -191,6 +202,7 @@ def write_csv(artifacts: list[ManifestArtifact], path: Path) -> None:
         "artifact_type",
         "status",
         "generated_at",
+        "generated_age_seconds",
         "profile",
         "model",
         "quantization",
@@ -207,6 +219,8 @@ def write_csv(artifacts: list[ManifestArtifact], path: Path) -> None:
         "current_commit_match",
         "commit_status",
         "commit_findings",
+        "freshness_status",
+        "freshness_findings",
         "sha256",
         "bytes",
     ]
@@ -217,6 +231,7 @@ def write_csv(artifacts: list[ManifestArtifact], path: Path) -> None:
             row = asdict(artifact)
             row["telemetry_findings"] = json.dumps(artifact.telemetry_findings, separators=(",", ":"))
             row["commit_findings"] = json.dumps(artifact.commit_findings, separators=(",", ":"))
+            row["freshness_findings"] = json.dumps(artifact.freshness_findings, separators=(",", ":"))
             writer.writerow({field: row[field] for field in fields})
 
 
@@ -226,12 +241,14 @@ def junit_report(report: dict[str, object]) -> str:
     airgap_failures = [row for row in history if row.get("command_airgap_status") == "fail"]
     telemetry_failures = [row for row in history if row.get("telemetry_status") == "fail"]
     commit_failures = [row for row in history if row.get("commit_status") == "fail"]
+    freshness_failures = [row for row in history if row.get("freshness_status") == "fail"]
     missing_latest = not report["latest_artifacts"]
     failures = (
         int(bool(failed_artifacts))
         + int(bool(airgap_failures))
         + int(bool(telemetry_failures))
         + int(bool(commit_failures))
+        + int(bool(freshness_failures))
         + int(missing_latest)
     )
 
@@ -239,7 +256,7 @@ def junit_report(report: dict[str, object]) -> str:
         "testsuite",
         {
             "name": "holyc_bench_artifact_manifest",
-            "tests": "5",
+            "tests": "6",
             "failures": str(failures),
         },
     )
@@ -310,6 +327,21 @@ def junit_report(report: dict[str, object]) -> str:
             for row in commit_failures
         )
 
+    freshness_case = ET.SubElement(suite, "testcase", {"name": "artifact_freshness"})
+    if freshness_failures:
+        failure = ET.SubElement(
+            freshness_case,
+            "failure",
+            {
+                "type": "benchmark_artifact_stale",
+                "message": f"{len(freshness_failures)} benchmark artifact(s) failed freshness policy",
+            },
+        )
+        failure.text = "\n".join(
+            f"{row.get('source', '')}: {json.dumps(row.get('freshness_findings', []), separators=(',', ':'))}"
+            for row in freshness_failures
+        )
+
     return ET.tostring(suite, encoding="unicode") + "\n"
 
 
@@ -371,14 +403,36 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Return non-zero if any manifest artifact commit differs from the current git commit",
     )
+    parser.add_argument(
+        "--max-artifact-age-hours",
+        type=float,
+        help="Mark artifacts as stale if generated_at is older than this many hours",
+    )
+    parser.add_argument(
+        "--fail-on-stale-artifact",
+        action="store_true",
+        help="Return non-zero if any artifact exceeds --max-artifact-age-hours",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     inputs = args.input or [Path("bench/results")]
+    max_artifact_age_seconds = None
+    if args.max_artifact_age_hours is not None:
+        if args.max_artifact_age_hours < 0:
+            print("error: --max-artifact-age-hours must be non-negative", file=sys.stderr)
+            return 2
+        max_artifact_age_seconds = int(args.max_artifact_age_hours * 3600)
+    elif args.fail_on_stale_artifact:
+        print("error: --fail-on-stale-artifact requires --max-artifact-age-hours", file=sys.stderr)
+        return 2
     try:
-        summaries = bench_result_index.load_summaries(inputs)
+        summaries = bench_result_index.load_summaries(
+            inputs,
+            max_artifact_age_seconds=max_artifact_age_seconds,
+        )
         output, status, artifacts = write_manifest(summaries, args.output_dir)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -387,6 +441,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"wrote_json={output}")
     print(f"status={status}")
     print(f"artifacts={len(summaries)}")
+    print(f"freshness_failures={sum(1 for artifact in artifacts if artifact.freshness_status == 'fail')}")
     if args.fail_on_airgap and has_airgap_failures(artifacts):
         return 1
     if args.fail_on_telemetry and has_telemetry_failures(artifacts):
@@ -394,6 +449,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.fail_on_commit_metadata and has_commit_metadata_failures(artifacts):
         return 1
     if args.fail_on_stale_commit and has_stale_commits(artifacts):
+        return 1
+    if args.fail_on_stale_artifact and has_stale_artifacts(artifacts):
         return 1
     return 0
 

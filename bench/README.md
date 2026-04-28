@@ -423,18 +423,22 @@ records SHA256 and byte size for each benchmark JSON, retains compact history,
 selects the newest artifact for each profile/model/quantization/prompt-suite
 key, keeps the same recorded-command air-gap and commit metadata checks, and writes
 `bench_artifact_manifest_junit_latest.xml` so CI can surface failed artifacts,
-air-gap violations, missing telemetry, inconsistent commit metadata, and empty
-manifests directly. Empty manifests are marked failed so missing benchmark
-uploads do not pass silently. For current-job manifests, `--fail-on-stale-commit`
-returns non-zero when any artifact was produced from a different commit than
-the current checkout. Use `--fail-on-airgap`, `--fail-on-telemetry`, and
-`--fail-on-commit-metadata` to gate those failure classes independently.
+air-gap violations, missing telemetry, stale artifacts, inconsistent commit
+metadata, and empty manifests directly. Empty manifests are marked failed so
+missing benchmark uploads do not pass silently. For current-job manifests,
+`--fail-on-stale-commit` returns non-zero when any artifact was produced from a
+different commit than the current checkout. `--max-artifact-age-hours` records
+artifact freshness status, and `--fail-on-stale-artifact` returns non-zero when
+any artifact exceeds that age. Use `--fail-on-airgap`, `--fail-on-telemetry`,
+and `--fail-on-commit-metadata` to gate those failure classes independently.
 
 ```bash
 python3 bench/bench_artifact_manifest.py \
   --input bench/results \
   --output-dir bench/results \
   --fail-on-stale-commit \
+  --max-artifact-age-hours 6 \
+  --fail-on-stale-artifact \
   --fail-on-airgap \
   --fail-on-telemetry
 ```

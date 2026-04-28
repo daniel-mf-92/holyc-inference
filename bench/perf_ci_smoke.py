@@ -598,6 +598,103 @@ def main() -> int:
             print("manifest_commit_gate_failed_on_stale_only=true", file=sys.stderr)
             return completed.returncode
 
+        complete_manifest_fixture_dir = tmp_path / "complete_manifest_fixture"
+        complete_manifest_fixture_dir.mkdir()
+        complete_report = complete_manifest_fixture_dir / "qemu_prompt_bench_complete.json"
+        complete_payload = json.loads(incomplete_report.read_text(encoding="utf-8"))
+        complete_payload["suite_summary"] = {
+            "prompts": 1,
+            "tok_per_s_median": 88.0,
+            "memory_bytes_max": 123456,
+        }
+        complete_payload["benchmarks"][0]["tokens"] = 8
+        complete_payload["benchmarks"][0]["elapsed_us"] = 90909
+        complete_report.write_text(json.dumps(complete_payload) + "\n", encoding="utf-8")
+
+        manifest_fresh_output_dir = tmp_path / "manifest_fresh_output"
+        manifest_fresh_command = [
+            sys.executable,
+            str(ROOT / "bench" / "bench_artifact_manifest.py"),
+            "--input",
+            str(complete_manifest_fixture_dir),
+            "--output-dir",
+            str(manifest_fresh_output_dir),
+            "--max-artifact-age-hours",
+            "1000000",
+            "--fail-on-stale-artifact",
+        ]
+        completed = subprocess.run(
+            manifest_fresh_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode != 0:
+            sys.stdout.write(completed.stdout)
+            sys.stderr.write(completed.stderr)
+            print("manifest_fresh_gate_failed=true", file=sys.stderr)
+            return completed.returncode
+        manifest_report = json.loads(
+            (manifest_fresh_output_dir / "bench_artifact_manifest_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        latest_artifact = manifest_report["latest_artifacts"][0]
+        if latest_artifact.get("freshness_status") != "pass":
+            print("missing_manifest_freshness_pass=true", file=sys.stderr)
+            return 1
+        if latest_artifact.get("generated_age_seconds") is None:
+            print("missing_manifest_artifact_age=true", file=sys.stderr)
+            return 1
+        if "Freshness" not in (
+            manifest_fresh_output_dir / "bench_artifact_manifest_latest.md"
+        ).read_text(encoding="utf-8"):
+            print("missing_manifest_freshness_markdown=true", file=sys.stderr)
+            return 1
+        if "freshness_status" not in (
+            manifest_fresh_output_dir / "bench_artifact_manifest_latest.csv"
+        ).read_text(encoding="utf-8"):
+            print("missing_manifest_freshness_csv=true", file=sys.stderr)
+            return 1
+        manifest_junit_root = ET.parse(
+            manifest_fresh_output_dir / "bench_artifact_manifest_junit_latest.xml"
+        ).getroot()
+        if manifest_junit_root.attrib.get("name") != "holyc_bench_artifact_manifest":
+            print("missing_manifest_junit_suite=true", file=sys.stderr)
+            return 1
+        if manifest_junit_root.attrib.get("failures") != "0":
+            print("unexpected_manifest_junit_failures=true", file=sys.stderr)
+            return 1
+
+        stale_manifest_fixture_dir = tmp_path / "stale_manifest_fixture"
+        stale_manifest_fixture_dir.mkdir()
+        stale_report = stale_manifest_fixture_dir / "qemu_prompt_bench_stale.json"
+        stale_payload = json.loads(complete_report.read_text(encoding="utf-8"))
+        stale_payload["generated_at"] = "2000-01-01T00:00:00Z"
+        stale_report.write_text(json.dumps(stale_payload) + "\n", encoding="utf-8")
+        stale_manifest_command = [
+            sys.executable,
+            str(ROOT / "bench" / "bench_artifact_manifest.py"),
+            "--input",
+            str(stale_manifest_fixture_dir),
+            "--output-dir",
+            str(tmp_path / "stale_manifest_output"),
+            "--max-artifact-age-hours",
+            "1",
+            "--fail-on-stale-artifact",
+        ]
+        completed = subprocess.run(
+            stale_manifest_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("manifest_stale_gate_did_not_fail=true", file=sys.stderr)
+            return 1
+
     print("perf_ci_smoke=ok")
     return 0
 

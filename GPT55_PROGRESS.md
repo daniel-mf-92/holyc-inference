@@ -98,3 +98,4 @@
 2026-04-28T05:32:49Z | Added QEMU prompt benchmark host-overhead telemetry gates with smoke coverage and refreshed benchmark artifacts.
 2026-04-28T05:55:23Z | Added build comparison TTFT deltas and opt-in first-token latency growth gating with refreshed reports.
 2026-04-28T06:05:31Z | Added quant audit zero-scale/nonzero-payload detection with opt-in failure gate, docs, tests, and refreshed reports.
+2026-04-28T06:11:51Z | Added benchmark artifact manifest freshness telemetry and opt-in stale-artifact gating with refreshed reports.
