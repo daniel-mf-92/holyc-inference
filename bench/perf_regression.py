@@ -40,6 +40,7 @@ class PerfRecord:
     us_per_token: float | None = None
     wall_us_per_token: float | None = None
     memory_bytes: int | None = None
+    host_child_peak_rss_bytes: int | None = None
     tokens: int | None = None
     ttft_us: int | None = None
     host_overhead_pct: float | None = None
@@ -74,6 +75,7 @@ class CommitPoint:
     us_per_token_records: int
     wall_us_per_token_records: int
     memory_records: int
+    host_child_peak_rss_records: int
     token_records: int
     ttft_us_records: int
     host_overhead_records: int
@@ -93,6 +95,7 @@ class CommitPoint:
     tok_per_s_cv_pct: float | None
     wall_tok_per_s_cv_pct: float | None
     max_memory_bytes: int | None
+    max_host_child_peak_rss_bytes: int | None
     prompt_suite_sha256: str
 
 
@@ -185,6 +188,9 @@ class ComparisonRow:
     max_memory_bytes_baseline: int | None
     max_memory_bytes_candidate: int | None
     max_memory_bytes_delta_pct: float | None
+    max_host_child_peak_rss_bytes_baseline: int | None
+    max_host_child_peak_rss_bytes_candidate: int | None
+    max_host_child_peak_rss_bytes_delta_pct: float | None
     median_tokens_baseline: float | None
     median_tokens_candidate: float | None
     median_tokens_delta_pct: float | None
@@ -287,6 +293,12 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
         or row.get("rss_bytes")
         or row.get("peak_memory_bytes")
     )
+    host_child_peak_rss_bytes = parse_int(
+        row.get("host_child_peak_rss_bytes")
+        or row.get("host_child_peak_rss_bytes_max")
+        or row.get("qemu_peak_rss_bytes")
+        or row.get("child_peak_rss_bytes")
+    )
     tokens = parse_int(
         row.get("tokens")
         or row.get("output_tokens")
@@ -312,6 +324,7 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
         and us_per_token is None
         and wall_us_per_token is None
         and memory_bytes is None
+        and host_child_peak_rss_bytes is None
         and tokens is None
         and ttft_us is None
         and host_overhead_pct is None
@@ -332,6 +345,7 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
         us_per_token=us_per_token,
         wall_us_per_token=wall_us_per_token,
         memory_bytes=memory_bytes,
+        host_child_peak_rss_bytes=host_child_peak_rss_bytes,
         tokens=tokens,
         ttft_us=ttft_us,
         host_overhead_pct=host_overhead_pct,
@@ -443,6 +457,11 @@ def summarize(records: list[PerfRecord]) -> dict[str, dict[str, Any]]:
             if record.wall_us_per_token is not None
         ]
         memory_values = [record.memory_bytes for record in key_records if record.memory_bytes is not None]
+        host_child_peak_rss_values = [
+            record.host_child_peak_rss_bytes
+            for record in key_records
+            if record.host_child_peak_rss_bytes is not None
+        ]
         token_values = [record.tokens for record in key_records if record.tokens is not None]
         ttft_values = [record.ttft_us for record in key_records if record.ttft_us is not None]
         host_overhead_values = [
@@ -473,6 +492,9 @@ def summarize(records: list[PerfRecord]) -> dict[str, dict[str, Any]]:
                 statistics.median(host_overhead_values) if host_overhead_values else None
             ),
             "max_memory_bytes": max(memory_values) if memory_values else None,
+            "max_host_child_peak_rss_bytes": (
+                max(host_child_peak_rss_values) if host_child_peak_rss_values else None
+            ),
         }
     return summaries
 
@@ -514,6 +536,11 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
             if record.wall_us_per_token is not None
         ]
         memory_values = [record.memory_bytes for record in commit_records if record.memory_bytes is not None]
+        host_child_peak_rss_values = [
+            record.host_child_peak_rss_bytes
+            for record in commit_records
+            if record.host_child_peak_rss_bytes is not None
+        ]
         token_values = [record.tokens for record in commit_records if record.tokens is not None]
         ttft_values = [record.ttft_us for record in commit_records if record.ttft_us is not None]
         host_overhead_values = [
@@ -537,6 +564,7 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                 us_per_token_records=len(us_per_token_values),
                 wall_us_per_token_records=len(wall_us_per_token_values),
                 memory_records=len(memory_values),
+                host_child_peak_rss_records=len(host_child_peak_rss_values),
                 token_records=len(token_values),
                 ttft_us_records=len(ttft_values),
                 host_overhead_records=len(host_overhead_values),
@@ -564,6 +592,9 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                 tok_per_s_cv_pct=tps_cv_pct,
                 wall_tok_per_s_cv_pct=wall_tps_cv_pct,
                 max_memory_bytes=max(memory_values) if memory_values else None,
+                max_host_child_peak_rss_bytes=(
+                    max(host_child_peak_rss_values) if host_child_peak_rss_values else None
+                ),
                 prompt_suite_sha256=";".join(prompt_hashes),
             )
         )
@@ -668,6 +699,12 @@ def comparison_rows(
                 max_memory_bytes_delta_pct=growth_delta_pct(
                     baseline.max_memory_bytes, candidate.max_memory_bytes
                 ),
+                max_host_child_peak_rss_bytes_baseline=baseline.max_host_child_peak_rss_bytes,
+                max_host_child_peak_rss_bytes_candidate=candidate.max_host_child_peak_rss_bytes,
+                max_host_child_peak_rss_bytes_delta_pct=growth_delta_pct(
+                    baseline.max_host_child_peak_rss_bytes,
+                    candidate.max_host_child_peak_rss_bytes,
+                ),
                 median_tokens_baseline=baseline.median_tokens,
                 median_tokens_candidate=candidate.median_tokens,
                 median_tokens_delta_pct=throughput_delta_pct(
@@ -698,6 +735,7 @@ def detect_regressions(
     records: list[PerfRecord],
     tok_threshold_pct: float,
     memory_threshold_pct: float,
+    host_child_peak_rss_threshold_pct: float | None = None,
     wall_tok_threshold_pct: float | None = None,
     ttft_threshold_pct: float | None = None,
     p95_ttft_threshold_pct: float | None = None,
@@ -878,6 +916,33 @@ def detect_regressions(
                         candidate_value=float(candidate.max_memory_bytes),
                         delta_pct=delta_pct,
                         threshold_pct=memory_threshold_pct,
+                    )
+                )
+
+        if (
+            host_child_peak_rss_threshold_pct is not None
+            and baseline.max_host_child_peak_rss_bytes
+            and candidate.max_host_child_peak_rss_bytes is not None
+        ):
+            delta_pct = (
+                (
+                    candidate.max_host_child_peak_rss_bytes
+                    - baseline.max_host_child_peak_rss_bytes
+                )
+                * 100.0
+                / baseline.max_host_child_peak_rss_bytes
+            )
+            if delta_pct > host_child_peak_rss_threshold_pct:
+                regressions.append(
+                    Regression(
+                        key=key,
+                        metric="host_child_peak_rss_bytes",
+                        baseline_commit=baseline.commit,
+                        candidate_commit=candidate.commit,
+                        baseline_value=float(baseline.max_host_child_peak_rss_bytes),
+                        candidate_value=float(candidate.max_host_child_peak_rss_bytes),
+                        delta_pct=delta_pct,
+                        threshold_pct=host_child_peak_rss_threshold_pct,
                     )
                 )
 
@@ -1126,6 +1191,7 @@ def detect_telemetry_coverage_violations(
     require_us_per_token: bool = False,
     require_wall_us_per_token: bool = False,
     require_memory: bool = False,
+    require_host_child_peak_rss: bool = False,
     require_tokens: bool = False,
     require_ttft_us: bool = False,
     require_host_overhead_pct: bool = False,
@@ -1136,6 +1202,11 @@ def detect_telemetry_coverage_violations(
         ("us_per_token", require_us_per_token, "us_per_token_records"),
         ("wall_us_per_token", require_wall_us_per_token, "wall_us_per_token_records"),
         ("memory_bytes", require_memory, "memory_records"),
+        (
+            "host_child_peak_rss_bytes",
+            require_host_child_peak_rss,
+            "host_child_peak_rss_records",
+        ),
         ("tokens", require_tokens, "token_records"),
         ("ttft_us", require_ttft_us, "ttft_us_records"),
         ("host_overhead_pct", require_host_overhead_pct, "host_overhead_records"),
@@ -1172,6 +1243,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Token latency regressions: {len([row for row in report['regressions'] if row['metric'] in {'us_per_token', 'wall_us_per_token'}])}",
         f"P95 TTFT regressions: {len([row for row in report['regressions'] if row['metric'] == 'ttft_us_p95'])}",
         f"Host overhead regressions: {len([row for row in report['regressions'] if row['metric'] == 'host_overhead_pct'])}",
+        f"Host child RSS regressions: {len([row for row in report['regressions'] if row['metric'] == 'host_child_peak_rss_bytes'])}",
         f"Token-count regressions: {len([row for row in report['regressions'] if row['metric'] == 'tokens'])}",
         f"Sample violations: {len(report['sample_violations'])}",
         f"Variability violations: {len(report['variability_violations'])}",
@@ -1286,9 +1358,9 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(["", "## Comparisons", ""])
     if report["comparisons"]:
         lines.append(
-            "| Key | Baseline | Candidate | Median tok/s Delta | P05 tok/s Delta | Wall tok/s Delta | P05 wall tok/s Delta | us/token Delta | Wall us/token Delta | Memory Delta | Token Drop | Median TTFT Delta | P95 TTFT Delta | Host Overhead Delta |"
+            "| Key | Baseline | Candidate | Median tok/s Delta | P05 tok/s Delta | Wall tok/s Delta | P05 wall tok/s Delta | us/token Delta | Wall us/token Delta | Memory Delta | Host RSS Delta | Token Drop | Median TTFT Delta | P95 TTFT Delta | Host Overhead Delta |"
         )
-        lines.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for comparison in report["comparisons"]:
             median_tps_delta = comparison["median_tok_per_s_delta_pct"]
             p05_tps_delta = comparison["p05_tok_per_s_delta_pct"]
@@ -1297,6 +1369,7 @@ def markdown_report(report: dict[str, Any]) -> str:
             us_per_token_delta = comparison["median_us_per_token_delta_pct"]
             wall_us_per_token_delta = comparison["median_wall_us_per_token_delta_pct"]
             memory_delta = comparison["max_memory_bytes_delta_pct"]
+            host_rss_delta = comparison["max_host_child_peak_rss_bytes_delta_pct"]
             token_delta = comparison["median_tokens_delta_pct"]
             ttft_delta = comparison["median_ttft_us_delta_pct"]
             p95_ttft_delta = comparison["p95_ttft_us_delta_pct"]
@@ -1316,6 +1389,7 @@ def markdown_report(report: dict[str, Any]) -> str:
                 else "-"
             )
             memory_cell = f"{memory_delta:.2f}%" if memory_delta is not None else "-"
+            host_rss_cell = f"{host_rss_delta:.2f}%" if host_rss_delta is not None else "-"
             token_cell = f"{token_delta:.2f}%" if token_delta is not None else "-"
             ttft_cell = f"{ttft_delta:.2f}%" if ttft_delta is not None else "-"
             p95_ttft_cell = f"{p95_ttft_delta:.2f}%" if p95_ttft_delta is not None else "-"
@@ -1325,7 +1399,8 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"{comparison['candidate_commit']} | {median_tps_cell} | {p05_tps_cell} | "
                 f"{wall_tps_cell} | {p05_wall_tps_cell} | "
                 f"{us_per_token_cell} | {wall_us_per_token_cell} | "
-                f"{memory_cell} | {token_cell} | {ttft_cell} | {p95_ttft_cell} | {overhead_cell} |"
+                f"{memory_cell} | {host_rss_cell} | {token_cell} | {ttft_cell} | "
+                f"{p95_ttft_cell} | {overhead_cell} |"
             )
     else:
         lines.append("No comparable baseline/candidate commit points found.")
@@ -1333,9 +1408,9 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(["", "## Commit Points", ""])
     if report["commit_points"]:
         lines.append(
-            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | us/token Records | Wall us/token Records | Memory Records | Token Records | TTFT Records | Host Overhead Records | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median TTFT us | P95 TTFT us | Median Host Overhead % | Tok/s CV | Wall Tok/s CV | Max Memory Bytes | Prompt Suite |"
+            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | us/token Records | Wall us/token Records | Memory Records | Host RSS Records | Token Records | TTFT Records | Host Overhead Records | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median TTFT us | P95 TTFT us | Median Host Overhead % | Tok/s CV | Wall Tok/s CV | Max Memory Bytes | Max Host RSS Bytes | Prompt Suite |"
         )
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
         for point in report["commit_points"]:
             p05_tps = point["p05_tok_per_s"]
             tps = point["median_tok_per_s"]
@@ -1353,6 +1428,7 @@ def markdown_report(report: dict[str, Any]) -> str:
             tps_cv = point["tok_per_s_cv_pct"]
             wall_tps_cv = point["wall_tok_per_s_cv_pct"]
             memory = point["max_memory_bytes"]
+            host_rss = point["max_host_child_peak_rss_bytes"]
             prompt_suite = point["prompt_suite_sha256"] or "-"
             p05_tps_cell = f"{p05_tps:.3f}" if p05_tps is not None else "-"
             tps_cell = f"{tps:.3f}" if tps is not None else "-"
@@ -1376,25 +1452,27 @@ def markdown_report(report: dict[str, Any]) -> str:
             tps_cv_cell = f"{tps_cv:.2f}%" if tps_cv is not None else "-"
             wall_tps_cv_cell = f"{wall_tps_cv:.2f}%" if wall_tps_cv is not None else "-"
             memory_cell = str(memory) if memory is not None else "-"
+            host_rss_cell = str(host_rss) if host_rss is not None else "-"
             lines.append(
                 f"| {point['key']} | {point['commit']} | {point['records']} | "
                 f"{point['tok_per_s_records']} | {point['wall_tok_per_s_records']} | "
                 f"{point['us_per_token_records']} | {point['wall_us_per_token_records']} | "
-                f"{point['memory_records']} | {point['token_records']} | {point['ttft_us_records']} | "
+                f"{point['memory_records']} | {point['host_child_peak_rss_records']} | "
+                f"{point['token_records']} | {point['ttft_us_records']} | "
                 f"{point['host_overhead_records']} | {p05_tps_cell} | {tps_cell} | "
                 f"{p05_wall_tps_cell} | {wall_tps_cell} | "
                 f"{us_per_token_cell} | {p95_us_per_token_cell} | "
                 f"{wall_us_per_token_cell} | {p95_wall_us_per_token_cell} | "
                 f"{tokens_cell} | {min_tokens_cell} | {ttft_cell} | {p95_ttft_cell} | {overhead_cell} | "
-                f"{tps_cv_cell} | {wall_tps_cv_cell} | {memory_cell} | {prompt_suite} |"
+                f"{tps_cv_cell} | {wall_tps_cv_cell} | {memory_cell} | {host_rss_cell} | {prompt_suite} |"
             )
     else:
         lines.append("No commit-level performance points found.")
 
     lines.extend(["", "## Latest Summary", ""])
     if report["summaries"]:
-        lines.append("| Key | Records | Latest Commit | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median TTFT us | P95 TTFT us | Median Host Overhead % | Max Memory Bytes |")
-        lines.append("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| Key | Records | Latest Commit | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median TTFT us | P95 TTFT us | Median Host Overhead % | Max Memory Bytes | Max Host RSS Bytes |")
+        lines.append("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for key, summary in report["summaries"].items():
             p05_tps = summary["p05_tok_per_s"]
             tps = summary["median_tok_per_s"]
@@ -1410,6 +1488,7 @@ def markdown_report(report: dict[str, Any]) -> str:
             p95_ttft = summary["p95_ttft_us"]
             overhead = summary["median_host_overhead_pct"]
             memory = summary["max_memory_bytes"]
+            host_rss = summary["max_host_child_peak_rss_bytes"]
             p05_tps_cell = f"{p05_tps:.3f}" if p05_tps is not None else "-"
             tps_cell = f"{tps:.3f}" if tps is not None else "-"
             p05_wall_tps_cell = f"{p05_wall_tps:.3f}" if p05_wall_tps is not None else "-"
@@ -1430,13 +1509,14 @@ def markdown_report(report: dict[str, Any]) -> str:
             p95_ttft_cell = f"{p95_ttft:.1f}" if p95_ttft is not None else "-"
             overhead_cell = f"{overhead:.3f}" if overhead is not None else "-"
             memory_cell = str(memory) if memory is not None else "-"
+            host_rss_cell = str(host_rss) if host_rss is not None else "-"
             lines.append(
                 f"| {key} | {summary['records']} | {summary['latest_commit']} | "
                 f"{p05_tps_cell} | {tps_cell} | {p05_wall_tps_cell} | {wall_tps_cell} | "
                 f"{us_per_token_cell} | {p95_us_per_token_cell} | "
                 f"{wall_us_per_token_cell} | {p95_wall_us_per_token_cell} | "
                 f"{tokens_cell} | {min_tokens_cell} | {ttft_cell} | {p95_ttft_cell} | "
-                f"{overhead_cell} | {memory_cell} |"
+                f"{overhead_cell} | {memory_cell} | {host_rss_cell} |"
             )
     else:
         lines.append("No performance records found.")
@@ -1744,6 +1824,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "us_per_token_records",
             "wall_us_per_token_records",
             "memory_records",
+            "host_child_peak_rss_records",
             "token_records",
             "ttft_us_records",
             "host_overhead_records",
@@ -1763,6 +1844,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "tok_per_s_cv_pct",
             "wall_tok_per_s_cv_pct",
             "max_memory_bytes",
+            "max_host_child_peak_rss_bytes",
             "prompt_suite_sha256",
         ],
     )
@@ -1812,6 +1894,9 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "max_memory_bytes_baseline",
             "max_memory_bytes_candidate",
             "max_memory_bytes_delta_pct",
+            "max_host_child_peak_rss_bytes_baseline",
+            "max_host_child_peak_rss_bytes_candidate",
+            "max_host_child_peak_rss_bytes_delta_pct",
             "median_tokens_baseline",
             "median_tokens_candidate",
             "median_tokens_delta_pct",
@@ -1884,6 +1969,7 @@ def build_report(
     records: list[PerfRecord],
     tok_threshold_pct: float,
     memory_threshold_pct: float,
+    host_child_peak_rss_threshold_pct: float | None = None,
     baseline_commit: str | None = None,
     candidate_commit: str | None = None,
     min_records_per_point: int = 1,
@@ -1904,6 +1990,7 @@ def build_report(
     require_us_per_token: bool = False,
     require_wall_us_per_token: bool = False,
     require_memory: bool = False,
+    require_host_child_peak_rss: bool = False,
     require_tokens: bool = False,
     require_ttft_us: bool = False,
     require_host_overhead_pct: bool = False,
@@ -1913,6 +2000,7 @@ def build_report(
         records,
         tok_threshold_pct,
         memory_threshold_pct,
+        host_child_peak_rss_threshold_pct=host_child_peak_rss_threshold_pct,
         wall_tok_threshold_pct=wall_tok_threshold_pct,
         ttft_threshold_pct=ttft_threshold_pct,
         p95_ttft_threshold_pct=p95_ttft_threshold_pct,
@@ -1941,6 +2029,7 @@ def build_report(
         require_us_per_token=require_us_per_token,
         require_wall_us_per_token=require_wall_us_per_token,
         require_memory=require_memory,
+        require_host_child_peak_rss=require_host_child_peak_rss,
         require_tokens=require_tokens,
         require_ttft_us=require_ttft_us,
         require_host_overhead_pct=require_host_overhead_pct,
@@ -1968,6 +2057,7 @@ def build_report(
         "thresholds": {
             "tok_regression_pct": tok_threshold_pct,
             "memory_regression_pct": memory_threshold_pct,
+            "host_child_peak_rss_regression_pct": host_child_peak_rss_threshold_pct,
             "wall_tok_regression_pct": wall_tok_threshold_pct,
             "ttft_regression_pct": ttft_threshold_pct,
             "p95_ttft_regression_pct": p95_ttft_threshold_pct,
@@ -1986,6 +2076,7 @@ def build_report(
             "require_us_per_token": require_us_per_token,
             "require_wall_us_per_token": require_wall_us_per_token,
             "require_memory": require_memory,
+            "require_host_child_peak_rss": require_host_child_peak_rss,
             "require_tokens": require_tokens,
             "require_ttft_us": require_ttft_us,
             "require_host_overhead_pct": require_host_overhead_pct,
@@ -2027,6 +2118,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-dir", type=Path, default=Path("bench/dashboards"))
     parser.add_argument("--tok-regression-pct", type=float, default=DEFAULT_TOK_REGRESSION_PCT)
     parser.add_argument("--memory-regression-pct", type=float, default=DEFAULT_MEMORY_REGRESSION_PCT)
+    parser.add_argument(
+        "--host-child-peak-rss-regression-pct",
+        type=float,
+        help="Fail when QEMU child-process peak RSS increases by more than this percent",
+    )
     parser.add_argument(
         "--wall-tok-regression-pct",
         type=float,
@@ -2125,6 +2221,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail when any benchmark key/commit point lacks memory telemetry",
     )
     parser.add_argument(
+        "--require-host-child-peak-rss",
+        action="store_true",
+        help="Fail when any benchmark key/commit point lacks QEMU child peak RSS telemetry",
+    )
+    parser.add_argument(
         "--require-tokens",
         action="store_true",
         help="Fail when any benchmark key/commit point lacks emitted-token telemetry",
@@ -2151,6 +2252,7 @@ def main(argv: list[str] | None = None) -> int:
         records,
         args.tok_regression_pct,
         args.memory_regression_pct,
+        host_child_peak_rss_threshold_pct=args.host_child_peak_rss_regression_pct,
         baseline_commit=args.baseline_commit,
         candidate_commit=args.candidate_commit,
         min_records_per_point=args.min_records_per_point,
@@ -2171,6 +2273,7 @@ def main(argv: list[str] | None = None) -> int:
         require_us_per_token=args.require_us_per_token,
         require_wall_us_per_token=args.require_wall_us_per_token,
         require_memory=args.require_memory,
+        require_host_child_peak_rss=args.require_host_child_peak_rss,
         require_tokens=args.require_tokens,
         require_ttft_us=args.require_ttft_us,
         require_host_overhead_pct=args.require_host_overhead_pct,
