@@ -141,6 +141,34 @@ def test_block_audit_counts_zero_q16_scales(tmp_path: Path) -> None:
     assert audit.scale_q16_max == 0
     assert audit.scale_q16_abs_max == 0
     assert audit.scale_q16_zero_count == 1
+    assert audit.zero_scale_nonzero_quant_block_count == 0
+    assert audit.zero_scale_nonzero_quant_entry_count == 0
+
+
+def test_block_audit_reports_zero_scale_nonzero_quant_payload(tmp_path: Path) -> None:
+    block_file = tmp_path / "q4.bin"
+    block_file.write_bytes(half_bits(0.0) + bytes([0x89] * 16))
+
+    audit = quant_audit.audit_q4_0_blocks(
+        block_file,
+        allow_inf_nan_scale=False,
+        fail_zero_scale_nonzero_blocks=True,
+    )
+
+    assert audit.zero_scale_nonzero_quant_block_count == 1
+    assert audit.zero_scale_nonzero_quant_entry_count == 16
+    assert "zero Q16 scale has 16 nonzero quant payload entries" in audit.findings[0]
+
+
+def test_q8_block_audit_counts_zero_scale_nonzero_quant_payload(tmp_path: Path) -> None:
+    block_file = tmp_path / "q8.bin"
+    block_file.write_bytes(half_bits(0.0) + bytes([0, 1, -1 & 0xFF] + [0] * 29))
+
+    audit = quant_audit.audit_q8_0_blocks(block_file, allow_inf_nan_scale=False)
+
+    assert audit.findings == []
+    assert audit.zero_scale_nonzero_quant_block_count == 1
+    assert audit.zero_scale_nonzero_quant_entry_count == 2
 
 
 def test_block_audit_checks_quant_distribution_gates(tmp_path: Path) -> None:
@@ -215,6 +243,7 @@ def test_cli_fails_on_q16_scale_limit(tmp_path: Path) -> None:
     assert '"scale_q16_over_limit_count": 1' in report
     markdown_text = markdown.read_text(encoding="utf-8")
     assert "Scale Q16 min/max/absmax/zero/overlimit" in markdown_text
+    assert "Zero-scale nonzero blocks/entries" in markdown_text
     assert "Used values" in markdown_text
     assert "block," in csv_report.read_text(encoding="utf-8")
     junit_root = ET.parse(junit).getroot()

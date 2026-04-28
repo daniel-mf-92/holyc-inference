@@ -12,8 +12,9 @@ TempleOS air-gapped; any QEMU command added under this tree must pass `-nic none
   common float math helper calls after comments and strings are stripped.
 - Raw Q4_0/Q8_0 block streams have valid block sizes, optional expected
   block/element counts, finite fp16 scales, fp16-to-Q16 scale ranges, optional
-  Q16 scale magnitude limits, quant ranges, quant histograms, and optional
-  packing-distribution gates for distinct quant values and saturated payloads.
+  Q16 scale magnitude limits, zero-scale/nonzero-payload counts, quant ranges,
+  quant histograms, and optional packing-distribution gates for distinct quant
+  values, saturated payloads, and non-canonical zero-scale blocks.
 
 Example:
 
@@ -33,6 +34,7 @@ python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin --exp
 python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --expect-blocks 128
 python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --max-abs-scale-q16 1048576
 python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin --min-used-quant-values 8 --max-saturation-pct 25
+python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin --fail-zero-scale-nonzero-blocks
 ```
 
 Mixed-format audits can validate Q4_0 and Q8_0 streams in one report:

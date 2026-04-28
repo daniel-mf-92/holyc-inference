@@ -97,3 +97,4 @@
 2026-04-28T05:24:14Z | Added quant audit CSV/JUnit CI outputs with smoke coverage and refreshed latest artifacts.
 2026-04-28T05:32:49Z | Added QEMU prompt benchmark host-overhead telemetry gates with smoke coverage and refreshed benchmark artifacts.
 2026-04-28T05:55:23Z | Added build comparison TTFT deltas and opt-in first-token latency growth gating with refreshed reports.
+2026-04-28T06:05:31Z | Added quant audit zero-scale/nonzero-payload detection with opt-in failure gate, docs, tests, and refreshed reports.
