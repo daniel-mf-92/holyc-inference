@@ -573,6 +573,53 @@ else:
     assert junit_root.attrib["failures"] == "3"
 
 
+def test_cli_host_overhead_gate_fails_noisy_host_timing(tmp_path: Path) -> None:
+    fake_qemu = tmp_path / "fake-qemu.py"
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    output_dir = tmp_path / "results"
+    prompts.write_text('{"prompt_id":"one","prompt":"Host overhead"}\n', encoding="utf-8")
+    fake_qemu.write_text(
+        """#!/usr/bin/env python3
+print("tokens=12 elapsed_us=1")
+""",
+        encoding="utf-8",
+    )
+    fake_qemu.chmod(0o755)
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--qemu-bin",
+            str(fake_qemu),
+            "--output-dir",
+            str(output_dir),
+            "--max-host-overhead-us",
+            "0",
+            "--max-host-overhead-pct",
+            "0",
+        ]
+    )
+
+    assert status == 1
+    report = json.loads((output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8"))
+    markdown = (output_dir / "qemu_prompt_bench_latest.md").read_text(encoding="utf-8")
+    junit_root = ET.parse(output_dir / "qemu_prompt_bench_junit_latest.xml").getroot()
+
+    assert report["status"] == "fail"
+    assert report["telemetry_gates"]["max_host_overhead_us"] == 0
+    assert report["telemetry_gates"]["max_host_overhead_pct"] == 0.0
+    assert {finding["metric"] for finding in report["telemetry_findings"]} == {
+        "host_overhead_us",
+        "host_overhead_pct",
+    }
+    assert "Telemetry Gate Findings" in markdown
+    assert junit_root.attrib["failures"] == "2"
+
+
 def test_cli_junit_reports_failed_qemu_run(tmp_path: Path) -> None:
     fake_qemu = tmp_path / "fake-qemu.py"
     prompts = tmp_path / "prompts.jsonl"
@@ -628,6 +675,34 @@ def test_cli_rejects_negative_warmup(tmp_path: Path) -> None:
             str(prompts),
             "--dry-run",
             "--warmup",
+            "-1",
+        ]
+    )
+
+    assert status == 2
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--dry-run",
+            "--max-host-overhead-us",
+            "-1",
+        ]
+    )
+
+    assert status == 2
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--dry-run",
+            "--max-host-overhead-pct",
             "-1",
         ]
     )

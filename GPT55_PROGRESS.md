@@ -94,3 +94,4 @@
 2026-04-28T05:11:53Z | Added static QEMU source air-gap audit with JSON/Markdown/CSV/JUnit reports, docs, smoke coverage, and latest artifact.
 2026-04-28T05:18:28Z | Added QEMU prompt benchmark wall-clock tok/s and memory telemetry gates with smoke coverage and refreshed artifacts.
 2026-04-28T05:24:14Z | Added quant audit CSV/JUnit CI outputs with smoke coverage and refreshed latest artifacts.
+2026-04-28T05:32:49Z | Added QEMU prompt benchmark host-overhead telemetry gates with smoke coverage and refreshed benchmark artifacts.

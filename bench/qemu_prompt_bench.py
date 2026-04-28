@@ -654,6 +654,8 @@ def telemetry_findings(
     min_wall_tok_per_s: float | None = None,
     max_memory_bytes: int | None = None,
     max_ttft_us: int | None = None,
+    max_host_overhead_us: int | None = None,
+    max_host_overhead_pct: float | None = None,
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     for run in runs:
@@ -698,6 +700,26 @@ def telemetry_findings(
             findings.append({**base, "metric": "ttft_us", "value": None, "limit": "present"})
         if max_ttft_us is not None and (run.ttft_us is None or run.ttft_us > max_ttft_us):
             findings.append({**base, "metric": "ttft_us", "value": run.ttft_us, "limit": max_ttft_us})
+        if max_host_overhead_us is not None and run.host_overhead_us > max_host_overhead_us:
+            findings.append(
+                {
+                    **base,
+                    "metric": "host_overhead_us",
+                    "value": run.host_overhead_us,
+                    "limit": max_host_overhead_us,
+                }
+            )
+        if max_host_overhead_pct is not None and (
+            run.host_overhead_pct is None or run.host_overhead_pct > max_host_overhead_pct
+        ):
+            findings.append(
+                {
+                    **base,
+                    "metric": "host_overhead_pct",
+                    "value": run.host_overhead_pct,
+                    "limit": max_host_overhead_pct,
+                }
+            )
     return findings
 
 
@@ -965,6 +987,8 @@ def write_report(
     min_wall_tok_per_s: float | None = None,
     max_memory_bytes: int | None = None,
     max_ttft_us: int | None = None,
+    max_host_overhead_us: int | None = None,
+    max_host_overhead_pct: float | None = None,
     environment: dict[str, Any] | None = None,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -989,6 +1013,8 @@ def write_report(
         min_wall_tok_per_s=min_wall_tok_per_s,
         max_memory_bytes=max_memory_bytes,
         max_ttft_us=max_ttft_us,
+        max_host_overhead_us=max_host_overhead_us,
+        max_host_overhead_pct=max_host_overhead_pct,
     )
     report = {
         "generated_at": iso_now(),
@@ -1013,6 +1039,8 @@ def write_report(
             "min_wall_tok_per_s": min_wall_tok_per_s,
             "max_memory_bytes": max_memory_bytes,
             "max_ttft_us": max_ttft_us,
+            "max_host_overhead_us": max_host_overhead_us,
+            "max_host_overhead_pct": max_host_overhead_pct,
         },
         "telemetry_findings": telemetry,
         "benchmarks": [asdict(run) for run in runs],
@@ -1238,6 +1266,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail if any measured run exceeds peak memory bytes or omits memory telemetry",
     )
     parser.add_argument("--max-ttft-us", type=int, default=None, help="Fail if any measured run exceeds TTFT in us")
+    parser.add_argument(
+        "--max-host-overhead-us",
+        type=int,
+        default=None,
+        help="Fail if any measured run exceeds host orchestration overhead in us",
+    )
+    parser.add_argument(
+        "--max-host-overhead-pct",
+        type=float,
+        default=None,
+        help="Fail if any measured run host overhead exceeds this percentage of guest elapsed time",
+    )
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--profile", default="default")
     parser.add_argument("--model", default="")
@@ -1275,6 +1315,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.max_ttft_us is not None and args.max_ttft_us < 0:
         print("error: --max-ttft-us must be >= 0", file=sys.stderr)
+        return 2
+    if args.max_host_overhead_us is not None and args.max_host_overhead_us < 0:
+        print("error: --max-host-overhead-us must be >= 0", file=sys.stderr)
+        return 2
+    if args.max_host_overhead_pct is not None and args.max_host_overhead_pct < 0:
+        print("error: --max-host-overhead-pct must be >= 0", file=sys.stderr)
         return 2
 
     try:
@@ -1333,6 +1379,8 @@ def main(argv: list[str] | None = None) -> int:
         min_wall_tok_per_s=args.min_wall_tok_per_s,
         max_memory_bytes=args.max_memory_bytes,
         max_ttft_us=args.max_ttft_us,
+        max_host_overhead_us=args.max_host_overhead_us,
+        max_host_overhead_pct=args.max_host_overhead_pct,
         environment=host_environment(args.qemu_bin),
     )
     report = json.loads(output.read_text(encoding="utf-8"))
