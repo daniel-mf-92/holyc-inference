@@ -137,7 +137,8 @@ manifests also record per-provenance contribution counts, and
 compact subset.
 Synthetic smoke manifests are allowed to omit `source_url`; real dataset
 manifests should record one, and `--require-source-url` turns that policy into a
-hard gate.
+hard gate. Repeat `--allow-license` or `--deny-license` to enforce exact
+case-folded license/usage-note policy values for promoted local subsets.
 
 ```bash
 python3 bench/dataset_provenance_audit.py \
@@ -145,6 +146,7 @@ python3 bench/dataset_provenance_audit.py \
   --output-dir bench/results/datasets \
   --max-provenance-pct 80 \
   --max-dataset-split-majority-answer-pct 90 \
+  --allow-license synthetic-smoke \
   --fail-on-findings
 ```
 

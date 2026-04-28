@@ -212,7 +212,9 @@ overall, per-dataset, per-split, and per-dataset/split answer-majority telemetry
 `--max-provenance-pct`, `--max-dataset-majority-answer-pct`, and
 `--max-split-majority-answer-pct`,
 `--max-dataset-split-majority-answer-pct` can fail CI when curated subsets are
-label skewed or dominated by one local source/provenance string.
+label skewed or dominated by one local source/provenance string. Use repeatable
+`--allow-license` and `--deny-license` gates to enforce an exact local license
+or usage-note policy before promoting a curated subset.
 
 ```bash
 python3 bench/dataset_provenance_audit.py \
@@ -222,6 +224,7 @@ python3 bench/dataset_provenance_audit.py \
   --max-dataset-majority-answer-pct 80 \
   --max-split-majority-answer-pct 80 \
   --max-dataset-split-majority-answer-pct 90 \
+  --allow-license synthetic-smoke \
   --fail-on-findings
 ```
 

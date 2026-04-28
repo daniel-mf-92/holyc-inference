@@ -375,6 +375,8 @@ def main() -> int:
             "100",
             "--max-dataset-split-majority-answer-pct",
             "100",
+            "--allow-license",
+            "synthetic-smoke",
             "--fail-on-findings",
         ]
         completed = run_command(provenance_command)
@@ -446,6 +448,74 @@ def main() -> int:
             provenance_root.attrib.get("failures") == "0",
             "unexpected_provenance_junit_failures",
         ):
+            return rc
+
+        denied_license_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_provenance_audit.py"),
+            "--input",
+            str(curated_manifest),
+            "--output-dir",
+            str(tmp_path / "denied-license-provenance"),
+            "--deny-license",
+            "synthetic-smoke",
+            "--fail-on-findings",
+        ]
+        completed = subprocess.run(
+            denied_license_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("denied_license_not_rejected=true", file=sys.stderr)
+            return 1
+        denied_license_failure = json.loads(
+            (tmp_path / "denied-license-provenance" / "dataset_provenance_audit_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        denied_license_kinds = {
+            finding["kind"]
+            for artifact in denied_license_failure["artifacts"]
+            for finding in artifact["findings"]
+        }
+        if rc := require("license_denied" in denied_license_kinds, "missing_denied_license_finding"):
+            return rc
+
+        unallowed_license_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_provenance_audit.py"),
+            "--input",
+            str(curated_manifest),
+            "--output-dir",
+            str(tmp_path / "unallowed-license-provenance"),
+            "--allow-license",
+            "other-local-license",
+            "--fail-on-findings",
+        ]
+        completed = subprocess.run(
+            unallowed_license_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("unallowed_license_not_rejected=true", file=sys.stderr)
+            return 1
+        unallowed_license_failure = json.loads(
+            (tmp_path / "unallowed-license-provenance" / "dataset_provenance_audit_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        unallowed_license_kinds = {
+            finding["kind"]
+            for artifact in unallowed_license_failure["artifacts"]
+            for finding in artifact["findings"]
+        }
+        if rc := require("license_not_allowed" in unallowed_license_kinds, "missing_unallowed_license_finding"):
             return rc
 
         stale_manifest = tmp_path / "stale_selected_ids.manifest.json"

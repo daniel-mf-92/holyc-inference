@@ -97,6 +97,10 @@ def is_synthetic_manifest(manifest: dict[str, Any]) -> bool:
     return "synthetic" in text or "smoke" in text
 
 
+def normalized_policy_values(values: Iterable[str]) -> set[str]:
+    return {clean(value).casefold() for value in values if clean(value)}
+
+
 def finding(path: Path, severity: str, kind: str, detail: str) -> ProvenanceFinding:
     return ProvenanceFinding(source=str(path), severity=severity, kind=kind, detail=detail)
 
@@ -270,6 +274,8 @@ def audit_manifest(
     max_dataset_majority_answer_pct: float | None = None,
     max_split_majority_answer_pct: float | None = None,
     max_dataset_split_majority_answer_pct: float | None = None,
+    allow_licenses: set[str] | None = None,
+    deny_licenses: set[str] | None = None,
 ) -> ProvenanceArtifact | None:
     manifest = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict) or manifest.get("format") != "hceval-curated-jsonl":
@@ -278,6 +284,8 @@ def audit_manifest(
     findings: list[ProvenanceFinding] = []
     source = manifest.get("source") if isinstance(manifest.get("source"), dict) else {}
     synthetic = is_synthetic_manifest(manifest)
+    license_text = clean(manifest.get("license"))
+    normalized_license = license_text.casefold()
 
     for key, kind in (
         ("source_name", "missing_source_name"),
@@ -286,6 +294,26 @@ def audit_manifest(
     ):
         if is_placeholder(manifest.get(key)):
             findings.append(finding(path, "error", kind, f"{key} is missing or placeholder"))
+
+    if normalized_license and deny_licenses and normalized_license in deny_licenses:
+        findings.append(
+            finding(
+                path,
+                "error",
+                "license_denied",
+                f"license {license_text!r} is denied by policy",
+            )
+        )
+    if normalized_license and allow_licenses and normalized_license not in allow_licenses:
+        allowed = ", ".join(sorted(allow_licenses))
+        findings.append(
+            finding(
+                path,
+                "error",
+                "license_not_allowed",
+                f"license {license_text!r} is not in allowed policy set: {allowed}",
+            )
+        )
 
     if not synthetic and (require_source_url or is_placeholder(manifest.get("source_url"))):
         findings.append(
@@ -572,6 +600,8 @@ def load_artifacts(
     max_dataset_majority_answer_pct: float | None = None,
     max_split_majority_answer_pct: float | None = None,
     max_dataset_split_majority_answer_pct: float | None = None,
+    allow_licenses: set[str] | None = None,
+    deny_licenses: set[str] | None = None,
 ) -> list[ProvenanceArtifact]:
     artifacts: list[ProvenanceArtifact] = []
     for path in sorted(set(iter_manifest_files(paths))):
@@ -583,6 +613,8 @@ def load_artifacts(
             max_dataset_majority_answer_pct,
             max_split_majority_answer_pct,
             max_dataset_split_majority_answer_pct,
+            allow_licenses,
+            deny_licenses,
         )
         if artifact is not None:
             artifacts.append(artifact)
@@ -791,6 +823,18 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         help="Fail when one answer index covers more than this percentage within any dataset/split pair",
     )
+    parser.add_argument(
+        "--allow-license",
+        action="append",
+        default=[],
+        help="Allowed exact license or usage note after case-folding; repeatable",
+    )
+    parser.add_argument(
+        "--deny-license",
+        action="append",
+        default=[],
+        help="Denied exact license or usage note after case-folding; repeatable",
+    )
     parser.add_argument("--fail-on-findings", action="store_true", help="Return non-zero if any finding is emitted")
     return parser
 
@@ -822,6 +866,8 @@ def main(argv: list[str] | None = None) -> int:
         print("error: --max-dataset-split-majority-answer-pct must be between 0 and 100", file=sys.stderr)
         return 2
     inputs = args.input or [Path("bench/results/datasets")]
+    allow_licenses = normalized_policy_values(args.allow_license)
+    deny_licenses = normalized_policy_values(args.deny_license)
     try:
         artifacts = load_artifacts(
             inputs,
@@ -831,6 +877,8 @@ def main(argv: list[str] | None = None) -> int:
             args.max_dataset_majority_answer_pct,
             args.max_split_majority_answer_pct,
             args.max_dataset_split_majority_answer_pct,
+            allow_licenses or None,
+            deny_licenses or None,
         )
         output = write_report(artifacts, args.output_dir)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
