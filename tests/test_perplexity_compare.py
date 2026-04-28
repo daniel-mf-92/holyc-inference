@@ -120,6 +120,8 @@ def test_cli_can_fail_on_perplexity_quality_gate_regression(tmp_path: Path) -> N
             "0.1",
             "--max-perplexity-ratio",
             "1.1",
+            "--max-p95-record-nll-delta",
+            "0.6",
             "--max-record-nll-delta",
             "0.2",
             "--fail-on-regression",
@@ -134,9 +136,58 @@ def test_cli_can_fail_on_perplexity_quality_gate_regression(tmp_path: Path) -> N
         "max_abs_record_nll_delta",
         "nll_delta_holyc_minus_llama",
         "perplexity_ratio_holyc_over_llama",
+        "p95_record_nll_delta",
     }
-    assert junit_root.attrib["failures"] == "3"
+    assert junit_root.attrib["failures"] == "4"
     assert junit_root.find("./testcase/failure") is not None
+
+
+def test_signed_p95_record_nll_gate_ignores_improvements(tmp_path: Path) -> None:
+    holyc = tmp_path / "holyc.jsonl"
+    llama = tmp_path / "llama.jsonl"
+    holyc.write_text(
+        "\n".join(
+            [
+                '{"id":"one","token_count":2,"mean_nll":0.10}',
+                '{"id":"two","token_count":2,"mean_nll":0.10}',
+                '{"id":"three","token_count":2,"mean_nll":0.10}',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    llama.write_text(
+        "\n".join(
+            [
+                '{"id":"one","token_count":2,"mean_nll":1.00}',
+                '{"id":"two","token_count":2,"mean_nll":1.00}',
+                '{"id":"three","token_count":2,"mean_nll":1.00}',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    status = perplexity_compare.main(
+        [
+            "--holyc",
+            str(holyc),
+            "--llama",
+            str(llama),
+            "--output-dir",
+            str(tmp_path),
+            "--output-stem",
+            "signed_tail",
+            "--max-p95-record-nll-delta",
+            "0.0",
+            "--fail-on-regression",
+        ]
+    )
+    payload = json.loads((tmp_path / "signed_tail.json").read_text(encoding="utf-8"))
+
+    assert status == 0
+    assert payload["summary"]["p95_record_nll_delta"] < 0.0
+    assert payload["regressions"] == []
 
 
 def test_token_count_mismatch_fails_by_default(tmp_path: Path) -> None:
@@ -167,6 +218,8 @@ if __name__ == "__main__":
     test_cli_writes_json_and_markdown_report()
     with tempfile.TemporaryDirectory() as tmp:
         test_cli_can_fail_on_perplexity_quality_gate_regression(Path(tmp))
+    with tempfile.TemporaryDirectory() as tmp:
+        test_signed_p95_record_nll_gate_ignores_improvements(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:
         test_token_count_mismatch_fails_by_default(Path(tmp))
     print("perplexity_compare_tests=ok")

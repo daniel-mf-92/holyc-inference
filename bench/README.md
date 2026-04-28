@@ -258,6 +258,13 @@ python3 bench/eval_compare.py \
   --fail-on-regression
 ```
 
+`perplexity_compare.py` also supports opt-in quality gates for full-token
+logprob/perplexity comparisons. Use `--max-p95-record-nll-delta` when CI should
+catch the P95 positive HolyC-minus-llama per-record NLL tail while ignoring
+records where HolyC improves over llama.cpp; use
+`--max-p95-abs-record-nll-delta` when any large per-record divergence should
+fail.
+
 ## QEMU Prompt Benchmark
 
 `prompt_audit.py` validates benchmark prompt files before a guest run. It

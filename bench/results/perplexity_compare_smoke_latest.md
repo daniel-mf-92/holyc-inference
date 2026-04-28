@@ -1,6 +1,6 @@
 # Perplexity Compare Report
 
-Generated: 2026-04-28T20:18:50Z
+Generated: 2026-04-28T20:28:10Z
 Dataset: smoke-eval
 Split: validation
 Quantization: Q4_0

@@ -335,6 +335,7 @@ def find_regressions(
     max_nll_delta: float | None = None,
     max_perplexity_ratio: float | None = None,
     max_p95_abs_record_nll_delta: float | None = None,
+    max_p95_record_nll_delta: float | None = None,
     max_record_nll_delta: float | None = None,
 ) -> list[PerplexityRegression]:
     regressions: list[PerplexityRegression] = []
@@ -379,6 +380,22 @@ def find_regressions(
                     f"P95 absolute per-record NLL/token delta "
                     f"{summary['p95_abs_record_nll_delta']:.6f} exceeds maximum "
                     f"{max_p95_abs_record_nll_delta:.6f}"
+                ),
+            )
+        )
+    if (
+        max_p95_record_nll_delta is not None
+        and summary["p95_record_nll_delta"] > max_p95_record_nll_delta
+    ):
+        regressions.append(
+            PerplexityRegression(
+                metric="p95_record_nll_delta",
+                value=summary["p95_record_nll_delta"],
+                threshold=max_p95_record_nll_delta,
+                message=(
+                    f"P95 signed per-record NLL/token delta "
+                    f"{summary['p95_record_nll_delta']:.6f} exceeds maximum "
+                    f"{max_p95_record_nll_delta:.6f}"
                 ),
             )
         )
@@ -525,6 +542,7 @@ def write_report(
         max_nll_delta=args.max_nll_delta,
         max_perplexity_ratio=args.max_perplexity_ratio,
         max_p95_abs_record_nll_delta=args.max_p95_abs_record_nll_delta,
+        max_p95_record_nll_delta=args.max_p95_record_nll_delta,
         max_record_nll_delta=args.max_record_nll_delta,
     )
     report = {
@@ -535,6 +553,7 @@ def write_report(
         "max_nll_delta": args.max_nll_delta,
         "max_perplexity_ratio": args.max_perplexity_ratio,
         "max_p95_abs_record_nll_delta": args.max_p95_abs_record_nll_delta,
+        "max_p95_record_nll_delta": args.max_p95_record_nll_delta,
         "max_record_nll_delta": args.max_record_nll_delta,
         "model": args.model,
         "quantization": args.quantization,
@@ -581,6 +600,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum allowed P95 absolute per-record NLL/token delta before CI gate failure",
     )
     parser.add_argument(
+        "--max-p95-record-nll-delta",
+        type=float,
+        help=(
+            "Maximum allowed P95 signed per-record HolyC-minus-llama NLL/token delta before "
+            "CI gate failure; negative/improved tails do not fail this gate"
+        ),
+    )
+    parser.add_argument(
         "--max-record-nll-delta",
         type=float,
         help="Maximum allowed absolute per-record NLL/token delta before CI gate failure",
@@ -615,6 +642,7 @@ def main(argv: list[str] | None = None) -> int:
         max_nll_delta=args.max_nll_delta,
         max_perplexity_ratio=args.max_perplexity_ratio,
         max_p95_abs_record_nll_delta=args.max_p95_abs_record_nll_delta,
+        max_p95_record_nll_delta=args.max_p95_record_nll_delta,
         max_record_nll_delta=args.max_record_nll_delta,
     )
     print(f"regressions={len(regressions)}")
