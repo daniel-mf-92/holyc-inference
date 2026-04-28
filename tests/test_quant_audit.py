@@ -150,6 +150,34 @@ def test_block_audit_counts_zero_q16_scales(tmp_path: Path) -> None:
     assert audit.zero_scale_nonzero_quant_entry_count == 0
 
 
+def test_block_audit_can_fail_zero_fp16_scales(tmp_path: Path) -> None:
+    block_file = tmp_path / "q4.bin"
+    block_file.write_bytes(half_bits(0.0) + bytes([0x88] * 16))
+
+    audit = quant_audit.audit_q4_0_blocks(
+        block_file,
+        allow_inf_nan_scale=False,
+        fail_zero_scales=True,
+    )
+
+    assert audit.scale_zero_count == 1
+    assert "block 0: fp16 scale is zero bits=0x0000" in audit.findings
+
+
+def test_block_audit_can_fail_subnormal_fp16_scales(tmp_path: Path) -> None:
+    block_file = tmp_path / "q8.bin"
+    block_file.write_bytes(bytes.fromhex("0100") + bytes([0] * 32))
+
+    audit = quant_audit.audit_q8_0_blocks(
+        block_file,
+        allow_inf_nan_scale=False,
+        fail_subnormal_scales=True,
+    )
+
+    assert audit.scale_subnormal_count == 1
+    assert "block 0: fp16 scale is subnormal bits=0x0001" in audit.findings
+
+
 def test_block_audit_reports_zero_scale_nonzero_quant_payload(tmp_path: Path) -> None:
     block_file = tmp_path / "q4.bin"
     block_file.write_bytes(half_bits(0.0) + bytes([0x89] * 16))

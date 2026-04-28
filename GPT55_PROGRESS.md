@@ -126,3 +126,4 @@
 2026-04-28T12:08:44Z | Added eval dataset provenance answer-histogram validation and opt-in majority-answer skew gate with refreshed artifacts.
 2026-04-28T12:18:20Z | Added per-dataset eval provenance answer histograms and opt-in per-dataset skew gate with refreshed dataset artifacts.
 2026-04-28T12:26:11Z | Added eval input gold-answer skew telemetry and opt-in gate with refreshed smoke artifacts.
+2026-04-28T12:34:53Z | Added quant audit zero/subnormal fp16 scale gates with smoke coverage and refreshed quant audit artifacts.

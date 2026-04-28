@@ -261,6 +261,20 @@ def check_zero_scale_quant_payload(
     return 1, block_nonzero_quant_count
 
 
+def check_scale_class_gates(
+    findings: list[str],
+    block_index: int,
+    scale_bits: int,
+    scale_class: str,
+    fail_zero_scales: bool,
+    fail_subnormal_scales: bool,
+) -> None:
+    if fail_zero_scales and scale_class == "zero":
+        findings.append(f"block {block_index}: fp16 scale is zero bits=0x{scale_bits:04x}")
+    if fail_subnormal_scales and scale_class == "subnormal":
+        findings.append(f"block {block_index}: fp16 scale is subnormal bits=0x{scale_bits:04x}")
+
+
 def check_expected_shape(
     findings: list[str],
     block_count: int,
@@ -364,6 +378,8 @@ def audit_q4_0_blocks(
     min_block_used_quant_values: int | None = None,
     max_block_saturation_pct: float | None = None,
     fail_zero_scale_nonzero_blocks: bool = False,
+    fail_zero_scales: bool = False,
+    fail_subnormal_scales: bool = False,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -397,6 +413,14 @@ def audit_q4_0_blocks(
         scale_bits = int.from_bytes(data[offset : offset + 2], "little")
         scale_class = fp16_class(scale_bits)
         counts[scale_class] += 1
+        check_scale_class_gates(
+            findings,
+            block_index,
+            scale_bits,
+            scale_class,
+            fail_zero_scales,
+            fail_subnormal_scales,
+        )
         if scale_class == "inf_nan" and not allow_inf_nan_scale:
             findings.append(f"block {block_index}: fp16 scale is inf/nan bits=0x{scale_bits:04x}")
 
@@ -520,6 +544,8 @@ def audit_q8_0_blocks(
     min_block_used_quant_values: int | None = None,
     max_block_saturation_pct: float | None = None,
     fail_zero_scale_nonzero_blocks: bool = False,
+    fail_zero_scales: bool = False,
+    fail_subnormal_scales: bool = False,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -553,6 +579,14 @@ def audit_q8_0_blocks(
         scale_bits = int.from_bytes(data[offset : offset + 2], "little")
         scale_class = fp16_class(scale_bits)
         counts[scale_class] += 1
+        check_scale_class_gates(
+            findings,
+            block_index,
+            scale_bits,
+            scale_class,
+            fail_zero_scales,
+            fail_subnormal_scales,
+        )
         if scale_class == "inf_nan" and not allow_inf_nan_scale:
             findings.append(f"block {block_index}: fp16 scale is inf/nan bits=0x{scale_bits:04x}")
 
@@ -675,6 +709,8 @@ def audit_blocks(
     min_block_used_quant_values: int | None = None,
     max_block_saturation_pct: float | None = None,
     fail_zero_scale_nonzero_blocks: bool = False,
+    fail_zero_scales: bool = False,
+    fail_subnormal_scales: bool = False,
 ) -> BlockAudit:
     if quant_format == "q4_0":
         return audit_q4_0_blocks(
@@ -688,6 +724,8 @@ def audit_blocks(
             min_block_used_quant_values,
             max_block_saturation_pct,
             fail_zero_scale_nonzero_blocks,
+            fail_zero_scales,
+            fail_subnormal_scales,
         )
     if quant_format == "q8_0":
         return audit_q8_0_blocks(
@@ -701,6 +739,8 @@ def audit_blocks(
             min_block_used_quant_values,
             max_block_saturation_pct,
             fail_zero_scale_nonzero_blocks,
+            fail_zero_scales,
+            fail_subnormal_scales,
         )
     raise ValueError(f"unsupported quant format: {quant_format}")
 
@@ -1004,6 +1044,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fail block files containing finite scales that round to Q16 zero while retaining nonzero quant payload entries",
     )
+    parser.add_argument(
+        "--fail-zero-scales",
+        action="store_true",
+        help="Fail any raw block whose fp16 scale field is exactly zero",
+    )
+    parser.add_argument(
+        "--fail-subnormal-scales",
+        action="store_true",
+        help="Fail any raw block whose fp16 scale field is subnormal",
+    )
     parser.add_argument("--allow-inf-nan-scale", action="store_true", help="Do not fail on fp16 inf/nan scales")
     parser.add_argument("--output", type=Path, help="Write JSON report to this path")
     parser.add_argument("--markdown", type=Path, help="Write Markdown report to this path")
@@ -1034,6 +1084,8 @@ def main(argv: list[str] | None = None) -> int:
             args.min_block_used_quant_values,
             args.max_block_saturation_pct,
             args.fail_zero_scale_nonzero_blocks,
+            args.fail_zero_scales,
+            args.fail_subnormal_scales,
         )
         for path, quant_format in block_specs
     ]
