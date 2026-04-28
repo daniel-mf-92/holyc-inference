@@ -94,6 +94,36 @@ def write_multi_report(
     )
 
 
+def write_metric_rows_report(path: Path, commit: str, rows: list[dict[str, object]]) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-04-28T16:00:00Z",
+                "status": "pass",
+                "prompt_suite": {"suite_sha256": "suite-a"},
+                "benchmarks": [
+                    {
+                        "commit": commit,
+                        "benchmark": "qemu_prompt",
+                        "profile": "secure-local",
+                        "model": "tiny",
+                        "quantization": "Q4_0",
+                        "prompt": "smoke",
+                        "tokens": 32,
+                        "elapsed_us": 200000,
+                        "memory_bytes": 4096,
+                        "returncode": 0,
+                        "timed_out": False,
+                        **row,
+                    }
+                    for row in rows
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_compare_builds_computes_tok_per_s_and_elapsed_deltas(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     candidate = tmp_path / "candidate.json"
@@ -344,6 +374,124 @@ def test_cli_can_gate_ttft_growth(tmp_path: Path) -> None:
     assert "ttft_us changed by 15.000%" in junit_root.find("./testcase/failure").attrib["message"]
 
 
+def test_cli_can_gate_host_latency_cpu_and_rss_drift(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    candidate = tmp_path / "candidate.json"
+    output_dir = tmp_path / "results"
+    write_metric_rows_report(
+        baseline,
+        "base",
+        [
+            {
+                "tok_per_s": 100.0,
+                "wall_tok_per_s": 95.0,
+                "us_per_token": 10000.0,
+                "wall_us_per_token": 10500.0,
+                "host_child_cpu_us": 500000,
+                "host_child_cpu_pct": 50.0,
+                "host_child_tok_per_cpu_s": 200.0,
+                "host_child_peak_rss_bytes": 1000000,
+            },
+            {
+                "tok_per_s": 102.0,
+                "wall_tok_per_s": 97.0,
+                "us_per_token": 9800.0,
+                "wall_us_per_token": 10300.0,
+                "host_child_cpu_us": 520000,
+                "host_child_cpu_pct": 52.0,
+                "host_child_tok_per_cpu_s": 205.0,
+                "host_child_peak_rss_bytes": 1100000,
+            },
+        ],
+    )
+    write_metric_rows_report(
+        candidate,
+        "head",
+        [
+            {
+                "tok_per_s": 99.0,
+                "wall_tok_per_s": 93.0,
+                "us_per_token": 10800.0,
+                "wall_us_per_token": 11300.0,
+                "host_child_cpu_us": 580000,
+                "host_child_cpu_pct": 59.0,
+                "host_child_tok_per_cpu_s": 175.0,
+                "host_child_peak_rss_bytes": 1300000,
+            },
+            {
+                "tok_per_s": 101.0,
+                "wall_tok_per_s": 94.0,
+                "us_per_token": 11000.0,
+                "wall_us_per_token": 11500.0,
+                "host_child_cpu_us": 600000,
+                "host_child_cpu_pct": 60.0,
+                "host_child_tok_per_cpu_s": 180.0,
+                "host_child_peak_rss_bytes": 1400000,
+            },
+        ],
+    )
+
+    status = build_compare.main(
+        [
+            "--input",
+            f"base={baseline}",
+            "--input",
+            f"head={candidate}",
+            "--output-dir",
+            str(output_dir),
+            "--max-us-per-token-growth-pct",
+            "5",
+            "--max-wall-us-per-token-growth-pct",
+            "5",
+            "--max-host-child-cpu-growth-pct",
+            "10",
+            "--max-host-child-cpu-pct-growth-pct",
+            "10",
+            "--max-host-child-tok-per-cpu-s-regression-pct",
+            "10",
+            "--max-host-child-rss-growth-pct",
+            "20",
+            "--fail-on-regression",
+        ]
+    )
+
+    payload = json.loads((output_dir / "build_compare_latest.json").read_text(encoding="utf-8"))
+    csv_rows = list(csv.DictReader((output_dir / "build_compare_latest.csv").open(newline="", encoding="utf-8")))
+    junit_root = ET.parse(output_dir / "build_compare_junit_latest.xml").getroot()
+    markdown = (output_dir / "build_compare_latest.md").read_text(encoding="utf-8")
+    delta = payload["deltas"][0]
+
+    assert status == 1
+    assert delta["baseline_us_per_token"] == 9900.0
+    assert delta["candidate_us_per_token"] == 10900.0
+    assert delta["baseline_wall_us_per_token"] == 10400.0
+    assert delta["candidate_wall_us_per_token"] == 11400.0
+    assert delta["baseline_host_child_cpu_us"] == 510000.0
+    assert delta["candidate_host_child_cpu_us"] == 590000.0
+    assert delta["baseline_host_child_cpu_pct"] == 51.0
+    assert delta["candidate_host_child_cpu_pct"] == 59.5
+    assert delta["baseline_host_child_tok_per_cpu_s"] == 202.5
+    assert delta["candidate_host_child_tok_per_cpu_s"] == 177.5
+    assert delta["baseline_host_child_peak_rss_bytes"] == 1100000
+    assert delta["candidate_host_child_peak_rss_bytes"] == 1400000
+    assert {
+        "us_per_token",
+        "wall_us_per_token",
+        "host_child_cpu_us",
+        "host_child_cpu_pct",
+        "host_child_tok_per_cpu_s",
+        "host_child_peak_rss_bytes",
+    }.issubset({row["metric"] for row in payload["regressions"]})
+    assert csv_rows[0]["candidate_wall_us_per_token"] == "11400.0"
+    assert csv_rows[0]["candidate_host_child_peak_rss_bytes"] == "1400000"
+    assert "Host child CPU/RSS regressions: 4" in markdown
+    assert "Candidate wall us/token" in markdown
+    assert junit_root.attrib["failures"] == "6"
+    assert "host_child_peak_rss_delta_pct" in "".join(
+        failure.text or "" for failure in junit_root.iter("failure")
+    )
+
+
 def test_cli_can_gate_ok_run_coverage(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     candidate = tmp_path / "candidate.json"
@@ -476,6 +624,7 @@ if __name__ == "__main__":
         test_cli_can_gate_p05_throughput_regression(tmp_path)
         test_cli_can_gate_p05_wall_clock_throughput_regression(tmp_path)
         test_cli_can_gate_ttft_growth(tmp_path)
+        test_cli_can_gate_host_latency_cpu_and_rss_drift(tmp_path)
         test_cli_can_gate_ok_run_coverage(tmp_path)
         test_cli_can_gate_prompt_suite_drift(tmp_path)
         test_cli_can_fail_on_throughput_regression(tmp_path)

@@ -43,6 +43,12 @@ class BuildMetric:
     median_wall_tok_per_s: float | None
     p05_wall_tok_per_s: float | None
     median_ttft_us: float | None
+    median_us_per_token: float | None
+    median_wall_us_per_token: float | None
+    median_host_child_cpu_us: float | None
+    median_host_child_cpu_pct: float | None
+    median_host_child_tok_per_cpu_s: float | None
+    max_host_child_peak_rss_bytes: int | None
     max_memory_bytes: int | None
 
     @property
@@ -78,6 +84,24 @@ class BuildDelta:
     baseline_ttft_us: float | None
     candidate_ttft_us: float | None
     ttft_delta_pct: float | None
+    baseline_us_per_token: float | None
+    candidate_us_per_token: float | None
+    us_per_token_delta_pct: float | None
+    baseline_wall_us_per_token: float | None
+    candidate_wall_us_per_token: float | None
+    wall_us_per_token_delta_pct: float | None
+    baseline_host_child_cpu_us: float | None
+    candidate_host_child_cpu_us: float | None
+    host_child_cpu_us_delta_pct: float | None
+    baseline_host_child_cpu_pct: float | None
+    candidate_host_child_cpu_pct: float | None
+    host_child_cpu_pct_delta_pct: float | None
+    baseline_host_child_tok_per_cpu_s: float | None
+    candidate_host_child_tok_per_cpu_s: float | None
+    host_child_tok_per_cpu_s_delta_pct: float | None
+    baseline_host_child_peak_rss_bytes: int | None
+    candidate_host_child_peak_rss_bytes: int | None
+    host_child_peak_rss_delta_pct: float | None
     baseline_memory_bytes: int | None
     candidate_memory_bytes: int | None
     memory_delta_pct: float | None
@@ -283,6 +307,61 @@ def metric_from_rows(build: str, source: Path, rows: list[dict[str, Any]]) -> li
         memory_values = [
             value for row in key_rows if (value := parse_int(row.get("memory_bytes"))) is not None and value >= 0
         ]
+        us_per_token_values = [
+            value
+            for row in key_rows
+            if (value := first_float(row, ("us_per_token", "us_per_token_median"))) is not None
+        ]
+        wall_us_per_token_values = [
+            value
+            for row in key_rows
+            if (
+                value := first_float(
+                    row,
+                    (
+                        "wall_us_per_token",
+                        "wall_us_per_token_median",
+                        "host_us_per_token",
+                        "host_wall_us_per_token",
+                    ),
+                )
+            )
+            is not None
+        ]
+        host_child_cpu_values = [
+            value
+            for row in key_rows
+            if (value := first_float(row, ("host_child_cpu_us", "host_child_cpu_us_median"))) is not None
+        ]
+        host_child_cpu_pct_values = [
+            value
+            for row in key_rows
+            if (value := first_float(row, ("host_child_cpu_pct", "host_child_cpu_pct_median"))) is not None
+        ]
+        host_child_tok_per_cpu_s_values = [
+            value
+            for row in key_rows
+            if (
+                value := first_float(
+                    row,
+                    ("host_child_tok_per_cpu_s", "host_child_tok_per_cpu_s_median"),
+                )
+            )
+            is not None
+        ]
+        host_child_peak_rss_values = [
+            value
+            for row in key_rows
+            if (
+                value := parse_int(
+                    row.get("host_child_peak_rss_bytes")
+                    if row.get("host_child_peak_rss_bytes") is not None
+                    else row.get("host_child_peak_rss_bytes_max")
+                )
+            )
+            is not None
+            and value >= 0
+        ]
         ok_runs = sum(
             1
             for row in key_rows
@@ -308,6 +387,24 @@ def metric_from_rows(build: str, source: Path, rows: list[dict[str, Any]]) -> li
                 median_wall_tok_per_s=statistics.median(wall_tok_values) if wall_tok_values else None,
                 p05_wall_tok_per_s=percentile(wall_tok_values, 5.0),
                 median_ttft_us=statistics.median(ttft_values) if ttft_values else None,
+                median_us_per_token=statistics.median(us_per_token_values) if us_per_token_values else None,
+                median_wall_us_per_token=(
+                    statistics.median(wall_us_per_token_values) if wall_us_per_token_values else None
+                ),
+                median_host_child_cpu_us=(
+                    statistics.median(host_child_cpu_values) if host_child_cpu_values else None
+                ),
+                median_host_child_cpu_pct=(
+                    statistics.median(host_child_cpu_pct_values) if host_child_cpu_pct_values else None
+                ),
+                median_host_child_tok_per_cpu_s=(
+                    statistics.median(host_child_tok_per_cpu_s_values)
+                    if host_child_tok_per_cpu_s_values
+                    else None
+                ),
+                max_host_child_peak_rss_bytes=(
+                    max(host_child_peak_rss_values) if host_child_peak_rss_values else None
+                ),
                 max_memory_bytes=max(memory_values) if memory_values else None,
             )
         )
@@ -384,6 +481,42 @@ def compare_builds(metrics: list[BuildMetric], baseline_build: str) -> list[Buil
                     baseline_ttft_us=baseline.median_ttft_us,
                     candidate_ttft_us=candidate.median_ttft_us,
                     ttft_delta_pct=pct_delta(candidate.median_ttft_us, baseline.median_ttft_us),
+                    baseline_us_per_token=baseline.median_us_per_token,
+                    candidate_us_per_token=candidate.median_us_per_token,
+                    us_per_token_delta_pct=pct_delta(
+                        candidate.median_us_per_token,
+                        baseline.median_us_per_token,
+                    ),
+                    baseline_wall_us_per_token=baseline.median_wall_us_per_token,
+                    candidate_wall_us_per_token=candidate.median_wall_us_per_token,
+                    wall_us_per_token_delta_pct=pct_delta(
+                        candidate.median_wall_us_per_token,
+                        baseline.median_wall_us_per_token,
+                    ),
+                    baseline_host_child_cpu_us=baseline.median_host_child_cpu_us,
+                    candidate_host_child_cpu_us=candidate.median_host_child_cpu_us,
+                    host_child_cpu_us_delta_pct=pct_delta(
+                        candidate.median_host_child_cpu_us,
+                        baseline.median_host_child_cpu_us,
+                    ),
+                    baseline_host_child_cpu_pct=baseline.median_host_child_cpu_pct,
+                    candidate_host_child_cpu_pct=candidate.median_host_child_cpu_pct,
+                    host_child_cpu_pct_delta_pct=pct_delta(
+                        candidate.median_host_child_cpu_pct,
+                        baseline.median_host_child_cpu_pct,
+                    ),
+                    baseline_host_child_tok_per_cpu_s=baseline.median_host_child_tok_per_cpu_s,
+                    candidate_host_child_tok_per_cpu_s=candidate.median_host_child_tok_per_cpu_s,
+                    host_child_tok_per_cpu_s_delta_pct=pct_delta(
+                        candidate.median_host_child_tok_per_cpu_s,
+                        baseline.median_host_child_tok_per_cpu_s,
+                    ),
+                    baseline_host_child_peak_rss_bytes=baseline.max_host_child_peak_rss_bytes,
+                    candidate_host_child_peak_rss_bytes=candidate.max_host_child_peak_rss_bytes,
+                    host_child_peak_rss_delta_pct=pct_delta(
+                        candidate.max_host_child_peak_rss_bytes,
+                        baseline.max_host_child_peak_rss_bytes,
+                    ),
                     baseline_memory_bytes=baseline.max_memory_bytes,
                     candidate_memory_bytes=candidate.max_memory_bytes,
                     memory_delta_pct=pct_delta(candidate.max_memory_bytes, baseline.max_memory_bytes),
@@ -403,6 +536,12 @@ def find_regressions(
     max_ttft_growth_pct: float | None = None,
     max_p05_tok_regression_pct: float | None = None,
     max_p05_wall_tok_regression_pct: float | None = None,
+    max_us_per_token_growth_pct: float | None = None,
+    max_wall_us_per_token_growth_pct: float | None = None,
+    max_host_child_cpu_growth_pct: float | None = None,
+    max_host_child_cpu_pct_growth_pct: float | None = None,
+    max_host_child_tok_per_cpu_s_regression_pct: float | None = None,
+    max_host_child_rss_growth_pct: float | None = None,
 ) -> list[BuildRegression]:
     threshold = -abs(max_tok_regression_pct)
     wall_threshold = -abs(max_wall_tok_regression_pct) if max_wall_tok_regression_pct is not None else None
@@ -492,6 +631,39 @@ def find_regressions(
                     allowed_pct=abs(max_ttft_growth_pct),
                 )
             )
+        growth_checks = (
+            ("us_per_token", delta.us_per_token_delta_pct, max_us_per_token_growth_pct),
+            ("wall_us_per_token", delta.wall_us_per_token_delta_pct, max_wall_us_per_token_growth_pct),
+            ("host_child_cpu_us", delta.host_child_cpu_us_delta_pct, max_host_child_cpu_growth_pct),
+            ("host_child_cpu_pct", delta.host_child_cpu_pct_delta_pct, max_host_child_cpu_pct_growth_pct),
+            ("host_child_peak_rss_bytes", delta.host_child_peak_rss_delta_pct, max_host_child_rss_growth_pct),
+        )
+        for metric, value, limit in growth_checks:
+            if limit is not None and value is not None and value >= abs(limit):
+                regressions.append(
+                    BuildRegression(
+                        key=delta.key,
+                        candidate_build=delta.candidate_build,
+                        metric=metric,
+                        delta_pct=value,
+                        allowed_pct=abs(limit),
+                    )
+                )
+        if (
+            max_host_child_tok_per_cpu_s_regression_pct is not None
+            and delta.host_child_tok_per_cpu_s_delta_pct is not None
+            and delta.host_child_tok_per_cpu_s_delta_pct
+            <= -abs(max_host_child_tok_per_cpu_s_regression_pct)
+        ):
+            regressions.append(
+                BuildRegression(
+                    key=delta.key,
+                    candidate_build=delta.candidate_build,
+                    metric="host_child_tok_per_cpu_s",
+                    delta_pct=delta.host_child_tok_per_cpu_s_delta_pct,
+                    allowed_pct=abs(max_host_child_tok_per_cpu_s_regression_pct),
+                )
+            )
     return regressions
 
 
@@ -571,6 +743,8 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Wall throughput regressions: {len([row for row in report['regressions'] if row['metric'] == 'wall_tok_per_s'])}",
         f"P05 wall throughput regressions: {len([row for row in report['regressions'] if row['metric'] == 'wall_tok_per_s_p05'])}",
         f"TTFT regressions: {len([row for row in report['regressions'] if row['metric'] == 'ttft_us'])}",
+        f"Token latency regressions: {len([row for row in report['regressions'] if row['metric'] in {'us_per_token', 'wall_us_per_token'}])}",
+        f"Host child CPU/RSS regressions: {len([row for row in report['regressions'] if row['metric'] in {'host_child_cpu_us', 'host_child_cpu_pct', 'host_child_tok_per_cpu_s', 'host_child_peak_rss_bytes'}])}",
         f"Memory regressions: {len([row for row in report['regressions'] if row['metric'] == 'memory_bytes'])}",
         f"Coverage violations: {len(report['coverage_violations'])}",
         f"Prompt-suite drift: {len(report['prompt_suite_drift'])}",
@@ -580,9 +754,9 @@ def markdown_report(report: dict[str, Any]) -> str:
     ]
     if report["deltas"]:
         lines.append(
-            "| Candidate | Prompt key | Base tok/s | Candidate tok/s | Tok/s delta % | Base P05 tok/s | Candidate P05 tok/s | P05 tok/s delta % | Base wall tok/s | Candidate wall tok/s | Wall tok/s delta % | Base P05 wall tok/s | Candidate P05 wall tok/s | P05 wall tok/s delta % | Base elapsed us | Candidate elapsed us | Elapsed delta % | Base TTFT us | Candidate TTFT us | TTFT delta % | Base memory bytes | Candidate memory bytes | Memory delta % |"
+            "| Candidate | Prompt key | Base tok/s | Candidate tok/s | Tok/s delta % | Base P05 tok/s | Candidate P05 tok/s | P05 tok/s delta % | Base wall tok/s | Candidate wall tok/s | Wall tok/s delta % | Base P05 wall tok/s | Candidate P05 wall tok/s | P05 wall tok/s delta % | Base elapsed us | Candidate elapsed us | Elapsed delta % | Base TTFT us | Candidate TTFT us | TTFT delta % | Base us/token | Candidate us/token | us/token delta % | Base wall us/token | Candidate wall us/token | Wall us/token delta % | Base child CPU us | Candidate child CPU us | Child CPU us delta % | Base child CPU % | Candidate child CPU % | Child CPU % delta % | Base child tok/CPU s | Candidate child tok/CPU s | Child tok/CPU s delta % | Base child RSS bytes | Candidate child RSS bytes | Child RSS delta % | Base memory bytes | Candidate memory bytes | Memory delta % |"
         )
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for delta in report["deltas"]:
             lines.append(
                 "| {candidate_build} | {key} | {baseline_tok_per_s} | {candidate_tok_per_s} | "
@@ -591,6 +765,12 @@ def markdown_report(report: dict[str, Any]) -> str:
                 "{wall_tok_per_s_delta_pct} | {baseline_wall_tok_per_s_p05} | {candidate_wall_tok_per_s_p05} | "
                 "{wall_tok_per_s_p05_delta_pct} | {baseline_elapsed_us} | {candidate_elapsed_us} | {elapsed_delta_pct} | "
                 "{baseline_ttft_us} | {candidate_ttft_us} | {ttft_delta_pct} | "
+                "{baseline_us_per_token} | {candidate_us_per_token} | {us_per_token_delta_pct} | "
+                "{baseline_wall_us_per_token} | {candidate_wall_us_per_token} | {wall_us_per_token_delta_pct} | "
+                "{baseline_host_child_cpu_us} | {candidate_host_child_cpu_us} | {host_child_cpu_us_delta_pct} | "
+                "{baseline_host_child_cpu_pct} | {candidate_host_child_cpu_pct} | {host_child_cpu_pct_delta_pct} | "
+                "{baseline_host_child_tok_per_cpu_s} | {candidate_host_child_tok_per_cpu_s} | {host_child_tok_per_cpu_s_delta_pct} | "
+                "{baseline_host_child_peak_rss_bytes} | {candidate_host_child_peak_rss_bytes} | {host_child_peak_rss_delta_pct} | "
                 "{baseline_memory_bytes} | {candidate_memory_bytes} | {memory_delta_pct} |".format(
                     **{key: format_value(value) for key, value in delta.items()}
                 )
@@ -647,6 +827,24 @@ def write_csv(deltas: list[BuildDelta], path: Path) -> None:
         "baseline_ttft_us",
         "candidate_ttft_us",
         "ttft_delta_pct",
+        "baseline_us_per_token",
+        "candidate_us_per_token",
+        "us_per_token_delta_pct",
+        "baseline_wall_us_per_token",
+        "candidate_wall_us_per_token",
+        "wall_us_per_token_delta_pct",
+        "baseline_host_child_cpu_us",
+        "candidate_host_child_cpu_us",
+        "host_child_cpu_us_delta_pct",
+        "baseline_host_child_cpu_pct",
+        "candidate_host_child_cpu_pct",
+        "host_child_cpu_pct_delta_pct",
+        "baseline_host_child_tok_per_cpu_s",
+        "candidate_host_child_tok_per_cpu_s",
+        "host_child_tok_per_cpu_s_delta_pct",
+        "baseline_host_child_peak_rss_bytes",
+        "candidate_host_child_peak_rss_bytes",
+        "host_child_peak_rss_delta_pct",
         "baseline_memory_bytes",
         "candidate_memory_bytes",
         "memory_delta_pct",
@@ -752,6 +950,24 @@ def write_junit(
                 f"baseline_ttft_us={format_value(delta.baseline_ttft_us)}\n"
                 f"candidate_ttft_us={format_value(delta.candidate_ttft_us)}\n"
                 f"ttft_delta_pct={format_value(delta.ttft_delta_pct)}\n"
+                f"baseline_us_per_token={format_value(delta.baseline_us_per_token)}\n"
+                f"candidate_us_per_token={format_value(delta.candidate_us_per_token)}\n"
+                f"us_per_token_delta_pct={format_value(delta.us_per_token_delta_pct)}\n"
+                f"baseline_wall_us_per_token={format_value(delta.baseline_wall_us_per_token)}\n"
+                f"candidate_wall_us_per_token={format_value(delta.candidate_wall_us_per_token)}\n"
+                f"wall_us_per_token_delta_pct={format_value(delta.wall_us_per_token_delta_pct)}\n"
+                f"baseline_host_child_cpu_us={format_value(delta.baseline_host_child_cpu_us)}\n"
+                f"candidate_host_child_cpu_us={format_value(delta.candidate_host_child_cpu_us)}\n"
+                f"host_child_cpu_us_delta_pct={format_value(delta.host_child_cpu_us_delta_pct)}\n"
+                f"baseline_host_child_cpu_pct={format_value(delta.baseline_host_child_cpu_pct)}\n"
+                f"candidate_host_child_cpu_pct={format_value(delta.candidate_host_child_cpu_pct)}\n"
+                f"host_child_cpu_pct_delta_pct={format_value(delta.host_child_cpu_pct_delta_pct)}\n"
+                f"baseline_host_child_tok_per_cpu_s={format_value(delta.baseline_host_child_tok_per_cpu_s)}\n"
+                f"candidate_host_child_tok_per_cpu_s={format_value(delta.candidate_host_child_tok_per_cpu_s)}\n"
+                f"host_child_tok_per_cpu_s_delta_pct={format_value(delta.host_child_tok_per_cpu_s_delta_pct)}\n"
+                f"baseline_host_child_peak_rss_bytes={format_value(delta.baseline_host_child_peak_rss_bytes)}\n"
+                f"candidate_host_child_peak_rss_bytes={format_value(delta.candidate_host_child_peak_rss_bytes)}\n"
+                f"host_child_peak_rss_delta_pct={format_value(delta.host_child_peak_rss_delta_pct)}\n"
                 f"baseline_memory_bytes={format_value(delta.baseline_memory_bytes)}\n"
                 f"candidate_memory_bytes={format_value(delta.candidate_memory_bytes)}\n"
                 f"memory_delta_pct={format_value(delta.memory_delta_pct)}\n"
@@ -815,6 +1031,12 @@ def write_report(
     max_ttft_growth_pct: float | None = None,
     max_p05_tok_regression_pct: float | None = None,
     max_p05_wall_tok_regression_pct: float | None = None,
+    max_us_per_token_growth_pct: float | None = None,
+    max_wall_us_per_token_growth_pct: float | None = None,
+    max_host_child_cpu_growth_pct: float | None = None,
+    max_host_child_cpu_pct_growth_pct: float | None = None,
+    max_host_child_tok_per_cpu_s_regression_pct: float | None = None,
+    max_host_child_rss_growth_pct: float | None = None,
     min_ok_runs_per_build: int = 0,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -826,6 +1048,12 @@ def write_report(
         max_ttft_growth_pct=max_ttft_growth_pct,
         max_p05_tok_regression_pct=max_p05_tok_regression_pct,
         max_p05_wall_tok_regression_pct=max_p05_wall_tok_regression_pct,
+        max_us_per_token_growth_pct=max_us_per_token_growth_pct,
+        max_wall_us_per_token_growth_pct=max_wall_us_per_token_growth_pct,
+        max_host_child_cpu_growth_pct=max_host_child_cpu_growth_pct,
+        max_host_child_cpu_pct_growth_pct=max_host_child_cpu_pct_growth_pct,
+        max_host_child_tok_per_cpu_s_regression_pct=max_host_child_tok_per_cpu_s_regression_pct,
+        max_host_child_rss_growth_pct=max_host_child_rss_growth_pct,
     )
     coverage_violations = find_coverage_violations(deltas, min_ok_runs_per_build)
     prompt_suite_drift = find_prompt_suite_drift(deltas)
@@ -846,6 +1074,24 @@ def write_report(
         else None,
         "max_memory_growth_pct": abs(max_memory_growth_pct) if max_memory_growth_pct is not None else None,
         "max_ttft_growth_pct": abs(max_ttft_growth_pct) if max_ttft_growth_pct is not None else None,
+        "max_us_per_token_growth_pct": abs(max_us_per_token_growth_pct)
+        if max_us_per_token_growth_pct is not None
+        else None,
+        "max_wall_us_per_token_growth_pct": abs(max_wall_us_per_token_growth_pct)
+        if max_wall_us_per_token_growth_pct is not None
+        else None,
+        "max_host_child_cpu_growth_pct": abs(max_host_child_cpu_growth_pct)
+        if max_host_child_cpu_growth_pct is not None
+        else None,
+        "max_host_child_cpu_pct_growth_pct": abs(max_host_child_cpu_pct_growth_pct)
+        if max_host_child_cpu_pct_growth_pct is not None
+        else None,
+        "max_host_child_tok_per_cpu_s_regression_pct": abs(max_host_child_tok_per_cpu_s_regression_pct)
+        if max_host_child_tok_per_cpu_s_regression_pct is not None
+        else None,
+        "max_host_child_rss_growth_pct": abs(max_host_child_rss_growth_pct)
+        if max_host_child_rss_growth_pct is not None
+        else None,
         "min_ok_runs_per_build": max(0, min_ok_runs_per_build),
         "metrics": [asdict(metric) for metric in metrics],
         "deltas": [asdict(delta) for delta in deltas],
@@ -913,6 +1159,36 @@ def build_parser() -> argparse.ArgumentParser:
         help="Allowed median first-token latency growth before a regression is reported; omitted disables TTFT gating",
     )
     parser.add_argument(
+        "--max-us-per-token-growth-pct",
+        type=float,
+        help="Allowed guest median us/token growth before a regression is reported; omitted disables token-latency gating",
+    )
+    parser.add_argument(
+        "--max-wall-us-per-token-growth-pct",
+        type=float,
+        help="Allowed host wall-clock median us/token growth before a regression is reported; omitted disables wall token-latency gating",
+    )
+    parser.add_argument(
+        "--max-host-child-cpu-growth-pct",
+        type=float,
+        help="Allowed median direct-child CPU time growth before a regression is reported; omitted disables CPU-time gating",
+    )
+    parser.add_argument(
+        "--max-host-child-cpu-pct-growth-pct",
+        type=float,
+        help="Allowed median direct-child CPU utilization growth before a regression is reported; omitted disables CPU-utilization gating",
+    )
+    parser.add_argument(
+        "--max-host-child-tok-per-cpu-s-regression-pct",
+        type=float,
+        help="Allowed direct-child tok/CPU-second drop before a regression is reported; omitted disables CPU-efficiency gating",
+    )
+    parser.add_argument(
+        "--max-host-child-rss-growth-pct",
+        type=float,
+        help="Allowed direct-child peak RSS growth before a regression is reported; omitted disables host RSS gating",
+    )
+    parser.add_argument(
         "--min-ok-runs-per-build",
         type=int,
         default=0,
@@ -954,6 +1230,12 @@ def main(argv: list[str] | None = None) -> int:
         max_ttft_growth_pct=args.max_ttft_growth_pct,
         max_p05_tok_regression_pct=args.max_p05_tok_regression_pct,
         max_p05_wall_tok_regression_pct=args.max_p05_wall_tok_regression_pct,
+        max_us_per_token_growth_pct=args.max_us_per_token_growth_pct,
+        max_wall_us_per_token_growth_pct=args.max_wall_us_per_token_growth_pct,
+        max_host_child_cpu_growth_pct=args.max_host_child_cpu_growth_pct,
+        max_host_child_cpu_pct_growth_pct=args.max_host_child_cpu_pct_growth_pct,
+        max_host_child_tok_per_cpu_s_regression_pct=args.max_host_child_tok_per_cpu_s_regression_pct,
+        max_host_child_rss_growth_pct=args.max_host_child_rss_growth_pct,
         min_ok_runs_per_build=args.min_ok_runs_per_build,
     )
     regressions = find_regressions(
@@ -964,6 +1246,12 @@ def main(argv: list[str] | None = None) -> int:
         max_ttft_growth_pct=args.max_ttft_growth_pct,
         max_p05_tok_regression_pct=args.max_p05_tok_regression_pct,
         max_p05_wall_tok_regression_pct=args.max_p05_wall_tok_regression_pct,
+        max_us_per_token_growth_pct=args.max_us_per_token_growth_pct,
+        max_wall_us_per_token_growth_pct=args.max_wall_us_per_token_growth_pct,
+        max_host_child_cpu_growth_pct=args.max_host_child_cpu_growth_pct,
+        max_host_child_cpu_pct_growth_pct=args.max_host_child_cpu_pct_growth_pct,
+        max_host_child_tok_per_cpu_s_regression_pct=args.max_host_child_tok_per_cpu_s_regression_pct,
+        max_host_child_rss_growth_pct=args.max_host_child_rss_growth_pct,
     )
     coverage_violations = find_coverage_violations(deltas, args.min_ok_runs_per_build)
     prompt_suite_drift = find_prompt_suite_drift(deltas)

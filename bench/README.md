@@ -626,13 +626,20 @@ dashboard passes; missing explicit comparison commits are written to
 prompt/profile/model/quantization and writes per-build throughput and elapsed
 time deltas to `bench/results/` as JSON, Markdown, CSV, and JUnit XML. It also
 compares P05 guest tok/s, median and P05 host wall-clock tok/s, first-token
-latency, and max memory bytes when benchmark reports include that telemetry. Use
+latency, guest/wall us-per-token latency, direct-child CPU time/utilization,
+direct-child tok/CPU-second efficiency, direct-child peak RSS, and max memory
+bytes when benchmark reports include that telemetry. Use
 `--fail-on-regression` with `--max-tok-regression-pct` to gate median guest
 tok/s drops in CI without launching QEMU, add `--max-p05-tok-regression-pct` to
 gate low-tail guest tok/s drops, add `--max-wall-tok-regression-pct` to gate
 host-observed tok/s drops, add `--max-p05-wall-tok-regression-pct` to gate
 low-tail host-observed tok/s drops, add `--max-ttft-growth-pct` to gate
-first-token latency growth, and add `--max-memory-growth-pct` to gate peak memory growth. Use
+first-token latency growth, add `--max-us-per-token-growth-pct` or
+`--max-wall-us-per-token-growth-pct` to gate per-token latency growth, add
+`--max-host-child-cpu-growth-pct`, `--max-host-child-cpu-pct-growth-pct`,
+`--max-host-child-tok-per-cpu-s-regression-pct`, or
+`--max-host-child-rss-growth-pct` to gate host CPU/RSS drift, and add
+`--max-memory-growth-pct` to gate peak memory growth. Use
 `--min-ok-runs-per-build` with `--fail-on-coverage` to reject comparisons where
 the baseline or candidate build has too few successful runs for a prompt key.
 Coverage violations are written to
@@ -655,6 +662,10 @@ python3 bench/build_compare.py \
   --max-wall-tok-regression-pct 5 \
   --max-p05-wall-tok-regression-pct 10 \
   --max-ttft-growth-pct 10 \
+  --max-us-per-token-growth-pct 10 \
+  --max-wall-us-per-token-growth-pct 10 \
+  --max-host-child-tok-per-cpu-s-regression-pct 10 \
+  --max-host-child-rss-growth-pct 10 \
   --max-memory-growth-pct 10 \
   --min-ok-runs-per-build 3 \
   --fail-on-coverage
