@@ -724,14 +724,18 @@ python3 bench/build_compare.py \
 llama.cpp against the same local gold JSONL dataset. It aligns by record id,
 supports prediction indexes, labels, exact choice text, or score arrays, and
 writes JSON, Markdown, per-record CSV, per-dataset/split breakdown CSV,
-confusion-matrix CSV, calibration-bin CSV, engine-disagreement CSV, and JUnit XML reports to
-`bench/results/`. Reports include
+confusion-matrix CSV, calibration-bin CSV, score-margin CSV,
+engine-disagreement CSV, and JUnit XML reports to `bench/results/`. Reports include
 accuracy, agreement, macro-F1, per-answer F1, per-dataset/split breakdowns, and
-confusion matrices for each engine. Accuracy and agreement summaries also
-include stdlib-only Wilson confidence intervals; use `--confidence-level` to
-select 0.80, 0.90, 0.95, 0.98, or 0.99. Add `--gate-dataset-breakdowns` to apply
-the same quality gates to each dataset/split bucket, which prevents mixed eval
-suites from hiding small-subset regressions behind healthy aggregate scores.
+confusion matrices for each engine. Score-vector reports include calibration,
+gold-rank, and predicted-vs-runner-up margin telemetry; use
+`--min-holyc-margin-coverage` and `--min-holyc-mean-margin` to fail CI when
+HolyC score margins are missing or too weak. Accuracy and agreement summaries
+also include stdlib-only Wilson confidence intervals; use `--confidence-level`
+to select 0.80, 0.90, 0.95, 0.98, or 0.99. Add `--gate-dataset-breakdowns` to
+apply the same quality gates to each dataset/split bucket, which prevents mixed
+eval suites from hiding small-subset regressions behind healthy aggregate
+scores.
 
 Before comparing, `eval_input_audit.py` can gate apples-to-apples inputs. It
 checks gold/prediction record coverage, duplicates, invalid prediction indexes,

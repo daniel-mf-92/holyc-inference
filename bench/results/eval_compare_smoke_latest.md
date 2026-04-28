@@ -1,6 +1,6 @@
 # Eval Compare Report
 
-Generated: 2026-04-28T18:34:33Z
+Generated: 2026-04-28T19:27:35Z
 Dataset: smoke-eval
 Split: validation
 Quantization: Q4_0
@@ -39,6 +39,13 @@ Status: pass
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | HolyC | 1/3 (0.3333) | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
 | llama.cpp | 1/3 (0.3333) | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+
+## Score Margins
+
+| Engine | Score coverage | Mean margin | Median margin | P10 margin | Min margin | Mean correct | Mean wrong | Low-margin rows |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| HolyC | 1/3 (0.3333) | 0.9990 | 0.9990 | 0.9990 | 0.9990 | 0.9990 | 0.0000 | 0 <= 0.1000 (0.0000) |
+| llama.cpp | 1/3 (0.3333) | 0.7185 | 0.7185 | 0.7185 | 0.7185 | 0.7185 | 0.0000 | 0 <= 0.1000 (0.0000) |
 
 ## Dataset Breakdown
 

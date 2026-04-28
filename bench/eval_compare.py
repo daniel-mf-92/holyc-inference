@@ -14,6 +14,7 @@ import csv
 import hashlib
 import json
 import math
+import statistics
 import sys
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
@@ -38,6 +39,7 @@ CONFIDENCE_Z = {
     0.98: 2.3263478740408408,
     0.99: 2.5758293035489004,
 }
+LOW_MARGIN_THRESHOLD = 0.10
 
 
 @dataclass(frozen=True)
@@ -441,6 +443,51 @@ def rank_metrics(rows: list[EvalRow], engine: str, *, max_k: int = 3) -> dict[st
     }
 
 
+def percentile(values: list[float], fraction: float) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    index = min(len(ordered) - 1, max(0, math.ceil(len(ordered) * fraction) - 1))
+    return ordered[index]
+
+
+def margin_metrics(
+    rows: list[EvalRow],
+    engine: str,
+    *,
+    low_margin_threshold: float = LOW_MARGIN_THRESHOLD,
+) -> dict[str, Any]:
+    scored_margins: list[float] = []
+    correct_margins: list[float] = []
+    wrong_margins: list[float] = []
+    for row in rows:
+        margin = row.holyc_margin if engine == "holyc" else row.llama_margin
+        if margin is None:
+            continue
+        value = float(margin)
+        scored_margins.append(value)
+        correct = row.holyc_correct if engine == "holyc" else row.llama_correct
+        if correct:
+            correct_margins.append(value)
+        else:
+            wrong_margins.append(value)
+    low_margin_count = sum(1 for margin in scored_margins if margin <= low_margin_threshold)
+    return {
+        "low_margin_count": low_margin_count,
+        "low_margin_rate": safe_div(low_margin_count, len(scored_margins)),
+        "low_margin_threshold": low_margin_threshold,
+        "mean_correct_margin": safe_div(sum(correct_margins), len(correct_margins)),
+        "mean_margin": safe_div(sum(scored_margins), len(scored_margins)),
+        "mean_wrong_margin": safe_div(sum(wrong_margins), len(wrong_margins)),
+        "median_margin": statistics.median(scored_margins) if scored_margins else 0.0,
+        "min_margin": min(scored_margins) if scored_margins else 0.0,
+        "p10_margin": percentile(scored_margins, 0.10),
+        "score_coverage": safe_div(len(scored_margins), len(rows)),
+        "scored_count": len(scored_margins),
+        "total_count": len(rows),
+    }
+
+
 def calibration_metrics(
     gold: dict[str, GoldCase],
     predictions: dict[str, Prediction],
@@ -524,8 +571,10 @@ def dataset_breakdown(rows: list[EvalRow]) -> list[dict[str, Any]]:
                 "dataset": dataset,
                 "holyc_accuracy": accuracy(holyc_correct, total),
                 "holyc_correct": holyc_correct,
+                "holyc_margin_metrics": margin_metrics(group_rows, "holyc"),
                 "llama_accuracy": accuracy(llama_correct, total),
                 "llama_correct": llama_correct,
+                "llama_margin_metrics": margin_metrics(group_rows, "llama"),
                 "mcnemar_exact": exact_mcnemar_test(holyc_only_correct, llama_only_correct),
                 "paired_correctness": {
                     "both_correct": both_correct,
@@ -599,6 +648,7 @@ def compare(
         "holyc_confusion_matrix": holyc_metrics["confusion_matrix"],
         "holyc_correct": holyc_correct,
         "holyc_macro_f1": holyc_metrics["macro_f1"],
+        "holyc_margin_metrics": margin_metrics(rows, "holyc"),
         "holyc_per_answer_index": holyc_metrics["per_answer_index"],
         "holyc_rank_metrics": rank_metrics(rows, "holyc"),
         "llama_accuracy": accuracy(llama_correct, total),
@@ -606,6 +656,7 @@ def compare(
         "llama_confusion_matrix": llama_metrics["confusion_matrix"],
         "llama_correct": llama_correct,
         "llama_macro_f1": llama_metrics["macro_f1"],
+        "llama_margin_metrics": margin_metrics(rows, "llama"),
         "llama_per_answer_index": llama_metrics["per_answer_index"],
         "llama_rank_metrics": rank_metrics(rows, "llama"),
         "mcnemar_exact": exact_mcnemar_test(holyc_only_correct, llama_only_correct),
@@ -694,6 +745,25 @@ def markdown_report(report: dict[str, Any]) -> str:
             f"({metrics['score_coverage']:.4f}) | {metrics['top_1_accuracy']:.4f} | "
             f"{metrics['top_2_accuracy']:.4f} | {metrics['top_3_accuracy']:.4f} | "
             f"{metrics['mean_gold_rank']:.4f} | {metrics['mean_reciprocal_rank']:.4f} |"
+        )
+    lines.append("")
+    lines.extend(
+        [
+            "## Score Margins",
+            "",
+            "| Engine | Score coverage | Mean margin | Median margin | P10 margin | Min margin | Mean correct | Mean wrong | Low-margin rows |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
+    for engine_label, key in (("HolyC", "holyc_margin_metrics"), ("llama.cpp", "llama_margin_metrics")):
+        metrics = summary[key]
+        lines.append(
+            f"| {engine_label} | {metrics['scored_count']}/{metrics['total_count']} "
+            f"({metrics['score_coverage']:.4f}) | {metrics['mean_margin']:.4f} | "
+            f"{metrics['median_margin']:.4f} | {metrics['p10_margin']:.4f} | "
+            f"{metrics['min_margin']:.4f} | {metrics['mean_correct_margin']:.4f} | "
+            f"{metrics['mean_wrong_margin']:.4f} | {metrics['low_margin_count']} "
+            f"<= {metrics['low_margin_threshold']:.4f} ({metrics['low_margin_rate']:.4f}) |"
         )
     lines.append("")
     breakdown = summary.get("dataset_breakdown", [])
@@ -808,6 +878,8 @@ def find_regressions(
     min_agreement: float | None = None,
     max_accuracy_drop: float | None = None,
     max_mcnemar_loss_p: float | None = None,
+    min_holyc_margin_coverage: float | None = None,
+    min_holyc_mean_margin: float | None = None,
     scope: str = "overall",
     dataset: str = "",
     split: str = "",
@@ -885,6 +957,41 @@ def find_regressions(
                     split=split,
                 )
             )
+    holyc_margin = summary.get("holyc_margin_metrics", {})
+    if min_holyc_margin_coverage is not None:
+        coverage = float(holyc_margin.get("score_coverage", 0.0))
+        if coverage < min_holyc_margin_coverage:
+            regressions.append(
+                EvalRegression(
+                    metric="holyc_margin_score_coverage",
+                    value=coverage,
+                    threshold=min_holyc_margin_coverage,
+                    message=(
+                        f"{prefix}HolyC margin score coverage {coverage:.4f} "
+                        f"is below minimum {min_holyc_margin_coverage:.4f}"
+                    ),
+                    scope=scope,
+                    dataset=dataset,
+                    split=split,
+                )
+            )
+    if min_holyc_mean_margin is not None:
+        mean_margin = float(holyc_margin.get("mean_margin", 0.0))
+        if mean_margin < min_holyc_mean_margin:
+            regressions.append(
+                EvalRegression(
+                    metric="holyc_mean_margin",
+                    value=mean_margin,
+                    threshold=min_holyc_mean_margin,
+                    message=(
+                        f"{prefix}HolyC mean prediction margin {mean_margin:.4f} "
+                        f"is below minimum {min_holyc_mean_margin:.4f}"
+                    ),
+                    scope=scope,
+                    dataset=dataset,
+                    split=split,
+                )
+            )
     return regressions
 
 
@@ -895,6 +1002,8 @@ def find_all_regressions(summary: dict[str, Any], args: argparse.Namespace) -> l
         min_agreement=args.min_agreement,
         max_accuracy_drop=args.max_accuracy_drop,
         max_mcnemar_loss_p=args.max_mcnemar_loss_p,
+        min_holyc_margin_coverage=args.min_holyc_margin_coverage,
+        min_holyc_mean_margin=args.min_holyc_mean_margin,
     )
     if args.gate_dataset_breakdowns:
         for item in summary.get("dataset_breakdown", []):
@@ -905,6 +1014,8 @@ def find_all_regressions(summary: dict[str, Any], args: argparse.Namespace) -> l
                     min_agreement=args.min_agreement,
                     max_accuracy_drop=args.max_accuracy_drop,
                     max_mcnemar_loss_p=args.max_mcnemar_loss_p,
+                    min_holyc_margin_coverage=args.min_holyc_margin_coverage,
+                    min_holyc_mean_margin=args.min_holyc_mean_margin,
                     scope="dataset_split",
                     dataset=item["dataset"],
                     split=item["split"],
@@ -1042,6 +1153,55 @@ def write_calibration_bins_csv_report(path: Path, summary: dict[str, Any]) -> No
                 )
 
 
+def write_margin_csv_report(path: Path, summary: dict[str, Any]) -> None:
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        fields = [
+            "scope",
+            "dataset",
+            "split",
+            "engine",
+            "total_count",
+            "scored_count",
+            "score_coverage",
+            "mean_margin",
+            "median_margin",
+            "p10_margin",
+            "min_margin",
+            "mean_correct_margin",
+            "mean_wrong_margin",
+            "low_margin_threshold",
+            "low_margin_count",
+            "low_margin_rate",
+        ]
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        rows: list[dict[str, Any]] = [
+            {"scope": "overall", "dataset": "", "split": "", "engine": "holyc", **summary["holyc_margin_metrics"]},
+            {"scope": "overall", "dataset": "", "split": "", "engine": "llama", **summary["llama_margin_metrics"]},
+        ]
+        for item in summary.get("dataset_breakdown", []):
+            rows.append(
+                {
+                    "scope": "dataset_split",
+                    "dataset": item.get("dataset", ""),
+                    "split": item.get("split", ""),
+                    "engine": "holyc",
+                    **item["holyc_margin_metrics"],
+                }
+            )
+            rows.append(
+                {
+                    "scope": "dataset_split",
+                    "dataset": item.get("dataset", ""),
+                    "split": item.get("split", ""),
+                    "engine": "llama",
+                    **item["llama_margin_metrics"],
+                }
+            )
+        for row in rows:
+            writer.writerow({field: row.get(field, "") for field in fields})
+
+
 def write_disagreements_csv_report(path: Path, rows: list[EvalRow]) -> None:
     with path.open("w", newline="", encoding="utf-8") as handle:
         fields = [
@@ -1076,7 +1236,7 @@ def write_report(
     gold_path: Path,
     holyc_path: Path,
     llama_path: Path,
-) -> tuple[Path, Path, Path, Path, Path, Path, Path]:
+) -> tuple[Path, Path, Path, Path, Path, Path, Path, Path]:
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     regressions = find_all_regressions(summary, args)
@@ -1089,6 +1249,8 @@ def write_report(
         "llama_predictions_sha256": file_sha256(llama_path),
         "max_accuracy_drop": args.max_accuracy_drop,
         "max_mcnemar_loss_p": args.max_mcnemar_loss_p,
+        "min_holyc_margin_coverage": args.min_holyc_margin_coverage,
+        "min_holyc_mean_margin": args.min_holyc_mean_margin,
         "model": args.model,
         "min_agreement": args.min_agreement,
         "min_holyc_accuracy": args.min_holyc_accuracy,
@@ -1106,6 +1268,7 @@ def write_report(
     breakdown_csv_path = output_dir / f"{stem}_breakdown.csv"
     confusion_csv_path = output_dir / f"{stem}_confusion.csv"
     calibration_bins_csv_path = output_dir / f"{stem}_calibration_bins.csv"
+    margin_csv_path = output_dir / f"{stem}_margins.csv"
     disagreements_csv_path = output_dir / f"{stem}_disagreements.csv"
     junit_path = output_dir / f"{stem}_junit.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -1114,6 +1277,7 @@ def write_report(
     write_breakdown_csv_report(breakdown_csv_path, summary.get("dataset_breakdown", []))
     write_confusion_csv_report(confusion_csv_path, summary)
     write_calibration_bins_csv_report(calibration_bins_csv_path, summary)
+    write_margin_csv_report(margin_csv_path, summary)
     write_disagreements_csv_report(disagreements_csv_path, rows)
     write_junit(regressions, junit_path)
     return (
@@ -1123,6 +1287,7 @@ def write_report(
         breakdown_csv_path,
         confusion_csv_path,
         calibration_bins_csv_path,
+        margin_csv_path,
         disagreements_csv_path,
     )
 
@@ -1158,6 +1323,16 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--min-holyc-margin-coverage",
+        type=float,
+        help="Minimum fraction of HolyC predictions with score vectors for margin telemetry",
+    )
+    parser.add_argument(
+        "--min-holyc-mean-margin",
+        type=float,
+        help="Minimum mean HolyC predicted-vs-runner-up probability margin before CI gate failure",
+    )
+    parser.add_argument(
         "--gate-dataset-breakdowns",
         action="store_true",
         help="Apply configured quality gates to each dataset/split breakdown as well as the aggregate",
@@ -1177,6 +1352,8 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         validate_probability_threshold(args.max_mcnemar_loss_p, "--max-mcnemar-loss-p")
+        validate_probability_threshold(args.min_holyc_margin_coverage, "--min-holyc-margin-coverage")
+        validate_probability_threshold(args.min_holyc_mean_margin, "--min-holyc-mean-margin")
         gold = load_gold(args.gold, args.dataset, args.split)
         holyc_predictions = load_predictions(args.holyc, gold)
         llama_predictions = load_predictions(args.llama, gold)
@@ -1189,6 +1366,7 @@ def main(argv: list[str] | None = None) -> int:
             breakdown_csv_path,
             confusion_csv_path,
             calibration_bins_csv_path,
+            margin_csv_path,
             disagreements_csv_path,
         ) = write_report(
             rows, summary, args, args.gold, args.holyc, args.llama
@@ -1203,6 +1381,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"wrote_breakdown_csv={breakdown_csv_path}")
     print(f"wrote_confusion_csv={confusion_csv_path}")
     print(f"wrote_calibration_bins_csv={calibration_bins_csv_path}")
+    print(f"wrote_margin_csv={margin_csv_path}")
     print(f"wrote_disagreements_csv={disagreements_csv_path}")
     print(f"holyc_accuracy={summary['holyc_accuracy']:.4f}")
     print(f"llama_accuracy={summary['llama_accuracy']:.4f}")

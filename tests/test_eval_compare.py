@@ -47,6 +47,8 @@ def test_smoke_predictions_compare_cleanly() -> None:
     assert summary["holyc_rank_metrics"]["scored_count"] == 1
     assert summary["holyc_rank_metrics"]["top_1_accuracy"] == 1.0
     assert summary["holyc_rank_metrics"]["mean_reciprocal_rank"] == 1.0
+    assert summary["holyc_margin_metrics"]["scored_count"] == 1
+    assert summary["holyc_margin_metrics"]["score_coverage"] == 1 / 3
     assert [item["dataset"] for item in summary["dataset_breakdown"]] == [
         "arc-smoke",
         "hellaswag-smoke",
@@ -94,6 +96,7 @@ def test_cli_writes_json_and_markdown_report() -> None:
         calibration_rows = list(
             csv.DictReader((Path(tmp) / "smoke_calibration_bins.csv").open(newline="", encoding="utf-8"))
         )
+        margin_rows = list(csv.DictReader((Path(tmp) / "smoke_margins.csv").open(newline="", encoding="utf-8")))
         disagreement_rows = list(
             csv.DictReader((Path(tmp) / "smoke_disagreements.csv").open(newline="", encoding="utf-8"))
         )
@@ -121,11 +124,16 @@ def test_cli_writes_json_and_markdown_report() -> None:
         assert "## Confidence Intervals" in markdown
         assert "## Score Calibration" in markdown
         assert "## Score Ranking" in markdown
+        assert "## Score Margins" in markdown
         assert "No quality gate regressions." in markdown
         assert len(csv_rows) == 3
         assert len(breakdown_rows) == 3
         assert len(calibration_rows) == 20
+        assert len(margin_rows) == 8
         assert {row["engine"] for row in calibration_rows} == {"holyc", "llama"}
+        assert margin_rows[0]["scope"] == "overall"
+        assert margin_rows[0]["engine"] == "holyc"
+        assert margin_rows[0]["scored_count"] == "1"
         assert calibration_rows[0]["bin_index"] == "0"
         assert calibration_rows[-1]["bin_index"] == "9"
         assert breakdown_rows[0]["dataset"] == "arc-smoke"
@@ -197,6 +205,10 @@ def test_compare_reports_score_vector_calibration() -> None:
     assert summary["holyc_rank_metrics"]["mean_gold_rank"] == 1.5
     assert summary["holyc_rank_metrics"]["mean_reciprocal_rank"] == 0.75
     assert summary["llama_rank_metrics"]["mean_reciprocal_rank"] == 1.0
+    assert summary["holyc_margin_metrics"]["scored_count"] == 2
+    assert summary["holyc_margin_metrics"]["low_margin_threshold"] == 0.10
+    assert round(summary["holyc_margin_metrics"]["mean_margin"], 4) == 0.7616
+    assert summary["llama_margin_metrics"]["mean_margin"] > summary["holyc_margin_metrics"]["mean_margin"]
 
 
 def test_confidence_level_can_be_configured() -> None:
@@ -531,6 +543,47 @@ def test_cli_can_gate_significant_paired_mcnemar_loss() -> None:
         assert junit_root.attrib["failures"] == "1"
 
 
+def test_cli_can_gate_holyc_margin_telemetry() -> None:
+    gold = BENCH_PATH / "datasets" / "samples" / "smoke_eval.jsonl"
+    holyc = BENCH_PATH / "eval" / "samples" / "holyc_smoke_predictions.jsonl"
+    llama = BENCH_PATH / "eval" / "samples" / "llama_smoke_predictions.jsonl"
+    with tempfile.TemporaryDirectory() as tmp:
+        status = eval_compare.main(
+            [
+                "--gold",
+                str(gold),
+                "--holyc",
+                str(holyc),
+                "--llama",
+                str(llama),
+                "--dataset",
+                "smoke-eval",
+                "--split",
+                "validation",
+                "--output-dir",
+                tmp,
+                "--output-stem",
+                "margin_gated",
+                "--min-holyc-margin-coverage",
+                "0.5",
+                "--min-holyc-mean-margin",
+                "0.9999",
+                "--fail-on-regression",
+            ]
+        )
+        payload = json.loads((Path(tmp) / "margin_gated.json").read_text(encoding="utf-8"))
+        junit_root = ET.parse(Path(tmp) / "margin_gated_junit.xml").getroot()
+
+        assert status == 1
+        assert payload["min_holyc_margin_coverage"] == 0.5
+        assert payload["min_holyc_mean_margin"] == 0.9999
+        assert {row["metric"] for row in payload["regressions"]} == {
+            "holyc_margin_score_coverage",
+            "holyc_mean_margin",
+        }
+        assert junit_root.attrib["failures"] == "2"
+
+
 def test_mcnemar_gate_does_not_fail_when_holyc_wins() -> None:
     summary = {
         "accuracy_delta_holyc_minus_llama": 1.0,
@@ -562,5 +615,6 @@ if __name__ == "__main__":
     test_cli_writes_disagreement_csv_for_engine_mismatches()
     test_cli_can_gate_dataset_breakdown_regressions()
     test_cli_can_gate_significant_paired_mcnemar_loss()
+    test_cli_can_gate_holyc_margin_telemetry()
     test_mcnemar_gate_does_not_fail_when_holyc_wins()
     print("eval_compare_tests=ok")

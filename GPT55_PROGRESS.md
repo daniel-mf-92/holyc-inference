@@ -156,3 +156,4 @@
 2026-04-28T19:05:57Z | Added build_compare QEMU command hash drift gate with CSV/JUnit/Markdown coverage.
 2026-04-28T19:12:07Z | Added eval dataset schema answer-skew telemetry/gates with smoke coverage and refreshed schema artifacts.
 2026-04-28T19:18:48Z | Added HellaSwag ctx_a/ctx_b prompt normalization for offline eval dataset packing with smoke coverage.
+2026-04-28T19:27:43Z | Added eval_compare score-margin telemetry, CSV output, optional HolyC margin gates, and refreshed smoke artifacts.
