@@ -205,6 +205,11 @@ Memory telemetry is optional. The runner normalizes `memory_bytes`,
 and `_mb` variants into `memory_bytes` so the perf regression dashboard can
 track peak memory alongside tok/s.
 
+Each measured run also records `wall_tok_per_s`, derived from host wall-clock
+elapsed time and emitted token count. This is reported next to guest telemetry
+in JSON, Markdown, and CSV so suspicious guest-side timing can be compared
+against the host-observed launch duration.
+
 Use `--max-suite-cv-pct` and `--max-prompt-cv-pct` to fail noisy benchmark runs
 when measured tok/s coefficient of variation exceeds a CI threshold. Gate
 findings are written into the JSON and Markdown reports as

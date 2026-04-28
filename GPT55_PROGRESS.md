@@ -58,3 +58,4 @@
 2026-04-27T23:47:43Z | Added JUnit XML export for benchmark matrix cells with smoke coverage and refreshed matrix artifacts.
 2026-04-27T23:56:01Z | Added JUnit XML export for benchmark air-gap audits with smoke coverage and refreshed audit artifacts.
 2026-04-28T00:01:28Z | Added optional QEMU first-token latency telemetry with synthetic smoke coverage and refreshed benchmark artifacts.
+2026-04-28T00:07:37Z | Added host wall-clock tok/s telemetry to QEMU prompt benchmarks with refreshed synthetic smoke artifacts.
