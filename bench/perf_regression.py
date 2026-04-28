@@ -91,6 +91,7 @@ class CommitPoint:
     p95_ttft_us: float | None
     median_host_overhead_pct: float | None
     tok_per_s_cv_pct: float | None
+    wall_tok_per_s_cv_pct: float | None
     max_memory_bytes: int | None
     prompt_suite_sha256: str
 
@@ -109,6 +110,15 @@ class VariabilityViolation:
     commit: str
     records: int
     tok_per_s_cv_pct: float
+    threshold_pct: float
+
+
+@dataclass(frozen=True)
+class WallVariabilityViolation:
+    key: str
+    commit: str
+    records: int
+    wall_tok_per_s_cv_pct: float
     threshold_pct: float
 
 
@@ -512,6 +522,7 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
             if record.host_overhead_pct is not None
         ]
         tps_cv_pct = coefficient_of_variation_pct(tps_values)
+        wall_tps_cv_pct = coefficient_of_variation_pct(wall_tps_values)
         prompt_hashes = sorted(
             {record.prompt_suite_sha256 for record in commit_records if record.prompt_suite_sha256}
         )
@@ -551,6 +562,7 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                     statistics.median(host_overhead_values) if host_overhead_values else None
                 ),
                 tok_per_s_cv_pct=tps_cv_pct,
+                wall_tok_per_s_cv_pct=wall_tps_cv_pct,
                 max_memory_bytes=max(memory_values) if memory_values else None,
                 prompt_suite_sha256=";".join(prompt_hashes),
             )
@@ -1006,6 +1018,28 @@ def detect_variability_violations(
     return violations
 
 
+def detect_wall_variability_violations(
+    points: list[CommitPoint], max_wall_tok_cv_pct: float | None
+) -> list[WallVariabilityViolation]:
+    if max_wall_tok_cv_pct is None:
+        return []
+    violations: list[WallVariabilityViolation] = []
+    for point in points:
+        if point.wall_tok_per_s_cv_pct is None:
+            continue
+        if point.wall_tok_per_s_cv_pct > max_wall_tok_cv_pct:
+            violations.append(
+                WallVariabilityViolation(
+                    key=point.key,
+                    commit=point.commit,
+                    records=point.records,
+                    wall_tok_per_s_cv_pct=point.wall_tok_per_s_cv_pct,
+                    threshold_pct=max_wall_tok_cv_pct,
+                )
+            )
+    return violations
+
+
 def detect_commit_coverage_violations(
     points: list[CommitPoint], minimum_commits: int
 ) -> list[CommitCoverageViolation]:
@@ -1141,6 +1175,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Token-count regressions: {len([row for row in report['regressions'] if row['metric'] == 'tokens'])}",
         f"Sample violations: {len(report['sample_violations'])}",
         f"Variability violations: {len(report['variability_violations'])}",
+        f"Wall variability violations: {len(report['wall_variability_violations'])}",
         f"Commit coverage violations: {len(report['commit_coverage_violations'])}",
         f"Comparison coverage violations: {len(report['comparison_coverage_violations'])}",
         f"Prompt-suite drift violations: {len(report['prompt_suite_drift_violations'])}",
@@ -1183,6 +1218,18 @@ def markdown_report(report: dict[str, Any]) -> str:
             )
     else:
         lines.append("Variability requirements satisfied.")
+
+    lines.extend(["", "## Wall Variability", ""])
+    if report["wall_variability_violations"]:
+        lines.append("| Key | Commit | Records | Wall Tok/s CV | Threshold |")
+        lines.append("| --- | --- | ---: | ---: | ---: |")
+        for violation in report["wall_variability_violations"]:
+            lines.append(
+                "| {key} | {commit} | {records} | {wall_tok_per_s_cv_pct:.2f}% | "
+                "{threshold_pct:.2f}% |".format(**violation)
+            )
+    else:
+        lines.append("Wall-clock variability requirements satisfied.")
 
     lines.extend(["", "## Commit Coverage", ""])
     if report["commit_coverage_violations"]:
@@ -1286,9 +1333,9 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(["", "## Commit Points", ""])
     if report["commit_points"]:
         lines.append(
-            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | us/token Records | Wall us/token Records | Memory Records | Token Records | TTFT Records | Host Overhead Records | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median TTFT us | P95 TTFT us | Median Host Overhead % | Tok/s CV | Max Memory Bytes | Prompt Suite |"
+            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | us/token Records | Wall us/token Records | Memory Records | Token Records | TTFT Records | Host Overhead Records | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median TTFT us | P95 TTFT us | Median Host Overhead % | Tok/s CV | Wall Tok/s CV | Max Memory Bytes | Prompt Suite |"
         )
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
         for point in report["commit_points"]:
             p05_tps = point["p05_tok_per_s"]
             tps = point["median_tok_per_s"]
@@ -1304,6 +1351,7 @@ def markdown_report(report: dict[str, Any]) -> str:
             p95_ttft = point["p95_ttft_us"]
             overhead = point["median_host_overhead_pct"]
             tps_cv = point["tok_per_s_cv_pct"]
+            wall_tps_cv = point["wall_tok_per_s_cv_pct"]
             memory = point["max_memory_bytes"]
             prompt_suite = point["prompt_suite_sha256"] or "-"
             p05_tps_cell = f"{p05_tps:.3f}" if p05_tps is not None else "-"
@@ -1326,6 +1374,7 @@ def markdown_report(report: dict[str, Any]) -> str:
             p95_ttft_cell = f"{p95_ttft:.1f}" if p95_ttft is not None else "-"
             overhead_cell = f"{overhead:.3f}" if overhead is not None else "-"
             tps_cv_cell = f"{tps_cv:.2f}%" if tps_cv is not None else "-"
+            wall_tps_cv_cell = f"{wall_tps_cv:.2f}%" if wall_tps_cv is not None else "-"
             memory_cell = str(memory) if memory is not None else "-"
             lines.append(
                 f"| {point['key']} | {point['commit']} | {point['records']} | "
@@ -1337,7 +1386,7 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"{us_per_token_cell} | {p95_us_per_token_cell} | "
                 f"{wall_us_per_token_cell} | {p95_wall_us_per_token_cell} | "
                 f"{tokens_cell} | {min_tokens_cell} | {ttft_cell} | {p95_ttft_cell} | {overhead_cell} | "
-                f"{tps_cv_cell} | {memory_cell} | {prompt_suite} |"
+                f"{tps_cv_cell} | {wall_tps_cv_cell} | {memory_cell} | {prompt_suite} |"
             )
     else:
         lines.append("No commit-level performance points found.")
@@ -1405,6 +1454,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]], fields: list[str]) -> None
 
 def junit_report(report: dict[str, Any]) -> str:
     variability_violations = report.get("variability_violations", [])
+    wall_variability_violations = report.get("wall_variability_violations", [])
     commit_coverage_violations = report.get("commit_coverage_violations", [])
     comparison_coverage_violations = report.get("comparison_coverage_violations", [])
     prompt_suite_drift_violations = report.get("prompt_suite_drift_violations", [])
@@ -1413,6 +1463,7 @@ def junit_report(report: dict[str, Any]) -> str:
         len(report["regressions"])
         + len(report["sample_violations"])
         + len(variability_violations)
+        + len(wall_variability_violations)
         + len(commit_coverage_violations)
         + len(comparison_coverage_violations)
         + len(prompt_suite_drift_violations)
@@ -1517,6 +1568,34 @@ def junit_report(report: dict[str, Any]) -> str:
                 f"commit={violation['commit']}\n"
                 f"records={violation['records']}\n"
                 f"tok_per_s_cv_pct={violation['tok_per_s_cv_pct']:.3f}\n"
+                f"threshold_pct={violation['threshold_pct']:.3f}\n"
+                f"key={violation['key']}"
+            )
+
+        for violation in wall_variability_violations:
+            case = ET.SubElement(
+                suite,
+                "testcase",
+                {
+                    "classname": "perf_regression.wall_variability",
+                    "name": f"{violation['commit']}:{violation['key']}",
+                },
+            )
+            failure = ET.SubElement(
+                case,
+                "failure",
+                {
+                    "type": "wall_tok_per_s_variability",
+                    "message": (
+                        f"wall tok/s CV {violation['wall_tok_per_s_cv_pct']:.2f}% exceeds "
+                        f"{violation['threshold_pct']:.2f}% threshold"
+                    ),
+                },
+            )
+            failure.text = (
+                f"commit={violation['commit']}\n"
+                f"records={violation['records']}\n"
+                f"wall_tok_per_s_cv_pct={violation['wall_tok_per_s_cv_pct']:.3f}\n"
                 f"threshold_pct={violation['threshold_pct']:.3f}\n"
                 f"key={violation['key']}"
             )
@@ -1637,6 +1716,9 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
     comparisons_csv = output_dir / "perf_regression_comparisons_latest.csv"
     sample_violations_csv = output_dir / "perf_regression_sample_violations_latest.csv"
     variability_violations_csv = output_dir / "perf_regression_variability_violations_latest.csv"
+    wall_variability_violations_csv = (
+        output_dir / "perf_regression_wall_variability_violations_latest.csv"
+    )
     commit_coverage_violations_csv = (
         output_dir / "perf_regression_commit_coverage_violations_latest.csv"
     )
@@ -1679,6 +1761,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "p95_ttft_us",
             "median_host_overhead_pct",
             "tok_per_s_cv_pct",
+            "wall_tok_per_s_cv_pct",
             "max_memory_bytes",
             "prompt_suite_sha256",
         ],
@@ -1757,6 +1840,11 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
         ["key", "commit", "records", "tok_per_s_cv_pct", "threshold_pct"],
     )
     write_csv(
+        wall_variability_violations_csv,
+        report["wall_variability_violations"],
+        ["key", "commit", "records", "wall_tok_per_s_cv_pct", "threshold_pct"],
+    )
+    write_csv(
         commit_coverage_violations_csv,
         report["commit_coverage_violations"],
         ["key", "commits", "minimum_commits", "latest_commit"],
@@ -1785,6 +1873,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
     print(f"wrote_comparisons_csv={comparisons_csv}")
     print(f"wrote_sample_violations_csv={sample_violations_csv}")
     print(f"wrote_variability_violations_csv={variability_violations_csv}")
+    print(f"wrote_wall_variability_violations_csv={wall_variability_violations_csv}")
     print(f"wrote_commit_coverage_violations_csv={commit_coverage_violations_csv}")
     print(f"wrote_comparison_coverage_violations_csv={comparison_coverage_violations_csv}")
     print(f"wrote_prompt_suite_drift_csv={prompt_suite_drift_csv}")
@@ -1799,6 +1888,7 @@ def build_report(
     candidate_commit: str | None = None,
     min_records_per_point: int = 1,
     max_tok_cv_pct: float | None = None,
+    max_wall_tok_cv_pct: float | None = None,
     wall_tok_threshold_pct: float | None = None,
     ttft_threshold_pct: float | None = None,
     p95_ttft_threshold_pct: float | None = None,
@@ -1837,6 +1927,7 @@ def build_report(
     )
     sample_violations = detect_sample_violations(points, min_records_per_point)
     variability_violations = detect_variability_violations(points, max_tok_cv_pct)
+    wall_variability_violations = detect_wall_variability_violations(points, max_wall_tok_cv_pct)
     commit_coverage_violations = detect_commit_coverage_violations(points, min_commits_per_key)
     comparisons = comparison_rows(points, baseline_commit, candidate_commit)
     comparison_coverage_violations = detect_comparison_coverage_violations(
@@ -1862,6 +1953,7 @@ def build_report(
             if regressions
             or sample_violations
             or variability_violations
+            or wall_variability_violations
             or commit_coverage_violations
             or comparison_coverage_violations
             or prompt_suite_drift_violations
@@ -1887,6 +1979,7 @@ def build_report(
             "wall_us_per_token_regression_pct": wall_us_per_token_threshold_pct,
             "min_records_per_point": min_records_per_point,
             "max_tok_cv_pct": max_tok_cv_pct,
+            "max_wall_tok_cv_pct": max_wall_tok_cv_pct,
             "min_commits_per_key": min_commits_per_key,
             "require_tok_per_s": require_tok_per_s,
             "require_wall_tok_per_s": require_wall_tok_per_s,
@@ -1903,6 +1996,9 @@ def build_report(
         "regressions": [asdict(regression) for regression in regressions],
         "sample_violations": [asdict(violation) for violation in sample_violations],
         "variability_violations": [asdict(violation) for violation in variability_violations],
+        "wall_variability_violations": [
+            asdict(violation) for violation in wall_variability_violations
+        ],
         "commit_coverage_violations": [
             asdict(violation) for violation in commit_coverage_violations
         ],
@@ -1990,6 +2086,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail when a benchmark key/commit point has tok/s coefficient of variation above this percent",
     )
     parser.add_argument(
+        "--max-wall-tok-cv-pct",
+        type=float,
+        help=(
+            "Fail when a benchmark key/commit point has host wall-clock tok/s "
+            "coefficient of variation above this percent"
+        ),
+    )
+    parser.add_argument(
         "--min-commits-per-key",
         type=int,
         default=1,
@@ -2051,6 +2155,7 @@ def main(argv: list[str] | None = None) -> int:
         candidate_commit=args.candidate_commit,
         min_records_per_point=args.min_records_per_point,
         max_tok_cv_pct=args.max_tok_cv_pct,
+        max_wall_tok_cv_pct=args.max_wall_tok_cv_pct,
         wall_tok_threshold_pct=args.wall_tok_regression_pct,
         ttft_threshold_pct=args.ttft_regression_pct,
         p95_ttft_threshold_pct=args.p95_ttft_regression_pct,

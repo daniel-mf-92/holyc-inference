@@ -622,6 +622,7 @@ python3 bench/perf_regression.py \
   --min-records-per-point 3 \
   --min-commits-per-key 2 \
   --max-tok-cv-pct 7.5 \
+  --max-wall-tok-cv-pct 7.5 \
   --p05-tok-regression-pct 7.5 \
   --wall-tok-regression-pct 7.5 \
   --p05-wall-tok-regression-pct 7.5 \
@@ -649,6 +650,8 @@ than required. This catches head-only perf uploads where there is no baseline to
 compare against.
 `--max-tok-cv-pct` fails the dashboard when repeated tok/s samples inside a
 benchmark key/commit point are too variable to trust as a baseline.
+`--max-wall-tok-cv-pct` applies the same variability gate to host-observed
+wall-clock tok/s, catching unstable QEMU/host runs before they become baselines.
 `--p05-tok-regression-pct` optionally gates low-tail guest tok/s drops, which
 catches slow individual runs that median throughput can hide.
 `--wall-tok-regression-pct` optionally gates host-observed wall-clock tok/s
@@ -675,8 +678,9 @@ records contain multiple non-empty prompt-suite hashes, preventing accidental
 throughput comparisons across different prompt sets.
 The dashboard also writes `perf_regression_junit_latest.xml` so CI systems can
 surface throughput regressions, sample-coverage failures, commit-coverage
-failures, comparison-coverage failures, prompt-suite drift, and variability
-failures as test failures. When `--baseline-commit` or `--candidate-commit` is
+failures, comparison-coverage failures, prompt-suite drift, and guest or wall
+variability failures as test failures. When `--baseline-commit` or
+`--candidate-commit` is
 provided, every benchmark key must contain the requested commit before the
 dashboard passes; missing explicit comparison commits are written to
 `perf_regression_comparison_coverage_violations_latest.csv`.
@@ -835,7 +839,8 @@ files are collapsed by benchmark key and commit before the latest distinct
 commits are compared. Outputs include JSON, Markdown, JUnit XML, commit-point
 CSV, baseline/candidate comparison CSV, regression CSV, sample-coverage CSV,
 commit-coverage CSV, comparison-coverage CSV, prompt-suite drift CSV,
-telemetry-coverage CSV, and tok/s variability CSV artifacts.
+telemetry-coverage CSV, tok/s variability CSV, and wall tok/s variability CSV
+artifacts.
 
 Example:
 
@@ -850,6 +855,7 @@ first-token latency, QEMU host overhead, or memory regressions with:
 ```bash
 python3 bench/perf_regression.py \
   --max-tok-cv-pct 7.5 \
+  --max-wall-tok-cv-pct 7.5 \
   --p05-tok-regression-pct 7.5 \
   --wall-tok-regression-pct 7.5 \
   --p05-wall-tok-regression-pct 7.5 \

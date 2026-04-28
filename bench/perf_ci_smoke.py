@@ -50,6 +50,9 @@ def main() -> int:
         comparisons_path = output_dir / "perf_regression_comparisons_latest.csv"
         sample_violations_path = output_dir / "perf_regression_sample_violations_latest.csv"
         variability_violations_path = output_dir / "perf_regression_variability_violations_latest.csv"
+        wall_variability_violations_path = (
+            output_dir / "perf_regression_wall_variability_violations_latest.csv"
+        )
         commit_coverage_violations_path = (
             output_dir / "perf_regression_commit_coverage_violations_latest.csv"
         )
@@ -72,6 +75,9 @@ def main() -> int:
             return 1
         if report["variability_violations"]:
             print("unexpected_variability_violations=true", file=sys.stderr)
+            return 1
+        if report["wall_variability_violations"]:
+            print("unexpected_wall_variability_violations=true", file=sys.stderr)
             return 1
         if report["commit_coverage_violations"]:
             print("unexpected_commit_coverage_violations=true", file=sys.stderr)
@@ -142,6 +148,7 @@ def main() -> int:
             "median_us_per_token", "p95_us_per_token",
             "median_wall_us_per_token", "p95_wall_us_per_token",
             "median_ttft_us", "p95_ttft_us", "median_host_overhead_pct",
+            "wall_tok_per_s_cv_pct",
         }
         if not required_commit_points_columns.issubset(commit_points_header):
             missing = sorted(required_commit_points_columns - set(commit_points_header))
@@ -338,6 +345,63 @@ def main() -> int:
             print("p05_wall_tok_regression_not_rejected=true", file=sys.stderr)
             return 1
 
+        wall_variability_fixture = tmp_path / "wall_variability.jsonl"
+        wall_variability_fixture.write_text(
+            "\n".join(
+                [
+                    json.dumps(
+                        {
+                            "timestamp": "2026-04-27T15:00:00Z",
+                            "commit": "wall-var-head",
+                            "benchmark": "qemu_prompt",
+                            "profile": "ci-airgap-smoke",
+                            "model": "synthetic-smoke",
+                            "quantization": "Q4_0",
+                            "prompt": "ci-wall-var",
+                            "tok_per_s": 100.0,
+                            "wall_tok_per_s": 100.0,
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "timestamp": "2026-04-27T15:01:00Z",
+                            "commit": "wall-var-head",
+                            "benchmark": "qemu_prompt",
+                            "profile": "ci-airgap-smoke",
+                            "model": "synthetic-smoke",
+                            "quantization": "Q4_0",
+                            "prompt": "ci-wall-var",
+                            "tok_per_s": 100.0,
+                            "wall_tok_per_s": 70.0,
+                        }
+                    ),
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        wall_variability_command = [
+            sys.executable,
+            str(ROOT / "bench" / "perf_regression.py"),
+            "--input",
+            str(wall_variability_fixture),
+            "--output-dir",
+            str(tmp_path / "wall_variability_dashboard"),
+            "--max-wall-tok-cv-pct",
+            "10",
+            "--fail-on-regression",
+        ]
+        completed = subprocess.run(
+            wall_variability_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("wall_variability_not_rejected=true", file=sys.stderr)
+            return 1
+
         token_latency_regression_fixture = tmp_path / "token_latency_regression.jsonl"
         token_latency_regression_fixture.write_text(
             "\n".join(
@@ -407,6 +471,12 @@ def main() -> int:
             encoding="utf-8"
         ):
             print("missing_variability_violations_csv=true", file=sys.stderr)
+            return 1
+        if (
+            "key,commit,records,wall_tok_per_s_cv_pct,threshold_pct"
+            not in wall_variability_violations_path.read_text(encoding="utf-8")
+        ):
+            print("missing_wall_variability_violations_csv=true", file=sys.stderr)
             return 1
         if "key,commits,minimum_commits,latest_commit" not in commit_coverage_violations_path.read_text(
             encoding="utf-8"
