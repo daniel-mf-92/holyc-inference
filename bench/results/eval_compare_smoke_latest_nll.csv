@@ -1,0 +1,9 @@
+scope,dataset,split,engine,total_count,scored_count,score_coverage,mean_gold_nll,median_gold_nll,perplexity,mean_correct_nll,mean_wrong_nll
+overall,,,holyc,3,1,0.3333333333333333,0.000697149257004621,0.000697149257004621,1.0006973923220288,0.000697149257004621,0.0
+overall,,,llama,3,1,0.3333333333333333,0.1851824526038126,0.1851824526038126,1.2034379904932109,0.1851824526038126,0.0
+dataset_split,arc-smoke,validation,holyc,1,1,1.0,0.000697149257004621,0.000697149257004621,1.0006973923220288,0.000697149257004621,0.0
+dataset_split,arc-smoke,validation,llama,1,0,0.0,0.0,0.0,0.0,0.0,0.0
+dataset_split,hellaswag-smoke,validation,holyc,1,0,0.0,0.0,0.0,0.0,0.0,0.0
+dataset_split,hellaswag-smoke,validation,llama,1,0,0.0,0.0,0.0,0.0,0.0,0.0
+dataset_split,truthfulqa-smoke,validation,holyc,1,0,0.0,0.0,0.0,0.0,0.0,0.0
+dataset_split,truthfulqa-smoke,validation,llama,1,1,1.0,0.1851824526038126,0.1851824526038126,1.2034379904932109,0.1851824526038126,0.0

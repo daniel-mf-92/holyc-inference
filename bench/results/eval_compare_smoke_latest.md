@@ -1,6 +1,6 @@
 # Eval Compare Report
 
-Generated: 2026-04-28T19:27:35Z
+Generated: 2026-04-28T20:01:15Z
 Dataset: smoke-eval
 Split: validation
 Quantization: Q4_0
@@ -18,6 +18,7 @@ Status: pass
 | HolyC macro F1 | 1.0000 |
 | llama.cpp macro F1 | 1.0000 |
 | Macro F1 delta | 0.0000 |
+| Mean gold NLL delta | -0.1845 |
 | Agreement | 1.0000 |
 
 ## Paired Correctness
@@ -32,6 +33,13 @@ Status: pass
 | --- | ---: | ---: | ---: | ---: | ---: |
 | HolyC | 1/3 (0.3333) | 0.9993 | 1.0000 | 0.0000 | 0.0007 |
 | llama.cpp | 1/3 (0.3333) | 0.8310 | 1.0000 | 0.0432 | 0.1690 |
+
+## Score NLL
+
+| Engine | Score coverage | Mean gold NLL | Median gold NLL | Perplexity | Mean correct NLL | Mean wrong NLL |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| HolyC | 1/3 (0.3333) | 0.0007 | 0.0007 | 1.0007 | 0.0007 | 0.0000 |
+| llama.cpp | 1/3 (0.3333) | 0.1852 | 0.1852 | 1.2034 | 0.1852 | 0.0000 |
 
 ## Score Ranking
 

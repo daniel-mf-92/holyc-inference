@@ -76,6 +76,8 @@ class EvalRow:
     llama_margin: float | None
     holyc_gold_rank: int | None
     llama_gold_rank: int | None
+    holyc_gold_nll: float | None
+    llama_gold_nll: float | None
 
 
 @dataclass(frozen=True)
@@ -423,6 +425,13 @@ def gold_rank(scores: list[float] | None, answer_index: int) -> int | None:
     return 1 + sum(1 for score in scores if score > gold_score)
 
 
+def gold_nll(scores: list[float] | None, answer_index: int) -> float | None:
+    if scores is None:
+        return None
+    probability = softmax(scores)[answer_index]
+    return -math.log(probability)
+
+
 def rank_metrics(rows: list[EvalRow], engine: str, *, max_k: int = 3) -> dict[str, Any]:
     ranks = [
         row.holyc_gold_rank if engine == "holyc" else row.llama_gold_rank
@@ -439,6 +448,34 @@ def rank_metrics(rows: list[EvalRow], engine: str, *, max_k: int = 3) -> dict[st
         "mean_reciprocal_rank": safe_div(sum(1.0 / rank for rank in scored_ranks), len(scored_ranks)),
         "score_coverage": safe_div(len(scored_ranks), len(rows)),
         "scored_count": len(scored_ranks),
+        "total_count": len(rows),
+    }
+
+
+def nll_metrics(rows: list[EvalRow], engine: str) -> dict[str, Any]:
+    scored_nlls: list[float] = []
+    correct_nlls: list[float] = []
+    wrong_nlls: list[float] = []
+    for row in rows:
+        nll = row.holyc_gold_nll if engine == "holyc" else row.llama_gold_nll
+        if nll is None:
+            continue
+        value = float(nll)
+        scored_nlls.append(value)
+        correct = row.holyc_correct if engine == "holyc" else row.llama_correct
+        if correct:
+            correct_nlls.append(value)
+        else:
+            wrong_nlls.append(value)
+    mean_nll = safe_div(sum(scored_nlls), len(scored_nlls))
+    return {
+        "mean_correct_nll": safe_div(sum(correct_nlls), len(correct_nlls)),
+        "mean_gold_nll": mean_nll,
+        "mean_wrong_nll": safe_div(sum(wrong_nlls), len(wrong_nlls)),
+        "median_gold_nll": statistics.median(scored_nlls) if scored_nlls else 0.0,
+        "perplexity": math.exp(mean_nll) if scored_nlls and mean_nll <= 709.0 else (math.inf if scored_nlls else 0.0),
+        "score_coverage": safe_div(len(scored_nlls), len(rows)),
+        "scored_count": len(scored_nlls),
         "total_count": len(rows),
     }
 
@@ -562,6 +599,8 @@ def dataset_breakdown(rows: list[EvalRow]) -> list[dict[str, Any]]:
         both_wrong = sum(1 for row in group_rows if not row.holyc_correct and not row.llama_correct)
         holyc_only_correct = sum(1 for row in group_rows if row.holyc_correct and not row.llama_correct)
         llama_only_correct = sum(1 for row in group_rows if row.llama_correct and not row.holyc_correct)
+        holyc_nll = nll_metrics(group_rows, "holyc")
+        llama_nll = nll_metrics(group_rows, "llama")
         breakdown.append(
             {
                 "accuracy_delta_holyc_minus_llama": accuracy(holyc_correct, total)
@@ -572,9 +611,13 @@ def dataset_breakdown(rows: list[EvalRow]) -> list[dict[str, Any]]:
                 "holyc_accuracy": accuracy(holyc_correct, total),
                 "holyc_correct": holyc_correct,
                 "holyc_margin_metrics": margin_metrics(group_rows, "holyc"),
+                "holyc_nll_metrics": holyc_nll,
                 "llama_accuracy": accuracy(llama_correct, total),
                 "llama_correct": llama_correct,
                 "llama_margin_metrics": margin_metrics(group_rows, "llama"),
+                "llama_nll_metrics": llama_nll,
+                "mean_gold_nll_delta_holyc_minus_llama": holyc_nll["mean_gold_nll"]
+                - llama_nll["mean_gold_nll"],
                 "mcnemar_exact": exact_mcnemar_test(holyc_only_correct, llama_only_correct),
                 "paired_correctness": {
                     "both_correct": both_correct,
@@ -622,6 +665,8 @@ def compare(
                 llama_margin=prediction_margin(llama.scores, llama.predicted_index),
                 holyc_gold_rank=gold_rank(holyc.scores, case.answer_index),
                 llama_gold_rank=gold_rank(llama.scores, case.answer_index),
+                holyc_gold_nll=gold_nll(holyc.scores, case.answer_index),
+                llama_gold_nll=gold_nll(llama.scores, case.answer_index),
             )
         )
 
@@ -649,6 +694,7 @@ def compare(
         "holyc_correct": holyc_correct,
         "holyc_macro_f1": holyc_metrics["macro_f1"],
         "holyc_margin_metrics": margin_metrics(rows, "holyc"),
+        "holyc_nll_metrics": nll_metrics(rows, "holyc"),
         "holyc_per_answer_index": holyc_metrics["per_answer_index"],
         "holyc_rank_metrics": rank_metrics(rows, "holyc"),
         "llama_accuracy": accuracy(llama_correct, total),
@@ -657,6 +703,7 @@ def compare(
         "llama_correct": llama_correct,
         "llama_macro_f1": llama_metrics["macro_f1"],
         "llama_margin_metrics": margin_metrics(rows, "llama"),
+        "llama_nll_metrics": nll_metrics(rows, "llama"),
         "llama_per_answer_index": llama_metrics["per_answer_index"],
         "llama_rank_metrics": rank_metrics(rows, "llama"),
         "mcnemar_exact": exact_mcnemar_test(holyc_only_correct, llama_only_correct),
@@ -670,6 +717,9 @@ def compare(
     }
     summary["accuracy_delta_holyc_minus_llama"] = summary["holyc_accuracy"] - summary["llama_accuracy"]
     summary["macro_f1_delta_holyc_minus_llama"] = summary["holyc_macro_f1"] - summary["llama_macro_f1"]
+    summary["mean_gold_nll_delta_holyc_minus_llama"] = (
+        summary["holyc_nll_metrics"]["mean_gold_nll"] - summary["llama_nll_metrics"]["mean_gold_nll"]
+    )
     return rows, summary
 
 
@@ -696,6 +746,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"| HolyC macro F1 | {summary['holyc_macro_f1']:.4f} |",
         f"| llama.cpp macro F1 | {summary['llama_macro_f1']:.4f} |",
         f"| Macro F1 delta | {summary['macro_f1_delta_holyc_minus_llama']:.4f} |",
+        f"| Mean gold NLL delta | {summary['mean_gold_nll_delta_holyc_minus_llama']:.4f} |",
         f"| Agreement | {summary['agreement']:.4f} |",
         "",
     ]
@@ -728,6 +779,23 @@ def markdown_report(report: dict[str, Any]) -> str:
             f"| {engine_label} | {metrics['scored_count']}/{metrics['total_count']} "
             f"({metrics['score_coverage']:.4f}) | {metrics['mean_confidence']:.4f} | "
             f"{metrics['accuracy_when_scored']:.4f} | {metrics['brier_score']:.4f} | {metrics['ece']:.4f} |"
+        )
+    lines.append("")
+    lines.extend(
+        [
+            "## Score NLL",
+            "",
+            "| Engine | Score coverage | Mean gold NLL | Median gold NLL | Perplexity | Mean correct NLL | Mean wrong NLL |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
+    for engine_label, key in (("HolyC", "holyc_nll_metrics"), ("llama.cpp", "llama_nll_metrics")):
+        metrics = summary[key]
+        lines.append(
+            f"| {engine_label} | {metrics['scored_count']}/{metrics['total_count']} "
+            f"({metrics['score_coverage']:.4f}) | {metrics['mean_gold_nll']:.4f} | "
+            f"{metrics['median_gold_nll']:.4f} | {metrics['perplexity']:.4f} | "
+            f"{metrics['mean_correct_nll']:.4f} | {metrics['mean_wrong_nll']:.4f} |"
         )
     lines.append("")
     lines.extend(
@@ -880,6 +948,9 @@ def find_regressions(
     max_mcnemar_loss_p: float | None = None,
     min_holyc_margin_coverage: float | None = None,
     min_holyc_mean_margin: float | None = None,
+    min_holyc_nll_coverage: float | None = None,
+    max_holyc_mean_nll: float | None = None,
+    max_holyc_nll_delta: float | None = None,
     scope: str = "overall",
     dataset: str = "",
     split: str = "",
@@ -992,6 +1063,58 @@ def find_regressions(
                     split=split,
                 )
             )
+    holyc_nll = summary.get("holyc_nll_metrics", {})
+    if min_holyc_nll_coverage is not None:
+        coverage = float(holyc_nll.get("score_coverage", 0.0))
+        if coverage < min_holyc_nll_coverage:
+            regressions.append(
+                EvalRegression(
+                    metric="holyc_nll_score_coverage",
+                    value=coverage,
+                    threshold=min_holyc_nll_coverage,
+                    message=(
+                        f"{prefix}HolyC NLL score coverage {coverage:.4f} "
+                        f"is below minimum {min_holyc_nll_coverage:.4f}"
+                    ),
+                    scope=scope,
+                    dataset=dataset,
+                    split=split,
+                )
+            )
+    if max_holyc_mean_nll is not None:
+        mean_nll = float(holyc_nll.get("mean_gold_nll", 0.0))
+        if mean_nll > max_holyc_mean_nll:
+            regressions.append(
+                EvalRegression(
+                    metric="holyc_mean_gold_nll",
+                    value=mean_nll,
+                    threshold=max_holyc_mean_nll,
+                    message=(
+                        f"{prefix}HolyC mean gold NLL {mean_nll:.4f} "
+                        f"is above maximum {max_holyc_mean_nll:.4f}"
+                    ),
+                    scope=scope,
+                    dataset=dataset,
+                    split=split,
+                )
+            )
+    if max_holyc_nll_delta is not None:
+        delta = float(summary.get("mean_gold_nll_delta_holyc_minus_llama", 0.0))
+        if delta > max_holyc_nll_delta:
+            regressions.append(
+                EvalRegression(
+                    metric="mean_gold_nll_delta_holyc_minus_llama",
+                    value=delta,
+                    threshold=max_holyc_nll_delta,
+                    message=(
+                        f"{prefix}HolyC mean gold NLL delta {delta:.4f} "
+                        f"is above maximum {max_holyc_nll_delta:.4f}"
+                    ),
+                    scope=scope,
+                    dataset=dataset,
+                    split=split,
+                )
+            )
     return regressions
 
 
@@ -1004,6 +1127,9 @@ def find_all_regressions(summary: dict[str, Any], args: argparse.Namespace) -> l
         max_mcnemar_loss_p=args.max_mcnemar_loss_p,
         min_holyc_margin_coverage=args.min_holyc_margin_coverage,
         min_holyc_mean_margin=args.min_holyc_mean_margin,
+        min_holyc_nll_coverage=args.min_holyc_nll_coverage,
+        max_holyc_mean_nll=args.max_holyc_mean_nll,
+        max_holyc_nll_delta=args.max_holyc_nll_delta,
     )
     if args.gate_dataset_breakdowns:
         for item in summary.get("dataset_breakdown", []):
@@ -1016,6 +1142,9 @@ def find_all_regressions(summary: dict[str, Any], args: argparse.Namespace) -> l
                     max_mcnemar_loss_p=args.max_mcnemar_loss_p,
                     min_holyc_margin_coverage=args.min_holyc_margin_coverage,
                     min_holyc_mean_margin=args.min_holyc_mean_margin,
+                    min_holyc_nll_coverage=args.min_holyc_nll_coverage,
+                    max_holyc_mean_nll=args.max_holyc_mean_nll,
+                    max_holyc_nll_delta=args.max_holyc_nll_delta,
                     scope="dataset_split",
                     dataset=item["dataset"],
                     split=item["split"],
@@ -1075,6 +1204,8 @@ def write_csv_report(path: Path, rows: list[EvalRow]) -> None:
                 "llama_margin",
                 "holyc_gold_rank",
                 "llama_gold_rank",
+                "holyc_gold_nll",
+                "llama_gold_nll",
             ],
             lineterminator="\n",
         )
@@ -1202,6 +1333,51 @@ def write_margin_csv_report(path: Path, summary: dict[str, Any]) -> None:
             writer.writerow({field: row.get(field, "") for field in fields})
 
 
+def write_nll_csv_report(path: Path, summary: dict[str, Any]) -> None:
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        fields = [
+            "scope",
+            "dataset",
+            "split",
+            "engine",
+            "total_count",
+            "scored_count",
+            "score_coverage",
+            "mean_gold_nll",
+            "median_gold_nll",
+            "perplexity",
+            "mean_correct_nll",
+            "mean_wrong_nll",
+        ]
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        rows: list[dict[str, Any]] = [
+            {"scope": "overall", "dataset": "", "split": "", "engine": "holyc", **summary["holyc_nll_metrics"]},
+            {"scope": "overall", "dataset": "", "split": "", "engine": "llama", **summary["llama_nll_metrics"]},
+        ]
+        for item in summary.get("dataset_breakdown", []):
+            rows.append(
+                {
+                    "scope": "dataset_split",
+                    "dataset": item.get("dataset", ""),
+                    "split": item.get("split", ""),
+                    "engine": "holyc",
+                    **item["holyc_nll_metrics"],
+                }
+            )
+            rows.append(
+                {
+                    "scope": "dataset_split",
+                    "dataset": item.get("dataset", ""),
+                    "split": item.get("split", ""),
+                    "engine": "llama",
+                    **item["llama_nll_metrics"],
+                }
+            )
+        for row in rows:
+            writer.writerow({field: row.get(field, "") for field in fields})
+
+
 def write_disagreements_csv_report(path: Path, rows: list[EvalRow]) -> None:
     with path.open("w", newline="", encoding="utf-8") as handle:
         fields = [
@@ -1219,6 +1395,8 @@ def write_disagreements_csv_report(path: Path, rows: list[EvalRow]) -> None:
             "llama_margin",
             "holyc_gold_rank",
             "llama_gold_rank",
+            "holyc_gold_nll",
+            "llama_gold_nll",
         ]
         writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
@@ -1236,7 +1414,7 @@ def write_report(
     gold_path: Path,
     holyc_path: Path,
     llama_path: Path,
-) -> tuple[Path, Path, Path, Path, Path, Path, Path, Path]:
+) -> tuple[Path, Path, Path, Path, Path, Path, Path, Path, Path]:
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     regressions = find_all_regressions(summary, args)
@@ -1248,9 +1426,12 @@ def write_report(
         "holyc_predictions_sha256": file_sha256(holyc_path),
         "llama_predictions_sha256": file_sha256(llama_path),
         "max_accuracy_drop": args.max_accuracy_drop,
+        "max_holyc_mean_nll": args.max_holyc_mean_nll,
+        "max_holyc_nll_delta": args.max_holyc_nll_delta,
         "max_mcnemar_loss_p": args.max_mcnemar_loss_p,
         "min_holyc_margin_coverage": args.min_holyc_margin_coverage,
         "min_holyc_mean_margin": args.min_holyc_mean_margin,
+        "min_holyc_nll_coverage": args.min_holyc_nll_coverage,
         "model": args.model,
         "min_agreement": args.min_agreement,
         "min_holyc_accuracy": args.min_holyc_accuracy,
@@ -1269,6 +1450,7 @@ def write_report(
     confusion_csv_path = output_dir / f"{stem}_confusion.csv"
     calibration_bins_csv_path = output_dir / f"{stem}_calibration_bins.csv"
     margin_csv_path = output_dir / f"{stem}_margins.csv"
+    nll_csv_path = output_dir / f"{stem}_nll.csv"
     disagreements_csv_path = output_dir / f"{stem}_disagreements.csv"
     junit_path = output_dir / f"{stem}_junit.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -1278,6 +1460,7 @@ def write_report(
     write_confusion_csv_report(confusion_csv_path, summary)
     write_calibration_bins_csv_report(calibration_bins_csv_path, summary)
     write_margin_csv_report(margin_csv_path, summary)
+    write_nll_csv_report(nll_csv_path, summary)
     write_disagreements_csv_report(disagreements_csv_path, rows)
     write_junit(regressions, junit_path)
     return (
@@ -1288,6 +1471,7 @@ def write_report(
         confusion_csv_path,
         calibration_bins_csv_path,
         margin_csv_path,
+        nll_csv_path,
         disagreements_csv_path,
     )
 
@@ -1333,6 +1517,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Minimum mean HolyC predicted-vs-runner-up probability margin before CI gate failure",
     )
     parser.add_argument(
+        "--min-holyc-nll-coverage",
+        type=float,
+        help="Minimum fraction of HolyC predictions with score vectors for NLL telemetry",
+    )
+    parser.add_argument(
+        "--max-holyc-mean-nll",
+        type=float,
+        help="Maximum HolyC mean gold-answer negative log likelihood before CI gate failure",
+    )
+    parser.add_argument(
+        "--max-holyc-nll-delta",
+        type=float,
+        help="Maximum allowed HolyC mean gold NLL increase versus llama.cpp before CI gate failure",
+    )
+    parser.add_argument(
         "--gate-dataset-breakdowns",
         action="store_true",
         help="Apply configured quality gates to each dataset/split breakdown as well as the aggregate",
@@ -1348,12 +1547,20 @@ def validate_probability_threshold(value: float | None, flag_name: str) -> None:
         raise ValueError(f"{flag_name} must be between 0 and 1")
 
 
+def validate_nonnegative_threshold(value: float | None, flag_name: str) -> None:
+    if value is not None and value < 0.0:
+        raise ValueError(f"{flag_name} must be non-negative")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         validate_probability_threshold(args.max_mcnemar_loss_p, "--max-mcnemar-loss-p")
         validate_probability_threshold(args.min_holyc_margin_coverage, "--min-holyc-margin-coverage")
         validate_probability_threshold(args.min_holyc_mean_margin, "--min-holyc-mean-margin")
+        validate_probability_threshold(args.min_holyc_nll_coverage, "--min-holyc-nll-coverage")
+        validate_nonnegative_threshold(args.max_holyc_mean_nll, "--max-holyc-mean-nll")
+        validate_nonnegative_threshold(args.max_holyc_nll_delta, "--max-holyc-nll-delta")
         gold = load_gold(args.gold, args.dataset, args.split)
         holyc_predictions = load_predictions(args.holyc, gold)
         llama_predictions = load_predictions(args.llama, gold)
@@ -1367,6 +1574,7 @@ def main(argv: list[str] | None = None) -> int:
             confusion_csv_path,
             calibration_bins_csv_path,
             margin_csv_path,
+            nll_csv_path,
             disagreements_csv_path,
         ) = write_report(
             rows, summary, args, args.gold, args.holyc, args.llama
@@ -1382,9 +1590,12 @@ def main(argv: list[str] | None = None) -> int:
     print(f"wrote_confusion_csv={confusion_csv_path}")
     print(f"wrote_calibration_bins_csv={calibration_bins_csv_path}")
     print(f"wrote_margin_csv={margin_csv_path}")
+    print(f"wrote_nll_csv={nll_csv_path}")
     print(f"wrote_disagreements_csv={disagreements_csv_path}")
     print(f"holyc_accuracy={summary['holyc_accuracy']:.4f}")
     print(f"llama_accuracy={summary['llama_accuracy']:.4f}")
+    print(f"holyc_mean_gold_nll={summary['holyc_nll_metrics']['mean_gold_nll']:.4f}")
+    print(f"llama_mean_gold_nll={summary['llama_nll_metrics']['mean_gold_nll']:.4f}")
     print(f"agreement={summary['agreement']:.4f}")
     regressions = find_all_regressions(summary, args)
     print(f"regressions={len(regressions)}")

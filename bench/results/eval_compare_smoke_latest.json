@@ -1,16 +1,19 @@
 {
   "dataset": "smoke-eval",
   "gate_dataset_breakdowns": false,
-  "generated_at": "2026-04-28T19:27:35Z",
+  "generated_at": "2026-04-28T20:01:15Z",
   "gold_sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131",
   "holyc_predictions_sha256": "61bb69247c6343f53493b5febb5636780ed8c5d99d6114976164e1c7ecd1c4e9",
   "llama_predictions_sha256": "22a31f8ffa48784acd9645bf802ac0f3e0260d45e703a34c926a3331e643dfa1",
   "max_accuracy_drop": null,
+  "max_holyc_mean_nll": null,
+  "max_holyc_nll_delta": null,
   "max_mcnemar_loss_p": null,
   "min_agreement": null,
   "min_holyc_accuracy": null,
   "min_holyc_margin_coverage": null,
   "min_holyc_mean_margin": null,
+  "min_holyc_nll_coverage": null,
   "model": "synthetic-smoke",
   "quantization": "Q4_0",
   "regressions": [],
@@ -21,11 +24,13 @@
       "engines_agree": true,
       "holyc_confidence": 0.9993030936950774,
       "holyc_correct": true,
+      "holyc_gold_nll": 0.000697149257004621,
       "holyc_gold_rank": 1,
       "holyc_margin": 0.9989678648531953,
       "holyc_prediction": 0,
       "llama_confidence": null,
       "llama_correct": true,
+      "llama_gold_nll": null,
       "llama_gold_rank": null,
       "llama_margin": null,
       "llama_prediction": 0,
@@ -38,11 +43,13 @@
       "engines_agree": true,
       "holyc_confidence": null,
       "holyc_correct": true,
+      "holyc_gold_nll": null,
       "holyc_gold_rank": null,
       "holyc_margin": null,
       "holyc_prediction": 0,
       "llama_confidence": null,
       "llama_correct": true,
+      "llama_gold_nll": null,
       "llama_gold_rank": null,
       "llama_margin": null,
       "llama_prediction": 0,
@@ -55,11 +62,13 @@
       "engines_agree": true,
       "holyc_confidence": null,
       "holyc_correct": true,
+      "holyc_gold_nll": null,
       "holyc_gold_rank": null,
       "holyc_margin": null,
       "holyc_prediction": 0,
       "llama_confidence": 0.8309526605439513,
       "llama_correct": true,
+      "llama_gold_nll": 0.1851824526038126,
       "llama_gold_rank": 1,
       "llama_margin": 0.7184954468730188,
       "llama_prediction": 0,
@@ -125,6 +134,16 @@
           "scored_count": 1,
           "total_count": 1
         },
+        "holyc_nll_metrics": {
+          "mean_correct_nll": 0.000697149257004621,
+          "mean_gold_nll": 0.000697149257004621,
+          "mean_wrong_nll": 0.0,
+          "median_gold_nll": 0.000697149257004621,
+          "perplexity": 1.0006973923220288,
+          "score_coverage": 1.0,
+          "scored_count": 1,
+          "total_count": 1
+        },
         "llama_accuracy": 1.0,
         "llama_correct": 1,
         "llama_margin_metrics": {
@@ -141,6 +160,16 @@
           "scored_count": 0,
           "total_count": 1
         },
+        "llama_nll_metrics": {
+          "mean_correct_nll": 0.0,
+          "mean_gold_nll": 0.0,
+          "mean_wrong_nll": 0.0,
+          "median_gold_nll": 0.0,
+          "perplexity": 0.0,
+          "score_coverage": 0.0,
+          "scored_count": 0,
+          "total_count": 1
+        },
         "mcnemar_exact": {
           "discordant_count": 0,
           "holyc_only_correct": 0,
@@ -148,6 +177,7 @@
           "method": "exact_binomial_two_sided",
           "p_value": 1.0
         },
+        "mean_gold_nll_delta_holyc_minus_llama": 0.000697149257004621,
         "paired_correctness": {
           "both_correct": 1,
           "both_wrong": 0,
@@ -178,6 +208,16 @@
           "scored_count": 0,
           "total_count": 1
         },
+        "holyc_nll_metrics": {
+          "mean_correct_nll": 0.0,
+          "mean_gold_nll": 0.0,
+          "mean_wrong_nll": 0.0,
+          "median_gold_nll": 0.0,
+          "perplexity": 0.0,
+          "score_coverage": 0.0,
+          "scored_count": 0,
+          "total_count": 1
+        },
         "llama_accuracy": 1.0,
         "llama_correct": 1,
         "llama_margin_metrics": {
@@ -194,6 +234,16 @@
           "scored_count": 0,
           "total_count": 1
         },
+        "llama_nll_metrics": {
+          "mean_correct_nll": 0.0,
+          "mean_gold_nll": 0.0,
+          "mean_wrong_nll": 0.0,
+          "median_gold_nll": 0.0,
+          "perplexity": 0.0,
+          "score_coverage": 0.0,
+          "scored_count": 0,
+          "total_count": 1
+        },
         "mcnemar_exact": {
           "discordant_count": 0,
           "holyc_only_correct": 0,
@@ -201,6 +251,7 @@
           "method": "exact_binomial_two_sided",
           "p_value": 1.0
         },
+        "mean_gold_nll_delta_holyc_minus_llama": 0.0,
         "paired_correctness": {
           "both_correct": 1,
           "both_wrong": 0,
@@ -231,6 +282,16 @@
           "scored_count": 0,
           "total_count": 1
         },
+        "holyc_nll_metrics": {
+          "mean_correct_nll": 0.0,
+          "mean_gold_nll": 0.0,
+          "mean_wrong_nll": 0.0,
+          "median_gold_nll": 0.0,
+          "perplexity": 0.0,
+          "score_coverage": 0.0,
+          "scored_count": 0,
+          "total_count": 1
+        },
         "llama_accuracy": 1.0,
         "llama_correct": 1,
         "llama_margin_metrics": {
@@ -247,6 +308,16 @@
           "scored_count": 1,
           "total_count": 1
         },
+        "llama_nll_metrics": {
+          "mean_correct_nll": 0.1851824526038126,
+          "mean_gold_nll": 0.1851824526038126,
+          "mean_wrong_nll": 0.0,
+          "median_gold_nll": 0.1851824526038126,
+          "perplexity": 1.2034379904932109,
+          "score_coverage": 1.0,
+          "scored_count": 1,
+          "total_count": 1
+        },
         "mcnemar_exact": {
           "discordant_count": 0,
           "holyc_only_correct": 0,
@@ -254,6 +325,7 @@
           "method": "exact_binomial_two_sided",
           "p_value": 1.0
         },
+        "mean_gold_nll_delta_holyc_minus_llama": -0.1851824526038126,
         "paired_correctness": {
           "both_correct": 1,
           "both_wrong": 0,
@@ -402,6 +474,16 @@
       "median_margin": 0.9989678648531953,
       "min_margin": 0.9989678648531953,
       "p10_margin": 0.9989678648531953,
+      "score_coverage": 0.3333333333333333,
+      "scored_count": 1,
+      "total_count": 3
+    },
+    "holyc_nll_metrics": {
+      "mean_correct_nll": 0.000697149257004621,
+      "mean_gold_nll": 0.000697149257004621,
+      "mean_wrong_nll": 0.0,
+      "median_gold_nll": 0.000697149257004621,
+      "perplexity": 1.0006973923220288,
       "score_coverage": 0.3333333333333333,
       "scored_count": 1,
       "total_count": 3
@@ -596,6 +678,16 @@
       "scored_count": 1,
       "total_count": 3
     },
+    "llama_nll_metrics": {
+      "mean_correct_nll": 0.1851824526038126,
+      "mean_gold_nll": 0.1851824526038126,
+      "mean_wrong_nll": 0.0,
+      "median_gold_nll": 0.1851824526038126,
+      "perplexity": 1.2034379904932109,
+      "score_coverage": 0.3333333333333333,
+      "scored_count": 1,
+      "total_count": 3
+    },
     "llama_per_answer_index": [
       {
         "answer_index": 0,
@@ -652,6 +744,7 @@
       "method": "exact_binomial_two_sided",
       "p_value": 1.0
     },
+    "mean_gold_nll_delta_holyc_minus_llama": -0.184485303346808,
     "paired_correctness": {
       "both_correct": 3,
       "both_wrong": 0,

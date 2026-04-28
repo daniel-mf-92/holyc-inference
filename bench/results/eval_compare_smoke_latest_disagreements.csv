@@ -1,1 +1,1 @@
-record_id,dataset,split,answer_index,holyc_prediction,llama_prediction,holyc_correct,llama_correct,holyc_confidence,llama_confidence,holyc_margin,llama_margin,holyc_gold_rank,llama_gold_rank
+record_id,dataset,split,answer_index,holyc_prediction,llama_prediction,holyc_correct,llama_correct,holyc_confidence,llama_confidence,holyc_margin,llama_margin,holyc_gold_rank,llama_gold_rank,holyc_gold_nll,llama_gold_nll
