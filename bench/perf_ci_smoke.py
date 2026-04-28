@@ -47,6 +47,7 @@ def main() -> int:
         markdown_path = output_dir / "perf_regression_latest.md"
         junit_path = output_dir / "perf_regression_junit_latest.xml"
         commit_points_path = output_dir / "perf_regression_commit_points_latest.csv"
+        comparisons_path = output_dir / "perf_regression_comparisons_latest.csv"
         sample_violations_path = output_dir / "perf_regression_sample_violations_latest.csv"
         variability_violations_path = output_dir / "perf_regression_variability_violations_latest.csv"
         commit_coverage_violations_path = (
@@ -117,6 +118,13 @@ def main() -> int:
             not in commit_points_path.read_text(encoding="utf-8")
         ):
             print("missing_commit_points_csv=true", file=sys.stderr)
+            return 1
+        comparisons_csv = comparisons_path.read_text(encoding="utf-8")
+        if "key,baseline_commit,candidate_commit,baseline_latest_timestamp" not in comparisons_csv:
+            print("missing_comparisons_csv=true", file=sys.stderr)
+            return 1
+        if "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/ci-short,ci-base,ci-head" not in comparisons_csv:
+            print("missing_ci_fixture_comparison=true", file=sys.stderr)
             return 1
 
         ttft_regression_fixture = tmp_path / "p95_ttft_regression.jsonl"

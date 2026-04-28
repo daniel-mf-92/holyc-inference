@@ -467,7 +467,9 @@ python3 bench/bench_artifact_manifest.py \
 `perf_regression.py` scans JSON, JSONL, and CSV benchmark artifacts, groups
 results by benchmark/profile/model/quantization/prompt plus commit, and writes
 guest tok/s, host wall-clock tok/s, memory, first-token latency, and
-sample-coverage dashboards under `bench/dashboards/`.
+sample-coverage dashboards under `bench/dashboards/`. The dashboard also emits
+`perf_regression_comparisons_latest.csv` so CI can archive baseline-vs-candidate
+metric deltas even when no regression threshold is crossed.
 
 Example CI gate:
 
@@ -640,9 +642,9 @@ fields such as `memory_bytes` or `max_rss_bytes`. Regression checks compare
 commit-level aggregates, so repeated runs and duplicate latest/stamped result
 files are collapsed by benchmark key and commit before the latest distinct
 commits are compared. Outputs include JSON, Markdown, JUnit XML, commit-point
-CSV, regression CSV, sample-coverage CSV, commit-coverage CSV, and
-comparison-coverage CSV, prompt-suite drift CSV, telemetry-coverage CSV, and
-tok/s variability CSV artifacts.
+CSV, baseline/candidate comparison CSV, regression CSV, sample-coverage CSV,
+commit-coverage CSV, comparison-coverage CSV, prompt-suite drift CSV,
+telemetry-coverage CSV, and tok/s variability CSV artifacts.
 
 Example:
 

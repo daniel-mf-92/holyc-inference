@@ -402,6 +402,76 @@ def test_explicit_comparison_commits_must_exist_for_each_key() -> None:
     assert failure.attrib["type"] == "comparison_coverage"
 
 
+def test_report_includes_baseline_candidate_comparison_rows() -> None:
+    records = [
+        perf_regression.PerfRecord(
+            source="fixture.jsonl",
+            commit="base",
+            timestamp="2026-04-28T00:00:00Z",
+            benchmark="qemu_prompt",
+            profile="ci",
+            model="synthetic",
+            quantization="Q4_0",
+            prompt="short",
+            tok_per_s=100.0,
+            wall_tok_per_s=90.0,
+            memory_bytes=1000,
+            ttft_us=50000,
+        ),
+        perf_regression.PerfRecord(
+            source="fixture.jsonl",
+            commit="head",
+            timestamp="2026-04-28T00:01:00Z",
+            benchmark="qemu_prompt",
+            profile="ci",
+            model="synthetic",
+            quantization="Q4_0",
+            prompt="short",
+            tok_per_s=95.0,
+            wall_tok_per_s=81.0,
+            memory_bytes=1100,
+            ttft_us=55000,
+        ),
+    ]
+
+    report = perf_regression.build_report(records, 10.0, 20.0)
+
+    assert report["status"] == "pass"
+    assert report["comparisons"] == [
+        {
+            "key": "qemu_prompt/ci/synthetic/Q4_0/short",
+            "baseline_commit": "base",
+            "candidate_commit": "head",
+            "baseline_latest_timestamp": "2026-04-28T00:00:00Z",
+            "candidate_latest_timestamp": "2026-04-28T00:01:00Z",
+            "baseline_records": 1,
+            "candidate_records": 1,
+            "median_tok_per_s_baseline": 100.0,
+            "median_tok_per_s_candidate": 95.0,
+            "median_tok_per_s_delta_pct": 5.0,
+            "p05_tok_per_s_baseline": 100.0,
+            "p05_tok_per_s_candidate": 95.0,
+            "p05_tok_per_s_delta_pct": 5.0,
+            "median_wall_tok_per_s_baseline": 90.0,
+            "median_wall_tok_per_s_candidate": 81.0,
+            "median_wall_tok_per_s_delta_pct": 10.0,
+            "max_memory_bytes_baseline": 1000,
+            "max_memory_bytes_candidate": 1100,
+            "max_memory_bytes_delta_pct": 10.0,
+            "median_ttft_us_baseline": 50000,
+            "median_ttft_us_candidate": 55000,
+            "median_ttft_us_delta_pct": 10.0,
+            "p95_ttft_us_baseline": 50000.0,
+            "p95_ttft_us_candidate": 55000.0,
+            "p95_ttft_us_delta_pct": 10.0,
+        }
+    ]
+    assert "## Comparisons" in perf_regression.markdown_report(report)
+    assert "| qemu_prompt/ci/synthetic/Q4_0/short | base | head | 5.00% |" in (
+        perf_regression.markdown_report(report)
+    )
+
+
 def test_prompt_suite_drift_fails_comparable_perf_key() -> None:
     records = [
         perf_regression.PerfRecord(
@@ -843,6 +913,7 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
     assert (output_dir / "perf_regression_latest.json").exists()
     assert (output_dir / "perf_regression_commit_points_latest.csv").exists()
     assert (output_dir / "perf_regression_regressions_latest.csv").exists()
+    assert (output_dir / "perf_regression_comparisons_latest.csv").exists()
     assert (output_dir / "perf_regression_sample_violations_latest.csv").exists()
     assert (output_dir / "perf_regression_variability_violations_latest.csv").exists()
     assert (output_dir / "perf_regression_commit_coverage_violations_latest.csv").exists()
@@ -857,6 +928,7 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
     assert "Variability" in markdown
     assert "Commit Coverage" in markdown
     assert "Comparison Coverage" in markdown
+    assert "Comparisons" in markdown
     assert "Prompt Suite Drift" in markdown
     assert "Telemetry Coverage" in markdown
     assert "prompt/dev-local/-/-/-" in markdown
@@ -864,6 +936,9 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
         encoding="utf-8"
     )
     regressions_csv = (output_dir / "perf_regression_regressions_latest.csv").read_text(
+        encoding="utf-8"
+    )
+    comparisons_csv = (output_dir / "perf_regression_comparisons_latest.csv").read_text(
         encoding="utf-8"
     )
     sample_violations_csv = (output_dir / "perf_regression_sample_violations_latest.csv").read_text(
@@ -885,11 +960,12 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
         output_dir / "perf_regression_telemetry_coverage_violations_latest.csv"
     ).read_text(encoding="utf-8")
     assert (
-        "key,commit,latest_timestamp,records,tok_per_s_records,wall_tok_per_s_records,memory_records,ttft_us_records,median_tok_per_s,median_wall_tok_per_s,median_ttft_us,tok_per_s_cv_pct,max_memory_bytes,prompt_suite_sha256"
+        "key,commit,latest_timestamp,records,tok_per_s_records,wall_tok_per_s_records,memory_records,ttft_us_records,p05_tok_per_s,median_tok_per_s,median_wall_tok_per_s,median_ttft_us,p95_ttft_us,tok_per_s_cv_pct,max_memory_bytes,prompt_suite_sha256"
         in commit_points_csv
     )
-    assert "prompt/dev-local/-/-/-,abc,2026-04-27T10:00:00Z,1,1,0,0,1,42.0,,12000," in commit_points_csv
+    assert "prompt/dev-local/-/-/-,abc,2026-04-27T10:00:00Z,1,1,0,0,1,42.0,42.0,,12000,12000.0," in commit_points_csv
     assert "key,metric,baseline_commit,candidate_commit,baseline_value,candidate_value" in regressions_csv
+    assert "key,baseline_commit,candidate_commit,baseline_latest_timestamp" in comparisons_csv
     assert "key,commit,records,minimum_records" in sample_violations_csv
     assert "key,commit,records,tok_per_s_cv_pct,threshold_pct" in variability_violations_csv
     assert "key,commits,minimum_commits,latest_commit" in commit_coverage_violations_csv

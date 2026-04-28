@@ -129,6 +129,35 @@ class TelemetryCoverageViolation:
     present_records: int
 
 
+@dataclass(frozen=True)
+class ComparisonRow:
+    key: str
+    baseline_commit: str
+    candidate_commit: str
+    baseline_latest_timestamp: str
+    candidate_latest_timestamp: str
+    baseline_records: int
+    candidate_records: int
+    median_tok_per_s_baseline: float | None
+    median_tok_per_s_candidate: float | None
+    median_tok_per_s_delta_pct: float | None
+    p05_tok_per_s_baseline: float | None
+    p05_tok_per_s_candidate: float | None
+    p05_tok_per_s_delta_pct: float | None
+    median_wall_tok_per_s_baseline: float | None
+    median_wall_tok_per_s_candidate: float | None
+    median_wall_tok_per_s_delta_pct: float | None
+    max_memory_bytes_baseline: int | None
+    max_memory_bytes_candidate: int | None
+    max_memory_bytes_delta_pct: float | None
+    median_ttft_us_baseline: float | None
+    median_ttft_us_candidate: float | None
+    median_ttft_us_delta_pct: float | None
+    p95_ttft_us_baseline: float | None
+    p95_ttft_us_candidate: float | None
+    p95_ttft_us_delta_pct: float | None
+
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -432,6 +461,73 @@ def select_comparison_points(
         return None
 
     return eligible_baselines[-1], candidate
+
+
+def throughput_delta_pct(baseline: float | None, candidate: float | None) -> float | None:
+    if baseline is None or candidate is None or baseline <= 0.0:
+        return None
+    return (baseline - candidate) * 100.0 / baseline
+
+
+def growth_delta_pct(baseline: float | int | None, candidate: float | int | None) -> float | None:
+    if baseline is None or candidate is None or float(baseline) <= 0.0:
+        return None
+    return (float(candidate) - float(baseline)) * 100.0 / float(baseline)
+
+
+def comparison_rows(
+    points: list[CommitPoint], baseline_commit: str | None, candidate_commit: str | None
+) -> list[ComparisonRow]:
+    by_key: dict[str, list[CommitPoint]] = {}
+    for point in points:
+        by_key.setdefault(point.key, []).append(point)
+
+    rows: list[ComparisonRow] = []
+    for key, key_points in sorted(by_key.items()):
+        comparison = select_comparison_points(key_points, baseline_commit, candidate_commit)
+        if comparison is None:
+            continue
+        baseline, candidate = comparison
+        rows.append(
+            ComparisonRow(
+                key=key,
+                baseline_commit=baseline.commit,
+                candidate_commit=candidate.commit,
+                baseline_latest_timestamp=baseline.latest_timestamp,
+                candidate_latest_timestamp=candidate.latest_timestamp,
+                baseline_records=baseline.records,
+                candidate_records=candidate.records,
+                median_tok_per_s_baseline=baseline.median_tok_per_s,
+                median_tok_per_s_candidate=candidate.median_tok_per_s,
+                median_tok_per_s_delta_pct=throughput_delta_pct(
+                    baseline.median_tok_per_s, candidate.median_tok_per_s
+                ),
+                p05_tok_per_s_baseline=baseline.p05_tok_per_s,
+                p05_tok_per_s_candidate=candidate.p05_tok_per_s,
+                p05_tok_per_s_delta_pct=throughput_delta_pct(
+                    baseline.p05_tok_per_s, candidate.p05_tok_per_s
+                ),
+                median_wall_tok_per_s_baseline=baseline.median_wall_tok_per_s,
+                median_wall_tok_per_s_candidate=candidate.median_wall_tok_per_s,
+                median_wall_tok_per_s_delta_pct=throughput_delta_pct(
+                    baseline.median_wall_tok_per_s, candidate.median_wall_tok_per_s
+                ),
+                max_memory_bytes_baseline=baseline.max_memory_bytes,
+                max_memory_bytes_candidate=candidate.max_memory_bytes,
+                max_memory_bytes_delta_pct=growth_delta_pct(
+                    baseline.max_memory_bytes, candidate.max_memory_bytes
+                ),
+                median_ttft_us_baseline=baseline.median_ttft_us,
+                median_ttft_us_candidate=candidate.median_ttft_us,
+                median_ttft_us_delta_pct=growth_delta_pct(
+                    baseline.median_ttft_us, candidate.median_ttft_us
+                ),
+                p95_ttft_us_baseline=baseline.p95_ttft_us,
+                p95_ttft_us_candidate=candidate.p95_ttft_us,
+                p95_ttft_us_delta_pct=growth_delta_pct(baseline.p95_ttft_us, candidate.p95_ttft_us),
+            )
+        )
+    return rows
 
 
 def detect_regressions(
@@ -851,6 +947,33 @@ def markdown_report(report: dict[str, Any]) -> str:
     else:
         lines.append("Required telemetry fields are present for every commit point.")
 
+    lines.extend(["", "## Comparisons", ""])
+    if report["comparisons"]:
+        lines.append(
+            "| Key | Baseline | Candidate | Median tok/s Delta | P05 tok/s Delta | Wall tok/s Delta | Memory Delta | Median TTFT Delta | P95 TTFT Delta |"
+        )
+        lines.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |")
+        for comparison in report["comparisons"]:
+            median_tps_delta = comparison["median_tok_per_s_delta_pct"]
+            p05_tps_delta = comparison["p05_tok_per_s_delta_pct"]
+            wall_tps_delta = comparison["median_wall_tok_per_s_delta_pct"]
+            memory_delta = comparison["max_memory_bytes_delta_pct"]
+            ttft_delta = comparison["median_ttft_us_delta_pct"]
+            p95_ttft_delta = comparison["p95_ttft_us_delta_pct"]
+            median_tps_cell = f"{median_tps_delta:.2f}%" if median_tps_delta is not None else "-"
+            p05_tps_cell = f"{p05_tps_delta:.2f}%" if p05_tps_delta is not None else "-"
+            wall_tps_cell = f"{wall_tps_delta:.2f}%" if wall_tps_delta is not None else "-"
+            memory_cell = f"{memory_delta:.2f}%" if memory_delta is not None else "-"
+            ttft_cell = f"{ttft_delta:.2f}%" if ttft_delta is not None else "-"
+            p95_ttft_cell = f"{p95_ttft_delta:.2f}%" if p95_ttft_delta is not None else "-"
+            lines.append(
+                f"| {comparison['key']} | {comparison['baseline_commit']} | "
+                f"{comparison['candidate_commit']} | {median_tps_cell} | {p05_tps_cell} | "
+                f"{wall_tps_cell} | {memory_cell} | {ttft_cell} | {p95_ttft_cell} |"
+            )
+    else:
+        lines.append("No comparable baseline/candidate commit points found.")
+
     lines.extend(["", "## Commit Points", ""])
     if report["commit_points"]:
         lines.append(
@@ -1148,6 +1271,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
     junit_path = output_dir / "perf_regression_junit_latest.xml"
     commit_points_csv = output_dir / "perf_regression_commit_points_latest.csv"
     regressions_csv = output_dir / "perf_regression_regressions_latest.csv"
+    comparisons_csv = output_dir / "perf_regression_comparisons_latest.csv"
     sample_violations_csv = output_dir / "perf_regression_sample_violations_latest.csv"
     variability_violations_csv = output_dir / "perf_regression_variability_violations_latest.csv"
     commit_coverage_violations_csv = (
@@ -1199,6 +1323,37 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
         ],
     )
     write_csv(
+        comparisons_csv,
+        report["comparisons"],
+        [
+            "key",
+            "baseline_commit",
+            "candidate_commit",
+            "baseline_latest_timestamp",
+            "candidate_latest_timestamp",
+            "baseline_records",
+            "candidate_records",
+            "median_tok_per_s_baseline",
+            "median_tok_per_s_candidate",
+            "median_tok_per_s_delta_pct",
+            "p05_tok_per_s_baseline",
+            "p05_tok_per_s_candidate",
+            "p05_tok_per_s_delta_pct",
+            "median_wall_tok_per_s_baseline",
+            "median_wall_tok_per_s_candidate",
+            "median_wall_tok_per_s_delta_pct",
+            "max_memory_bytes_baseline",
+            "max_memory_bytes_candidate",
+            "max_memory_bytes_delta_pct",
+            "median_ttft_us_baseline",
+            "median_ttft_us_candidate",
+            "median_ttft_us_delta_pct",
+            "p95_ttft_us_baseline",
+            "p95_ttft_us_candidate",
+            "p95_ttft_us_delta_pct",
+        ],
+    )
+    write_csv(
         sample_violations_csv,
         report["sample_violations"],
         ["key", "commit", "records", "minimum_records"],
@@ -1234,6 +1389,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
     print(f"wrote_junit={junit_path}")
     print(f"wrote_commit_points_csv={commit_points_csv}")
     print(f"wrote_regressions_csv={regressions_csv}")
+    print(f"wrote_comparisons_csv={comparisons_csv}")
     print(f"wrote_sample_violations_csv={sample_violations_csv}")
     print(f"wrote_variability_violations_csv={variability_violations_csv}")
     print(f"wrote_commit_coverage_violations_csv={commit_coverage_violations_csv}")
@@ -1275,6 +1431,7 @@ def build_report(
     sample_violations = detect_sample_violations(points, min_records_per_point)
     variability_violations = detect_variability_violations(points, max_tok_cv_pct)
     commit_coverage_violations = detect_commit_coverage_violations(points, min_commits_per_key)
+    comparisons = comparison_rows(points, baseline_commit, candidate_commit)
     comparison_coverage_violations = detect_comparison_coverage_violations(
         points, baseline_commit, candidate_commit
     )
@@ -1322,6 +1479,7 @@ def build_report(
         },
         "summaries": summarize(records),
         "commit_points": [asdict(point) for point in points],
+        "comparisons": [asdict(comparison) for comparison in comparisons],
         "regressions": [asdict(regression) for regression in regressions],
         "sample_violations": [asdict(violation) for violation in sample_violations],
         "variability_violations": [asdict(violation) for violation in variability_violations],

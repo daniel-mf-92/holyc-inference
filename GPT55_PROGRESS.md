@@ -115,3 +115,4 @@
 2026-04-28T09:50:00Z | Added command-hash metadata propagation and opt-in gating to benchmark artifact manifests with refreshed reports.
 2026-04-28T09:57:13Z | Added full-history CSV export to benchmark artifact manifests with docs, tests, and refreshed reports.
 2026-04-28T10:06:08Z | Added eval_compare per-dataset/split breakdown CSV output and opt-in breakdown quality gates with refreshed smoke artifacts.
+2026-04-28T10:15:29Z | Added perf regression baseline/candidate comparison CSV dashboards with docs, smoke checks, and refreshed artifacts.

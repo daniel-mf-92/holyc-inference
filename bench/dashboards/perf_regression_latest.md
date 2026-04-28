@@ -1,6 +1,6 @@
 # Perf Regression Dashboard
 
-Generated: 2026-04-28T09:43:25Z
+Generated: 2026-04-28T10:17:41Z
 Status: pass
 Records: 352
 Regressions: 0
@@ -40,6 +40,18 @@ Prompt-suite hashes are consistent for comparable benchmark keys.
 ## Telemetry Coverage
 
 Required telemetry fields are present for every commit point.
+
+## Comparisons
+
+| Key | Baseline | Candidate | Median tok/s Delta | P05 tok/s Delta | Wall tok/s Delta | Memory Delta | Median TTFT Delta | P95 TTFT Delta |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/ci-short | ci-base | ci-head | -1.00% | -1.00% | -1.05% | 0.00% | -2.00% | -2.00% |
+| qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-code | d1ee8f0158c3 | e4311d1fe5fa | 0.00% | 0.00% | -17.90% | 0.00% | 0.00% | 0.00% |
+| qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/smoke-short | d1ee8f0158c3 | e4311d1fe5fa | 0.00% | 0.00% | -68.37% | 0.00% | 0.00% | 0.00% |
+| qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-code | a0126ad2c367 | d1ee8f0158c3 | 0.00% | 0.00% | 11.88% | 0.00% | 0.00% | 0.00% |
+| qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q8_0/smoke-short | a0126ad2c367 | d1ee8f0158c3 | 0.00% | 0.00% | 27.82% | 0.00% | 0.00% | 0.00% |
+| qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-code | e4b0c6c494ee | d1ee8f0158c3 | 0.00% | 0.00% | 69.44% | 0.00% | 0.00% | 0.00% |
+| qemu_prompt/synthetic-airgap-smoke/synthetic-smoke/Q4_0/smoke-short | e4b0c6c494ee | d1ee8f0158c3 | 0.00% | 0.00% | -81.52% | 0.00% | 0.00% | 0.00% |
 
 ## Commit Points
 
