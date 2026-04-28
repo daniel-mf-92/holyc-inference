@@ -559,9 +559,11 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
                 "ttft_us_median": statistics.median(ttft_values) if ttft_values else None,
                 "ttft_us_p95": percentile([float(value) for value in ttft_values], 95.0),
                 "tok_per_s_min": min(tok_values) if tok_values else None,
+                "tok_per_s_p05": percentile(tok_values, 5.0),
                 "tok_per_s_median": statistics.median(tok_values) if tok_values else None,
                 "tok_per_s_stdev": sample_stdev(tok_values),
                 "tok_per_s_cv_pct": coefficient_of_variation_pct(tok_values),
+                "tok_per_s_p05_p95_spread_pct": percentile_spread_pct(tok_values, 5.0, 95.0),
                 "tok_per_s_max": max(tok_values) if tok_values else None,
                 "wall_tok_per_s_median": statistics.median(wall_tok_values) if wall_tok_values else None,
                 "wall_tok_per_s_p95": percentile(wall_tok_values, 95.0),
@@ -610,6 +612,17 @@ def coefficient_of_variation_pct(values: list[float]) -> float | None:
     if mean == 0:
         return None
     return statistics.stdev(values) * 100.0 / mean
+
+
+def percentile_spread_pct(values: list[float], low_pct: float, high_pct: float) -> float | None:
+    if not values:
+        return None
+    low = percentile(values, low_pct)
+    high = percentile(values, high_pct)
+    median = statistics.median(values)
+    if low is None or high is None or median == 0:
+        return None
+    return (high - low) * 100.0 / median
 
 
 def variability_findings(
@@ -761,9 +774,11 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
         "ttft_us_median": statistics.median(ttft_values) if ttft_values else None,
         "ttft_us_p95": percentile([float(value) for value in ttft_values], 95.0),
         "tok_per_s_min": min(tok_values) if tok_values else None,
+        "tok_per_s_p05": percentile(tok_values, 5.0),
         "tok_per_s_median": statistics.median(tok_values) if tok_values else None,
         "tok_per_s_stdev": sample_stdev(tok_values),
         "tok_per_s_cv_pct": coefficient_of_variation_pct(tok_values),
+        "tok_per_s_p05_p95_spread_pct": percentile_spread_pct(tok_values, 5.0, 95.0),
         "tok_per_s_p95": percentile(tok_values, 95.0),
         "tok_per_s_max": max(tok_values) if tok_values else None,
         "wall_tok_per_s_median": statistics.median(wall_tok_values) if wall_tok_values else None,
@@ -802,18 +817,18 @@ def markdown_report(report: dict[str, Any]) -> str:
             [
                 "## Suite Summary",
                 "",
-                "| Prompts | Runs | OK | Measured prompt bytes | Total tokens | Total elapsed us | Median host overhead us | Median host overhead % | Median TTFT us | P95 TTFT us | Median tok/s | P95 tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |",
-                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| Prompts | Runs | OK | Measured prompt bytes | Total tokens | Total elapsed us | Median host overhead us | Median host overhead % | Median TTFT us | P95 TTFT us | P05 tok/s | Median tok/s | P95 tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
                 "| {prompts} | {runs} | {ok_runs} | {measured_prompt_bytes_total} | {total_tokens} | {total_elapsed_us} | "
-                "{host_overhead_us_median} | {host_overhead_pct_median} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_median} | {tok_per_s_p95} | "
+                "{host_overhead_us_median} | {host_overhead_pct_median} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_p95} | "
                 "{wall_tok_per_s_median} | {wall_tok_per_s_p95} | {us_per_token_median} | {us_per_token_p95} | "
                 "{wall_us_per_token_median} | {wall_us_per_token_p95} | {memory_bytes_max} |".format(
                     **{key: format_summary_value(value) for key, value in suite.items()}
                 ),
                 "",
-                "| tok/s stdev | tok/s CV % |",
-                "| ---: | ---: |",
-                "| {tok_per_s_stdev} | {tok_per_s_cv_pct} |".format(
+                "| tok/s stdev | tok/s CV % | tok/s P05-P95 spread % |",
+                "| ---: | ---: | ---: |",
+                "| {tok_per_s_stdev} | {tok_per_s_cv_pct} | {tok_per_s_p05_p95_spread_pct} |".format(
                     **{key: format_summary_value(value) for key, value in suite.items()}
                 ),
                 "",
@@ -823,13 +838,13 @@ def markdown_report(report: dict[str, Any]) -> str:
         )
     if report["summaries"]:
         lines.append(
-            "| Prompt | Prompt bytes | Runs | OK | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median TTFT us | P95 TTFT us | Min tok/s | Median tok/s | tok/s stdev | tok/s CV % | Max tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |"
+            "| Prompt | Prompt bytes | Runs | OK | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median TTFT us | P95 TTFT us | Min tok/s | P05 tok/s | Median tok/s | tok/s stdev | tok/s CV % | P05-P95 spread % | Max tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |"
         )
-        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for summary in report["summaries"]:
             lines.append(
                 "| {prompt} | {prompt_bytes} | {runs} | {ok_runs} | {tokens_median} | {elapsed_us_median} | "
-                "{host_overhead_us_median} | {host_overhead_pct_median} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_min} | {tok_per_s_median} | {tok_per_s_stdev} | {tok_per_s_cv_pct} | "
+                "{host_overhead_us_median} | {host_overhead_pct_median} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_min} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_stdev} | {tok_per_s_cv_pct} | {tok_per_s_p05_p95_spread_pct} | "
                 "{tok_per_s_max} | {wall_tok_per_s_median} | {wall_tok_per_s_p95} | {us_per_token_median} | {us_per_token_p95} | "
                 "{wall_us_per_token_median} | {wall_us_per_token_p95} | {memory_bytes_max} |".format(
                     **{key: format_summary_value(value) for key, value in summary.items()}

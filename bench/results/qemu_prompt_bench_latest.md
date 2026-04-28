@@ -1,28 +1,28 @@
 # QEMU Prompt Benchmark
 
-Generated: 2026-04-28T06:19:52Z
+Generated: 2026-04-28T06:47:52Z
 Status: pass
 Prompt suite: 68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a
-Command SHA256: e415146c052b9f0baa23706ffde97548f2374f6601337823b4d810c39bed48e7
-Warmup runs: 0
-Runs: 6
+Command SHA256: b9be9bb048be4bf27f179ec73019754dd945d4c113f0a28a4ca266b00b458b85
+Warmup runs: 2
+Runs: 4
 
 ## Suite Summary
 
-| Prompts | Runs | OK | Measured prompt bytes | Total tokens | Total elapsed us | Median host overhead us | Median host overhead % | Median TTFT us | P95 TTFT us | Median tok/s | P95 tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 2 | 6 | 6 | 360 | 240 | 1500000 | -143989.500 | -71.995 | 12000.000 | 12400.000 | 160.000 | 160.000 | 571.482 | 719.831 | 6250.000 | 6250.000 | 1750.328 | 4640.943 | 67207168 |
+| Prompts | Runs | OK | Measured prompt bytes | Total tokens | Total elapsed us | Median host overhead us | Median host overhead % | Median TTFT us | P95 TTFT us | P05 tok/s | Median tok/s | P95 tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2 | 4 | 4 | 240 | 160 | 1000000 | -195450.500 | -77.299 | 12000.000 | 12400.000 | 160.000 | 160.000 | 160.000 | 732.395 | 885.598 | 6250.000 | 6250.000 | 1418.792 | 1778.213 | 67207168 |
 
-| tok/s stdev | tok/s CV % |
-| ---: | ---: |
-| 0.000 | 0.000 |
+| tok/s stdev | tok/s CV % | tok/s P05-P95 spread % |
+| ---: | ---: | ---: |
+| 0.000 | 0.000 | 0.000 |
 
 ## Prompt Summary
 
-| Prompt | Prompt bytes | Runs | OK | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median TTFT us | P95 TTFT us | Min tok/s | Median tok/s | tok/s stdev | tok/s CV % | Max tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| smoke-code | 71 | 3 | 3 | 48 | 300000 | -108251 | -36.084 | 12400 | 12400.000 | 160.000 | 160.000 | 0.000 | 0.000 | 160.000 | 250.327 | 709.856 | 6250.000 | 6250.000 | 3994.771 | 4770.177 | 67207168 |
-| smoke-short | 49 | 3 | 3 | 32 | 200000 | -144927 | -72.463 | 11600 | 11600.000 | 160.000 | 160.000 | 0.000 | 0.000 | 160.000 | 581.047 | 595.027 | 6250.000 | 6250.000 | 1721.031 | 1773.766 | 67174400 |
+| Prompt | Prompt bytes | Runs | OK | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median TTFT us | P95 TTFT us | Min tok/s | P05 tok/s | Median tok/s | tok/s stdev | tok/s CV % | P05-P95 spread % | Max tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| smoke-code | 71 | 2 | 2 | 48.000 | 300000.000 | -245515.000 | -81.838 | 12400.000 | 12400.000 | 160.000 | 160.000 | 160.000 | 0.000 | 0.000 | 0.000 | 160.000 | 881.025 | 886.904 | 6250.000 | 6250.000 | 1135.104 | 1142.679 | 67207168 |
+| smoke-short | 49 | 2 | 2 | 32.000 | 200000.000 | -144206.000 | -72.103 | 11600.000 | 11600.000 | 160.000 | 160.000 | 160.000 | 0.000 | 0.000 | 0.000 | 160.000 | 574.001 | 588.667 | 6250.000 | 6250.000 | 1743.562 | 1788.112 | 67174400 |
 
 ## Environment
 

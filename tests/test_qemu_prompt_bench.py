@@ -341,7 +341,9 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
     assert report["suite_summary"]["host_overhead_us_median"] is not None
     assert report["suite_summary"]["host_overhead_pct_median"] is not None
     assert report["suite_summary"]["tok_per_s_median"] == 300.0
+    assert report["suite_summary"]["tok_per_s_p05"] == 200.0
     assert report["suite_summary"]["tok_per_s_p95"] == 400.0
+    assert round(report["suite_summary"]["tok_per_s_p05_p95_spread_pct"], 3) == 66.667
     assert report["suite_summary"]["wall_tok_per_s_median"] > 0
     assert report["suite_summary"]["wall_tok_per_s_p95"] > 0
     assert report["suite_summary"]["us_per_token_median"] == 3750.0
@@ -354,6 +356,8 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
     assert report["summaries"][0]["prompt_bytes"] == 5
     assert report["summaries"][0]["runs"] == 3
     assert report["summaries"][0]["tok_per_s_median"] == 200.0
+    assert report["summaries"][0]["tok_per_s_p05"] == 200.0
+    assert report["summaries"][0]["tok_per_s_p05_p95_spread_pct"] == 0.0
     assert report["summaries"][0]["host_overhead_us_median"] is not None
     assert report["summaries"][0]["host_overhead_pct_median"] is not None
     assert report["summaries"][0]["wall_tok_per_s_median"] > 0
@@ -367,6 +371,8 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
     assert f"Prompt suite: {report['prompt_suite']['suite_sha256']}" in markdown
     assert f"Command SHA256: {report['command_sha256']}" in markdown
     assert "Median host overhead us" in markdown
+    assert "P05 tok/s" in markdown
+    assert "tok/s P05-P95 spread %" in markdown
     assert "Median wall tok/s" in markdown
     assert "Median us/token" in markdown
     assert "| 2 | 6 | 6 | 33 | 180 | 600000 |" in markdown
