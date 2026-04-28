@@ -1,6 +1,6 @@
 # Eval Compare Report
 
-Generated: 2026-04-28T04:38:21Z
+Generated: 2026-04-28T07:35:05Z
 Dataset: smoke-eval
 Split: validation
 Quantization: Q4_0
@@ -32,6 +32,13 @@ Status: pass
 | --- | ---: | ---: | ---: | ---: | ---: |
 | HolyC | 1/3 (0.3333) | 0.9993 | 1.0000 | 0.0000 | 0.0007 |
 | llama.cpp | 1/3 (0.3333) | 0.8310 | 1.0000 | 0.0432 | 0.1690 |
+
+## Score Ranking
+
+| Engine | Score coverage | Top-1 | Top-2 | Top-3 | Mean gold rank | MRR |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| HolyC | 1/3 (0.3333) | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+| llama.cpp | 1/3 (0.3333) | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
 
 ## Dataset Breakdown
 

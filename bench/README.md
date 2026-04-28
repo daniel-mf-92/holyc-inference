@@ -156,6 +156,8 @@ Prediction score vectors are treated as choice-aligned logits/logprobs: every
 score must be finite and the score count must match the gold choice count.
 When score vectors are present, reports include per-row confidence/margin plus
 score coverage, mean confidence, Brier score, and expected calibration error.
+Reports also rank the gold answer within each score vector and summarize top-1,
+top-2, top-3, mean gold rank, and mean reciprocal rank for each engine.
 Reports also include paired correctness counts and an exact two-sided McNemar
 binomial p-value so HolyC-vs-llama quality deltas can be interpreted as paired
 eval outcomes on the same records.

@@ -75,6 +75,11 @@ def test_q4_0_block_audit_reports_signed_nibble_range(tmp_path: Path) -> None:
     assert audit.quant_used_value_count == 3
     assert audit.quant_saturation_count == 2
     assert audit.quant_saturation_pct == 6.25
+    assert audit.min_block_used_quant_values == 3
+    assert audit.min_block_used_quant_values_index == 0
+    assert audit.worst_block_saturation_count == 2
+    assert audit.worst_block_saturation_pct == 6.25
+    assert audit.worst_block_saturation_index == 0
     assert audit.scale_normal_count == 1
     assert audit.scale_q16_min == 65536
     assert audit.scale_q16_max == 65536
@@ -190,6 +195,37 @@ def test_block_audit_checks_quant_distribution_gates(tmp_path: Path) -> None:
     assert "saturated quant values 100.000% exceeds limit 90.000%" in audit.findings
 
 
+def test_block_audit_checks_per_block_distribution_gates(tmp_path: Path) -> None:
+    block_file = tmp_path / "q8.bin"
+    first_block = half_bits(1.0) + bytes([0] * 32)
+    second_payload = bytes([128] * 16 + [127] * 16)
+    second_block = half_bits(1.0) + second_payload
+    block_file.write_bytes(first_block + second_block)
+
+    audit = quant_audit.audit_q8_0_blocks(
+        block_file,
+        allow_inf_nan_scale=False,
+        min_used_quant_values=3,
+        max_saturation_pct=90.0,
+        min_block_used_quant_values=2,
+        max_block_saturation_pct=50.0,
+    )
+
+    assert audit.quant_used_value_count == 3
+    assert audit.quant_saturation_count == 32
+    assert audit.quant_saturation_pct == 50.0
+    assert audit.min_block_used_quant_values == 1
+    assert audit.min_block_used_quant_values_index == 0
+    assert audit.worst_block_saturation_count == 32
+    assert audit.worst_block_saturation_pct == 100.0
+    assert audit.worst_block_saturation_index == 1
+    assert "block 0: used quant values 1 below per-block minimum 2" in audit.findings
+    assert (
+        "block 1: saturated quant values 100.000% exceeds per-block limit 50.000%"
+        in audit.findings
+    )
+
+
 def test_cli_writes_pass_report(tmp_path: Path) -> None:
     source = tmp_path / "ok.HC"
     output = tmp_path / "report.json"
@@ -226,6 +262,10 @@ def test_cli_fails_on_q16_scale_limit(tmp_path: Path) -> None:
             "32768",
             "--min-used-quant-values",
             "1",
+            "--min-block-used-quant-values",
+            "1",
+            "--max-block-saturation-pct",
+            "100",
             "--output",
             str(output),
             "--markdown",
@@ -241,10 +281,13 @@ def test_cli_fails_on_q16_scale_limit(tmp_path: Path) -> None:
     report = output.read_text(encoding="utf-8")
     assert '"scale_q16_abs_max": 65536' in report
     assert '"scale_q16_over_limit_count": 1' in report
+    assert '"min_block_used_quant_values": 1' in report
+    assert '"worst_block_saturation_count": 0' in report
     markdown_text = markdown.read_text(encoding="utf-8")
     assert "Scale Q16 min/max/absmax/zero/overlimit" in markdown_text
     assert "Zero-scale nonzero blocks/entries" in markdown_text
     assert "Used values" in markdown_text
+    assert "Min block used values" in markdown_text
     assert "block," in csv_report.read_text(encoding="utf-8")
     junit_root = ET.parse(junit).getroot()
     assert junit_root.attrib["name"] == "holyc_quant_audit"

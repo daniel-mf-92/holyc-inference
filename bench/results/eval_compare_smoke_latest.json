@@ -1,6 +1,6 @@
 {
   "dataset": "smoke-eval",
-  "generated_at": "2026-04-28T04:38:21Z",
+  "generated_at": "2026-04-28T07:35:05Z",
   "gold_sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131",
   "holyc_predictions_sha256": "61bb69247c6343f53493b5febb5636780ed8c5d99d6114976164e1c7ecd1c4e9",
   "llama_predictions_sha256": "22a31f8ffa48784acd9645bf802ac0f3e0260d45e703a34c926a3331e643dfa1",
@@ -17,10 +17,12 @@
       "engines_agree": true,
       "holyc_confidence": 0.9993030936950774,
       "holyc_correct": true,
+      "holyc_gold_rank": 1,
       "holyc_margin": 0.9989678648531953,
       "holyc_prediction": 0,
       "llama_confidence": null,
       "llama_correct": true,
+      "llama_gold_rank": null,
       "llama_margin": null,
       "llama_prediction": 0,
       "record_id": "smoke-arc-1",
@@ -32,10 +34,12 @@
       "engines_agree": true,
       "holyc_confidence": null,
       "holyc_correct": true,
+      "holyc_gold_rank": null,
       "holyc_margin": null,
       "holyc_prediction": 0,
       "llama_confidence": null,
       "llama_correct": true,
+      "llama_gold_rank": null,
       "llama_margin": null,
       "llama_prediction": 0,
       "record_id": "smoke-hellaswag-1",
@@ -47,10 +51,12 @@
       "engines_agree": true,
       "holyc_confidence": null,
       "holyc_correct": true,
+      "holyc_gold_rank": null,
       "holyc_margin": null,
       "holyc_prediction": 0,
       "llama_confidence": 0.8309526605439513,
       "llama_correct": true,
+      "llama_gold_rank": 1,
       "llama_margin": 0.7184954468730188,
       "llama_prediction": 0,
       "record_id": "smoke-truthfulqa-1",
@@ -297,6 +303,16 @@
         "true_positive": 0
       }
     ],
+    "holyc_rank_metrics": {
+      "mean_gold_rank": 1.0,
+      "mean_reciprocal_rank": 1.0,
+      "score_coverage": 0.3333333333333333,
+      "scored_count": 1,
+      "top_1_accuracy": 1.0,
+      "top_2_accuracy": 1.0,
+      "top_3_accuracy": 1.0,
+      "total_count": 3
+    },
     "llama_accuracy": 1.0,
     "llama_calibration": {
       "accuracy_when_scored": 1.0,
@@ -463,6 +479,16 @@
         "true_positive": 0
       }
     ],
+    "llama_rank_metrics": {
+      "mean_gold_rank": 1.0,
+      "mean_reciprocal_rank": 1.0,
+      "score_coverage": 0.3333333333333333,
+      "scored_count": 1,
+      "top_1_accuracy": 1.0,
+      "top_2_accuracy": 1.0,
+      "top_3_accuracy": 1.0,
+      "total_count": 3
+    },
     "macro_f1_delta_holyc_minus_llama": 0.0,
     "mcnemar_exact": {
       "discordant_count": 0,

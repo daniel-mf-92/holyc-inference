@@ -44,6 +44,9 @@ def test_smoke_predictions_compare_cleanly() -> None:
     assert summary["holyc_confusion_matrix"]["matrix"][0][0] == 3
     assert summary["holyc_calibration"]["scored_count"] == 1
     assert summary["llama_calibration"]["scored_count"] == 1
+    assert summary["holyc_rank_metrics"]["scored_count"] == 1
+    assert summary["holyc_rank_metrics"]["top_1_accuracy"] == 1.0
+    assert summary["holyc_rank_metrics"]["mean_reciprocal_rank"] == 1.0
     assert [item["dataset"] for item in summary["dataset_breakdown"]] == [
         "arc-smoke",
         "hellaswag-smoke",
@@ -108,12 +111,14 @@ def test_cli_writes_json_and_markdown_report() -> None:
         assert "## Dataset Breakdown" in markdown
         assert "## Confidence Intervals" in markdown
         assert "## Score Calibration" in markdown
+        assert "## Score Ranking" in markdown
         assert "No quality gate regressions." in markdown
         assert len(csv_rows) == 3
         assert csv_rows[0]["record_id"] == "smoke-arc-1"
         assert csv_rows[0]["holyc_correct"] == "True"
         assert csv_rows[0]["engines_agree"] == "True"
         assert csv_rows[0]["holyc_confidence"] != ""
+        assert csv_rows[0]["holyc_gold_rank"] == "1"
         assert junit_root.attrib["name"] == "holyc_eval_compare"
         assert junit_root.attrib["failures"] == "0"
 
@@ -168,6 +173,13 @@ def test_compare_reports_score_vector_calibration() -> None:
     assert round(summary["holyc_calibration"]["accuracy_when_scored"], 4) == 0.5
     assert summary["holyc_calibration"]["brier_score"] > summary["llama_calibration"]["brier_score"]
     assert summary["holyc_calibration"]["ece"] > 0.0
+    assert rows[0].holyc_gold_rank == 1
+    assert rows[1].holyc_gold_rank == 2
+    assert summary["holyc_rank_metrics"]["top_1_accuracy"] == 0.5
+    assert summary["holyc_rank_metrics"]["top_2_accuracy"] == 1.0
+    assert summary["holyc_rank_metrics"]["mean_gold_rank"] == 1.5
+    assert summary["holyc_rank_metrics"]["mean_reciprocal_rank"] == 0.75
+    assert summary["llama_rank_metrics"]["mean_reciprocal_rank"] == 1.0
 
 
 def test_confidence_level_can_be_configured() -> None:

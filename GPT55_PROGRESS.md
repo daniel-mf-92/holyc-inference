@@ -104,3 +104,4 @@
 2026-04-28T06:38:41Z | Added build-compare prompt-suite drift gating with CSV/JUnit reporting, docs, tests, and refreshed comparison artifacts.
 2026-04-28T06:48:02Z | Added QEMU prompt benchmark low-tail tok/s percentile/spread reporting with refreshed synthetic artifacts.
 2026-04-28T06:57:32Z | Added build-compare P05 tok/s deltas and opt-in low-tail regression gating with refreshed comparison artifacts.
+2026-04-28T07:46:07Z | Added quant audit per-block distribution gates for low diversity and saturation with refreshed source audit artifacts.

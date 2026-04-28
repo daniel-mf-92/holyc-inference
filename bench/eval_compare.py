@@ -72,6 +72,8 @@ class EvalRow:
     llama_confidence: float | None
     holyc_margin: float | None
     llama_margin: float | None
+    holyc_gold_rank: int | None
+    llama_gold_rank: int | None
 
 
 @dataclass(frozen=True)
@@ -409,6 +411,33 @@ def prediction_margin(scores: list[float] | None, predicted_index: int) -> float
     return predicted_probability - runner_up
 
 
+def gold_rank(scores: list[float] | None, answer_index: int) -> int | None:
+    if scores is None:
+        return None
+    gold_score = scores[answer_index]
+    return 1 + sum(1 for score in scores if score > gold_score)
+
+
+def rank_metrics(rows: list[EvalRow], engine: str, *, max_k: int = 3) -> dict[str, Any]:
+    ranks = [
+        row.holyc_gold_rank if engine == "holyc" else row.llama_gold_rank
+        for row in rows
+    ]
+    scored_ranks = [rank for rank in ranks if rank is not None]
+    topk = {
+        f"top_{k}_accuracy": safe_div(sum(1 for rank in scored_ranks if rank <= k), len(scored_ranks))
+        for k in range(1, max_k + 1)
+    }
+    return {
+        **topk,
+        "mean_gold_rank": safe_div(sum(scored_ranks), len(scored_ranks)),
+        "mean_reciprocal_rank": safe_div(sum(1.0 / rank for rank in scored_ranks), len(scored_ranks)),
+        "score_coverage": safe_div(len(scored_ranks), len(rows)),
+        "scored_count": len(scored_ranks),
+        "total_count": len(rows),
+    }
+
+
 def calibration_metrics(
     gold: dict[str, GoldCase],
     predictions: dict[str, Prediction],
@@ -528,6 +557,8 @@ def compare(
                 llama_confidence=prediction_confidence(llama.scores, llama.predicted_index),
                 holyc_margin=prediction_margin(holyc.scores, holyc.predicted_index),
                 llama_margin=prediction_margin(llama.scores, llama.predicted_index),
+                holyc_gold_rank=gold_rank(holyc.scores, case.answer_index),
+                llama_gold_rank=gold_rank(llama.scores, case.answer_index),
             )
         )
 
@@ -555,12 +586,14 @@ def compare(
         "holyc_correct": holyc_correct,
         "holyc_macro_f1": holyc_metrics["macro_f1"],
         "holyc_per_answer_index": holyc_metrics["per_answer_index"],
+        "holyc_rank_metrics": rank_metrics(rows, "holyc"),
         "llama_accuracy": accuracy(llama_correct, total),
         "llama_calibration": llama_calibration,
         "llama_confusion_matrix": llama_metrics["confusion_matrix"],
         "llama_correct": llama_correct,
         "llama_macro_f1": llama_metrics["macro_f1"],
         "llama_per_answer_index": llama_metrics["per_answer_index"],
+        "llama_rank_metrics": rank_metrics(rows, "llama"),
         "mcnemar_exact": exact_mcnemar_test(holyc_only_correct, llama_only_correct),
         "paired_correctness": {
             "both_correct": both_correct,
@@ -630,6 +663,23 @@ def markdown_report(report: dict[str, Any]) -> str:
             f"| {engine_label} | {metrics['scored_count']}/{metrics['total_count']} "
             f"({metrics['score_coverage']:.4f}) | {metrics['mean_confidence']:.4f} | "
             f"{metrics['accuracy_when_scored']:.4f} | {metrics['brier_score']:.4f} | {metrics['ece']:.4f} |"
+        )
+    lines.append("")
+    lines.extend(
+        [
+            "## Score Ranking",
+            "",
+            "| Engine | Score coverage | Top-1 | Top-2 | Top-3 | Mean gold rank | MRR |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
+    for engine_label, key in (("HolyC", "holyc_rank_metrics"), ("llama.cpp", "llama_rank_metrics")):
+        metrics = summary[key]
+        lines.append(
+            f"| {engine_label} | {metrics['scored_count']}/{metrics['total_count']} "
+            f"({metrics['score_coverage']:.4f}) | {metrics['top_1_accuracy']:.4f} | "
+            f"{metrics['top_2_accuracy']:.4f} | {metrics['top_3_accuracy']:.4f} | "
+            f"{metrics['mean_gold_rank']:.4f} | {metrics['mean_reciprocal_rank']:.4f} |"
         )
     lines.append("")
     breakdown = summary.get("dataset_breakdown", [])
@@ -832,6 +882,8 @@ def write_csv_report(path: Path, rows: list[EvalRow]) -> None:
                 "llama_confidence",
                 "holyc_margin",
                 "llama_margin",
+                "holyc_gold_rank",
+                "llama_gold_rank",
             ],
             lineterminator="\n",
         )
