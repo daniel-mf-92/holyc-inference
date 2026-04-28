@@ -39,6 +39,7 @@ class BuildMetric:
     median_tokens: float | None
     median_elapsed_us: float | None
     median_tok_per_s: float | None
+    p05_tok_per_s: float | None
     median_wall_tok_per_s: float | None
     median_ttft_us: float | None
     max_memory_bytes: int | None
@@ -61,6 +62,9 @@ class BuildDelta:
     baseline_tok_per_s: float | None
     candidate_tok_per_s: float | None
     tok_per_s_delta_pct: float | None
+    baseline_tok_per_s_p05: float | None
+    candidate_tok_per_s_p05: float | None
+    tok_per_s_p05_delta_pct: float | None
     baseline_wall_tok_per_s: float | None
     candidate_wall_tok_per_s: float | None
     wall_tok_per_s_delta_pct: float | None
@@ -163,6 +167,19 @@ def duration_us(row: dict[str, Any], names: Iterable[str]) -> float | None:
         if value is not None:
             return value * 1_000_000.0
     return None
+
+
+def percentile(values: list[float], pct: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    if len(ordered) == 1:
+        return ordered[0]
+    rank = (len(ordered) - 1) * (pct / 100.0)
+    lower = int(rank)
+    upper = min(lower + 1, len(ordered) - 1)
+    weight = rank - lower
+    return ordered[lower] * (1.0 - weight) + ordered[upper] * weight
 
 
 def flatten_payload(payload: Any) -> Iterable[dict[str, Any]]:
@@ -283,6 +300,7 @@ def metric_from_rows(build: str, source: Path, rows: list[dict[str, Any]]) -> li
                 median_tokens=statistics.median(token_values) if token_values else None,
                 median_elapsed_us=statistics.median(elapsed_values) if elapsed_values else None,
                 median_tok_per_s=statistics.median(tok_values) if tok_values else None,
+                p05_tok_per_s=percentile(tok_values, 5.0),
                 median_wall_tok_per_s=statistics.median(wall_tok_values) if wall_tok_values else None,
                 median_ttft_us=statistics.median(ttft_values) if ttft_values else None,
                 max_memory_bytes=max(memory_values) if memory_values else None,
@@ -340,6 +358,9 @@ def compare_builds(metrics: list[BuildMetric], baseline_build: str) -> list[Buil
                     baseline_tok_per_s=baseline.median_tok_per_s,
                     candidate_tok_per_s=candidate.median_tok_per_s,
                     tok_per_s_delta_pct=pct_delta(candidate.median_tok_per_s, baseline.median_tok_per_s),
+                    baseline_tok_per_s_p05=baseline.p05_tok_per_s,
+                    candidate_tok_per_s_p05=candidate.p05_tok_per_s,
+                    tok_per_s_p05_delta_pct=pct_delta(candidate.p05_tok_per_s, baseline.p05_tok_per_s),
                     baseline_wall_tok_per_s=baseline.median_wall_tok_per_s,
                     candidate_wall_tok_per_s=candidate.median_wall_tok_per_s,
                     wall_tok_per_s_delta_pct=pct_delta(
@@ -369,9 +390,11 @@ def find_regressions(
     *,
     max_wall_tok_regression_pct: float | None = None,
     max_ttft_growth_pct: float | None = None,
+    max_p05_tok_regression_pct: float | None = None,
 ) -> list[BuildRegression]:
     threshold = -abs(max_tok_regression_pct)
     wall_threshold = -abs(max_wall_tok_regression_pct) if max_wall_tok_regression_pct is not None else None
+    p05_threshold = -abs(max_p05_tok_regression_pct) if max_p05_tok_regression_pct is not None else None
     regressions: list[BuildRegression] = []
     for delta in deltas:
         if delta.tok_per_s_delta_pct is not None and delta.tok_per_s_delta_pct <= threshold:
@@ -382,6 +405,20 @@ def find_regressions(
                     metric="tok_per_s",
                     delta_pct=delta.tok_per_s_delta_pct,
                     allowed_pct=abs(max_tok_regression_pct),
+                )
+            )
+        if (
+            p05_threshold is not None
+            and delta.tok_per_s_p05_delta_pct is not None
+            and delta.tok_per_s_p05_delta_pct <= p05_threshold
+        ):
+            regressions.append(
+                BuildRegression(
+                    key=delta.key,
+                    candidate_build=delta.candidate_build,
+                    metric="tok_per_s_p05",
+                    delta_pct=delta.tok_per_s_p05_delta_pct,
+                    allowed_pct=abs(max_p05_tok_regression_pct),
                 )
             )
         if (
@@ -501,6 +538,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Baseline: {report['baseline_build']}",
         f"Builds: {', '.join(report['builds'])}",
         f"Throughput regressions: {len([row for row in report['regressions'] if row['metric'] == 'tok_per_s'])}",
+        f"P05 throughput regressions: {len([row for row in report['regressions'] if row['metric'] == 'tok_per_s_p05'])}",
         f"Wall throughput regressions: {len([row for row in report['regressions'] if row['metric'] == 'wall_tok_per_s'])}",
         f"TTFT regressions: {len([row for row in report['regressions'] if row['metric'] == 'ttft_us'])}",
         f"Memory regressions: {len([row for row in report['regressions'] if row['metric'] == 'memory_bytes'])}",
@@ -512,13 +550,14 @@ def markdown_report(report: dict[str, Any]) -> str:
     ]
     if report["deltas"]:
         lines.append(
-            "| Candidate | Prompt key | Base tok/s | Candidate tok/s | Tok/s delta % | Base wall tok/s | Candidate wall tok/s | Wall tok/s delta % | Base elapsed us | Candidate elapsed us | Elapsed delta % | Base TTFT us | Candidate TTFT us | TTFT delta % | Base memory bytes | Candidate memory bytes | Memory delta % |"
+            "| Candidate | Prompt key | Base tok/s | Candidate tok/s | Tok/s delta % | Base P05 tok/s | Candidate P05 tok/s | P05 tok/s delta % | Base wall tok/s | Candidate wall tok/s | Wall tok/s delta % | Base elapsed us | Candidate elapsed us | Elapsed delta % | Base TTFT us | Candidate TTFT us | TTFT delta % | Base memory bytes | Candidate memory bytes | Memory delta % |"
         )
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for delta in report["deltas"]:
             lines.append(
                 "| {candidate_build} | {key} | {baseline_tok_per_s} | {candidate_tok_per_s} | "
-                "{tok_per_s_delta_pct} | {baseline_wall_tok_per_s} | {candidate_wall_tok_per_s} | "
+                "{tok_per_s_delta_pct} | {baseline_tok_per_s_p05} | {candidate_tok_per_s_p05} | "
+                "{tok_per_s_p05_delta_pct} | {baseline_wall_tok_per_s} | {candidate_wall_tok_per_s} | "
                 "{wall_tok_per_s_delta_pct} | {baseline_elapsed_us} | {candidate_elapsed_us} | {elapsed_delta_pct} | "
                 "{baseline_ttft_us} | {candidate_ttft_us} | {ttft_delta_pct} | "
                 "{baseline_memory_bytes} | {candidate_memory_bytes} | {memory_delta_pct} |".format(
@@ -562,6 +601,9 @@ def write_csv(deltas: list[BuildDelta], path: Path) -> None:
         "baseline_tok_per_s",
         "candidate_tok_per_s",
         "tok_per_s_delta_pct",
+        "baseline_tok_per_s_p05",
+        "candidate_tok_per_s_p05",
+        "tok_per_s_p05_delta_pct",
         "baseline_wall_tok_per_s",
         "candidate_wall_tok_per_s",
         "wall_tok_per_s_delta_pct",
@@ -664,6 +706,9 @@ def write_junit(
                 f"baseline_tok_per_s={format_value(delta.baseline_tok_per_s)}\n"
                 f"candidate_tok_per_s={format_value(delta.candidate_tok_per_s)}\n"
                 f"tok_per_s_delta_pct={format_value(delta.tok_per_s_delta_pct)}\n"
+                f"baseline_tok_per_s_p05={format_value(delta.baseline_tok_per_s_p05)}\n"
+                f"candidate_tok_per_s_p05={format_value(delta.candidate_tok_per_s_p05)}\n"
+                f"tok_per_s_p05_delta_pct={format_value(delta.tok_per_s_p05_delta_pct)}\n"
                 f"baseline_wall_tok_per_s={format_value(delta.baseline_wall_tok_per_s)}\n"
                 f"candidate_wall_tok_per_s={format_value(delta.candidate_wall_tok_per_s)}\n"
                 f"wall_tok_per_s_delta_pct={format_value(delta.wall_tok_per_s_delta_pct)}\n"
@@ -731,6 +776,7 @@ def write_report(
     max_wall_tok_regression_pct: float | None = None,
     max_memory_growth_pct: float | None = None,
     max_ttft_growth_pct: float | None = None,
+    max_p05_tok_regression_pct: float | None = None,
     min_ok_runs_per_build: int = 0,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -740,6 +786,7 @@ def write_report(
         max_memory_growth_pct,
         max_wall_tok_regression_pct=max_wall_tok_regression_pct,
         max_ttft_growth_pct=max_ttft_growth_pct,
+        max_p05_tok_regression_pct=max_p05_tok_regression_pct,
     )
     coverage_violations = find_coverage_violations(deltas, min_ok_runs_per_build)
     prompt_suite_drift = find_prompt_suite_drift(deltas)
@@ -751,6 +798,9 @@ def write_report(
         "max_tok_regression_pct": abs(max_tok_regression_pct),
         "max_wall_tok_regression_pct": abs(max_wall_tok_regression_pct)
         if max_wall_tok_regression_pct is not None
+        else None,
+        "max_p05_tok_regression_pct": abs(max_p05_tok_regression_pct)
+        if max_p05_tok_regression_pct is not None
         else None,
         "max_memory_growth_pct": abs(max_memory_growth_pct) if max_memory_growth_pct is not None else None,
         "max_ttft_growth_pct": abs(max_ttft_growth_pct) if max_ttft_growth_pct is not None else None,
@@ -803,6 +853,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Allowed host wall-clock median tok/s drop before a regression is reported; omitted disables wall-time gating",
     )
     parser.add_argument(
+        "--max-p05-tok-regression-pct",
+        type=float,
+        help="Allowed P05 tok/s drop before a low-tail throughput regression is reported; omitted disables P05 gating",
+    )
+    parser.add_argument(
         "--max-ttft-growth-pct",
         type=float,
         help="Allowed median first-token latency growth before a regression is reported; omitted disables TTFT gating",
@@ -847,6 +902,7 @@ def main(argv: list[str] | None = None) -> int:
         max_wall_tok_regression_pct=args.max_wall_tok_regression_pct,
         max_memory_growth_pct=args.max_memory_growth_pct,
         max_ttft_growth_pct=args.max_ttft_growth_pct,
+        max_p05_tok_regression_pct=args.max_p05_tok_regression_pct,
         min_ok_runs_per_build=args.min_ok_runs_per_build,
     )
     regressions = find_regressions(
@@ -855,6 +911,7 @@ def main(argv: list[str] | None = None) -> int:
         args.max_memory_growth_pct,
         max_wall_tok_regression_pct=args.max_wall_tok_regression_pct,
         max_ttft_growth_pct=args.max_ttft_growth_pct,
+        max_p05_tok_regression_pct=args.max_p05_tok_regression_pct,
     )
     coverage_violations = find_coverage_violations(deltas, args.min_ok_runs_per_build)
     prompt_suite_drift = find_prompt_suite_drift(deltas)

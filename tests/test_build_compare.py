@@ -56,6 +56,42 @@ def write_report(
     )
 
 
+def write_multi_report(
+    path: Path,
+    commit: str,
+    tok_per_s_values: list[float],
+    elapsed_us: int = 200000,
+) -> None:
+    rows = []
+    for index, tok_per_s in enumerate(tok_per_s_values):
+        rows.append(
+            {
+                "commit": commit,
+                "benchmark": "qemu_prompt",
+                "profile": "secure-local",
+                "model": "tiny",
+                "quantization": "Q4_0",
+                "prompt": "smoke",
+                "tokens": 32,
+                "elapsed_us": elapsed_us + index,
+                "tok_per_s": tok_per_s,
+                "memory_bytes": 4096,
+                "returncode": 0,
+                "timed_out": False,
+            }
+        )
+    path.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-04-27T10:00:00Z",
+                "prompt_suite": {"suite_sha256": "suite-a"},
+                "benchmarks": rows,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_compare_builds_computes_tok_per_s_and_elapsed_deltas(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     candidate = tmp_path / "candidate.json"
@@ -69,6 +105,9 @@ def test_compare_builds_computes_tok_per_s_and_elapsed_deltas(tmp_path: Path) ->
     assert len(deltas) == 1
     assert deltas[0].candidate_build == "head"
     assert deltas[0].tok_per_s_delta_pct == 25.0
+    assert deltas[0].baseline_tok_per_s_p05 == 100.0
+    assert deltas[0].candidate_tok_per_s_p05 == 125.0
+    assert deltas[0].tok_per_s_p05_delta_pct == 25.0
     assert deltas[0].wall_tok_per_s_delta_pct == 25.0
     assert deltas[0].elapsed_delta_pct == -20.0
     assert deltas[0].baseline_ttft_us == 40000
@@ -107,12 +146,14 @@ def test_cli_writes_json_markdown_and_csv_reports(tmp_path: Path) -> None:
     assert payload["status"] == "fail"
     assert payload["baseline_build"] == "base"
     assert payload["deltas"][0]["tok_per_s_delta_pct"] == -10.0
+    assert payload["deltas"][0]["tok_per_s_p05_delta_pct"] == -10.0
     assert payload["deltas"][0]["wall_tok_per_s_delta_pct"] == -10.0
     assert payload["deltas"][0]["ttft_delta_pct"] == 10.0
     assert payload["deltas"][0]["memory_delta_pct"] == 50.0
     assert payload["regressions"][0]["candidate_build"] == "head"
     assert payload["regressions"][0]["metric"] == "tok_per_s"
     assert csv_rows[0]["tok_per_s_delta_pct"] == "-10.0"
+    assert csv_rows[0]["tok_per_s_p05_delta_pct"] == "-10.0"
     assert csv_rows[0]["wall_tok_per_s_delta_pct"] == "-10.0"
     assert csv_rows[0]["ttft_delta_pct"] == "10.0"
     assert csv_rows[0]["memory_delta_pct"] == "50.0"
@@ -124,7 +165,8 @@ def test_cli_writes_json_markdown_and_csv_reports(tmp_path: Path) -> None:
     assert "Status: fail" in markdown
     assert (
         "| head | qemu_prompt/secure-local/tiny/Q4_0/smoke | 100.000 | 90.000 | -10.000 | "
-        "50.000 | 45.000 | -10.000 | 200000.000 | 220000.000 | 10.000 | "
+        "100.000 | 90.000 | -10.000 | 50.000 | 45.000 | -10.000 | "
+        "200000.000 | 220000.000 | 10.000 | "
         "40000.000 | 44000.000 | 10.000 |"
     ) in markdown
 
@@ -190,6 +232,41 @@ def test_cli_can_gate_wall_clock_throughput_regression(tmp_path: Path) -> None:
     assert payload["regressions"][0]["metric"] == "wall_tok_per_s"
     assert payload["regressions"][0]["delta_pct"] == -12.5
     assert "wall_tok_per_s changed by -12.500%" in junit_root.find("./testcase/failure").attrib["message"]
+
+
+def test_cli_can_gate_p05_throughput_regression(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    candidate = tmp_path / "candidate.json"
+    output_dir = tmp_path / "results"
+    write_multi_report(baseline, "base", [100.0, 110.0, 120.0])
+    write_multi_report(candidate, "head", [80.0, 115.0, 130.0])
+
+    status = build_compare.main(
+        [
+            "--input",
+            f"base={baseline}",
+            "--input",
+            f"head={candidate}",
+            "--output-dir",
+            str(output_dir),
+            "--max-tok-regression-pct",
+            "10",
+            "--max-p05-tok-regression-pct",
+            "10",
+            "--fail-on-regression",
+        ]
+    )
+
+    payload = json.loads((output_dir / "build_compare_latest.json").read_text(encoding="utf-8"))
+    junit_root = ET.parse(output_dir / "build_compare_junit_latest.xml").getroot()
+
+    assert status == 1
+    assert payload["status"] == "fail"
+    assert payload["max_p05_tok_regression_pct"] == 10.0
+    assert payload["deltas"][0]["tok_per_s_delta_pct"] > 0.0
+    assert payload["deltas"][0]["tok_per_s_p05_delta_pct"] < -10.0
+    assert payload["regressions"][0]["metric"] == "tok_per_s_p05"
+    assert "tok_per_s_p05 changed by" in junit_root.find("./testcase/failure").attrib["message"]
 
 
 def test_cli_can_gate_ttft_growth(tmp_path: Path) -> None:
@@ -353,6 +430,7 @@ if __name__ == "__main__":
         test_cli_writes_json_markdown_and_csv_reports(tmp_path)
         test_cli_can_gate_memory_growth(tmp_path)
         test_cli_can_gate_wall_clock_throughput_regression(tmp_path)
+        test_cli_can_gate_p05_throughput_regression(tmp_path)
         test_cli_can_gate_ttft_growth(tmp_path)
         test_cli_can_gate_ok_run_coverage(tmp_path)
         test_cli_can_gate_prompt_suite_drift(tmp_path)
