@@ -737,6 +737,34 @@ def main() -> int:
         ).read_text(encoding="utf-8"):
             print("missing_matrix_variability_csv=true", file=sys.stderr)
             return 1
+        matrix_summary_csv = (matrix_output_dir / "bench_matrix_summary_latest.csv").read_text(
+            encoding="utf-8"
+        )
+        matrix_summary_lines = matrix_summary_csv.splitlines()
+        matrix_summary_header = set(matrix_summary_lines[0].split(","))
+        matrix_summary_required_fields = {
+            "scope",
+            "status",
+            "cells",
+            "passing_cells",
+            "failing_cells",
+            "prompts",
+            "prompt_bytes_total",
+            "median_tok_per_s_median",
+            "wall_tok_per_s_median",
+            "ttft_us_p95_max",
+            "host_child_peak_rss_bytes_max",
+            "variability_findings",
+        }
+        if not matrix_summary_required_fields.issubset(matrix_summary_header):
+            print("missing_matrix_summary_csv_fields=true", file=sys.stderr)
+            return 1
+        if len(matrix_summary_lines) != len(matrix_report["cells"]) + 2:
+            print("unexpected_matrix_summary_csv_rows=true", file=sys.stderr)
+            return 1
+        if not matrix_summary_lines[1].startswith("matrix,"):
+            print("missing_matrix_summary_csv_matrix_row=true", file=sys.stderr)
+            return 1
         matrix_metric_fields = {
             "wall_tok_per_s_median",
             "ttft_us_p95",

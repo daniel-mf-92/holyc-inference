@@ -139,3 +139,4 @@
 2026-04-28T14:20:41Z | Added eval_compare engine-disagreement CSV output with smoke artifact refresh and coverage.
 2026-04-28T14:28:25Z | Added qemu_prompt_bench host child CPU efficiency telemetry/gate with smoke artifact refresh and coverage.
 2026-04-28T14:40:50Z | Added qemu_prompt_bench host child peak RSS telemetry/gates with matrix rollups and refreshed smoke artifacts.
+2026-04-28T14:50:07Z | Added benchmark matrix aggregate summary CSV output with smoke coverage and refreshed matrix artifacts.

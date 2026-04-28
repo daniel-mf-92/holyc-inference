@@ -406,8 +406,9 @@ python3 bench/qemu_prompt_bench.py \
 profiles, models, and quantization formats. Each cell writes an isolated
 `qemu_prompt_bench_latest.json` under `bench/results/bench_matrix_*`, while the
 matrix summary is written to `bench/results/bench_matrix_latest.json`, `.md`,
-`.csv`, and `bench_matrix_junit_latest.xml`. QEMU launches still flow through
-the air-gap guard that injects `-nic none` and rejects NIC/network arguments.
+`.csv`, `bench_matrix_summary_latest.csv`, and
+`bench_matrix_junit_latest.xml`. QEMU launches still flow through the air-gap
+guard that injects `-nic none` and rejects NIC/network arguments.
 Matrix-level and per-axis QEMU options may be declared with `qemu_args`,
 `qemu_args_file`, or `qemu_args_files`; file paths are resolved relative to the
 matrix JSON file and are validated before cells are launched. Matrix summaries
@@ -421,6 +422,9 @@ P95 TTFT, median host-overhead percentage, and guest/wall us-per-token latency
 from the underlying prompt benchmark report.
 They also include total, minimum, and maximum prompt byte counts for each cell
 so prompt-size changes are visible next to tok/s, RSS, and latency rollups.
+`bench_matrix_summary_latest.csv` adds one matrix-wide aggregate row plus one
+compact row per cell for CI dashboards that only need pass/fail counts,
+throughput ranges, prompt-byte totals, latency, RSS, and variability findings.
 Use `max_suite_cv_pct` and `max_prompt_cv_pct` in the matrix JSON, or the
 matching CLI flags, to pass tok/s variability gates through to every cell. A
 cell that fails a variability gate still writes its prompt-benchmark report and

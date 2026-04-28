@@ -1,0 +1,4 @@
+scope,profile,model,quantization,status,cells,passing_cells,failing_cells,planned_cells,prompts,prompt_bytes_total,prompt_bytes_min,prompt_bytes_max,measured_runs,warmup_runs,median_tok_per_s_min,median_tok_per_s_median,median_tok_per_s_max,wall_tok_per_s_median,ttft_us_p95_max,host_overhead_pct_median,host_child_cpu_pct_median,host_child_peak_rss_bytes_max,us_per_token_median,wall_us_per_token_median,max_memory_bytes,variability_findings
+matrix,,,,pass,2,2,0,0,4,240,49,71,8,4,160.0,160.0,160.0,718.1087611792896,12400.0,-77.12458333333333,80.52111857450646,589824,6250.0,1429.7135416666667,67207168,0
+cell,ci-airgap-smoke,synthetic-smoke,Q4_0,pass,1,1,0,0,2,120,49,71,4,2,160.0,160.0,160.0,624.7592791056438,12400.0,-74.38966666666667,74.43845023676931,589824,6250.0,1600.6458333333335,67207168,0
+cell,ci-airgap-smoke,synthetic-smoke,Q8_0,pass,1,1,0,0,2,120,49,71,4,2,160.0,160.0,160.0,811.4582432529353,12400.0,-79.8595,86.6037869122436,442368,6250.0,1258.78125,67207168,0

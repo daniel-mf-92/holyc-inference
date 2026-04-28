@@ -470,10 +470,12 @@ def write_matrix_report(
     json_path = output_dir / "bench_matrix_latest.json"
     md_path = output_dir / "bench_matrix_latest.md"
     csv_path = output_dir / "bench_matrix_latest.csv"
+    summary_csv_path = output_dir / "bench_matrix_summary_latest.csv"
     junit_path = output_dir / "bench_matrix_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
     write_matrix_csv(cells, csv_path)
+    write_matrix_summary_csv(cells, summary_csv_path)
     write_matrix_junit(cells, junit_path)
     return json_path
 
@@ -515,6 +517,149 @@ def write_matrix_csv(cells: list[MatrixCellResult], path: Path) -> None:
             row = asdict(cell)
             row["command"] = json.dumps(cell.command, separators=(",", ":"))
             writer.writerow({field: row[field] for field in fields})
+
+
+def finite_values(cells: list[MatrixCellResult], field: str) -> list[float]:
+    values: list[float] = []
+    for cell in cells:
+        value = getattr(cell, field)
+        if value is not None:
+            values.append(float(value))
+    return values
+
+
+def median_field(cells: list[MatrixCellResult], field: str) -> float | None:
+    values = finite_values(cells, field)
+    return statistics.median(values) if values else None
+
+
+def min_field(cells: list[MatrixCellResult], field: str) -> float | None:
+    values = finite_values(cells, field)
+    return min(values) if values else None
+
+
+def max_field(cells: list[MatrixCellResult], field: str) -> float | None:
+    values = finite_values(cells, field)
+    return max(values) if values else None
+
+
+def matrix_summary_row(cells: list[MatrixCellResult]) -> dict[str, Any]:
+    statuses = {cell.status for cell in cells}
+    if not cells:
+        status = "empty"
+    elif statuses == {"pass"}:
+        status = "pass"
+    elif statuses == {"planned"}:
+        status = "planned"
+    else:
+        status = "fail"
+    prompt_mins = [cell.prompt_bytes_min for cell in cells if cell.prompt_bytes_min is not None]
+    prompt_maxes = [cell.prompt_bytes_max for cell in cells if cell.prompt_bytes_max is not None]
+    return {
+        "scope": "matrix",
+        "profile": "",
+        "model": "",
+        "quantization": "",
+        "status": status,
+        "cells": len(cells),
+        "passing_cells": sum(1 for cell in cells if cell.status == "pass"),
+        "failing_cells": sum(1 for cell in cells if cell.status == "fail"),
+        "planned_cells": sum(1 for cell in cells if cell.status == "planned"),
+        "prompts": sum(cell.prompts for cell in cells),
+        "prompt_bytes_total": sum(cell.prompt_bytes_total for cell in cells),
+        "prompt_bytes_min": min(prompt_mins) if prompt_mins else None,
+        "prompt_bytes_max": max(prompt_maxes) if prompt_maxes else None,
+        "measured_runs": sum(cell.measured_runs for cell in cells),
+        "warmup_runs": sum(cell.warmup_runs for cell in cells),
+        "median_tok_per_s_min": min_field(cells, "median_tok_per_s"),
+        "median_tok_per_s_median": median_field(cells, "median_tok_per_s"),
+        "median_tok_per_s_max": max_field(cells, "median_tok_per_s"),
+        "wall_tok_per_s_median": median_field(cells, "wall_tok_per_s_median"),
+        "ttft_us_p95_max": max_field(cells, "ttft_us_p95"),
+        "host_overhead_pct_median": median_field(cells, "host_overhead_pct_median"),
+        "host_child_cpu_pct_median": median_field(cells, "host_child_cpu_pct_median"),
+        "host_child_peak_rss_bytes_max": max(
+            (cell.host_child_peak_rss_bytes_max for cell in cells if cell.host_child_peak_rss_bytes_max is not None),
+            default=None,
+        ),
+        "us_per_token_median": median_field(cells, "us_per_token_median"),
+        "wall_us_per_token_median": median_field(cells, "wall_us_per_token_median"),
+        "max_memory_bytes": max(
+            (cell.max_memory_bytes for cell in cells if cell.max_memory_bytes is not None),
+            default=None,
+        ),
+        "variability_findings": sum(cell.variability_findings for cell in cells),
+    }
+
+
+def cell_summary_row(cell: MatrixCellResult) -> dict[str, Any]:
+    return {
+        "scope": "cell",
+        "profile": cell.profile,
+        "model": cell.model,
+        "quantization": cell.quantization,
+        "status": cell.status,
+        "cells": 1,
+        "passing_cells": 1 if cell.status == "pass" else 0,
+        "failing_cells": 1 if cell.status == "fail" else 0,
+        "planned_cells": 1 if cell.status == "planned" else 0,
+        "prompts": cell.prompts,
+        "prompt_bytes_total": cell.prompt_bytes_total,
+        "prompt_bytes_min": cell.prompt_bytes_min,
+        "prompt_bytes_max": cell.prompt_bytes_max,
+        "measured_runs": cell.measured_runs,
+        "warmup_runs": cell.warmup_runs,
+        "median_tok_per_s_min": cell.median_tok_per_s,
+        "median_tok_per_s_median": cell.median_tok_per_s,
+        "median_tok_per_s_max": cell.median_tok_per_s,
+        "wall_tok_per_s_median": cell.wall_tok_per_s_median,
+        "ttft_us_p95_max": cell.ttft_us_p95,
+        "host_overhead_pct_median": cell.host_overhead_pct_median,
+        "host_child_cpu_pct_median": cell.host_child_cpu_pct_median,
+        "host_child_peak_rss_bytes_max": cell.host_child_peak_rss_bytes_max,
+        "us_per_token_median": cell.us_per_token_median,
+        "wall_us_per_token_median": cell.wall_us_per_token_median,
+        "max_memory_bytes": cell.max_memory_bytes,
+        "variability_findings": cell.variability_findings,
+    }
+
+
+def write_matrix_summary_csv(cells: list[MatrixCellResult], path: Path) -> None:
+    fields = [
+        "scope",
+        "profile",
+        "model",
+        "quantization",
+        "status",
+        "cells",
+        "passing_cells",
+        "failing_cells",
+        "planned_cells",
+        "prompts",
+        "prompt_bytes_total",
+        "prompt_bytes_min",
+        "prompt_bytes_max",
+        "measured_runs",
+        "warmup_runs",
+        "median_tok_per_s_min",
+        "median_tok_per_s_median",
+        "median_tok_per_s_max",
+        "wall_tok_per_s_median",
+        "ttft_us_p95_max",
+        "host_overhead_pct_median",
+        "host_child_cpu_pct_median",
+        "host_child_peak_rss_bytes_max",
+        "us_per_token_median",
+        "wall_us_per_token_median",
+        "max_memory_bytes",
+        "variability_findings",
+    ]
+    rows = [matrix_summary_row(cells)] + [cell_summary_row(cell) for cell in cells]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: row.get(field) for field in fields})
 
 
 def write_matrix_junit(cells: list[MatrixCellResult], path: Path) -> None:
