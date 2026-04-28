@@ -1159,10 +1159,12 @@ def write_report(
     latest = output_dir / "qemu_prompt_bench_latest.json"
     latest_md = output_dir / "qemu_prompt_bench_latest.md"
     latest_csv = output_dir / "qemu_prompt_bench_latest.csv"
+    latest_summary_csv = output_dir / "qemu_prompt_bench_summary_latest.csv"
     latest_junit = output_dir / "qemu_prompt_bench_junit_latest.xml"
     latest.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     latest_md.write_text(markdown_report(report), encoding="utf-8")
     write_csv_report(runs, latest_csv)
+    write_summary_csv_report(report, latest_summary_csv)
     write_junit_report(runs, warmup_runs, findings, telemetry, latest_junit)
     stamped = output_dir / f"qemu_prompt_bench_{report['generated_at'].replace(':', '').replace('-', '')}.json"
     stamped.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -1206,6 +1208,62 @@ def write_csv_report(runs: list[BenchRun], path: Path) -> None:
         for run in runs:
             row = asdict(run)
             writer.writerow({field: row[field] for field in fields})
+
+
+def write_summary_csv_report(report: dict[str, Any], path: Path) -> None:
+    fields = [
+        "scope",
+        "prompt",
+        "prompt_bytes",
+        "prompts",
+        "runs",
+        "ok_runs",
+        "tokens_median",
+        "total_tokens",
+        "elapsed_us_median",
+        "total_elapsed_us",
+        "host_overhead_us_median",
+        "host_overhead_pct_median",
+        "host_child_cpu_us_median",
+        "host_child_cpu_pct_median",
+        "ttft_us_median",
+        "ttft_us_p95",
+        "tok_per_s_min",
+        "tok_per_s_p05",
+        "tok_per_s_median",
+        "tok_per_s_stdev",
+        "tok_per_s_cv_pct",
+        "tok_per_s_p05_p95_spread_pct",
+        "tok_per_s_p95",
+        "tok_per_s_max",
+        "wall_tok_per_s_median",
+        "wall_tok_per_s_p95",
+        "us_per_token_median",
+        "us_per_token_p95",
+        "wall_us_per_token_median",
+        "wall_us_per_token_p95",
+        "memory_bytes_max",
+    ]
+    rows: list[dict[str, Any]] = []
+    suite = report.get("suite_summary") or {}
+    if suite:
+        rows.append(
+            {
+                "scope": "suite",
+                "prompt": "",
+                "prompt_bytes": suite.get("measured_prompt_bytes_total"),
+                **suite,
+            }
+        )
+    for summary in report.get("summaries", []):
+        if isinstance(summary, dict):
+            rows.append({"scope": "prompt", "prompts": "", "total_tokens": "", "total_elapsed_us": "", **summary})
+
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: row.get(field) for field in fields})
 
 
 def write_junit_report(

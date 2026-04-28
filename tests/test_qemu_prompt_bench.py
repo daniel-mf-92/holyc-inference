@@ -283,12 +283,16 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
     assert report["environment"]["qemu_path"] == str(fake_qemu)
     assert report["environment"]["qemu_version"] is None
     csv_report = (output_dir / "qemu_prompt_bench_latest.csv").read_text(encoding="utf-8")
+    summary_csv_report = (output_dir / "qemu_prompt_bench_summary_latest.csv").read_text(encoding="utf-8")
     assert "prompt_sha256,prompt_bytes,iteration" in csv_report
     assert "host_overhead_us,host_overhead_pct" in csv_report
     assert "wall_tok_per_s" in csv_report
     assert "us_per_token,wall_us_per_token" in csv_report
     assert "timed_out,command_sha256" in csv_report
     assert "qemu_prompt,default,,,prompt-1" in csv_report
+    assert summary_csv_report.startswith("scope,prompt,prompt_bytes,prompts,runs,ok_runs")
+    assert "suite,,20,1,1,1,,32," in summary_csv_report
+    assert "prompt,prompt-1,20,,1,1,32,," in summary_csv_report
 
 
 def test_cli_repeat_writes_prompt_summary_and_markdown(tmp_path: Path) -> None:
@@ -385,8 +389,13 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
     assert "| 2 | 6 | 6 | 33 | 180 | 600000 |" in markdown
     assert "| one | 5 | 3 | 3 | 20 | 100000 |" in markdown
     csv_report = (output_dir / "qemu_prompt_bench_latest.csv").read_text(encoding="utf-8")
+    summary_csv_report = (output_dir / "qemu_prompt_bench_summary_latest.csv").read_text(encoding="utf-8")
     junit_root = ET.parse(output_dir / "qemu_prompt_bench_junit_latest.xml").getroot()
     assert csv_report.count("\n") == 7
+    assert summary_csv_report.count("\n") == 4
+    assert "suite,,33,2,6,6,,180," in summary_csv_report
+    assert "prompt,one,5,,3,3,20," in summary_csv_report
+    assert "prompt,two,6,,3,3,40," in summary_csv_report
     assert ",one," in csv_report
     assert ",two," in csv_report
     assert junit_root.attrib["name"] == "holyc_qemu_prompt_bench"

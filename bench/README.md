@@ -264,10 +264,13 @@ normalized from `ttft_us`, `time_to_first_token_us`, `first_token_us`, and their
 median and P95 TTFT when present. The runner also writes a deterministic
 prompt-suite SHA256 matching `prompt_audit.py`, plus
 `qemu_prompt_bench_latest.csv` with one row per measured run for CI artifact
-upload, spreadsheets, and simple shell comparisons. JSON and Markdown reports
-also include host provenance for reproducibility: platform, machine, Python
-version, CPU count, QEMU binary/path, QEMU version when discoverable, and a
-stable SHA256 fingerprint of the QEMU command line.
+upload, spreadsheets, and simple shell comparisons. It also writes
+`qemu_prompt_bench_summary_latest.csv` with one suite row plus one row per
+prompt aggregate so CI can publish compact latency, throughput, prompt-byte,
+and memory rollups without parsing JSON. JSON and Markdown reports also include
+host provenance for reproducibility: platform, machine, Python version, CPU
+count, QEMU binary/path, QEMU version when discoverable, and a stable SHA256
+fingerprint of the QEMU command line.
 
 Prompt files can be JSON, JSONL, or plain text split with `---`. Guest output may
 include a JSON line such as:
