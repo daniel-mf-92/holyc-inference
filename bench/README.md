@@ -240,7 +240,10 @@ computed as host wall elapsed time minus guest-reported elapsed time, so QEMU
 launch/serial/host orchestration overhead can be tracked separately from guest
 decode telemetry. This is reported next to guest telemetry in JSON, Markdown,
 and CSV so suspicious guest-side timing can be compared against the
-host-observed launch duration.
+host-observed launch duration. The same artifacts also include derived
+`us_per_token` and `wall_us_per_token` latency metrics, plus median/P95 latency
+rollups, so dashboards can compare either throughput or per-token decode cost
+without reprocessing raw elapsed times.
 
 Use `--max-suite-cv-pct` and `--max-prompt-cv-pct` to fail noisy benchmark runs
 when measured tok/s coefficient of variation exceeds a CI threshold. Gate

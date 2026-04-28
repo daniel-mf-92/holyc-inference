@@ -130,6 +130,9 @@ print("BENCH_RESULT: " + json.dumps({"tokens": 64, "elapsed_us": 250000, "tok_pe
     assert run.tok_per_s == 256.0
     assert run.wall_tok_per_s is not None
     assert run.wall_tok_per_s > 0
+    assert run.us_per_token == 3906.25
+    assert run.wall_us_per_token is not None
+    assert run.wall_us_per_token > 0
     assert run.memory_bytes == 4194304
     assert run.prompt == "smoke"
     assert run.prompt_bytes == 14
@@ -263,6 +266,8 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
     assert report["benchmarks"][0]["host_overhead_pct"] is not None
     assert report["benchmarks"][0]["tok_per_s"] == 320.0
     assert report["benchmarks"][0]["wall_tok_per_s"] > 0
+    assert report["benchmarks"][0]["us_per_token"] == 3125.0
+    assert report["benchmarks"][0]["wall_us_per_token"] > 0
     assert report["benchmarks"][0]["memory_bytes"] == 8388608
     assert report["benchmarks"][0]["command"][1:3] == ["-nic", "none"]
     assert report["environment"]["qemu_bin"] == str(fake_qemu)
@@ -272,6 +277,7 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
     assert "prompt_sha256,prompt_bytes,iteration" in csv_report
     assert "host_overhead_us,host_overhead_pct" in csv_report
     assert "wall_tok_per_s" in csv_report
+    assert "us_per_token,wall_us_per_token" in csv_report
     assert "qemu_prompt,default,,,prompt-1" in csv_report
 
 
@@ -331,6 +337,10 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
     assert report["suite_summary"]["tok_per_s_p95"] == 400.0
     assert report["suite_summary"]["wall_tok_per_s_median"] > 0
     assert report["suite_summary"]["wall_tok_per_s_p95"] > 0
+    assert report["suite_summary"]["us_per_token_median"] == 3750.0
+    assert report["suite_summary"]["us_per_token_p95"] == 5000.0
+    assert report["suite_summary"]["wall_us_per_token_median"] > 0
+    assert report["suite_summary"]["wall_us_per_token_p95"] > 0
     assert report["suite_summary"]["memory_bytes_max"] == 2000
     assert [run["iteration"] for run in report["benchmarks"][:3]] == [1, 2, 3]
     assert report["summaries"][0]["prompt"] == "one"
@@ -341,11 +351,16 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
     assert report["summaries"][0]["host_overhead_pct_median"] is not None
     assert report["summaries"][0]["wall_tok_per_s_median"] > 0
     assert report["summaries"][0]["wall_tok_per_s_p95"] > 0
+    assert report["summaries"][0]["us_per_token_median"] == 5000.0
+    assert report["summaries"][0]["us_per_token_p95"] == 5000.0
+    assert report["summaries"][0]["wall_us_per_token_median"] > 0
+    assert report["summaries"][0]["wall_us_per_token_p95"] > 0
     assert report["summaries"][0]["memory_bytes_max"] == 1000
     assert "QEMU Prompt Benchmark" in markdown
     assert f"Prompt suite: {report['prompt_suite']['suite_sha256']}" in markdown
     assert "Median host overhead us" in markdown
     assert "Median wall tok/s" in markdown
+    assert "Median us/token" in markdown
     assert "| 2 | 6 | 6 | 33 | 180 | 600000 |" in markdown
     assert "| one | 5 | 3 | 3 | 20 | 100000 |" in markdown
     csv_report = (output_dir / "qemu_prompt_bench_latest.csv").read_text(encoding="utf-8")

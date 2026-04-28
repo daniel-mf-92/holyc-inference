@@ -1,8 +1,8 @@
 # Benchmark Result Index
 
-Generated: 2026-04-28T04:45:27Z
+Generated: 2026-04-28T04:53:57Z
 Status: pass
-Artifacts: 52
+Artifacts: 53
 
 | Type | Status | Air-gap | Telemetry | Commit | Profile | Model | Quant | Prompts | Runs | Warmups | Median tok/s | Max memory bytes | Source |
 | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
@@ -57,6 +57,7 @@ Artifacts: 52
 | qemu_prompt | pass | pass | pass | pass:a0126ad2c367 | ci-airgap-smoke | synthetic-smoke | Q8_0 | 2 | 4 | 2 | 160.000 | 67207168 | bench/results/bench_matrix_20260428T035157Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T035204Z.json |
 | qemu_prompt | pass | pass | pass | pass:a0126ad2c367 | ci-airgap-smoke | synthetic-smoke | Q8_0 | 2 | 4 | 2 | 160.000 | 67207168 | bench/results/bench_matrix_20260428T035157Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json |
 | qemu_prompt | pass | pass | pass | pass:9305c9617dbe | synthetic-airgap-smoke | synthetic-smoke | Q4_0 | 2 | 6 | 0 | 160.000 | 67207168 | bench/results/qemu_prompt_bench_20260428T044520Z.json |
-| qemu_prompt | pass | pass | pass | pass:9305c9617dbe | synthetic-airgap-smoke | synthetic-smoke | Q4_0 | 2 | 6 | 0 | 160.000 | 67207168 | bench/results/qemu_prompt_bench_latest.json |
+| qemu_prompt | pass | pass | pass | pass:cd2ef624364d | synthetic-airgap-smoke | synthetic-smoke | Q4_0 | 2 | 6 | 0 | 160.000 | 67207168 | bench/results/qemu_prompt_bench_20260428T045336Z.json |
+| qemu_prompt | pass | pass | pass | pass:cd2ef624364d | synthetic-airgap-smoke | synthetic-smoke | Q4_0 | 2 | 6 | 0 | 160.000 | 67207168 | bench/results/qemu_prompt_bench_latest.json |
 
 Prompt suite drift: none detected.

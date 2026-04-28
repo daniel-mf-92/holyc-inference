@@ -90,3 +90,4 @@
 2026-04-28T04:31:49Z | Added stdlib dataset CI smoke gate covering curate, pack, inspect, leak audit, index, and leakage rejection.
 2026-04-28T04:37:49Z | Added per-dataset eval comparison breakdowns with refreshed smoke reports and focused coverage.
 2026-04-28T04:45:52Z | Added opt-in QEMU TTFT telemetry gates with refreshed synthetic benchmark, index, and air-gap audit artifacts.
+2026-04-28T04:54:14Z | Added QEMU prompt benchmark per-token latency metrics with refreshed smoke, index, manifest, and air-gap artifacts.
