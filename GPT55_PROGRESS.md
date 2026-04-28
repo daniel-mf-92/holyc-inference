@@ -113,3 +113,4 @@
 2026-04-28T09:14:36Z | Added build-compare P05 wall-clock tok/s deltas and opt-in low-tail wall-throughput gating with refreshed comparison artifacts.
 2026-04-28T09:43:31Z | Added perf regression P95 first-token latency tracking and opt-in tail-latency gating with refreshed dashboard artifacts.
 2026-04-28T09:50:00Z | Added command-hash metadata propagation and opt-in gating to benchmark artifact manifests with refreshed reports.
+2026-04-28T09:57:13Z | Added full-history CSV export to benchmark artifact manifests with docs, tests, and refreshed reports.

@@ -397,10 +397,12 @@ def write_manifest(
     json_path = output_dir / "bench_artifact_manifest_latest.json"
     md_path = output_dir / "bench_artifact_manifest_latest.md"
     csv_path = output_dir / "bench_artifact_manifest_latest.csv"
+    history_csv_path = output_dir / "bench_artifact_manifest_history_latest.csv"
     junit_path = output_dir / "bench_artifact_manifest_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
     write_csv(latest, csv_path)
+    write_csv(history, history_csv_path)
     junit_path.write_text(junit_report(report), encoding="utf-8")
     return json_path, str(report["status"]), history
 

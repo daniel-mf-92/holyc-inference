@@ -22,10 +22,12 @@ def make_summary(source: Path, **overrides: object) -> bench_result_index.Artifa
         "artifact_type": "qemu_prompt",
         "status": "pass",
         "generated_at": "2026-04-28T02:50:00Z",
+        "generated_age_seconds": 60,
         "profile": "ci-airgap-smoke",
         "model": "synthetic-smoke",
         "quantization": "Q4_0",
         "prompt_suite_sha256": "a" * 64,
+        "command_sha256": "b" * 64,
         "prompts": 2,
         "measured_runs": 2,
         "warmup_runs": 0,
@@ -33,6 +35,8 @@ def make_summary(source: Path, **overrides: object) -> bench_result_index.Artifa
         "max_memory_bytes": 4096,
         "telemetry_status": "pass",
         "telemetry_findings": [],
+        "command_hash_status": "pass",
+        "command_hash_findings": [],
         "command_airgap_status": "pass",
         "command_findings": [],
         "commit": "abc123",
@@ -40,6 +44,8 @@ def make_summary(source: Path, **overrides: object) -> bench_result_index.Artifa
         "current_commit_match": True,
         "commit_status": "pass",
         "commit_findings": [],
+        "freshness_status": "unchecked",
+        "freshness_findings": [],
     }
     values.update(overrides)
     return bench_result_index.ArtifactSummary(**values)  # type: ignore[arg-type]
@@ -49,7 +55,7 @@ def test_manifest_includes_commit_metadata_in_json_markdown_and_csv(tmp_path: Pa
     source = tmp_path / "qemu_prompt_bench_latest.json"
     source.write_text('{"status":"pass"}\n', encoding="utf-8")
 
-    output_path, status = bench_artifact_manifest.write_manifest([make_summary(source)], tmp_path)
+    output_path, status, _history = bench_artifact_manifest.write_manifest([make_summary(source)], tmp_path)
 
     assert status == "pass"
     payload = json.loads(output_path.read_text(encoding="utf-8"))
@@ -66,6 +72,10 @@ def test_manifest_includes_commit_metadata_in_json_markdown_and_csv(tmp_path: Pa
     rows = list(csv.DictReader((tmp_path / "bench_artifact_manifest_latest.csv").open(encoding="utf-8")))
     assert rows[0]["commit"] == "abc123"
     assert rows[0]["current_commit_match"] == "True"
+    history_rows = list(
+        csv.DictReader((tmp_path / "bench_artifact_manifest_history_latest.csv").open(encoding="utf-8"))
+    )
+    assert history_rows[0]["source"] == str(source)
 
 
 def test_manifest_status_and_junit_fail_on_inconsistent_commit_metadata(tmp_path: Path) -> None:
@@ -78,7 +88,7 @@ def test_manifest_status_and_junit_fail_on_inconsistent_commit_metadata(tmp_path
         commit_findings=["qemu_prompt: mixed commits: abc123,def456"],
     )
 
-    output_path, status = bench_artifact_manifest.write_manifest([summary], tmp_path)
+    output_path, status, _history = bench_artifact_manifest.write_manifest([summary], tmp_path)
 
     assert status == "fail"
     payload = json.loads(output_path.read_text(encoding="utf-8"))
@@ -86,11 +96,34 @@ def test_manifest_status_and_junit_fail_on_inconsistent_commit_metadata(tmp_path
 
     root = ET.parse(tmp_path / "bench_artifact_manifest_junit_latest.xml").getroot()
     assert root.attrib["name"] == "holyc_bench_artifact_manifest"
-    assert root.attrib["tests"] == "5"
+    assert root.attrib["tests"] == "7"
     assert root.attrib["failures"] == "1"
     failure = root.find("./testcase[@name='commit_metadata']/failure")
     assert failure is not None
     assert failure.attrib["type"] == "benchmark_commit_metadata_failure"
+
+
+def test_manifest_history_csv_keeps_superseded_artifacts(tmp_path: Path) -> None:
+    older_source = tmp_path / "qemu_prompt_bench_older.json"
+    newer_source = tmp_path / "qemu_prompt_bench_latest.json"
+    older_source.write_text('{"status":"pass","generation":"older"}\n', encoding="utf-8")
+    newer_source.write_text('{"status":"pass","generation":"newer"}\n', encoding="utf-8")
+
+    bench_artifact_manifest.write_manifest(
+        [
+            make_summary(older_source, generated_at="2026-04-28T02:40:00Z", median_tok_per_s=100.0),
+            make_summary(newer_source, generated_at="2026-04-28T02:50:00Z", median_tok_per_s=128.0),
+        ],
+        tmp_path,
+    )
+
+    latest_rows = list(csv.DictReader((tmp_path / "bench_artifact_manifest_latest.csv").open(encoding="utf-8")))
+    history_rows = list(
+        csv.DictReader((tmp_path / "bench_artifact_manifest_history_latest.csv").open(encoding="utf-8"))
+    )
+
+    assert [row["source"] for row in latest_rows] == [str(newer_source)]
+    assert [row["source"] for row in history_rows] == [str(older_source), str(newer_source)]
 
 
 def test_manifest_stale_commit_gate_is_opt_in(tmp_path: Path) -> None:
