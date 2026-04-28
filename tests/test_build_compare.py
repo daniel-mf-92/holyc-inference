@@ -222,6 +222,45 @@ def test_cli_can_gate_ttft_growth(tmp_path: Path) -> None:
     assert "ttft_us changed by 15.000%" in junit_root.find("./testcase/failure").attrib["message"]
 
 
+def test_cli_can_gate_ok_run_coverage(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    candidate = tmp_path / "candidate.json"
+    output_dir = tmp_path / "results"
+    write_report(baseline, "base", 100.0, 200000)
+    write_report(candidate, "head", 100.0, 200000)
+
+    status = build_compare.main(
+        [
+            "--input",
+            f"base={baseline}",
+            "--input",
+            f"head={candidate}",
+            "--output-dir",
+            str(output_dir),
+            "--min-ok-runs-per-build",
+            "2",
+            "--fail-on-coverage",
+        ]
+    )
+
+    payload = json.loads((output_dir / "build_compare_latest.json").read_text(encoding="utf-8"))
+    coverage_rows = list(
+        csv.DictReader((output_dir / "build_compare_coverage_violations_latest.csv").open(newline="", encoding="utf-8"))
+    )
+    junit_root = ET.parse(output_dir / "build_compare_junit_latest.xml").getroot()
+    failures = junit_root.findall("./testcase/failure")
+
+    assert status == 1
+    assert payload["status"] == "fail"
+    assert payload["min_ok_runs_per_build"] == 2
+    assert len(payload["coverage_violations"]) == 2
+    assert {row["build"] for row in coverage_rows} == {"base", "head"}
+    assert {row["ok_runs"] for row in coverage_rows} == {"1"}
+    assert junit_root.attrib["failures"] == "2"
+    assert {failure.attrib["type"] for failure in failures} == {"build_compare_sample_coverage"}
+    assert "Coverage violations: 2" in (output_dir / "build_compare_latest.md").read_text(encoding="utf-8")
+
+
 def test_cli_can_fail_on_throughput_regression(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     candidate = tmp_path / "candidate.json"
@@ -275,6 +314,7 @@ if __name__ == "__main__":
         test_cli_can_gate_memory_growth(tmp_path)
         test_cli_can_gate_wall_clock_throughput_regression(tmp_path)
         test_cli_can_gate_ttft_growth(tmp_path)
+        test_cli_can_gate_ok_run_coverage(tmp_path)
         test_cli_can_fail_on_throughput_regression(tmp_path)
         test_missing_baseline_returns_error(tmp_path)
     print("build_compare_tests=ok")

@@ -83,6 +83,15 @@ class BuildRegression:
     allowed_pct: float
 
 
+@dataclass(frozen=True)
+class BuildCoverageViolation:
+    key: str
+    build: str
+    role: str
+    ok_runs: int
+    minimum_ok_runs: int
+
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -404,6 +413,34 @@ def throughput_regressions(deltas: list[BuildDelta], max_tok_regression_pct: flo
     ]
 
 
+def find_coverage_violations(deltas: list[BuildDelta], minimum_ok_runs: int) -> list[BuildCoverageViolation]:
+    if minimum_ok_runs <= 0:
+        return []
+    violations: list[BuildCoverageViolation] = []
+    seen: set[tuple[str, str, str]] = set()
+    for delta in deltas:
+        checks = (
+            (delta.baseline_build, "baseline", delta.baseline_ok_runs),
+            (delta.candidate_build, "candidate", delta.candidate_ok_runs),
+        )
+        for build, role, ok_runs in checks:
+            dedupe_key = (delta.key, build, role)
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            if ok_runs < minimum_ok_runs:
+                violations.append(
+                    BuildCoverageViolation(
+                        key=delta.key,
+                        build=build,
+                        role=role,
+                        ok_runs=ok_runs,
+                        minimum_ok_runs=minimum_ok_runs,
+                    )
+                )
+    return violations
+
+
 def format_value(value: Any) -> str:
     if value is None:
         return "-"
@@ -424,6 +461,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Wall throughput regressions: {len([row for row in report['regressions'] if row['metric'] == 'wall_tok_per_s'])}",
         f"TTFT regressions: {len([row for row in report['regressions'] if row['metric'] == 'ttft_us'])}",
         f"Memory regressions: {len([row for row in report['regressions'] if row['metric'] == 'memory_bytes'])}",
+        f"Coverage violations: {len(report['coverage_violations'])}",
         "",
         "## Deltas",
         "",
@@ -445,6 +483,16 @@ def markdown_report(report: dict[str, Any]) -> str:
             )
     else:
         lines.append("No comparable prompt metrics found.")
+    if report["coverage_violations"]:
+        lines.extend(["", "## Coverage Violations", ""])
+        lines.append("| Build | Role | Prompt key | OK runs | Minimum OK runs |")
+        lines.append("| --- | --- | --- | ---: | ---: |")
+        for violation in report["coverage_violations"]:
+            lines.append(
+                "| {build} | {role} | {key} | {ok_runs} | {minimum_ok_runs} |".format(
+                    **violation
+                )
+            )
     return "\n".join(lines) + "\n"
 
 
@@ -480,16 +528,33 @@ def write_csv(deltas: list[BuildDelta], path: Path) -> None:
             writer.writerow({field: getattr(delta, field) for field in fields})
 
 
-def write_junit(deltas: list[BuildDelta], regressions: list[BuildRegression], path: Path) -> None:
+def write_coverage_csv(violations: list[BuildCoverageViolation], path: Path) -> None:
+    fields = ["key", "build", "role", "ok_runs", "minimum_ok_runs"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for violation in violations:
+            writer.writerow({field: getattr(violation, field) for field in fields})
+
+
+def write_junit(
+    deltas: list[BuildDelta],
+    regressions: list[BuildRegression],
+    coverage_violations: list[BuildCoverageViolation],
+    path: Path,
+) -> None:
     regression_by_key: dict[tuple[str, str], list[BuildRegression]] = {}
     for regression in regressions:
         regression_by_key.setdefault((regression.candidate_build, regression.key), []).append(regression)
+    coverage_by_key: dict[tuple[str, str], list[BuildCoverageViolation]] = {}
+    for violation in coverage_violations:
+        coverage_by_key.setdefault((violation.build, violation.key), []).append(violation)
     suite = ET.Element(
         "testsuite",
         {
             "name": "holyc_build_compare",
             "tests": str(len(deltas)),
-            "failures": str(len(regressions)),
+            "failures": str(len(regressions) + len(coverage_violations)),
             "errors": "0",
         },
     )
@@ -536,6 +601,29 @@ def write_junit(deltas: list[BuildDelta], regressions: list[BuildRegression], pa
                 f"baseline_commit={delta.baseline_commit}\n"
                 f"candidate_commit={delta.candidate_commit}\n"
             )
+        case_coverage = coverage_by_key.get((delta.baseline_build, delta.key), []) + coverage_by_key.get(
+            (delta.candidate_build, delta.key),
+            [],
+        )
+        for violation in case_coverage:
+            failure = ET.SubElement(
+                case,
+                "failure",
+                {
+                    "type": "build_compare_sample_coverage",
+                    "message": (
+                        f"{violation.build} {violation.role} has {violation.ok_runs} OK runs; "
+                        f"minimum is {violation.minimum_ok_runs}"
+                    ),
+                },
+            )
+            failure.text = (
+                f"build={violation.build}\n"
+                f"role={violation.role}\n"
+                f"key={violation.key}\n"
+                f"ok_runs={violation.ok_runs}\n"
+                f"minimum_ok_runs={violation.minimum_ok_runs}\n"
+            )
     ET.indent(suite)
     ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
     with path.open("ab") as handle:
@@ -552,6 +640,7 @@ def write_report(
     max_wall_tok_regression_pct: float | None = None,
     max_memory_growth_pct: float | None = None,
     max_ttft_growth_pct: float | None = None,
+    min_ok_runs_per_build: int = 0,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     regressions = find_regressions(
@@ -561,9 +650,10 @@ def write_report(
         max_wall_tok_regression_pct=max_wall_tok_regression_pct,
         max_ttft_growth_pct=max_ttft_growth_pct,
     )
+    coverage_violations = find_coverage_violations(deltas, min_ok_runs_per_build)
     report = {
         "generated_at": iso_now(),
-        "status": "fail" if regressions else "pass",
+        "status": "fail" if regressions or coverage_violations else "pass",
         "baseline_build": baseline_build,
         "builds": sorted({metric.build for metric in metrics}),
         "max_tok_regression_pct": abs(max_tok_regression_pct),
@@ -572,18 +662,22 @@ def write_report(
         else None,
         "max_memory_growth_pct": abs(max_memory_growth_pct) if max_memory_growth_pct is not None else None,
         "max_ttft_growth_pct": abs(max_ttft_growth_pct) if max_ttft_growth_pct is not None else None,
+        "min_ok_runs_per_build": max(0, min_ok_runs_per_build),
         "metrics": [asdict(metric) for metric in metrics],
         "deltas": [asdict(delta) for delta in deltas],
         "regressions": [asdict(regression) for regression in regressions],
+        "coverage_violations": [asdict(violation) for violation in coverage_violations],
     }
     json_path = output_dir / "build_compare_latest.json"
     md_path = output_dir / "build_compare_latest.md"
     csv_path = output_dir / "build_compare_latest.csv"
+    coverage_csv_path = output_dir / "build_compare_coverage_violations_latest.csv"
     junit_path = output_dir / "build_compare_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
     write_csv(deltas, csv_path)
-    write_junit(deltas, regressions, junit_path)
+    write_coverage_csv(coverage_violations, coverage_csv_path)
+    write_junit(deltas, regressions, coverage_violations, junit_path)
     return json_path
 
 
@@ -618,7 +712,14 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         help="Allowed median first-token latency growth before a regression is reported; omitted disables TTFT gating",
     )
+    parser.add_argument(
+        "--min-ok-runs-per-build",
+        type=int,
+        default=0,
+        help="Minimum successful runs required for each comparable baseline/candidate build point; 0 disables",
+    )
     parser.add_argument("--fail-on-regression", action="store_true", help="Return non-zero on benchmark regression")
+    parser.add_argument("--fail-on-coverage", action="store_true", help="Return non-zero on OK-run coverage violations")
     return parser
 
 
@@ -646,6 +747,7 @@ def main(argv: list[str] | None = None) -> int:
         max_wall_tok_regression_pct=args.max_wall_tok_regression_pct,
         max_memory_growth_pct=args.max_memory_growth_pct,
         max_ttft_growth_pct=args.max_ttft_growth_pct,
+        min_ok_runs_per_build=args.min_ok_runs_per_build,
     )
     regressions = find_regressions(
         deltas,
@@ -654,10 +756,14 @@ def main(argv: list[str] | None = None) -> int:
         max_wall_tok_regression_pct=args.max_wall_tok_regression_pct,
         max_ttft_growth_pct=args.max_ttft_growth_pct,
     )
+    coverage_violations = find_coverage_violations(deltas, args.min_ok_runs_per_build)
     print(f"wrote_json={output}")
     print(f"compared_deltas={len(deltas)}")
     print(f"regressions={len(regressions)}")
+    print(f"coverage_violations={len(coverage_violations)}")
     if args.fail_on_regression and regressions:
+        return 1
+    if args.fail_on_coverage and coverage_violations:
         return 1
     return 0
 

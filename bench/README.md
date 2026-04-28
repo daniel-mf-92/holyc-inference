@@ -505,7 +505,11 @@ benchmark reports include that telemetry. Use `--fail-on-regression` with
 `--max-tok-regression-pct` to gate median guest tok/s drops in CI without
 launching QEMU, add `--max-wall-tok-regression-pct` to gate host-observed tok/s
 drops, add `--max-ttft-growth-pct` to gate first-token latency growth, and add
-`--max-memory-growth-pct` to gate peak memory growth.
+`--max-memory-growth-pct` to gate peak memory growth. Use
+`--min-ok-runs-per-build` with `--fail-on-coverage` to reject comparisons where
+the baseline or candidate build has too few successful runs for a prompt key.
+Coverage violations are written to
+`build_compare_coverage_violations_latest.csv` and surfaced in the JUnit report.
 
 Example:
 
@@ -518,7 +522,9 @@ python3 bench/build_compare.py \
   --max-tok-regression-pct 5 \
   --max-wall-tok-regression-pct 5 \
   --max-ttft-growth-pct 10 \
-  --max-memory-growth-pct 10
+  --max-memory-growth-pct 10 \
+  --min-ok-runs-per-build 3 \
+  --fail-on-coverage
 ```
 
 ## HolyC vs llama.cpp Eval Compare
