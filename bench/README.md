@@ -555,8 +555,10 @@ python3 bench/bench_result_index.py \
 deterministic latest-artifact manifest for CI upload/download consumers. It
 records SHA256 and byte size for each benchmark JSON, retains compact history,
 selects the newest artifact for each profile/model/quantization/prompt-suite
-key, writes both latest-key and full-history CSV exports, keeps the same
-recorded-command air-gap, command SHA256, and commit
+key, preserves prompt count, wall-clock throughput, TTFT, host overhead,
+host child CPU/RSS, and guest/wall per-token latency telemetry, writes both
+latest-key and full-history CSV exports, keeps the same recorded-command
+air-gap, command SHA256, and commit
 metadata checks while preserving environment fingerprints, and writes
 `bench_artifact_manifest_junit_latest.xml` so CI can
 surface failed artifacts, air-gap violations, missing telemetry, stale

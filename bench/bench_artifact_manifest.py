@@ -42,11 +42,19 @@ class ManifestArtifact:
     host_machine: str
     qemu_version: str
     qemu_bin: str
+    prompts: int | None
     measured_runs: int
     warmup_runs: int
     median_tok_per_s: float | None
+    wall_tok_per_s_median: float | None
+    ttft_us_p95: float | None
+    host_overhead_pct_median: float | None
+    host_child_cpu_us_median: float | None
+    host_child_cpu_pct_median: float | None
     host_child_tok_per_cpu_s_median: float | None
     host_child_peak_rss_bytes_max: int | None
+    us_per_token_median: float | None
+    wall_us_per_token_median: float | None
     max_memory_bytes: int | None
     telemetry_status: str
     telemetry_findings: list[str]
@@ -105,11 +113,19 @@ def to_manifest_artifact(summary: bench_result_index.ArtifactSummary) -> Manifes
         host_machine=summary.host_machine,
         qemu_version=summary.qemu_version,
         qemu_bin=summary.qemu_bin,
+        prompts=summary.prompts,
         measured_runs=summary.measured_runs,
         warmup_runs=summary.warmup_runs,
         median_tok_per_s=summary.median_tok_per_s,
+        wall_tok_per_s_median=summary.wall_tok_per_s_median,
+        ttft_us_p95=summary.ttft_us_p95,
+        host_overhead_pct_median=summary.host_overhead_pct_median,
+        host_child_cpu_us_median=summary.host_child_cpu_us_median,
+        host_child_cpu_pct_median=summary.host_child_cpu_pct_median,
         host_child_tok_per_cpu_s_median=summary.host_child_tok_per_cpu_s_median,
         host_child_peak_rss_bytes_max=summary.host_child_peak_rss_bytes_max,
+        us_per_token_median=summary.us_per_token_median,
+        wall_us_per_token_median=summary.wall_us_per_token_median,
         max_memory_bytes=summary.max_memory_bytes,
         telemetry_status=summary.telemetry_status,
         telemetry_findings=summary.telemetry_findings,
@@ -203,8 +219,8 @@ def markdown_report(report: dict[str, object]) -> str:
     if latest:
         lines.extend(
             [
-                "| Key | Status | Air-gap | Telemetry | Command Hash | Freshness | Commit | Host | QEMU | Runs | Warmups | Age seconds | Median tok/s | Host child tok/CPU s | Max host child RSS bytes | Max memory bytes | Command SHA256 | Env SHA256 | Artifact SHA256 | Source |",
-                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- |",
+                "| Key | Status | Air-gap | Telemetry | Command Hash | Freshness | Commit | Host | QEMU | Prompts | Runs | Warmups | Age seconds | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Max memory bytes | Command SHA256 | Env SHA256 | Artifact SHA256 | Source |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- |",
             ]
         )
         for artifact in latest:
@@ -212,9 +228,12 @@ def markdown_report(report: dict[str, object]) -> str:
             values["qemu"] = format_value(artifact.get("qemu_version") or artifact.get("qemu_bin"))
             lines.append(
                 "| {key} | {status} | {command_airgap_status} | {telemetry_status} | {command_hash_status} | {freshness_status} | {commit_status}:{commit} | "
-                "{host_platform}/{host_machine} | {qemu} | {measured_runs} | "
-                "{warmup_runs} | {generated_age_seconds} | {median_tok_per_s} | {host_child_tok_per_cpu_s_median} | "
-                "{host_child_peak_rss_bytes_max} | {max_memory_bytes} | {command_sha256} | {environment_sha256} | "
+                "{host_platform}/{host_machine} | {qemu} | {prompts} | {measured_runs} | "
+                "{warmup_runs} | {generated_age_seconds} | {median_tok_per_s} | {wall_tok_per_s_median} | "
+                "{ttft_us_p95} | {host_overhead_pct_median} | {host_child_cpu_us_median} | "
+                "{host_child_cpu_pct_median} | {host_child_tok_per_cpu_s_median} | "
+                "{host_child_peak_rss_bytes_max} | {us_per_token_median} | {wall_us_per_token_median} | "
+                "{max_memory_bytes} | {command_sha256} | {environment_sha256} | "
                 "{sha256} | {source} |".format(**values)
             )
     else:
@@ -240,11 +259,19 @@ def write_csv(artifacts: list[ManifestArtifact], path: Path) -> None:
         "host_machine",
         "qemu_version",
         "qemu_bin",
+        "prompts",
         "measured_runs",
         "warmup_runs",
         "median_tok_per_s",
+        "wall_tok_per_s_median",
+        "ttft_us_p95",
+        "host_overhead_pct_median",
+        "host_child_cpu_us_median",
+        "host_child_cpu_pct_median",
         "host_child_tok_per_cpu_s_median",
         "host_child_peak_rss_bytes_max",
+        "us_per_token_median",
+        "wall_us_per_token_median",
         "max_memory_bytes",
         "telemetry_status",
         "telemetry_findings",

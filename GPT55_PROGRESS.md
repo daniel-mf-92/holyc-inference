@@ -157,3 +157,4 @@
 2026-04-28T19:12:07Z | Added eval dataset schema answer-skew telemetry/gates with smoke coverage and refreshed schema artifacts.
 2026-04-28T19:18:48Z | Added HellaSwag ctx_a/ctx_b prompt normalization for offline eval dataset packing with smoke coverage.
 2026-04-28T19:27:43Z | Added eval_compare score-margin telemetry, CSV output, optional HolyC margin gates, and refreshed smoke artifacts.
+2026-04-28T19:36:30Z | Added expanded benchmark artifact manifest telemetry fields with refreshed manifest artifacts.
