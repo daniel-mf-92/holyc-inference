@@ -172,3 +172,4 @@
 2026-04-28T22:32:04Z | Added qemu_prompt_bench dry-run launch-plan hash/CSV artifacts with refreshed air-gapped smoke outputs.
 2026-04-28T22:39:12Z | Added qemu_prompt_bench wall-clock P05/spread throughput telemetry with smoke coverage and refreshed artifacts.
 2026-04-28T22:53:10Z | Added qemu_prompt_bench IQR tok/s variability telemetry/gates with matrix passthrough and refreshed smoke artifacts.
+2026-04-28T23:03:45Z | Added dataset schema duplicate payload/conflicting-answer gates with smoke coverage and refreshed artifacts.

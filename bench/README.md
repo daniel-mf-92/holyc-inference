@@ -69,6 +69,8 @@ python3 bench/dataset_schema_audit.py \
   --max-choice-bytes 1024 \
   --max-record-payload-bytes 8192 \
   --fail-on-duplicate-ids \
+  --fail-on-duplicate-payloads \
+  --fail-on-conflicting-payload-answers \
   --fail-on-findings
 ```
 

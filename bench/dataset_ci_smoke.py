@@ -95,6 +95,8 @@ def main() -> int:
             "--max-dataset-split-majority-answer-pct",
             "100",
             "--fail-on-duplicate-ids",
+            "--fail-on-duplicate-payloads",
+            "--fail-on-conflicting-payload-answers",
             "--fail-on-findings",
         ]
         completed = run_command(schema_command)
@@ -123,6 +125,8 @@ def main() -> int:
             },
             "unexpected_schema_dataset_split_answer_histograms",
         ):
+            return rc
+        if rc := require(schema_report["duplicate_payloads"] == [], "unexpected_schema_duplicate_payloads"):
             return rc
         if rc := require(
             "Eval Dataset Schema Audit" in schema_md.read_text(encoding="utf-8"),

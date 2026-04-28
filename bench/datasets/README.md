@@ -35,6 +35,8 @@ python3 bench/dataset_schema_audit.py \
   --max-majority-answer-pct 80 \
   --max-dataset-split-majority-answer-pct 90 \
   --fail-on-duplicate-ids \
+  --fail-on-duplicate-payloads \
+  --fail-on-conflicting-payload-answers \
   --fail-on-findings
 ```
 

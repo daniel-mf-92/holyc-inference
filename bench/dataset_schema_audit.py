@@ -13,6 +13,7 @@ import collections
 import csv
 import hashlib
 import json
+import re
 import sys
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
@@ -74,6 +75,26 @@ def read_rows(path: Path, findings: list[Finding]) -> list[dict[str, Any]]:
 
 def source_ref(path: Path, row_number: int) -> str:
     return f"{path}:{row_number}"
+
+
+def stable_text_key(text: str) -> str:
+    normalized = dataset_pack.clean_text(text).casefold()
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized.strip()
+
+
+def key_digest(value: Any) -> str:
+    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def payload_key(record: dataset_pack.EvalRecord) -> str:
+    return key_digest(
+        {
+            "choices": [stable_text_key(choice) for choice in record.choices],
+            "prompt": stable_text_key(record.prompt),
+        }
+    )
 
 
 def load_records(
@@ -193,6 +214,33 @@ def duplicate_ids(records: list[LoadedRecord]) -> list[dict[str, Any]]:
     return duplicates
 
 
+def duplicate_payloads(records: list[LoadedRecord]) -> list[dict[str, Any]]:
+    groups: dict[tuple[str, str, str], list[LoadedRecord]] = {}
+    for loaded in records:
+        groups.setdefault(
+            (loaded.record.dataset, loaded.record.split, payload_key(loaded.record)),
+            [],
+        ).append(loaded)
+
+    duplicates: list[dict[str, Any]] = []
+    for (dataset, split, key), group in sorted(groups.items()):
+        if len(group) <= 1:
+            continue
+        answer_hist = answer_histogram([loaded.record for loaded in group])
+        duplicates.append(
+            {
+                "dataset": dataset,
+                "split": split,
+                "key_sha256": key,
+                "record_ids": sorted({loaded.record.record_id for loaded in group}),
+                "sources": [source_ref(Path(loaded.source), loaded.row_number) for loaded in group],
+                "answer_histogram": answer_hist,
+                "conflicting_answers": len(answer_hist) > 1,
+            }
+        )
+    return duplicates
+
+
 def apply_record_gates(
     records: list[LoadedRecord],
     min_choices: int | None,
@@ -203,6 +251,8 @@ def apply_record_gates(
     max_majority_answer_pct: float | None,
     max_dataset_split_majority_answer_pct: float | None,
     fail_on_duplicate_ids: bool,
+    fail_on_duplicate_payloads: bool,
+    fail_on_conflicting_payload_answers: bool,
     findings: list[Finding],
 ) -> None:
     for loaded in records:
@@ -233,6 +283,31 @@ def apply_record_gates(
             ",".join(duplicate["sources"]),
             f"{duplicate['dataset']} record id {duplicate['record_id']!r} appears more than once",
         )
+
+    for duplicate in duplicate_payloads(records):
+        if fail_on_duplicate_payloads:
+            append_finding(
+                findings,
+                "error",
+                "duplicate_payload",
+                ",".join(duplicate["sources"]),
+                (
+                    f"{duplicate['dataset']}/{duplicate['split']} normalized prompt+choices payload "
+                    f"{duplicate['key_sha256']} appears {len(duplicate['sources'])} times"
+                ),
+            )
+        if duplicate["conflicting_answers"] and fail_on_conflicting_payload_answers:
+            append_finding(
+                findings,
+                "error",
+                "conflicting_payload_answers",
+                ",".join(duplicate["sources"]),
+                (
+                    f"{duplicate['dataset']}/{duplicate['split']} normalized prompt+choices payload "
+                    f"{duplicate['key_sha256']} has answer histogram "
+                    f"{json.dumps(duplicate['answer_histogram'], sort_keys=True)}"
+                ),
+            )
 
     for message in dataset_pack.size_limit_findings(
         [loaded.record for loaded in records],
@@ -305,6 +380,7 @@ def build_report(
         "dataset_split_majority_answers": majority_answers_by_dataset_split(dataset_split_answer_histograms),
         "byte_stats": dataset_pack.byte_stats(normalized),
         "duplicate_record_ids": duplicate_ids(records),
+        "duplicate_payloads": duplicate_payloads(records),
         "error_count": error_count,
         "warning_count": warning_count,
         "findings": [asdict(finding) for finding in findings],
@@ -338,6 +414,7 @@ def markdown_report(report: dict[str, Any]) -> str:
             f"- Choice counts: `{json.dumps(report['choice_count_histogram'], sort_keys=True)}`",
             f"- Answer indexes: `{json.dumps(report['answer_histogram'], sort_keys=True)}`",
             f"- Majority answer: `{json.dumps(report['majority_answer'], sort_keys=True)}`",
+            f"- Duplicate payload groups: {len(report['duplicate_payloads'])}",
             "",
             "## Findings",
             "",
@@ -444,6 +521,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail if one answer index covers more than this percentage within any dataset/split group",
     )
     parser.add_argument("--fail-on-duplicate-ids", action="store_true", help="Treat duplicate record IDs as errors")
+    parser.add_argument(
+        "--fail-on-duplicate-payloads",
+        action="store_true",
+        help="Fail if normalized prompt+choices payloads repeat within the same dataset/split",
+    )
+    parser.add_argument(
+        "--fail-on-conflicting-payload-answers",
+        action="store_true",
+        help="Fail if repeated normalized prompt+choices payloads disagree on answer index",
+    )
     parser.add_argument("--fail-on-findings", action="store_true", help="Exit nonzero when errors are present")
     return parser
 
@@ -474,6 +561,8 @@ def main(argv: list[str] | None = None) -> int:
         args.max_majority_answer_pct,
         args.max_dataset_split_majority_answer_pct,
         args.fail_on_duplicate_ids,
+        args.fail_on_duplicate_payloads,
+        args.fail_on_conflicting_payload_answers,
         findings,
     )
     report = build_report(inputs, records, findings)

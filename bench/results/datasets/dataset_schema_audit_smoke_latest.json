@@ -63,11 +63,12 @@
       }
     }
   },
+  "duplicate_payloads": [],
   "duplicate_record_ids": [],
   "error_count": 0,
   "findings": [],
   "format": "hceval-schema-audit",
-  "generated_at": "2026-04-28T19:11:22Z",
+  "generated_at": "2026-04-28T23:03:39Z",
   "input_row_count": 3,
   "inputs": [
     {

@@ -19,6 +19,7 @@
 - Choice counts: `{"4": 3}`
 - Answer indexes: `{"0": 3}`
 - Majority answer: `{"answer_index": "0", "pct": 100.0, "records": 3}`
+- Duplicate payload groups: 0
 
 ## Findings
 
