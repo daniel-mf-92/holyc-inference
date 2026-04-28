@@ -14,6 +14,7 @@ import csv
 import hashlib
 import json
 import sys
+import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -343,6 +344,51 @@ def markdown_report(report: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def junit_report(report: dict[str, Any]) -> str:
+    artifacts = [row for row in report["artifacts"] if isinstance(row, dict)]
+    failed_artifacts = [row for row in artifacts if row.get("status") == "fail"]
+    finding_artifacts = [row for row in artifacts if row.get("findings")]
+    failures = int(bool(failed_artifacts)) + int(bool(finding_artifacts))
+
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": "holyc_dataset_index",
+            "tests": "2",
+            "failures": str(failures),
+        },
+    )
+
+    status_case = ET.SubElement(suite, "testcase", {"name": "artifact_status"})
+    if failed_artifacts:
+        failure = ET.SubElement(
+            status_case,
+            "failure",
+            {
+                "type": "dataset_artifact_failure",
+                "message": f"{len(failed_artifacts)} dataset artifact(s) failed",
+            },
+        )
+        failure.text = "\n".join(str(row.get("source", "")) for row in failed_artifacts)
+
+    findings_case = ET.SubElement(suite, "testcase", {"name": "artifact_findings"})
+    if finding_artifacts:
+        failure = ET.SubElement(
+            findings_case,
+            "failure",
+            {
+                "type": "dataset_artifact_findings",
+                "message": f"{len(finding_artifacts)} dataset artifact(s) have findings",
+            },
+        )
+        failure.text = "\n".join(
+            f"{row.get('source', '')}: {json.dumps(row.get('findings', []), separators=(',', ':'))}"
+            for row in finding_artifacts
+        )
+
+    return ET.tostring(suite, encoding="unicode") + "\n"
+
+
 def write_csv(artifacts: list[DatasetArtifact], path: Path) -> None:
     fields = [
         "source",
@@ -380,8 +426,10 @@ def write_report(artifacts: list[DatasetArtifact], output_dir: Path) -> Path:
     json_path = output_dir / "dataset_index_latest.json"
     md_path = output_dir / "dataset_index_latest.md"
     csv_path = output_dir / "dataset_index_latest.csv"
+    junit_path = output_dir / "dataset_index_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
+    junit_path.write_text(junit_report(report), encoding="utf-8")
     write_csv(artifacts, csv_path)
     return json_path
 

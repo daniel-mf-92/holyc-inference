@@ -108,7 +108,7 @@ python3 bench/hceval_inspect.py \
 
 `dataset_index.py` scans curated manifests, packed `.hceval` manifests, and
 inspection reports, verifies local hashes/provenance fields where possible, and
-writes JSON/Markdown/CSV rollups:
+writes JSON/Markdown/CSV/JUnit XML rollups:
 
 ```bash
 python3 bench/dataset_index.py \
