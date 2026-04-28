@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -40,6 +41,33 @@ def file_sha256(path: Path) -> str:
 def stable_sample_key(record: dataset_pack.EvalRecord, seed: str) -> str:
     payload = json.dumps(asdict(record), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(f"{seed}\0{payload}".encode("utf-8")).hexdigest()
+
+
+def stable_text_key(text: str) -> str:
+    normalized = dataset_pack.clean_text(text).casefold()
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized.strip()
+
+
+def split_payload_key(record: dataset_pack.EvalRecord) -> str:
+    payload = {
+        "choices": [stable_text_key(choice) for choice in record.choices],
+        "dataset": record.dataset,
+        "prompt": stable_text_key(record.prompt),
+        "split": record.split,
+    }
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def exact_split_payload_key(record: dataset_pack.EvalRecord) -> str:
+    payload = {
+        "answer_index": record.answer_index,
+        "choices": [stable_text_key(choice) for choice in record.choices],
+        "dataset": record.dataset,
+        "prompt": stable_text_key(record.prompt),
+        "split": record.split,
+    }
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
 def answer_histogram(records: list[dataset_pack.EvalRecord]) -> dict[str, int]:
@@ -129,6 +157,34 @@ def reject_duplicate_ids(records: list[dataset_pack.EvalRecord]) -> None:
     if duplicates:
         preview = ", ".join(sorted(set(duplicates))[:5])
         raise ValueError(f"duplicate record ids after filtering: {preview}")
+
+
+def dedupe_within_split_payloads(
+    records: list[dataset_pack.EvalRecord],
+    enabled: bool,
+    seed: str,
+) -> list[dataset_pack.EvalRecord]:
+    if not enabled:
+        return list(records)
+
+    answers_by_payload: dict[str, set[int]] = {}
+    for record in records:
+        answers_by_payload.setdefault(split_payload_key(record), set()).add(record.answer_index)
+
+    conflicts = [key for key, answers in answers_by_payload.items() if len(answers) > 1]
+    if conflicts:
+        preview = ", ".join(hashlib.sha256(key.encode("utf-8")).hexdigest()[:12] for key in sorted(conflicts)[:5])
+        raise ValueError(f"conflicting answers for duplicate within-split payloads: {preview}")
+
+    groups: dict[str, list[dataset_pack.EvalRecord]] = {}
+    for record in records:
+        groups.setdefault(exact_split_payload_key(record), []).append(record)
+
+    selected = []
+    for key in sorted(groups):
+        group = sorted(groups[key], key=lambda record: stable_sample_key(record, seed))
+        selected.append(group[0])
+    return selected
 
 
 def cap_records_by_field(
@@ -223,6 +279,7 @@ def build_manifest(
     args: argparse.Namespace,
     source_count: int,
     filtered_count: int,
+    deduped_count: int,
     capped_count: int,
     selected: list[dataset_pack.EvalRecord],
 ) -> dict[str, Any]:
@@ -248,6 +305,7 @@ def build_manifest(
             "min_choices": args.min_choices,
             "max_record_payload_bytes": args.max_record_payload_bytes,
             "require_provenance": args.require_provenance,
+            "dedupe_within_split_payloads": args.dedupe_within_split_payloads,
             "seed": args.seed,
         },
         "format": "hceval-curated-jsonl",
@@ -266,6 +324,7 @@ def build_manifest(
         "source_url": args.source_url,
         "source_version": args.source_version,
         "split_counts": count_by(selected, "split"),
+        "total_after_deduplication": deduped_count,
         "total_after_filters": filtered_count,
         "total_after_group_caps": capped_count,
     }
@@ -317,6 +376,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-records-per-provenance",
         type=int,
         help="Deterministically keep at most this many records from each provenance/source string before global sampling",
+    )
+    parser.add_argument(
+        "--dedupe-within-split-payloads",
+        action="store_true",
+        help="Before caps/sampling, keep one deterministic row per normalized dataset/split/prompt/choices/answer payload",
     )
     parser.add_argument("--seed", default="holyc-eval-v1", help="Stable sampling seed")
     parser.add_argument(
@@ -389,8 +453,9 @@ def main(argv: list[str] | None = None) -> int:
             args.max_choice_bytes,
             args.max_record_payload_bytes,
         )
-        reject_duplicate_ids(filtered)
-        capped = cap_records_by_field(filtered, "dataset", args.max_records_per_dataset, args.seed)
+        deduped = dedupe_within_split_payloads(filtered, args.dedupe_within_split_payloads, args.seed)
+        reject_duplicate_ids(deduped)
+        capped = cap_records_by_field(deduped, "dataset", args.max_records_per_dataset, args.seed)
         capped = cap_records_by_field(capped, "split", args.max_records_per_split, args.seed)
         capped = cap_records_by_field(capped, "provenance", args.max_records_per_provenance, args.seed)
         capped = cap_records_by_dataset_split(capped, args.max_records_per_dataset_split, args.seed)
@@ -399,7 +464,7 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("no records selected after filters")
 
         write_jsonl(selected, args.output)
-        manifest = build_manifest(args, len(records), len(filtered), len(capped), selected)
+        manifest = build_manifest(args, len(records), len(filtered), len(deduped), len(capped), selected)
         args.manifest.parent.mkdir(parents=True, exist_ok=True)
         args.manifest.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 

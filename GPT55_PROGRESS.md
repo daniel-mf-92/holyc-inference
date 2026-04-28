@@ -143,3 +143,4 @@
 2026-04-28T15:21:02Z | Added result-index and artifact-manifest host child CPU efficiency/RSS rollups with refreshed benchmark artifacts.
 2026-04-28T15:39:29Z | Added qemu_prompt_bench failure-count rollups for failed, timeout, and nonzero-exit runs with refreshed smoke artifacts.
 2026-04-28T15:56:34Z | Added benchmark environment fingerprints and env-drift gating with refreshed index/manifest artifacts.
+2026-04-28T16:07:07Z | Added within-split dataset payload dedupe and answer-conflict rejection with smoke coverage and refreshed dataset artifacts.

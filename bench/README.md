@@ -70,6 +70,7 @@ python3 bench/dataset_curate.py \
   --max-records-per-provenance 1 \
   --max-records 3 \
   --balance-answer-index \
+  --dedupe-within-split-payloads \
   --pack-output bench/results/datasets/smoke_curated.hceval \
   --pack-manifest bench/results/datasets/smoke_curated.hceval.manifest.json
 ```
@@ -83,6 +84,10 @@ counts across HellaSwag-, ARC-, TruthfulQA-, and normalized local rows.
 Use `--max-records-per-provenance` when local source files combine multiple
 staged shards and each shard should contribute at most a fixed number of rows
 before the final global sample is selected.
+Use `--dedupe-within-split-payloads` to collapse repeated normalized
+dataset/split/prompt/choices/answer rows before caps and sampling. If duplicate
+within-split prompt/choices payloads disagree on the answer index, curation
+fails instead of silently choosing one label.
 
 `dataset_pack.py` converts local JSONL multiple-choice evaluation rows into a
 deterministic HolyC-loadable binary plus a provenance manifest. It accepts a

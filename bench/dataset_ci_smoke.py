@@ -41,6 +41,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="holyc-dataset-ci-") as tmp:
         tmp_path = Path(tmp)
         datasets_dir = tmp_path / "datasets"
+        curated_source = datasets_dir / "smoke_eval_with_duplicate.jsonl"
         curated = datasets_dir / "smoke_curated.jsonl"
         curated_manifest = datasets_dir / "smoke_curated.manifest.json"
         packed = datasets_dir / "smoke_curated.hceval"
@@ -57,11 +58,15 @@ def main() -> int:
         provenance_csv = datasets_dir / "dataset_provenance_audit_latest.csv"
         provenance_junit = datasets_dir / "dataset_provenance_audit_junit_latest.xml"
 
+        sample_lines = SAMPLE.read_text(encoding="utf-8").splitlines()
+        curated_source.parent.mkdir(parents=True, exist_ok=True)
+        curated_source.write_text("\n".join(sample_lines + [sample_lines[0]]) + "\n", encoding="utf-8")
+
         curate_command = [
             sys.executable,
             str(ROOT / "bench" / "dataset_curate.py"),
             "--input",
-            str(SAMPLE),
+            str(curated_source),
             "--output",
             str(curated),
             "--manifest",
@@ -82,6 +87,7 @@ def main() -> int:
             "1",
             "--max-records-per-provenance",
             "1",
+            "--dedupe-within-split-payloads",
             "--max-prompt-bytes",
             "4096",
             "--max-choice-bytes",
@@ -103,6 +109,10 @@ def main() -> int:
             return completed.returncode
 
         curated_report = json.loads(curated_manifest.read_text(encoding="utf-8"))
+        if rc := require(curated_report["source"]["record_count"] == 4, "unexpected_curated_source_count"):
+            return rc
+        if rc := require(curated_report["total_after_deduplication"] == 3, "unexpected_deduped_record_count"):
+            return rc
         if rc := require(curated_report["record_count"] == 3, "unexpected_curated_record_count"):
             return rc
         if rc := require(
@@ -120,6 +130,11 @@ def main() -> int:
         ):
             return rc
         if rc := require(curated_report["filters"]["balance_answer_index"] is True, "missing_balance_flag"):
+            return rc
+        if rc := require(
+            curated_report["filters"]["dedupe_within_split_payloads"] is True,
+            "missing_dedupe_payload_flag",
+        ):
             return rc
         if rc := require(
             curated_report["filters"]["max_records_per_dataset_split"] == 1,
@@ -453,6 +468,65 @@ def main() -> int:
             "dataset_answer_histograms_mismatch" in stale_dataset_answer_kinds,
             "missing_dataset_answer_histogram_finding",
         ):
+            return rc
+
+        conflict_fixture = tmp_path / "conflicting_duplicate_payloads.jsonl"
+        conflict_fixture.write_text(
+            "\n".join(
+                [
+                    json.dumps(
+                        {
+                            "id": "conflict-a",
+                            "dataset": "conflict-smoke",
+                            "split": "validation",
+                            "prompt": "Same prompt?",
+                            "choices": ["yes", "no"],
+                            "answer_index": 0,
+                            "provenance": "synthetic conflict smoke row",
+                        },
+                        sort_keys=True,
+                    ),
+                    json.dumps(
+                        {
+                            "id": "conflict-b",
+                            "dataset": "conflict-smoke",
+                            "split": "validation",
+                            "prompt": " Same   prompt? ",
+                            "choices": ["yes", "no"],
+                            "answer_index": 1,
+                            "provenance": "synthetic conflict smoke row",
+                        },
+                        sort_keys=True,
+                    ),
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        conflict_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_curate.py"),
+            "--input",
+            str(conflict_fixture),
+            "--output",
+            str(tmp_path / "conflict_curated.jsonl"),
+            "--manifest",
+            str(tmp_path / "conflict_curated.manifest.json"),
+            "--source-name",
+            "conflict-smoke",
+            "--dedupe-within-split-payloads",
+        ]
+        completed = subprocess.run(
+            conflict_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("conflicting_payloads_not_rejected=true", file=sys.stderr)
+            return 1
+        if rc := require("conflicting answers" in completed.stderr, "missing_conflicting_payload_error"):
             return rc
 
         leak_fixture = tmp_path / "leaky.jsonl"
