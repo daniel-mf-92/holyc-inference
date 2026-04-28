@@ -48,6 +48,9 @@ def main() -> int:
         junit_path = output_dir / "perf_regression_junit_latest.xml"
         sample_violations_path = output_dir / "perf_regression_sample_violations_latest.csv"
         variability_violations_path = output_dir / "perf_regression_variability_violations_latest.csv"
+        commit_coverage_violations_path = (
+            output_dir / "perf_regression_commit_coverage_violations_latest.csv"
+        )
         report = json.loads(report_path.read_text(encoding="utf-8"))
         if report["status"] != "pass":
             print(f"unexpected_status={report['status']}", file=sys.stderr)
@@ -60,6 +63,9 @@ def main() -> int:
             return 1
         if report["variability_violations"]:
             print("unexpected_variability_violations=true", file=sys.stderr)
+            return 1
+        if report["commit_coverage_violations"]:
+            print("unexpected_commit_coverage_violations=true", file=sys.stderr)
             return 1
         if "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/ci-short" not in report["summaries"]:
             print("missing_ci_fixture_summary=true", file=sys.stderr)
@@ -89,6 +95,11 @@ def main() -> int:
             encoding="utf-8"
         ):
             print("missing_variability_violations_csv=true", file=sys.stderr)
+            return 1
+        if "key,commits,minimum_commits,latest_commit" not in commit_coverage_violations_path.read_text(
+            encoding="utf-8"
+        ):
+            print("missing_commit_coverage_violations_csv=true", file=sys.stderr)
             return 1
 
         audit_output = tmp_path / "airgap_audit.json"

@@ -86,6 +86,14 @@ class VariabilityViolation:
     threshold_pct: float
 
 
+@dataclass(frozen=True)
+class CommitCoverageViolation:
+    key: str
+    commits: int
+    minimum_commits: int
+    latest_commit: str
+
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -444,6 +452,33 @@ def detect_variability_violations(
     return violations
 
 
+def detect_commit_coverage_violations(
+    points: list[CommitPoint], minimum_commits: int
+) -> list[CommitCoverageViolation]:
+    if minimum_commits <= 1:
+        return []
+
+    by_key: dict[str, list[CommitPoint]] = {}
+    for point in points:
+        by_key.setdefault(point.key, []).append(point)
+
+    violations: list[CommitCoverageViolation] = []
+    for key, key_points in sorted(by_key.items()):
+        commits = {point.commit for point in key_points}
+        if len(commits) >= minimum_commits:
+            continue
+        latest = sorted(key_points, key=lambda point: (point.latest_timestamp, point.commit))[-1]
+        violations.append(
+            CommitCoverageViolation(
+                key=key,
+                commits=len(commits),
+                minimum_commits=minimum_commits,
+                latest_commit=latest.commit,
+            )
+        )
+    return violations
+
+
 def markdown_report(report: dict[str, Any]) -> str:
     lines = [
         "# Perf Regression Dashboard",
@@ -454,6 +489,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Regressions: {len(report['regressions'])}",
         f"Sample violations: {len(report['sample_violations'])}",
         f"Variability violations: {len(report['variability_violations'])}",
+        f"Commit coverage violations: {len(report['commit_coverage_violations'])}",
         "",
         "## Regressions",
         "",
@@ -492,6 +528,19 @@ def markdown_report(report: dict[str, Any]) -> str:
             )
     else:
         lines.append("Variability requirements satisfied.")
+
+    lines.extend(["", "## Commit Coverage", ""])
+    if report["commit_coverage_violations"]:
+        lines.append("| Key | Commits | Minimum Commits | Latest Commit |")
+        lines.append("| --- | ---: | ---: | --- |")
+        for violation in report["commit_coverage_violations"]:
+            lines.append(
+                "| {key} | {commits} | {minimum_commits} | {latest_commit} |".format(
+                    **violation
+                )
+            )
+    else:
+        lines.append("Commit coverage requirements satisfied.")
 
     lines.extend(["", "## Commit Points", ""])
     if report["commit_points"]:
@@ -546,7 +595,13 @@ def write_csv(path: Path, rows: list[dict[str, Any]], fields: list[str]) -> None
 
 def junit_report(report: dict[str, Any]) -> str:
     variability_violations = report.get("variability_violations", [])
-    failures = len(report["regressions"]) + len(report["sample_violations"]) + len(variability_violations)
+    commit_coverage_violations = report.get("commit_coverage_violations", [])
+    failures = (
+        len(report["regressions"])
+        + len(report["sample_violations"])
+        + len(variability_violations)
+        + len(commit_coverage_violations)
+    )
     tests = failures or 1
     suite = ET.Element(
         "testsuite",
@@ -650,6 +705,33 @@ def junit_report(report: dict[str, Any]) -> str:
                 f"key={violation['key']}"
             )
 
+        for violation in commit_coverage_violations:
+            case = ET.SubElement(
+                suite,
+                "testcase",
+                {
+                    "classname": "perf_regression.commit_coverage",
+                    "name": violation["key"],
+                },
+            )
+            failure = ET.SubElement(
+                case,
+                "failure",
+                {
+                    "type": "commit_coverage",
+                    "message": (
+                        f"{violation['commits']} commits below minimum "
+                        f"{violation['minimum_commits']}"
+                    ),
+                },
+            )
+            failure.text = (
+                f"commits={violation['commits']}\n"
+                f"minimum_commits={violation['minimum_commits']}\n"
+                f"latest_commit={violation['latest_commit']}\n"
+                f"key={violation['key']}"
+            )
+
     ET.indent(suite, space="  ")
     return ET.tostring(suite, encoding="unicode", xml_declaration=True) + "\n"
 
@@ -663,6 +745,9 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
     regressions_csv = output_dir / "perf_regression_regressions_latest.csv"
     sample_violations_csv = output_dir / "perf_regression_sample_violations_latest.csv"
     variability_violations_csv = output_dir / "perf_regression_variability_violations_latest.csv"
+    commit_coverage_violations_csv = (
+        output_dir / "perf_regression_commit_coverage_violations_latest.csv"
+    )
 
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
@@ -705,6 +790,11 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
         report["variability_violations"],
         ["key", "commit", "records", "tok_per_s_cv_pct", "threshold_pct"],
     )
+    write_csv(
+        commit_coverage_violations_csv,
+        report["commit_coverage_violations"],
+        ["key", "commits", "minimum_commits", "latest_commit"],
+    )
 
     print(f"wrote_json={json_path}")
     print(f"wrote_markdown={md_path}")
@@ -713,6 +803,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
     print(f"wrote_regressions_csv={regressions_csv}")
     print(f"wrote_sample_violations_csv={sample_violations_csv}")
     print(f"wrote_variability_violations_csv={variability_violations_csv}")
+    print(f"wrote_commit_coverage_violations_csv={commit_coverage_violations_csv}")
 
 
 def build_report(
@@ -724,6 +815,7 @@ def build_report(
     min_records_per_point: int = 1,
     max_tok_cv_pct: float | None = None,
     wall_tok_threshold_pct: float | None = None,
+    min_commits_per_key: int = 1,
 ) -> dict[str, Any]:
     points = commit_points(records)
     regressions = detect_regressions(
@@ -736,10 +828,18 @@ def build_report(
     )
     sample_violations = detect_sample_violations(points, min_records_per_point)
     variability_violations = detect_variability_violations(points, max_tok_cv_pct)
+    commit_coverage_violations = detect_commit_coverage_violations(points, min_commits_per_key)
     return {
         "generated_at": iso_now(),
         "record_count": len(records),
-        "status": "fail" if regressions or sample_violations or variability_violations else "pass",
+        "status": (
+            "fail"
+            if regressions
+            or sample_violations
+            or variability_violations
+            or commit_coverage_violations
+            else "pass"
+        ),
         "comparison": {
             "baseline_commit": baseline_commit,
             "candidate_commit": candidate_commit,
@@ -751,12 +851,16 @@ def build_report(
             "wall_tok_regression_pct": wall_tok_threshold_pct,
             "min_records_per_point": min_records_per_point,
             "max_tok_cv_pct": max_tok_cv_pct,
+            "min_commits_per_key": min_commits_per_key,
         },
         "summaries": summarize(records),
         "commit_points": [asdict(point) for point in points],
         "regressions": [asdict(regression) for regression in regressions],
         "sample_violations": [asdict(violation) for violation in sample_violations],
         "variability_violations": [asdict(violation) for violation in variability_violations],
+        "commit_coverage_violations": [
+            asdict(violation) for violation in commit_coverage_violations
+        ],
         "records": [asdict(record) for record in sorted(records, key=lambda item: (item.key, item.timestamp))],
     }
 
@@ -791,6 +895,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         help="Fail when a benchmark key/commit point has tok/s coefficient of variation above this percent",
     )
+    parser.add_argument(
+        "--min-commits-per-key",
+        type=int,
+        default=1,
+        help="Minimum distinct commits required for each benchmark key before the dashboard passes",
+    )
     parser.add_argument("--fail-on-regression", action="store_true")
     return parser
 
@@ -808,6 +918,7 @@ def main(argv: list[str] | None = None) -> int:
         min_records_per_point=args.min_records_per_point,
         max_tok_cv_pct=args.max_tok_cv_pct,
         wall_tok_threshold_pct=args.wall_tok_regression_pct,
+        min_commits_per_key=args.min_commits_per_key,
     )
 
     write_dashboard_outputs(report, args.output_dir)
