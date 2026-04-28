@@ -137,6 +137,8 @@ python3 bench/dataset_leak_audit.py \
 against the same gold JSONL and writes JSON, Markdown, CSV, and JUnit XML
 reports. Optional quality gates can fail CI when HolyC accuracy, engine
 agreement, or accuracy delta versus llama.cpp falls outside configured bounds.
+Prediction score vectors are treated as choice-aligned logits/logprobs: every
+score must be finite and the score count must match the gold choice count.
 
 ```bash
 python3 bench/eval_compare.py \

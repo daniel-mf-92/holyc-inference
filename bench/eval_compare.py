@@ -172,9 +172,12 @@ def parse_scores(value: Any, row_label: str) -> list[float] | None:
     if not isinstance(value, list) or not value:
         raise ValueError(f"{row_label}: scores must be a non-empty list")
     try:
-        return [float(item) for item in value]
+        scores = [float(item) for item in value]
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{row_label}: scores must contain numbers") from exc
+    if not all(math.isfinite(score) for score in scores):
+        raise ValueError(f"{row_label}: scores must contain only finite numbers")
+    return scores
 
 
 def argmax(values: list[float]) -> int:
@@ -217,6 +220,10 @@ def normalize_prediction(row: dict[str, Any], gold: GoldCase, source: Path, inde
     row_label = f"{source}:{index + 1}"
     record_id = case_id(row, row_label)
     scores = parse_scores(first_present(row, SCORE_KEYS), row_label)
+    if scores is not None and len(scores) != len(gold.choices):
+        raise ValueError(
+            f"{row_label}: scores length {len(scores)} does not match choice count {len(gold.choices)}"
+        )
     raw_prediction = first_present(row, PREDICTION_KEYS)
     predicted_index = parse_prediction_index(raw_prediction, gold.choices, row_label)
     if predicted_index is None and scores is not None:

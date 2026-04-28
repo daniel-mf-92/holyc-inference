@@ -164,6 +164,38 @@ def test_invalid_confidence_level_fails_fast() -> None:
         )
 
 
+def test_score_vector_must_match_choice_count() -> None:
+    gold = eval_compare.GoldCase("score-short", "unit", "validation", 0, ["A", "B", "C"])
+
+    try:
+        eval_compare.normalize_prediction(
+            {"id": "score-short", "scores": [1.0, 0.5]},
+            gold,
+            Path("predictions.jsonl"),
+            0,
+        )
+    except ValueError as exc:
+        assert "scores length 2 does not match choice count 3" in str(exc)
+    else:
+        raise AssertionError("short score vector should fail")
+
+
+def test_score_vector_rejects_non_finite_values() -> None:
+    gold = eval_compare.GoldCase("score-nan", "unit", "validation", 0, ["A", "B"])
+
+    try:
+        eval_compare.normalize_prediction(
+            {"id": "score-nan", "scores": [1.0, float("nan")]},
+            gold,
+            Path("predictions.jsonl"),
+            0,
+        )
+    except ValueError as exc:
+        assert "scores must contain only finite numbers" in str(exc)
+    else:
+        raise AssertionError("non-finite score vector should fail")
+
+
 def test_missing_prediction_fails_fast() -> None:
     gold = BENCH_PATH / "datasets" / "samples" / "smoke_eval.jsonl"
     llama = BENCH_PATH / "eval" / "samples" / "llama_smoke_predictions.jsonl"
