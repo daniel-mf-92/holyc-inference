@@ -220,6 +220,122 @@ def test_memory_regression_uses_commit_point_max_memory(tmp_path: Path) -> None:
     assert regressions[0].candidate_value == 1150.0
 
 
+def test_explicit_comparison_commits_must_exist_for_each_key() -> None:
+    records = [
+        perf_regression.PerfRecord(
+            source="fixture.jsonl",
+            commit="base",
+            timestamp="2026-04-28T00:00:00Z",
+            benchmark="qemu_prompt",
+            profile="ci",
+            model="synthetic",
+            quantization="Q4_0",
+            prompt="short",
+            tok_per_s=100.0,
+            wall_tok_per_s=90.0,
+            memory_bytes=1024,
+        ),
+        perf_regression.PerfRecord(
+            source="fixture.jsonl",
+            commit="head",
+            timestamp="2026-04-28T00:01:00Z",
+            benchmark="qemu_prompt",
+            profile="ci",
+            model="synthetic",
+            quantization="Q4_0",
+            prompt="short",
+            tok_per_s=99.0,
+            wall_tok_per_s=89.0,
+            memory_bytes=1024,
+        ),
+        perf_regression.PerfRecord(
+            source="fixture.jsonl",
+            commit="head",
+            timestamp="2026-04-28T00:01:00Z",
+            benchmark="qemu_prompt",
+            profile="ci",
+            model="synthetic",
+            quantization="Q8_0",
+            prompt="short",
+            tok_per_s=101.0,
+            wall_tok_per_s=91.0,
+            memory_bytes=1024,
+        ),
+    ]
+
+    report = perf_regression.build_report(
+        records,
+        tok_threshold_pct=5.0,
+        memory_threshold_pct=10.0,
+        baseline_commit="base",
+        candidate_commit="head",
+    )
+
+    assert report["status"] == "fail"
+    assert report["comparison_coverage_violations"] == [
+        {
+            "key": "qemu_prompt/ci/synthetic/Q8_0/short",
+            "baseline_commit": "base",
+            "candidate_commit": "head",
+            "missing_commits": "baseline:base",
+        }
+    ]
+    assert "Comparison coverage violations: 1" in perf_regression.markdown_report(report)
+
+    junit_root = ET.fromstring(perf_regression.junit_report(report))
+    assert junit_root.attrib["failures"] == "1"
+    failure = junit_root.find("./testcase/failure")
+    assert failure is not None
+    assert failure.attrib["type"] == "comparison_coverage"
+
+
+def test_cli_writes_comparison_coverage_csv(tmp_path: Path) -> None:
+    input_path = tmp_path / "perf.jsonl"
+    output_dir = tmp_path / "dashboards"
+    input_path.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "commit": "head",
+                        "timestamp": "2026-04-28T00:01:00Z",
+                        "benchmark": "qemu_prompt",
+                        "profile": "ci",
+                        "model": "synthetic",
+                        "quantization": "Q4_0",
+                        "prompt": "short",
+                        "tok_per_s": 100.0,
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    status = perf_regression.main(
+        [
+            "--input",
+            str(input_path),
+            "--output-dir",
+            str(output_dir),
+            "--baseline-commit",
+            "base",
+            "--candidate-commit",
+            "head",
+            "--fail-on-regression",
+        ]
+    )
+
+    assert status == 1
+    payload = json.loads((output_dir / "perf_regression_latest.json").read_text(encoding="utf-8"))
+    csv_text = (
+        output_dir / "perf_regression_comparison_coverage_violations_latest.csv"
+    ).read_text(encoding="utf-8")
+    assert payload["comparison_coverage_violations"][0]["missing_commits"] == "baseline:base"
+    assert "key,baseline_commit,candidate_commit,missing_commits" in csv_text
+
+
 def test_min_records_per_point_flags_under_sampled_commit_points(tmp_path: Path) -> None:
     result = tmp_path / "perf.jsonl"
     write_jsonl(
@@ -463,12 +579,16 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
     assert (output_dir / "perf_regression_sample_violations_latest.csv").exists()
     assert (output_dir / "perf_regression_variability_violations_latest.csv").exists()
     assert (output_dir / "perf_regression_commit_coverage_violations_latest.csv").exists()
+    assert (
+        output_dir / "perf_regression_comparison_coverage_violations_latest.csv"
+    ).exists()
     markdown = (output_dir / "perf_regression_latest.md").read_text(encoding="utf-8")
     assert "Perf Regression Dashboard" in markdown
     assert "Commit Points" in markdown
     assert "Sample Coverage" in markdown
     assert "Variability" in markdown
     assert "Commit Coverage" in markdown
+    assert "Comparison Coverage" in markdown
     assert "prompt/dev-local/-/-/-" in markdown
     commit_points_csv = (output_dir / "perf_regression_commit_points_latest.csv").read_text(
         encoding="utf-8"
@@ -485,6 +605,9 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
     commit_coverage_violations_csv = (
         output_dir / "perf_regression_commit_coverage_violations_latest.csv"
     ).read_text(encoding="utf-8")
+    comparison_coverage_violations_csv = (
+        output_dir / "perf_regression_comparison_coverage_violations_latest.csv"
+    ).read_text(encoding="utf-8")
     assert (
         "key,commit,latest_timestamp,records,median_tok_per_s,median_wall_tok_per_s,tok_per_s_cv_pct,max_memory_bytes"
         in commit_points_csv
@@ -494,3 +617,4 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
     assert "key,commit,records,minimum_records" in sample_violations_csv
     assert "key,commit,records,tok_per_s_cv_pct,threshold_pct" in variability_violations_csv
     assert "key,commits,minimum_commits,latest_commit" in commit_coverage_violations_csv
+    assert "key,baseline_commit,candidate_commit,missing_commits" in comparison_coverage_violations_csv

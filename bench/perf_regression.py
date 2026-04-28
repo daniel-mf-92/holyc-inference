@@ -94,6 +94,14 @@ class CommitCoverageViolation:
     latest_commit: str
 
 
+@dataclass(frozen=True)
+class ComparisonCoverageViolation:
+    key: str
+    baseline_commit: str | None
+    candidate_commit: str | None
+    missing_commits: str
+
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -479,6 +487,35 @@ def detect_commit_coverage_violations(
     return violations
 
 
+def detect_comparison_coverage_violations(
+    points: list[CommitPoint], baseline_commit: str | None, candidate_commit: str | None
+) -> list[ComparisonCoverageViolation]:
+    if baseline_commit is None and candidate_commit is None:
+        return []
+
+    by_key: dict[str, set[str]] = {}
+    for point in points:
+        by_key.setdefault(point.key, set()).add(point.commit)
+
+    violations: list[ComparisonCoverageViolation] = []
+    for key, commits in sorted(by_key.items()):
+        missing = []
+        if baseline_commit is not None and baseline_commit not in commits:
+            missing.append(f"baseline:{baseline_commit}")
+        if candidate_commit is not None and candidate_commit not in commits:
+            missing.append(f"candidate:{candidate_commit}")
+        if missing:
+            violations.append(
+                ComparisonCoverageViolation(
+                    key=key,
+                    baseline_commit=baseline_commit,
+                    candidate_commit=candidate_commit,
+                    missing_commits=";".join(missing),
+                )
+            )
+    return violations
+
+
 def markdown_report(report: dict[str, Any]) -> str:
     lines = [
         "# Perf Regression Dashboard",
@@ -490,6 +527,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Sample violations: {len(report['sample_violations'])}",
         f"Variability violations: {len(report['variability_violations'])}",
         f"Commit coverage violations: {len(report['commit_coverage_violations'])}",
+        f"Comparison coverage violations: {len(report['comparison_coverage_violations'])}",
         "",
         "## Regressions",
         "",
@@ -541,6 +579,20 @@ def markdown_report(report: dict[str, Any]) -> str:
             )
     else:
         lines.append("Commit coverage requirements satisfied.")
+
+    lines.extend(["", "## Comparison Coverage", ""])
+    if report["comparison_coverage_violations"]:
+        lines.append("| Key | Baseline Commit | Candidate Commit | Missing Commits |")
+        lines.append("| --- | --- | --- | --- |")
+        for violation in report["comparison_coverage_violations"]:
+            baseline = violation["baseline_commit"] or "-"
+            candidate = violation["candidate_commit"] or "-"
+            lines.append(
+                f"| {violation['key']} | {baseline} | {candidate} | "
+                f"{violation['missing_commits']} |"
+            )
+    else:
+        lines.append("Explicit comparison commits were present for all benchmark keys.")
 
     lines.extend(["", "## Commit Points", ""])
     if report["commit_points"]:
@@ -596,11 +648,13 @@ def write_csv(path: Path, rows: list[dict[str, Any]], fields: list[str]) -> None
 def junit_report(report: dict[str, Any]) -> str:
     variability_violations = report.get("variability_violations", [])
     commit_coverage_violations = report.get("commit_coverage_violations", [])
+    comparison_coverage_violations = report.get("comparison_coverage_violations", [])
     failures = (
         len(report["regressions"])
         + len(report["sample_violations"])
         + len(variability_violations)
         + len(commit_coverage_violations)
+        + len(comparison_coverage_violations)
     )
     tests = failures or 1
     suite = ET.Element(
@@ -732,6 +786,32 @@ def junit_report(report: dict[str, Any]) -> str:
                 f"key={violation['key']}"
             )
 
+        for violation in comparison_coverage_violations:
+            case = ET.SubElement(
+                suite,
+                "testcase",
+                {
+                    "classname": "perf_regression.comparison_coverage",
+                    "name": violation["key"],
+                },
+            )
+            failure = ET.SubElement(
+                case,
+                "failure",
+                {
+                    "type": "comparison_coverage",
+                    "message": f"missing explicit comparison commits: {violation['missing_commits']}",
+                },
+            )
+            baseline = violation["baseline_commit"] or ""
+            candidate = violation["candidate_commit"] or ""
+            failure.text = (
+                f"baseline_commit={baseline}\n"
+                f"candidate_commit={candidate}\n"
+                f"missing_commits={violation['missing_commits']}\n"
+                f"key={violation['key']}"
+            )
+
     ET.indent(suite, space="  ")
     return ET.tostring(suite, encoding="unicode", xml_declaration=True) + "\n"
 
@@ -747,6 +827,9 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
     variability_violations_csv = output_dir / "perf_regression_variability_violations_latest.csv"
     commit_coverage_violations_csv = (
         output_dir / "perf_regression_commit_coverage_violations_latest.csv"
+    )
+    comparison_coverage_violations_csv = (
+        output_dir / "perf_regression_comparison_coverage_violations_latest.csv"
     )
 
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -795,6 +878,11 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
         report["commit_coverage_violations"],
         ["key", "commits", "minimum_commits", "latest_commit"],
     )
+    write_csv(
+        comparison_coverage_violations_csv,
+        report["comparison_coverage_violations"],
+        ["key", "baseline_commit", "candidate_commit", "missing_commits"],
+    )
 
     print(f"wrote_json={json_path}")
     print(f"wrote_markdown={md_path}")
@@ -804,6 +892,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
     print(f"wrote_sample_violations_csv={sample_violations_csv}")
     print(f"wrote_variability_violations_csv={variability_violations_csv}")
     print(f"wrote_commit_coverage_violations_csv={commit_coverage_violations_csv}")
+    print(f"wrote_comparison_coverage_violations_csv={comparison_coverage_violations_csv}")
 
 
 def build_report(
@@ -829,6 +918,9 @@ def build_report(
     sample_violations = detect_sample_violations(points, min_records_per_point)
     variability_violations = detect_variability_violations(points, max_tok_cv_pct)
     commit_coverage_violations = detect_commit_coverage_violations(points, min_commits_per_key)
+    comparison_coverage_violations = detect_comparison_coverage_violations(
+        points, baseline_commit, candidate_commit
+    )
     return {
         "generated_at": iso_now(),
         "record_count": len(records),
@@ -838,6 +930,7 @@ def build_report(
             or sample_violations
             or variability_violations
             or commit_coverage_violations
+            or comparison_coverage_violations
             else "pass"
         ),
         "comparison": {
@@ -860,6 +953,9 @@ def build_report(
         "variability_violations": [asdict(violation) for violation in variability_violations],
         "commit_coverage_violations": [
             asdict(violation) for violation in commit_coverage_violations
+        ],
+        "comparison_coverage_violations": [
+            asdict(violation) for violation in comparison_coverage_violations
         ],
         "records": [asdict(record) for record in sorted(records, key=lambda item: (item.key, item.timestamp))],
     }

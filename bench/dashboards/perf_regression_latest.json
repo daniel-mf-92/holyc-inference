@@ -547,7 +547,8 @@
     "candidate_commit": null,
     "mode": "latest-distinct-commits"
   },
-  "generated_at": "2026-04-28T01:08:46Z",
+  "comparison_coverage_violations": [],
+  "generated_at": "2026-04-28T01:21:50Z",
   "record_count": 242,
   "records": [
     {

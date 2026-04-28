@@ -364,7 +364,11 @@ benchmark key/commit point are too variable to trust as a baseline.
 drops, which is useful when guest-side timing looks suspicious.
 The dashboard also writes `perf_regression_junit_latest.xml` so CI systems can
 surface throughput regressions, sample-coverage failures, commit-coverage
-failures, and variability failures as test failures.
+failures, comparison-coverage failures, and variability failures as test
+failures. When `--baseline-commit` or `--candidate-commit` is provided, every
+benchmark key must contain the requested commit before the dashboard passes;
+missing explicit comparison commits are written to
+`perf_regression_comparison_coverage_violations_latest.csv`.
 
 ## Build Benchmark Compare
 
@@ -460,7 +464,7 @@ checks compare commit-level aggregates, so repeated runs and duplicate
 latest/stamped result files are collapsed by benchmark key and commit before the
 latest distinct commits are compared. Outputs include JSON, Markdown, JUnit XML,
 commit-point CSV, regression CSV, sample-coverage CSV, commit-coverage CSV, and
-tok/s variability CSV artifacts.
+comparison-coverage CSV, and tok/s variability CSV artifacts.
 
 Example:
 

@@ -1,12 +1,13 @@
 # Perf Regression Dashboard
 
-Generated: 2026-04-28T01:08:46Z
+Generated: 2026-04-28T01:21:50Z
 Status: pass
 Records: 242
 Regressions: 0
 Sample violations: 0
 Variability violations: 0
 Commit coverage violations: 0
+Comparison coverage violations: 0
 
 ## Regressions
 
@@ -23,6 +24,10 @@ Variability requirements satisfied.
 ## Commit Coverage
 
 Commit coverage requirements satisfied.
+
+## Comparison Coverage
+
+Explicit comparison commits were present for all benchmark keys.
 
 ## Commit Points
 
