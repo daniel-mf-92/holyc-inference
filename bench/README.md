@@ -118,6 +118,9 @@ normalized schema as well as HellaSwag-, ARC-, and TruthfulQA-shaped rows. It is
 offline-only; place source data on disk first and document provenance.
 Manifests include UTF-8 prompt/choice/record byte statistics, and optional size
 gates can fail packing before writing oversized artifacts.
+For HellaSwag-shaped rows, `ctx` is preferred when present; locally staged rows
+that only carry `ctx_a`/`ctx_b` are normalized by joining those context parts
+before packing.
 
 Example:
 

@@ -150,9 +150,34 @@ def test_invalid_answer_fails_fast() -> None:
         raise AssertionError("invalid answer index should fail")
 
 
+def test_hellaswag_ctx_parts_normalize_without_ctx_field() -> None:
+    row = {
+        "id": "hellaswag-parts",
+        "dataset": "hellaswag",
+        "split": "validation",
+        "ctx_a": "A chef slices onions",
+        "ctx_b": "and places them into a pan.",
+        "endings": [
+            "They begin to sizzle.",
+            "The dog flies away.",
+            "A book closes itself.",
+            "The snow melts upward.",
+        ],
+        "label": "0",
+        "provenance": "synthetic HellaSwag ctx_a ctx_b test",
+    }
+
+    record = dataset_pack.normalize_records([row], "eval", "validation")[0]
+
+    assert record.prompt == "A chef slices onions and places them into a pan."
+    assert record.choices[0] == "They begin to sizzle."
+    assert record.answer_index == 0
+
+
 if __name__ == "__main__":
     test_smoke_shapes_pack_into_deterministic_binary()
     test_cli_writes_binary_and_manifest()
     test_cli_size_gates_fail_before_writing()
     test_invalid_answer_fails_fast()
+    test_hellaswag_ctx_parts_normalize_without_ctx_field()
     print("eval_dataset_pack_tests=ok")

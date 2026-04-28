@@ -119,12 +119,7 @@ def normalize_truthfulqa(row: dict[str, Any]) -> tuple[list[str], int | None]:
     return choices, answer_index
 
 
-def normalize_row(row: dict[str, Any], index: int, default_dataset: str, default_split: str) -> EvalRecord:
-    dataset = clean_text(row.get("dataset") or row.get("source_dataset") or default_dataset)
-    split = clean_text(row.get("split") or default_split)
-    record_id = clean_text(row.get("id") or row.get("ind") or row.get("question_id") or f"{dataset}-{index + 1}")
-    provenance = clean_text(row.get("provenance") or row.get("source") or dataset)
-
+def normalize_prompt(row: dict[str, Any]) -> str:
     prompt = clean_text(
         row.get("prompt")
         or row.get("query")
@@ -132,6 +127,24 @@ def normalize_row(row: dict[str, Any], index: int, default_dataset: str, default
         or row.get("ctx")
         or row.get("input")
     )
+    if prompt:
+        return prompt
+
+    ctx_parts = [clean_text(row.get("ctx_a")), clean_text(row.get("ctx_b"))]
+    hellaswag_context = clean_text(" ".join(part for part in ctx_parts if part))
+    if hellaswag_context:
+        return hellaswag_context
+
+    return clean_text(row.get("activity_label"))
+
+
+def normalize_row(row: dict[str, Any], index: int, default_dataset: str, default_split: str) -> EvalRecord:
+    dataset = clean_text(row.get("dataset") or row.get("source_dataset") or default_dataset)
+    split = clean_text(row.get("split") or default_split)
+    record_id = clean_text(row.get("id") or row.get("ind") or row.get("question_id") or f"{dataset}-{index + 1}")
+    provenance = clean_text(row.get("provenance") or row.get("source") or dataset)
+
+    prompt = normalize_prompt(row)
 
     choices, labels = normalize_choices(row.get("choices") or row.get("endings"))
     answer_index = answer_from_labels(
