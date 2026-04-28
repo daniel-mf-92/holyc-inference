@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import importlib.util
+import csv
 import json
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -58,6 +60,10 @@ def test_smoke_eval_inputs_pass() -> None:
         assert report["summary"]["llama_coverage"] == 3
         assert report["choice_count_histogram"] == {"4": 3}
         assert (tmp_path / "audit.md").exists()
+        assert list(csv.DictReader((tmp_path / "audit.csv").open(newline="", encoding="utf-8"))) == []
+        junit_root = ET.parse(tmp_path / "audit_junit.xml").getroot()
+        assert junit_root.attrib["name"] == "holyc_eval_input_audit"
+        assert junit_root.attrib["failures"] == "0"
 
 
 def test_missing_prediction_fails_with_structured_report() -> None:
@@ -71,8 +77,12 @@ def test_missing_prediction_fails_with_structured_report() -> None:
         assert eval_input_audit.main(args) == 2
 
         report = json.loads((tmp_path / "missing.json").read_text(encoding="utf-8"))
+        csv_rows = list(csv.DictReader((tmp_path / "missing.csv").open(newline="", encoding="utf-8")))
+        junit_root = ET.parse(tmp_path / "missing_junit.xml").getroot()
         messages = [issue["message"] for issue in report["issues"]]
         assert report["status"] == "fail"
+        assert len(csv_rows) == report["summary"]["errors"]
+        assert junit_root.attrib["failures"] == "1"
         assert any("missing prediction id 'smoke-arc-1'" in message for message in messages)
         assert any("missing prediction id 'smoke-truthfulqa-1'" in message for message in messages)
 

@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="holyc_eval_input_audit" tests="1" failures="0" errors="0">
+  <testcase classname="eval_input_audit" name="input_gate" />
+</testsuite>

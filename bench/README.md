@@ -408,7 +408,8 @@ Wilson confidence intervals; use `--confidence-level` to select 0.80, 0.90,
 Before comparing, `eval_input_audit.py` can gate apples-to-apples inputs. It
 checks gold/prediction record coverage, duplicates, invalid prediction indexes,
 dataset/split metadata, and optional model/quantization metadata drift. The
-audit writes JSON and Markdown reports and exits non-zero when it finds errors:
+audit writes JSON, Markdown, CSV, and JUnit XML reports and exits non-zero when
+it finds errors:
 
 ```bash
 python3 bench/eval_input_audit.py \

@@ -4,16 +4,19 @@
 The audit validates local gold and prediction files before an apples-to-apples
 comparison run. It checks record-id coverage, duplicate rows, prediction ranges,
 optional dataset/split/model/quantization metadata, and writes JSON plus Markdown
-reports under bench/results. It is host-side only and never launches QEMU.
+reports, CSV issue rows, and JUnit XML under bench/results. It is host-side only
+and never launches QEMU.
 """
 
 from __future__ import annotations
 
 import argparse
 import collections
+import csv
 import hashlib
 import json
 import sys
+import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -322,13 +325,60 @@ def markdown_report(report: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def write_report(report: dict[str, Any], output_dir: Path, output_stem: str) -> tuple[Path, Path]:
+def write_csv(report: dict[str, Any], path: Path) -> None:
+    fields = ["severity", "source", "message"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for issue in report["issues"]:
+            writer.writerow({field: issue[field] for field in fields})
+
+
+def write_junit(report: dict[str, Any], path: Path) -> None:
+    errors = [issue for issue in report["issues"] if issue["severity"] == "error"]
+    warnings = [issue for issue in report["issues"] if issue["severity"] == "warning"]
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": "holyc_eval_input_audit",
+            "tests": "1",
+            "failures": "1" if errors else "0",
+            "errors": "0",
+        },
+    )
+    case = ET.SubElement(suite, "testcase", {"classname": "eval_input_audit", "name": "input_gate"})
+    if errors:
+        failure = ET.SubElement(
+            case,
+            "failure",
+            {
+                "type": "eval_input_audit_error",
+                "message": f"{len(errors)} eval input error(s), {len(warnings)} warning(s)",
+            },
+        )
+        failure.text = "\n".join(
+            f"{issue['source']}: {issue['message']}" for issue in errors
+        )
+    elif warnings:
+        system_out = ET.SubElement(case, "system-out")
+        system_out.text = "\n".join(f"{issue['source']}: {issue['message']}" for issue in warnings)
+    ET.indent(suite)
+    ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
+    with path.open("ab") as handle:
+        handle.write(b"\n")
+
+
+def write_report(report: dict[str, Any], output_dir: Path, output_stem: str) -> tuple[Path, Path, Path, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / f"{output_stem}.json"
     md_path = output_dir / f"{output_stem}.md"
+    csv_path = output_dir / f"{output_stem}.csv"
+    junit_path = output_dir / f"{output_stem}_junit.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
-    return json_path, md_path
+    write_csv(report, csv_path)
+    write_junit(report, junit_path)
+    return json_path, md_path, csv_path, junit_path
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -348,9 +398,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     report = build_report(args)
-    json_path, md_path = write_report(report, args.output_dir, args.output_stem)
+    json_path, md_path, csv_path, junit_path = write_report(report, args.output_dir, args.output_stem)
     print(f"wrote_json={json_path}")
     print(f"wrote_markdown={md_path}")
+    print(f"wrote_csv={csv_path}")
+    print(f"wrote_junit={junit_path}")
     print(f"status={report['status']}")
     print(f"errors={report['summary']['errors']}")
     print(f"warnings={report['summary']['warnings']}")
