@@ -635,7 +635,7 @@ python3 bench/bench_artifact_manifest.py \
 results by benchmark/profile/model/quantization/prompt plus commit, and writes
 guest tok/s, host wall-clock tok/s, guest/wall microseconds per token, emitted
 token counts, QEMU host overhead percentage, guest memory, host child peak RSS,
-first-token latency, and
+host child tok/CPU-second efficiency, first-token latency, and
 sample-coverage dashboards
 under `bench/dashboards/`.
 The dashboard also emits
@@ -661,6 +661,7 @@ python3 bench/perf_regression.py \
   --p95-ttft-regression-pct 15 \
   --host-overhead-regression-pct 25 \
   --host-child-peak-rss-regression-pct 10 \
+  --host-child-tok-per-cpu-s-regression-pct 10 \
   --require-tok-per-s \
   --require-wall-tok-per-s \
   --require-us-per-token \
@@ -670,6 +671,7 @@ python3 bench/perf_regression.py \
   --require-host-overhead-pct \
   --require-memory \
   --require-host-child-peak-rss \
+  --require-host-child-tok-per-cpu-s \
   --fail-on-regression
 ```
 
@@ -697,13 +699,15 @@ and tail first-token latency growth. `--host-overhead-regression-pct`
 optionally gates increases in QEMU host overhead.
 `--host-child-peak-rss-regression-pct` optionally gates host-observed QEMU
 child peak RSS growth separately from guest-reported memory.
+`--host-child-tok-per-cpu-s-regression-pct` optionally gates drops in QEMU
+child process CPU efficiency when host child CPU telemetry is available.
 `--token-drop-regression-pct`
 optionally gates drops in median emitted token count so faster runs cannot pass
 only because they generated less output. `--require-tok-per-s`,
 `--require-wall-tok-per-s`, `--require-us-per-token`,
 `--require-wall-us-per-token`, `--require-tokens`, `--require-ttft-us`,
 `--require-host-overhead-pct`, `--require-memory`, and
-`--require-host-child-peak-rss` fail the dashboard when
+`--require-host-child-peak-rss`, and `--require-host-child-tok-per-cpu-s` fail the dashboard when
 any benchmark key/commit point has zero samples for that telemetry field. This
 catches malformed or partially uploaded artifacts before CI treats missing
 metrics as merely non-comparable.
@@ -869,7 +873,8 @@ or `tok_per_s_milli`, optional `wall_tok_per_s` or `wall_tok_per_s_milli`,
 optional `us_per_token` / `wall_us_per_token`, optional first-token latency
 fields such as `ttft_us` or `ttft_ms`, optional `host_overhead_pct`, guest
 memory fields such as `memory_bytes` or `max_rss_bytes`, optional host RSS
-fields such as `host_child_peak_rss_bytes` or `qemu_peak_rss_bytes`, and
+fields such as `host_child_peak_rss_bytes` or `qemu_peak_rss_bytes`, optional
+host CPU efficiency fields such as `host_child_tok_per_cpu_s`, and
 emitted-token fields such as `tokens`, `output_tokens`, `generated_tokens`, or
 `completion_tokens`.
 Regression checks compare
@@ -890,7 +895,7 @@ python3 bench/perf_regression.py --input bench/results --output-dir bench/dashbo
 CI can fail on median throughput, low-tail guest or host wall-clock throughput,
 guest/wall microseconds per token, emitted-token drops, median or P95
 first-token latency, QEMU host overhead, guest memory, or host child peak RSS
-regressions with:
+or tok/CPU-second regressions with:
 
 ```bash
 python3 bench/perf_regression.py \
@@ -906,12 +911,14 @@ python3 bench/perf_regression.py \
   --p95-ttft-regression-pct 15 \
   --host-overhead-regression-pct 25 \
   --host-child-peak-rss-regression-pct 10 \
+  --host-child-tok-per-cpu-s-regression-pct 10 \
   --require-us-per-token \
   --require-wall-us-per-token \
   --require-tokens \
   --require-ttft-us \
   --require-host-overhead-pct \
   --require-host-child-peak-rss \
+  --require-host-child-tok-per-cpu-s \
   --fail-on-regression
 ```
 

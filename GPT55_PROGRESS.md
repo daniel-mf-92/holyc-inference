@@ -177,3 +177,4 @@
 2026-04-28T23:22:50Z | Added qemu_source_audit coverage for standalone JSON QEMU args arrays with smoke validation and refreshed artifacts.
 2026-04-28T23:28:23Z | Added dataset provenance license allow/deny gates with smoke coverage and refreshed provenance artifacts.
 2026-04-28T23:38:05Z | Added perf regression host child peak RSS telemetry/gates with smoke coverage and refreshed dashboards.
+2026-04-28T23:47:44Z | Added perf regression host child tok/CPU-s telemetry gates with smoke coverage and refreshed dashboards.
