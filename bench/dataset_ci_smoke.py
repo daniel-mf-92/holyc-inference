@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import subprocess
 import sys
@@ -237,6 +238,8 @@ def main() -> int:
             str(datasets_dir),
             "--output-dir",
             str(datasets_dir),
+            "--max-majority-answer-pct",
+            "100",
             "--fail-on-findings",
         ]
         completed = run_command(provenance_command)
@@ -257,6 +260,13 @@ def main() -> int:
             "source,status,source_name,source_version,license,source_url,output"
             in provenance_csv.read_text(encoding="utf-8"),
             "missing_provenance_csv_header",
+        ):
+            return rc
+        with provenance_csv.open(newline="", encoding="utf-8") as handle:
+            provenance_rows = list(csv.DictReader(handle))
+        if rc := require(
+            json.loads(provenance_rows[0]["answer_histogram"]) == {"0": 3},
+            "missing_provenance_answer_histogram",
         ):
             return rc
         provenance_root = ET.parse(provenance_junit).getroot()
@@ -303,6 +313,77 @@ def main() -> int:
             for finding in artifact["findings"]
         }
         if rc := require("selected_record_ids_mismatch" in stale_kinds, "missing_stale_selected_id_finding"):
+            return rc
+
+        skew_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_provenance_audit.py"),
+            "--input",
+            str(curated_manifest),
+            "--output-dir",
+            str(tmp_path / "skew-provenance"),
+            "--max-majority-answer-pct",
+            "90",
+            "--fail-on-findings",
+        ]
+        completed = subprocess.run(
+            skew_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("answer_skew_not_rejected=true", file=sys.stderr)
+            return 1
+        skew_failure = json.loads(
+            (tmp_path / "skew-provenance" / "dataset_provenance_audit_latest.json").read_text(encoding="utf-8")
+        )
+        skew_kinds = {
+            finding["kind"]
+            for artifact in skew_failure["artifacts"]
+            for finding in artifact["findings"]
+        }
+        if rc := require("majority_answer_skew" in skew_kinds, "missing_answer_skew_finding"):
+            return rc
+
+        stale_answer_manifest = tmp_path / "stale_answer_histogram.manifest.json"
+        stale_answer_report = dict(curated_report)
+        stale_answer_report["answer_histogram"] = {"1": 3}
+        stale_answer_manifest.write_text(
+            json.dumps(stale_answer_report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        stale_answer_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_provenance_audit.py"),
+            "--input",
+            str(stale_answer_manifest),
+            "--output-dir",
+            str(tmp_path / "stale-answer-provenance"),
+            "--fail-on-findings",
+        ]
+        completed = subprocess.run(
+            stale_answer_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("stale_answer_histogram_not_rejected=true", file=sys.stderr)
+            return 1
+        stale_answer_failure = json.loads(
+            (tmp_path / "stale-answer-provenance" / "dataset_provenance_audit_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        stale_answer_kinds = {
+            finding["kind"]
+            for artifact in stale_answer_failure["artifacts"]
+            for finding in artifact["findings"]
+        }
+        if rc := require("answer_histogram_mismatch" in stale_answer_kinds, "missing_answer_histogram_finding"):
             return rc
 
         leak_fixture = tmp_path / "leaky.jsonl"

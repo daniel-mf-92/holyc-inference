@@ -50,6 +50,9 @@ class ProvenanceArtifact:
     record_count: int
     source_records: int
     selected_records: int
+    answer_histogram: dict[str, int]
+    majority_answer_index: str
+    majority_answer_pct: float | None
     findings: list[ProvenanceFinding]
 
 
@@ -112,6 +115,23 @@ def count_by_dataset_split(records: list[dataset_pack.EvalRecord]) -> dict[str, 
     return {dataset: dict(sorted(split_counts.items())) for dataset, split_counts in sorted(counts.items())}
 
 
+def answer_histogram(records: list[dataset_pack.EvalRecord]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for record in records:
+        key = str(record.answer_index)
+        counts[key] = counts.get(key, 0) + 1
+    return dict(sorted(counts.items(), key=lambda item: int(item[0])))
+
+
+def majority_answer(histogram: dict[str, int]) -> tuple[str, float | None]:
+    if not histogram:
+        return "", None
+    label, count = max(histogram.items(), key=lambda item: (item[1], item[0]))
+    total = sum(histogram.values())
+    pct = (count / total * 100.0) if total else None
+    return label, pct
+
+
 def load_records(path: Path) -> list[dataset_pack.EvalRecord]:
     records: list[dataset_pack.EvalRecord] = []
     for index, row in enumerate(dataset_pack.read_jsonl(path)):
@@ -146,7 +166,11 @@ def output_path(manifest: dict[str, Any], manifest_path: Path) -> Path | None:
     return dataset_index.resolve_relative(path_text, Path.cwd(), manifest_path.parent)
 
 
-def audit_manifest(path: Path, require_source_url: bool) -> ProvenanceArtifact | None:
+def audit_manifest(
+    path: Path,
+    require_source_url: bool,
+    max_majority_answer_pct: float | None,
+) -> ProvenanceArtifact | None:
     manifest = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict) or manifest.get("format") != "hceval-curated-jsonl":
         return None
@@ -199,6 +223,9 @@ def audit_manifest(path: Path, require_source_url: bool) -> ProvenanceArtifact |
             findings.append(finding(path, "error", "cannot_read_source", str(exc)))
 
     records: list[dataset_pack.EvalRecord] = []
+    observed_answer_histogram: dict[str, int] = {}
+    majority_answer_index = ""
+    majority_answer_pct: float | None = None
     curated_output = output_path(manifest, path)
     if curated_output is None:
         findings.append(finding(path, "error", "missing_output_path", "output is missing"))
@@ -242,6 +269,28 @@ def audit_manifest(path: Path, require_source_url: bool) -> ProvenanceArtifact |
                 findings.append(
                     finding(path, "error", "dataset_split_counts_mismatch", "dataset_split_counts do not match output")
                 )
+            observed_answer_histogram = answer_histogram(records)
+            majority_answer_index, majority_answer_pct = majority_answer(observed_answer_histogram)
+            if observed_answer_histogram != manifest.get("answer_histogram"):
+                findings.append(
+                    finding(path, "error", "answer_histogram_mismatch", "answer_histogram does not match output")
+                )
+            if (
+                max_majority_answer_pct is not None
+                and majority_answer_pct is not None
+                and majority_answer_pct > max_majority_answer_pct
+            ):
+                findings.append(
+                    finding(
+                        path,
+                        "error",
+                        "majority_answer_skew",
+                        (
+                            f"answer index {majority_answer_index} covers {majority_answer_pct:.2f}% of records, "
+                            f"above {max_majority_answer_pct:.2f}% gate"
+                        ),
+                    )
+                )
             empty_provenance = [record.record_id for record in records if not record.provenance]
             if empty_provenance:
                 findings.append(
@@ -273,14 +322,21 @@ def audit_manifest(path: Path, require_source_url: bool) -> ProvenanceArtifact |
         record_count=parse_int(manifest.get("record_count")),
         source_records=parse_int(source.get("record_count")),
         selected_records=len(records),
+        answer_histogram=observed_answer_histogram,
+        majority_answer_index=majority_answer_index,
+        majority_answer_pct=majority_answer_pct,
         findings=findings,
     )
 
 
-def load_artifacts(paths: Iterable[Path], require_source_url: bool) -> list[ProvenanceArtifact]:
+def load_artifacts(
+    paths: Iterable[Path],
+    require_source_url: bool,
+    max_majority_answer_pct: float | None,
+) -> list[ProvenanceArtifact]:
     artifacts: list[ProvenanceArtifact] = []
     for path in sorted(set(iter_manifest_files(paths))):
-        artifact = audit_manifest(path, require_source_url)
+        artifact = audit_manifest(path, require_source_url, max_majority_answer_pct)
         if artifact is not None:
             artifacts.append(artifact)
     return sorted(artifacts, key=lambda item: item.source)
@@ -312,19 +368,23 @@ def markdown_report(report: dict[str, Any]) -> str:
     if report["artifacts"]:
         lines.extend(
             [
-                "| Status | Source | Source Name | Version | License | Records | Findings |",
-                "| --- | --- | --- | --- | --- | ---: | ---: |",
+                "| Status | Source | Source Name | Version | License | Records | Majority Answer | Findings |",
+                "| --- | --- | --- | --- | --- | ---: | ---: | ---: |",
             ]
         )
         for artifact in report["artifacts"]:
+            majority = "-"
+            if artifact["majority_answer_pct"] is not None:
+                majority = f"{artifact['majority_answer_index']} ({artifact['majority_answer_pct']:.2f}%)"
             lines.append(
-                "| {status} | {source} | {source_name} | {source_version} | {license} | {record_count} | {findings} |".format(
+                "| {status} | {source} | {source_name} | {source_version} | {license} | {record_count} | {majority} | {findings} |".format(
                     status=artifact["status"],
                     source=artifact["source"],
                     source_name=artifact["source_name"] or "-",
                     source_version=artifact["source_version"] or "-",
                     license=artifact["license"] or "-",
                     record_count=artifact["record_count"],
+                    majority=majority,
                     findings=len(artifact["findings"]),
                 )
             )
@@ -353,6 +413,9 @@ def write_csv(artifacts: list[ProvenanceArtifact], path: Path) -> None:
         "record_count",
         "source_records",
         "selected_records",
+        "answer_histogram",
+        "majority_answer_index",
+        "majority_answer_pct",
         "findings",
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:
@@ -360,6 +423,7 @@ def write_csv(artifacts: list[ProvenanceArtifact], path: Path) -> None:
         writer.writeheader()
         for artifact in artifacts:
             row = asdict(artifact)
+            row["answer_histogram"] = json.dumps(artifact.answer_histogram, separators=(",", ":"))
             row["findings"] = json.dumps([asdict(item) for item in artifact.findings], separators=(",", ":"))
             writer.writerow({field: row[field] for field in fields})
 
@@ -427,6 +491,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Treat missing source_url as an error for non-synthetic manifests",
     )
+    parser.add_argument(
+        "--max-majority-answer-pct",
+        type=float,
+        help="Fail when one answer index covers more than this percentage of curated records",
+    )
     parser.add_argument("--fail-on-findings", action="store_true", help="Return non-zero if any finding is emitted")
     return parser
 
@@ -435,7 +504,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     inputs = args.input or [Path("bench/results/datasets")]
     try:
-        artifacts = load_artifacts(inputs, args.require_source_url)
+        artifacts = load_artifacts(inputs, args.require_source_url, args.max_majority_answer_pct)
         output = write_report(artifacts, args.output_dir)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)

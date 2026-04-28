@@ -1,8 +1,13 @@
 {
   "artifacts": [
     {
+      "answer_histogram": {
+        "0": 3
+      },
       "findings": [],
       "license": "synthetic-smoke",
+      "majority_answer_index": "0",
+      "majority_answer_pct": 100.0,
       "output": "bench/results/datasets/smoke_curated.jsonl",
       "record_count": 3,
       "selected_records": 3,
@@ -14,6 +19,6 @@
       "status": "pass"
     }
   ],
-  "generated_at": "2026-04-28T11:49:14Z",
+  "generated_at": "2026-04-28T12:08:24Z",
   "status": "pass"
 }

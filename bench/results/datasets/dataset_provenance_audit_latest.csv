@@ -1,2 +1,2 @@
-source,status,source_name,source_version,license,source_url,output,record_count,source_records,selected_records,findings
-bench/results/datasets/smoke_curated.manifest.json,pass,smoke-eval,synthetic,synthetic-smoke,,bench/results/datasets/smoke_curated.jsonl,3,3,3,[]
+source,status,source_name,source_version,license,source_url,output,record_count,source_records,selected_records,answer_histogram,majority_answer_index,majority_answer_pct,findings
+bench/results/datasets/smoke_curated.manifest.json,pass,smoke-eval,synthetic,synthetic-smoke,,bench/results/datasets/smoke_curated.jsonl,3,3,3,"{""0"":3}",0,100.0,[]

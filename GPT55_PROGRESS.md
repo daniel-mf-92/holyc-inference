@@ -123,3 +123,4 @@
 2026-04-28T11:49:31Z | Added focused eval dataset provenance audit with JSON/Markdown/CSV/JUnit artifacts and smoke gate coverage.
 2026-04-28T11:56:45Z | Added eval input prediction-distribution telemetry and opt-in majority-prediction collapse gate with refreshed smoke artifacts.
 2026-04-28T12:02:39Z | Added eval input score-vector coverage telemetry and opt-in score-coverage gate with refreshed smoke artifacts.
+2026-04-28T12:08:44Z | Added eval dataset provenance answer-histogram validation and opt-in majority-answer skew gate with refreshed artifacts.
