@@ -91,6 +91,9 @@ def test_cli_writes_json_and_markdown_report() -> None:
         payload = json.loads((Path(tmp) / "smoke.json").read_text(encoding="utf-8"))
         csv_rows = list(csv.DictReader((Path(tmp) / "smoke.csv").open(newline="", encoding="utf-8")))
         breakdown_rows = list(csv.DictReader((Path(tmp) / "smoke_breakdown.csv").open(newline="", encoding="utf-8")))
+        calibration_rows = list(
+            csv.DictReader((Path(tmp) / "smoke_calibration_bins.csv").open(newline="", encoding="utf-8"))
+        )
         junit_root = ET.parse(Path(tmp) / "smoke_junit.xml").getroot()
         assert payload["summary"]["record_count"] == 3
         assert payload["status"] == "pass"
@@ -116,6 +119,10 @@ def test_cli_writes_json_and_markdown_report() -> None:
         assert "No quality gate regressions." in markdown
         assert len(csv_rows) == 3
         assert len(breakdown_rows) == 3
+        assert len(calibration_rows) == 20
+        assert {row["engine"] for row in calibration_rows} == {"holyc", "llama"}
+        assert calibration_rows[0]["bin_index"] == "0"
+        assert calibration_rows[-1]["bin_index"] == "9"
         assert breakdown_rows[0]["dataset"] == "arc-smoke"
         assert breakdown_rows[0]["record_count"] == "1"
         assert csv_rows[0]["record_id"] == "smoke-arc-1"

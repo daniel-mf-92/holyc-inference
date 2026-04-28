@@ -178,7 +178,8 @@ python3 bench/dataset_provenance_audit.py \
 
 `eval_compare.py` compares local HolyC and llama.cpp multiple-choice predictions
 against the same gold JSONL and writes JSON, Markdown, per-record CSV,
-per-dataset/split breakdown CSV, confusion-matrix CSV, and JUnit XML reports.
+per-dataset/split breakdown CSV, confusion-matrix CSV, calibration-bin CSV, and
+JUnit XML reports.
 Optional quality gates can fail CI when HolyC accuracy, engine agreement, or
 accuracy delta versus llama.cpp falls outside configured bounds.
 Prediction score vectors are treated as choice-aligned logits/logprobs: every
@@ -617,7 +618,8 @@ python3 bench/build_compare.py \
 llama.cpp against the same local gold JSONL dataset. It aligns by record id,
 supports prediction indexes, labels, exact choice text, or score arrays, and
 writes JSON, Markdown, per-record CSV, per-dataset/split breakdown CSV,
-confusion-matrix CSV, and JUnit XML reports to `bench/results/`. Reports include
+confusion-matrix CSV, calibration-bin CSV, and JUnit XML reports to
+`bench/results/`. Reports include
 accuracy, agreement, macro-F1, per-answer F1, per-dataset/split breakdowns, and
 confusion matrices for each engine. Accuracy and agreement summaries also
 include stdlib-only Wilson confidence intervals; use `--confidence-level` to
