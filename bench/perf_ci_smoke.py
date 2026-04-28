@@ -831,6 +831,12 @@ def main() -> int:
         if suite_summary.get("tok_per_s_cv_pct") is None:
             print("missing_suite_tok_cv=true", file=sys.stderr)
             return 1
+        if suite_summary.get("wall_tok_per_s_p05") is None:
+            print("missing_suite_wall_tok_p05=true", file=sys.stderr)
+            return 1
+        if suite_summary.get("wall_tok_per_s_p05_p95_spread_pct") is None:
+            print("missing_suite_wall_tok_spread=true", file=sys.stderr)
+            return 1
         if suite_summary.get("ttft_us_median") is None:
             print("missing_suite_ttft_median=true", file=sys.stderr)
             return 1
@@ -848,6 +854,13 @@ def main() -> int:
             return 1
         if not all("tok_per_s_cv_pct" in row for row in bench_report["summaries"]):
             print("missing_prompt_tok_cv=true", file=sys.stderr)
+            return 1
+        if not all(
+            row.get("wall_tok_per_s_p05") is not None
+            and row.get("wall_tok_per_s_p05_p95_spread_pct") is not None
+            for row in bench_report["summaries"]
+        ):
+            print("missing_prompt_wall_tok_tail=true", file=sys.stderr)
             return 1
         if not all(
             row.get("failed_runs") == 0

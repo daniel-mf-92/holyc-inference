@@ -170,3 +170,4 @@
 2026-04-28T22:17:38Z | Added eval input top-score tie telemetry/gate with smoke audit artifacts and coverage.
 2026-04-28T22:22:54Z | Added qemu_prompt_bench dry-run CSV/JUnit planning artifacts and refreshed air-gapped dry-run outputs.
 2026-04-28T22:32:04Z | Added qemu_prompt_bench dry-run launch-plan hash/CSV artifacts with refreshed air-gapped smoke outputs.
+2026-04-28T22:39:12Z | Added qemu_prompt_bench wall-clock P05/spread throughput telemetry with smoke coverage and refreshed artifacts.

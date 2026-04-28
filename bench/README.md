@@ -318,9 +318,10 @@ summary, and per-prompt medians, OK/failed/timeout/nonzero-exit counts,
 min/max tok/s, P05/P95 tok/s, and P05-to-P95 spread percentages in JSON and
 Markdown. The suite summary includes measured prompt count, run count, total
 prompt bytes launched, total tokens, total elapsed time,
-OK/failed/timeout/nonzero-exit counts, P05/median/P95 tok/s, tok/s standard
-deviation, coefficient of variation, P05-to-P95 spread percentage, and max
-memory. Per-run and per-prompt reports include UTF-8 prompt byte counts so
+OK/failed/timeout/nonzero-exit counts, P05/median/P95 tok/s, P05/median/P95
+wall tok/s, tok/s standard deviation, coefficient of variation, P05-to-P95
+spread percentage, wall tok/s P05-to-P95 spread percentage, and max memory.
+Per-run and per-prompt reports include UTF-8 prompt byte counts so
 benchmark changes can be separated from prompt-suite size drift. Optional
 first-token latency telemetry is
 normalized from `ttft_us`, `time_to_first_token_us`, `first_token_us`, and their
