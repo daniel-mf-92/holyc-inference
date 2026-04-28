@@ -423,11 +423,13 @@ python3 bench/qemu_prompt_bench.py \
 ```
 
 Dry-runs also write `qemu_prompt_bench_dry_run_latest.json`, Markdown, CSV, and
-JUnit XML artifacts under the selected output directory. These artifacts record
-the exact `-nic none` command, the command SHA256 fingerprint, prompt-suite hash,
-warmup count, repeat count, configured launch budget, and planned launch totals
-for CI review without booting a guest, plus the same host/QEMU provenance fields
-used by measured benchmark reports.
+JUnit XML artifacts under the selected output directory, plus
+`qemu_prompt_bench_dry_run_launches_latest.csv` with one row per planned launch.
+These artifacts record the exact `-nic none` command, the command SHA256
+fingerprint, prompt-suite hash, launch-plan SHA256, warmup count, repeat count,
+configured launch budget, and planned launch totals for CI review without
+booting a guest, plus the same host/QEMU provenance fields used by measured
+benchmark reports.
 
 `qemu_source_audit.py` statically scans host-side docs/config/shell-like files
 for literal `qemu-system*` launch snippets and applies the same air-gap command

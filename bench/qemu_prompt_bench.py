@@ -176,6 +176,31 @@ def prompt_suite_metadata(source: Path, cases: list[PromptCase]) -> dict[str, An
     }
 
 
+def dry_run_launch_plan(cases: list[PromptCase], *, warmup: int, repeat: int) -> list[dict[str, Any]]:
+    plan: list[dict[str, Any]] = []
+    launch_index = 1
+    for phase, iterations in (("warmup", warmup), ("measured", repeat)):
+        for case in cases:
+            for iteration in range(1, iterations + 1):
+                plan.append(
+                    {
+                        "launch_index": launch_index,
+                        "phase": phase,
+                        "prompt_id": case.prompt_id,
+                        "prompt_sha256": prompt_hash(case.prompt),
+                        "prompt_bytes": prompt_bytes(case.prompt),
+                        "iteration": iteration,
+                    }
+                )
+                launch_index += 1
+    return plan
+
+
+def launch_plan_hash(plan: list[dict[str, Any]]) -> str:
+    encoded = json.dumps(plan, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def git_commit(root: Path) -> str:
     try:
         result = subprocess.run(
@@ -1175,6 +1200,7 @@ def markdown_dry_run_report(report: dict[str, Any]) -> str:
     prompt_suite = report.get("prompt_suite") or {}
     command = report.get("command") or []
     environment = report.get("environment") or {}
+    launch_plan = report.get("launch_plan") if isinstance(report.get("launch_plan"), list) else []
     lines = [
         "# QEMU Prompt Benchmark Dry Run",
         "",
@@ -1182,6 +1208,7 @@ def markdown_dry_run_report(report: dict[str, Any]) -> str:
         f"Status: {report['status']}",
         f"Prompt suite: {prompt_suite.get('suite_sha256', '-')}",
         f"Command SHA256: {report.get('command_sha256', '-')}",
+        f"Launch plan SHA256: {report.get('launch_plan_sha256', '-')}",
         f"Prompt count: {report['prompt_count']}",
         f"Warmup launches: {report['planned_warmup_launches']}",
         f"Measured launches: {report['planned_measured_launches']}",
@@ -1193,6 +1220,27 @@ def markdown_dry_run_report(report: dict[str, Any]) -> str:
         " ".join(command),
         "```",
     ]
+    if launch_plan:
+        lines.extend(
+            [
+                "",
+                "## Launch Plan",
+                "",
+                "| Launch | Phase | Prompt | Iteration | Prompt bytes | Prompt SHA256 |",
+                "| ---: | --- | --- | ---: | ---: | --- |",
+            ]
+        )
+        for row in launch_plan:
+            lines.append(
+                "| {launch_index} | {phase} | {prompt_id} | {iteration} | {prompt_bytes} | {prompt_sha256} |".format(
+                    launch_index=format_summary_value(row.get("launch_index")),
+                    phase=format_summary_value(row.get("phase")),
+                    prompt_id=format_summary_value(row.get("prompt_id")),
+                    iteration=format_summary_value(row.get("iteration")),
+                    prompt_bytes=format_summary_value(row.get("prompt_bytes")),
+                    prompt_sha256=format_summary_value(row.get("prompt_sha256")),
+                )
+            )
     if environment:
         lines.extend(
             [
@@ -1235,11 +1283,14 @@ def dry_run_payload(
     planned_warmups = prompt_count * warmup
     planned_measured = prompt_count * repeat
     planned_total = planned_warmups + planned_measured
+    plan = dry_run_launch_plan(prompts, warmup=warmup, repeat=repeat)
     return {
         "generated_at": iso_now(),
         "status": "planned",
         "command": command,
         "command_sha256": command_hash(command),
+        "launch_plan_sha256": launch_plan_hash(plan),
+        "launch_plan": plan,
         "prompt_count": prompt_count,
         "prompt_suite": prompt_suite_metadata(prompts_path, prompts),
         "environment": environment or {},
@@ -1274,10 +1325,12 @@ def write_dry_run_report(report: dict[str, Any], output_dir: Path) -> Path:
     latest = output_dir / "qemu_prompt_bench_dry_run_latest.json"
     latest_md = output_dir / "qemu_prompt_bench_dry_run_latest.md"
     latest_csv = output_dir / "qemu_prompt_bench_dry_run_latest.csv"
+    latest_launch_csv = output_dir / "qemu_prompt_bench_dry_run_launches_latest.csv"
     latest_junit = output_dir / "qemu_prompt_bench_dry_run_junit_latest.xml"
     latest.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     latest_md.write_text(markdown_dry_run_report(report), encoding="utf-8")
     write_dry_run_csv_report(report, latest_csv)
+    write_dry_run_launch_csv_report(report, latest_launch_csv)
     write_dry_run_junit_report(report, latest_junit)
     stamped = output_dir / f"qemu_prompt_bench_dry_run_{report['generated_at'].replace(':', '').replace('-', '')}.json"
     stamped.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -1291,6 +1344,7 @@ def write_dry_run_csv_report(report: dict[str, Any], path: Path) -> None:
         "generated_at",
         "status",
         "command_sha256",
+        "launch_plan_sha256",
         "prompt_count",
         "prompt_suite_sha256",
         "prompt_bytes_total",
@@ -1308,6 +1362,7 @@ def write_dry_run_csv_report(report: dict[str, Any], path: Path) -> None:
         "generated_at": report.get("generated_at"),
         "status": report.get("status"),
         "command_sha256": report.get("command_sha256"),
+        "launch_plan_sha256": report.get("launch_plan_sha256"),
         "prompt_count": report.get("prompt_count"),
         "prompt_suite_sha256": prompt_suite.get("suite_sha256"),
         "prompt_bytes_total": prompt_suite.get("prompt_bytes_total"),
@@ -1325,6 +1380,38 @@ def write_dry_run_csv_report(report: dict[str, Any], path: Path) -> None:
         writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
         writer.writerow(row)
+
+
+def write_dry_run_launch_csv_report(report: dict[str, Any], path: Path) -> None:
+    fields = [
+        "generated_at",
+        "command_sha256",
+        "launch_plan_sha256",
+        "launch_index",
+        "phase",
+        "prompt_id",
+        "prompt_sha256",
+        "prompt_bytes",
+        "iteration",
+    ]
+    launch_plan = report.get("launch_plan") if isinstance(report.get("launch_plan"), list) else []
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for row in launch_plan:
+            writer.writerow(
+                {
+                    "generated_at": report.get("generated_at"),
+                    "command_sha256": report.get("command_sha256"),
+                    "launch_plan_sha256": report.get("launch_plan_sha256"),
+                    "launch_index": row.get("launch_index"),
+                    "phase": row.get("phase"),
+                    "prompt_id": row.get("prompt_id"),
+                    "prompt_sha256": row.get("prompt_sha256"),
+                    "prompt_bytes": row.get("prompt_bytes"),
+                    "iteration": row.get("iteration"),
+                }
+            )
 
 
 def write_dry_run_junit_report(report: dict[str, Any], path: Path) -> None:
@@ -1356,6 +1443,7 @@ def write_dry_run_junit_report(report: dict[str, Any], path: Path) -> None:
         "planned_total_launches",
         "max_launches",
         "command_sha256",
+        "launch_plan_sha256",
     ):
         ET.SubElement(
             properties,

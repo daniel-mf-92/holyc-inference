@@ -1,15 +1,16 @@
 <?xml version='1.0' encoding='utf-8'?>
 <testsuite name="holyc_qemu_prompt_bench_dry_run" tests="1" failures="0" errors="0">
-  <testcase classname="qemu_prompt_bench.dry_run" name="1f08e65115fc8d318ef7726804d26085b1c556e5cee8743249e52ecae3581d74">
+  <testcase classname="qemu_prompt_bench.dry_run" name="72742a3c184093a30f9923158e9d8f9f87376e61ba1ff2368bef36920abe9755">
     <properties>
       <property name="status" value="planned" />
       <property name="prompt_count" value="2" />
       <property name="planned_warmup_launches" value="2" />
       <property name="planned_measured_launches" value="4" />
       <property name="planned_total_launches" value="6" />
-      <property name="max_launches" value="10" />
-      <property name="command_sha256" value="1f08e65115fc8d318ef7726804d26085b1c556e5cee8743249e52ecae3581d74" />
-      <property name="command" value="qemu-system-x86_64 -nic none -serial stdio -display none -drive file=/tmp/TempleOS.synthetic.img,format=raw,if=ide" />
+      <property name="max_launches" value="6" />
+      <property name="command_sha256" value="72742a3c184093a30f9923158e9d8f9f87376e61ba1ff2368bef36920abe9755" />
+      <property name="launch_plan_sha256" value="b223f9a0e6d1633add356e01e86a8af33c00349530d3d8d9eba2b81b68013712" />
+      <property name="command" value="qemu-system-x86_64 -nic none -serial stdio -display none -drive file=/tmp/templeos.img,format=raw,if=ide -nic none -serial stdio" />
     </properties>
   </testcase>
 </testsuite>
