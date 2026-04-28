@@ -13,6 +13,28 @@ be placed on disk with provenance notes before packing.
 
 ## Curation
 
+Run `bench/dataset_schema_audit.py` before curation when staging new local
+sources. It verifies that every row can normalize into the packer schema, emits
+dataset/split counts, answer and choice histograms, duplicate ID warnings, UTF-8
+byte telemetry, and can enforce provenance and fixed loader-size budgets:
+
+```bash
+python3 bench/dataset_schema_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_schema_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_schema_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_schema_audit_smoke_latest.csv \
+  --junit bench/results/datasets/dataset_schema_audit_smoke_latest_junit.xml \
+  --require-provenance \
+  --min-choices 4 \
+  --max-choices 4 \
+  --max-prompt-bytes 4096 \
+  --max-choice-bytes 1024 \
+  --max-record-payload-bytes 8192 \
+  --fail-on-duplicate-ids \
+  --fail-on-findings
+```
+
 Use `bench/dataset_curate.py` to make a reproducible subset from locally staged
 source JSONL before packing. The curator normalizes rows through the packer, can
 filter by dataset or split, samples with a stable SHA-256 key, rejects duplicate

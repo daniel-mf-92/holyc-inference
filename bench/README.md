@@ -49,6 +49,29 @@ python3 bench/quant_audit.py \
 
 ## Offline Eval Dataset Packer
 
+`dataset_schema_audit.py` validates local eval JSONL before curation or
+packing. It normalizes the same HellaSwag-, ARC-, TruthfulQA-, and normalized
+row shapes accepted by the packer, reports dataset/split counts, answer and
+choice histograms, byte telemetry, duplicate IDs, and optional provenance or
+loader-size gate findings. It never fetches remote datasets.
+
+```bash
+python3 bench/dataset_schema_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_schema_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_schema_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_schema_audit_smoke_latest.csv \
+  --junit bench/results/datasets/dataset_schema_audit_smoke_latest_junit.xml \
+  --require-provenance \
+  --min-choices 4 \
+  --max-choices 4 \
+  --max-prompt-bytes 4096 \
+  --max-choice-bytes 1024 \
+  --max-record-payload-bytes 8192 \
+  --fail-on-duplicate-ids \
+  --fail-on-findings
+```
+
 `dataset_curate.py` prepares deterministic, local-only evaluation subsets before
 packing. It accepts the same normalized, HellaSwag-, ARC-, and TruthfulQA-shaped
 JSONL rows as the packer, writes normalized JSONL plus a provenance manifest,

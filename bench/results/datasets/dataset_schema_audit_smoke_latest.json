@@ -1,0 +1,42 @@
+{
+  "answer_histogram": {
+    "0": 3
+  },
+  "byte_stats": {
+    "max_choice_bytes": 45,
+    "max_prompt_bytes": 69,
+    "max_record_payload_bytes": 304,
+    "total_choice_bytes": 327,
+    "total_prompt_bytes": 182
+  },
+  "choice_count_histogram": {
+    "4": 3
+  },
+  "dataset_split_counts": {
+    "arc-smoke": {
+      "validation": 1
+    },
+    "hellaswag-smoke": {
+      "validation": 1
+    },
+    "truthfulqa-smoke": {
+      "validation": 1
+    }
+  },
+  "duplicate_record_ids": [],
+  "error_count": 0,
+  "findings": [],
+  "format": "hceval-schema-audit",
+  "generated_at": "2026-04-28T18:59:16Z",
+  "input_row_count": 3,
+  "inputs": [
+    {
+      "path": "bench/datasets/samples/smoke_eval.jsonl",
+      "rows": 3,
+      "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+    }
+  ],
+  "normalized_record_count": 3,
+  "status": "pass",
+  "warning_count": 0
+}

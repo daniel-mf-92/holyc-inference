@@ -152,3 +152,4 @@
 2026-04-28T18:14:26Z | Added perf regression P05 wall-clock tok/s rollups/gate with smoke coverage and refreshed dashboards.
 2026-04-28T18:27:23Z | Added eval dataset provenance contribution counts/skew gate with smoke coverage and refreshed dataset artifacts.
 2026-04-28T18:33:49Z | Added eval_compare paired McNemar loss gating with smoke artifact refresh and coverage.
+2026-04-28T18:50:28Z | Added eval dataset schema audit gate with smoke reports and dataset CI coverage.

@@ -46,6 +46,10 @@ def main() -> int:
         curated_manifest = datasets_dir / "smoke_curated.manifest.json"
         packed = datasets_dir / "smoke_curated.hceval"
         pack_manifest = datasets_dir / "smoke_curated.hceval.manifest.json"
+        schema_json = datasets_dir / "dataset_schema_audit_smoke_latest.json"
+        schema_md = datasets_dir / "dataset_schema_audit_smoke_latest.md"
+        schema_csv = datasets_dir / "dataset_schema_audit_smoke_latest.csv"
+        schema_junit = datasets_dir / "dataset_schema_audit_smoke_latest_junit.xml"
         inspect_json = datasets_dir / "smoke_curated.inspect.json"
         inspect_md = datasets_dir / "smoke_curated.inspect.md"
         inspect_junit = datasets_dir / "smoke_curated.inspect.junit.xml"
@@ -61,6 +65,62 @@ def main() -> int:
         sample_lines = SAMPLE.read_text(encoding="utf-8").splitlines()
         curated_source.parent.mkdir(parents=True, exist_ok=True)
         curated_source.write_text("\n".join(sample_lines + [sample_lines[0]]) + "\n", encoding="utf-8")
+
+        schema_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_schema_audit.py"),
+            "--input",
+            str(SAMPLE),
+            "--output",
+            str(schema_json),
+            "--markdown",
+            str(schema_md),
+            "--csv",
+            str(schema_csv),
+            "--junit",
+            str(schema_junit),
+            "--require-provenance",
+            "--min-choices",
+            "4",
+            "--max-choices",
+            "4",
+            "--max-prompt-bytes",
+            "4096",
+            "--max-choice-bytes",
+            "1024",
+            "--max-record-payload-bytes",
+            "8192",
+            "--fail-on-duplicate-ids",
+            "--fail-on-findings",
+        ]
+        completed = run_command(schema_command)
+        if completed.returncode != 0:
+            return completed.returncode
+
+        schema_report = json.loads(schema_json.read_text(encoding="utf-8"))
+        if rc := require(schema_report["status"] == "pass", "unexpected_schema_status"):
+            return rc
+        if rc := require(schema_report["normalized_record_count"] == 3, "unexpected_schema_record_count"):
+            return rc
+        if rc := require(schema_report["choice_count_histogram"] == {"4": 3}, "unexpected_schema_choice_histogram"):
+            return rc
+        if rc := require(schema_report["answer_histogram"] == {"0": 3}, "unexpected_schema_answer_histogram"):
+            return rc
+        if rc := require(
+            "Eval Dataset Schema Audit" in schema_md.read_text(encoding="utf-8"),
+            "missing_schema_markdown",
+        ):
+            return rc
+        if rc := require(
+            "severity,kind,source,detail" in schema_csv.read_text(encoding="utf-8"),
+            "missing_schema_csv_header",
+        ):
+            return rc
+        schema_root = ET.parse(schema_junit).getroot()
+        if rc := require(schema_root.attrib.get("name") == "holyc_dataset_schema_audit", "missing_schema_junit"):
+            return rc
+        if rc := require(schema_root.attrib.get("failures") == "0", "unexpected_schema_junit_failures"):
+            return rc
 
         curate_command = [
             sys.executable,
@@ -616,6 +676,49 @@ def main() -> int:
             "provenance_counts_mismatch" in stale_provenance_kinds,
             "missing_provenance_counts_finding",
         ):
+            return rc
+
+        missing_provenance_fixture = tmp_path / "missing_provenance.jsonl"
+        missing_provenance_fixture.write_text(
+            json.dumps(
+                {
+                    "id": "missing-provenance",
+                    "dataset": "schema-smoke",
+                    "split": "validation",
+                    "prompt": "Which answer is correct?",
+                    "choices": ["A", "B", "C", "D"],
+                    "answer_index": 0,
+                },
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        missing_provenance_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_schema_audit.py"),
+            "--input",
+            str(missing_provenance_fixture),
+            "--output",
+            str(tmp_path / "missing_provenance_schema.json"),
+            "--require-provenance",
+            "--fail-on-findings",
+        ]
+        completed = subprocess.run(
+            missing_provenance_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("missing_provenance_not_rejected=true", file=sys.stderr)
+            return 1
+        missing_provenance_failure = json.loads(
+            (tmp_path / "missing_provenance_schema.json").read_text(encoding="utf-8")
+        )
+        schema_kinds = {finding["kind"] for finding in missing_provenance_failure["findings"]}
+        if rc := require("missing_provenance" in schema_kinds, "missing_schema_provenance_finding"):
             return rc
 
         conflict_fixture = tmp_path / "conflicting_duplicate_payloads.jsonl"
