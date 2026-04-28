@@ -20,7 +20,18 @@
       "sha256": "22a31f8ffa48784acd9645bf802ac0f3e0260d45e703a34c926a3331e643dfa1"
     }
   },
-  "generated_at": "2026-04-28T12:02:21Z",
+  "generated_at": "2026-04-28T12:25:45Z",
+  "gold_distribution": {
+    "answer_histogram": {
+      "0": 3
+    },
+    "choice_count_histogram": {
+      "4": 3
+    },
+    "majority_answer": "0",
+    "majority_answer_count": 3,
+    "majority_answer_pct": 100.0
+  },
   "gold_record_count": 3,
   "issues": [],
   "model": "synthetic-smoke",

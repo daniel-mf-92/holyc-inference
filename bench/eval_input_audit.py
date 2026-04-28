@@ -303,6 +303,22 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     gold = audit_gold(args.gold, args.dataset, args.split, issues)
     answer_histogram = sorted_counts(case.answer_index for case in gold.values())
     choice_count_histogram = sorted_counts(len(case.choices) for case in gold.values())
+    majority_gold_answer, majority_gold_answer_count, majority_gold_answer_pct = majority_label(answer_histogram)
+    if (
+        args.max_majority_gold_answer_pct is not None
+        and majority_gold_answer_pct is not None
+        and majority_gold_answer_pct > args.max_majority_gold_answer_pct
+    ):
+        append_issue(
+            issues,
+            "error",
+            "gold",
+            (
+                f"majority gold answer index {majority_gold_answer!r} covers "
+                f"{majority_gold_answer_pct:.2f}% of gold rows, above "
+                f"{args.max_majority_gold_answer_pct:.2f}% gate"
+            ),
+        )
 
     holyc = audit_predictions(
         args.holyc,
@@ -345,6 +361,13 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "llama": {"path": str(args.llama), "sha256": file_sha256(args.llama) if args.llama.exists() else ""},
         },
         "generated_at": iso_now(),
+        "gold_distribution": {
+            "answer_histogram": answer_histogram,
+            "choice_count_histogram": choice_count_histogram,
+            "majority_answer": majority_gold_answer,
+            "majority_answer_count": majority_gold_answer_count,
+            "majority_answer_pct": majority_gold_answer_pct,
+        },
         "gold_record_count": len(gold),
         "issues": [asdict(issue) for issue in issues],
         "model": args.model,
@@ -386,11 +409,28 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"| Errors | {summary['errors']} |",
         f"| Warnings | {summary['warnings']} |",
         "",
-        "## Prediction Distribution",
+        "## Gold Distribution",
         "",
-        "| Engine | Histogram | Majority | Majority % |",
+        "| Answer histogram | Choice counts | Majority | Majority % |",
         "| --- | --- | --- | ---: |",
     ]
+    gold_distribution = report["gold_distribution"]
+    majority_pct = gold_distribution["majority_answer_pct"]
+    majority_pct_text = "-" if majority_pct is None else f"{majority_pct:.2f}"
+    lines.append(
+        f"| {json.dumps(gold_distribution['answer_histogram'], sort_keys=True)} | "
+        f"{json.dumps(gold_distribution['choice_count_histogram'], sort_keys=True)} | "
+        f"{gold_distribution['majority_answer'] or '-'} | {majority_pct_text} |"
+    )
+    lines.extend(
+        [
+            "",
+            "## Prediction Distribution",
+            "",
+            "| Engine | Histogram | Majority | Majority % |",
+            "| --- | --- | --- | ---: |",
+        ]
+    )
     for name, audit in report["prediction_audits"].items():
         majority_pct = audit["majority_prediction_pct"]
         majority_pct_text = "-" if majority_pct is None else f"{majority_pct:.2f}"
@@ -502,6 +542,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail when either engine predicts one answer index for more than this percentage of valid rows",
     )
     parser.add_argument(
+        "--max-majority-gold-answer-pct",
+        type=float,
+        help="Fail when one gold answer index covers more than this percentage of gold rows",
+    )
+    parser.add_argument(
         "--min-score-coverage-pct",
         type=float,
         help="Fail when either engine has score vectors for less than this percentage of valid rows",
@@ -513,6 +558,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.max_majority_gold_answer_pct is not None and not 0.0 <= args.max_majority_gold_answer_pct <= 100.0:
+        print("error: --max-majority-gold-answer-pct must be between 0 and 100", file=sys.stderr)
+        return 2
+    if args.max_majority_prediction_pct is not None and not 0.0 <= args.max_majority_prediction_pct <= 100.0:
+        print("error: --max-majority-prediction-pct must be between 0 and 100", file=sys.stderr)
+        return 2
+    if args.min_score_coverage_pct is not None and not 0.0 <= args.min_score_coverage_pct <= 100.0:
+        print("error: --min-score-coverage-pct must be between 0 and 100", file=sys.stderr)
+        return 2
     report = build_report(args)
     json_path, md_path, csv_path, junit_path = write_report(report, args.output_dir, args.output_stem)
     print(f"wrote_json={json_path}")

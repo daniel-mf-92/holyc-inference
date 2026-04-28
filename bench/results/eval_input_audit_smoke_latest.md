@@ -1,6 +1,6 @@
 # Eval Input Audit
 
-Generated: 2026-04-28T12:02:21Z
+Generated: 2026-04-28T12:25:45Z
 Status: pass
 Dataset: smoke-eval
 Split: validation
@@ -16,6 +16,12 @@ Quantization: Q4_0
 | llama.cpp valid predictions | 3 |
 | Errors | 0 |
 | Warnings | 0 |
+
+## Gold Distribution
+
+| Answer histogram | Choice counts | Majority | Majority % |
+| --- | --- | --- | ---: |
+| {"0": 3} | {"4": 3} | 0 | 100.00 |
 
 ## Prediction Distribution
 

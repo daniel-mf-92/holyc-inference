@@ -610,9 +610,11 @@ small-subset regressions behind healthy aggregate scores.
 
 Before comparing, `eval_input_audit.py` can gate apples-to-apples inputs. It
 checks gold/prediction record coverage, duplicates, invalid prediction indexes,
-dataset/split metadata, and optional model/quantization metadata drift. The
-audit writes JSON, Markdown, CSV, and JUnit XML reports and exits non-zero when
-it finds errors:
+dataset/split metadata, optional model/quantization metadata drift, and gold
+answer distribution. Use `--max-majority-gold-answer-pct` to fail early when a
+gold file is too label-skewed for a useful paired comparison. The audit writes
+JSON, Markdown, CSV, and JUnit XML reports and exits non-zero when it finds
+errors:
 
 ```bash
 python3 bench/eval_input_audit.py \
@@ -623,6 +625,7 @@ python3 bench/eval_input_audit.py \
   --split validation \
   --model synthetic-smoke \
   --quantization Q4_0 \
+  --max-majority-gold-answer-pct 100 \
   --output-stem eval_input_audit_smoke_latest
 ```
 
