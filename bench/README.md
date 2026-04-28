@@ -547,8 +547,9 @@ python3 bench/bench_artifact_manifest.py \
 
 `perf_regression.py` scans JSON, JSONL, and CSV benchmark artifacts, groups
 results by benchmark/profile/model/quantization/prompt plus commit, and writes
-guest tok/s, host wall-clock tok/s, guest/wall microseconds per token, QEMU host
-overhead percentage, memory, first-token latency, and sample-coverage dashboards
+guest tok/s, host wall-clock tok/s, guest/wall microseconds per token, emitted
+token counts, QEMU host overhead percentage, memory, first-token latency, and
+sample-coverage dashboards
 under `bench/dashboards/`.
 The dashboard also emits
 `perf_regression_comparisons_latest.csv` so CI can archive baseline-vs-candidate
@@ -567,12 +568,14 @@ python3 bench/perf_regression.py \
   --wall-tok-regression-pct 7.5 \
   --us-per-token-regression-pct 7.5 \
   --wall-us-per-token-regression-pct 7.5 \
+  --token-drop-regression-pct 5 \
   --p95-ttft-regression-pct 15 \
   --host-overhead-regression-pct 25 \
   --require-tok-per-s \
   --require-wall-tok-per-s \
   --require-us-per-token \
   --require-wall-us-per-token \
+  --require-tokens \
   --require-ttft-us \
   --require-host-overhead-pct \
   --require-memory \
@@ -596,9 +599,11 @@ optionally gate guest and host token-latency growth directly, which is easier to
 reason about for short prompts where throughput deltas compress latency changes.
 `--ttft-regression-pct` and `--p95-ttft-regression-pct` optionally gate median
 and tail first-token latency growth. `--host-overhead-regression-pct`
-optionally gates increases in QEMU host overhead. `--require-tok-per-s`,
+optionally gates increases in QEMU host overhead. `--token-drop-regression-pct`
+optionally gates drops in median emitted token count so faster runs cannot pass
+only because they generated less output. `--require-tok-per-s`,
 `--require-wall-tok-per-s`, `--require-us-per-token`,
-`--require-wall-us-per-token`, `--require-ttft-us`,
+`--require-wall-us-per-token`, `--require-tokens`, `--require-ttft-us`,
 `--require-host-overhead-pct`, and `--require-memory` fail the dashboard when
 any benchmark key/commit point has zero samples for that telemetry field. This
 catches malformed or partially uploaded artifacts before CI treats missing
@@ -737,9 +742,10 @@ python3 bench/perplexity_compare.py \
 to `bench/dashboards/`. It accepts JSON, JSONL, and CSV records with `tok_per_s`
 or `tok_per_s_milli`, optional `wall_tok_per_s` or `wall_tok_per_s_milli`,
 optional `us_per_token` / `wall_us_per_token`, optional first-token latency
-fields such as `ttft_us` or `ttft_ms`, optional `host_overhead_pct`, plus memory
-fields such as `memory_bytes` or
-`max_rss_bytes`. Regression checks compare
+fields such as `ttft_us` or `ttft_ms`, optional `host_overhead_pct`, memory
+fields such as `memory_bytes` or `max_rss_bytes`, and emitted-token fields such
+as `tokens`, `output_tokens`, `generated_tokens`, or `completion_tokens`.
+Regression checks compare
 commit-level aggregates, so repeated runs and duplicate latest/stamped result
 files are collapsed by benchmark key and commit before the latest distinct
 commits are compared. Outputs include JSON, Markdown, JUnit XML, commit-point
@@ -754,8 +760,8 @@ python3 bench/perf_regression.py --input bench/results --output-dir bench/dashbo
 ```
 
 CI can fail on median throughput, low-tail throughput, host wall-clock
-throughput, guest/wall microseconds per token, median or P95 first-token
-latency, QEMU host overhead, or memory regressions with:
+throughput, guest/wall microseconds per token, emitted-token drops, median or
+P95 first-token latency, QEMU host overhead, or memory regressions with:
 
 ```bash
 python3 bench/perf_regression.py \
@@ -764,11 +770,13 @@ python3 bench/perf_regression.py \
   --wall-tok-regression-pct 7.5 \
   --us-per-token-regression-pct 7.5 \
   --wall-us-per-token-regression-pct 7.5 \
+  --token-drop-regression-pct 5 \
   --ttft-regression-pct 15 \
   --p95-ttft-regression-pct 15 \
   --host-overhead-regression-pct 25 \
   --require-us-per-token \
   --require-wall-us-per-token \
+  --require-tokens \
   --require-ttft-us \
   --require-host-overhead-pct \
   --fail-on-regression
