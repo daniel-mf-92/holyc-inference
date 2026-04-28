@@ -84,3 +84,4 @@
 2026-04-28T03:33:02Z | Added prompt audit CSV/JUnit CI artifacts with smoke coverage and refreshed reports.
 2026-04-28T03:42:52Z | Added dataset leak audit JUnit CI output with refreshed smoke artifacts.
 2026-04-28T04:00:04Z | Added QEMU prompt benchmark host overhead timing metrics with refreshed smoke/index artifacts.
+2026-04-28T04:10:03Z | Added class-specific benchmark artifact manifest gates with smoke coverage and refreshed manifest artifacts.

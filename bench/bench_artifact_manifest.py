@@ -128,6 +128,22 @@ def manifest_status(artifacts: list[ManifestArtifact]) -> str:
     return "pass"
 
 
+def has_airgap_failures(artifacts: Iterable[ManifestArtifact]) -> bool:
+    return any(artifact.command_airgap_status == "fail" for artifact in artifacts)
+
+
+def has_telemetry_failures(artifacts: Iterable[ManifestArtifact]) -> bool:
+    return any(artifact.telemetry_status == "fail" for artifact in artifacts)
+
+
+def has_commit_metadata_failures(artifacts: Iterable[ManifestArtifact]) -> bool:
+    return any(artifact.commit_status == "fail" for artifact in artifacts)
+
+
+def has_stale_commits(artifacts: Iterable[ManifestArtifact]) -> bool:
+    return any(artifact.current_commit_match is False for artifact in artifacts)
+
+
 def format_value(value: object) -> str:
     if value is None or value == "":
         return "-"
@@ -299,7 +315,7 @@ def junit_report(report: dict[str, object]) -> str:
 
 def write_manifest(
     summaries: list[bench_result_index.ArtifactSummary], output_dir: Path
-) -> tuple[Path, str]:
+) -> tuple[Path, str, list[ManifestArtifact]]:
     output_dir.mkdir(parents=True, exist_ok=True)
     history = sorted(
         (to_manifest_artifact(summary) for summary in summaries),
@@ -322,7 +338,7 @@ def write_manifest(
     md_path.write_text(markdown_report(report), encoding="utf-8")
     write_csv(latest, csv_path)
     junit_path.write_text(junit_report(report), encoding="utf-8")
-    return json_path, str(report["status"])
+    return json_path, str(report["status"]), history
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -341,6 +357,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Return non-zero if any manifest artifact records a QEMU air-gap violation",
     )
     parser.add_argument(
+        "--fail-on-telemetry",
+        action="store_true",
+        help="Return non-zero if any manifest artifact is missing required benchmark telemetry",
+    )
+    parser.add_argument(
+        "--fail-on-commit-metadata",
+        action="store_true",
+        help="Return non-zero if any manifest artifact has missing or inconsistent commit metadata",
+    )
+    parser.add_argument(
         "--fail-on-stale-commit",
         action="store_true",
         help="Return non-zero if any manifest artifact commit differs from the current git commit",
@@ -353,7 +379,7 @@ def main(argv: list[str] | None = None) -> int:
     inputs = args.input or [Path("bench/results")]
     try:
         summaries = bench_result_index.load_summaries(inputs)
-        output, status = write_manifest(summaries, args.output_dir)
+        output, status, artifacts = write_manifest(summaries, args.output_dir)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -361,9 +387,13 @@ def main(argv: list[str] | None = None) -> int:
     print(f"wrote_json={output}")
     print(f"status={status}")
     print(f"artifacts={len(summaries)}")
-    if args.fail_on_airgap and status == "fail":
+    if args.fail_on_airgap and has_airgap_failures(artifacts):
         return 1
-    if args.fail_on_stale_commit and any(summary.current_commit_match is False for summary in summaries):
+    if args.fail_on_telemetry and has_telemetry_failures(artifacts):
+        return 1
+    if args.fail_on_commit_metadata and has_commit_metadata_failures(artifacts):
+        return 1
+    if args.fail_on_stale_commit and has_stale_commits(artifacts):
         return 1
     return 0
 

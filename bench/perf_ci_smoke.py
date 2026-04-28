@@ -353,6 +353,104 @@ def main() -> int:
             print("missing_matrix_variability_csv=true", file=sys.stderr)
             return 1
 
+        manifest_fixture_dir = tmp_path / "manifest_fixture"
+        manifest_fixture_dir.mkdir()
+        incomplete_report = manifest_fixture_dir / "qemu_prompt_bench_incomplete.json"
+        incomplete_report.write_text(
+            json.dumps(
+                {
+                    "generated_at": "2026-04-28T00:00:00Z",
+                    "status": "pass",
+                    "prompt_suite": {
+                        "prompt_count": 1,
+                        "suite_sha256": "manifest-smoke-suite",
+                    },
+                    "benchmarks": [
+                        {
+                            "benchmark": "qemu_prompt",
+                            "profile": "manifest-smoke",
+                            "model": "synthetic-smoke",
+                            "quantization": "Q4_0",
+                            "commit": "manifest-smoke-commit",
+                            "command": [
+                                "qemu-system-x86_64",
+                                "-nic",
+                                "none",
+                                "-drive",
+                                "file=/tmp/TempleOS.img,format=raw,if=ide",
+                            ],
+                        }
+                    ],
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        manifest_output_dir = tmp_path / "manifest_output"
+        manifest_airgap_command = [
+            sys.executable,
+            str(ROOT / "bench" / "bench_artifact_manifest.py"),
+            "--input",
+            str(manifest_fixture_dir),
+            "--output-dir",
+            str(manifest_output_dir),
+            "--fail-on-airgap",
+        ]
+        completed = subprocess.run(
+            manifest_airgap_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode != 0:
+            sys.stdout.write(completed.stdout)
+            sys.stderr.write(completed.stderr)
+            print("manifest_airgap_gate_failed_on_non_airgap_issue=true", file=sys.stderr)
+            return completed.returncode
+
+        manifest_telemetry_command = [
+            sys.executable,
+            str(ROOT / "bench" / "bench_artifact_manifest.py"),
+            "--input",
+            str(manifest_fixture_dir),
+            "--output-dir",
+            str(manifest_output_dir),
+            "--fail-on-telemetry",
+        ]
+        completed = subprocess.run(
+            manifest_telemetry_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("manifest_telemetry_gate_did_not_fail=true", file=sys.stderr)
+            return 1
+
+        manifest_commit_command = [
+            sys.executable,
+            str(ROOT / "bench" / "bench_artifact_manifest.py"),
+            "--input",
+            str(manifest_fixture_dir),
+            "--output-dir",
+            str(manifest_output_dir),
+            "--fail-on-commit-metadata",
+        ]
+        completed = subprocess.run(
+            manifest_commit_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode != 0:
+            sys.stdout.write(completed.stdout)
+            sys.stderr.write(completed.stderr)
+            print("manifest_commit_gate_failed_on_stale_only=true", file=sys.stderr)
+            return completed.returncode
+
     print("perf_ci_smoke=ok")
     return 0
 

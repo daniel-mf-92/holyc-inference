@@ -364,14 +364,16 @@ air-gap violations, missing telemetry, inconsistent commit metadata, and empty
 manifests directly. Empty manifests are marked failed so missing benchmark
 uploads do not pass silently. For current-job manifests, `--fail-on-stale-commit`
 returns non-zero when any artifact was produced from a different commit than
-the current checkout.
+the current checkout. Use `--fail-on-airgap`, `--fail-on-telemetry`, and
+`--fail-on-commit-metadata` to gate those failure classes independently.
 
 ```bash
 python3 bench/bench_artifact_manifest.py \
   --input bench/results \
   --output-dir bench/results \
   --fail-on-stale-commit \
-  --fail-on-airgap
+  --fail-on-airgap \
+  --fail-on-telemetry
 ```
 
 ## Perf Regression Dashboard
