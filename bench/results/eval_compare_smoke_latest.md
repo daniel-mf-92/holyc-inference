@@ -1,6 +1,6 @@
 # Eval Compare Report
 
-Generated: 2026-04-28T04:24:38Z
+Generated: 2026-04-28T04:38:21Z
 Dataset: smoke-eval
 Split: validation
 Quantization: Q4_0
@@ -32,6 +32,14 @@ Status: pass
 | --- | ---: | ---: | ---: | ---: | ---: |
 | HolyC | 1/3 (0.3333) | 0.9993 | 1.0000 | 0.0000 | 0.0007 |
 | llama.cpp | 1/3 (0.3333) | 0.8310 | 1.0000 | 0.0432 | 0.1690 |
+
+## Dataset Breakdown
+
+| Dataset | Split | Records | HolyC accuracy | llama.cpp accuracy | Accuracy delta | Agreement |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| arc-smoke | validation | 1 | 1.0000 | 1.0000 | 0.0000 | 1.0000 |
+| hellaswag-smoke | validation | 1 | 1.0000 | 1.0000 | 0.0000 | 1.0000 |
+| truthfulqa-smoke | validation | 1 | 1.0000 | 1.0000 | 0.0000 | 1.0000 |
 
 ## Confidence Intervals
 

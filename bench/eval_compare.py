@@ -468,6 +468,35 @@ def calibration_metrics(
     }
 
 
+def dataset_breakdown(rows: list[EvalRow]) -> list[dict[str, Any]]:
+    groups: dict[tuple[str, str], list[EvalRow]] = {}
+    for row in rows:
+        groups.setdefault((row.dataset, row.split), []).append(row)
+
+    breakdown: list[dict[str, Any]] = []
+    for (dataset, split), group_rows in sorted(groups.items()):
+        total = len(group_rows)
+        holyc_correct = sum(1 for row in group_rows if row.holyc_correct)
+        llama_correct = sum(1 for row in group_rows if row.llama_correct)
+        agreement_count = sum(1 for row in group_rows if row.engines_agree)
+        breakdown.append(
+            {
+                "accuracy_delta_holyc_minus_llama": accuracy(holyc_correct, total)
+                - accuracy(llama_correct, total),
+                "agreement": accuracy(agreement_count, total),
+                "agreement_count": agreement_count,
+                "dataset": dataset,
+                "holyc_accuracy": accuracy(holyc_correct, total),
+                "holyc_correct": holyc_correct,
+                "llama_accuracy": accuracy(llama_correct, total),
+                "llama_correct": llama_correct,
+                "record_count": total,
+                "split": split,
+            }
+        )
+    return breakdown
+
+
 def compare(
     gold: dict[str, GoldCase],
     holyc_predictions: dict[str, Prediction],
@@ -519,6 +548,7 @@ def compare(
         "agreement": accuracy(agreements, total),
         "agreement_count": agreements,
         "class_count": len(labels),
+        "dataset_breakdown": dataset_breakdown(rows),
         "holyc_accuracy": accuracy(holyc_correct, total),
         "holyc_calibration": holyc_calibration,
         "holyc_confusion_matrix": holyc_metrics["confusion_matrix"],
@@ -602,6 +632,23 @@ def markdown_report(report: dict[str, Any]) -> str:
             f"{metrics['accuracy_when_scored']:.4f} | {metrics['brier_score']:.4f} | {metrics['ece']:.4f} |"
         )
     lines.append("")
+    breakdown = summary.get("dataset_breakdown", [])
+    if breakdown:
+        lines.extend(
+            [
+                "## Dataset Breakdown",
+                "",
+                "| Dataset | Split | Records | HolyC accuracy | llama.cpp accuracy | Accuracy delta | Agreement |",
+                "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for item in breakdown:
+            lines.append(
+                f"| {item['dataset']} | {item['split']} | {item['record_count']} | "
+                f"{item['holyc_accuracy']:.4f} | {item['llama_accuracy']:.4f} | "
+                f"{item['accuracy_delta_holyc_minus_llama']:.4f} | {item['agreement']:.4f} |"
+            )
+        lines.append("")
     intervals = summary.get("confidence_intervals", {})
     if intervals:
         lines.extend(

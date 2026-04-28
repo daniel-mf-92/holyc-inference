@@ -44,6 +44,12 @@ def test_smoke_predictions_compare_cleanly() -> None:
     assert summary["holyc_confusion_matrix"]["matrix"][0][0] == 3
     assert summary["holyc_calibration"]["scored_count"] == 1
     assert summary["llama_calibration"]["scored_count"] == 1
+    assert [item["dataset"] for item in summary["dataset_breakdown"]] == [
+        "arc-smoke",
+        "hellaswag-smoke",
+        "truthfulqa-smoke",
+    ]
+    assert all(item["holyc_accuracy"] == 1.0 for item in summary["dataset_breakdown"])
     assert rows[0].holyc_confidence is not None
     assert rows[0].holyc_margin is not None
 
@@ -95,8 +101,11 @@ def test_cli_writes_json_and_markdown_report() -> None:
         assert round(holyc_interval["lower"], 4) == 0.4385
         assert holyc_interval["upper"] == 1.0
         assert payload["summary"]["holyc_per_answer_index"][0]["support"] == 3
+        assert payload["summary"]["dataset_breakdown"][0]["dataset"] == "arc-smoke"
+        assert payload["summary"]["dataset_breakdown"][0]["record_count"] == 1
         assert (Path(tmp) / "smoke.md").exists()
         markdown = (Path(tmp) / "smoke.md").read_text(encoding="utf-8")
+        assert "## Dataset Breakdown" in markdown
         assert "## Confidence Intervals" in markdown
         assert "## Score Calibration" in markdown
         assert "No quality gate regressions." in markdown

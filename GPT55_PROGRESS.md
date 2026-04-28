@@ -88,3 +88,4 @@
 2026-04-28T04:17:47Z | Added QEMU argument-file support to prompt benchmarks and matrix dry-runs with air-gap validation coverage.
 2026-04-28T04:24:57Z | Added eval_compare paired correctness and exact McNemar reporting with refreshed smoke artifacts.
 2026-04-28T04:31:49Z | Added stdlib dataset CI smoke gate covering curate, pack, inspect, leak audit, index, and leakage rejection.
+2026-04-28T04:37:49Z | Added per-dataset eval comparison breakdowns with refreshed smoke reports and focused coverage.
