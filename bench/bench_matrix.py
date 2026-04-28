@@ -266,6 +266,8 @@ def run_cell(
     repeat: int,
     max_suite_cv_pct: float | None,
     max_prompt_cv_pct: float | None,
+    max_suite_iqr_pct: float | None,
+    max_prompt_iqr_pct: float | None,
     matrix_dir: Path,
     dry_run: bool,
 ) -> MatrixCellResult:
@@ -340,6 +342,10 @@ def run_cell(
         argv.extend(["--max-suite-cv-pct", str(max_suite_cv_pct)])
     if max_prompt_cv_pct is not None:
         argv.extend(["--max-prompt-cv-pct", str(max_prompt_cv_pct)])
+    if max_suite_iqr_pct is not None:
+        argv.extend(["--max-suite-iqr-pct", str(max_suite_iqr_pct)])
+    if max_prompt_iqr_pct is not None:
+        argv.extend(["--max-prompt-iqr-pct", str(max_prompt_iqr_pct)])
     for arg in global_qemu_args + cell.profile.qemu_args + cell.model.qemu_args + cell.quantization.qemu_args:
         argv.append(f"--qemu-arg={arg}")
 
@@ -399,9 +405,11 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Status: {report['status']}",
         f"Matrix: {report['matrix_name']}",
         f"Cells: {len(report['cells'])}",
-        "Variability gates: suite CV <= {suite}, prompt CV <= {prompt}".format(
+        "Variability gates: suite CV <= {suite}, prompt CV <= {prompt}, suite IQR <= {suite_iqr}, prompt IQR <= {prompt_iqr}".format(
             suite=format_gate(report["variability_gates"].get("max_suite_cv_pct")),
             prompt=format_gate(report["variability_gates"].get("max_prompt_cv_pct")),
+            suite_iqr=format_gate(report["variability_gates"].get("max_suite_iqr_pct")),
+            prompt_iqr=format_gate(report["variability_gates"].get("max_prompt_iqr_pct")),
         ),
         "",
         "## Cells",
@@ -469,6 +477,8 @@ def write_matrix_report(
     dry_run: bool,
     max_suite_cv_pct: float | None,
     max_prompt_cv_pct: float | None,
+    max_suite_iqr_pct: float | None,
+    max_prompt_iqr_pct: float | None,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     report = {
@@ -481,6 +491,8 @@ def write_matrix_report(
         "variability_gates": {
             "max_suite_cv_pct": max_suite_cv_pct,
             "max_prompt_cv_pct": max_prompt_cv_pct,
+            "max_suite_iqr_pct": max_suite_iqr_pct,
+            "max_prompt_iqr_pct": max_prompt_iqr_pct,
         },
         "cells": [asdict(cell) for cell in cells],
     }
@@ -780,6 +792,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repeat", type=int)
     parser.add_argument("--max-suite-cv-pct", type=float, help="Fail cells whose suite tok/s CV exceeds this percentage")
     parser.add_argument("--max-prompt-cv-pct", type=float, help="Fail cells whose per-prompt tok/s CV exceeds this percentage")
+    parser.add_argument(
+        "--max-suite-iqr-pct",
+        type=float,
+        help="Fail cells whose suite tok/s interquartile spread exceeds this percentage",
+    )
+    parser.add_argument(
+        "--max-prompt-iqr-pct",
+        type=float,
+        help="Fail cells whose per-prompt tok/s interquartile spread exceeds this percentage",
+    )
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--dry-run", action="store_true", help="Validate and write planned commands without launching")
     return parser
@@ -819,12 +841,28 @@ def main(argv: list[str] | None = None) -> int:
             if args.max_prompt_cv_pct is not None
             else payload.get("max_prompt_cv_pct")
         )
+        max_suite_iqr_pct = (
+            args.max_suite_iqr_pct
+            if args.max_suite_iqr_pct is not None
+            else payload.get("max_suite_iqr_pct")
+        )
+        max_prompt_iqr_pct = (
+            args.max_prompt_iqr_pct
+            if args.max_prompt_iqr_pct is not None
+            else payload.get("max_prompt_iqr_pct")
+        )
         max_suite_cv_pct = float(max_suite_cv_pct) if max_suite_cv_pct is not None else None
         max_prompt_cv_pct = float(max_prompt_cv_pct) if max_prompt_cv_pct is not None else None
+        max_suite_iqr_pct = float(max_suite_iqr_pct) if max_suite_iqr_pct is not None else None
+        max_prompt_iqr_pct = float(max_prompt_iqr_pct) if max_prompt_iqr_pct is not None else None
         if max_suite_cv_pct is not None and max_suite_cv_pct < 0:
             raise ValueError("--max-suite-cv-pct must be >= 0")
         if max_prompt_cv_pct is not None and max_prompt_cv_pct < 0:
             raise ValueError("--max-prompt-cv-pct must be >= 0")
+        if max_suite_iqr_pct is not None and max_suite_iqr_pct < 0:
+            raise ValueError("--max-suite-iqr-pct must be >= 0")
+        if max_prompt_iqr_pct is not None and max_prompt_iqr_pct < 0:
+            raise ValueError("--max-prompt-iqr-pct must be >= 0")
 
         matrix_base_dir = args.matrix.resolve().parent
         global_qemu_args = matrix_qemu_args(payload, "matrix", matrix_base_dir)
@@ -842,6 +880,8 @@ def main(argv: list[str] | None = None) -> int:
                 repeat=repeat,
                 max_suite_cv_pct=max_suite_cv_pct,
                 max_prompt_cv_pct=max_prompt_cv_pct,
+                max_suite_iqr_pct=max_suite_iqr_pct,
+                max_prompt_iqr_pct=max_prompt_iqr_pct,
                 matrix_dir=matrix_dir,
                 dry_run=args.dry_run,
             )
@@ -856,6 +896,8 @@ def main(argv: list[str] | None = None) -> int:
             dry_run=args.dry_run,
             max_suite_cv_pct=max_suite_cv_pct,
             max_prompt_cv_pct=max_prompt_cv_pct,
+            max_suite_iqr_pct=max_suite_iqr_pct,
+            max_prompt_iqr_pct=max_prompt_iqr_pct,
         )
     except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)

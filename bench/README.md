@@ -320,7 +320,8 @@ Markdown. The suite summary includes measured prompt count, run count, total
 prompt bytes launched, total tokens, total elapsed time,
 OK/failed/timeout/nonzero-exit counts, P05/median/P95 tok/s, P05/median/P95
 wall tok/s, tok/s standard deviation, coefficient of variation, P05-to-P95
-spread percentage, wall tok/s P05-to-P95 spread percentage, and max memory.
+spread percentage, interquartile tok/s spread percentage, wall tok/s
+interquartile and P05-to-P95 spread percentages, and max memory.
 Per-run and per-prompt reports include UTF-8 prompt byte counts so
 benchmark changes can be separated from prompt-suite size drift. Optional
 first-token latency telemetry is
@@ -368,8 +369,9 @@ guest-reported `memory_bytes`. The same artifacts also include derived
 rollups, so dashboards can compare either throughput or per-token decode cost
 without reprocessing raw elapsed times.
 
-Use `--max-suite-cv-pct` and `--max-prompt-cv-pct` to fail noisy benchmark runs
-when measured tok/s coefficient of variation exceeds a CI threshold. Gate
+Use `--max-suite-cv-pct`, `--max-prompt-cv-pct`, `--max-suite-iqr-pct`, and
+`--max-prompt-iqr-pct` to fail noisy benchmark runs when measured tok/s
+coefficient of variation or interquartile spread exceeds a CI threshold. Gate
 findings are written into the JSON and Markdown reports as
 `variability_findings`. The runner also writes
 `qemu_prompt_bench_junit_latest.xml` so CI can surface failed prompt launches
@@ -398,6 +400,7 @@ python3 bench/qemu_prompt_bench.py \
   --repeat 5 \
   --max-launches 30 \
   --max-prompt-cv-pct 5 \
+  --max-prompt-iqr-pct 5 \
   --require-tokens \
   --require-tok-per-s \
   --require-ttft-us \
@@ -500,10 +503,11 @@ generation-volume changes are visible next to tok/s, RSS, and latency rollups.
 compact row per cell for CI dashboards that only need pass/fail counts,
 throughput ranges, prompt-byte and token totals, latency, RSS, and variability
 findings.
-Use `max_suite_cv_pct` and `max_prompt_cv_pct` in the matrix JSON, or the
-matching CLI flags, to pass tok/s variability gates through to every cell. A
-cell that fails a variability gate still writes its prompt-benchmark report and
-is preserved in the matrix summary as a failed cell with a findings count.
+Use `max_suite_cv_pct`, `max_prompt_cv_pct`, `max_suite_iqr_pct`, and
+`max_prompt_iqr_pct` in the matrix JSON, or the matching CLI flags, to pass
+tok/s variability gates through to every cell. A cell that fails a variability
+gate still writes its prompt-benchmark report and is preserved in the matrix
+summary as a failed cell with a findings count.
 
 Example:
 

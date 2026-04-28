@@ -797,11 +797,13 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
                 "tok_per_s_median": statistics.median(tok_values) if tok_values else None,
                 "tok_per_s_stdev": sample_stdev(tok_values),
                 "tok_per_s_cv_pct": coefficient_of_variation_pct(tok_values),
+                "tok_per_s_iqr_pct": interquartile_range_pct(tok_values),
                 "tok_per_s_p05_p95_spread_pct": percentile_spread_pct(tok_values, 5.0, 95.0),
                 "tok_per_s_max": max(tok_values) if tok_values else None,
                 "wall_tok_per_s_p05": percentile(wall_tok_values, 5.0),
                 "wall_tok_per_s_median": statistics.median(wall_tok_values) if wall_tok_values else None,
                 "wall_tok_per_s_p95": percentile(wall_tok_values, 95.0),
+                "wall_tok_per_s_iqr_pct": interquartile_range_pct(wall_tok_values),
                 "wall_tok_per_s_p05_p95_spread_pct": percentile_spread_pct(
                     wall_tok_values, 5.0, 95.0
                 ),
@@ -863,12 +865,25 @@ def percentile_spread_pct(values: list[float], low_pct: float, high_pct: float) 
     return (high - low) * 100.0 / median
 
 
+def interquartile_range_pct(values: list[float]) -> float | None:
+    if not values:
+        return None
+    lower = percentile(values, 25.0)
+    upper = percentile(values, 75.0)
+    median = statistics.median(values)
+    if lower is None or upper is None or median == 0:
+        return None
+    return (upper - lower) * 100.0 / median
+
+
 def variability_findings(
     suite: dict[str, Any],
     summaries: list[dict[str, Any]],
     *,
     max_suite_cv_pct: float | None = None,
     max_prompt_cv_pct: float | None = None,
+    max_suite_iqr_pct: float | None = None,
+    max_prompt_iqr_pct: float | None = None,
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     suite_cv = parse_float(suite.get("tok_per_s_cv_pct"))
@@ -880,6 +895,17 @@ def variability_findings(
                 "metric": "tok_per_s_cv_pct",
                 "value": suite_cv,
                 "limit": max_suite_cv_pct,
+            }
+        )
+    suite_iqr = parse_float(suite.get("tok_per_s_iqr_pct"))
+    if max_suite_iqr_pct is not None and suite_iqr is not None and suite_iqr > max_suite_iqr_pct:
+        findings.append(
+            {
+                "scope": "suite",
+                "prompt": "",
+                "metric": "tok_per_s_iqr_pct",
+                "value": suite_iqr,
+                "limit": max_suite_iqr_pct,
             }
         )
 
@@ -895,6 +921,20 @@ def variability_findings(
                     "metric": "tok_per_s_cv_pct",
                     "value": prompt_cv,
                     "limit": max_prompt_cv_pct,
+                }
+            )
+    if max_prompt_iqr_pct is not None:
+        for summary in summaries:
+            prompt_iqr = parse_float(summary.get("tok_per_s_iqr_pct"))
+            if prompt_iqr is None or prompt_iqr <= max_prompt_iqr_pct:
+                continue
+            findings.append(
+                {
+                    "scope": "prompt",
+                    "prompt": str(summary.get("prompt", "")),
+                    "metric": "tok_per_s_iqr_pct",
+                    "value": prompt_iqr,
+                    "limit": max_prompt_iqr_pct,
                 }
             )
     return findings
@@ -1070,12 +1110,14 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
         "tok_per_s_median": statistics.median(tok_values) if tok_values else None,
         "tok_per_s_stdev": sample_stdev(tok_values),
         "tok_per_s_cv_pct": coefficient_of_variation_pct(tok_values),
+        "tok_per_s_iqr_pct": interquartile_range_pct(tok_values),
         "tok_per_s_p05_p95_spread_pct": percentile_spread_pct(tok_values, 5.0, 95.0),
         "tok_per_s_p95": percentile(tok_values, 95.0),
         "tok_per_s_max": max(tok_values) if tok_values else None,
         "wall_tok_per_s_p05": percentile(wall_tok_values, 5.0),
         "wall_tok_per_s_median": statistics.median(wall_tok_values) if wall_tok_values else None,
         "wall_tok_per_s_p95": percentile(wall_tok_values, 95.0),
+        "wall_tok_per_s_iqr_pct": interquartile_range_pct(wall_tok_values),
         "wall_tok_per_s_p05_p95_spread_pct": percentile_spread_pct(wall_tok_values, 5.0, 95.0),
         "us_per_token_median": statistics.median(us_per_token_values) if us_per_token_values else None,
         "us_per_token_p95": percentile(us_per_token_values, 95.0),
@@ -1122,9 +1164,9 @@ def markdown_report(report: dict[str, Any]) -> str:
                     **{key: format_summary_value(value) for key, value in suite.items()}
                 ),
                 "",
-                "| tok/s stdev | tok/s CV % | tok/s P05-P95 spread % | Wall tok/s P05-P95 spread % |",
-                "| ---: | ---: | ---: | ---: |",
-                "| {tok_per_s_stdev} | {tok_per_s_cv_pct} | {tok_per_s_p05_p95_spread_pct} | {wall_tok_per_s_p05_p95_spread_pct} |".format(
+                "| tok/s stdev | tok/s CV % | tok/s IQR % | tok/s P05-P95 spread % | Wall tok/s IQR % | Wall tok/s P05-P95 spread % |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| {tok_per_s_stdev} | {tok_per_s_cv_pct} | {tok_per_s_iqr_pct} | {tok_per_s_p05_p95_spread_pct} | {wall_tok_per_s_iqr_pct} | {wall_tok_per_s_p05_p95_spread_pct} |".format(
                     **{key: format_summary_value(value) for key, value in suite.items()}
                 ),
                 "",
@@ -1134,14 +1176,14 @@ def markdown_report(report: dict[str, Any]) -> str:
         )
     if report["summaries"]:
         lines.append(
-            "| Prompt | Prompt bytes | Runs | OK | Failed | Timed out | Nonzero exit | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | Min tok/s | P05 tok/s | Median tok/s | tok/s stdev | tok/s CV % | P05-P95 spread % | Max tok/s | P05 wall tok/s | Median wall tok/s | P95 wall tok/s | Wall P05-P95 spread % | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |"
+            "| Prompt | Prompt bytes | Runs | OK | Failed | Timed out | Nonzero exit | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | Min tok/s | P05 tok/s | Median tok/s | tok/s stdev | tok/s CV % | tok/s IQR % | P05-P95 spread % | Max tok/s | P05 wall tok/s | Median wall tok/s | P95 wall tok/s | Wall tok/s IQR % | Wall P05-P95 spread % | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |"
         )
-        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for summary in report["summaries"]:
             lines.append(
                 "| {prompt} | {prompt_bytes} | {runs} | {ok_runs} | {failed_runs} | {timed_out_runs} | {nonzero_exit_runs} | {tokens_median} | {elapsed_us_median} | "
-                "{host_overhead_us_median} | {host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | {host_child_tok_per_cpu_s_median} | {host_child_peak_rss_bytes_max} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_min} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_stdev} | {tok_per_s_cv_pct} | {tok_per_s_p05_p95_spread_pct} | "
-                "{tok_per_s_max} | {wall_tok_per_s_p05} | {wall_tok_per_s_median} | {wall_tok_per_s_p95} | {wall_tok_per_s_p05_p95_spread_pct} | {us_per_token_median} | {us_per_token_p95} | "
+                "{host_overhead_us_median} | {host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | {host_child_tok_per_cpu_s_median} | {host_child_peak_rss_bytes_max} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_min} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_stdev} | {tok_per_s_cv_pct} | {tok_per_s_iqr_pct} | {tok_per_s_p05_p95_spread_pct} | "
+                "{tok_per_s_max} | {wall_tok_per_s_p05} | {wall_tok_per_s_median} | {wall_tok_per_s_p95} | {wall_tok_per_s_iqr_pct} | {wall_tok_per_s_p05_p95_spread_pct} | {us_per_token_median} | {us_per_token_p95} | "
                 "{wall_us_per_token_median} | {wall_us_per_token_p95} | {memory_bytes_max} |".format(
                     **{key: format_summary_value(value) for key, value in summary.items()}
                 )
@@ -1471,6 +1513,8 @@ def write_report(
     warmups: list[BenchRun] | None = None,
     max_suite_cv_pct: float | None = None,
     max_prompt_cv_pct: float | None = None,
+    max_suite_iqr_pct: float | None = None,
+    max_prompt_iqr_pct: float | None = None,
     require_tokens: bool = False,
     require_tok_per_s: bool = False,
     require_memory: bool = False,
@@ -1498,6 +1542,8 @@ def write_report(
         summaries,
         max_suite_cv_pct=max_suite_cv_pct,
         max_prompt_cv_pct=max_prompt_cv_pct,
+        max_suite_iqr_pct=max_suite_iqr_pct,
+        max_prompt_iqr_pct=max_prompt_iqr_pct,
     )
     telemetry = telemetry_findings(
         runs,
@@ -1532,6 +1578,8 @@ def write_report(
         "variability_gates": {
             "max_suite_cv_pct": max_suite_cv_pct,
             "max_prompt_cv_pct": max_prompt_cv_pct,
+            "max_suite_iqr_pct": max_suite_iqr_pct,
+            "max_prompt_iqr_pct": max_prompt_iqr_pct,
         },
         "variability_findings": findings,
         "telemetry_gates": {
@@ -1637,12 +1685,14 @@ def write_summary_csv_report(report: dict[str, Any], path: Path) -> None:
         "tok_per_s_median",
         "tok_per_s_stdev",
         "tok_per_s_cv_pct",
+        "tok_per_s_iqr_pct",
         "tok_per_s_p05_p95_spread_pct",
         "tok_per_s_p95",
         "tok_per_s_max",
         "wall_tok_per_s_p05",
         "wall_tok_per_s_median",
         "wall_tok_per_s_p95",
+        "wall_tok_per_s_iqr_pct",
         "wall_tok_per_s_p05_p95_spread_pct",
         "us_per_token_median",
         "us_per_token_p95",
@@ -1840,6 +1890,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Fail if any prompt tok/s coefficient of variation exceeds this percentage",
     )
+    parser.add_argument(
+        "--max-suite-iqr-pct",
+        type=float,
+        default=None,
+        help="Fail if measured suite tok/s interquartile spread exceeds this percentage",
+    )
+    parser.add_argument(
+        "--max-prompt-iqr-pct",
+        type=float,
+        default=None,
+        help="Fail if any prompt tok/s interquartile spread exceeds this percentage",
+    )
     parser.add_argument("--require-tokens", action="store_true", help="Fail if any measured run omits token count")
     parser.add_argument("--require-tok-per-s", action="store_true", help="Fail if any measured run omits tok/s")
     parser.add_argument("--require-memory", action="store_true", help="Fail if any measured run omits memory telemetry")
@@ -1913,6 +1975,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.max_prompt_cv_pct is not None and args.max_prompt_cv_pct < 0:
         print("error: --max-prompt-cv-pct must be >= 0", file=sys.stderr)
+        return 2
+    if args.max_suite_iqr_pct is not None and args.max_suite_iqr_pct < 0:
+        print("error: --max-suite-iqr-pct must be >= 0", file=sys.stderr)
+        return 2
+    if args.max_prompt_iqr_pct is not None and args.max_prompt_iqr_pct < 0:
+        print("error: --max-prompt-iqr-pct must be >= 0", file=sys.stderr)
         return 2
     if args.min_tokens is not None and args.min_tokens < 0:
         print("error: --min-tokens must be >= 0", file=sys.stderr)
@@ -1996,6 +2064,8 @@ def main(argv: list[str] | None = None) -> int:
         warmups=warmups,
         max_suite_cv_pct=args.max_suite_cv_pct,
         max_prompt_cv_pct=args.max_prompt_cv_pct,
+        max_suite_iqr_pct=args.max_suite_iqr_pct,
+        max_prompt_iqr_pct=args.max_prompt_iqr_pct,
         require_tokens=args.require_tokens,
         require_tok_per_s=args.require_tok_per_s,
         require_memory=args.require_memory,

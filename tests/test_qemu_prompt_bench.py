@@ -291,8 +291,8 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
     assert "timed_out,command_sha256" in csv_report
     assert "qemu_prompt,default,,,prompt-1" in csv_report
     assert summary_csv_report.startswith("scope,prompt,prompt_bytes,prompts,runs,ok_runs")
-    assert "suite,,20,1,1,1,,32," in summary_csv_report
-    assert "prompt,prompt-1,20,,1,1,32,," in summary_csv_report
+    assert "suite,,20,1,1,1,0,0,0,,32," in summary_csv_report
+    assert "prompt,prompt-1,20,,1,1,0,0,0,32,," in summary_csv_report
 
 
 def test_cli_repeat_writes_prompt_summary_and_markdown(tmp_path: Path) -> None:
@@ -354,8 +354,10 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
     assert report["suite_summary"]["tok_per_s_median"] == 300.0
     assert report["suite_summary"]["tok_per_s_p05"] == 200.0
     assert report["suite_summary"]["tok_per_s_p95"] == 400.0
+    assert round(report["suite_summary"]["tok_per_s_iqr_pct"], 3) == 66.667
     assert round(report["suite_summary"]["tok_per_s_p05_p95_spread_pct"], 3) == 66.667
     assert report["suite_summary"]["wall_tok_per_s_median"] > 0
+    assert report["suite_summary"]["wall_tok_per_s_iqr_pct"] is not None
     assert report["suite_summary"]["wall_tok_per_s_p95"] > 0
     assert report["suite_summary"]["us_per_token_median"] == 3750.0
     assert report["suite_summary"]["us_per_token_p95"] == 5000.0
@@ -368,6 +370,7 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
     assert report["summaries"][0]["runs"] == 3
     assert report["summaries"][0]["tok_per_s_median"] == 200.0
     assert report["summaries"][0]["tok_per_s_p05"] == 200.0
+    assert report["summaries"][0]["tok_per_s_iqr_pct"] == 0.0
     assert report["summaries"][0]["tok_per_s_p05_p95_spread_pct"] == 0.0
     assert report["summaries"][0]["host_overhead_us_median"] is not None
     assert report["summaries"][0]["host_overhead_pct_median"] is not None
@@ -383,19 +386,20 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
     assert f"Command SHA256: {report['command_sha256']}" in markdown
     assert "Median host overhead us" in markdown
     assert "P05 tok/s" in markdown
+    assert "tok/s IQR %" in markdown
     assert "tok/s P05-P95 spread %" in markdown
     assert "Median wall tok/s" in markdown
     assert "Median us/token" in markdown
-    assert "| 2 | 6 | 6 | 33 | 180 | 600000 |" in markdown
-    assert "| one | 5 | 3 | 3 | 20 | 100000 |" in markdown
+    assert "| 2 | 6 | 6 | 0 | 0 | 0 | 33 | 180 | 600000 |" in markdown
+    assert "| one | 5 | 3 | 3 | 0 | 0 | 0 | 20 | 100000 |" in markdown
     csv_report = (output_dir / "qemu_prompt_bench_latest.csv").read_text(encoding="utf-8")
     summary_csv_report = (output_dir / "qemu_prompt_bench_summary_latest.csv").read_text(encoding="utf-8")
     junit_root = ET.parse(output_dir / "qemu_prompt_bench_junit_latest.xml").getroot()
     assert csv_report.count("\n") == 7
     assert summary_csv_report.count("\n") == 4
-    assert "suite,,33,2,6,6,,180," in summary_csv_report
-    assert "prompt,one,5,,3,3,20," in summary_csv_report
-    assert "prompt,two,6,,3,3,40," in summary_csv_report
+    assert "suite,,33,2,6,6,0,0,0,,180," in summary_csv_report
+    assert "prompt,one,5,,3,3,0,0,0,20," in summary_csv_report
+    assert "prompt,two,6,,3,3,0,0,0,40," in summary_csv_report
     assert ",one," in csv_report
     assert ",two," in csv_report
     assert junit_root.attrib["name"] == "holyc_qemu_prompt_bench"
@@ -497,6 +501,52 @@ print(f"tokens=100 elapsed_us={elapsed_us}")
     failure = junit_root.find(".//failure")
     assert failure is not None
     assert failure.attrib["type"] == "benchmark_variability"
+
+
+def test_cli_iqr_variability_gate_fails_noisy_prompt_runs(tmp_path: Path) -> None:
+    fake_qemu = tmp_path / "fake-qemu.py"
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    output_dir = tmp_path / "results"
+    prompts.write_text('{"prompt_id":"one","prompt":"IQR noisy"}\n', encoding="utf-8")
+    fake_qemu.write_text(
+        """#!/usr/bin/env python3
+from pathlib import Path
+counter = Path(__file__).with_suffix(".count")
+iteration = int(counter.read_text()) + 1 if counter.exists() else 1
+counter.write_text(str(iteration))
+elapsed_us = 100000 if iteration != 1 else 200000
+print(f"tokens=100 elapsed_us={elapsed_us}")
+""",
+        encoding="utf-8",
+    )
+    fake_qemu.chmod(0o755)
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--qemu-bin",
+            str(fake_qemu),
+            "--output-dir",
+            str(output_dir),
+            "--repeat",
+            "3",
+            "--max-prompt-iqr-pct",
+            "10",
+        ]
+    )
+
+    assert status == 1
+    report = json.loads((output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8"))
+
+    assert report["status"] == "fail"
+    assert report["variability_gates"]["max_prompt_iqr_pct"] == 10.0
+    assert report["variability_findings"][0]["scope"] == "prompt"
+    assert report["variability_findings"][0]["prompt"] == "one"
+    assert report["variability_findings"][0]["metric"] == "tok_per_s_iqr_pct"
 
 
 def test_cli_telemetry_gate_fails_missing_or_low_metrics(tmp_path: Path) -> None:
@@ -832,6 +882,20 @@ def test_cli_rejects_negative_variability_gate(tmp_path: Path) -> None:
             str(prompts),
             "--dry-run",
             "--max-suite-cv-pct",
+            "-1",
+        ]
+    )
+
+    assert status == 2
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--dry-run",
+            "--max-prompt-iqr-pct",
             "-1",
         ]
     )

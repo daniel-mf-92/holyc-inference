@@ -47,6 +47,8 @@ def test_dry_run_writes_planned_air_gapped_commands(tmp_path: Path) -> None:
                 "prompts": str(prompts),
                 "qemu_bin": "qemu-system-x86_64",
                 "qemu_args_files": ["qemu.args"],
+                "max_suite_iqr_pct": 12,
+                "max_prompt_iqr_pct": 8,
                 "profiles": [{"name": "secure", "qemu_args": ["-smp", "1"]}],
                 "models": ["tiny"],
                 "quantizations": ["Q4_0"],
@@ -63,6 +65,8 @@ def test_dry_run_writes_planned_air_gapped_commands(tmp_path: Path) -> None:
     junit_root = ET.parse(output_dir / "bench_matrix_junit_latest.xml").getroot()
     cell = report["cells"][0]
     assert report["status"] == "planned"
+    assert report["variability_gates"]["max_suite_iqr_pct"] == 12.0
+    assert report["variability_gates"]["max_prompt_iqr_pct"] == 8.0
     assert cell["status"] == "planned"
     assert csv_rows[0]["status"] == "planned"
     assert junit_root.attrib["name"] == "holyc_bench_matrix"
