@@ -27,6 +27,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+try:
+    import resource
+except ImportError:  # pragma: no cover - resource is Unix-only.
+    resource = None
+
 
 DEFAULT_TIMEOUT_SECONDS = 300.0
 NETWORK_DEVICE_MARKERS = (
@@ -72,6 +77,10 @@ class BenchRun:
     wall_elapsed_us: int
     host_overhead_us: int
     host_overhead_pct: float | None
+    host_child_user_cpu_us: int | None
+    host_child_system_cpu_us: int | None
+    host_child_cpu_us: int | None
+    host_child_cpu_pct: float | None
     ttft_us: int | None
     tok_per_s: float | None
     wall_tok_per_s: float | None
@@ -390,6 +399,27 @@ def host_overhead_pct(host_overhead_us: int, elapsed_us: int) -> float | None:
     return host_overhead_us * 100.0 / elapsed_us
 
 
+def child_rusage() -> tuple[float, float] | None:
+    if resource is None:
+        return None
+    usage = resource.getrusage(resource.RUSAGE_CHILDREN)
+    return (usage.ru_utime, usage.ru_stime)
+
+
+def child_cpu_delta_us(before: tuple[float, float] | None, after: tuple[float, float] | None) -> tuple[int, int] | None:
+    if before is None or after is None:
+        return None
+    user_us = max(0, int((after[0] - before[0]) * 1_000_000.0))
+    system_us = max(0, int((after[1] - before[1]) * 1_000_000.0))
+    return (user_us, system_us)
+
+
+def cpu_pct(cpu_us: int | None, wall_elapsed_us: int) -> float | None:
+    if cpu_us is None or wall_elapsed_us <= 0:
+        return None
+    return cpu_us * 100.0 / wall_elapsed_us
+
+
 def extract_ttft_us(payload: dict[str, Any]) -> int | None:
     for key in ("ttft_us", "time_to_first_token_us", "first_token_us"):
         parsed = parse_int(payload.get(key))
@@ -446,6 +476,7 @@ def run_prompt(
     iteration: int = 1,
 ) -> BenchRun:
     started = time.monotonic_ns()
+    child_cpu_before = child_rusage()
     env = os.environ.copy()
     env["HOLYC_BENCH_PROMPT"] = prompt_case.prompt
     env["HOLYC_BENCH_PROMPT_ID"] = prompt_case.prompt_id
@@ -475,6 +506,11 @@ def run_prompt(
             stderr = stderr.decode("utf-8", errors="replace")
 
     wall_elapsed_us = max(1, (time.monotonic_ns() - started) // 1000)
+    child_cpu_after = child_rusage()
+    child_cpu = child_cpu_delta_us(child_cpu_before, child_cpu_after)
+    child_user_cpu_us = child_cpu[0] if child_cpu else None
+    child_system_cpu_us = child_cpu[1] if child_cpu else None
+    child_total_cpu_us = sum(child_cpu) if child_cpu else None
     payload = parse_bench_payload(stdout + "\n" + stderr)
     tokens = extract_tokens(payload)
     elapsed_us = extract_elapsed_us(payload, wall_elapsed_us)
@@ -502,6 +538,10 @@ def run_prompt(
         wall_elapsed_us=wall_elapsed_us,
         host_overhead_us=host_overhead_us,
         host_overhead_pct=host_overhead_pct(host_overhead_us, elapsed_us),
+        host_child_user_cpu_us=child_user_cpu_us,
+        host_child_system_cpu_us=child_system_cpu_us,
+        host_child_cpu_us=child_total_cpu_us,
+        host_child_cpu_pct=cpu_pct(child_total_cpu_us, wall_elapsed_us),
         ttft_us=ttft_us,
         tok_per_s=tok_per_s,
         wall_tok_per_s=wall_tok_per_s,
@@ -535,6 +575,12 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
         host_overhead_pct_values = [
             run.host_overhead_pct for run in prompt_runs if run.host_overhead_pct is not None
         ]
+        host_child_cpu_values = [
+            run.host_child_cpu_us for run in prompt_runs if run.host_child_cpu_us is not None
+        ]
+        host_child_cpu_pct_values = [
+            run.host_child_cpu_pct for run in prompt_runs if run.host_child_cpu_pct is not None
+        ]
         ttft_values = [run.ttft_us for run in prompt_runs if run.ttft_us is not None]
         memory_values = [run.memory_bytes for run in prompt_runs if run.memory_bytes is not None]
         ok_runs = [run for run in prompt_runs if run.returncode == 0 and not run.timed_out]
@@ -555,6 +601,12 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
                 else None,
                 "host_overhead_pct_median": statistics.median(host_overhead_pct_values)
                 if host_overhead_pct_values
+                else None,
+                "host_child_cpu_us_median": statistics.median(host_child_cpu_values)
+                if host_child_cpu_values
+                else None,
+                "host_child_cpu_pct_median": statistics.median(host_child_cpu_pct_values)
+                if host_child_cpu_pct_values
                 else None,
                 "ttft_us_median": statistics.median(ttft_values) if ttft_values else None,
                 "ttft_us_p95": percentile([float(value) for value in ttft_values], 95.0),
@@ -751,6 +803,8 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
     elapsed_values = [run.elapsed_us for run in runs if run.elapsed_us > 0]
     host_overhead_values = [run.host_overhead_us for run in runs]
     host_overhead_pct_values = [run.host_overhead_pct for run in runs if run.host_overhead_pct is not None]
+    host_child_cpu_values = [run.host_child_cpu_us for run in runs if run.host_child_cpu_us is not None]
+    host_child_cpu_pct_values = [run.host_child_cpu_pct for run in runs if run.host_child_cpu_pct is not None]
     ttft_values = [run.ttft_us for run in runs if run.ttft_us is not None]
     memory_values = [run.memory_bytes for run in runs if run.memory_bytes is not None]
     token_values = [run.tokens for run in runs if run.tokens is not None]
@@ -770,6 +824,10 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
         "host_overhead_us_median": statistics.median(host_overhead_values) if host_overhead_values else None,
         "host_overhead_pct_median": statistics.median(host_overhead_pct_values)
         if host_overhead_pct_values
+        else None,
+        "host_child_cpu_us_median": statistics.median(host_child_cpu_values) if host_child_cpu_values else None,
+        "host_child_cpu_pct_median": statistics.median(host_child_cpu_pct_values)
+        if host_child_cpu_pct_values
         else None,
         "ttft_us_median": statistics.median(ttft_values) if ttft_values else None,
         "ttft_us_p95": percentile([float(value) for value in ttft_values], 95.0),
@@ -819,10 +877,10 @@ def markdown_report(report: dict[str, Any]) -> str:
             [
                 "## Suite Summary",
                 "",
-                "| Prompts | Runs | OK | Measured prompt bytes | Total tokens | Total elapsed us | Median host overhead us | Median host overhead % | Median TTFT us | P95 TTFT us | P05 tok/s | Median tok/s | P95 tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |",
-                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| Prompts | Runs | OK | Measured prompt bytes | Total tokens | Total elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median TTFT us | P95 TTFT us | P05 tok/s | Median tok/s | P95 tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
                 "| {prompts} | {runs} | {ok_runs} | {measured_prompt_bytes_total} | {total_tokens} | {total_elapsed_us} | "
-                "{host_overhead_us_median} | {host_overhead_pct_median} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_p95} | "
+                "{host_overhead_us_median} | {host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_p95} | "
                 "{wall_tok_per_s_median} | {wall_tok_per_s_p95} | {us_per_token_median} | {us_per_token_p95} | "
                 "{wall_us_per_token_median} | {wall_us_per_token_p95} | {memory_bytes_max} |".format(
                     **{key: format_summary_value(value) for key, value in suite.items()}
@@ -840,13 +898,13 @@ def markdown_report(report: dict[str, Any]) -> str:
         )
     if report["summaries"]:
         lines.append(
-            "| Prompt | Prompt bytes | Runs | OK | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median TTFT us | P95 TTFT us | Min tok/s | P05 tok/s | Median tok/s | tok/s stdev | tok/s CV % | P05-P95 spread % | Max tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |"
+            "| Prompt | Prompt bytes | Runs | OK | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median TTFT us | P95 TTFT us | Min tok/s | P05 tok/s | Median tok/s | tok/s stdev | tok/s CV % | P05-P95 spread % | Max tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |"
         )
-        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for summary in report["summaries"]:
             lines.append(
                 "| {prompt} | {prompt_bytes} | {runs} | {ok_runs} | {tokens_median} | {elapsed_us_median} | "
-                "{host_overhead_us_median} | {host_overhead_pct_median} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_min} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_stdev} | {tok_per_s_cv_pct} | {tok_per_s_p05_p95_spread_pct} | "
+                "{host_overhead_us_median} | {host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_min} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_stdev} | {tok_per_s_cv_pct} | {tok_per_s_p05_p95_spread_pct} | "
                 "{tok_per_s_max} | {wall_tok_per_s_median} | {wall_tok_per_s_p95} | {us_per_token_median} | {us_per_token_p95} | "
                 "{wall_us_per_token_median} | {wall_us_per_token_p95} | {memory_bytes_max} |".format(
                     **{key: format_summary_value(value) for key, value in summary.items()}
@@ -1128,6 +1186,10 @@ def write_csv_report(runs: list[BenchRun], path: Path) -> None:
         "wall_elapsed_us",
         "host_overhead_us",
         "host_overhead_pct",
+        "host_child_user_cpu_us",
+        "host_child_system_cpu_us",
+        "host_child_cpu_us",
+        "host_child_cpu_pct",
         "ttft_us",
         "tok_per_s",
         "wall_tok_per_s",
@@ -1196,6 +1258,10 @@ def write_junit_report(
                 f"wall_elapsed_us={run.wall_elapsed_us}\n"
                 f"host_overhead_us={run.host_overhead_us}\n"
                 f"host_overhead_pct={format_summary_value(run.host_overhead_pct)}\n"
+                f"host_child_user_cpu_us={format_summary_value(run.host_child_user_cpu_us)}\n"
+                f"host_child_system_cpu_us={format_summary_value(run.host_child_system_cpu_us)}\n"
+                f"host_child_cpu_us={format_summary_value(run.host_child_cpu_us)}\n"
+                f"host_child_cpu_pct={format_summary_value(run.host_child_cpu_pct)}\n"
                 f"ttft_us={format_summary_value(run.ttft_us)}\n"
                 f"tok_per_s={format_summary_value(run.tok_per_s)}\n"
                 f"wall_tok_per_s={format_summary_value(run.wall_tok_per_s)}\n"

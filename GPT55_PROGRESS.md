@@ -128,3 +128,4 @@
 2026-04-28T12:26:11Z | Added eval input gold-answer skew telemetry and opt-in gate with refreshed smoke artifacts.
 2026-04-28T12:34:53Z | Added quant audit zero/subnormal fp16 scale gates with smoke coverage and refreshed quant audit artifacts.
 2026-04-28T12:43:32Z | Added qemu_prompt_bench launch-budget guardrail with dry-run metadata, smoke coverage, and refreshed benchmark artifacts.
+2026-04-28T12:53:37Z | Added qemu_prompt_bench host child CPU telemetry with smoke coverage and refreshed benchmark artifacts.

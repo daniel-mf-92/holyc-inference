@@ -524,6 +524,12 @@ def main() -> int:
         if suite_summary.get("host_overhead_us_median") is None:
             print("missing_suite_host_overhead=true", file=sys.stderr)
             return 1
+        if suite_summary.get("host_child_cpu_us_median") is None:
+            print("missing_suite_host_child_cpu=true", file=sys.stderr)
+            return 1
+        if suite_summary.get("host_child_cpu_pct_median") is None:
+            print("missing_suite_host_child_cpu_pct=true", file=sys.stderr)
+            return 1
         if not all("tok_per_s_cv_pct" in row for row in bench_report["summaries"]):
             print("missing_prompt_tok_cv=true", file=sys.stderr)
             return 1
@@ -532,6 +538,18 @@ def main() -> int:
             for row in bench_report["summaries"]
         ):
             print("missing_prompt_host_overhead=true", file=sys.stderr)
+            return 1
+        if not all(
+            "host_child_cpu_us_median" in row and "host_child_cpu_pct_median" in row
+            for row in bench_report["summaries"]
+        ):
+            print("missing_prompt_host_child_cpu=true", file=sys.stderr)
+            return 1
+        if not all(
+            "host_child_cpu_us" in row and "host_child_cpu_pct" in row
+            for row in bench_report["benchmarks"]
+        ):
+            print("missing_run_host_child_cpu=true", file=sys.stderr)
             return 1
         if not all(
             "ttft_us_median" in row and "ttft_us_p95" in row
