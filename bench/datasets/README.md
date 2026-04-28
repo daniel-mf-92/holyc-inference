@@ -37,6 +37,9 @@ the deterministic sample across answer labels. The manifest records the flag and
 the resulting answer histogram for downstream eval reproducibility checks.
 Use `--max-records-per-dataset-split` when combining multiple datasets and
 splits so one large dataset/split pair cannot dominate the curated subset.
+Use `--max-prompt-bytes`, `--max-choice-bytes`, and
+`--max-record-payload-bytes` during curation when you want oversized rows
+dropped before deterministic sampling instead of rejected later by the packer.
 
 ## Binary Format
 

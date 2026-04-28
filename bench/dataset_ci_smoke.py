@@ -75,6 +75,12 @@ def main() -> int:
             "3",
             "--max-records-per-dataset-split",
             "1",
+            "--max-prompt-bytes",
+            "4096",
+            "--max-choice-bytes",
+            "1024",
+            "--max-record-payload-bytes",
+            "8192",
             "--balance-answer-index",
             "--pack-output",
             str(packed),
@@ -102,6 +108,15 @@ def main() -> int:
         if rc := require(
             curated_report["filters"]["max_records_per_dataset_split"] == 1,
             "missing_dataset_split_cap",
+        ):
+            return rc
+        if rc := require(curated_report["filters"]["max_prompt_bytes"] == 4096, "missing_prompt_byte_filter"):
+            return rc
+        if rc := require(curated_report["filters"]["max_choice_bytes"] == 1024, "missing_choice_byte_filter"):
+            return rc
+        if rc := require(
+            curated_report["filters"]["max_record_payload_bytes"] == 8192,
+            "missing_record_payload_byte_filter",
         ):
             return rc
         if rc := require(

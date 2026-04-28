@@ -274,10 +274,79 @@ def test_choice_count_filters_keep_homogeneous_multiple_choice_rows() -> None:
         assert [row["record_id"] for row in curated_rows] == ["four-choice"]
 
 
+def test_byte_budget_filters_drop_oversized_rows_before_sampling() -> None:
+    rows = [
+        {
+            "id": "kept",
+            "prompt": "short prompt",
+            "choices": ["short", "tiny"],
+            "answer_index": 0,
+            "provenance": "synthetic byte budget curation test",
+        },
+        {
+            "id": "long-prompt",
+            "prompt": "x" * 32,
+            "choices": ["short", "tiny"],
+            "answer_index": 0,
+            "provenance": "synthetic byte budget curation test",
+        },
+        {
+            "id": "long-choice",
+            "prompt": "short prompt",
+            "choices": ["short", "choice text too long"],
+            "answer_index": 0,
+            "provenance": "synthetic byte budget curation test",
+        },
+        {
+            "id": "large-payload",
+            "prompt": "payload prompt",
+            "choices": ["left", "right"],
+            "answer_index": 0,
+            "provenance": "synthetic byte budget curation test with extra payload bytes",
+        },
+    ]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        source = Path(tmp) / "source.jsonl"
+        output = Path(tmp) / "curated.jsonl"
+        manifest = Path(tmp) / "curated.manifest.json"
+        write_jsonl(source, rows)
+
+        status = dataset_curate.main(
+            [
+                "--input",
+                str(source),
+                "--output",
+                str(output),
+                "--manifest",
+                str(manifest),
+                "--source-name",
+                "synthetic-byte-budgets",
+                "--max-prompt-bytes",
+                "16",
+                "--max-choice-bytes",
+                "8",
+                "--max-record-payload-bytes",
+                "80",
+            ]
+        )
+
+        assert status == 0
+        manifest_json = json.loads(manifest.read_text(encoding="utf-8"))
+        curated_rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+
+        assert manifest_json["filters"]["max_prompt_bytes"] == 16
+        assert manifest_json["filters"]["max_choice_bytes"] == 8
+        assert manifest_json["filters"]["max_record_payload_bytes"] == 80
+        assert manifest_json["total_after_filters"] == 1
+        assert [row["record_id"] for row in curated_rows] == ["kept"]
+
+
 if __name__ == "__main__":
     test_balanced_answer_index_sampling_limits_label_skew()
     test_duplicate_ids_fail_after_filtering()
     test_per_dataset_and_split_caps_are_deterministic()
     test_per_dataset_split_cap_limits_each_pair()
     test_choice_count_filters_keep_homogeneous_multiple_choice_rows()
+    test_byte_budget_filters_drop_oversized_rows_before_sampling()
     print("eval_dataset_curate_tests=ok")

@@ -76,6 +76,9 @@ def apply_filters(
     require_provenance: bool,
     min_choices: int | None,
     max_choices: int | None,
+    max_prompt_bytes: int | None,
+    max_choice_bytes: int | None,
+    max_record_payload_bytes: int | None,
 ) -> list[dataset_pack.EvalRecord]:
     filtered = []
     for record in records:
@@ -88,6 +91,17 @@ def apply_filters(
         if min_choices is not None and len(record.choices) < min_choices:
             continue
         if max_choices is not None and len(record.choices) > max_choices:
+            continue
+        if max_prompt_bytes is not None and len(record.prompt.encode("utf-8")) > max_prompt_bytes:
+            continue
+        if max_choice_bytes is not None and any(
+            len(choice.encode("utf-8")) > max_choice_bytes for choice in record.choices
+        ):
+            continue
+        if (
+            max_record_payload_bytes is not None
+            and dataset_pack.record_payload_bytes(record) > max_record_payload_bytes
+        ):
             continue
         filtered.append(record)
     return filtered
@@ -215,7 +229,10 @@ def build_manifest(
             "max_records_per_split": args.max_records_per_split,
             "max_records": args.max_records,
             "max_choices": args.max_choices,
+            "max_choice_bytes": args.max_choice_bytes,
+            "max_prompt_bytes": args.max_prompt_bytes,
             "min_choices": args.min_choices,
+            "max_record_payload_bytes": args.max_record_payload_bytes,
             "require_provenance": args.require_provenance,
             "seed": args.seed,
         },
@@ -252,6 +269,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-records", type=int, help="Deterministically sample at most this many records")
     parser.add_argument("--min-choices", type=int, help="Keep only records with at least this many answer choices")
     parser.add_argument("--max-choices", type=int, help="Keep only records with no more than this many answer choices")
+    parser.add_argument(
+        "--max-prompt-bytes",
+        type=int,
+        help="Drop records whose cleaned prompt exceeds this UTF-8 byte budget before sampling",
+    )
+    parser.add_argument(
+        "--max-choice-bytes",
+        type=int,
+        help="Drop records with any cleaned choice exceeding this UTF-8 byte budget before sampling",
+    )
+    parser.add_argument(
+        "--max-record-payload-bytes",
+        type=int,
+        help="Drop records whose packed payload excluding the fixed record header exceeds this byte budget before sampling",
+    )
     parser.add_argument(
         "--max-records-per-dataset",
         type=int,
@@ -299,6 +331,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.min_choices is not None and args.max_choices is not None and args.min_choices > args.max_choices:
         print("error: --min-choices cannot exceed --max-choices", file=sys.stderr)
         return 2
+    if args.max_prompt_bytes is not None and args.max_prompt_bytes < 1:
+        print("error: --max-prompt-bytes must be >= 1", file=sys.stderr)
+        return 2
+    if args.max_choice_bytes is not None and args.max_choice_bytes < 1:
+        print("error: --max-choice-bytes must be >= 1", file=sys.stderr)
+        return 2
+    if args.max_record_payload_bytes is not None and args.max_record_payload_bytes < 1:
+        print("error: --max-record-payload-bytes must be >= 1", file=sys.stderr)
+        return 2
     if args.max_records_per_dataset is not None and args.max_records_per_dataset < 1:
         print("error: --max-records-per-dataset must be >= 1", file=sys.stderr)
         return 2
@@ -322,6 +363,9 @@ def main(argv: list[str] | None = None) -> int:
             args.require_provenance,
             args.min_choices,
             args.max_choices,
+            args.max_prompt_bytes,
+            args.max_choice_bytes,
+            args.max_record_payload_bytes,
         )
         reject_duplicate_ids(filtered)
         capped = cap_records_by_field(filtered, "dataset", args.max_records_per_dataset, args.seed)
