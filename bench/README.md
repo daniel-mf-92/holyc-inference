@@ -327,7 +327,10 @@ python3 bench/bench_result_index.py \
 deterministic latest-artifact manifest for CI upload/download consumers. It
 records SHA256 and byte size for each benchmark JSON, retains compact history,
 selects the newest artifact for each profile/model/quantization/prompt-suite
-key, and keeps the same recorded-command air-gap checks.
+key, keeps the same recorded-command air-gap checks, and writes
+`bench_artifact_manifest_junit_latest.xml` so CI can surface failed artifacts,
+air-gap violations, missing telemetry, and empty manifests directly. Empty
+manifests are marked failed so missing benchmark uploads do not pass silently.
 
 ```bash
 python3 bench/bench_artifact_manifest.py \

@@ -1,0 +1,1 @@
+<testsuite name="holyc_bench_artifact_manifest" tests="4" failures="0"><testcase name="artifact_status" /><testcase name="airgap_status" /><testcase name="telemetry_coverage" /><testcase name="latest_artifacts_present" /></testsuite>

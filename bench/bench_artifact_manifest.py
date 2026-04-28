@@ -13,6 +13,7 @@ import csv
 import hashlib
 import json
 import sys
+import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -104,6 +105,8 @@ def latest_artifacts(artifacts: Iterable[ManifestArtifact]) -> list[ManifestArti
 
 
 def manifest_status(artifacts: list[ManifestArtifact]) -> str:
+    if not artifacts:
+        return "fail"
     if any(
         item.status == "fail"
         or item.command_airgap_status == "fail"
@@ -184,7 +187,85 @@ def write_csv(artifacts: list[ManifestArtifact], path: Path) -> None:
             writer.writerow({field: row[field] for field in fields})
 
 
-def write_manifest(summaries: list[bench_result_index.ArtifactSummary], output_dir: Path) -> Path:
+def junit_report(report: dict[str, object]) -> str:
+    history = [row for row in report["history"] if isinstance(row, dict)]
+    failed_artifacts = [row for row in history if row.get("status") == "fail"]
+    airgap_failures = [row for row in history if row.get("command_airgap_status") == "fail"]
+    telemetry_failures = [row for row in history if row.get("telemetry_status") == "fail"]
+    missing_latest = not report["latest_artifacts"]
+    failures = (
+        int(bool(failed_artifacts))
+        + int(bool(airgap_failures))
+        + int(bool(telemetry_failures))
+        + int(missing_latest)
+    )
+
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": "holyc_bench_artifact_manifest",
+            "tests": "4",
+            "failures": str(failures),
+        },
+    )
+
+    artifact_case = ET.SubElement(suite, "testcase", {"name": "artifact_status"})
+    if failed_artifacts:
+        failure = ET.SubElement(
+            artifact_case,
+            "failure",
+            {
+                "type": "benchmark_artifact_failure",
+                "message": f"{len(failed_artifacts)} benchmark artifact(s) failed",
+            },
+        )
+        failure.text = "\n".join(str(row.get("source", "")) for row in failed_artifacts)
+
+    airgap_case = ET.SubElement(suite, "testcase", {"name": "airgap_status"})
+    if airgap_failures:
+        failure = ET.SubElement(
+            airgap_case,
+            "failure",
+            {
+                "type": "airgap_violation",
+                "message": f"{len(airgap_failures)} benchmark artifact(s) violated air-gap policy",
+            },
+        )
+        failure.text = "\n".join(str(row.get("source", "")) for row in airgap_failures)
+
+    telemetry_case = ET.SubElement(suite, "testcase", {"name": "telemetry_coverage"})
+    if telemetry_failures:
+        failure = ET.SubElement(
+            telemetry_case,
+            "failure",
+            {
+                "type": "benchmark_telemetry_missing",
+                "message": f"{len(telemetry_failures)} benchmark artifact(s) are missing telemetry",
+            },
+        )
+        failure.text = "\n".join(
+            f"{row.get('source', '')}: {json.dumps(row.get('telemetry_findings', []), separators=(',', ':'))}"
+            for row in telemetry_failures
+        )
+
+    latest_case = ET.SubElement(suite, "testcase", {"name": "latest_artifacts_present"})
+    if missing_latest:
+        failure = ET.SubElement(
+            latest_case,
+            "failure",
+            {
+                "type": "manifest_empty",
+                "message": "manifest contains no latest benchmark artifacts",
+            },
+        )
+        failure.text = "No supported benchmark artifacts found."
+
+    return ET.tostring(suite, encoding="unicode") + "\n"
+
+
+def write_manifest(
+    summaries: list[bench_result_index.ArtifactSummary], output_dir: Path
+) -> tuple[Path, str]:
     output_dir.mkdir(parents=True, exist_ok=True)
     history = sorted(
         (to_manifest_artifact(summary) for summary in summaries),
@@ -202,10 +283,12 @@ def write_manifest(summaries: list[bench_result_index.ArtifactSummary], output_d
     json_path = output_dir / "bench_artifact_manifest_latest.json"
     md_path = output_dir / "bench_artifact_manifest_latest.md"
     csv_path = output_dir / "bench_artifact_manifest_latest.csv"
+    junit_path = output_dir / "bench_artifact_manifest_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
     write_csv(latest, csv_path)
-    return json_path
+    junit_path.write_text(junit_report(report), encoding="utf-8")
+    return json_path, str(report["status"])
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -231,17 +314,11 @@ def main(argv: list[str] | None = None) -> int:
     inputs = args.input or [Path("bench/results")]
     try:
         summaries = bench_result_index.load_summaries(inputs)
-        output = write_manifest(summaries, args.output_dir)
+        output, status = write_manifest(summaries, args.output_dir)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    status = "fail" if any(
-        summary.status == "fail"
-        or summary.command_airgap_status == "fail"
-        or summary.telemetry_status == "fail"
-        for summary in summaries
-    ) else "pass"
     print(f"wrote_json={output}")
     print(f"status={status}")
     print(f"artifacts={len(summaries)}")
