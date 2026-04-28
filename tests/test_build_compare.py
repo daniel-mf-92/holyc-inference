@@ -22,6 +22,7 @@ def write_report(
     tok_per_s: float,
     elapsed_us: int,
     wall_tok_per_s: float | None = None,
+    ttft_us: int | None = None,
     memory_bytes: int = 4096,
 ) -> None:
     row = {
@@ -40,6 +41,8 @@ def write_report(
     }
     if wall_tok_per_s is not None:
         row["wall_tok_per_s"] = wall_tok_per_s
+    if ttft_us is not None:
+        row["ttft_us"] = ttft_us
     path.write_text(
         json.dumps(
             {
@@ -54,8 +57,8 @@ def write_report(
 def test_compare_builds_computes_tok_per_s_and_elapsed_deltas(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     candidate = tmp_path / "candidate.json"
-    write_report(baseline, "base", 100.0, 200000, wall_tok_per_s=80.0)
-    write_report(candidate, "head", 125.0, 160000, wall_tok_per_s=100.0, memory_bytes=5120)
+    write_report(baseline, "base", 100.0, 200000, wall_tok_per_s=80.0, ttft_us=40000)
+    write_report(candidate, "head", 125.0, 160000, wall_tok_per_s=100.0, ttft_us=36000, memory_bytes=5120)
 
     metrics = build_compare.load_build_metrics([f"base={baseline}", f"head={candidate}"])
     deltas = build_compare.compare_builds(metrics, "base")
@@ -66,6 +69,9 @@ def test_compare_builds_computes_tok_per_s_and_elapsed_deltas(tmp_path: Path) ->
     assert deltas[0].tok_per_s_delta_pct == 25.0
     assert deltas[0].wall_tok_per_s_delta_pct == 25.0
     assert deltas[0].elapsed_delta_pct == -20.0
+    assert deltas[0].baseline_ttft_us == 40000
+    assert deltas[0].candidate_ttft_us == 36000
+    assert deltas[0].ttft_delta_pct == -10.0
     assert deltas[0].baseline_memory_bytes == 4096
     assert deltas[0].candidate_memory_bytes == 5120
     assert deltas[0].memory_delta_pct == 25.0
@@ -76,8 +82,8 @@ def test_cli_writes_json_markdown_and_csv_reports(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     candidate = tmp_path / "candidate.json"
     output_dir = tmp_path / "results"
-    write_report(baseline, "base", 100.0, 200000, wall_tok_per_s=50.0)
-    write_report(candidate, "head", 90.0, 220000, wall_tok_per_s=45.0, memory_bytes=6144)
+    write_report(baseline, "base", 100.0, 200000, wall_tok_per_s=50.0, ttft_us=40000)
+    write_report(candidate, "head", 90.0, 220000, wall_tok_per_s=45.0, ttft_us=44000, memory_bytes=6144)
 
     status = build_compare.main(
         [
@@ -100,11 +106,13 @@ def test_cli_writes_json_markdown_and_csv_reports(tmp_path: Path) -> None:
     assert payload["baseline_build"] == "base"
     assert payload["deltas"][0]["tok_per_s_delta_pct"] == -10.0
     assert payload["deltas"][0]["wall_tok_per_s_delta_pct"] == -10.0
+    assert payload["deltas"][0]["ttft_delta_pct"] == 10.0
     assert payload["deltas"][0]["memory_delta_pct"] == 50.0
     assert payload["regressions"][0]["candidate_build"] == "head"
     assert payload["regressions"][0]["metric"] == "tok_per_s"
     assert csv_rows[0]["tok_per_s_delta_pct"] == "-10.0"
     assert csv_rows[0]["wall_tok_per_s_delta_pct"] == "-10.0"
+    assert csv_rows[0]["ttft_delta_pct"] == "10.0"
     assert csv_rows[0]["memory_delta_pct"] == "50.0"
     assert junit_root.attrib["name"] == "holyc_build_compare"
     assert junit_root.attrib["tests"] == "1"
@@ -114,7 +122,8 @@ def test_cli_writes_json_markdown_and_csv_reports(tmp_path: Path) -> None:
     assert "Status: fail" in markdown
     assert (
         "| head | qemu_prompt/secure-local/tiny/Q4_0/smoke | 100.000 | 90.000 | -10.000 | "
-        "50.000 | 45.000 | -10.000 |"
+        "50.000 | 45.000 | -10.000 | 200000.000 | 220000.000 | 10.000 | "
+        "40000.000 | 44000.000 | 10.000 |"
     ) in markdown
 
 
@@ -181,6 +190,38 @@ def test_cli_can_gate_wall_clock_throughput_regression(tmp_path: Path) -> None:
     assert "wall_tok_per_s changed by -12.500%" in junit_root.find("./testcase/failure").attrib["message"]
 
 
+def test_cli_can_gate_ttft_growth(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    candidate = tmp_path / "candidate.json"
+    output_dir = tmp_path / "results"
+    write_report(baseline, "base", 100.0, 200000, ttft_us=40000)
+    write_report(candidate, "head", 100.0, 200000, ttft_us=46000)
+
+    status = build_compare.main(
+        [
+            "--input",
+            f"base={baseline}",
+            "--input",
+            f"head={candidate}",
+            "--output-dir",
+            str(output_dir),
+            "--max-ttft-growth-pct",
+            "10",
+            "--fail-on-regression",
+        ]
+    )
+
+    payload = json.loads((output_dir / "build_compare_latest.json").read_text(encoding="utf-8"))
+    junit_root = ET.parse(output_dir / "build_compare_junit_latest.xml").getroot()
+
+    assert status == 1
+    assert payload["status"] == "fail"
+    assert payload["max_ttft_growth_pct"] == 10.0
+    assert payload["regressions"][0]["metric"] == "ttft_us"
+    assert payload["regressions"][0]["delta_pct"] == 15.0
+    assert "ttft_us changed by 15.000%" in junit_root.find("./testcase/failure").attrib["message"]
+
+
 def test_cli_can_fail_on_throughput_regression(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     candidate = tmp_path / "candidate.json"
@@ -233,6 +274,7 @@ if __name__ == "__main__":
         test_cli_writes_json_markdown_and_csv_reports(tmp_path)
         test_cli_can_gate_memory_growth(tmp_path)
         test_cli_can_gate_wall_clock_throughput_regression(tmp_path)
+        test_cli_can_gate_ttft_growth(tmp_path)
         test_cli_can_fail_on_throughput_regression(tmp_path)
         test_missing_baseline_returns_error(tmp_path)
     print("build_compare_tests=ok")
