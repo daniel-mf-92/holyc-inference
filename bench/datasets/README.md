@@ -92,6 +92,12 @@ python3 bench/dataset_index.py \
   --fail-on-findings
 ```
 
+For a complete local smoke gate of the dataset toolchain, run:
+
+```bash
+python3 bench/dataset_ci_smoke.py
+```
+
 ## Split Leakage Audit
 
 Before freezing a train/dev/test subset, run the local leakage audit over the

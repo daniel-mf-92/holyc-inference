@@ -118,6 +118,15 @@ python3 bench/dataset_index.py \
   --fail-on-findings
 ```
 
+`dataset_ci_smoke.py` is a stdlib-only CI gate for the offline dataset pipeline.
+It curates the synthetic sample, packs and inspects the `.hceval` binary, runs
+the split-leakage audit, indexes the generated artifacts, and checks that a
+known leaky fixture is rejected:
+
+```bash
+python3 bench/dataset_ci_smoke.py
+```
+
 `dataset_leak_audit.py` checks local eval JSONL before packing for duplicate
 record IDs, normalized prompt reuse across splits, repeated prompt+choice
 payloads across splits, and conflicting answers for the same payload. It never
