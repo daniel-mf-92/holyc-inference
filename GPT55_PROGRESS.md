@@ -132,3 +132,4 @@
 2026-04-28T13:02:04Z | Added eval dataset provenance/source-shard curation caps with smoke coverage and refreshed dataset artifacts.
 2026-04-28T13:07:42Z | Added eval_compare confusion-matrix CSV output with docs and refreshed smoke comparison artifacts.
 2026-04-28T13:18:00Z | Added eval_compare calibration-bin CSV output with smoke coverage and refreshed comparison artifacts.
+2026-04-28T13:28:19Z | Added benchmark matrix/result-index host child CPU rollups with smoke coverage and refreshed benchmark artifacts.

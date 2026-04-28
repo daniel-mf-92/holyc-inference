@@ -154,8 +154,13 @@ def test_cli_runs_synthetic_matrix(tmp_path: Path) -> None:
     assert all(row["measured_runs"] == "4" for row in csv_rows)
     assert all(cell["warmup_runs"] == 2 for cell in report["cells"])
     assert all(cell["median_tok_per_s"] == 160.0 for cell in report["cells"])
+    assert all(cell["host_child_cpu_us_median"] is not None for cell in report["cells"])
+    assert all(cell["host_child_cpu_pct_median"] is not None for cell in report["cells"])
+    assert all(row["host_child_cpu_us_median"] != "" for row in csv_rows)
+    assert all(row["host_child_cpu_pct_median"] != "" for row in csv_rows)
     assert all(cell["command"][1:3] == ["-nic", "none"] for cell in report["cells"])
     assert "Benchmark Matrix" in markdown
+    assert "Host child CPU %" in markdown
     assert "Prompt suite" in markdown
     assert "Command SHA256" in markdown
 
@@ -178,6 +183,13 @@ def test_junit_marks_failed_matrix_cells(tmp_path: Path) -> None:
             measured_runs=3,
             warmup_runs=1,
             median_tok_per_s=120.0,
+            wall_tok_per_s_median=None,
+            ttft_us_p95=None,
+            host_overhead_pct_median=None,
+            host_child_cpu_us_median=None,
+            host_child_cpu_pct_median=None,
+            us_per_token_median=None,
+            wall_us_per_token_median=None,
             max_memory_bytes=4096,
             variability_findings=0,
         ),
@@ -196,6 +208,13 @@ def test_junit_marks_failed_matrix_cells(tmp_path: Path) -> None:
             measured_runs=3,
             warmup_runs=1,
             median_tok_per_s=90.0,
+            wall_tok_per_s_median=None,
+            ttft_us_p95=None,
+            host_overhead_pct_median=None,
+            host_child_cpu_us_median=12000.0,
+            host_child_cpu_pct_median=85.0,
+            us_per_token_median=None,
+            wall_us_per_token_median=None,
             max_memory_bytes=8192,
             variability_findings=1,
         ),
@@ -212,3 +231,4 @@ def test_junit_marks_failed_matrix_cells(tmp_path: Path) -> None:
     assert failure.attrib["type"] == "benchmark_matrix_cell_failure"
     assert "variability_findings=1" in (failure.text or "")
     assert "command_sha256=" in (failure.text or "")
+    assert "host_child_cpu_pct_median=85.0" in (failure.text or "")

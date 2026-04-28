@@ -44,6 +44,8 @@ class ArtifactSummary:
     wall_tok_per_s_median: float | None
     ttft_us_p95: float | None
     host_overhead_pct_median: float | None
+    host_child_cpu_us_median: float | None
+    host_child_cpu_pct_median: float | None
     us_per_token_median: float | None
     wall_us_per_token_median: float | None
     max_memory_bytes: int | None
@@ -360,6 +362,8 @@ def summarize_qemu_report(
         wall_tok_per_s_median=summary_float(report, summaries, "wall_tok_per_s_median"),
         ttft_us_p95=summary_float(report, summaries, "ttft_us_p95"),
         host_overhead_pct_median=summary_float(report, summaries, "host_overhead_pct_median"),
+        host_child_cpu_us_median=summary_float(report, summaries, "host_child_cpu_us_median"),
+        host_child_cpu_pct_median=summary_float(report, summaries, "host_child_cpu_pct_median"),
         us_per_token_median=summary_float(report, summaries, "us_per_token_median"),
         wall_us_per_token_median=summary_float(report, summaries, "wall_us_per_token_median"),
         max_memory_bytes=max_memory_bytes,
@@ -436,6 +440,8 @@ def summarize_matrix_report(
                 wall_tok_per_s_median=parse_float(cell.get("wall_tok_per_s_median")),
                 ttft_us_p95=parse_float(cell.get("ttft_us_p95")),
                 host_overhead_pct_median=parse_float(cell.get("host_overhead_pct_median")),
+                host_child_cpu_us_median=parse_float(cell.get("host_child_cpu_us_median")),
+                host_child_cpu_pct_median=parse_float(cell.get("host_child_cpu_pct_median")),
                 us_per_token_median=parse_float(cell.get("us_per_token_median")),
                 wall_us_per_token_median=parse_float(cell.get("wall_us_per_token_median")),
                 max_memory_bytes=parse_int(cell.get("max_memory_bytes")),
@@ -608,8 +614,8 @@ def markdown_report(report: dict[str, Any]) -> str:
     if report["artifacts"]:
         lines.extend(
             [
-                "| Type | Status | Air-gap | Telemetry | Freshness | Commit | Profile | Model | Quant | Prompt suite | Command SHA256 | Prompts | Runs | Warmups | Age seconds | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Guest us/token | Wall us/token | Max memory bytes | Source |",
-                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+                "| Type | Status | Air-gap | Telemetry | Freshness | Commit | Profile | Model | Quant | Prompt suite | Command SHA256 | Prompts | Runs | Warmups | Age seconds | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Guest us/token | Wall us/token | Max memory bytes | Source |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
             ]
         )
         for artifact in report["artifacts"]:
@@ -617,7 +623,8 @@ def markdown_report(report: dict[str, Any]) -> str:
                 "| {artifact_type} | {status} | {command_airgap_status} | {telemetry_status} | {freshness_status} | {commit_status}:{commit} | {profile} | {model} | "
                 "{quantization} | {prompt_suite_sha256} | {command_sha256} | {prompts} | {measured_runs} | {warmup_runs} | "
                 "{generated_age_seconds} | {median_tok_per_s} | {wall_tok_per_s_median} | {ttft_us_p95} | "
-                "{host_overhead_pct_median} | {us_per_token_median} | {wall_us_per_token_median} | "
+                "{host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | "
+                "{us_per_token_median} | {wall_us_per_token_median} | "
                 "{max_memory_bytes} | {source} |".format(
                     **{key: format_value(value) for key, value in artifact.items()}
                 )
@@ -829,6 +836,8 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
         "wall_tok_per_s_median",
         "ttft_us_p95",
         "host_overhead_pct_median",
+        "host_child_cpu_us_median",
+        "host_child_cpu_pct_median",
         "us_per_token_median",
         "wall_us_per_token_median",
         "max_memory_bytes",

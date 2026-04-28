@@ -24,7 +24,12 @@ def test_indexes_qemu_prompt_report_with_airgap_status(tmp_path: Path) -> None:
                 "generated_at": "2026-04-27T20:00:00Z",
                 "status": "pass",
                 "prompt_suite": {"suite_sha256": "a" * 64, "prompt_count": 1},
-                "suite_summary": {"tok_per_s_median": 123.0, "memory_bytes_max": 4096},
+                "suite_summary": {
+                    "tok_per_s_median": 123.0,
+                    "memory_bytes_max": 4096,
+                    "host_child_cpu_us_median": 5000,
+                    "host_child_cpu_pct_median": 75.5,
+                },
                 "warmups": [],
                 "benchmarks": [
                     {
@@ -57,6 +62,8 @@ def test_indexes_qemu_prompt_report_with_airgap_status(tmp_path: Path) -> None:
     assert summary.generated_age_seconds is not None
     assert summary.freshness_status == "unchecked"
     assert summary.median_tok_per_s == 123.0
+    assert summary.host_child_cpu_us_median == 5000.0
+    assert summary.host_child_cpu_pct_median == 75.5
     assert summary.max_memory_bytes == 4096
 
 
