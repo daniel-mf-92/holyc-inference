@@ -275,6 +275,54 @@ def test_qemu_prompt_report_marks_stale_commit_and_cli_can_fail(tmp_path: Path) 
     assert payload["artifacts"][0]["current_commit_match"] is False
 
 
+def test_mixed_commit_metadata_fails_index_and_junit(tmp_path: Path) -> None:
+    report = tmp_path / "qemu_prompt_bench_latest.json"
+    report.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-04-27T20:00:00Z",
+                "status": "pass",
+                "prompt_suite": {"suite_sha256": "b" * 64, "prompt_count": 2},
+                "suite_summary": {"tok_per_s_median": 123.0},
+                "benchmarks": [
+                    {
+                        "benchmark": "qemu_prompt",
+                        "profile": "secure",
+                        "model": "tiny",
+                        "quantization": "Q4_0",
+                        "commit": "abc123",
+                        "command": ["qemu-system-x86_64", "-nic", "none"],
+                    },
+                    {
+                        "benchmark": "qemu_prompt",
+                        "profile": "secure",
+                        "model": "tiny",
+                        "quantization": "Q4_0",
+                        "commit": "def456",
+                        "command": ["qemu-system-x86_64", "-nic", "none"],
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summaries = bench_result_index.load_summaries([tmp_path])
+    report_payload = {
+        "artifacts": [summary.__dict__ for summary in summaries],
+        "prompt_suite_drift": [],
+    }
+    root = ET.fromstring(bench_result_index.junit_report(report_payload))
+
+    assert summaries[0].commit_status == "fail"
+    assert bench_result_index.index_status(summaries) == "fail"
+    assert root.attrib["tests"] == "5"
+    assert root.attrib["failures"] == "1"
+    failure = root.find("./testcase[@name='commit_metadata']/failure")
+    assert failure is not None
+    assert failure.attrib["type"] == "benchmark_commit_metadata_failure"
+
+
 def test_indexes_matrix_cells_and_flags_network_devices(tmp_path: Path) -> None:
     report = tmp_path / "bench_matrix_latest.json"
     report.write_text(
@@ -406,6 +454,41 @@ def test_cli_writes_json_markdown_and_csv(tmp_path: Path) -> None:
     assert junit_root.attrib["failures"] == "0"
 
 
+def test_cli_airgap_gate_ignores_telemetry_only_failures(tmp_path: Path) -> None:
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    input_dir.mkdir()
+    (input_dir / "qemu_prompt_bench_latest.json").write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-04-27T20:00:00Z",
+                "status": "pass",
+                "prompt_suite": {"suite_sha256": "d" * 64, "prompt_count": 1},
+                "suite_summary": {},
+                "benchmarks": [
+                    {
+                        "profile": "synthetic",
+                        "model": "smoke",
+                        "quantization": "Q4_0",
+                        "command": ["qemu-system-x86_64", "-nic", "none"],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    airgap_status = bench_result_index.main(
+        ["--input", str(input_dir), "--output-dir", str(output_dir), "--fail-on-airgap"]
+    )
+    telemetry_status = bench_result_index.main(
+        ["--input", str(input_dir), "--output-dir", str(output_dir), "--fail-on-telemetry"]
+    )
+
+    assert airgap_status == 0
+    assert telemetry_status == 1
+
+
 def test_cli_writes_drift_csv_and_can_fail_on_drift(tmp_path: Path) -> None:
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"
@@ -473,7 +556,7 @@ def test_junit_report_marks_artifact_airgap_and_drift_failures() -> None:
     root = ET.fromstring(bench_result_index.junit_report(report))
 
     assert root.attrib["name"] == "holyc_bench_result_index"
-    assert root.attrib["tests"] == "4"
+    assert root.attrib["tests"] == "5"
     assert root.attrib["failures"] == "3"
     failures = root.findall("./testcase/failure")
     assert {failure.attrib["type"] for failure in failures} == {

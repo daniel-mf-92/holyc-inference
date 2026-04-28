@@ -347,9 +347,23 @@ def index_status(summaries: list[ArtifactSummary]) -> str:
         return "fail"
     if any(summary.telemetry_status == "fail" for summary in summaries):
         return "fail"
+    if any(summary.commit_status == "fail" for summary in summaries):
+        return "fail"
     if any(summary.status == "fail" for summary in summaries):
         return "fail"
     return "pass"
+
+
+def has_airgap_failures(summaries: list[ArtifactSummary]) -> bool:
+    return any(summary.command_airgap_status == "fail" for summary in summaries)
+
+
+def has_telemetry_failures(summaries: list[ArtifactSummary]) -> bool:
+    return any(summary.telemetry_status == "fail" for summary in summaries)
+
+
+def has_commit_metadata_failures(summaries: list[ArtifactSummary]) -> bool:
+    return any(summary.commit_status == "fail" for summary in summaries)
 
 
 def commit_drift(summaries: list[ArtifactSummary]) -> list[ArtifactSummary]:
@@ -448,10 +462,12 @@ def junit_report(report: dict[str, Any]) -> str:
     failed_artifacts = [row for row in artifacts if row.get("status") == "fail"]
     airgap_failures = [row for row in artifacts if row.get("command_airgap_status") == "fail"]
     telemetry_failures = [row for row in artifacts if row.get("telemetry_status") == "fail"]
+    commit_failures = [row for row in artifacts if row.get("commit_status") == "fail"]
     failures = (
         int(bool(failed_artifacts))
         + int(bool(airgap_failures))
         + int(bool(telemetry_failures))
+        + int(bool(commit_failures))
         + int(bool(drift))
     )
 
@@ -459,7 +475,7 @@ def junit_report(report: dict[str, Any]) -> str:
         "testsuite",
         {
             "name": "holyc_bench_result_index",
-            "tests": "4",
+            "tests": "5",
             "failures": str(failures),
         },
     )
@@ -501,6 +517,21 @@ def junit_report(report: dict[str, Any]) -> str:
         failure.text = "\n".join(
             f"{row.get('source', '')}: {json.dumps(row.get('telemetry_findings', []), separators=(',', ':'))}"
             for row in telemetry_failures
+        )
+
+    commit_case = ET.SubElement(suite, "testcase", {"name": "commit_metadata"})
+    if commit_failures:
+        failure = ET.SubElement(
+            commit_case,
+            "failure",
+            {
+                "type": "benchmark_commit_metadata_failure",
+                "message": f"{len(commit_failures)} benchmark artifact(s) have inconsistent commit metadata",
+            },
+        )
+        failure.text = "\n".join(
+            f"{row.get('source', '')}: {json.dumps(row.get('commit_findings', []), separators=(',', ':'))}"
+            for row in commit_failures
         )
 
     drift_case = ET.SubElement(suite, "testcase", {"name": "prompt_suite_drift"})
@@ -609,6 +640,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Return non-zero if any indexed command violates air-gap policy",
     )
     parser.add_argument(
+        "--fail-on-telemetry",
+        action="store_true",
+        help="Return non-zero if any indexed artifact is missing required benchmark telemetry",
+    )
+    parser.add_argument(
+        "--fail-on-commit-metadata",
+        action="store_true",
+        help="Return non-zero if any artifact has missing or inconsistent commit metadata",
+    )
+    parser.add_argument(
         "--fail-on-drift",
         action="store_true",
         help="Return non-zero if comparable artifacts use different prompt-suite hashes",
@@ -636,7 +677,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"status={status}")
     print(f"artifacts={len(summaries)}")
     print(f"prompt_suite_drift={len(drift)}")
-    if args.fail_on_airgap and status == "fail":
+    if args.fail_on_airgap and has_airgap_failures(summaries):
+        return 1
+    if args.fail_on_telemetry and has_telemetry_failures(summaries):
+        return 1
+    if args.fail_on_commit_metadata and has_commit_metadata_failures(summaries):
         return 1
     if args.fail_on_drift and drift:
         return 1

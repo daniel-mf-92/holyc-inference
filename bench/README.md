@@ -319,10 +319,12 @@ benchmark reports do not enter CI dashboards as valid data. The drift findings
 are also written to
 `bench_result_index_prompt_suite_drift_latest.csv`, and
 `bench_result_index_junit_latest.xml` exposes artifact failures, air-gap
-violations, missing telemetry, and prompt drift as CI test failures. It never
-launches QEMU. The index also records per-artifact commit metadata and can
-optionally fail when benchmark artifacts were produced from a different commit
-than the current checkout.
+violations, missing telemetry, inconsistent commit metadata, and prompt drift
+as CI test failures. It never launches QEMU. The index also records
+per-artifact commit metadata and can optionally fail when benchmark artifacts
+were produced from a different commit than the current checkout. Use
+`--fail-on-airgap`, `--fail-on-telemetry`, and `--fail-on-commit-metadata` to
+gate those failure classes independently.
 
 Example:
 
