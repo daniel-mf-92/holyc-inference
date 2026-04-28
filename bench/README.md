@@ -348,15 +348,19 @@ python3 bench/bench_result_index.py \
 deterministic latest-artifact manifest for CI upload/download consumers. It
 records SHA256 and byte size for each benchmark JSON, retains compact history,
 selects the newest artifact for each profile/model/quantization/prompt-suite
-key, keeps the same recorded-command air-gap checks, and writes
+key, keeps the same recorded-command air-gap and commit metadata checks, and writes
 `bench_artifact_manifest_junit_latest.xml` so CI can surface failed artifacts,
-air-gap violations, missing telemetry, and empty manifests directly. Empty
-manifests are marked failed so missing benchmark uploads do not pass silently.
+air-gap violations, missing telemetry, inconsistent commit metadata, and empty
+manifests directly. Empty manifests are marked failed so missing benchmark
+uploads do not pass silently. For current-job manifests, `--fail-on-stale-commit`
+returns non-zero when any artifact was produced from a different commit than
+the current checkout.
 
 ```bash
 python3 bench/bench_artifact_manifest.py \
   --input bench/results \
   --output-dir bench/results \
+  --fail-on-stale-commit \
   --fail-on-airgap
 ```
 

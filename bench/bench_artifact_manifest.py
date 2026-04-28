@@ -42,6 +42,11 @@ class ManifestArtifact:
     telemetry_status: str
     telemetry_findings: list[str]
     command_airgap_status: str
+    commit: str
+    current_commit: str
+    current_commit_match: bool | None
+    commit_status: str
+    commit_findings: list[str]
     sha256: str
     bytes: int
 
@@ -87,6 +92,11 @@ def to_manifest_artifact(summary: bench_result_index.ArtifactSummary) -> Manifes
         telemetry_status=summary.telemetry_status,
         telemetry_findings=summary.telemetry_findings,
         command_airgap_status=summary.command_airgap_status,
+        commit=summary.commit,
+        current_commit=summary.current_commit,
+        current_commit_match=summary.current_commit_match,
+        commit_status=summary.commit_status,
+        commit_findings=summary.commit_findings,
         sha256=file_sha256(path),
         bytes=path.stat().st_size,
     )
@@ -111,6 +121,7 @@ def manifest_status(artifacts: list[ManifestArtifact]) -> str:
         item.status == "fail"
         or item.command_airgap_status == "fail"
         or item.telemetry_status == "fail"
+        or item.commit_status == "fail"
         for item in artifacts
     ):
         return "fail"
@@ -140,13 +151,13 @@ def markdown_report(report: dict[str, object]) -> str:
     if latest:
         lines.extend(
             [
-                "| Key | Status | Air-gap | Telemetry | Runs | Warmups | Median tok/s | Max memory bytes | SHA256 | Source |",
-                "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |",
+                "| Key | Status | Air-gap | Telemetry | Commit | Runs | Warmups | Median tok/s | Max memory bytes | SHA256 | Source |",
+                "| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |",
             ]
         )
         for artifact in latest:
             lines.append(
-                "| {key} | {status} | {command_airgap_status} | {telemetry_status} | {measured_runs} | "
+                "| {key} | {status} | {command_airgap_status} | {telemetry_status} | {commit_status}:{commit} | {measured_runs} | "
                 "{warmup_runs} | {median_tok_per_s} | {max_memory_bytes} | {sha256} | "
                 "{source} |".format(
                     **{key: format_value(value) for key, value in artifact.items()}
@@ -175,6 +186,11 @@ def write_csv(artifacts: list[ManifestArtifact], path: Path) -> None:
         "telemetry_status",
         "telemetry_findings",
         "command_airgap_status",
+        "commit",
+        "current_commit",
+        "current_commit_match",
+        "commit_status",
+        "commit_findings",
         "sha256",
         "bytes",
     ]
@@ -184,6 +200,7 @@ def write_csv(artifacts: list[ManifestArtifact], path: Path) -> None:
         for artifact in artifacts:
             row = asdict(artifact)
             row["telemetry_findings"] = json.dumps(artifact.telemetry_findings, separators=(",", ":"))
+            row["commit_findings"] = json.dumps(artifact.commit_findings, separators=(",", ":"))
             writer.writerow({field: row[field] for field in fields})
 
 
@@ -192,11 +209,13 @@ def junit_report(report: dict[str, object]) -> str:
     failed_artifacts = [row for row in history if row.get("status") == "fail"]
     airgap_failures = [row for row in history if row.get("command_airgap_status") == "fail"]
     telemetry_failures = [row for row in history if row.get("telemetry_status") == "fail"]
+    commit_failures = [row for row in history if row.get("commit_status") == "fail"]
     missing_latest = not report["latest_artifacts"]
     failures = (
         int(bool(failed_artifacts))
         + int(bool(airgap_failures))
         + int(bool(telemetry_failures))
+        + int(bool(commit_failures))
         + int(missing_latest)
     )
 
@@ -204,7 +223,7 @@ def junit_report(report: dict[str, object]) -> str:
         "testsuite",
         {
             "name": "holyc_bench_artifact_manifest",
-            "tests": "4",
+            "tests": "5",
             "failures": str(failures),
         },
     )
@@ -260,6 +279,21 @@ def junit_report(report: dict[str, object]) -> str:
         )
         failure.text = "No supported benchmark artifacts found."
 
+    commit_case = ET.SubElement(suite, "testcase", {"name": "commit_metadata"})
+    if commit_failures:
+        failure = ET.SubElement(
+            commit_case,
+            "failure",
+            {
+                "type": "benchmark_commit_metadata_failure",
+                "message": f"{len(commit_failures)} benchmark artifact(s) have inconsistent commit metadata",
+            },
+        )
+        failure.text = "\n".join(
+            f"{row.get('source', '')}: {json.dumps(row.get('commit_findings', []), separators=(',', ':'))}"
+            for row in commit_failures
+        )
+
     return ET.tostring(suite, encoding="unicode") + "\n"
 
 
@@ -306,6 +340,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Return non-zero if any manifest artifact records a QEMU air-gap violation",
     )
+    parser.add_argument(
+        "--fail-on-stale-commit",
+        action="store_true",
+        help="Return non-zero if any manifest artifact commit differs from the current git commit",
+    )
     return parser
 
 
@@ -323,6 +362,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"status={status}")
     print(f"artifacts={len(summaries)}")
     if args.fail_on_airgap and status == "fail":
+        return 1
+    if args.fail_on_stale_commit and any(summary.current_commit_match is False for summary in summaries):
         return 1
     return 0
 
