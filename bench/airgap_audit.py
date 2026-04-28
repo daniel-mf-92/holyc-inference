@@ -37,6 +37,7 @@ NETWORK_DEVICE_MARKERS = (
     "vmxnet",
     "xen_nic",
 )
+COMMAND_KEYS = ("command", "qemu_command", "launch_command", "qemu_launch_command")
 RESULT_KEYS = ("benchmarks", "warmups", "cells", "results", "runs", "rows")
 
 
@@ -180,13 +181,21 @@ def normalize_command(value: Any) -> list[str] | None:
     return None
 
 
+def row_command(row: dict[str, Any]) -> list[str] | None:
+    for key in COMMAND_KEYS:
+        command = normalize_command(row.get(key))
+        if command is not None:
+            return command
+    return None
+
+
 def audit(paths: Iterable[Path]) -> tuple[int, list[Finding]]:
     commands_checked = 0
     findings: list[Finding] = []
     for path in sorted(iter_input_files(paths)):
         loader = load_jsonl_records if path.suffix.lower() == ".jsonl" else load_json_records
         for row_number, row in enumerate(loader(path), 1):
-            command = normalize_command(row.get("command"))
+            command = row_command(row)
             if command is None:
                 continue
             violations = command_violations(command)

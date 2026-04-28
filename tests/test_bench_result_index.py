@@ -239,6 +239,39 @@ def test_qemu_prompt_report_checks_every_recorded_command(tmp_path: Path) -> Non
     assert bench_result_index.index_status(summaries) == "fail"
 
 
+def test_qemu_prompt_report_checks_qemu_command_alias(tmp_path: Path) -> None:
+    report = tmp_path / "qemu_prompt_bench_latest.json"
+    report.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-04-27T20:00:00Z",
+                "status": "pass",
+                "prompt_suite": {"suite_sha256": "a" * 64, "prompt_count": 1},
+                "suite_summary": {"tok_per_s_median": 123.0},
+                "benchmarks": [
+                    {
+                        "benchmark": "qemu_prompt",
+                        "profile": "secure",
+                        "model": "tiny",
+                        "quantization": "Q4_0",
+                        "qemu_command": [
+                            "qemu-system-x86_64",
+                            "-drive",
+                            "file=TempleOS.img,format=raw,if=ide",
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summaries = bench_result_index.load_summaries([tmp_path])
+
+    assert summaries[0].command_airgap_status == "fail"
+    assert "measured[0]: missing explicit `-nic none`" in summaries[0].command_findings
+
+
 def test_qemu_prompt_report_recomputes_command_hash_metadata(tmp_path: Path) -> None:
     command = [
         "qemu-system-x86_64",

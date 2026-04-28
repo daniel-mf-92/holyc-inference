@@ -94,6 +94,50 @@ def test_audit_checks_bench_matrix_cell_commands(tmp_path: Path) -> None:
     assert any("network backend" in finding.reason for finding in findings)
 
 
+def test_audit_checks_qemu_command_aliases(tmp_path: Path) -> None:
+    report = tmp_path / "artifact.json"
+    report.write_text(
+        json.dumps(
+            {
+                "results": [
+                    {
+                        "qemu_command": [
+                            "qemu-system-x86_64",
+                            "-drive",
+                            "file=TempleOS.img,format=raw,if=ide",
+                        ]
+                    },
+                    {
+                        "launch_command": [
+                            "qemu-system-x86_64",
+                            "-nic",
+                            "none",
+                            "-drive",
+                            "file=TempleOS.img,format=raw,if=ide",
+                        ]
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    commands_checked, findings = airgap_audit.audit([report])
+
+    assert commands_checked == 2
+    assert len(findings) == 1
+    assert findings[0].reason == "missing explicit `-nic none`"
+
+
+def test_row_command_prefers_primary_command_field() -> None:
+    row = {
+        "command": ["qemu-system-x86_64", "-nic", "none"],
+        "qemu_command": ["qemu-system-x86_64", "-device", "rtl8139"],
+    }
+
+    assert airgap_audit.row_command(row) == ["qemu-system-x86_64", "-nic", "none"]
+
+
 def test_cli_writes_markdown_csv_and_junit_reports(tmp_path: Path) -> None:
     report = tmp_path / "qemu_prompt_bench_latest.json"
     report.write_text(

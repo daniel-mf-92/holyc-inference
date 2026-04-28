@@ -211,6 +211,10 @@ def aggregate_command_status(commands: Iterable[tuple[str, Any]]) -> tuple[str, 
     return "not-qemu", findings
 
 
+def row_command(row: dict[str, Any]) -> list[str] | None:
+    return airgap_audit.row_command(row)
+
+
 def qemu_run_failed(row: dict[str, Any]) -> bool:
     returncode = parse_int(row.get("returncode"))
     return (returncode is not None and returncode != 0) or parse_bool(row.get("timed_out"))
@@ -378,8 +382,8 @@ def summarize_qemu_report(
         if (value := parse_int(row.get("memory_bytes_max"))) is not None
     ]
     airgap_status, findings = aggregate_command_status(
-        [(f"measured[{index}]", row.get("command")) for index, row in enumerate(runs)]
-        + [(f"warmup[{index}]", row.get("command")) for index, row in enumerate(warmups)]
+        [(f"measured[{index}]", row_command(row)) for index, row in enumerate(runs)]
+        + [(f"warmup[{index}]", row_command(row)) for index, row in enumerate(warmups)]
     )
 
     prompts = parse_int(prompt_suite.get("prompt_count"))
@@ -405,8 +409,8 @@ def summarize_qemu_report(
         "qemu_prompt",
         [report.get("command_sha256")]
         + [row.get("command_sha256") for row in runs + warmups if isinstance(row, dict)],
-        [(f"measured[{index}]", row.get("command")) for index, row in enumerate(runs)]
-        + [(f"warmup[{index}]", row.get("command")) for index, row in enumerate(warmups)],
+        [(f"measured[{index}]", row_command(row)) for index, row in enumerate(runs)]
+        + [(f"warmup[{index}]", row_command(row)) for index, row in enumerate(warmups)],
     )
     if command_hash_state == "fail":
         findings.extend(command_hash_findings)
@@ -486,7 +490,8 @@ def summarize_matrix_report(
     )
     environment = report.get("environment") if isinstance(report.get("environment"), dict) else {}
     for cell in cells:
-        airgap_status, findings = command_status(cell.get("command"))
+        cell_command = row_command(cell)
+        airgap_status, findings = command_status(cell_command)
         prompts = parse_int(cell.get("prompts"))
         measured_runs = parse_int(cell.get("measured_runs")) or 0
         median_tok_per_s = parse_float(cell.get("median_tok_per_s"))
@@ -503,7 +508,7 @@ def summarize_matrix_report(
         command_hash_state, command_sha256, command_hash_findings = command_hash_status(
             "bench_matrix_cell",
             [cell.get("command_sha256")],
-            [("cell", cell.get("command"))],
+            [("cell", cell_command)],
         )
         if command_hash_state == "fail":
             findings.extend(command_hash_findings)
