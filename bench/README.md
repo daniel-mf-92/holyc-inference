@@ -177,9 +177,10 @@ python3 bench/dataset_provenance_audit.py \
 ## Offline Eval Comparator
 
 `eval_compare.py` compares local HolyC and llama.cpp multiple-choice predictions
-against the same gold JSONL and writes JSON, Markdown, CSV, and JUnit XML
-reports. Optional quality gates can fail CI when HolyC accuracy, engine
-agreement, or accuracy delta versus llama.cpp falls outside configured bounds.
+against the same gold JSONL and writes JSON, Markdown, per-record CSV,
+per-dataset/split breakdown CSV, confusion-matrix CSV, and JUnit XML reports.
+Optional quality gates can fail CI when HolyC accuracy, engine agreement, or
+accuracy delta versus llama.cpp falls outside configured bounds.
 Prediction score vectors are treated as choice-aligned logits/logprobs: every
 score must be finite and the score count must match the gold choice count.
 `eval_input_audit.py` also records per-engine prediction histograms and can fail
@@ -615,14 +616,14 @@ python3 bench/build_compare.py \
 `eval_compare.py` compares offline multiple-choice predictions from HolyC and
 llama.cpp against the same local gold JSONL dataset. It aligns by record id,
 supports prediction indexes, labels, exact choice text, or score arrays, and
-writes JSON, Markdown, per-record CSV, per-dataset/split breakdown CSV, and
-JUnit XML reports to `bench/results/`. Reports include accuracy, agreement,
-macro-F1, per-answer F1, per-dataset/split breakdowns, and confusion matrices
-for each engine. Accuracy and agreement summaries also include stdlib-only
-Wilson confidence intervals; use `--confidence-level` to select 0.80, 0.90,
-0.95, 0.98, or 0.99. Add `--gate-dataset-breakdowns` to apply the same quality
-gates to each dataset/split bucket, which prevents mixed eval suites from hiding
-small-subset regressions behind healthy aggregate scores.
+writes JSON, Markdown, per-record CSV, per-dataset/split breakdown CSV,
+confusion-matrix CSV, and JUnit XML reports to `bench/results/`. Reports include
+accuracy, agreement, macro-F1, per-answer F1, per-dataset/split breakdowns, and
+confusion matrices for each engine. Accuracy and agreement summaries also
+include stdlib-only Wilson confidence intervals; use `--confidence-level` to
+select 0.80, 0.90, 0.95, 0.98, or 0.99. Add `--gate-dataset-breakdowns` to apply
+the same quality gates to each dataset/split bucket, which prevents mixed eval
+suites from hiding small-subset regressions behind healthy aggregate scores.
 
 Before comparing, `eval_input_audit.py` can gate apples-to-apples inputs. It
 checks gold/prediction record coverage, duplicates, invalid prediction indexes,
