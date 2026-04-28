@@ -38,6 +38,8 @@ class ManifestArtifact:
     warmup_runs: int
     median_tok_per_s: float | None
     max_memory_bytes: int | None
+    telemetry_status: str
+    telemetry_findings: list[str]
     command_airgap_status: str
     sha256: str
     bytes: int
@@ -81,6 +83,8 @@ def to_manifest_artifact(summary: bench_result_index.ArtifactSummary) -> Manifes
         warmup_runs=summary.warmup_runs,
         median_tok_per_s=summary.median_tok_per_s,
         max_memory_bytes=summary.max_memory_bytes,
+        telemetry_status=summary.telemetry_status,
+        telemetry_findings=summary.telemetry_findings,
         command_airgap_status=summary.command_airgap_status,
         sha256=file_sha256(path),
         bytes=path.stat().st_size,
@@ -100,7 +104,12 @@ def latest_artifacts(artifacts: Iterable[ManifestArtifact]) -> list[ManifestArti
 
 
 def manifest_status(artifacts: list[ManifestArtifact]) -> str:
-    if any(item.status == "fail" or item.command_airgap_status == "fail" for item in artifacts):
+    if any(
+        item.status == "fail"
+        or item.command_airgap_status == "fail"
+        or item.telemetry_status == "fail"
+        for item in artifacts
+    ):
         return "fail"
     return "pass"
 
@@ -128,13 +137,13 @@ def markdown_report(report: dict[str, object]) -> str:
     if latest:
         lines.extend(
             [
-                "| Key | Status | Air-gap | Runs | Warmups | Median tok/s | Max memory bytes | SHA256 | Source |",
-                "| --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |",
+                "| Key | Status | Air-gap | Telemetry | Runs | Warmups | Median tok/s | Max memory bytes | SHA256 | Source |",
+                "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |",
             ]
         )
         for artifact in latest:
             lines.append(
-                "| {key} | {status} | {command_airgap_status} | {measured_runs} | "
+                "| {key} | {status} | {command_airgap_status} | {telemetry_status} | {measured_runs} | "
                 "{warmup_runs} | {median_tok_per_s} | {max_memory_bytes} | {sha256} | "
                 "{source} |".format(
                     **{key: format_value(value) for key, value in artifact.items()}
@@ -160,6 +169,8 @@ def write_csv(artifacts: list[ManifestArtifact], path: Path) -> None:
         "warmup_runs",
         "median_tok_per_s",
         "max_memory_bytes",
+        "telemetry_status",
+        "telemetry_findings",
         "command_airgap_status",
         "sha256",
         "bytes",
@@ -169,6 +180,7 @@ def write_csv(artifacts: list[ManifestArtifact], path: Path) -> None:
         writer.writeheader()
         for artifact in artifacts:
             row = asdict(artifact)
+            row["telemetry_findings"] = json.dumps(artifact.telemetry_findings, separators=(",", ":"))
             writer.writerow({field: row[field] for field in fields})
 
 
@@ -225,7 +237,10 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     status = "fail" if any(
-        summary.status == "fail" or summary.command_airgap_status == "fail" for summary in summaries
+        summary.status == "fail"
+        or summary.command_airgap_status == "fail"
+        or summary.telemetry_status == "fail"
+        for summary in summaries
     ) else "pass"
     print(f"wrote_json={output}")
     print(f"status={status}")

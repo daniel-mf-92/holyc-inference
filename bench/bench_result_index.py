@@ -39,6 +39,8 @@ class ArtifactSummary:
     warmup_runs: int
     median_tok_per_s: float | None
     max_memory_bytes: int | None
+    telemetry_status: str
+    telemetry_findings: list[str]
     command_airgap_status: str
     command_findings: list[str]
 
@@ -146,6 +148,24 @@ def qemu_report_status(report: dict[str, Any], runs: list[dict[str, Any]], warmu
     return status
 
 
+def telemetry_status(
+    artifact_type: str,
+    prompts: int | None,
+    measured_runs: int,
+    median_tok_per_s: float | None,
+) -> tuple[str, list[str]]:
+    findings: list[str] = []
+    if prompts is not None and prompts <= 0:
+        findings.append(f"non-positive prompt count: {prompts}")
+    if measured_runs <= 0:
+        findings.append(f"non-positive measured run count: {measured_runs}")
+    if median_tok_per_s is None:
+        findings.append("missing median tok/s")
+    elif median_tok_per_s <= 0:
+        findings.append(f"non-positive median tok/s: {median_tok_per_s}")
+    return ("fail" if findings else "pass"), [f"{artifact_type}: {finding}" for finding in findings]
+
+
 def summarize_qemu_report(path: Path, report: dict[str, Any]) -> ArtifactSummary:
     runs = [row for row in report.get("benchmarks", []) if isinstance(row, dict)]
     warmups = [row for row in report.get("warmups", []) if isinstance(row, dict)]
@@ -169,6 +189,22 @@ def summarize_qemu_report(path: Path, report: dict[str, Any]) -> ArtifactSummary
         + [(f"warmup[{index}]", row.get("command")) for index, row in enumerate(warmups)]
     )
 
+    prompts = parse_int(prompt_suite.get("prompt_count"))
+    if prompts is None:
+        prompts = parse_int(suite_summary.get("prompts"))
+    median_tok_per_s = parse_float(suite_summary.get("tok_per_s_median"))
+    if median_tok_per_s is None and tok_values:
+        median_tok_per_s = statistics.median(tok_values)
+    max_memory_bytes = parse_int(suite_summary.get("memory_bytes_max"))
+    if max_memory_bytes is None and memory_values:
+        max_memory_bytes = max(memory_values)
+    telem_status, telem_findings = telemetry_status(
+        "qemu_prompt",
+        prompts,
+        len(runs),
+        median_tok_per_s,
+    )
+
     return ArtifactSummary(
         source=str(path),
         artifact_type="qemu_prompt",
@@ -178,13 +214,13 @@ def summarize_qemu_report(path: Path, report: dict[str, Any]) -> ArtifactSummary
         model=first_present(first_run, ("model",), str(report.get("model", ""))),
         quantization=first_present(first_run, ("quantization",), str(report.get("quantization", ""))),
         prompt_suite_sha256=str(prompt_suite.get("suite_sha256", "")),
-        prompts=parse_int(prompt_suite.get("prompt_count")) or parse_int(suite_summary.get("prompts")),
+        prompts=prompts,
         measured_runs=len(runs),
         warmup_runs=len(warmups),
-        median_tok_per_s=parse_float(suite_summary.get("tok_per_s_median"))
-        or (statistics.median(tok_values) if tok_values else None),
-        max_memory_bytes=parse_int(suite_summary.get("memory_bytes_max"))
-        or (max(memory_values) if memory_values else None),
+        median_tok_per_s=median_tok_per_s,
+        max_memory_bytes=max_memory_bytes,
+        telemetry_status=telem_status,
+        telemetry_findings=telem_findings,
         command_airgap_status=airgap_status,
         command_findings=findings,
     )
@@ -195,6 +231,15 @@ def summarize_matrix_report(path: Path, report: dict[str, Any]) -> list[Artifact
     summaries: list[ArtifactSummary] = []
     for cell in cells:
         airgap_status, findings = command_status(cell.get("command"))
+        prompts = parse_int(cell.get("prompts"))
+        measured_runs = parse_int(cell.get("measured_runs")) or 0
+        median_tok_per_s = parse_float(cell.get("median_tok_per_s"))
+        telem_status, telem_findings = telemetry_status(
+            "bench_matrix_cell",
+            prompts,
+            measured_runs,
+            median_tok_per_s,
+        )
         summaries.append(
             ArtifactSummary(
                 source=str(path),
@@ -205,11 +250,13 @@ def summarize_matrix_report(path: Path, report: dict[str, Any]) -> list[Artifact
                 model=str(cell.get("model", "")),
                 quantization=str(cell.get("quantization", "")),
                 prompt_suite_sha256=str(cell.get("prompt_suite_sha256", "")),
-                prompts=parse_int(cell.get("prompts")),
-                measured_runs=parse_int(cell.get("measured_runs")) or 0,
+                prompts=prompts,
+                measured_runs=measured_runs,
                 warmup_runs=parse_int(cell.get("warmup_runs")) or 0,
-                median_tok_per_s=parse_float(cell.get("median_tok_per_s")),
+                median_tok_per_s=median_tok_per_s,
                 max_memory_bytes=parse_int(cell.get("max_memory_bytes")),
+                telemetry_status=telem_status,
+                telemetry_findings=telem_findings,
                 command_airgap_status=airgap_status,
                 command_findings=findings,
             )
@@ -242,6 +289,8 @@ def load_summaries(paths: Iterable[Path]) -> list[ArtifactSummary]:
 
 def index_status(summaries: list[ArtifactSummary]) -> str:
     if any(summary.command_airgap_status == "fail" for summary in summaries):
+        return "fail"
+    if any(summary.telemetry_status == "fail" for summary in summaries):
         return "fail"
     if any(summary.status == "fail" for summary in summaries):
         return "fail"
@@ -296,13 +345,13 @@ def markdown_report(report: dict[str, Any]) -> str:
     if report["artifacts"]:
         lines.extend(
             [
-                "| Type | Status | Air-gap | Profile | Model | Quant | Prompts | Runs | Warmups | Median tok/s | Max memory bytes | Source |",
-                "| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |",
+                "| Type | Status | Air-gap | Telemetry | Profile | Model | Quant | Prompts | Runs | Warmups | Median tok/s | Max memory bytes | Source |",
+                "| --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |",
             ]
         )
         for artifact in report["artifacts"]:
             lines.append(
-                "| {artifact_type} | {status} | {command_airgap_status} | {profile} | {model} | "
+                "| {artifact_type} | {status} | {command_airgap_status} | {telemetry_status} | {profile} | {model} | "
                 "{quantization} | {prompts} | {measured_runs} | {warmup_runs} | "
                 "{median_tok_per_s} | {max_memory_bytes} | {source} |".format(
                     **{key: format_value(value) for key, value in artifact.items()}
@@ -339,13 +388,19 @@ def junit_report(report: dict[str, Any]) -> str:
     drift = [row for row in report["prompt_suite_drift"] if isinstance(row, dict)]
     failed_artifacts = [row for row in artifacts if row.get("status") == "fail"]
     airgap_failures = [row for row in artifacts if row.get("command_airgap_status") == "fail"]
-    failures = int(bool(failed_artifacts)) + int(bool(airgap_failures)) + int(bool(drift))
+    telemetry_failures = [row for row in artifacts if row.get("telemetry_status") == "fail"]
+    failures = (
+        int(bool(failed_artifacts))
+        + int(bool(airgap_failures))
+        + int(bool(telemetry_failures))
+        + int(bool(drift))
+    )
 
     suite = ET.Element(
         "testsuite",
         {
             "name": "holyc_bench_result_index",
-            "tests": "3",
+            "tests": "4",
             "failures": str(failures),
         },
     )
@@ -373,6 +428,21 @@ def junit_report(report: dict[str, Any]) -> str:
             },
         )
         failure.text = "\n".join(str(row.get("source", "")) for row in airgap_failures)
+
+    telemetry_case = ET.SubElement(suite, "testcase", {"name": "telemetry_coverage"})
+    if telemetry_failures:
+        failure = ET.SubElement(
+            telemetry_case,
+            "failure",
+            {
+                "type": "benchmark_telemetry_missing",
+                "message": f"{len(telemetry_failures)} benchmark artifact(s) are missing required telemetry",
+            },
+        )
+        failure.text = "\n".join(
+            f"{row.get('source', '')}: {json.dumps(row.get('telemetry_findings', []), separators=(',', ':'))}"
+            for row in telemetry_failures
+        )
 
     drift_case = ET.SubElement(suite, "testcase", {"name": "prompt_suite_drift"})
     if drift:
@@ -404,6 +474,8 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
         "warmup_runs",
         "median_tok_per_s",
         "max_memory_bytes",
+        "telemetry_status",
+        "telemetry_findings",
         "command_airgap_status",
         "command_findings",
     ]
@@ -412,6 +484,7 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
         writer.writeheader()
         for summary in summaries:
             row = asdict(summary)
+            row["telemetry_findings"] = json.dumps(summary.telemetry_findings, separators=(",", ":"))
             row["command_findings"] = json.dumps(summary.command_findings, separators=(",", ":"))
             writer.writerow({field: row[field] for field in fields})
 

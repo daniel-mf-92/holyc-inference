@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-28T00:01:21Z",
+  "generated_at": "2026-04-28T02:00:52Z",
   "history": [
     {
       "artifact_type": "qemu_prompt",
@@ -17,6 +17,8 @@
       "sha256": "b0184d191ade2f3b0d3caac2b900db4023204980e280399082d0f0cc7890d7ae",
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T200250Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -35,6 +37,8 @@
       "sha256": "b0184d191ade2f3b0d3caac2b900db4023204980e280399082d0f0cc7890d7ae",
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -53,6 +57,8 @@
       "sha256": "4c0b912cbc5a9fa0e1b955680958a589bc7fd241f9d3fad5d000dee0ef8093ea",
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T230734Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -71,6 +77,8 @@
       "sha256": "4c0b912cbc5a9fa0e1b955680958a589bc7fd241f9d3fad5d000dee0ef8093ea",
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -89,6 +97,8 @@
       "sha256": "bede6dd70b15c798c29bc9fd453ddb63278d2c4d95281fd10dabb17282fa797c",
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T234738Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -107,6 +117,8 @@
       "sha256": "bede6dd70b15c798c29bc9fd453ddb63278d2c4d95281fd10dabb17282fa797c",
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -125,6 +137,8 @@
       "sha256": "283d6759e0362267a519ca4a7576164e48d3cf53e04b958733e321718911d0bf",
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T000110Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -143,6 +157,8 @@
       "sha256": "283d6759e0362267a519ca4a7576164e48d3cf53e04b958733e321718911d0bf",
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -161,6 +177,8 @@
       "sha256": "9838c0f80877802397c432aa140eafd3d9ef3d2aeb5e41d35eae314969d0ea69",
       "source": "bench/results/bench_matrix_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -179,6 +197,8 @@
       "sha256": "f03e0a4784e2b1ac18934cd66392573425b9a42378ee334584bf89de847dfcc0",
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T182911Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -197,6 +217,8 @@
       "sha256": "f03e0a4784e2b1ac18934cd66392573425b9a42378ee334584bf89de847dfcc0",
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -215,6 +237,8 @@
       "sha256": "5e580cae597218ed4c77404ea007ff632cb934f6e05707e7b4b4059e963ae3c1",
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T184001Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -233,6 +257,8 @@
       "sha256": "5e580cae597218ed4c77404ea007ff632cb934f6e05707e7b4b4059e963ae3c1",
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -251,6 +277,8 @@
       "sha256": "e8546ee5292356be14a0693bb8785f4013ffcbe613c5a207b832842e2501a1b6",
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T200250Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -269,6 +297,8 @@
       "sha256": "e8546ee5292356be14a0693bb8785f4013ffcbe613c5a207b832842e2501a1b6",
       "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -287,6 +317,8 @@
       "sha256": "2ad12ced1a3e7c9849466b0aba1c9ba954bb2257295b3c9907efb5e31af3c9d9",
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T230734Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -305,6 +337,8 @@
       "sha256": "2ad12ced1a3e7c9849466b0aba1c9ba954bb2257295b3c9907efb5e31af3c9d9",
       "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -323,6 +357,8 @@
       "sha256": "963042e43a3e6fd24e1396dfaa2b88406e323d5afdcd746b8183c7f442c125df",
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T234738Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -341,6 +377,8 @@
       "sha256": "963042e43a3e6fd24e1396dfaa2b88406e323d5afdcd746b8183c7f442c125df",
       "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -359,6 +397,8 @@
       "sha256": "5c217161fa9dbeb8cecec3e4e632602787f440f2173e83a5c9d27e6d8469df8a",
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T000111Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -377,6 +417,8 @@
       "sha256": "5c217161fa9dbeb8cecec3e4e632602787f440f2173e83a5c9d27e6d8469df8a",
       "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -395,6 +437,8 @@
       "sha256": "9838c0f80877802397c432aa140eafd3d9ef3d2aeb5e41d35eae314969d0ea69",
       "source": "bench/results/bench_matrix_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -413,6 +457,8 @@
       "sha256": "8b5db103026c546742ed5490b3bb87d2c30f73158d3c65b662759927cfd0c72e",
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T182911Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -431,6 +477,8 @@
       "sha256": "8b5db103026c546742ed5490b3bb87d2c30f73158d3c65b662759927cfd0c72e",
       "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -449,6 +497,8 @@
       "sha256": "d51ebd04a54d9ed8ebc4cf0324fc047011e4aed5576e981439ac14eb2a488754",
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T184001Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -467,6 +517,8 @@
       "sha256": "d51ebd04a54d9ed8ebc4cf0324fc047011e4aed5576e981439ac14eb2a488754",
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -485,6 +537,8 @@
       "sha256": "c4f1ae311023ee1d0a056d2dd8608554c125d4d9a3e9e76debc5c52e6decc7c1",
       "source": "bench/results/qemu_prompt_bench_20260427T200233Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 0
     },
     {
@@ -503,6 +557,8 @@
       "sha256": "849d37d12315aee403d03f3f264af1e7978b081ce5ac2f00c7496c85d68b7b21",
       "source": "bench/results/qemu_prompt_bench_20260427T220828Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 0
     },
     {
@@ -521,6 +577,8 @@
       "sha256": "0e2406a9bb88ba1a10473ba873cb7bfab569fd3e9d6afec0af2a5cd0875a7824",
       "source": "bench/results/qemu_prompt_bench_20260427T221951Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 0
     },
     {
@@ -539,6 +597,8 @@
       "sha256": "b926982911873580d956553c90e26ab75cb615c215eec5addea9e0e0a57b9866",
       "source": "bench/results/qemu_prompt_bench_20260427T231904Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 0
     },
     {
@@ -557,6 +617,8 @@
       "sha256": "90eb7cf76f9677ef57b9eccb0880e6a2056e72f2817e5ef5376cd7f4290c0b21",
       "source": "bench/results/qemu_prompt_bench_20260427T233253Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 0
     },
     {
@@ -575,6 +637,8 @@
       "sha256": "d1c1674b86c71c780cccdc94f9361d37abe1c9532aff6fc976c4254a76d0f6ad",
       "source": "bench/results/qemu_prompt_bench_20260427T234033Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 0
     },
     {
@@ -593,13 +657,15 @@
       "sha256": "a8378b399e21937e84d07fed92ee2937c90d356bec6842e57a4ff25c54cbe3e0",
       "source": "bench/results/qemu_prompt_bench_20260428T000110Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 0
     },
     {
       "artifact_type": "qemu_prompt",
-      "bytes": 8420,
+      "bytes": 8964,
       "command_airgap_status": "pass",
-      "generated_at": "2026-04-28T00:01:10Z",
+      "generated_at": "2026-04-28T00:06:50Z",
       "key": "synthetic-airgap-smoke/synthetic-smoke/Q4_0/68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "max_memory_bytes": 67207168,
       "measured_runs": 6,
@@ -608,9 +674,31 @@
       "profile": "synthetic-airgap-smoke",
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "quantization": "Q4_0",
-      "sha256": "a8378b399e21937e84d07fed92ee2937c90d356bec6842e57a4ff25c54cbe3e0",
+      "sha256": "9b09fc0ac764a11767ca2578787b56bf8609bfd565d5e80563af0536bdec7ba5",
+      "source": "bench/results/qemu_prompt_bench_20260428T000650Z.json",
+      "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
+      "warmup_runs": 0
+    },
+    {
+      "artifact_type": "qemu_prompt",
+      "bytes": 8964,
+      "command_airgap_status": "pass",
+      "generated_at": "2026-04-28T00:06:50Z",
+      "key": "synthetic-airgap-smoke/synthetic-smoke/Q4_0/68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "max_memory_bytes": 67207168,
+      "measured_runs": 6,
+      "median_tok_per_s": 160.0,
+      "model": "synthetic-smoke",
+      "profile": "synthetic-airgap-smoke",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "quantization": "Q4_0",
+      "sha256": "9b09fc0ac764a11767ca2578787b56bf8609bfd565d5e80563af0536bdec7ba5",
       "source": "bench/results/qemu_prompt_bench_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 0
     },
     {
@@ -629,6 +717,8 @@
       "sha256": "58d04ceca4ecb71fa79a3fc2a7c5d3767ece4115800edeb153db330eccb2d319",
       "source": "bench/results/qemu_prompt_bench_20260427T144137Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 0
     },
     {
@@ -647,6 +737,8 @@
       "sha256": "da7a83865a1eac99b962a859ffea90af8495fc7a502598a4f405f3094242f128",
       "source": "bench/results/qemu_prompt_bench_20260427T161259Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 0
     },
     {
@@ -665,6 +757,8 @@
       "sha256": "7080943945acbe002c75b2f3a6f277cf850f0beba88d5af0b68577313d8a9cea",
       "source": "bench/results/qemu_prompt_bench_20260427T170437Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 0
     },
     {
@@ -683,6 +777,8 @@
       "sha256": "e12ba43d17a370743d9164566feda153c56f5b928991325e9967180699e2a238",
       "source": "bench/results/qemu_prompt_bench_20260427T172021Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 0
     },
     {
@@ -701,6 +797,8 @@
       "sha256": "0ffc59e1f1067c12cf78eeab987f021e3e9adcdd21acdaf12d73e4dddab659c1",
       "source": "bench/results/qemu_prompt_bench_20260427T180219Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -719,10 +817,12 @@
       "sha256": "d7a8b390218f0d34a445c291a4e0a361530bb29055a6af7dd943c0558ff44925",
       "source": "bench/results/qemu_prompt_bench_20260427T192232Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 0
     }
   ],
-  "history_artifacts": 40,
+  "history_artifacts": 41,
   "latest_artifacts": [
     {
       "artifact_type": "bench_matrix_cell",
@@ -740,6 +840,8 @@
       "sha256": "9838c0f80877802397c432aa140eafd3d9ef3d2aeb5e41d35eae314969d0ea69",
       "source": "bench/results/bench_matrix_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -758,6 +860,8 @@
       "sha256": "5e580cae597218ed4c77404ea007ff632cb934f6e05707e7b4b4059e963ae3c1",
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -776,6 +880,8 @@
       "sha256": "9838c0f80877802397c432aa140eafd3d9ef3d2aeb5e41d35eae314969d0ea69",
       "source": "bench/results/bench_matrix_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
@@ -794,13 +900,15 @@
       "sha256": "d51ebd04a54d9ed8ebc4cf0324fc047011e4aed5576e981439ac14eb2a488754",
       "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 2
     },
     {
       "artifact_type": "qemu_prompt",
-      "bytes": 8420,
+      "bytes": 8964,
       "command_airgap_status": "pass",
-      "generated_at": "2026-04-28T00:01:10Z",
+      "generated_at": "2026-04-28T00:06:50Z",
       "key": "synthetic-airgap-smoke/synthetic-smoke/Q4_0/68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "max_memory_bytes": 67207168,
       "measured_runs": 6,
@@ -809,9 +917,11 @@
       "profile": "synthetic-airgap-smoke",
       "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "quantization": "Q4_0",
-      "sha256": "a8378b399e21937e84d07fed92ee2937c90d356bec6842e57a4ff25c54cbe3e0",
+      "sha256": "9b09fc0ac764a11767ca2578787b56bf8609bfd565d5e80563af0536bdec7ba5",
       "source": "bench/results/qemu_prompt_bench_latest.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 0
     },
     {
@@ -830,6 +940,8 @@
       "sha256": "d7a8b390218f0d34a445c291a4e0a361530bb29055a6af7dd943c0558ff44925",
       "source": "bench/results/qemu_prompt_bench_20260427T192232Z.json",
       "status": "pass",
+      "telemetry_findings": [],
+      "telemetry_status": "pass",
       "warmup_runs": 0
     }
   ],

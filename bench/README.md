@@ -304,10 +304,14 @@ JSON/Markdown/CSV/JUnit XML index, and checks each recorded QEMU command for
 explicit `-nic none` air-gap compliance. It also reports prompt-suite drift when
 comparable profile/model/quantization artifacts carry different non-empty suite
 hashes, which catches accidental prompt changes before throughput numbers are
-compared. The drift findings are also written to
+compared. The index marks artifacts with missing required telemetry, such as
+zero measured runs or absent median tok/s, as failures so empty or malformed
+benchmark reports do not enter CI dashboards as valid data. The drift findings
+are also written to
 `bench_result_index_prompt_suite_drift_latest.csv`, and
 `bench_result_index_junit_latest.xml` exposes artifact failures, air-gap
-violations, and prompt drift as CI test failures. It never launches QEMU.
+violations, missing telemetry, and prompt drift as CI test failures. It never
+launches QEMU.
 
 Example:
 

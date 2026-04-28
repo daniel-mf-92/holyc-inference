@@ -136,6 +136,29 @@ def test_qemu_prompt_report_status_reflects_variability_findings(tmp_path: Path)
     assert bench_result_index.index_status(summaries) == "fail"
 
 
+def test_qemu_prompt_report_requires_measured_telemetry(tmp_path: Path) -> None:
+    report = tmp_path / "qemu_prompt_bench_latest.json"
+    report.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-04-27T20:00:00Z",
+                "status": "pass",
+                "prompt_suite": {"suite_sha256": "1" * 64, "prompt_count": 1},
+                "suite_summary": {},
+                "benchmarks": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summaries = bench_result_index.load_summaries([tmp_path])
+
+    assert summaries[0].telemetry_status == "fail"
+    assert "qemu_prompt: non-positive measured run count: 0" in summaries[0].telemetry_findings
+    assert "qemu_prompt: missing median tok/s" in summaries[0].telemetry_findings
+    assert bench_result_index.index_status(summaries) == "fail"
+
+
 def test_qemu_prompt_report_checks_every_recorded_command(tmp_path: Path) -> None:
     report = tmp_path / "qemu_prompt_bench_latest.json"
     report.write_text(
@@ -328,6 +351,7 @@ def test_cli_writes_json_markdown_and_csv(tmp_path: Path) -> None:
     assert "Benchmark Result Index" in markdown
     assert "Prompt suite drift: none detected." in markdown
     assert rows[0]["command_airgap_status"] == "pass"
+    assert rows[0]["telemetry_status"] == "pass"
     assert junit_root.attrib["name"] == "holyc_bench_result_index"
     assert junit_root.attrib["failures"] == "0"
 
@@ -399,7 +423,7 @@ def test_junit_report_marks_artifact_airgap_and_drift_failures() -> None:
     root = ET.fromstring(bench_result_index.junit_report(report))
 
     assert root.attrib["name"] == "holyc_bench_result_index"
-    assert root.attrib["tests"] == "3"
+    assert root.attrib["tests"] == "4"
     assert root.attrib["failures"] == "3"
     failures = root.findall("./testcase/failure")
     assert {failure.attrib["type"] for failure in failures} == {
@@ -407,3 +431,26 @@ def test_junit_report_marks_artifact_airgap_and_drift_failures() -> None:
         "airgap_violation",
         "prompt_suite_drift",
     }
+
+
+def test_junit_report_marks_missing_telemetry_failure() -> None:
+    report = {
+        "artifacts": [
+            {
+                "source": "qemu_prompt_bench_latest.json",
+                "status": "pass",
+                "command_airgap_status": "pass",
+                "telemetry_status": "fail",
+                "telemetry_findings": ["qemu_prompt: missing median tok/s"],
+            }
+        ],
+        "prompt_suite_drift": [],
+    }
+
+    root = ET.fromstring(bench_result_index.junit_report(report))
+
+    assert root.attrib["name"] == "holyc_bench_result_index"
+    assert root.attrib["failures"] == "1"
+    failure = root.find("./testcase[@name='telemetry_coverage']/failure")
+    assert failure is not None
+    assert failure.attrib["type"] == "benchmark_telemetry_missing"
