@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="holyc_hceval_inspect" tests="1" failures="0" errors="0" timestamp="2026-04-28T02:22:33Z">
+  <testcase classname="hceval_inspect" name="bench/results/datasets/smoke_curated.hceval" />
+</testsuite>

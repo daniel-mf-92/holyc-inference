@@ -93,7 +93,7 @@ python3 bench/dataset_pack.py \
 
 `hceval_inspect.py` independently parses `.hceval` binaries, validates record
 bounds, verifies source/binary hashes against a companion manifest, and writes
-JSON or Markdown inspection reports:
+JSON, Markdown, or JUnit XML inspection reports:
 It can re-apply the same byte-size gates to already packed binaries.
 
 ```bash
@@ -102,6 +102,7 @@ python3 bench/hceval_inspect.py \
   --manifest bench/results/datasets/smoke_eval.manifest.json \
   --output bench/results/datasets/smoke_eval.inspect.json \
   --markdown bench/results/datasets/smoke_eval.inspect.md \
+  --junit bench/results/datasets/smoke_eval.inspect.junit.xml \
   --max-prompt-bytes 4096 \
   --max-choice-bytes 1024
 ```

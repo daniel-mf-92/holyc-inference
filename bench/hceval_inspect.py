@@ -14,6 +14,7 @@ import hashlib
 import json
 import struct
 import sys
+import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -320,12 +321,48 @@ def markdown_report(report: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def junit_report(report: dict[str, Any]) -> str:
+    findings = [str(finding) for finding in report.get("findings", [])]
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": "holyc_hceval_inspect",
+            "tests": "1",
+            "failures": "1" if findings else "0",
+            "errors": "0",
+            "timestamp": str(report.get("generated_at", "")),
+        },
+    )
+    case = ET.SubElement(
+        suite,
+        "testcase",
+        {
+            "classname": "hceval_inspect",
+            "name": str(report.get("input", "dataset")),
+        },
+    )
+    if findings:
+        failure = ET.SubElement(
+            case,
+            "failure",
+            {
+                "type": "hceval_inspection_failure",
+                "message": f"{len(findings)} dataset inspection finding(s)",
+            },
+        )
+        failure.text = "\n".join(findings)
+
+    ET.indent(suite, space="  ")
+    return ET.tostring(suite, encoding="unicode", xml_declaration=True) + "\n"
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, required=True, help="Input .hceval file")
     parser.add_argument("--manifest", type=Path, help="Optional companion manifest JSON")
     parser.add_argument("--output", type=Path, help="Optional JSON inspection report path")
     parser.add_argument("--markdown", type=Path, help="Optional Markdown inspection report path")
+    parser.add_argument("--junit", type=Path, help="Optional JUnit XML inspection report path")
     parser.add_argument("--no-records", action="store_true", help="Omit full record text from JSON output")
     parser.add_argument("--max-prompt-bytes", type=int, help="Fail if any prompt exceeds this UTF-8 byte limit")
     parser.add_argument("--max-choice-bytes", type=int, help="Fail if any choice exceeds this UTF-8 byte limit")
@@ -368,6 +405,11 @@ def main(argv: list[str] | None = None) -> int:
         args.markdown.parent.mkdir(parents=True, exist_ok=True)
         args.markdown.write_text(markdown_report(report), encoding="utf-8")
         print(f"wrote_markdown={args.markdown}")
+
+    if args.junit:
+        args.junit.parent.mkdir(parents=True, exist_ok=True)
+        args.junit.write_text(junit_report(report), encoding="utf-8")
+        print(f"wrote_junit={args.junit}")
 
     print(f"status={report['status']}")
     return 0 if report["status"] == "pass" else 1
