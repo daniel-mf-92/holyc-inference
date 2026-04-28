@@ -293,9 +293,9 @@ and CSV so suspicious guest-side timing can be compared against the
 host-observed launch duration. On Unix hosts, the runner also records
 `host_child_user_cpu_us`, `host_child_system_cpu_us`, `host_child_cpu_us`, and
 `host_child_cpu_pct` from child-process resource usage around each QEMU launch;
-suite and prompt summaries include median child CPU time and utilization so CPU
-saturation can be distinguished from guest decode timing drift. The same
-artifacts also include derived
+suite and prompt summaries include median child CPU time, utilization, and
+`host_child_tok_per_cpu_s` efficiency so CPU saturation can be distinguished
+from guest decode timing drift. The same artifacts also include derived
 `us_per_token` and `wall_us_per_token` latency metrics, plus median/P95 latency
 rollups, so dashboards can compare either throughput or per-token decode cost
 without reprocessing raw elapsed times.
@@ -309,11 +309,12 @@ and variability gate failures directly from the benchmark job.
 Use `--require-tokens`, `--require-tok-per-s`, `--require-memory`,
 `--require-ttft-us`, `--min-tokens`, `--min-tok-per-s`,
 `--min-wall-tok-per-s`, `--max-memory-bytes`, `--max-ttft-us`,
-`--max-host-overhead-us`, and `--max-host-overhead-pct` to fail measured runs
-that omit required telemetry, produce too little work for a trustworthy
-throughput sample, exceed a host-observed latency, memory, or orchestration
-overhead budget, or exceed a first-token latency budget. Telemetry gate failures
-are written as `telemetry_findings` in JSON/Markdown and as
+`--max-host-overhead-us`, `--max-host-overhead-pct`, and
+`--min-host-child-tok-per-cpu-s` to fail measured runs that omit required
+telemetry, produce too little work for a trustworthy throughput sample, exceed
+a host-observed latency, memory, or orchestration overhead budget, exceed a
+first-token latency budget, or fall below a host child-CPU efficiency floor.
+Telemetry gate failures are written as `telemetry_findings` in JSON/Markdown and as
 `benchmark_telemetry` failures in the JUnit report.
 
 Example:
@@ -336,6 +337,7 @@ python3 bench/qemu_prompt_bench.py \
   --max-memory-bytes 536870912 \
   --max-ttft-us 1000000 \
   --max-host-overhead-pct 25 \
+  --min-host-child-tok-per-cpu-s 20 \
   --qemu-args-file bench/fixtures/local-qemu.args \
   -- -m 512M
 ```
