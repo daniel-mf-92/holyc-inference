@@ -510,6 +510,10 @@ drops, add `--max-ttft-growth-pct` to gate first-token latency growth, and add
 the baseline or candidate build has too few successful runs for a prompt key.
 Coverage violations are written to
 `build_compare_coverage_violations_latest.csv` and surfaced in the JUnit report.
+Prompt-suite SHA256s are carried through from QEMU prompt benchmark reports;
+`--fail-on-prompt-suite-drift` rejects comparable build pairs whose prompt-suite
+hashes differ, with details written to
+`build_compare_prompt_suite_drift_latest.csv` and the JUnit report.
 
 Example:
 

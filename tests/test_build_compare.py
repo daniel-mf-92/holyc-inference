@@ -24,6 +24,7 @@ def write_report(
     wall_tok_per_s: float | None = None,
     ttft_us: int | None = None,
     memory_bytes: int = 4096,
+    prompt_suite_sha256: str = "suite-a",
 ) -> None:
     row = {
         "commit": commit,
@@ -47,6 +48,7 @@ def write_report(
         json.dumps(
             {
                 "generated_at": "2026-04-27T10:00:00Z",
+                "prompt_suite": {"suite_sha256": prompt_suite_sha256},
                 "benchmarks": [row],
             }
         ),
@@ -261,6 +263,44 @@ def test_cli_can_gate_ok_run_coverage(tmp_path: Path) -> None:
     assert "Coverage violations: 2" in (output_dir / "build_compare_latest.md").read_text(encoding="utf-8")
 
 
+def test_cli_can_gate_prompt_suite_drift(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    candidate = tmp_path / "candidate.json"
+    output_dir = tmp_path / "results"
+    write_report(baseline, "base", 100.0, 200000, prompt_suite_sha256="suite-a")
+    write_report(candidate, "head", 100.0, 200000, prompt_suite_sha256="suite-b")
+
+    status = build_compare.main(
+        [
+            "--input",
+            f"base={baseline}",
+            "--input",
+            f"head={candidate}",
+            "--output-dir",
+            str(output_dir),
+            "--fail-on-prompt-suite-drift",
+        ]
+    )
+
+    payload = json.loads((output_dir / "build_compare_latest.json").read_text(encoding="utf-8"))
+    drift_rows = list(
+        csv.DictReader((output_dir / "build_compare_prompt_suite_drift_latest.csv").open(newline="", encoding="utf-8"))
+    )
+    junit_root = ET.parse(output_dir / "build_compare_junit_latest.xml").getroot()
+    failure = junit_root.find("./testcase/failure")
+
+    assert status == 1
+    assert payload["status"] == "fail"
+    assert payload["deltas"][0]["baseline_prompt_suite_sha256"] == "suite-a"
+    assert payload["deltas"][0]["candidate_prompt_suite_sha256"] == "suite-b"
+    assert payload["prompt_suite_drift"][0]["candidate_build"] == "head"
+    assert drift_rows[0]["baseline_prompt_suite_sha256"] == "suite-a"
+    assert junit_root.attrib["failures"] == "1"
+    assert failure is not None
+    assert failure.attrib["type"] == "build_compare_prompt_suite_drift"
+    assert "Prompt-suite drift: 1" in (output_dir / "build_compare_latest.md").read_text(encoding="utf-8")
+
+
 def test_cli_can_fail_on_throughput_regression(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     candidate = tmp_path / "candidate.json"
@@ -315,6 +355,7 @@ if __name__ == "__main__":
         test_cli_can_gate_wall_clock_throughput_regression(tmp_path)
         test_cli_can_gate_ttft_growth(tmp_path)
         test_cli_can_gate_ok_run_coverage(tmp_path)
+        test_cli_can_gate_prompt_suite_drift(tmp_path)
         test_cli_can_fail_on_throughput_regression(tmp_path)
         test_missing_baseline_returns_error(tmp_path)
     print("build_compare_tests=ok")

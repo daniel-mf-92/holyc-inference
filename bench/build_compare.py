@@ -33,6 +33,7 @@ class BuildMetric:
     model: str
     quantization: str
     prompt: str
+    prompt_suite_sha256: str
     runs: int
     ok_runs: int
     median_tokens: float | None
@@ -55,6 +56,8 @@ class BuildDelta:
     candidate_build: str
     baseline_commit: str
     candidate_commit: str
+    baseline_prompt_suite_sha256: str
+    candidate_prompt_suite_sha256: str
     baseline_tok_per_s: float | None
     candidate_tok_per_s: float | None
     tok_per_s_delta_pct: float | None
@@ -90,6 +93,15 @@ class BuildCoverageViolation:
     role: str
     ok_runs: int
     minimum_ok_runs: int
+
+
+@dataclass(frozen=True)
+class BuildPromptSuiteDrift:
+    key: str
+    baseline_build: str
+    candidate_build: str
+    baseline_prompt_suite_sha256: str
+    candidate_prompt_suite_sha256: str
 
 
 def iso_now() -> str:
@@ -128,6 +140,15 @@ def first_float(row: dict[str, Any], names: Iterable[str]) -> float | None:
         if value is not None:
             return value
     return None
+
+
+def prompt_suite_sha256(row: dict[str, Any]) -> str:
+    suite = row.get("prompt_suite")
+    if isinstance(suite, dict):
+        value = suite.get("suite_sha256") or suite.get("sha256")
+        if value is not None:
+            return str(value)
+    return first_present(row, ("prompt_suite_sha256", "suite_sha256", "prompt_set_sha256"), "")
 
 
 def duration_us(row: dict[str, Any], names: Iterable[str]) -> float | None:
@@ -256,6 +277,7 @@ def metric_from_rows(build: str, source: Path, rows: list[dict[str, Any]]) -> li
                 model=first_present(first, ("model", "model_name"), ""),
                 quantization=first_present(first, ("quantization", "quant", "format"), ""),
                 prompt=first_present(first, ("prompt", "prompt_id", "case", "scenario"), ""),
+                prompt_suite_sha256=prompt_suite_sha256(first),
                 runs=len(key_rows),
                 ok_runs=ok_runs,
                 median_tokens=statistics.median(token_values) if token_values else None,
@@ -313,6 +335,8 @@ def compare_builds(metrics: list[BuildMetric], baseline_build: str) -> list[Buil
                     candidate_build=candidate.build,
                     baseline_commit=baseline.commit,
                     candidate_commit=candidate.commit,
+                    baseline_prompt_suite_sha256=baseline.prompt_suite_sha256,
+                    candidate_prompt_suite_sha256=candidate.prompt_suite_sha256,
                     baseline_tok_per_s=baseline.median_tok_per_s,
                     candidate_tok_per_s=candidate.median_tok_per_s,
                     tok_per_s_delta_pct=pct_delta(candidate.median_tok_per_s, baseline.median_tok_per_s),
@@ -441,6 +465,25 @@ def find_coverage_violations(deltas: list[BuildDelta], minimum_ok_runs: int) -> 
     return violations
 
 
+def find_prompt_suite_drift(deltas: list[BuildDelta]) -> list[BuildPromptSuiteDrift]:
+    drift: list[BuildPromptSuiteDrift] = []
+    for delta in deltas:
+        if not delta.baseline_prompt_suite_sha256 or not delta.candidate_prompt_suite_sha256:
+            continue
+        if delta.baseline_prompt_suite_sha256 == delta.candidate_prompt_suite_sha256:
+            continue
+        drift.append(
+            BuildPromptSuiteDrift(
+                key=delta.key,
+                baseline_build=delta.baseline_build,
+                candidate_build=delta.candidate_build,
+                baseline_prompt_suite_sha256=delta.baseline_prompt_suite_sha256,
+                candidate_prompt_suite_sha256=delta.candidate_prompt_suite_sha256,
+            )
+        )
+    return drift
+
+
 def format_value(value: Any) -> str:
     if value is None:
         return "-"
@@ -462,6 +505,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"TTFT regressions: {len([row for row in report['regressions'] if row['metric'] == 'ttft_us'])}",
         f"Memory regressions: {len([row for row in report['regressions'] if row['metric'] == 'memory_bytes'])}",
         f"Coverage violations: {len(report['coverage_violations'])}",
+        f"Prompt-suite drift: {len(report['prompt_suite_drift'])}",
         "",
         "## Deltas",
         "",
@@ -483,6 +527,16 @@ def markdown_report(report: dict[str, Any]) -> str:
             )
     else:
         lines.append("No comparable prompt metrics found.")
+    if report["prompt_suite_drift"]:
+        lines.extend(["", "## Prompt-Suite Drift", ""])
+        lines.append("| Candidate | Prompt key | Base suite | Candidate suite |")
+        lines.append("| --- | --- | --- | --- |")
+        for drift in report["prompt_suite_drift"]:
+            lines.append(
+                "| {candidate_build} | {key} | {baseline_prompt_suite_sha256} | {candidate_prompt_suite_sha256} |".format(
+                    **drift
+                )
+            )
     if report["coverage_violations"]:
         lines.extend(["", "## Coverage Violations", ""])
         lines.append("| Build | Role | Prompt key | OK runs | Minimum OK runs |")
@@ -503,6 +557,8 @@ def write_csv(deltas: list[BuildDelta], path: Path) -> None:
         "candidate_build",
         "baseline_commit",
         "candidate_commit",
+        "baseline_prompt_suite_sha256",
+        "candidate_prompt_suite_sha256",
         "baseline_tok_per_s",
         "candidate_tok_per_s",
         "tok_per_s_delta_pct",
@@ -537,10 +593,26 @@ def write_coverage_csv(violations: list[BuildCoverageViolation], path: Path) -> 
             writer.writerow({field: getattr(violation, field) for field in fields})
 
 
+def write_prompt_suite_drift_csv(violations: list[BuildPromptSuiteDrift], path: Path) -> None:
+    fields = [
+        "key",
+        "baseline_build",
+        "candidate_build",
+        "baseline_prompt_suite_sha256",
+        "candidate_prompt_suite_sha256",
+    ]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for violation in violations:
+            writer.writerow({field: getattr(violation, field) for field in fields})
+
+
 def write_junit(
     deltas: list[BuildDelta],
     regressions: list[BuildRegression],
     coverage_violations: list[BuildCoverageViolation],
+    prompt_suite_drift: list[BuildPromptSuiteDrift],
     path: Path,
 ) -> None:
     regression_by_key: dict[tuple[str, str], list[BuildRegression]] = {}
@@ -549,12 +621,15 @@ def write_junit(
     coverage_by_key: dict[tuple[str, str], list[BuildCoverageViolation]] = {}
     for violation in coverage_violations:
         coverage_by_key.setdefault((violation.build, violation.key), []).append(violation)
+    prompt_suite_drift_by_key = {
+        (violation.candidate_build, violation.key): violation for violation in prompt_suite_drift
+    }
     suite = ET.Element(
         "testsuite",
         {
             "name": "holyc_build_compare",
             "tests": str(len(deltas)),
-            "failures": str(len(regressions) + len(coverage_violations)),
+            "failures": str(len(regressions) + len(coverage_violations) + len(prompt_suite_drift)),
             "errors": "0",
         },
     )
@@ -600,6 +675,22 @@ def write_junit(
                 f"memory_delta_pct={format_value(delta.memory_delta_pct)}\n"
                 f"baseline_commit={delta.baseline_commit}\n"
                 f"candidate_commit={delta.candidate_commit}\n"
+            )
+        drift = prompt_suite_drift_by_key.get((delta.candidate_build, delta.key))
+        if drift is not None:
+            failure = ET.SubElement(
+                case,
+                "failure",
+                {
+                    "type": "build_compare_prompt_suite_drift",
+                    "message": "baseline and candidate prompt-suite hashes differ",
+                },
+            )
+            failure.text = (
+                f"candidate={delta.candidate_build}\n"
+                f"key={delta.key}\n"
+                f"baseline_prompt_suite_sha256={drift.baseline_prompt_suite_sha256}\n"
+                f"candidate_prompt_suite_sha256={drift.candidate_prompt_suite_sha256}\n"
             )
         case_coverage = coverage_by_key.get((delta.baseline_build, delta.key), []) + coverage_by_key.get(
             (delta.candidate_build, delta.key),
@@ -651,9 +742,10 @@ def write_report(
         max_ttft_growth_pct=max_ttft_growth_pct,
     )
     coverage_violations = find_coverage_violations(deltas, min_ok_runs_per_build)
+    prompt_suite_drift = find_prompt_suite_drift(deltas)
     report = {
         "generated_at": iso_now(),
-        "status": "fail" if regressions or coverage_violations else "pass",
+        "status": "fail" if regressions or coverage_violations or prompt_suite_drift else "pass",
         "baseline_build": baseline_build,
         "builds": sorted({metric.build for metric in metrics}),
         "max_tok_regression_pct": abs(max_tok_regression_pct),
@@ -667,17 +759,20 @@ def write_report(
         "deltas": [asdict(delta) for delta in deltas],
         "regressions": [asdict(regression) for regression in regressions],
         "coverage_violations": [asdict(violation) for violation in coverage_violations],
+        "prompt_suite_drift": [asdict(violation) for violation in prompt_suite_drift],
     }
     json_path = output_dir / "build_compare_latest.json"
     md_path = output_dir / "build_compare_latest.md"
     csv_path = output_dir / "build_compare_latest.csv"
     coverage_csv_path = output_dir / "build_compare_coverage_violations_latest.csv"
+    prompt_suite_drift_csv_path = output_dir / "build_compare_prompt_suite_drift_latest.csv"
     junit_path = output_dir / "build_compare_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
     write_csv(deltas, csv_path)
     write_coverage_csv(coverage_violations, coverage_csv_path)
-    write_junit(deltas, regressions, coverage_violations, junit_path)
+    write_prompt_suite_drift_csv(prompt_suite_drift, prompt_suite_drift_csv_path)
+    write_junit(deltas, regressions, coverage_violations, prompt_suite_drift, junit_path)
     return json_path
 
 
@@ -720,6 +815,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--fail-on-regression", action="store_true", help="Return non-zero on benchmark regression")
     parser.add_argument("--fail-on-coverage", action="store_true", help="Return non-zero on OK-run coverage violations")
+    parser.add_argument(
+        "--fail-on-prompt-suite-drift",
+        action="store_true",
+        help="Return non-zero when comparable builds report different prompt-suite hashes",
+    )
     return parser
 
 
@@ -757,13 +857,17 @@ def main(argv: list[str] | None = None) -> int:
         max_ttft_growth_pct=args.max_ttft_growth_pct,
     )
     coverage_violations = find_coverage_violations(deltas, args.min_ok_runs_per_build)
+    prompt_suite_drift = find_prompt_suite_drift(deltas)
     print(f"wrote_json={output}")
     print(f"compared_deltas={len(deltas)}")
     print(f"regressions={len(regressions)}")
     print(f"coverage_violations={len(coverage_violations)}")
+    print(f"prompt_suite_drift={len(prompt_suite_drift)}")
     if args.fail_on_regression and regressions:
         return 1
     if args.fail_on_coverage and coverage_violations:
+        return 1
+    if args.fail_on_prompt_suite_drift and prompt_suite_drift:
         return 1
     return 0
 

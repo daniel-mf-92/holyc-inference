@@ -12,6 +12,7 @@
       "baseline_elapsed_us": 300000.0,
       "baseline_memory_bytes": 67207168,
       "baseline_ok_runs": 3,
+      "baseline_prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "baseline_tok_per_s": 160.0,
       "baseline_ttft_us": 12400.0,
       "baseline_wall_tok_per_s": 250.32725072881735,
@@ -20,6 +21,7 @@
       "candidate_elapsed_us": 300000.0,
       "candidate_memory_bytes": 67207168,
       "candidate_ok_runs": 3,
+      "candidate_prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "candidate_tok_per_s": 160.0,
       "candidate_ttft_us": 12400.0,
       "candidate_wall_tok_per_s": 250.32725072881735,
@@ -36,6 +38,7 @@
       "baseline_elapsed_us": 200000.0,
       "baseline_memory_bytes": 67174400,
       "baseline_ok_runs": 3,
+      "baseline_prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "baseline_tok_per_s": 160.0,
       "baseline_ttft_us": 11600.0,
       "baseline_wall_tok_per_s": 581.0469740163056,
@@ -44,6 +47,7 @@
       "candidate_elapsed_us": 200000.0,
       "candidate_memory_bytes": 67174400,
       "candidate_ok_runs": 3,
+      "candidate_prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "candidate_tok_per_s": 160.0,
       "candidate_ttft_us": 11600.0,
       "candidate_wall_tok_per_s": 581.0469740163056,
@@ -55,7 +59,7 @@
       "wall_tok_per_s_delta_pct": 0.0
     }
   ],
-  "generated_at": "2026-04-28T06:29:01Z",
+  "generated_at": "2026-04-28T06:38:30Z",
   "max_memory_growth_pct": null,
   "max_tok_regression_pct": 5.0,
   "max_ttft_growth_pct": null,
@@ -75,6 +79,7 @@
       "ok_runs": 3,
       "profile": "synthetic-airgap-smoke",
       "prompt": "smoke-code",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "quantization": "Q4_0",
       "runs": 3,
       "source": "bench/results/qemu_prompt_bench_latest.json"
@@ -93,6 +98,7 @@
       "ok_runs": 3,
       "profile": "synthetic-airgap-smoke",
       "prompt": "smoke-short",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "quantization": "Q4_0",
       "runs": 3,
       "source": "bench/results/qemu_prompt_bench_latest.json"
@@ -111,6 +117,7 @@
       "ok_runs": 3,
       "profile": "synthetic-airgap-smoke",
       "prompt": "smoke-code",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "quantization": "Q4_0",
       "runs": 3,
       "source": "bench/results/qemu_prompt_bench_latest.json"
@@ -129,12 +136,14 @@
       "ok_runs": 3,
       "profile": "synthetic-airgap-smoke",
       "prompt": "smoke-short",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "quantization": "Q4_0",
       "runs": 3,
       "source": "bench/results/qemu_prompt_bench_latest.json"
     }
   ],
   "min_ok_runs_per_build": 1,
+  "prompt_suite_drift": [],
   "regressions": [],
   "status": "pass"
 }

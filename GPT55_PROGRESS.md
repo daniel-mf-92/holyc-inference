@@ -101,3 +101,4 @@
 2026-04-28T06:11:51Z | Added benchmark artifact manifest freshness telemetry and opt-in stale-artifact gating with refreshed reports.
 2026-04-28T06:22:13Z | Added QEMU command SHA256 fingerprints to prompt benchmark and matrix artifacts with refreshed smoke reports.
 2026-04-28T06:29:39Z | Added build-compare OK-run coverage gating with CSV/JUnit reporting, docs, tests, and refreshed comparison artifacts.
+2026-04-28T06:38:41Z | Added build-compare prompt-suite drift gating with CSV/JUnit reporting, docs, tests, and refreshed comparison artifacts.

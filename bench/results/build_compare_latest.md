@@ -1,6 +1,6 @@
 # Build Benchmark Compare
 
-Generated: 2026-04-28T06:29:01Z
+Generated: 2026-04-28T06:38:30Z
 Status: pass
 Baseline: base
 Builds: base, head
@@ -9,6 +9,7 @@ Wall throughput regressions: 0
 TTFT regressions: 0
 Memory regressions: 0
 Coverage violations: 0
+Prompt-suite drift: 0
 
 ## Deltas
 
