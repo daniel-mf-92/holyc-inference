@@ -42,6 +42,10 @@ def test_smoke_predictions_compare_cleanly() -> None:
     assert summary["llama_macro_f1"] == 1.0
     assert summary["agreement"] == 1.0
     assert summary["holyc_confusion_matrix"]["matrix"][0][0] == 3
+    assert summary["holyc_calibration"]["scored_count"] == 1
+    assert summary["llama_calibration"]["scored_count"] == 1
+    assert rows[0].holyc_confidence is not None
+    assert rows[0].holyc_margin is not None
 
 
 def test_cli_writes_json_and_markdown_report() -> None:
@@ -82,6 +86,8 @@ def test_cli_writes_json_and_markdown_report() -> None:
         assert payload["status"] == "pass"
         assert payload["regressions"] == []
         assert payload["summary"]["class_count"] == 4
+        assert payload["summary"]["holyc_calibration"]["scored_count"] == 1
+        assert payload["summary"]["llama_calibration"]["score_coverage"] == 1 / 3
         holyc_interval = payload["summary"]["confidence_intervals"]["holyc_accuracy"]
         assert holyc_interval["method"] == "wilson"
         assert holyc_interval["successes"] == 3
@@ -92,11 +98,13 @@ def test_cli_writes_json_and_markdown_report() -> None:
         assert (Path(tmp) / "smoke.md").exists()
         markdown = (Path(tmp) / "smoke.md").read_text(encoding="utf-8")
         assert "## Confidence Intervals" in markdown
+        assert "## Score Calibration" in markdown
         assert "No quality gate regressions." in markdown
         assert len(csv_rows) == 3
         assert csv_rows[0]["record_id"] == "smoke-arc-1"
         assert csv_rows[0]["holyc_correct"] == "True"
         assert csv_rows[0]["engines_agree"] == "True"
+        assert csv_rows[0]["holyc_confidence"] != ""
         assert junit_root.attrib["name"] == "holyc_eval_compare"
         assert junit_root.attrib["failures"] == "0"
 
@@ -124,6 +132,33 @@ def test_compare_reports_macro_f1_and_confusion_matrix() -> None:
     assert round(summary["llama_macro_f1"], 4) == 0.4
     assert summary["holyc_confusion_matrix"]["matrix"] == [[1, 1], [0, 1]]
     assert summary["llama_confusion_matrix"]["matrix"] == [[2, 0], [1, 0]]
+    assert summary["holyc_calibration"]["scored_count"] == 0
+
+
+def test_compare_reports_score_vector_calibration() -> None:
+    gold = {
+        "a": eval_compare.GoldCase("a", "unit", "validation", 0, ["A", "B"]),
+        "b": eval_compare.GoldCase("b", "unit", "validation", 1, ["A", "B"]),
+    }
+    holyc = {
+        "a": eval_compare.Prediction("a", 0, 0, [3.0, 1.0]),
+        "b": eval_compare.Prediction("b", 0, 0, [2.0, 0.0]),
+    }
+    llama = {
+        "a": eval_compare.Prediction("a", 0, 0, [4.0, 0.0]),
+        "b": eval_compare.Prediction("b", 1, 1, [0.0, 4.0]),
+    }
+
+    rows, summary = eval_compare.compare(gold, holyc, llama)
+
+    assert round(rows[0].holyc_confidence or 0.0, 4) == 0.8808
+    assert round(rows[0].holyc_margin or 0.0, 4) == 0.7616
+    assert summary["holyc_calibration"]["scored_count"] == 2
+    assert summary["holyc_calibration"]["total_count"] == 2
+    assert summary["holyc_calibration"]["score_coverage"] == 1.0
+    assert round(summary["holyc_calibration"]["accuracy_when_scored"], 4) == 0.5
+    assert summary["holyc_calibration"]["brier_score"] > summary["llama_calibration"]["brier_score"]
+    assert summary["holyc_calibration"]["ece"] > 0.0
 
 
 def test_confidence_level_can_be_configured() -> None:
@@ -282,6 +317,7 @@ if __name__ == "__main__":
     test_smoke_predictions_compare_cleanly()
     test_cli_writes_json_and_markdown_report()
     test_compare_reports_macro_f1_and_confusion_matrix()
+    test_compare_reports_score_vector_calibration()
     test_confidence_level_can_be_configured()
     test_invalid_confidence_level_fails_fast()
     test_missing_prediction_fails_fast()

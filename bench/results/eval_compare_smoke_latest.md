@@ -1,6 +1,6 @@
 # Eval Compare Report
 
-Generated: 2026-04-28T00:32:37Z
+Generated: 2026-04-28T00:39:15Z
 Dataset: smoke-eval
 Split: validation
 Quantization: Q4_0
@@ -19,6 +19,13 @@ Status: pass
 | llama.cpp macro F1 | 1.0000 |
 | Macro F1 delta | 0.0000 |
 | Agreement | 1.0000 |
+
+## Score Calibration
+
+| Engine | Score coverage | Mean confidence | Accuracy when scored | Brier score | ECE |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| HolyC | 1/3 (0.3333) | 0.9993 | 1.0000 | 0.0000 | 0.0007 |
+| llama.cpp | 1/3 (0.3333) | 0.8310 | 1.0000 | 0.0432 | 0.1690 |
 
 ## Confidence Intervals
 

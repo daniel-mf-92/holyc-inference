@@ -68,6 +68,10 @@ class EvalRow:
     holyc_correct: bool
     llama_correct: bool
     engines_agree: bool
+    holyc_confidence: float | None
+    llama_confidence: float | None
+    holyc_margin: float | None
+    llama_margin: float | None
 
 
 @dataclass(frozen=True)
@@ -358,6 +362,90 @@ def classification_metrics(rows: list[EvalRow], engine: str, labels: list[int]) 
     }
 
 
+def softmax(scores: list[float]) -> list[float]:
+    max_score = max(scores)
+    exps = [math.exp(score - max_score) for score in scores]
+    total = sum(exps)
+    return [value / total for value in exps]
+
+
+def prediction_confidence(scores: list[float] | None, predicted_index: int) -> float | None:
+    if scores is None:
+        return None
+    return softmax(scores)[predicted_index]
+
+
+def prediction_margin(scores: list[float] | None, predicted_index: int) -> float | None:
+    if scores is None:
+        return None
+    probabilities = softmax(scores)
+    predicted_probability = probabilities[predicted_index]
+    runner_up = max(
+        (value for index, value in enumerate(probabilities) if index != predicted_index),
+        default=0.0,
+    )
+    return predicted_probability - runner_up
+
+
+def calibration_metrics(
+    gold: dict[str, GoldCase],
+    predictions: dict[str, Prediction],
+    rows: list[EvalRow],
+    engine: str,
+    *,
+    bin_count: int = 10,
+) -> dict[str, Any]:
+    scored: list[dict[str, Any]] = []
+    for row in rows:
+        prediction = predictions[row.record_id]
+        if prediction.scores is None:
+            continue
+        probabilities = softmax(prediction.scores)
+        case = gold[row.record_id]
+        correct = row.holyc_correct if engine == "holyc" else row.llama_correct
+        confidence = probabilities[prediction.predicted_index]
+        brier = sum(
+            (probability - (1.0 if index == case.answer_index else 0.0)) ** 2
+            for index, probability in enumerate(probabilities)
+        )
+        scored.append({"brier": brier, "confidence": confidence, "correct": correct})
+
+    bins: list[dict[str, Any]] = []
+    ece = 0.0
+    for offset in range(bin_count):
+        lower = offset / bin_count
+        upper = (offset + 1) / bin_count
+        if offset == bin_count - 1:
+            in_bin = [item for item in scored if lower <= item["confidence"] <= upper]
+        else:
+            in_bin = [item for item in scored if lower <= item["confidence"] < upper]
+        accuracy_value = safe_div(sum(1 for item in in_bin if item["correct"]), len(in_bin))
+        confidence_value = safe_div(sum(item["confidence"] for item in in_bin), len(in_bin))
+        contribution = (len(in_bin) / len(scored)) * abs(accuracy_value - confidence_value) if scored else 0.0
+        ece += contribution
+        bins.append(
+            {
+                "accuracy": accuracy_value,
+                "confidence": confidence_value,
+                "count": len(in_bin),
+                "ece_contribution": contribution,
+                "lower": lower,
+                "upper": upper,
+            }
+        )
+
+    return {
+        "accuracy_when_scored": safe_div(sum(1 for item in scored if item["correct"]), len(scored)),
+        "brier_score": safe_div(sum(item["brier"] for item in scored), len(scored)),
+        "calibration_bins": bins,
+        "ece": ece,
+        "mean_confidence": safe_div(sum(item["confidence"] for item in scored), len(scored)),
+        "score_coverage": safe_div(len(scored), len(rows)),
+        "scored_count": len(scored),
+        "total_count": len(rows),
+    }
+
+
 def compare(
     gold: dict[str, GoldCase],
     holyc_predictions: dict[str, Prediction],
@@ -385,6 +473,10 @@ def compare(
                 holyc_correct=holyc.predicted_index == case.answer_index,
                 llama_correct=llama.predicted_index == case.answer_index,
                 engines_agree=holyc.predicted_index == llama.predicted_index,
+                holyc_confidence=prediction_confidence(holyc.scores, holyc.predicted_index),
+                llama_confidence=prediction_confidence(llama.scores, llama.predicted_index),
+                holyc_margin=prediction_margin(holyc.scores, holyc.predicted_index),
+                llama_margin=prediction_margin(llama.scores, llama.predicted_index),
             )
         )
 
@@ -395,16 +487,20 @@ def compare(
     labels = list(range(class_count(gold)))
     holyc_metrics = classification_metrics(rows, "holyc", labels)
     llama_metrics = classification_metrics(rows, "llama", labels)
+    holyc_calibration = calibration_metrics(gold, holyc_predictions, rows, "holyc")
+    llama_calibration = calibration_metrics(gold, llama_predictions, rows, "llama")
     summary = {
         "agreement": accuracy(agreements, total),
         "agreement_count": agreements,
         "class_count": len(labels),
         "holyc_accuracy": accuracy(holyc_correct, total),
+        "holyc_calibration": holyc_calibration,
         "holyc_confusion_matrix": holyc_metrics["confusion_matrix"],
         "holyc_correct": holyc_correct,
         "holyc_macro_f1": holyc_metrics["macro_f1"],
         "holyc_per_answer_index": holyc_metrics["per_answer_index"],
         "llama_accuracy": accuracy(llama_correct, total),
+        "llama_calibration": llama_calibration,
         "llama_confusion_matrix": llama_metrics["confusion_matrix"],
         "llama_correct": llama_correct,
         "llama_macro_f1": llama_metrics["macro_f1"],
@@ -442,6 +538,22 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"| Agreement | {summary['agreement']:.4f} |",
         "",
     ]
+    lines.extend(
+        [
+            "## Score Calibration",
+            "",
+            "| Engine | Score coverage | Mean confidence | Accuracy when scored | Brier score | ECE |",
+            "| --- | ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
+    for engine_label, key in (("HolyC", "holyc_calibration"), ("llama.cpp", "llama_calibration")):
+        metrics = summary[key]
+        lines.append(
+            f"| {engine_label} | {metrics['scored_count']}/{metrics['total_count']} "
+            f"({metrics['score_coverage']:.4f}) | {metrics['mean_confidence']:.4f} | "
+            f"{metrics['accuracy_when_scored']:.4f} | {metrics['brier_score']:.4f} | {metrics['ece']:.4f} |"
+        )
+    lines.append("")
     intervals = summary.get("confidence_intervals", {})
     if intervals:
         lines.extend(
@@ -621,7 +733,12 @@ def write_csv_report(path: Path, rows: list[EvalRow]) -> None:
                 "holyc_correct",
                 "llama_correct",
                 "engines_agree",
+                "holyc_confidence",
+                "llama_confidence",
+                "holyc_margin",
+                "llama_margin",
             ],
+            lineterminator="\n",
         )
         writer.writeheader()
         for row in rows:

@@ -139,6 +139,8 @@ reports. Optional quality gates can fail CI when HolyC accuracy, engine
 agreement, or accuracy delta versus llama.cpp falls outside configured bounds.
 Prediction score vectors are treated as choice-aligned logits/logprobs: every
 score must be finite and the score count must match the gold choice count.
+When score vectors are present, reports include per-row confidence/margin plus
+score coverage, mean confidence, Brier score, and expected calibration error.
 
 ```bash
 python3 bench/eval_compare.py \

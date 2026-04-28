@@ -63,3 +63,4 @@
 2026-04-28T00:19:30Z | Added host-side Q4_0/Q8_0 quant packing distribution metrics and optional saturation/cardinality gates with refreshed audit artifacts.
 2026-04-28T00:26:47Z | Added perf regression tok/s variability gating with dashboard/JUnit/CSV artifacts and refreshed CI smoke coverage.
 2026-04-28T00:32:05Z | Hardened eval comparison score-vector validation for finite choice-aligned scores with refreshed smoke eval artifacts.
+2026-04-28T00:38:33Z | Added score-vector calibration metrics to offline HolyC vs llama.cpp eval reports with refreshed smoke artifacts.

@@ -1,4 +1,4 @@
-record_id,dataset,split,answer_index,holyc_prediction,llama_prediction,holyc_correct,llama_correct,engines_agree
-smoke-arc-1,arc-smoke,validation,0,0,0,True,True,True
-smoke-hellaswag-1,hellaswag-smoke,validation,0,0,0,True,True,True
-smoke-truthfulqa-1,truthfulqa-smoke,validation,0,0,0,True,True,True
+record_id,dataset,split,answer_index,holyc_prediction,llama_prediction,holyc_correct,llama_correct,engines_agree,holyc_confidence,llama_confidence,holyc_margin,llama_margin
+smoke-arc-1,arc-smoke,validation,0,0,0,True,True,True,0.9993030936950774,,0.9989678648531953,
+smoke-hellaswag-1,hellaswag-smoke,validation,0,0,0,True,True,True,,,,
+smoke-truthfulqa-1,truthfulqa-smoke,validation,0,0,0,True,True,True,,0.8309526605439513,,0.7184954468730188
