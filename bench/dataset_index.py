@@ -58,11 +58,14 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def resolve_relative(path_text: str, base: Path) -> Path:
+def resolve_relative(path_text: str, base: Path, fallback_base: Path | None = None) -> Path:
     path = Path(path_text)
     if path.is_absolute():
         return path
-    return (base / path).resolve()
+    resolved = (base / path).resolve()
+    if resolved.exists() or fallback_base is None:
+        return resolved
+    return (fallback_base / path).resolve()
 
 
 def parse_int(value: Any) -> int:
@@ -116,9 +119,9 @@ def summarize_curated_manifest(path: Path, manifest: dict[str, Any]) -> DatasetA
     findings: list[str] = []
     source = manifest.get("source") if isinstance(manifest.get("source"), dict) else {}
     output = str(manifest.get("output", ""))
-    output_path = resolve_relative(output, Path.cwd()) if output else None
+    output_path = resolve_relative(output, Path.cwd(), path.parent) if output else None
     source_path_text = str(source.get("path", ""))
-    source_path = resolve_relative(source_path_text, Path.cwd()) if source_path_text else None
+    source_path = resolve_relative(source_path_text, Path.cwd(), path.parent) if source_path_text else None
     source_sha256 = str(source.get("sha256", ""))
     normalized_sha256 = str(manifest.get("normalized_sha256", ""))
 
@@ -151,7 +154,7 @@ def summarize_curated_manifest(path: Path, manifest: dict[str, Any]) -> DatasetA
             findings.append(f"cannot normalize curated output: {exc}")
 
     pack_output = str(manifest.get("pack_output") or "")
-    if pack_output and not resolve_relative(pack_output, Path.cwd()).exists():
+    if pack_output and not resolve_relative(pack_output, Path.cwd(), path.parent).exists():
         findings.append(f"pack_output does not exist: {pack_output}")
 
     dataset_counts = manifest.get("dataset_counts") if isinstance(manifest.get("dataset_counts"), dict) else {}
@@ -180,7 +183,7 @@ def summarize_curated_manifest(path: Path, manifest: dict[str, Any]) -> DatasetA
 def summarize_pack_manifest(path: Path, manifest: dict[str, Any]) -> DatasetArtifact:
     findings: list[str] = []
     output = str(manifest.get("output", ""))
-    output_path = resolve_relative(output, Path.cwd()) if output else None
+    output_path = resolve_relative(output, Path.cwd(), path.parent) if output else None
     binary_sha256 = str(manifest.get("binary_sha256", ""))
     source_sha256 = str(manifest.get("source_sha256", ""))
     records = manifest.get("records") if isinstance(manifest.get("records"), list) else []
@@ -234,7 +237,7 @@ def summarize_inspect_report(path: Path, report: dict[str, Any]) -> DatasetArtif
     findings = [str(finding) for finding in report.get("findings", [])]
     status = str(report.get("status", "fail" if findings else "pass"))
     input_path_text = str(report.get("input", ""))
-    input_path = resolve_relative(input_path_text, Path.cwd()) if input_path_text else None
+    input_path = resolve_relative(input_path_text, Path.cwd(), path.parent) if input_path_text else None
     payload_sha256 = str(report.get("payload_sha256", ""))
     if input_path_text and input_path is not None and input_path.exists() and payload_sha256:
         if file_sha256(input_path) != payload_sha256:

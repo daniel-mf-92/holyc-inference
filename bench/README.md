@@ -114,6 +114,9 @@ python3 bench/hceval_inspect.py \
 `dataset_index.py` scans curated manifests, packed `.hceval` manifests, and
 inspection reports, verifies local hashes/provenance fields where possible, and
 writes JSON/Markdown/CSV/JUnit XML rollups:
+Relative artifact paths are resolved from the current working directory first,
+then from the manifest/report directory so archived dataset bundles remain
+self-validating after they are moved.
 
 ```bash
 python3 bench/dataset_index.py \

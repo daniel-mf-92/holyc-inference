@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 import xml.etree.ElementTree as ET
@@ -75,3 +76,56 @@ def test_cli_writes_json_markdown_csv_and_junit(tmp_path: Path) -> None:
     assert "smoke-eval" in csv_text
     assert junit_root.attrib["name"] == "holyc_dataset_index"
     assert junit_root.attrib["failures"] == "0"
+
+
+def test_curated_manifest_relative_paths_resolve_from_manifest_dir(tmp_path: Path) -> None:
+    input_dir = tmp_path / "bundle"
+    output_dir = tmp_path / "output"
+    input_dir.mkdir()
+    source = input_dir / "source.jsonl"
+    curated = input_dir / "curated.jsonl"
+    manifest = input_dir / "curated.manifest.json"
+    row = {
+        "record_id": "smoke-1",
+        "dataset": "smoke-eval",
+        "split": "validation",
+        "prompt": "Pick the color.",
+        "choices": ["red", "blue"],
+        "answer_index": 1,
+        "provenance": "synthetic smoke",
+    }
+    source.write_text(json.dumps(row, sort_keys=True) + "\n", encoding="utf-8")
+    curated.write_text(json.dumps(row, sort_keys=True) + "\n", encoding="utf-8")
+    records = [dataset_index.eval_record_from_mapping(row, 0)]
+    manifest.write_text(
+        json.dumps(
+            {
+                "format": "hceval-curated-jsonl",
+                "source_name": "smoke-eval",
+                "source_version": "synthetic",
+                "license": "synthetic-smoke",
+                "output": "curated.jsonl",
+                "normalized_sha256": hashlib.sha256(dataset_index.dataset_pack.canonical_rows(records)).hexdigest(),
+                "record_count": 1,
+                "answer_histogram": {"1": 1},
+                "dataset_counts": {"smoke-eval": 1},
+                "split_counts": {"validation": 1},
+                "source": {
+                    "path": "source.jsonl",
+                    "record_count": 1,
+                    "sha256": dataset_index.file_sha256(source),
+                },
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    status = dataset_index.main(["--input", str(manifest), "--output-dir", str(output_dir), "--fail-on-findings"])
+
+    payload = json.loads((output_dir / "dataset_index_latest.json").read_text(encoding="utf-8"))
+    assert status == 0
+    assert payload["status"] == "pass"
+    assert payload["artifacts"][0]["status"] == "pass"
+    assert payload["artifacts"][0]["findings"] == []
