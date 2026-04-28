@@ -807,6 +807,8 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Status: {report['status']}",
         f"Prompt suite: {report.get('prompt_suite', {}).get('suite_sha256', '-')}",
         f"Command SHA256: {report.get('command_sha256', '-')}",
+        f"Launch budget: {format_summary_value(report.get('max_launches'))}",
+        f"Total launches: {format_summary_value(report.get('planned_total_launches'))}",
         f"Warmup runs: {len(report['warmups'])}",
         f"Runs: {len(report['benchmarks'])}",
         "",
@@ -963,11 +965,13 @@ def dry_run_payload(
     prompts: list[PromptCase],
     warmup: int,
     repeat: int,
+    max_launches: int | None = None,
     environment: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     prompt_count = len(prompts)
     planned_warmups = prompt_count * warmup
     planned_measured = prompt_count * repeat
+    planned_total = planned_warmups + planned_measured
     return {
         "generated_at": iso_now(),
         "status": "planned",
@@ -978,10 +982,28 @@ def dry_run_payload(
         "environment": environment or {},
         "warmup": warmup,
         "repeat": repeat,
+        "max_launches": max_launches,
         "planned_warmup_launches": planned_warmups,
         "planned_measured_launches": planned_measured,
-        "planned_total_launches": planned_warmups + planned_measured,
+        "planned_total_launches": planned_total,
     }
+
+
+def validate_launch_budget(
+    prompts: list[PromptCase],
+    *,
+    warmup: int,
+    repeat: int,
+    max_launches: int | None,
+) -> None:
+    if max_launches is None:
+        return
+    planned = len(prompts) * (warmup + repeat)
+    if planned > max_launches:
+        raise ValueError(
+            f"planned QEMU launches ({planned}) exceed --max-launches ({max_launches}); "
+            "reduce prompts, --warmup, or --repeat"
+        )
 
 
 def write_dry_run_report(report: dict[str, Any], output_dir: Path) -> Path:
@@ -1014,6 +1036,7 @@ def write_report(
     max_ttft_us: int | None = None,
     max_host_overhead_us: int | None = None,
     max_host_overhead_pct: float | None = None,
+    max_launches: int | None = None,
     environment: dict[str, Any] | None = None,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1047,6 +1070,10 @@ def write_report(
         "prompt_suite": prompt_suite or {},
         "environment": environment or {},
         "command_sha256": command_hash(all_runs[0].command) if all_runs else command_hash([]),
+        "max_launches": max_launches,
+        "planned_warmup_launches": len(warmup_runs),
+        "planned_measured_launches": len(runs),
+        "planned_total_launches": len(all_runs),
         "warmups": [asdict(run) for run in warmup_runs],
         "suite_summary": suite,
         "summaries": summaries,
@@ -1264,6 +1291,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--repeat", type=int, default=1, help="Run each prompt this many times")
     parser.add_argument(
+        "--max-launches",
+        type=int,
+        default=None,
+        help="Fail before launching QEMU if prompts * (warmup + repeat) exceeds this count",
+    )
+    parser.add_argument(
         "--max-suite-cv-pct",
         type=float,
         default=None,
@@ -1323,6 +1356,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.warmup < 0:
         print("error: --warmup must be >= 0", file=sys.stderr)
         return 2
+    if args.max_launches is not None and args.max_launches < 0:
+        print("error: --max-launches must be >= 0", file=sys.stderr)
+        return 2
     if args.max_suite_cv_pct is not None and args.max_suite_cv_pct < 0:
         print("error: --max-suite-cv-pct must be >= 0", file=sys.stderr)
         return 2
@@ -1354,6 +1390,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         root = Path(__file__).resolve().parents[1]
         prompts = load_prompt_cases(args.prompts)
+        validate_launch_budget(
+            prompts,
+            warmup=args.warmup,
+            repeat=args.repeat,
+            max_launches=args.max_launches,
+        )
         trailing_qemu_args = args.qemu_args[1:] if args.qemu_args[:1] == ["--"] else args.qemu_args
         file_qemu_args = load_qemu_args_files(args.qemu_args_file)
         command = build_command(args.qemu_bin, args.image, file_qemu_args + args.qemu_arg + trailing_qemu_args)
@@ -1368,6 +1410,7 @@ def main(argv: list[str] | None = None) -> int:
             prompts=prompts,
             warmup=args.warmup,
             repeat=args.repeat,
+            max_launches=args.max_launches,
             environment=host_environment(args.qemu_bin),
         )
         output = write_dry_run_report(report, args.output_dir)
@@ -1409,6 +1452,7 @@ def main(argv: list[str] | None = None) -> int:
         max_ttft_us=args.max_ttft_us,
         max_host_overhead_us=args.max_host_overhead_us,
         max_host_overhead_pct=args.max_host_overhead_pct,
+        max_launches=args.max_launches,
         environment=host_environment(args.qemu_bin),
     )
     report = json.loads(output.read_text(encoding="utf-8"))

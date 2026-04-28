@@ -242,9 +242,11 @@ network rejection before any dry run or guest launch.
 
 Use `--warmup N` to launch each prompt before measurement without mixing those
 runs into throughput dashboards, and `--repeat N` to run every prompt multiple
-times. Reports include separate warmup records, raw measured per-run records,
-an overall suite summary, and per-prompt medians, min/max tok/s, P05/P95 tok/s,
-and P05-to-P95 spread percentages in JSON and
+times. Use `--max-launches N` to fail before booting QEMU when
+`prompts * (warmup + repeat)` would exceed the expected launch budget. Reports
+include separate warmup records, raw measured per-run records, an overall suite
+summary, and per-prompt medians, min/max tok/s, P05/P95 tok/s, and
+P05-to-P95 spread percentages in JSON and
 Markdown. The suite summary includes measured prompt count, run count, total
 prompt bytes launched, total tokens, total elapsed time, P05/median/P95 tok/s,
 tok/s standard deviation, coefficient of variation, P05-to-P95 spread
@@ -310,6 +312,7 @@ python3 bench/qemu_prompt_bench.py \
   --quantization Q4_0 \
   --warmup 1 \
   --repeat 5 \
+  --max-launches 30 \
   --max-prompt-cv-pct 5 \
   --require-tokens \
   --require-tok-per-s \
@@ -329,14 +332,16 @@ Validate the final QEMU command without launching:
 python3 bench/qemu_prompt_bench.py \
   --image path/to/TempleOS.img \
   --prompts bench/prompts/smoke.jsonl \
+  --max-launches 10 \
   --dry-run
 ```
 
 Dry-runs also write `qemu_prompt_bench_dry_run_latest.json` and `.md` under the
 selected output directory. These artifacts record the exact `-nic none` command,
 the command SHA256 fingerprint, prompt-suite hash, warmup count, repeat count,
-and planned launch totals for CI review without booting a guest, plus the same
-host/QEMU provenance fields used by measured benchmark reports.
+configured launch budget, and planned launch totals for CI review without
+booting a guest, plus the same host/QEMU provenance fields used by measured
+benchmark reports.
 
 `qemu_source_audit.py` statically scans host-side docs/config/shell-like files
 for literal `qemu-system*` launch snippets and applies the same air-gap command

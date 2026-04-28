@@ -183,6 +183,7 @@ def test_cli_dry_run_validates_without_launching_qemu(tmp_path: Path, capsys) ->
     assert payload["planned_warmup_launches"] == 1
     assert payload["planned_measured_launches"] == 2
     assert payload["planned_total_launches"] == 3
+    assert payload["max_launches"] is None
     assert payload["command"][1:3] == ["-nic", "none"]
     assert payload["command_sha256"] == qemu_prompt_bench.command_hash(payload["command"])
     assert len(payload["command_sha256"]) == 64
@@ -262,6 +263,8 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
     assert report["prompt_suite"]["source"] == str(prompts)
     assert report["prompt_suite"]["prompt_count"] == 1
     assert report["prompt_suite"]["prompt_bytes_total"] == 20
+    assert report["max_launches"] is None
+    assert report["planned_total_launches"] == 1
     assert report["benchmarks"][0]["tokens"] == 32
     assert report["benchmarks"][0]["prompt_bytes"] == 20
     assert report["benchmarks"][0]["host_overhead_us"] == (
@@ -319,6 +322,8 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
             str(fake_qemu),
             "--output-dir",
             str(output_dir),
+            "--max-launches",
+            "6",
             "--repeat",
             "3",
         ]
@@ -332,6 +337,8 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
     assert report["suite_summary"]["prompts"] == 2
     assert len(report["prompt_suite"]["suite_sha256"]) == 64
     assert report["suite_summary"]["runs"] == 6
+    assert report["max_launches"] == 6
+    assert report["planned_total_launches"] == 6
     assert report["suite_summary"]["ok_runs"] == 6
     assert report["suite_summary"]["measured_prompt_bytes_total"] == 33
     assert report["suite_summary"]["prompt_bytes_min"] == 5
@@ -722,6 +729,85 @@ def test_cli_rejects_negative_warmup(tmp_path: Path) -> None:
     )
 
     assert status == 2
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--dry-run",
+            "--max-launches",
+            "-1",
+        ]
+    )
+
+    assert status == 2
+
+
+def test_cli_launch_budget_fails_before_qemu(tmp_path: Path, capsys) -> None:
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    output_dir = tmp_path / "results"
+    prompts.write_text(
+        '{"prompt_id":"one","prompt":"A"}\n{"prompt_id":"two","prompt":"B"}\n',
+        encoding="utf-8",
+    )
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--output-dir",
+            str(output_dir),
+            "--dry-run",
+            "--warmup",
+            "1",
+            "--repeat",
+            "2",
+            "--max-launches",
+            "5",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert status == 2
+    assert "planned QEMU launches (6) exceed --max-launches (5)" in captured.err
+    assert not (output_dir / "qemu_prompt_bench_dry_run_latest.json").exists()
+
+
+def test_cli_launch_budget_is_recorded_in_dry_run(tmp_path: Path, capsys) -> None:
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    output_dir = tmp_path / "results"
+    prompts.write_text('{"prompt_id":"one","prompt":"A"}\n', encoding="utf-8")
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--output-dir",
+            str(output_dir),
+            "--dry-run",
+            "--warmup",
+            "1",
+            "--repeat",
+            "2",
+            "--max-launches",
+            "3",
+        ]
+    )
+
+    assert status == 0
+    payload = json.loads(capsys.readouterr().out)
+    report = json.loads((output_dir / "qemu_prompt_bench_dry_run_latest.json").read_text(encoding="utf-8"))
+    assert payload["max_launches"] == 3
+    assert payload["planned_total_launches"] == 3
+    assert report["max_launches"] == 3
 
 
 def test_cli_rejects_negative_variability_gate(tmp_path: Path) -> None:

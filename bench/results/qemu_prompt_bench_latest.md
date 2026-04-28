@@ -1,17 +1,19 @@
 # QEMU Prompt Benchmark
 
-Generated: 2026-04-28T06:47:52Z
+Generated: 2026-04-28T12:42:20Z
 Status: pass
 Prompt suite: 68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a
-Command SHA256: b9be9bb048be4bf27f179ec73019754dd945d4c113f0a28a4ca266b00b458b85
-Warmup runs: 2
-Runs: 4
+Command SHA256: e415146c052b9f0baa23706ffde97548f2374f6601337823b4d810c39bed48e7
+Launch budget: 6
+Total launches: 6
+Warmup runs: 0
+Runs: 6
 
 ## Suite Summary
 
 | Prompts | Runs | OK | Measured prompt bytes | Total tokens | Total elapsed us | Median host overhead us | Median host overhead % | Median TTFT us | P95 TTFT us | P05 tok/s | Median tok/s | P95 tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 2 | 4 | 4 | 240 | 160 | 1000000 | -195450.500 | -77.299 | 12000.000 | 12400.000 | 160.000 | 160.000 | 160.000 | 732.395 | 885.598 | 6250.000 | 6250.000 | 1418.792 | 1778.213 | 67207168 |
+| 2 | 6 | 6 | 360 | 240 | 1500000 | -179884.000 | -72.873 | 12000.000 | 12400.000 | 160.000 | 160.000 | 160.000 | 607.241 | 1203.785 | 6250.000 | 6250.000 | 1695.453 | 6319.703 | 67207168 |
 
 | tok/s stdev | tok/s CV % | tok/s P05-P95 spread % |
 | ---: | ---: | ---: |
@@ -21,8 +23,8 @@ Runs: 4
 
 | Prompt | Prompt bytes | Runs | OK | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median TTFT us | P95 TTFT us | Min tok/s | P05 tok/s | Median tok/s | tok/s stdev | tok/s CV % | P05-P95 spread % | Max tok/s | Median wall tok/s | P95 wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| smoke-code | 71 | 2 | 2 | 48.000 | 300000.000 | -245515.000 | -81.838 | 12400.000 | 12400.000 | 160.000 | 160.000 | 160.000 | 0.000 | 0.000 | 0.000 | 160.000 | 881.025 | 886.904 | 6250.000 | 6250.000 | 1135.104 | 1142.679 | 67207168 |
-| smoke-short | 49 | 2 | 2 | 32.000 | 200000.000 | -144206.000 | -72.103 | 11600.000 | 11600.000 | 160.000 | 160.000 | 160.000 | 0.000 | 0.000 | 0.000 | 160.000 | 574.001 | 588.667 | 6250.000 | 6250.000 | 1743.562 | 1788.112 | 67174400 |
+| smoke-code | 71 | 3 | 3 | 48 | 300000 | -259776 | -86.592 | 12400 | 12400.000 | 160.000 | 160.000 | 160.000 | 0.000 | 0.000 | 0.000 | 160.000 | 1193.317 | 1205.878 | 6250.000 | 6250.000 | 838.000 | 1868.219 | 67207168 |
+| smoke-short | 49 | 3 | 3 | 32 | 200000 | -15726 | -7.863 | 11600 | 11600.000 | 160.000 | 160.000 | 160.000 | 0.000 | 0.000 | 0.000 | 160.000 | 173.654 | 656.471 | 6250.000 | 6250.000 | 5758.562 | 6431.931 | 67174400 |
 
 ## Environment
 
