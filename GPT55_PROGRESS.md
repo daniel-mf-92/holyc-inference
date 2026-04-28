@@ -135,3 +135,4 @@
 2026-04-28T13:28:19Z | Added benchmark matrix/result-index host child CPU rollups with smoke coverage and refreshed benchmark artifacts.
 2026-04-28T13:38:25Z | Added benchmark matrix prompt-byte rollups with smoke coverage and refreshed matrix artifacts.
 2026-04-28T13:46:24Z | Added QEMU prompt benchmark aggregate summary CSV output with smoke artifact refresh and coverage.
+2026-04-28T14:14:50Z | Added perf regression guest/wall us-per-token telemetry gates with smoke coverage and refreshed dashboards.
