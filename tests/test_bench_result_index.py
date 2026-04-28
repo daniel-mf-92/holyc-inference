@@ -7,6 +7,7 @@ import csv
 import json
 import sys
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -53,6 +54,8 @@ def test_indexes_qemu_prompt_report_with_airgap_status(tmp_path: Path) -> None:
     assert summary.command_airgap_status == "pass"
     assert summary.profile == "secure"
     assert summary.quantization == "Q4_0"
+    assert summary.generated_age_seconds is not None
+    assert summary.freshness_status == "unchecked"
     assert summary.median_tok_per_s == 123.0
     assert summary.max_memory_bytes == 4096
 
@@ -316,7 +319,7 @@ def test_mixed_commit_metadata_fails_index_and_junit(tmp_path: Path) -> None:
 
     assert summaries[0].commit_status == "fail"
     assert bench_result_index.index_status(summaries) == "fail"
-    assert root.attrib["tests"] == "5"
+    assert root.attrib["tests"] == "6"
     assert root.attrib["failures"] == "1"
     failure = root.find("./testcase[@name='commit_metadata']/failure")
     assert failure is not None
@@ -450,6 +453,8 @@ def test_cli_writes_json_markdown_and_csv(tmp_path: Path) -> None:
     assert "Prompt suite drift: none detected." in markdown
     assert rows[0]["command_airgap_status"] == "pass"
     assert rows[0]["telemetry_status"] == "pass"
+    assert rows[0]["freshness_status"] == "unchecked"
+    assert rows[0]["generated_age_seconds"] != ""
     assert junit_root.attrib["name"] == "holyc_bench_result_index"
     assert junit_root.attrib["failures"] == "0"
 
@@ -556,7 +561,7 @@ def test_junit_report_marks_artifact_airgap_and_drift_failures() -> None:
     root = ET.fromstring(bench_result_index.junit_report(report))
 
     assert root.attrib["name"] == "holyc_bench_result_index"
-    assert root.attrib["tests"] == "5"
+    assert root.attrib["tests"] == "6"
     assert root.attrib["failures"] == "3"
     failures = root.findall("./testcase/failure")
     assert {failure.attrib["type"] for failure in failures} == {
@@ -587,3 +592,65 @@ def test_junit_report_marks_missing_telemetry_failure() -> None:
     failure = root.find("./testcase[@name='telemetry_coverage']/failure")
     assert failure is not None
     assert failure.attrib["type"] == "benchmark_telemetry_missing"
+
+
+def test_artifact_freshness_gate_marks_old_reports(tmp_path: Path) -> None:
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    input_dir.mkdir()
+    (input_dir / "qemu_prompt_bench_latest.json").write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-04-27T20:00:00Z",
+                "status": "pass",
+                "prompt_suite": {"suite_sha256": "e" * 64, "prompt_count": 1},
+                "suite_summary": {"tok_per_s_median": 160.0},
+                "benchmarks": [
+                    {
+                        "profile": "synthetic",
+                        "model": "smoke",
+                        "quantization": "Q4_0",
+                        "command": ["qemu-system-x86_64", "-nic", "none"],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summaries = bench_result_index.load_summaries(
+        [input_dir],
+        max_artifact_age_seconds=3600,
+        now=datetime(2026, 4, 27, 22, 0, 0, tzinfo=timezone.utc),
+    )
+    status = bench_result_index.main(
+        [
+            "--input",
+            str(input_dir),
+            "--output-dir",
+            str(output_dir),
+            "--max-artifact-age-hours",
+            "1",
+            "--fail-on-stale-artifact",
+        ]
+    )
+
+    assert summaries[0].generated_age_seconds == 7200
+    assert summaries[0].freshness_status == "fail"
+    assert "exceeds 3600s" in summaries[0].freshness_findings[0]
+    assert bench_result_index.index_status(summaries) == "fail"
+    assert status == 1
+    payload = json.loads((output_dir / "bench_result_index_latest.json").read_text(encoding="utf-8"))
+    assert payload["artifacts"][0]["freshness_status"] == "fail"
+    junit_root = ET.parse(output_dir / "bench_result_index_junit_latest.xml").getroot()
+    failure = junit_root.find("./testcase[@name='artifact_freshness']/failure")
+    assert failure is not None
+    assert failure.attrib["type"] == "benchmark_artifact_stale"
+
+
+def test_stale_artifact_gate_requires_age_threshold(tmp_path: Path) -> None:
+    status = bench_result_index.main(
+        ["--input", str(tmp_path), "--output-dir", str(tmp_path / "out"), "--fail-on-stale-artifact"]
+    )
+
+    assert status == 2

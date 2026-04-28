@@ -387,9 +387,11 @@ are also written to
 violations, missing telemetry, inconsistent commit metadata, and prompt drift
 as CI test failures. It never launches QEMU. The index also records
 per-artifact commit metadata and can optionally fail when benchmark artifacts
-were produced from a different commit than the current checkout. Use
-`--fail-on-airgap`, `--fail-on-telemetry`, and `--fail-on-commit-metadata` to
-gate those failure classes independently.
+were produced from a different commit than the current checkout. It can also
+enforce freshness with `--max-artifact-age-hours`, marking artifacts stale when
+their `generated_at` timestamp is too old. Use `--fail-on-airgap`,
+`--fail-on-telemetry`, `--fail-on-commit-metadata`, and
+`--fail-on-stale-artifact` to gate those failure classes independently.
 
 Example:
 
@@ -408,7 +410,9 @@ the current checkout, add:
 python3 bench/bench_result_index.py \
   --input bench/results/current-job \
   --output-dir bench/results/current-job \
-  --fail-on-stale-commit
+  --fail-on-stale-commit \
+  --max-artifact-age-hours 6 \
+  --fail-on-stale-artifact
 ```
 
 `bench_artifact_manifest.py` builds on the same indexer and writes a

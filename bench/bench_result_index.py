@@ -31,6 +31,7 @@ class ArtifactSummary:
     artifact_type: str
     status: str
     generated_at: str
+    generated_age_seconds: int | None
     profile: str
     model: str
     quantization: str
@@ -49,6 +50,8 @@ class ArtifactSummary:
     current_commit_match: bool | None
     commit_status: str
     commit_findings: list[str]
+    freshness_status: str
+    freshness_findings: list[str]
 
 
 @dataclass(frozen=True)
@@ -60,6 +63,25 @@ class PromptSuiteDrift:
 
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def parse_iso_datetime(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def artifact_age_seconds(generated_at: str, now: datetime) -> int | None:
+    generated = parse_iso_datetime(generated_at)
+    if generated is None:
+        return None
+    return max(0, int((now - generated).total_seconds()))
 
 
 def git_commit(root: Path) -> str:
@@ -202,7 +224,34 @@ def current_commit_match(commit: str, current_commit: str) -> bool | None:
     return commit == current_commit
 
 
-def summarize_qemu_report(path: Path, report: dict[str, Any], current_commit: str) -> ArtifactSummary:
+def freshness_status(
+    artifact_type: str,
+    generated_at: str,
+    generated_age_seconds: int | None,
+    max_artifact_age_seconds: int | None,
+) -> tuple[str, list[str]]:
+    if max_artifact_age_seconds is None:
+        return "unchecked", []
+    if generated_age_seconds is None:
+        return "fail", [f"{artifact_type}: missing or invalid generated_at: {generated_at or '-'}"]
+    if generated_age_seconds > max_artifact_age_seconds:
+        return (
+            "fail",
+            [
+                f"{artifact_type}: artifact age {generated_age_seconds}s exceeds "
+                f"{max_artifact_age_seconds}s"
+            ],
+        )
+    return "pass", []
+
+
+def summarize_qemu_report(
+    path: Path,
+    report: dict[str, Any],
+    current_commit: str,
+    now: datetime,
+    max_artifact_age_seconds: int | None,
+) -> ArtifactSummary:
     runs = [row for row in report.get("benchmarks", []) if isinstance(row, dict)]
     warmups = [row for row in report.get("warmups", []) if isinstance(row, dict)]
     summaries = [row for row in report.get("summaries", []) if isinstance(row, dict)]
@@ -244,12 +293,21 @@ def summarize_qemu_report(path: Path, report: dict[str, Any], current_commit: st
         "qemu_prompt",
         [row.get("commit") for row in runs + warmups if isinstance(row, dict)],
     )
+    generated_at = str(report.get("generated_at", ""))
+    generated_age = artifact_age_seconds(generated_at, now)
+    fresh_state, fresh_findings = freshness_status(
+        "qemu_prompt",
+        generated_at,
+        generated_age,
+        max_artifact_age_seconds,
+    )
 
     return ArtifactSummary(
         source=str(path),
         artifact_type="qemu_prompt",
         status=qemu_report_status(report, runs, warmups),
-        generated_at=str(report.get("generated_at", "")),
+        generated_at=generated_at,
+        generated_age_seconds=generated_age,
         profile=first_present(first_run, ("profile",), str(report.get("profile", ""))),
         model=first_present(first_run, ("model",), str(report.get("model", ""))),
         quantization=first_present(first_run, ("quantization",), str(report.get("quantization", ""))),
@@ -268,12 +326,28 @@ def summarize_qemu_report(path: Path, report: dict[str, Any], current_commit: st
         current_commit_match=current_commit_match(commit, current_commit),
         commit_status=commit_state,
         commit_findings=commit_findings,
+        freshness_status=fresh_state,
+        freshness_findings=fresh_findings,
     )
 
 
-def summarize_matrix_report(path: Path, report: dict[str, Any], current_commit: str) -> list[ArtifactSummary]:
+def summarize_matrix_report(
+    path: Path,
+    report: dict[str, Any],
+    current_commit: str,
+    now: datetime,
+    max_artifact_age_seconds: int | None,
+) -> list[ArtifactSummary]:
     cells = [row for row in report.get("cells", []) if isinstance(row, dict)]
     summaries: list[ArtifactSummary] = []
+    generated_at = str(report.get("generated_at", ""))
+    generated_age = artifact_age_seconds(generated_at, now)
+    fresh_state, fresh_findings = freshness_status(
+        "bench_matrix_cell",
+        generated_at,
+        generated_age,
+        max_artifact_age_seconds,
+    )
     for cell in cells:
         airgap_status, findings = command_status(cell.get("command"))
         prompts = parse_int(cell.get("prompts"))
@@ -294,7 +368,8 @@ def summarize_matrix_report(path: Path, report: dict[str, Any], current_commit: 
                 source=str(path),
                 artifact_type="bench_matrix_cell",
                 status=str(cell.get("status", report.get("status", "unknown"))),
-                generated_at=str(report.get("generated_at", "")),
+                generated_at=generated_at,
+                generated_age_seconds=generated_age,
                 profile=str(cell.get("profile", "")),
                 model=str(cell.get("model", "")),
                 quantization=str(cell.get("quantization", "")),
@@ -313,22 +388,33 @@ def summarize_matrix_report(path: Path, report: dict[str, Any], current_commit: 
                 current_commit_match=current_commit_match(commit, current_commit),
                 commit_status=commit_state,
                 commit_findings=commit_findings,
+                freshness_status=fresh_state,
+                freshness_findings=fresh_findings,
             )
         )
     return summaries
 
 
-def load_summaries(paths: Iterable[Path]) -> list[ArtifactSummary]:
+def load_summaries(
+    paths: Iterable[Path],
+    max_artifact_age_seconds: int | None = None,
+    now: datetime | None = None,
+) -> list[ArtifactSummary]:
     summaries: list[ArtifactSummary] = []
     current_commit = git_commit(Path.cwd())
+    effective_now = now or datetime.now(timezone.utc)
     for path in sorted(set(iter_report_files(paths))):
         report = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(report, dict):
             continue
         if isinstance(report.get("benchmarks"), list):
-            summaries.append(summarize_qemu_report(path, report, current_commit))
+            summaries.append(
+                summarize_qemu_report(path, report, current_commit, effective_now, max_artifact_age_seconds)
+            )
         elif isinstance(report.get("cells"), list):
-            summaries.extend(summarize_matrix_report(path, report, current_commit))
+            summaries.extend(
+                summarize_matrix_report(path, report, current_commit, effective_now, max_artifact_age_seconds)
+            )
     return sorted(
         summaries,
         key=lambda item: (
@@ -349,6 +435,8 @@ def index_status(summaries: list[ArtifactSummary]) -> str:
         return "fail"
     if any(summary.commit_status == "fail" for summary in summaries):
         return "fail"
+    if any(summary.freshness_status == "fail" for summary in summaries):
+        return "fail"
     if any(summary.status == "fail" for summary in summaries):
         return "fail"
     return "pass"
@@ -364,6 +452,10 @@ def has_telemetry_failures(summaries: list[ArtifactSummary]) -> bool:
 
 def has_commit_metadata_failures(summaries: list[ArtifactSummary]) -> bool:
     return any(summary.commit_status == "fail" for summary in summaries)
+
+
+def has_freshness_failures(summaries: list[ArtifactSummary]) -> bool:
+    return any(summary.freshness_status == "fail" for summary in summaries)
 
 
 def commit_drift(summaries: list[ArtifactSummary]) -> list[ArtifactSummary]:
@@ -418,15 +510,15 @@ def markdown_report(report: dict[str, Any]) -> str:
     if report["artifacts"]:
         lines.extend(
             [
-                "| Type | Status | Air-gap | Telemetry | Commit | Profile | Model | Quant | Prompts | Runs | Warmups | Median tok/s | Max memory bytes | Source |",
-                "| --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |",
+                "| Type | Status | Air-gap | Telemetry | Freshness | Commit | Profile | Model | Quant | Prompts | Runs | Warmups | Age seconds | Median tok/s | Max memory bytes | Source |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
             ]
         )
         for artifact in report["artifacts"]:
             lines.append(
-                "| {artifact_type} | {status} | {command_airgap_status} | {telemetry_status} | {commit_status}:{commit} | {profile} | {model} | "
+                "| {artifact_type} | {status} | {command_airgap_status} | {telemetry_status} | {freshness_status} | {commit_status}:{commit} | {profile} | {model} | "
                 "{quantization} | {prompts} | {measured_runs} | {warmup_runs} | "
-                "{median_tok_per_s} | {max_memory_bytes} | {source} |".format(
+                "{generated_age_seconds} | {median_tok_per_s} | {max_memory_bytes} | {source} |".format(
                     **{key: format_value(value) for key, value in artifact.items()}
                 )
             )
@@ -463,11 +555,13 @@ def junit_report(report: dict[str, Any]) -> str:
     airgap_failures = [row for row in artifacts if row.get("command_airgap_status") == "fail"]
     telemetry_failures = [row for row in artifacts if row.get("telemetry_status") == "fail"]
     commit_failures = [row for row in artifacts if row.get("commit_status") == "fail"]
+    freshness_failures = [row for row in artifacts if row.get("freshness_status") == "fail"]
     failures = (
         int(bool(failed_artifacts))
         + int(bool(airgap_failures))
         + int(bool(telemetry_failures))
         + int(bool(commit_failures))
+        + int(bool(freshness_failures))
         + int(bool(drift))
     )
 
@@ -475,7 +569,7 @@ def junit_report(report: dict[str, Any]) -> str:
         "testsuite",
         {
             "name": "holyc_bench_result_index",
-            "tests": "5",
+            "tests": "6",
             "failures": str(failures),
         },
     )
@@ -534,6 +628,21 @@ def junit_report(report: dict[str, Any]) -> str:
             for row in commit_failures
         )
 
+    freshness_case = ET.SubElement(suite, "testcase", {"name": "artifact_freshness"})
+    if freshness_failures:
+        failure = ET.SubElement(
+            freshness_case,
+            "failure",
+            {
+                "type": "benchmark_artifact_stale",
+                "message": f"{len(freshness_failures)} benchmark artifact(s) failed freshness policy",
+            },
+        )
+        failure.text = "\n".join(
+            f"{row.get('source', '')}: {json.dumps(row.get('freshness_findings', []), separators=(',', ':'))}"
+            for row in freshness_failures
+        )
+
     drift_case = ET.SubElement(suite, "testcase", {"name": "prompt_suite_drift"})
     if drift:
         failure = ET.SubElement(
@@ -555,6 +664,7 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
         "artifact_type",
         "status",
         "generated_at",
+        "generated_age_seconds",
         "profile",
         "model",
         "quantization",
@@ -573,6 +683,8 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
         "current_commit_match",
         "commit_status",
         "commit_findings",
+        "freshness_status",
+        "freshness_findings",
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
@@ -582,6 +694,7 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
             row["telemetry_findings"] = json.dumps(summary.telemetry_findings, separators=(",", ":"))
             row["command_findings"] = json.dumps(summary.command_findings, separators=(",", ":"))
             row["commit_findings"] = json.dumps(summary.commit_findings, separators=(",", ":"))
+            row["freshness_findings"] = json.dumps(summary.freshness_findings, separators=(",", ":"))
             writer.writerow({field: row[field] for field in fields})
 
 
@@ -659,14 +772,33 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Return non-zero if any artifact commit differs from the current git commit",
     )
+    parser.add_argument(
+        "--max-artifact-age-hours",
+        type=float,
+        help="Mark artifacts as stale if generated_at is older than this many hours",
+    )
+    parser.add_argument(
+        "--fail-on-stale-artifact",
+        action="store_true",
+        help="Return non-zero if any artifact exceeds --max-artifact-age-hours",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     inputs = args.input or [Path("bench/results")]
+    max_artifact_age_seconds = None
+    if args.max_artifact_age_hours is not None:
+        if args.max_artifact_age_hours < 0:
+            print("error: --max-artifact-age-hours must be non-negative", file=sys.stderr)
+            return 2
+        max_artifact_age_seconds = int(args.max_artifact_age_hours * 3600)
+    elif args.fail_on_stale_artifact:
+        print("error: --fail-on-stale-artifact requires --max-artifact-age-hours", file=sys.stderr)
+        return 2
     try:
-        summaries = load_summaries(inputs)
+        summaries = load_summaries(inputs, max_artifact_age_seconds=max_artifact_age_seconds)
         output, drift = write_report(summaries, args.output_dir)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -677,6 +809,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"status={status}")
     print(f"artifacts={len(summaries)}")
     print(f"prompt_suite_drift={len(drift)}")
+    print(f"freshness_failures={sum(1 for summary in summaries if summary.freshness_status == 'fail')}")
     if args.fail_on_airgap and has_airgap_failures(summaries):
         return 1
     if args.fail_on_telemetry and has_telemetry_failures(summaries):
@@ -686,6 +819,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.fail_on_drift and drift:
         return 1
     if args.fail_on_stale_commit and commit_drift(summaries):
+        return 1
+    if args.fail_on_stale_artifact and has_freshness_failures(summaries):
         return 1
     return 0
 

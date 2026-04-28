@@ -1,1 +1,1 @@
-<testsuite name="holyc_bench_result_index" tests="5" failures="0"><testcase name="artifact_status" /><testcase name="airgap_status" /><testcase name="telemetry_coverage" /><testcase name="commit_metadata" /><testcase name="prompt_suite_drift" /></testsuite>
+<testsuite name="holyc_bench_result_index" tests="6" failures="0"><testcase name="artifact_status" /><testcase name="airgap_status" /><testcase name="telemetry_coverage" /><testcase name="commit_metadata" /><testcase name="artifact_freshness" /><testcase name="prompt_suite_drift" /></testsuite>
