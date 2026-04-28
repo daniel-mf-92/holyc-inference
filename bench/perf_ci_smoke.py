@@ -94,6 +94,9 @@ def main() -> int:
         if fixture_summary.get("median_wall_tok_per_s") != 95.5:
             print("missing_wall_tok_summary=true", file=sys.stderr)
             return 1
+        if fixture_summary.get("p05_wall_tok_per_s") != 95.05:
+            print("missing_p05_wall_tok_summary=true", file=sys.stderr)
+            return 1
         if fixture_summary.get("median_us_per_token") != 9950.495049504951:
             print("missing_us_per_token_summary=true", file=sys.stderr)
             return 1
@@ -135,6 +138,7 @@ def main() -> int:
             "us_per_token_records", "wall_us_per_token_records",
             "memory_records", "ttft_us_records", "host_overhead_records",
             "p05_tok_per_s", "median_tok_per_s", "median_wall_tok_per_s",
+            "p05_wall_tok_per_s",
             "median_us_per_token", "p95_us_per_token",
             "median_wall_us_per_token", "p95_wall_us_per_token",
             "median_ttft_us", "p95_ttft_us", "median_host_overhead_pct",
@@ -152,6 +156,9 @@ def main() -> int:
             return 1
         if "median_host_overhead_pct_baseline,median_host_overhead_pct_candidate,median_host_overhead_pct_delta_pct" not in comparisons_csv:
             print("missing_host_overhead_comparison=true", file=sys.stderr)
+            return 1
+        if "p05_wall_tok_per_s_baseline,p05_wall_tok_per_s_candidate,p05_wall_tok_per_s_delta_pct" not in comparisons_csv:
+            print("missing_p05_wall_tok_comparison=true", file=sys.stderr)
             return 1
         if "median_us_per_token_baseline,median_us_per_token_candidate,median_us_per_token_delta_pct" not in comparisons_csv:
             print("missing_us_per_token_comparison=true", file=sys.stderr)
@@ -272,6 +279,63 @@ def main() -> int:
         )
         if completed.returncode == 0:
             print("host_overhead_regression_not_rejected=true", file=sys.stderr)
+            return 1
+
+        p05_wall_regression_fixture = tmp_path / "p05_wall_tok_regression.jsonl"
+        p05_wall_regression_fixture.write_text(
+            "\n".join(
+                [
+                    json.dumps(
+                        {
+                            "timestamp": "2026-04-27T15:00:00Z",
+                            "commit": "p05-wall-base",
+                            "benchmark": "qemu_prompt",
+                            "profile": "ci-airgap-smoke",
+                            "model": "synthetic-smoke",
+                            "quantization": "Q4_0",
+                            "prompt": "ci-p05-wall",
+                            "tok_per_s": 100.0,
+                            "wall_tok_per_s": 100.0,
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "timestamp": "2026-04-27T15:05:00Z",
+                            "commit": "p05-wall-head",
+                            "benchmark": "qemu_prompt",
+                            "profile": "ci-airgap-smoke",
+                            "model": "synthetic-smoke",
+                            "quantization": "Q4_0",
+                            "prompt": "ci-p05-wall",
+                            "tok_per_s": 100.0,
+                            "wall_tok_per_s": 84.0,
+                        }
+                    ),
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        p05_wall_regression_command = [
+            sys.executable,
+            str(ROOT / "bench" / "perf_regression.py"),
+            "--input",
+            str(p05_wall_regression_fixture),
+            "--output-dir",
+            str(tmp_path / "p05_wall_regression_dashboard"),
+            "--p05-wall-tok-regression-pct",
+            "10",
+            "--fail-on-regression",
+        ]
+        completed = subprocess.run(
+            p05_wall_regression_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("p05_wall_tok_regression_not_rejected=true", file=sys.stderr)
             return 1
 
         token_latency_regression_fixture = tmp_path / "token_latency_regression.jsonl"

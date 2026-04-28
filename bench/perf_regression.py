@@ -80,6 +80,7 @@ class CommitPoint:
     median_tok_per_s: float | None
     p05_tok_per_s: float | None
     median_wall_tok_per_s: float | None
+    p05_wall_tok_per_s: float | None
     median_us_per_token: float | None
     p95_us_per_token: float | None
     median_wall_us_per_token: float | None
@@ -162,6 +163,9 @@ class ComparisonRow:
     median_wall_tok_per_s_baseline: float | None
     median_wall_tok_per_s_candidate: float | None
     median_wall_tok_per_s_delta_pct: float | None
+    p05_wall_tok_per_s_baseline: float | None
+    p05_wall_tok_per_s_candidate: float | None
+    p05_wall_tok_per_s_delta_pct: float | None
     median_us_per_token_baseline: float | None
     median_us_per_token_candidate: float | None
     median_us_per_token_delta_pct: float | None
@@ -442,6 +446,7 @@ def summarize(records: list[PerfRecord]) -> dict[str, dict[str, Any]]:
             "median_tok_per_s": statistics.median(tps_values) if tps_values else None,
             "p05_tok_per_s": percentile(tps_values, 5.0),
             "median_wall_tok_per_s": statistics.median(wall_tps_values) if wall_tps_values else None,
+            "p05_wall_tok_per_s": percentile(wall_tps_values, 5.0),
             "median_us_per_token": (
                 statistics.median(us_per_token_values) if us_per_token_values else None
             ),
@@ -527,6 +532,7 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                 median_tok_per_s=statistics.median(tps_values) if tps_values else None,
                 p05_tok_per_s=percentile(tps_values, 5.0),
                 median_wall_tok_per_s=statistics.median(wall_tps_values) if wall_tps_values else None,
+                p05_wall_tok_per_s=percentile(wall_tps_values, 5.0),
                 median_us_per_token=(
                     statistics.median(us_per_token_values) if us_per_token_values else None
                 ),
@@ -630,6 +636,11 @@ def comparison_rows(
                 median_wall_tok_per_s_delta_pct=throughput_delta_pct(
                     baseline.median_wall_tok_per_s, candidate.median_wall_tok_per_s
                 ),
+                p05_wall_tok_per_s_baseline=baseline.p05_wall_tok_per_s,
+                p05_wall_tok_per_s_candidate=candidate.p05_wall_tok_per_s,
+                p05_wall_tok_per_s_delta_pct=throughput_delta_pct(
+                    baseline.p05_wall_tok_per_s, candidate.p05_wall_tok_per_s
+                ),
                 median_us_per_token_baseline=baseline.median_us_per_token,
                 median_us_per_token_candidate=candidate.median_us_per_token,
                 median_us_per_token_delta_pct=growth_delta_pct(
@@ -680,6 +691,7 @@ def detect_regressions(
     p95_ttft_threshold_pct: float | None = None,
     host_overhead_threshold_pct: float | None = None,
     p05_tok_threshold_pct: float | None = None,
+    p05_wall_tok_threshold_pct: float | None = None,
     token_drop_threshold_pct: float | None = None,
     us_per_token_threshold_pct: float | None = None,
     wall_us_per_token_threshold_pct: float | None = None,
@@ -762,6 +774,30 @@ def detect_regressions(
                         candidate_value=candidate.median_wall_tok_per_s,
                         delta_pct=delta_pct,
                         threshold_pct=wall_tok_threshold_pct,
+                    )
+                )
+
+        if (
+            p05_wall_tok_threshold_pct is not None
+            and baseline.p05_wall_tok_per_s
+            and candidate.p05_wall_tok_per_s is not None
+        ):
+            delta_pct = (
+                (baseline.p05_wall_tok_per_s - candidate.p05_wall_tok_per_s)
+                * 100.0
+                / baseline.p05_wall_tok_per_s
+            )
+            if delta_pct > p05_wall_tok_threshold_pct:
+                regressions.append(
+                    Regression(
+                        key=key,
+                        metric="wall_tok_per_s_p05",
+                        baseline_commit=baseline.commit,
+                        candidate_commit=candidate.commit,
+                        baseline_value=baseline.p05_wall_tok_per_s,
+                        candidate_value=candidate.p05_wall_tok_per_s,
+                        delta_pct=delta_pct,
+                        threshold_pct=p05_wall_tok_threshold_pct,
                     )
                 )
 
@@ -1098,6 +1134,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Records: {report['record_count']}",
         f"Regressions: {len(report['regressions'])}",
         f"P05 throughput regressions: {len([row for row in report['regressions'] if row['metric'] == 'tok_per_s_p05'])}",
+        f"P05 wall throughput regressions: {len([row for row in report['regressions'] if row['metric'] == 'wall_tok_per_s_p05'])}",
         f"Token latency regressions: {len([row for row in report['regressions'] if row['metric'] in {'us_per_token', 'wall_us_per_token'}])}",
         f"P95 TTFT regressions: {len([row for row in report['regressions'] if row['metric'] == 'ttft_us_p95'])}",
         f"Host overhead regressions: {len([row for row in report['regressions'] if row['metric'] == 'host_overhead_pct'])}",
@@ -1202,13 +1239,14 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(["", "## Comparisons", ""])
     if report["comparisons"]:
         lines.append(
-            "| Key | Baseline | Candidate | Median tok/s Delta | P05 tok/s Delta | Wall tok/s Delta | us/token Delta | Wall us/token Delta | Memory Delta | Token Drop | Median TTFT Delta | P95 TTFT Delta | Host Overhead Delta |"
+            "| Key | Baseline | Candidate | Median tok/s Delta | P05 tok/s Delta | Wall tok/s Delta | P05 wall tok/s Delta | us/token Delta | Wall us/token Delta | Memory Delta | Token Drop | Median TTFT Delta | P95 TTFT Delta | Host Overhead Delta |"
         )
-        lines.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for comparison in report["comparisons"]:
             median_tps_delta = comparison["median_tok_per_s_delta_pct"]
             p05_tps_delta = comparison["p05_tok_per_s_delta_pct"]
             wall_tps_delta = comparison["median_wall_tok_per_s_delta_pct"]
+            p05_wall_tps_delta = comparison["p05_wall_tok_per_s_delta_pct"]
             us_per_token_delta = comparison["median_us_per_token_delta_pct"]
             wall_us_per_token_delta = comparison["median_wall_us_per_token_delta_pct"]
             memory_delta = comparison["max_memory_bytes_delta_pct"]
@@ -1219,6 +1257,9 @@ def markdown_report(report: dict[str, Any]) -> str:
             median_tps_cell = f"{median_tps_delta:.2f}%" if median_tps_delta is not None else "-"
             p05_tps_cell = f"{p05_tps_delta:.2f}%" if p05_tps_delta is not None else "-"
             wall_tps_cell = f"{wall_tps_delta:.2f}%" if wall_tps_delta is not None else "-"
+            p05_wall_tps_cell = (
+                f"{p05_wall_tps_delta:.2f}%" if p05_wall_tps_delta is not None else "-"
+            )
             us_per_token_cell = (
                 f"{us_per_token_delta:.2f}%" if us_per_token_delta is not None else "-"
             )
@@ -1235,7 +1276,8 @@ def markdown_report(report: dict[str, Any]) -> str:
             lines.append(
                 f"| {comparison['key']} | {comparison['baseline_commit']} | "
                 f"{comparison['candidate_commit']} | {median_tps_cell} | {p05_tps_cell} | "
-                f"{wall_tps_cell} | {us_per_token_cell} | {wall_us_per_token_cell} | "
+                f"{wall_tps_cell} | {p05_wall_tps_cell} | "
+                f"{us_per_token_cell} | {wall_us_per_token_cell} | "
                 f"{memory_cell} | {token_cell} | {ttft_cell} | {p95_ttft_cell} | {overhead_cell} |"
             )
     else:
@@ -1244,12 +1286,13 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(["", "## Commit Points", ""])
     if report["commit_points"]:
         lines.append(
-            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | us/token Records | Wall us/token Records | Memory Records | Token Records | TTFT Records | Host Overhead Records | P05 tok/s | Median tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median TTFT us | P95 TTFT us | Median Host Overhead % | Tok/s CV | Max Memory Bytes | Prompt Suite |"
+            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | us/token Records | Wall us/token Records | Memory Records | Token Records | TTFT Records | Host Overhead Records | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median TTFT us | P95 TTFT us | Median Host Overhead % | Tok/s CV | Max Memory Bytes | Prompt Suite |"
         )
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
         for point in report["commit_points"]:
             p05_tps = point["p05_tok_per_s"]
             tps = point["median_tok_per_s"]
+            p05_wall_tps = point["p05_wall_tok_per_s"]
             wall_tps = point["median_wall_tok_per_s"]
             us_per_token = point["median_us_per_token"]
             p95_us_per_token = point["p95_us_per_token"]
@@ -1265,6 +1308,7 @@ def markdown_report(report: dict[str, Any]) -> str:
             prompt_suite = point["prompt_suite_sha256"] or "-"
             p05_tps_cell = f"{p05_tps:.3f}" if p05_tps is not None else "-"
             tps_cell = f"{tps:.3f}" if tps is not None else "-"
+            p05_wall_tps_cell = f"{p05_wall_tps:.3f}" if p05_wall_tps is not None else "-"
             wall_tps_cell = f"{wall_tps:.3f}" if wall_tps is not None else "-"
             us_per_token_cell = f"{us_per_token:.3f}" if us_per_token is not None else "-"
             p95_us_per_token_cell = (
@@ -1289,7 +1333,8 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"{point['us_per_token_records']} | {point['wall_us_per_token_records']} | "
                 f"{point['memory_records']} | {point['token_records']} | {point['ttft_us_records']} | "
                 f"{point['host_overhead_records']} | {p05_tps_cell} | {tps_cell} | "
-                f"{wall_tps_cell} | {us_per_token_cell} | {p95_us_per_token_cell} | "
+                f"{p05_wall_tps_cell} | {wall_tps_cell} | "
+                f"{us_per_token_cell} | {p95_us_per_token_cell} | "
                 f"{wall_us_per_token_cell} | {p95_wall_us_per_token_cell} | "
                 f"{tokens_cell} | {min_tokens_cell} | {ttft_cell} | {p95_ttft_cell} | {overhead_cell} | "
                 f"{tps_cv_cell} | {memory_cell} | {prompt_suite} |"
@@ -1299,11 +1344,12 @@ def markdown_report(report: dict[str, Any]) -> str:
 
     lines.extend(["", "## Latest Summary", ""])
     if report["summaries"]:
-        lines.append("| Key | Records | Latest Commit | P05 tok/s | Median tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median TTFT us | P95 TTFT us | Median Host Overhead % | Max Memory Bytes |")
-        lines.append("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| Key | Records | Latest Commit | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median TTFT us | P95 TTFT us | Median Host Overhead % | Max Memory Bytes |")
+        lines.append("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for key, summary in report["summaries"].items():
             p05_tps = summary["p05_tok_per_s"]
             tps = summary["median_tok_per_s"]
+            p05_wall_tps = summary["p05_wall_tok_per_s"]
             wall_tps = summary["median_wall_tok_per_s"]
             us_per_token = summary["median_us_per_token"]
             p95_us_per_token = summary["p95_us_per_token"]
@@ -1317,6 +1363,7 @@ def markdown_report(report: dict[str, Any]) -> str:
             memory = summary["max_memory_bytes"]
             p05_tps_cell = f"{p05_tps:.3f}" if p05_tps is not None else "-"
             tps_cell = f"{tps:.3f}" if tps is not None else "-"
+            p05_wall_tps_cell = f"{p05_wall_tps:.3f}" if p05_wall_tps is not None else "-"
             wall_tps_cell = f"{wall_tps:.3f}" if wall_tps is not None else "-"
             us_per_token_cell = f"{us_per_token:.3f}" if us_per_token is not None else "-"
             p95_us_per_token_cell = (
@@ -1336,7 +1383,7 @@ def markdown_report(report: dict[str, Any]) -> str:
             memory_cell = str(memory) if memory is not None else "-"
             lines.append(
                 f"| {key} | {summary['records']} | {summary['latest_commit']} | "
-                f"{p05_tps_cell} | {tps_cell} | {wall_tps_cell} | "
+                f"{p05_tps_cell} | {tps_cell} | {p05_wall_tps_cell} | {wall_tps_cell} | "
                 f"{us_per_token_cell} | {p95_us_per_token_cell} | "
                 f"{wall_us_per_token_cell} | {p95_wall_us_per_token_cell} | "
                 f"{tokens_cell} | {min_tokens_cell} | {ttft_cell} | {p95_ttft_cell} | "
@@ -1620,6 +1667,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "host_overhead_records",
             "p05_tok_per_s",
             "median_tok_per_s",
+            "p05_wall_tok_per_s",
             "median_wall_tok_per_s",
             "median_us_per_token",
             "p95_us_per_token",
@@ -1669,6 +1717,9 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "median_wall_tok_per_s_baseline",
             "median_wall_tok_per_s_candidate",
             "median_wall_tok_per_s_delta_pct",
+            "p05_wall_tok_per_s_baseline",
+            "p05_wall_tok_per_s_candidate",
+            "p05_wall_tok_per_s_delta_pct",
             "median_us_per_token_baseline",
             "median_us_per_token_candidate",
             "median_us_per_token_delta_pct",
@@ -1753,6 +1804,7 @@ def build_report(
     p95_ttft_threshold_pct: float | None = None,
     host_overhead_threshold_pct: float | None = None,
     p05_tok_threshold_pct: float | None = None,
+    p05_wall_tok_threshold_pct: float | None = None,
     token_drop_threshold_pct: float | None = None,
     us_per_token_threshold_pct: float | None = None,
     wall_us_per_token_threshold_pct: float | None = None,
@@ -1776,6 +1828,7 @@ def build_report(
         p95_ttft_threshold_pct=p95_ttft_threshold_pct,
         host_overhead_threshold_pct=host_overhead_threshold_pct,
         p05_tok_threshold_pct=p05_tok_threshold_pct,
+        p05_wall_tok_threshold_pct=p05_wall_tok_threshold_pct,
         token_drop_threshold_pct=token_drop_threshold_pct,
         us_per_token_threshold_pct=us_per_token_threshold_pct,
         wall_us_per_token_threshold_pct=wall_us_per_token_threshold_pct,
@@ -1828,6 +1881,7 @@ def build_report(
             "p95_ttft_regression_pct": p95_ttft_threshold_pct,
             "host_overhead_regression_pct": host_overhead_threshold_pct,
             "p05_tok_regression_pct": p05_tok_threshold_pct,
+            "p05_wall_tok_regression_pct": p05_wall_tok_threshold_pct,
             "token_drop_regression_pct": token_drop_threshold_pct,
             "us_per_token_regression_pct": us_per_token_threshold_pct,
             "wall_us_per_token_regression_pct": wall_us_per_token_threshold_pct,
@@ -1901,6 +1955,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--p05-tok-regression-pct",
         type=float,
         help="Fail when P05 guest tok/s drops by more than this percent",
+    )
+    parser.add_argument(
+        "--p05-wall-tok-regression-pct",
+        type=float,
+        help="Fail when P05 host wall-clock tok/s drops by more than this percent",
     )
     parser.add_argument(
         "--token-drop-regression-pct",
@@ -1997,6 +2056,7 @@ def main(argv: list[str] | None = None) -> int:
         p95_ttft_threshold_pct=args.p95_ttft_regression_pct,
         host_overhead_threshold_pct=args.host_overhead_regression_pct,
         p05_tok_threshold_pct=args.p05_tok_regression_pct,
+        p05_wall_tok_threshold_pct=args.p05_wall_tok_regression_pct,
         token_drop_threshold_pct=args.token_drop_regression_pct,
         us_per_token_threshold_pct=args.us_per_token_regression_pct,
         wall_us_per_token_threshold_pct=args.wall_us_per_token_regression_pct,

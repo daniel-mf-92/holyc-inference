@@ -572,6 +572,7 @@ python3 bench/perf_regression.py \
   --max-tok-cv-pct 7.5 \
   --p05-tok-regression-pct 7.5 \
   --wall-tok-regression-pct 7.5 \
+  --p05-wall-tok-regression-pct 7.5 \
   --us-per-token-regression-pct 7.5 \
   --wall-us-per-token-regression-pct 7.5 \
   --token-drop-regression-pct 5 \
@@ -600,6 +601,8 @@ benchmark key/commit point are too variable to trust as a baseline.
 catches slow individual runs that median throughput can hide.
 `--wall-tok-regression-pct` optionally gates host-observed wall-clock tok/s
 drops, which is useful when guest-side timing looks suspicious.
+`--p05-wall-tok-regression-pct` optionally gates low-tail host-observed tok/s
+drops, catching wall-clock outliers that median host throughput can hide.
 `--us-per-token-regression-pct` and `--wall-us-per-token-regression-pct`
 optionally gate guest and host token-latency growth directly, which is easier to
 reason about for short prompts where throughput deltas compress latency changes.
@@ -776,15 +779,16 @@ Example:
 python3 bench/perf_regression.py --input bench/results --output-dir bench/dashboards
 ```
 
-CI can fail on median throughput, low-tail throughput, host wall-clock
-throughput, guest/wall microseconds per token, emitted-token drops, median or
-P95 first-token latency, QEMU host overhead, or memory regressions with:
+CI can fail on median throughput, low-tail guest or host wall-clock throughput,
+guest/wall microseconds per token, emitted-token drops, median or P95
+first-token latency, QEMU host overhead, or memory regressions with:
 
 ```bash
 python3 bench/perf_regression.py \
   --max-tok-cv-pct 7.5 \
   --p05-tok-regression-pct 7.5 \
   --wall-tok-regression-pct 7.5 \
+  --p05-wall-tok-regression-pct 7.5 \
   --us-per-token-regression-pct 7.5 \
   --wall-us-per-token-regression-pct 7.5 \
   --token-drop-regression-pct 5 \
