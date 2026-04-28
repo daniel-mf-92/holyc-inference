@@ -73,6 +73,7 @@ class CommitPoint:
     p05_tok_per_s: float | None
     median_wall_tok_per_s: float | None
     median_ttft_us: float | None
+    p95_ttft_us: float | None
     tok_per_s_cv_pct: float | None
     max_memory_bytes: int | None
     prompt_suite_sha256: str
@@ -341,6 +342,7 @@ def summarize(records: list[PerfRecord]) -> dict[str, dict[str, Any]]:
             "p05_tok_per_s": percentile(tps_values, 5.0),
             "median_wall_tok_per_s": statistics.median(wall_tps_values) if wall_tps_values else None,
             "median_ttft_us": statistics.median(ttft_values) if ttft_values else None,
+            "p95_ttft_us": percentile([float(value) for value in ttft_values], 95.0),
             "max_memory_bytes": max(memory_values) if memory_values else None,
         }
     return summaries
@@ -394,6 +396,7 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                 p05_tok_per_s=percentile(tps_values, 5.0),
                 median_wall_tok_per_s=statistics.median(wall_tps_values) if wall_tps_values else None,
                 median_ttft_us=statistics.median(ttft_values) if ttft_values else None,
+                p95_ttft_us=percentile([float(value) for value in ttft_values], 95.0),
                 tok_per_s_cv_pct=tps_cv_pct,
                 max_memory_bytes=max(memory_values) if memory_values else None,
                 prompt_suite_sha256=";".join(prompt_hashes),
@@ -437,6 +440,7 @@ def detect_regressions(
     memory_threshold_pct: float,
     wall_tok_threshold_pct: float | None = None,
     ttft_threshold_pct: float | None = None,
+    p95_ttft_threshold_pct: float | None = None,
     p05_tok_threshold_pct: float | None = None,
     baseline_commit: str | None = None,
     candidate_commit: str | None = None,
@@ -561,6 +565,30 @@ def detect_regressions(
                         candidate_value=candidate.median_ttft_us,
                         delta_pct=delta_pct,
                         threshold_pct=ttft_threshold_pct,
+                )
+            )
+
+        if (
+            p95_ttft_threshold_pct is not None
+            and baseline.p95_ttft_us
+            and candidate.p95_ttft_us is not None
+        ):
+            delta_pct = (
+                (candidate.p95_ttft_us - baseline.p95_ttft_us)
+                * 100.0
+                / baseline.p95_ttft_us
+            )
+            if delta_pct > p95_ttft_threshold_pct:
+                regressions.append(
+                    Regression(
+                        key=key,
+                        metric="ttft_us_p95",
+                        baseline_commit=baseline.commit,
+                        candidate_commit=candidate.commit,
+                        baseline_value=baseline.p95_ttft_us,
+                        candidate_value=candidate.p95_ttft_us,
+                        delta_pct=delta_pct,
+                        threshold_pct=p95_ttft_threshold_pct,
                     )
                 )
     return regressions
@@ -725,6 +753,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Records: {report['record_count']}",
         f"Regressions: {len(report['regressions'])}",
         f"P05 throughput regressions: {len([row for row in report['regressions'] if row['metric'] == 'tok_per_s_p05'])}",
+        f"P95 TTFT regressions: {len([row for row in report['regressions'] if row['metric'] == 'ttft_us_p95'])}",
         f"Sample violations: {len(report['sample_violations'])}",
         f"Variability violations: {len(report['variability_violations'])}",
         f"Commit coverage violations: {len(report['commit_coverage_violations'])}",
@@ -825,14 +854,15 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(["", "## Commit Points", ""])
     if report["commit_points"]:
         lines.append(
-            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | Memory Records | TTFT Records | P05 tok/s | Median tok/s | Median wall tok/s | Median TTFT us | Tok/s CV | Max Memory Bytes | Prompt Suite |"
+            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | Memory Records | TTFT Records | P05 tok/s | Median tok/s | Median wall tok/s | Median TTFT us | P95 TTFT us | Tok/s CV | Max Memory Bytes | Prompt Suite |"
         )
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
         for point in report["commit_points"]:
             p05_tps = point["p05_tok_per_s"]
             tps = point["median_tok_per_s"]
             wall_tps = point["median_wall_tok_per_s"]
             ttft = point["median_ttft_us"]
+            p95_ttft = point["p95_ttft_us"]
             tps_cv = point["tok_per_s_cv_pct"]
             memory = point["max_memory_bytes"]
             prompt_suite = point["prompt_suite_sha256"] or "-"
@@ -840,35 +870,38 @@ def markdown_report(report: dict[str, Any]) -> str:
             tps_cell = f"{tps:.3f}" if tps is not None else "-"
             wall_tps_cell = f"{wall_tps:.3f}" if wall_tps is not None else "-"
             ttft_cell = f"{ttft:.1f}" if ttft is not None else "-"
+            p95_ttft_cell = f"{p95_ttft:.1f}" if p95_ttft is not None else "-"
             tps_cv_cell = f"{tps_cv:.2f}%" if tps_cv is not None else "-"
             memory_cell = str(memory) if memory is not None else "-"
             lines.append(
                 f"| {point['key']} | {point['commit']} | {point['records']} | "
                 f"{point['tok_per_s_records']} | {point['wall_tok_per_s_records']} | "
                 f"{point['memory_records']} | {point['ttft_us_records']} | {p05_tps_cell} | {tps_cell} | "
-                f"{wall_tps_cell} | {ttft_cell} | {tps_cv_cell} | {memory_cell} | {prompt_suite} |"
+                f"{wall_tps_cell} | {ttft_cell} | {p95_ttft_cell} | {tps_cv_cell} | {memory_cell} | {prompt_suite} |"
             )
     else:
         lines.append("No commit-level performance points found.")
 
     lines.extend(["", "## Latest Summary", ""])
     if report["summaries"]:
-        lines.append("| Key | Records | Latest Commit | P05 tok/s | Median tok/s | Median wall tok/s | Median TTFT us | Max Memory Bytes |")
-        lines.append("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| Key | Records | Latest Commit | P05 tok/s | Median tok/s | Median wall tok/s | Median TTFT us | P95 TTFT us | Max Memory Bytes |")
+        lines.append("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |")
         for key, summary in report["summaries"].items():
             p05_tps = summary["p05_tok_per_s"]
             tps = summary["median_tok_per_s"]
             wall_tps = summary["median_wall_tok_per_s"]
             ttft = summary["median_ttft_us"]
+            p95_ttft = summary["p95_ttft_us"]
             memory = summary["max_memory_bytes"]
             p05_tps_cell = f"{p05_tps:.3f}" if p05_tps is not None else "-"
             tps_cell = f"{tps:.3f}" if tps is not None else "-"
             wall_tps_cell = f"{wall_tps:.3f}" if wall_tps is not None else "-"
             ttft_cell = f"{ttft:.1f}" if ttft is not None else "-"
+            p95_ttft_cell = f"{p95_ttft:.1f}" if p95_ttft is not None else "-"
             memory_cell = str(memory) if memory is not None else "-"
             lines.append(
                 f"| {key} | {summary['records']} | {summary['latest_commit']} | "
-                f"{p05_tps_cell} | {tps_cell} | {wall_tps_cell} | {ttft_cell} | {memory_cell} |"
+                f"{p05_tps_cell} | {tps_cell} | {wall_tps_cell} | {ttft_cell} | {p95_ttft_cell} | {memory_cell} |"
             )
     else:
         lines.append("No performance records found.")
@@ -1145,6 +1178,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "median_tok_per_s",
             "median_wall_tok_per_s",
             "median_ttft_us",
+            "p95_ttft_us",
             "tok_per_s_cv_pct",
             "max_memory_bytes",
             "prompt_suite_sha256",
@@ -1218,6 +1252,7 @@ def build_report(
     max_tok_cv_pct: float | None = None,
     wall_tok_threshold_pct: float | None = None,
     ttft_threshold_pct: float | None = None,
+    p95_ttft_threshold_pct: float | None = None,
     p05_tok_threshold_pct: float | None = None,
     min_commits_per_key: int = 1,
     require_tok_per_s: bool = False,
@@ -1232,6 +1267,7 @@ def build_report(
         memory_threshold_pct,
         wall_tok_threshold_pct=wall_tok_threshold_pct,
         ttft_threshold_pct=ttft_threshold_pct,
+        p95_ttft_threshold_pct=p95_ttft_threshold_pct,
         p05_tok_threshold_pct=p05_tok_threshold_pct,
         baseline_commit=baseline_commit,
         candidate_commit=candidate_commit,
@@ -1274,6 +1310,7 @@ def build_report(
             "memory_regression_pct": memory_threshold_pct,
             "wall_tok_regression_pct": wall_tok_threshold_pct,
             "ttft_regression_pct": ttft_threshold_pct,
+            "p95_ttft_regression_pct": p95_ttft_threshold_pct,
             "p05_tok_regression_pct": p05_tok_threshold_pct,
             "min_records_per_point": min_records_per_point,
             "max_tok_cv_pct": max_tok_cv_pct,
@@ -1325,6 +1362,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--ttft-regression-pct",
         type=float,
         help="Fail when median first-token latency increases by more than this percent",
+    )
+    parser.add_argument(
+        "--p95-ttft-regression-pct",
+        type=float,
+        help="Fail when P95 first-token latency increases by more than this percent",
     )
     parser.add_argument(
         "--p05-tok-regression-pct",
@@ -1388,6 +1430,7 @@ def main(argv: list[str] | None = None) -> int:
         max_tok_cv_pct=args.max_tok_cv_pct,
         wall_tok_threshold_pct=args.wall_tok_regression_pct,
         ttft_threshold_pct=args.ttft_regression_pct,
+        p95_ttft_threshold_pct=args.p95_ttft_regression_pct,
         p05_tok_threshold_pct=args.p05_tok_regression_pct,
         min_commits_per_key=args.min_commits_per_key,
         require_tok_per_s=args.require_tok_per_s,

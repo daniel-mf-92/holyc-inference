@@ -462,8 +462,8 @@ python3 bench/bench_artifact_manifest.py \
 
 `perf_regression.py` scans JSON, JSONL, and CSV benchmark artifacts, groups
 results by benchmark/profile/model/quantization/prompt plus commit, and writes
-guest tok/s, host wall-clock tok/s, memory, and sample-coverage dashboards under
-`bench/dashboards/`.
+guest tok/s, host wall-clock tok/s, memory, first-token latency, and
+sample-coverage dashboards under `bench/dashboards/`.
 
 Example CI gate:
 
@@ -476,8 +476,10 @@ python3 bench/perf_regression.py \
   --max-tok-cv-pct 7.5 \
   --p05-tok-regression-pct 7.5 \
   --wall-tok-regression-pct 7.5 \
+  --p95-ttft-regression-pct 15 \
   --require-tok-per-s \
   --require-wall-tok-per-s \
+  --require-ttft-us \
   --require-memory \
   --fail-on-regression
 ```
@@ -494,10 +496,12 @@ benchmark key/commit point are too variable to trust as a baseline.
 catches slow individual runs that median throughput can hide.
 `--wall-tok-regression-pct` optionally gates host-observed wall-clock tok/s
 drops, which is useful when guest-side timing looks suspicious.
-`--require-tok-per-s`, `--require-wall-tok-per-s`, and `--require-memory` fail
-the dashboard when any benchmark key/commit point has zero samples for that
-telemetry field. This catches malformed or partially uploaded artifacts before
-CI treats missing metrics as merely non-comparable.
+`--ttft-regression-pct` and `--p95-ttft-regression-pct` optionally gate median
+and tail first-token latency growth. `--require-tok-per-s`,
+`--require-wall-tok-per-s`, `--require-ttft-us`, and `--require-memory` fail the
+dashboard when any benchmark key/commit point has zero samples for that telemetry
+field. This catches malformed or partially uploaded artifacts before CI treats
+missing metrics as merely non-comparable.
 Prompt-suite hashes from QEMU benchmark reports are carried into commit points;
 the dashboard fails when comparable benchmark/profile/model/quantization/prompt
 records contain multiple non-empty prompt-suite hashes, preventing accidental
@@ -639,7 +643,7 @@ python3 bench/perf_regression.py --input bench/results --output-dir bench/dashbo
 ```
 
 CI can fail on median throughput, low-tail throughput, host wall-clock
-throughput, first-token latency, or memory regressions with:
+throughput, median or P95 first-token latency, or memory regressions with:
 
 ```bash
 python3 bench/perf_regression.py \
@@ -647,6 +651,7 @@ python3 bench/perf_regression.py \
   --p05-tok-regression-pct 7.5 \
   --wall-tok-regression-pct 7.5 \
   --ttft-regression-pct 15 \
+  --p95-ttft-regression-pct 15 \
   --require-ttft-us \
   --fail-on-regression
 ```

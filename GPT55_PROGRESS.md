@@ -111,3 +111,4 @@
 2026-04-28T08:59:27Z | Added deterministic per-dataset/split curation caps with smoke gate coverage and refreshed dataset artifacts.
 2026-04-28T09:06:53Z | Made dataset index manifests portable by resolving relative artifact paths from manifest directories and refreshed dataset index artifacts.
 2026-04-28T09:14:36Z | Added build-compare P05 wall-clock tok/s deltas and opt-in low-tail wall-throughput gating with refreshed comparison artifacts.
+2026-04-28T09:43:31Z | Added perf regression P95 first-token latency tracking and opt-in tail-latency gating with refreshed dashboard artifacts.
