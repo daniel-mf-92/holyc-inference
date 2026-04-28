@@ -336,7 +336,8 @@ python3 bench/bench_artifact_manifest.py \
 
 `perf_regression.py` scans JSON, JSONL, and CSV benchmark artifacts, groups
 results by benchmark/profile/model/quantization/prompt plus commit, and writes
-tok/s, memory, and sample-coverage dashboards under `bench/dashboards/`.
+guest tok/s, host wall-clock tok/s, memory, and sample-coverage dashboards under
+`bench/dashboards/`.
 
 Example CI gate:
 
@@ -346,6 +347,7 @@ python3 bench/perf_regression.py \
   --output-dir bench/dashboards \
   --min-records-per-point 3 \
   --max-tok-cv-pct 7.5 \
+  --wall-tok-regression-pct 7.5 \
   --fail-on-regression
 ```
 
@@ -354,6 +356,8 @@ point has fewer samples than required. This catches partial matrix uploads and
 single-run artifacts before noisy throughput medians are accepted.
 `--max-tok-cv-pct` fails the dashboard when repeated tok/s samples inside a
 benchmark key/commit point are too variable to trust as a baseline.
+`--wall-tok-regression-pct` optionally gates host-observed wall-clock tok/s
+drops, which is useful when guest-side timing looks suspicious.
 The dashboard also writes `perf_regression_junit_latest.xml` so CI systems can
 surface throughput regressions, sample-coverage failures, and variability
 failures as test failures.
@@ -444,12 +448,13 @@ python3 bench/perplexity_compare.py \
 
 `perf_regression.py` scans host-side benchmark result files and writes dashboards
 to `bench/dashboards/`. It accepts JSON, JSONL, and CSV records with `tok_per_s`
-or `tok_per_s_milli`, plus optional memory fields such as `memory_bytes` or
-`max_rss_bytes`. Regression checks compare commit-level aggregates, so repeated
-runs and duplicate latest/stamped result files are collapsed by benchmark key and
-commit before the latest distinct commits are compared. Outputs include JSON,
-Markdown, JUnit XML, commit-point CSV, regression CSV, sample-coverage CSV, and
-tok/s variability CSV artifacts.
+or `tok_per_s_milli`, optional `wall_tok_per_s` or `wall_tok_per_s_milli`, plus
+optional memory fields such as `memory_bytes` or `max_rss_bytes`. Regression
+checks compare commit-level aggregates, so repeated runs and duplicate
+latest/stamped result files are collapsed by benchmark key and commit before the
+latest distinct commits are compared. Outputs include JSON, Markdown, JUnit XML,
+commit-point CSV, regression CSV, sample-coverage CSV, and tok/s variability CSV
+artifacts.
 
 Example:
 
@@ -457,10 +462,13 @@ Example:
 python3 bench/perf_regression.py --input bench/results --output-dir bench/dashboards
 ```
 
-CI can fail on throughput or memory regressions with:
+CI can fail on throughput, host wall-clock throughput, or memory regressions with:
 
 ```bash
-python3 bench/perf_regression.py --max-tok-cv-pct 7.5 --fail-on-regression
+python3 bench/perf_regression.py \
+  --max-tok-cv-pct 7.5 \
+  --wall-tok-regression-pct 7.5 \
+  --fail-on-regression
 ```
 
 Pin an explicit baseline/candidate pair when CI provides known SHAs:

@@ -36,6 +36,7 @@ class PerfRecord:
     quantization: str
     prompt: str
     tok_per_s: float | None
+    wall_tok_per_s: float | None
     memory_bytes: int | None
 
     @property
@@ -63,6 +64,7 @@ class CommitPoint:
     latest_timestamp: str
     records: int
     median_tok_per_s: float | None
+    median_wall_tok_per_s: float | None
     tok_per_s_cv_pct: float | None
     max_memory_bytes: int | None
 
@@ -119,6 +121,16 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
     tok_per_s_milli = parse_float(row.get("tok_per_s_milli"))
     if tok_per_s is None and tok_per_s_milli is not None:
         tok_per_s = tok_per_s_milli / 1000.0
+    wall_tok_per_s = parse_float(
+        row.get("wall_tok_per_s") or row.get("host_tok_per_s") or row.get("host_wall_tok_per_s")
+    )
+    wall_tok_per_s_milli = parse_float(
+        row.get("wall_tok_per_s_milli")
+        or row.get("host_tok_per_s_milli")
+        or row.get("host_wall_tok_per_s_milli")
+    )
+    if wall_tok_per_s is None and wall_tok_per_s_milli is not None:
+        wall_tok_per_s = wall_tok_per_s_milli / 1000.0
 
     memory_bytes = parse_int(
         row.get("memory_bytes")
@@ -127,7 +139,7 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
         or row.get("peak_memory_bytes")
     )
 
-    if tok_per_s is None and memory_bytes is None:
+    if tok_per_s is None and wall_tok_per_s is None and memory_bytes is None:
         return None
 
     return PerfRecord(
@@ -140,6 +152,7 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
         quantization=first_present(row, ("quantization", "quant", "format"), ""),
         prompt=first_present(row, ("prompt", "prompt_id", "case", "scenario"), ""),
         tok_per_s=tok_per_s,
+        wall_tok_per_s=wall_tok_per_s,
         memory_bytes=memory_bytes,
     )
 
@@ -236,11 +249,15 @@ def summarize(records: list[PerfRecord]) -> dict[str, dict[str, Any]]:
     summaries: dict[str, dict[str, Any]] = {}
     for key, key_records in sorted(by_key.items()):
         tps_values = [record.tok_per_s for record in key_records if record.tok_per_s is not None]
+        wall_tps_values = [
+            record.wall_tok_per_s for record in key_records if record.wall_tok_per_s is not None
+        ]
         memory_values = [record.memory_bytes for record in key_records if record.memory_bytes is not None]
         summaries[key] = {
             "records": len(key_records),
             "latest_commit": sorted(key_records, key=record_sort_key)[-1].commit,
             "median_tok_per_s": statistics.median(tps_values) if tps_values else None,
+            "median_wall_tok_per_s": statistics.median(wall_tps_values) if wall_tps_values else None,
             "max_memory_bytes": max(memory_values) if memory_values else None,
         }
     return summaries
@@ -254,6 +271,9 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
     points: list[CommitPoint] = []
     for (key, commit), commit_records in sorted(by_key_commit.items()):
         tps_values = [record.tok_per_s for record in commit_records if record.tok_per_s is not None]
+        wall_tps_values = [
+            record.wall_tok_per_s for record in commit_records if record.wall_tok_per_s is not None
+        ]
         memory_values = [record.memory_bytes for record in commit_records if record.memory_bytes is not None]
         tps_cv_pct = coefficient_of_variation_pct(tps_values)
         points.append(
@@ -263,6 +283,7 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                 latest_timestamp=max(record.timestamp for record in commit_records),
                 records=len(commit_records),
                 median_tok_per_s=statistics.median(tps_values) if tps_values else None,
+                median_wall_tok_per_s=statistics.median(wall_tps_values) if wall_tps_values else None,
                 tok_per_s_cv_pct=tps_cv_pct,
                 max_memory_bytes=max(memory_values) if memory_values else None,
             )
@@ -303,6 +324,7 @@ def detect_regressions(
     records: list[PerfRecord],
     tok_threshold_pct: float,
     memory_threshold_pct: float,
+    wall_tok_threshold_pct: float | None = None,
     baseline_commit: str | None = None,
     candidate_commit: str | None = None,
 ) -> list[Regression]:
@@ -334,6 +356,30 @@ def detect_regressions(
                         candidate_value=candidate.median_tok_per_s,
                         delta_pct=delta_pct,
                         threshold_pct=tok_threshold_pct,
+                    )
+                )
+
+        if (
+            wall_tok_threshold_pct is not None
+            and baseline.median_wall_tok_per_s
+            and candidate.median_wall_tok_per_s is not None
+        ):
+            delta_pct = (
+                (baseline.median_wall_tok_per_s - candidate.median_wall_tok_per_s)
+                * 100.0
+                / baseline.median_wall_tok_per_s
+            )
+            if delta_pct > wall_tok_threshold_pct:
+                regressions.append(
+                    Regression(
+                        key=key,
+                        metric="wall_tok_per_s",
+                        baseline_commit=baseline.commit,
+                        candidate_commit=candidate.commit,
+                        baseline_value=baseline.median_wall_tok_per_s,
+                        candidate_value=candidate.median_wall_tok_per_s,
+                        delta_pct=delta_pct,
+                        threshold_pct=wall_tok_threshold_pct,
                     )
                 )
 
@@ -449,34 +495,40 @@ def markdown_report(report: dict[str, Any]) -> str:
 
     lines.extend(["", "## Commit Points", ""])
     if report["commit_points"]:
-        lines.append("| Key | Commit | Records | Median tok/s | Tok/s CV | Max Memory Bytes |")
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: |")
+        lines.append(
+            "| Key | Commit | Records | Median tok/s | Median wall tok/s | Tok/s CV | Max Memory Bytes |"
+        )
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: |")
         for point in report["commit_points"]:
             tps = point["median_tok_per_s"]
+            wall_tps = point["median_wall_tok_per_s"]
             tps_cv = point["tok_per_s_cv_pct"]
             memory = point["max_memory_bytes"]
             tps_cell = f"{tps:.3f}" if tps is not None else "-"
+            wall_tps_cell = f"{wall_tps:.3f}" if wall_tps is not None else "-"
             tps_cv_cell = f"{tps_cv:.2f}%" if tps_cv is not None else "-"
             memory_cell = str(memory) if memory is not None else "-"
             lines.append(
                 f"| {point['key']} | {point['commit']} | {point['records']} | "
-                f"{tps_cell} | {tps_cv_cell} | {memory_cell} |"
+                f"{tps_cell} | {wall_tps_cell} | {tps_cv_cell} | {memory_cell} |"
             )
     else:
         lines.append("No commit-level performance points found.")
 
     lines.extend(["", "## Latest Summary", ""])
     if report["summaries"]:
-        lines.append("| Key | Records | Latest Commit | Median tok/s | Max Memory Bytes |")
-        lines.append("| --- | ---: | --- | ---: | ---: |")
+        lines.append("| Key | Records | Latest Commit | Median tok/s | Median wall tok/s | Max Memory Bytes |")
+        lines.append("| --- | ---: | --- | ---: | ---: | ---: |")
         for key, summary in report["summaries"].items():
             tps = summary["median_tok_per_s"]
+            wall_tps = summary["median_wall_tok_per_s"]
             memory = summary["max_memory_bytes"]
             tps_cell = f"{tps:.3f}" if tps is not None else "-"
+            wall_tps_cell = f"{wall_tps:.3f}" if wall_tps is not None else "-"
             memory_cell = str(memory) if memory is not None else "-"
             lines.append(
                 f"| {key} | {summary['records']} | {summary['latest_commit']} | "
-                f"{tps_cell} | {memory_cell} |"
+                f"{tps_cell} | {wall_tps_cell} | {memory_cell} |"
             )
     else:
         lines.append("No performance records found.")
@@ -624,6 +676,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "latest_timestamp",
             "records",
             "median_tok_per_s",
+            "median_wall_tok_per_s",
             "tok_per_s_cv_pct",
             "max_memory_bytes",
         ],
@@ -670,12 +723,14 @@ def build_report(
     candidate_commit: str | None = None,
     min_records_per_point: int = 1,
     max_tok_cv_pct: float | None = None,
+    wall_tok_threshold_pct: float | None = None,
 ) -> dict[str, Any]:
     points = commit_points(records)
     regressions = detect_regressions(
         records,
         tok_threshold_pct,
         memory_threshold_pct,
+        wall_tok_threshold_pct=wall_tok_threshold_pct,
         baseline_commit=baseline_commit,
         candidate_commit=candidate_commit,
     )
@@ -693,6 +748,7 @@ def build_report(
         "thresholds": {
             "tok_regression_pct": tok_threshold_pct,
             "memory_regression_pct": memory_threshold_pct,
+            "wall_tok_regression_pct": wall_tok_threshold_pct,
             "min_records_per_point": min_records_per_point,
             "max_tok_cv_pct": max_tok_cv_pct,
         },
@@ -717,6 +773,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-dir", type=Path, default=Path("bench/dashboards"))
     parser.add_argument("--tok-regression-pct", type=float, default=DEFAULT_TOK_REGRESSION_PCT)
     parser.add_argument("--memory-regression-pct", type=float, default=DEFAULT_MEMORY_REGRESSION_PCT)
+    parser.add_argument(
+        "--wall-tok-regression-pct",
+        type=float,
+        help="Fail when host wall-clock median tok/s drops by more than this percent",
+    )
     parser.add_argument("--baseline-commit", help="Commit SHA/name to use as the comparison baseline")
     parser.add_argument("--candidate-commit", help="Commit SHA/name to compare against the baseline")
     parser.add_argument(
@@ -746,6 +807,7 @@ def main(argv: list[str] | None = None) -> int:
         candidate_commit=args.candidate_commit,
         min_records_per_point=args.min_records_per_point,
         max_tok_cv_pct=args.max_tok_cv_pct,
+        wall_tok_threshold_pct=args.wall_tok_regression_pct,
     )
 
     write_dashboard_outputs(report, args.output_dir)

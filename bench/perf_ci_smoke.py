@@ -64,6 +64,12 @@ def main() -> int:
         if "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/ci-short" not in report["summaries"]:
             print("missing_ci_fixture_summary=true", file=sys.stderr)
             return 1
+        fixture_summary = report["summaries"][
+            "qemu_prompt/ci-airgap-smoke/synthetic-smoke/Q4_0/ci-short"
+        ]
+        if fixture_summary.get("median_wall_tok_per_s") != 95.5:
+            print("missing_wall_tok_summary=true", file=sys.stderr)
+            return 1
         if "Perf Regression Dashboard" not in markdown_path.read_text(encoding="utf-8"):
             print("missing_markdown_dashboard=true", file=sys.stderr)
             return 1

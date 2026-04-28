@@ -60,6 +60,47 @@ def test_detects_tok_per_s_and_memory_regressions(tmp_path: Path) -> None:
     assert regressions[0].candidate_commit == "head"
 
 
+def test_detects_optional_wall_tok_per_s_regressions(tmp_path: Path) -> None:
+    result = tmp_path / "perf.jsonl"
+    write_jsonl(
+        result,
+        [
+            {
+                "timestamp": "2026-04-27T10:00:00Z",
+                "commit": "base",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "wall_tok_per_s": 80.0,
+            },
+            {
+                "timestamp": "2026-04-27T11:00:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "wall_tok_per_s": 70.0,
+            },
+        ],
+    )
+
+    records = perf_regression.load_records([result])
+    assert records[0].wall_tok_per_s == 80.0
+    assert perf_regression.detect_regressions(records, 5.0, 10.0) == []
+
+    regressions = perf_regression.detect_regressions(
+        records,
+        5.0,
+        10.0,
+        wall_tok_threshold_pct=5.0,
+    )
+
+    assert len(regressions) == 1
+    assert regressions[0].metric == "wall_tok_per_s"
+    assert regressions[0].baseline_value == 80.0
+    assert regressions[0].candidate_value == 70.0
+
+
 def test_regression_detection_compares_latest_distinct_commits(tmp_path: Path) -> None:
     result = tmp_path / "perf.jsonl"
     write_jsonl(
@@ -330,8 +371,8 @@ def test_write_dashboard_outputs_includes_junit(tmp_path: Path) -> None:
 def test_csv_tok_per_s_milli_is_normalized(tmp_path: Path) -> None:
     result = tmp_path / "perf.csv"
     result.write_text(
-        "profile,iter,tokens,prompt_tokens,elapsed_us,tok_per_s_milli,hardening\n"
-        "secure-local,1,256,128,1000,250000,attestation=on\n",
+        "profile,iter,tokens,prompt_tokens,elapsed_us,tok_per_s_milli,wall_tok_per_s_milli,hardening\n"
+        "secure-local,1,256,128,1000,250000,200000,attestation=on\n",
         encoding="utf-8",
     )
 
@@ -339,6 +380,7 @@ def test_csv_tok_per_s_milli_is_normalized(tmp_path: Path) -> None:
 
     assert len(records) == 1
     assert records[0].tok_per_s == 250.0
+    assert records[0].wall_tok_per_s == 200.0
     assert records[0].benchmark == "perf"
 
 
@@ -389,10 +431,10 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
         output_dir / "perf_regression_variability_violations_latest.csv"
     ).read_text(encoding="utf-8")
     assert (
-        "key,commit,latest_timestamp,records,median_tok_per_s,tok_per_s_cv_pct,max_memory_bytes"
+        "key,commit,latest_timestamp,records,median_tok_per_s,median_wall_tok_per_s,tok_per_s_cv_pct,max_memory_bytes"
         in commit_points_csv
     )
-    assert "prompt/dev-local/-/-/-,abc,2026-04-27T10:00:00Z,1,42.0,," in commit_points_csv
+    assert "prompt/dev-local/-/-/-,abc,2026-04-27T10:00:00Z,1,42.0,,," in commit_points_csv
     assert "key,metric,baseline_commit,candidate_commit,baseline_value,candidate_value" in regressions_csv
     assert "key,commit,records,minimum_records" in sample_violations_csv
     assert "key,commit,records,tok_per_s_cv_pct,threshold_pct" in variability_violations_csv
