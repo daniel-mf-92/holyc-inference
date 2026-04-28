@@ -362,6 +362,9 @@ argument drift independently from prompt-suite drift.
 Each matrix cell records the
 prompt-suite SHA256 from its underlying prompt benchmark report so matrix
 comparisons can reject accidental prompt drift.
+Matrix rollups also preserve each cell's guest tok/s, host wall-clock tok/s,
+P95 TTFT, median host-overhead percentage, and guest/wall us-per-token latency
+from the underlying prompt benchmark report.
 Use `max_suite_cv_pct` and `max_prompt_cv_pct` in the matrix JSON, or the
 matching CLI flags, to pass tok/s variability gates through to every cell. A
 cell that fails a variability gate still writes its prompt-benchmark report and
@@ -385,7 +388,8 @@ python3 bench/bench_matrix.py \
 ```
 
 `bench_result_index.py` scans existing QEMU prompt and matrix JSON reports,
-rolls their tok/s, memory, prompt-suite, and run-count metadata into a single
+rolls their tok/s, wall-clock tok/s, TTFT, host-overhead, per-token latency,
+memory, prompt-suite, and run-count metadata into a single
 JSON/Markdown/CSV/JUnit XML index, and checks each recorded QEMU command for
 explicit `-nic none` air-gap compliance. It also reports prompt-suite drift when
 comparable profile/model/quantization artifacts carry different non-empty suite

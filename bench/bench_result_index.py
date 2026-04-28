@@ -41,6 +41,11 @@ class ArtifactSummary:
     measured_runs: int
     warmup_runs: int
     median_tok_per_s: float | None
+    wall_tok_per_s_median: float | None
+    ttft_us_p95: float | None
+    host_overhead_pct_median: float | None
+    us_per_token_median: float | None
+    wall_us_per_token_median: float | None
     max_memory_bytes: int | None
     telemetry_status: str
     telemetry_findings: list[str]
@@ -201,6 +206,15 @@ def qemu_report_status(report: dict[str, Any], runs: list[dict[str, Any]], warmu
     return status
 
 
+def summary_float(report: dict[str, Any], summaries: list[dict[str, Any]], key: str) -> float | None:
+    suite_summary = report.get("suite_summary") if isinstance(report.get("suite_summary"), dict) else {}
+    value = parse_float(suite_summary.get(key))
+    if value is not None:
+        return value
+    values = [parsed for row in summaries if (parsed := parse_float(row.get(key))) is not None]
+    return statistics.median(values) if values else None
+
+
 def telemetry_status(
     artifact_type: str,
     prompts: int | None,
@@ -343,6 +357,11 @@ def summarize_qemu_report(
         measured_runs=len(runs),
         warmup_runs=len(warmups),
         median_tok_per_s=median_tok_per_s,
+        wall_tok_per_s_median=summary_float(report, summaries, "wall_tok_per_s_median"),
+        ttft_us_p95=summary_float(report, summaries, "ttft_us_p95"),
+        host_overhead_pct_median=summary_float(report, summaries, "host_overhead_pct_median"),
+        us_per_token_median=summary_float(report, summaries, "us_per_token_median"),
+        wall_us_per_token_median=summary_float(report, summaries, "wall_us_per_token_median"),
         max_memory_bytes=max_memory_bytes,
         telemetry_status=telem_status,
         telemetry_findings=telem_findings,
@@ -414,6 +433,11 @@ def summarize_matrix_report(
                 measured_runs=measured_runs,
                 warmup_runs=parse_int(cell.get("warmup_runs")) or 0,
                 median_tok_per_s=median_tok_per_s,
+                wall_tok_per_s_median=parse_float(cell.get("wall_tok_per_s_median")),
+                ttft_us_p95=parse_float(cell.get("ttft_us_p95")),
+                host_overhead_pct_median=parse_float(cell.get("host_overhead_pct_median")),
+                us_per_token_median=parse_float(cell.get("us_per_token_median")),
+                wall_us_per_token_median=parse_float(cell.get("wall_us_per_token_median")),
                 max_memory_bytes=parse_int(cell.get("max_memory_bytes")),
                 telemetry_status=telem_status,
                 telemetry_findings=telem_findings,
@@ -584,15 +608,17 @@ def markdown_report(report: dict[str, Any]) -> str:
     if report["artifacts"]:
         lines.extend(
             [
-                "| Type | Status | Air-gap | Telemetry | Freshness | Commit | Profile | Model | Quant | Prompt suite | Command SHA256 | Prompts | Runs | Warmups | Age seconds | Median tok/s | Max memory bytes | Source |",
-                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+                "| Type | Status | Air-gap | Telemetry | Freshness | Commit | Profile | Model | Quant | Prompt suite | Command SHA256 | Prompts | Runs | Warmups | Age seconds | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Guest us/token | Wall us/token | Max memory bytes | Source |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
             ]
         )
         for artifact in report["artifacts"]:
             lines.append(
                 "| {artifact_type} | {status} | {command_airgap_status} | {telemetry_status} | {freshness_status} | {commit_status}:{commit} | {profile} | {model} | "
                 "{quantization} | {prompt_suite_sha256} | {command_sha256} | {prompts} | {measured_runs} | {warmup_runs} | "
-                "{generated_age_seconds} | {median_tok_per_s} | {max_memory_bytes} | {source} |".format(
+                "{generated_age_seconds} | {median_tok_per_s} | {wall_tok_per_s_median} | {ttft_us_p95} | "
+                "{host_overhead_pct_median} | {us_per_token_median} | {wall_us_per_token_median} | "
+                "{max_memory_bytes} | {source} |".format(
                     **{key: format_value(value) for key, value in artifact.items()}
                 )
             )
@@ -800,6 +826,11 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
         "measured_runs",
         "warmup_runs",
         "median_tok_per_s",
+        "wall_tok_per_s_median",
+        "ttft_us_p95",
+        "host_overhead_pct_median",
+        "us_per_token_median",
+        "wall_us_per_token_median",
         "max_memory_bytes",
         "telemetry_status",
         "telemetry_findings",

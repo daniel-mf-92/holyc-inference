@@ -66,6 +66,11 @@ class MatrixCellResult:
     measured_runs: int
     warmup_runs: int
     median_tok_per_s: float | None
+    wall_tok_per_s_median: float | None
+    ttft_us_p95: float | None
+    host_overhead_pct_median: float | None
+    us_per_token_median: float | None
+    wall_us_per_token_median: float | None
     max_memory_bytes: int | None
     variability_findings: int
 
@@ -200,6 +205,19 @@ def max_cell_memory_bytes(report: dict[str, Any]) -> int | None:
     return max(int(value) for value in values) if values else None
 
 
+def suite_float(report: dict[str, Any], key: str) -> float | None:
+    suite_summary = report.get("suite_summary")
+    if not isinstance(suite_summary, dict):
+        return None
+    value = suite_summary.get(key)
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def report_commit(report: dict[str, Any]) -> str:
     commits = sorted(
         {
@@ -260,6 +278,11 @@ def run_cell(
             measured_runs=0,
             warmup_runs=0,
             median_tok_per_s=None,
+            wall_tok_per_s_median=None,
+            ttft_us_p95=None,
+            host_overhead_pct_median=None,
+            us_per_token_median=None,
+            wall_us_per_token_median=None,
             max_memory_bytes=None,
             variability_findings=0,
         )
@@ -318,6 +341,11 @@ def run_cell(
         measured_runs=len(report.get("benchmarks", [])),
         warmup_runs=len(report.get("warmups", [])),
         median_tok_per_s=median_cell_tok_per_s(report),
+        wall_tok_per_s_median=suite_float(report, "wall_tok_per_s_median"),
+        ttft_us_p95=suite_float(report, "ttft_us_p95"),
+        host_overhead_pct_median=suite_float(report, "host_overhead_pct_median"),
+        us_per_token_median=suite_float(report, "us_per_token_median"),
+        wall_us_per_token_median=suite_float(report, "wall_us_per_token_median"),
         max_memory_bytes=max_cell_memory_bytes(report),
         variability_findings=len(findings) if isinstance(findings, list) else 0,
     )
@@ -341,19 +369,30 @@ def markdown_report(report: dict[str, Any]) -> str:
     ]
     if report["cells"]:
         lines.append(
-            "| Profile | Model | Quantization | Commit | Status | Prompts | Prompt suite | Command SHA256 | Runs | Warmups | Median tok/s | Max memory bytes | Variability findings |"
+            "| Profile | Model | Quantization | Commit | Status | Prompts | Prompt suite | Command SHA256 | Runs | Warmups | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Guest us/token | Wall us/token | Max memory bytes | Variability findings |"
         )
-        lines.append("| --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | --- | --- | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for cell in report["cells"]:
             median = cell["median_tok_per_s"]
             memory = cell["max_memory_bytes"]
             median_cell = f"{median:.3f}" if median is not None else "-"
+            wall_tok = cell["wall_tok_per_s_median"]
+            wall_tok_cell = f"{wall_tok:.3f}" if wall_tok is not None else "-"
+            ttft = cell["ttft_us_p95"]
+            ttft_cell = f"{ttft:.3f}" if ttft is not None else "-"
+            overhead = cell["host_overhead_pct_median"]
+            overhead_cell = f"{overhead:.3f}" if overhead is not None else "-"
+            us_per_token = cell["us_per_token_median"]
+            us_per_token_cell = f"{us_per_token:.3f}" if us_per_token is not None else "-"
+            wall_us_per_token = cell["wall_us_per_token_median"]
+            wall_us_per_token_cell = f"{wall_us_per_token:.3f}" if wall_us_per_token is not None else "-"
             memory_cell = str(memory) if memory is not None else "-"
             lines.append(
                 f"| {cell['profile']} | {cell['model']} | {cell['quantization']} | {cell['commit'] or '-'} | {cell['status']} | "
                 f"{cell['prompts']} | {cell['prompt_suite_sha256']} | {cell['command_sha256']} | "
                 f"{cell['measured_runs']} | {cell['warmup_runs']} | "
-                f"{median_cell} | {memory_cell} | {cell['variability_findings']} |"
+                f"{median_cell} | {wall_tok_cell} | {ttft_cell} | {overhead_cell} | "
+                f"{us_per_token_cell} | {wall_us_per_token_cell} | {memory_cell} | {cell['variability_findings']} |"
             )
     else:
         lines.append("No matrix cells were expanded.")
@@ -415,6 +454,11 @@ def write_matrix_csv(cells: list[MatrixCellResult], path: Path) -> None:
         "measured_runs",
         "warmup_runs",
         "median_tok_per_s",
+        "wall_tok_per_s_median",
+        "ttft_us_p95",
+        "host_overhead_pct_median",
+        "us_per_token_median",
+        "wall_us_per_token_median",
         "max_memory_bytes",
         "variability_findings",
         "command",
@@ -475,6 +519,11 @@ def write_matrix_junit(cells: list[MatrixCellResult], path: Path) -> None:
                 f"measured_runs={cell.measured_runs}",
                 f"warmup_runs={cell.warmup_runs}",
                 f"median_tok_per_s={cell.median_tok_per_s}",
+                f"wall_tok_per_s_median={cell.wall_tok_per_s_median}",
+                f"ttft_us_p95={cell.ttft_us_p95}",
+                f"host_overhead_pct_median={cell.host_overhead_pct_median}",
+                f"us_per_token_median={cell.us_per_token_median}",
+                f"wall_us_per_token_median={cell.wall_us_per_token_median}",
                 f"max_memory_bytes={cell.max_memory_bytes}",
                 f"variability_findings={cell.variability_findings}",
                 f"command={json.dumps(cell.command, separators=(',', ':'))}",

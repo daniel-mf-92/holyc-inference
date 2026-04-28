@@ -640,6 +640,95 @@ def main() -> int:
         ).read_text(encoding="utf-8"):
             print("missing_matrix_variability_csv=true", file=sys.stderr)
             return 1
+        matrix_metric_fields = {
+            "wall_tok_per_s_median",
+            "ttft_us_p95",
+            "host_overhead_pct_median",
+            "us_per_token_median",
+            "wall_us_per_token_median",
+        }
+        for cell in matrix_report["cells"]:
+            missing_fields = [
+                field for field in matrix_metric_fields if cell.get(field) is None
+            ]
+            if missing_fields:
+                print(
+                    "missing_matrix_rollup_metrics="
+                    + ",".join(sorted(missing_fields)),
+                    file=sys.stderr,
+                )
+                return 1
+        matrix_csv = (matrix_output_dir / "bench_matrix_latest.csv").read_text(
+            encoding="utf-8"
+        )
+        if not matrix_metric_fields.issubset(set(matrix_csv.splitlines()[0].split(","))):
+            print("missing_matrix_metric_csv_fields=true", file=sys.stderr)
+            return 1
+        if "Wall tok/s" not in (matrix_output_dir / "bench_matrix_latest.md").read_text(
+            encoding="utf-8"
+        ):
+            print("missing_matrix_metric_markdown=true", file=sys.stderr)
+            return 1
+
+        result_index_output_dir = tmp_path / "bench_result_index"
+        result_index_command = [
+            sys.executable,
+            str(ROOT / "bench" / "bench_result_index.py"),
+            "--input",
+            str(matrix_output_dir),
+            "--output-dir",
+            str(result_index_output_dir),
+            "--fail-on-airgap",
+            "--fail-on-telemetry",
+            "--fail-on-command-hash-metadata",
+        ]
+        completed = subprocess.run(
+            result_index_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode != 0:
+            sys.stdout.write(completed.stdout)
+            sys.stderr.write(completed.stderr)
+            return completed.returncode
+        result_index_report = json.loads(
+            (result_index_output_dir / "bench_result_index_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        if result_index_report["status"] != "pass":
+            print(
+                f"unexpected_result_index_status={result_index_report['status']}",
+                file=sys.stderr,
+            )
+            return 1
+        if not result_index_report["artifacts"]:
+            print("missing_result_index_artifacts=true", file=sys.stderr)
+            return 1
+        for artifact in result_index_report["artifacts"]:
+            missing_fields = [
+                field for field in matrix_metric_fields if artifact.get(field) is None
+            ]
+            if missing_fields:
+                print(
+                    "missing_result_index_rollup_metrics="
+                    + ",".join(sorted(missing_fields)),
+                    file=sys.stderr,
+                )
+                return 1
+        result_index_csv = (
+            result_index_output_dir / "bench_result_index_latest.csv"
+        ).read_text(encoding="utf-8")
+        if not matrix_metric_fields.issubset(set(result_index_csv.splitlines()[0].split(","))):
+            print("missing_result_index_metric_csv_fields=true", file=sys.stderr)
+            return 1
+        if "Wall tok/s" not in (
+            result_index_output_dir / "bench_result_index_latest.md"
+        ).read_text(encoding="utf-8"):
+            print("missing_result_index_metric_markdown=true", file=sys.stderr)
+            return 1
 
         manifest_fixture_dir = tmp_path / "manifest_fixture"
         manifest_fixture_dir.mkdir()
