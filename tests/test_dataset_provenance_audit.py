@@ -61,11 +61,29 @@ def skewed_dataset_rows() -> list[dict]:
     ]
 
 
-def curate_fixture(tmp_path: Path) -> Path:
+def skewed_split_rows() -> list[dict]:
+    rows = []
+    for split, answer_index in (("validation", 0), ("test", 1)):
+        for index in range(2):
+            rows.append(
+                {
+                    "id": f"{split}-{index}",
+                    "dataset": "arc",
+                    "split": split,
+                    "prompt": f"ARC {split} question {index}",
+                    "choices": ["A", "B"],
+                    "answer_index": answer_index,
+                    "provenance": "synthetic split provenance audit test",
+                }
+            )
+    return rows
+
+
+def curate_fixture(tmp_path: Path, rows: list[dict] | None = None) -> Path:
     source = tmp_path / "source.jsonl"
     output = tmp_path / "curated.jsonl"
     manifest = tmp_path / "curated.manifest.json"
-    write_jsonl(source, skewed_dataset_rows())
+    write_jsonl(source, rows or skewed_dataset_rows())
     status = dataset_curate.main(
         [
             "--input",
@@ -105,8 +123,10 @@ def test_provenance_audit_reports_dataset_answer_histograms() -> None:
 
         assert artifact["answer_histogram"] == {"0": 2, "1": 2}
         assert artifact["dataset_answer_histograms"] == {"arc": {"0": 2}, "truthfulqa": {"1": 2}}
+        assert artifact["split_answer_histograms"] == {"validation": {"0": 2, "1": 2}}
         assert artifact["dataset_majority_answers"]["arc"]["pct"] == 100.0
         assert json.loads(csv_rows[0]["dataset_answer_histograms"]) == {"arc": {"0": 2}, "truthfulqa": {"1": 2}}
+        assert json.loads(csv_rows[0]["split_answer_histograms"]) == {"validation": {"0": 2, "1": 2}}
 
 
 def test_per_dataset_majority_answer_gate_fails_skewed_dataset() -> None:
@@ -136,7 +156,37 @@ def test_per_dataset_majority_answer_gate_fails_skewed_dataset() -> None:
         assert findings.count("dataset_majority_answer_skew") == 2
 
 
+def test_per_split_majority_answer_gate_fails_skewed_split() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        manifest = curate_fixture(tmp_path, skewed_split_rows())
+        output_dir = tmp_path / "audit"
+
+        status = dataset_provenance_audit.main(
+            [
+                "--input",
+                str(manifest),
+                "--output-dir",
+                str(output_dir),
+                "--max-majority-answer-pct",
+                "75",
+                "--max-split-majority-answer-pct",
+                "75",
+                "--fail-on-findings",
+            ]
+        )
+
+        report = json.loads((output_dir / "dataset_provenance_audit_latest.json").read_text(encoding="utf-8"))
+        artifact = report["artifacts"][0]
+        findings = [finding["kind"] for finding in artifact["findings"]]
+        assert status == 1
+        assert artifact["split_answer_histograms"] == {"test": {"1": 2}, "validation": {"0": 2}}
+        assert "majority_answer_skew" not in findings
+        assert findings.count("split_majority_answer_skew") == 2
+
+
 if __name__ == "__main__":
     test_provenance_audit_reports_dataset_answer_histograms()
     test_per_dataset_majority_answer_gate_fails_skewed_dataset()
+    test_per_split_majority_answer_gate_fails_skewed_split()
     print("dataset_provenance_audit_tests=ok")

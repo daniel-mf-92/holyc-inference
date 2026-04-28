@@ -52,9 +52,11 @@ class ProvenanceArtifact:
     selected_records: int
     answer_histogram: dict[str, int]
     dataset_answer_histograms: dict[str, dict[str, int]]
+    split_answer_histograms: dict[str, dict[str, int]]
     majority_answer_index: str
     majority_answer_pct: float | None
     dataset_majority_answers: dict[str, dict[str, Any]]
+    split_majority_answers: dict[str, dict[str, Any]]
     findings: list[ProvenanceFinding]
 
 
@@ -137,6 +139,18 @@ def answer_histograms_by_dataset(records: list[dataset_pack.EvalRecord]) -> dict
     }
 
 
+def answer_histograms_by_split(records: list[dataset_pack.EvalRecord]) -> dict[str, dict[str, int]]:
+    grouped: dict[str, dict[str, int]] = {}
+    for record in records:
+        histogram = grouped.setdefault(record.split, {})
+        key = str(record.answer_index)
+        histogram[key] = histogram.get(key, 0) + 1
+    return {
+        split: dict(sorted(histogram.items(), key=lambda item: int(item[0])))
+        for split, histogram in sorted(grouped.items())
+    }
+
+
 def majority_answer(histogram: dict[str, int]) -> tuple[str, float | None]:
     if not histogram:
         return "", None
@@ -153,6 +167,20 @@ def majority_answers_by_dataset(
     for dataset, histogram in sorted(histograms.items()):
         answer_index, pct = majority_answer(histogram)
         majorities[dataset] = {
+            "answer_index": answer_index,
+            "pct": pct,
+            "records": sum(histogram.values()),
+        }
+    return majorities
+
+
+def majority_answers_by_split(
+    histograms: dict[str, dict[str, int]]
+) -> dict[str, dict[str, Any]]:
+    majorities: dict[str, dict[str, Any]] = {}
+    for split, histogram in sorted(histograms.items()):
+        answer_index, pct = majority_answer(histogram)
+        majorities[split] = {
             "answer_index": answer_index,
             "pct": pct,
             "records": sum(histogram.values()),
@@ -199,6 +227,7 @@ def audit_manifest(
     require_source_url: bool,
     max_majority_answer_pct: float | None,
     max_dataset_majority_answer_pct: float | None = None,
+    max_split_majority_answer_pct: float | None = None,
 ) -> ProvenanceArtifact | None:
     manifest = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict) or manifest.get("format") != "hceval-curated-jsonl":
@@ -254,9 +283,11 @@ def audit_manifest(
     records: list[dataset_pack.EvalRecord] = []
     observed_answer_histogram: dict[str, int] = {}
     observed_dataset_answer_histograms: dict[str, dict[str, int]] = {}
+    observed_split_answer_histograms: dict[str, dict[str, int]] = {}
     majority_answer_index = ""
     majority_answer_pct: float | None = None
     observed_dataset_majority_answers: dict[str, dict[str, Any]] = {}
+    observed_split_majority_answers: dict[str, dict[str, Any]] = {}
     curated_output = output_path(manifest, path)
     if curated_output is None:
         findings.append(finding(path, "error", "missing_output_path", "output is missing"))
@@ -302,8 +333,10 @@ def audit_manifest(
                 )
             observed_answer_histogram = answer_histogram(records)
             observed_dataset_answer_histograms = answer_histograms_by_dataset(records)
+            observed_split_answer_histograms = answer_histograms_by_split(records)
             majority_answer_index, majority_answer_pct = majority_answer(observed_answer_histogram)
             observed_dataset_majority_answers = majority_answers_by_dataset(observed_dataset_answer_histograms)
+            observed_split_majority_answers = majority_answers_by_split(observed_split_answer_histograms)
             if observed_answer_histogram != manifest.get("answer_histogram"):
                 findings.append(
                     finding(path, "error", "answer_histogram_mismatch", "answer_histogram does not match output")
@@ -319,6 +352,19 @@ def audit_manifest(
                         "error",
                         "dataset_answer_histograms_mismatch",
                         "dataset_answer_histograms does not match output",
+                    )
+                )
+            manifest_split_answer_histograms = manifest.get("split_answer_histograms")
+            if (
+                manifest_split_answer_histograms is not None
+                and observed_split_answer_histograms != manifest_split_answer_histograms
+            ):
+                findings.append(
+                    finding(
+                        path,
+                        "error",
+                        "split_answer_histograms_mismatch",
+                        "split_answer_histograms does not match output",
                     )
                 )
             if (
@@ -349,6 +395,21 @@ def audit_manifest(
                                 (
                                     f"{dataset} answer index {majority['answer_index']} covers {pct:.2f}% "
                                     f"of records, above {max_dataset_majority_answer_pct:.2f}% gate"
+                                ),
+                            )
+                        )
+            if max_split_majority_answer_pct is not None:
+                for split, majority in observed_split_majority_answers.items():
+                    pct = majority.get("pct")
+                    if pct is not None and pct > max_split_majority_answer_pct:
+                        findings.append(
+                            finding(
+                                path,
+                                "error",
+                                "split_majority_answer_skew",
+                                (
+                                    f"{split} answer index {majority['answer_index']} covers {pct:.2f}% "
+                                    f"of records, above {max_split_majority_answer_pct:.2f}% gate"
                                 ),
                             )
                         )
@@ -385,9 +446,11 @@ def audit_manifest(
         selected_records=len(records),
         answer_histogram=observed_answer_histogram,
         dataset_answer_histograms=observed_dataset_answer_histograms,
+        split_answer_histograms=observed_split_answer_histograms,
         majority_answer_index=majority_answer_index,
         majority_answer_pct=majority_answer_pct,
         dataset_majority_answers=observed_dataset_majority_answers,
+        split_majority_answers=observed_split_majority_answers,
         findings=findings,
     )
 
@@ -397,6 +460,7 @@ def load_artifacts(
     require_source_url: bool,
     max_majority_answer_pct: float | None,
     max_dataset_majority_answer_pct: float | None = None,
+    max_split_majority_answer_pct: float | None = None,
 ) -> list[ProvenanceArtifact]:
     artifacts: list[ProvenanceArtifact] = []
     for path in sorted(set(iter_manifest_files(paths))):
@@ -405,6 +469,7 @@ def load_artifacts(
             require_source_url,
             max_majority_answer_pct,
             max_dataset_majority_answer_pct,
+            max_split_majority_answer_pct,
         )
         if artifact is not None:
             artifacts.append(artifact)
@@ -484,9 +549,11 @@ def write_csv(artifacts: list[ProvenanceArtifact], path: Path) -> None:
         "selected_records",
         "answer_histogram",
         "dataset_answer_histograms",
+        "split_answer_histograms",
         "majority_answer_index",
         "majority_answer_pct",
         "dataset_majority_answers",
+        "split_majority_answers",
         "findings",
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:
@@ -498,8 +565,14 @@ def write_csv(artifacts: list[ProvenanceArtifact], path: Path) -> None:
             row["dataset_answer_histograms"] = json.dumps(
                 artifact.dataset_answer_histograms, separators=(",", ":")
             )
+            row["split_answer_histograms"] = json.dumps(
+                artifact.split_answer_histograms, separators=(",", ":")
+            )
             row["dataset_majority_answers"] = json.dumps(
                 artifact.dataset_majority_answers, separators=(",", ":")
+            )
+            row["split_majority_answers"] = json.dumps(
+                artifact.split_majority_answers, separators=(",", ":")
             )
             row["findings"] = json.dumps([asdict(item) for item in artifact.findings], separators=(",", ":"))
             writer.writerow({field: row[field] for field in fields})
@@ -578,6 +651,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         help="Fail when one answer index covers more than this percentage within any single dataset",
     )
+    parser.add_argument(
+        "--max-split-majority-answer-pct",
+        type=float,
+        help="Fail when one answer index covers more than this percentage within any single split",
+    )
     parser.add_argument("--fail-on-findings", action="store_true", help="Return non-zero if any finding is emitted")
     return parser
 
@@ -593,6 +671,12 @@ def main(argv: list[str] | None = None) -> int:
     ):
         print("error: --max-dataset-majority-answer-pct must be between 0 and 100", file=sys.stderr)
         return 2
+    if (
+        args.max_split_majority_answer_pct is not None
+        and not 0.0 <= args.max_split_majority_answer_pct <= 100.0
+    ):
+        print("error: --max-split-majority-answer-pct must be between 0 and 100", file=sys.stderr)
+        return 2
     inputs = args.input or [Path("bench/results/datasets")]
     try:
         artifacts = load_artifacts(
@@ -600,6 +684,7 @@ def main(argv: list[str] | None = None) -> int:
             args.require_source_url,
             args.max_majority_answer_pct,
             args.max_dataset_majority_answer_pct,
+            args.max_split_majority_answer_pct,
         )
         output = write_report(artifacts, args.output_dir)
     except (OSError, ValueError, json.JSONDecodeError) as exc:

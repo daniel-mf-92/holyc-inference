@@ -206,6 +206,12 @@ def test_per_dataset_split_cap_limits_each_pair() -> None:
 
         assert status == 0
         manifest_json = json.loads(manifest.read_text(encoding="utf-8"))
+        curated_rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+        split_answer_histograms: dict[str, dict[str, int]] = {}
+        for row in curated_rows:
+            histogram = split_answer_histograms.setdefault(row["split"], {})
+            key = str(row["answer_index"])
+            histogram[key] = histogram.get(key, 0) + 1
 
         assert manifest_json["filters"]["max_records_per_dataset_split"] == 2
         assert manifest_json["total_after_filters"] == 20
@@ -213,6 +219,10 @@ def test_per_dataset_split_cap_limits_each_pair() -> None:
         assert manifest_json["dataset_split_counts"] == {
             "arc": {"train": 2, "validation": 2},
             "hellaswag": {"train": 2, "validation": 2},
+        }
+        assert manifest_json["split_answer_histograms"] == {
+            split: dict(sorted(histogram.items(), key=lambda item: int(item[0])))
+            for split, histogram in sorted(split_answer_histograms.items())
         }
 
 

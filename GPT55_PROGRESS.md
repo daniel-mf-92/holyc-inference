@@ -144,3 +144,4 @@
 2026-04-28T15:39:29Z | Added qemu_prompt_bench failure-count rollups for failed, timeout, and nonzero-exit runs with refreshed smoke artifacts.
 2026-04-28T15:56:34Z | Added benchmark environment fingerprints and env-drift gating with refreshed index/manifest artifacts.
 2026-04-28T16:07:07Z | Added within-split dataset payload dedupe and answer-conflict rejection with smoke coverage and refreshed dataset artifacts.
+2026-04-28T16:17:08Z | Added split-level eval dataset answer histograms and split skew gating with refreshed dataset artifacts.

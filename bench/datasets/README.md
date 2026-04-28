@@ -101,7 +101,8 @@ python3 bench/dataset_index.py \
 
 Run the focused provenance audit on curated manifests before promoting an eval
 subset. It verifies source/license metadata, source and normalized hashes,
-selected record IDs, count rollups, pack outputs, and non-empty row provenance.
+selected record IDs, count rollups, pack outputs, non-empty row provenance, and
+overall/per-dataset/per-split answer histograms.
 Synthetic smoke manifests are allowed to omit `source_url`; real dataset
 manifests should record one, and `--require-source-url` turns that policy into a
 hard gate.

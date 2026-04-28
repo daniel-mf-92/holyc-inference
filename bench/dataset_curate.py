@@ -90,6 +90,18 @@ def answer_histograms_by_dataset(records: list[dataset_pack.EvalRecord]) -> dict
     }
 
 
+def answer_histograms_by_split(records: list[dataset_pack.EvalRecord]) -> dict[str, dict[str, int]]:
+    grouped: dict[str, dict[str, int]] = {}
+    for record in records:
+        histogram = grouped.setdefault(record.split, {})
+        key = str(record.answer_index)
+        histogram[key] = histogram.get(key, 0) + 1
+    return {
+        split: dict(sorted(histogram.items(), key=lambda item: int(item[0])))
+        for split, histogram in sorted(grouped.items())
+    }
+
+
 def count_by(records: list[dataset_pack.EvalRecord], field: str) -> dict[str, int]:
     counts: dict[str, int] = {}
     for record in records:
@@ -323,6 +335,7 @@ def build_manifest(
         "source_name": args.source_name,
         "source_url": args.source_url,
         "source_version": args.source_version,
+        "split_answer_histograms": answer_histograms_by_split(selected),
         "split_counts": count_by(selected, "split"),
         "total_after_deduplication": deduped_count,
         "total_after_filters": filtered_count,

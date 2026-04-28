@@ -44,9 +44,21 @@
       "source_records": 3,
       "source_url": "",
       "source_version": "synthetic",
+      "split_answer_histograms": {
+        "validation": {
+          "0": 3
+        }
+      },
+      "split_majority_answers": {
+        "validation": {
+          "answer_index": "0",
+          "pct": 100.0,
+          "records": 3
+        }
+      },
       "status": "pass"
     }
   ],
-  "generated_at": "2026-04-28T16:08:02Z",
+  "generated_at": "2026-04-28T16:16:12Z",
   "status": "pass"
 }
