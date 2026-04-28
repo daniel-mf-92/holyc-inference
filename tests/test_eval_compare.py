@@ -113,6 +113,8 @@ def test_cli_writes_json_and_markdown_report() -> None:
         assert payload["summary"]["holyc_per_answer_index"][0]["support"] == 3
         assert payload["summary"]["dataset_breakdown"][0]["dataset"] == "arc-smoke"
         assert payload["summary"]["dataset_breakdown"][0]["record_count"] == 1
+        assert payload["summary"]["dataset_breakdown"][0]["mcnemar_exact"]["p_value"] == 1.0
+        assert payload["max_mcnemar_loss_p"] is None
         assert (Path(tmp) / "smoke.md").exists()
         markdown = (Path(tmp) / "smoke.md").read_text(encoding="utf-8")
         assert "## Dataset Breakdown" in markdown
@@ -473,6 +475,79 @@ def test_cli_can_gate_dataset_breakdown_regressions() -> None:
         assert junit_root.attrib["failures"] == "1"
 
 
+def test_cli_can_gate_significant_paired_mcnemar_loss() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        gold = tmp_path / "gold.jsonl"
+        holyc = tmp_path / "holyc.jsonl"
+        llama = tmp_path / "llama.jsonl"
+        gold.write_text(
+            "\n".join(
+                f'{{"id":"r{index}","dataset":"unit","split":"validation",'
+                f'"prompt":"Q{index}?","choices":["A","B"],"answer_index":0}}'
+                for index in range(5)
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        holyc.write_text(
+            "\n".join(f'{{"id":"r{index}","prediction":1}}' for index in range(5)) + "\n",
+            encoding="utf-8",
+        )
+        llama.write_text(
+            "\n".join(f'{{"id":"r{index}","prediction":0}}' for index in range(5)) + "\n",
+            encoding="utf-8",
+        )
+
+        status = eval_compare.main(
+            [
+                "--gold",
+                str(gold),
+                "--holyc",
+                str(holyc),
+                "--llama",
+                str(llama),
+                "--dataset",
+                "unit",
+                "--split",
+                "validation",
+                "--output-dir",
+                tmp,
+                "--output-stem",
+                "mcnemar_gated",
+                "--max-mcnemar-loss-p",
+                "0.1",
+                "--fail-on-regression",
+            ]
+        )
+        payload = json.loads((tmp_path / "mcnemar_gated.json").read_text(encoding="utf-8"))
+        junit_root = ET.parse(tmp_path / "mcnemar_gated_junit.xml").getroot()
+
+        assert status == 1
+        assert payload["max_mcnemar_loss_p"] == 0.1
+        assert payload["summary"]["mcnemar_exact"]["p_value"] == 0.0625
+        assert payload["regressions"][0]["metric"] == "mcnemar_exact_p_value"
+        assert payload["regressions"][0]["value"] == 0.0625
+        assert junit_root.attrib["failures"] == "1"
+
+
+def test_mcnemar_gate_does_not_fail_when_holyc_wins() -> None:
+    summary = {
+        "accuracy_delta_holyc_minus_llama": 1.0,
+        "agreement": 0.0,
+        "holyc_accuracy": 1.0,
+        "mcnemar_exact": eval_compare.exact_mcnemar_test(5, 0),
+        "paired_correctness": {
+            "both_correct": 0,
+            "both_wrong": 0,
+            "holyc_only_correct": 5,
+            "llama_only_correct": 0,
+        },
+    }
+
+    assert eval_compare.find_regressions(summary, max_mcnemar_loss_p=0.1) == []
+
+
 if __name__ == "__main__":
     test_smoke_predictions_compare_cleanly()
     test_cli_writes_json_and_markdown_report()
@@ -486,4 +561,6 @@ if __name__ == "__main__":
     test_cli_can_fail_on_quality_gate_regression()
     test_cli_writes_disagreement_csv_for_engine_mismatches()
     test_cli_can_gate_dataset_breakdown_regressions()
+    test_cli_can_gate_significant_paired_mcnemar_loss()
+    test_mcnemar_gate_does_not_fail_when_holyc_wins()
     print("eval_compare_tests=ok")

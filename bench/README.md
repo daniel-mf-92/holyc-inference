@@ -189,8 +189,9 @@ python3 bench/dataset_provenance_audit.py \
 against the same gold JSONL and writes JSON, Markdown, per-record CSV,
 per-dataset/split breakdown CSV, confusion-matrix CSV, calibration-bin CSV, and
 engine-disagreement CSV, and JUnit XML reports.
-Optional quality gates can fail CI when HolyC accuracy, engine agreement, or
-accuracy delta versus llama.cpp falls outside configured bounds.
+Optional quality gates can fail CI when HolyC accuracy, engine agreement,
+accuracy delta versus llama.cpp, or a paired exact McNemar loss falls outside
+configured bounds.
 Prediction score vectors are treated as choice-aligned logits/logprobs: every
 score must be finite and the score count must match the gold choice count.
 `eval_input_audit.py` also records per-engine prediction histograms and can fail
@@ -205,7 +206,9 @@ Reports also rank the gold answer within each score vector and summarize top-1,
 top-2, top-3, mean gold rank, and mean reciprocal rank for each engine.
 Reports also include paired correctness counts and an exact two-sided McNemar
 binomial p-value so HolyC-vs-llama quality deltas can be interpreted as paired
-eval outcomes on the same records.
+eval outcomes on the same records. `--max-mcnemar-loss-p` optionally fails CI
+only when llama.cpp has more discordant wins than HolyC and the paired p-value
+is at or below the configured threshold.
 
 ```bash
 python3 bench/eval_compare.py \
@@ -219,6 +222,7 @@ python3 bench/eval_compare.py \
   --min-holyc-accuracy 0.95 \
   --min-agreement 0.95 \
   --max-accuracy-drop 0.02 \
+  --max-mcnemar-loss-p 0.05 \
   --fail-on-regression
 ```
 

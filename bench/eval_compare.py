@@ -511,6 +511,10 @@ def dataset_breakdown(rows: list[EvalRow]) -> list[dict[str, Any]]:
         holyc_correct = sum(1 for row in group_rows if row.holyc_correct)
         llama_correct = sum(1 for row in group_rows if row.llama_correct)
         agreement_count = sum(1 for row in group_rows if row.engines_agree)
+        both_correct = sum(1 for row in group_rows if row.holyc_correct and row.llama_correct)
+        both_wrong = sum(1 for row in group_rows if not row.holyc_correct and not row.llama_correct)
+        holyc_only_correct = sum(1 for row in group_rows if row.holyc_correct and not row.llama_correct)
+        llama_only_correct = sum(1 for row in group_rows if row.llama_correct and not row.holyc_correct)
         breakdown.append(
             {
                 "accuracy_delta_holyc_minus_llama": accuracy(holyc_correct, total)
@@ -522,6 +526,13 @@ def dataset_breakdown(rows: list[EvalRow]) -> list[dict[str, Any]]:
                 "holyc_correct": holyc_correct,
                 "llama_accuracy": accuracy(llama_correct, total),
                 "llama_correct": llama_correct,
+                "mcnemar_exact": exact_mcnemar_test(holyc_only_correct, llama_only_correct),
+                "paired_correctness": {
+                    "both_correct": both_correct,
+                    "both_wrong": both_wrong,
+                    "holyc_only_correct": holyc_only_correct,
+                    "llama_only_correct": llama_only_correct,
+                },
                 "record_count": total,
                 "split": split,
             }
@@ -796,6 +807,7 @@ def find_regressions(
     min_holyc_accuracy: float | None = None,
     min_agreement: float | None = None,
     max_accuracy_drop: float | None = None,
+    max_mcnemar_loss_p: float | None = None,
     scope: str = "overall",
     dataset: str = "",
     split: str = "",
@@ -847,6 +859,32 @@ def find_regressions(
                     split=split,
                 )
             )
+    if max_mcnemar_loss_p is not None:
+        mcnemar = summary.get("mcnemar_exact", {})
+        paired = summary.get("paired_correctness", {})
+        p_value = mcnemar.get("p_value")
+        holyc_only_correct = int(paired.get("holyc_only_correct", 0))
+        llama_only_correct = int(paired.get("llama_only_correct", 0))
+        if (
+            p_value is not None
+            and llama_only_correct > holyc_only_correct
+            and p_value <= max_mcnemar_loss_p
+        ):
+            regressions.append(
+                EvalRegression(
+                    metric="mcnemar_exact_p_value",
+                    value=p_value,
+                    threshold=max_mcnemar_loss_p,
+                    message=(
+                        f"{prefix}paired McNemar loss is significant at p={p_value:.6f} "
+                        f"with HolyC-only correct={holyc_only_correct} and "
+                        f"llama.cpp-only correct={llama_only_correct}"
+                    ),
+                    scope=scope,
+                    dataset=dataset,
+                    split=split,
+                )
+            )
     return regressions
 
 
@@ -856,6 +894,7 @@ def find_all_regressions(summary: dict[str, Any], args: argparse.Namespace) -> l
         min_holyc_accuracy=args.min_holyc_accuracy,
         min_agreement=args.min_agreement,
         max_accuracy_drop=args.max_accuracy_drop,
+        max_mcnemar_loss_p=args.max_mcnemar_loss_p,
     )
     if args.gate_dataset_breakdowns:
         for item in summary.get("dataset_breakdown", []):
@@ -865,6 +904,7 @@ def find_all_regressions(summary: dict[str, Any], args: argparse.Namespace) -> l
                     min_holyc_accuracy=args.min_holyc_accuracy,
                     min_agreement=args.min_agreement,
                     max_accuracy_drop=args.max_accuracy_drop,
+                    max_mcnemar_loss_p=args.max_mcnemar_loss_p,
                     scope="dataset_split",
                     dataset=item["dataset"],
                     split=item["split"],
@@ -1048,6 +1088,7 @@ def write_report(
         "holyc_predictions_sha256": file_sha256(holyc_path),
         "llama_predictions_sha256": file_sha256(llama_path),
         "max_accuracy_drop": args.max_accuracy_drop,
+        "max_mcnemar_loss_p": args.max_mcnemar_loss_p,
         "model": args.model,
         "min_agreement": args.min_agreement,
         "min_holyc_accuracy": args.min_holyc_accuracy,
@@ -1109,6 +1150,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Wilson confidence level for accuracy/agreement intervals",
     )
     parser.add_argument(
+        "--max-mcnemar-loss-p",
+        type=float,
+        help=(
+            "Fail the paired quality gate when llama.cpp has more discordant wins "
+            "and the exact two-sided McNemar p-value is at or below this threshold"
+        ),
+    )
+    parser.add_argument(
         "--gate-dataset-breakdowns",
         action="store_true",
         help="Apply configured quality gates to each dataset/split breakdown as well as the aggregate",
@@ -1119,9 +1168,15 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def validate_probability_threshold(value: float | None, flag_name: str) -> None:
+    if value is not None and not 0.0 <= value <= 1.0:
+        raise ValueError(f"{flag_name} must be between 0 and 1")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        validate_probability_threshold(args.max_mcnemar_loss_p, "--max-mcnemar-loss-p")
         gold = load_gold(args.gold, args.dataset, args.split)
         holyc_predictions = load_predictions(args.holyc, gold)
         llama_predictions = load_predictions(args.llama, gold)
