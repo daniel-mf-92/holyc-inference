@@ -60,6 +60,50 @@ def test_detects_tok_per_s_and_memory_regressions(tmp_path: Path) -> None:
     assert regressions[0].candidate_commit == "head"
 
 
+def test_detects_optional_memory_per_token_regressions(tmp_path: Path) -> None:
+    result = tmp_path / "perf.jsonl"
+    write_jsonl(
+        result,
+        [
+            {
+                "timestamp": "2026-04-27T10:00:00Z",
+                "commit": "base",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "memory_bytes": 1000,
+                "tokens": 100,
+            },
+            {
+                "timestamp": "2026-04-27T11:00:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "memory_bytes": 1200,
+                "tokens": 60,
+            },
+        ],
+    )
+
+    records = perf_regression.load_records([result])
+    report = perf_regression.build_report(
+        records,
+        5.0,
+        100.0,
+        memory_per_token_threshold_pct=50.0,
+        require_memory_per_token=True,
+    )
+
+    assert report["status"] == "fail"
+    assert report["commit_points"][0]["memory_bytes_per_token_records"] == 1
+    assert report["commit_points"][0]["median_memory_bytes_per_token"] == 10.0
+    assert report["commit_points"][1]["median_memory_bytes_per_token"] == 20.0
+    assert report["comparisons"][0]["median_memory_bytes_per_token_delta_pct"] == 100.0
+    assert report["regressions"][0]["metric"] == "memory_bytes_per_token"
+    assert report["telemetry_coverage_violations"] == []
+
+
 def test_detects_optional_wall_tok_per_s_regressions(tmp_path: Path) -> None:
     result = tmp_path / "perf.jsonl"
     write_jsonl(
@@ -498,6 +542,9 @@ def test_report_includes_baseline_candidate_comparison_rows() -> None:
             "median_wall_tok_per_s_baseline": 90.0,
             "median_wall_tok_per_s_candidate": 81.0,
             "median_wall_tok_per_s_delta_pct": 10.0,
+            "p05_wall_tok_per_s_baseline": 90.0,
+            "p05_wall_tok_per_s_candidate": 81.0,
+            "p05_wall_tok_per_s_delta_pct": 10.0,
             "median_us_per_token_baseline": None,
             "median_us_per_token_candidate": None,
             "median_us_per_token_delta_pct": None,
@@ -507,6 +554,27 @@ def test_report_includes_baseline_candidate_comparison_rows() -> None:
             "max_memory_bytes_baseline": 1000,
             "max_memory_bytes_candidate": 1100,
             "max_memory_bytes_delta_pct": 10.0,
+            "median_memory_bytes_per_token_baseline": None,
+            "median_memory_bytes_per_token_candidate": None,
+            "median_memory_bytes_per_token_delta_pct": None,
+            "max_memory_bytes_per_token_baseline": None,
+            "max_memory_bytes_per_token_candidate": None,
+            "max_memory_bytes_per_token_delta_pct": None,
+            "max_host_child_peak_rss_bytes_baseline": None,
+            "max_host_child_peak_rss_bytes_candidate": None,
+            "max_host_child_peak_rss_bytes_delta_pct": None,
+            "median_host_child_cpu_us_baseline": None,
+            "median_host_child_cpu_us_candidate": None,
+            "median_host_child_cpu_us_delta_pct": None,
+            "p95_host_child_cpu_us_baseline": None,
+            "p95_host_child_cpu_us_candidate": None,
+            "p95_host_child_cpu_us_delta_pct": None,
+            "median_host_child_cpu_pct_baseline": None,
+            "median_host_child_cpu_pct_candidate": None,
+            "median_host_child_cpu_pct_delta_pct": None,
+            "median_host_child_tok_per_cpu_s_baseline": None,
+            "median_host_child_tok_per_cpu_s_candidate": None,
+            "median_host_child_tok_per_cpu_s_delta_pct": None,
             "median_tokens_baseline": None,
             "median_tokens_candidate": None,
             "median_tokens_delta_pct": None,
@@ -1099,10 +1167,10 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
         output_dir / "perf_regression_telemetry_coverage_violations_latest.csv"
     ).read_text(encoding="utf-8")
     assert (
-        "key,commit,latest_timestamp,records,tok_per_s_records,wall_tok_per_s_records,us_per_token_records,wall_us_per_token_records,memory_records,token_records,ttft_us_records"
+        "key,commit,latest_timestamp,records,tok_per_s_records,wall_tok_per_s_records,us_per_token_records,wall_us_per_token_records,memory_records,memory_bytes_per_token_records"
         in commit_points_csv
     )
-    assert "prompt/dev-local/-/-/-,abc,2026-04-27T10:00:00Z,1,1,0,0,0,0,0,1,0,42.0,42.0" in commit_points_csv
+    assert "prompt/dev-local/-/-/-,abc,2026-04-27T10:00:00Z,1,1,0,0,0,0,0,0,0,0,0,0,1,0,42.0,42.0" in commit_points_csv
     assert "key,metric,baseline_commit,candidate_commit,baseline_value,candidate_value" in regressions_csv
     assert "key,baseline_commit,candidate_commit,baseline_latest_timestamp" in comparisons_csv
     assert "key,commit,records,minimum_records" in sample_violations_csv

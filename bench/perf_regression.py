@@ -84,6 +84,7 @@ class CommitPoint:
     us_per_token_records: int
     wall_us_per_token_records: int
     memory_records: int
+    memory_bytes_per_token_records: int
     host_child_peak_rss_records: int
     host_child_cpu_us_records: int
     host_child_cpu_pct_records: int
@@ -111,6 +112,8 @@ class CommitPoint:
     tok_per_s_cv_pct: float | None
     wall_tok_per_s_cv_pct: float | None
     max_memory_bytes: int | None
+    median_memory_bytes_per_token: float | None
+    max_memory_bytes_per_token: float | None
     max_host_child_peak_rss_bytes: int | None
     prompt_suite_sha256: str
     environment_sha256: str
@@ -230,6 +233,12 @@ class ComparisonRow:
     max_memory_bytes_baseline: int | None
     max_memory_bytes_candidate: int | None
     max_memory_bytes_delta_pct: float | None
+    median_memory_bytes_per_token_baseline: float | None
+    median_memory_bytes_per_token_candidate: float | None
+    median_memory_bytes_per_token_delta_pct: float | None
+    max_memory_bytes_per_token_baseline: float | None
+    max_memory_bytes_per_token_candidate: float | None
+    max_memory_bytes_per_token_delta_pct: float | None
     max_host_child_peak_rss_bytes_baseline: int | None
     max_host_child_peak_rss_bytes_candidate: int | None
     max_host_child_peak_rss_bytes_delta_pct: float | None
@@ -553,6 +562,14 @@ def record_sort_key(record: PerfRecord) -> tuple[str, str]:
     return (record.timestamp, record.commit)
 
 
+def memory_bytes_per_token_values(records: list[PerfRecord]) -> list[float]:
+    return [
+        float(record.memory_bytes) / float(record.tokens)
+        for record in records
+        if record.memory_bytes is not None and record.tokens is not None and record.tokens > 0
+    ]
+
+
 def summarize(records: list[PerfRecord]) -> dict[str, dict[str, Any]]:
     by_key: dict[str, list[PerfRecord]] = {}
     for record in records:
@@ -573,6 +590,7 @@ def summarize(records: list[PerfRecord]) -> dict[str, dict[str, Any]]:
             if record.wall_us_per_token is not None
         ]
         memory_values = [record.memory_bytes for record in key_records if record.memory_bytes is not None]
+        memory_per_token_values = memory_bytes_per_token_values(key_records)
         host_child_peak_rss_values = [
             record.host_child_peak_rss_bytes
             for record in key_records
@@ -630,6 +648,12 @@ def summarize(records: list[PerfRecord]) -> dict[str, dict[str, Any]]:
                 statistics.median(host_child_cpu_pct_values) if host_child_cpu_pct_values else None
             ),
             "max_memory_bytes": max(memory_values) if memory_values else None,
+            "median_memory_bytes_per_token": (
+                statistics.median(memory_per_token_values) if memory_per_token_values else None
+            ),
+            "max_memory_bytes_per_token": (
+                max(memory_per_token_values) if memory_per_token_values else None
+            ),
             "max_host_child_peak_rss_bytes": (
                 max(host_child_peak_rss_values) if host_child_peak_rss_values else None
             ),
@@ -679,6 +703,7 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
             if record.wall_us_per_token is not None
         ]
         memory_values = [record.memory_bytes for record in commit_records if record.memory_bytes is not None]
+        memory_per_token_values = memory_bytes_per_token_values(commit_records)
         host_child_peak_rss_values = [
             record.host_child_peak_rss_bytes
             for record in commit_records
@@ -729,6 +754,7 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                 us_per_token_records=len(us_per_token_values),
                 wall_us_per_token_records=len(wall_us_per_token_values),
                 memory_records=len(memory_values),
+                memory_bytes_per_token_records=len(memory_per_token_values),
                 host_child_peak_rss_records=len(host_child_peak_rss_values),
                 host_child_cpu_us_records=len(host_child_cpu_values),
                 host_child_cpu_pct_records=len(host_child_cpu_pct_values),
@@ -776,6 +802,14 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                 tok_per_s_cv_pct=tps_cv_pct,
                 wall_tok_per_s_cv_pct=wall_tps_cv_pct,
                 max_memory_bytes=max(memory_values) if memory_values else None,
+                median_memory_bytes_per_token=(
+                    statistics.median(memory_per_token_values)
+                    if memory_per_token_values
+                    else None
+                ),
+                max_memory_bytes_per_token=(
+                    max(memory_per_token_values) if memory_per_token_values else None
+                ),
                 max_host_child_peak_rss_bytes=(
                     max(host_child_peak_rss_values) if host_child_peak_rss_values else None
                 ),
@@ -888,6 +922,18 @@ def comparison_rows(
                 max_memory_bytes_delta_pct=growth_delta_pct(
                     baseline.max_memory_bytes, candidate.max_memory_bytes
                 ),
+                median_memory_bytes_per_token_baseline=baseline.median_memory_bytes_per_token,
+                median_memory_bytes_per_token_candidate=candidate.median_memory_bytes_per_token,
+                median_memory_bytes_per_token_delta_pct=growth_delta_pct(
+                    baseline.median_memory_bytes_per_token,
+                    candidate.median_memory_bytes_per_token,
+                ),
+                max_memory_bytes_per_token_baseline=baseline.max_memory_bytes_per_token,
+                max_memory_bytes_per_token_candidate=candidate.max_memory_bytes_per_token,
+                max_memory_bytes_per_token_delta_pct=growth_delta_pct(
+                    baseline.max_memory_bytes_per_token,
+                    candidate.max_memory_bytes_per_token,
+                ),
                 max_host_child_peak_rss_bytes_baseline=baseline.max_host_child_peak_rss_bytes,
                 max_host_child_peak_rss_bytes_candidate=candidate.max_host_child_peak_rss_bytes,
                 max_host_child_peak_rss_bytes_delta_pct=growth_delta_pct(
@@ -965,6 +1011,7 @@ def detect_regressions(
     p05_wall_tok_threshold_pct: float | None = None,
     token_drop_threshold_pct: float | None = None,
     min_token_drop_threshold_pct: float | None = None,
+    memory_per_token_threshold_pct: float | None = None,
     us_per_token_threshold_pct: float | None = None,
     wall_us_per_token_threshold_pct: float | None = None,
     baseline_commit: str | None = None,
@@ -1316,6 +1363,33 @@ def detect_regressions(
                 )
 
         if (
+            memory_per_token_threshold_pct is not None
+            and baseline.median_memory_bytes_per_token
+            and candidate.median_memory_bytes_per_token is not None
+        ):
+            delta_pct = (
+                (
+                    candidate.median_memory_bytes_per_token
+                    - baseline.median_memory_bytes_per_token
+                )
+                * 100.0
+                / baseline.median_memory_bytes_per_token
+            )
+            if delta_pct > memory_per_token_threshold_pct:
+                regressions.append(
+                    Regression(
+                        key=key,
+                        metric="memory_bytes_per_token",
+                        baseline_commit=baseline.commit,
+                        candidate_commit=candidate.commit,
+                        baseline_value=baseline.median_memory_bytes_per_token,
+                        candidate_value=candidate.median_memory_bytes_per_token,
+                        delta_pct=delta_pct,
+                        threshold_pct=memory_per_token_threshold_pct,
+                    )
+                )
+
+        if (
             ttft_threshold_pct is not None
             and baseline.median_ttft_us
             and candidate.median_ttft_us is not None
@@ -1610,6 +1684,7 @@ def detect_telemetry_coverage_violations(
     require_us_per_token: bool = False,
     require_wall_us_per_token: bool = False,
     require_memory: bool = False,
+    require_memory_per_token: bool = False,
     require_host_child_peak_rss: bool = False,
     require_host_child_cpu_us: bool = False,
     require_host_child_cpu_pct: bool = False,
@@ -1624,6 +1699,11 @@ def detect_telemetry_coverage_violations(
         ("us_per_token", require_us_per_token, "us_per_token_records"),
         ("wall_us_per_token", require_wall_us_per_token, "wall_us_per_token_records"),
         ("memory_bytes", require_memory, "memory_records"),
+        (
+            "memory_bytes_per_token",
+            require_memory_per_token,
+            "memory_bytes_per_token_records",
+        ),
         (
             "host_child_peak_rss_bytes",
             require_host_child_peak_rss,
@@ -1675,6 +1755,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Host child RSS regressions: {len([row for row in report['regressions'] if row['metric'] == 'host_child_peak_rss_bytes'])}",
         f"Host child CPU regressions: {len([row for row in report['regressions'] if row['metric'] in {'host_child_cpu_us', 'host_child_cpu_us_p95', 'host_child_cpu_pct'}])}",
         f"Host child tok/CPU-s regressions: {len([row for row in report['regressions'] if row['metric'] == 'host_child_tok_per_cpu_s'])}",
+        f"Memory/token regressions: {len([row for row in report['regressions'] if row['metric'] == 'memory_bytes_per_token'])}",
         f"Token-count regressions: {len([row for row in report['regressions'] if row['metric'] in {'tokens', 'min_tokens'}])}",
         f"Sample violations: {len(report['sample_violations'])}",
         f"Variability violations: {len(report['variability_violations'])}",
@@ -1817,9 +1898,9 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(["", "## Comparisons", ""])
     if report["comparisons"]:
         lines.append(
-            "| Key | Baseline | Candidate | Median tok/s Delta | P05 tok/s Delta | Wall tok/s Delta | P05 wall tok/s Delta | us/token Delta | Wall us/token Delta | Memory Delta | Host RSS Delta | Host CPU Delta | P95 Host CPU Delta | Host CPU % Delta | Host tok/CPU-s Delta | Token Drop | Median TTFT Delta | P95 TTFT Delta | Host Overhead Delta |"
+            "| Key | Baseline | Candidate | Median tok/s Delta | P05 tok/s Delta | Wall tok/s Delta | P05 wall tok/s Delta | us/token Delta | Wall us/token Delta | Memory Delta | Memory/token Delta | Host RSS Delta | Host CPU Delta | P95 Host CPU Delta | Host CPU % Delta | Host tok/CPU-s Delta | Token Drop | Median TTFT Delta | P95 TTFT Delta | Host Overhead Delta |"
         )
-        lines.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for comparison in report["comparisons"]:
             median_tps_delta = comparison["median_tok_per_s_delta_pct"]
             p05_tps_delta = comparison["p05_tok_per_s_delta_pct"]
@@ -1828,6 +1909,7 @@ def markdown_report(report: dict[str, Any]) -> str:
             us_per_token_delta = comparison["median_us_per_token_delta_pct"]
             wall_us_per_token_delta = comparison["median_wall_us_per_token_delta_pct"]
             memory_delta = comparison["max_memory_bytes_delta_pct"]
+            memory_per_token_delta = comparison["median_memory_bytes_per_token_delta_pct"]
             host_rss_delta = comparison["max_host_child_peak_rss_bytes_delta_pct"]
             host_cpu_delta = comparison["median_host_child_cpu_us_delta_pct"]
             p95_host_cpu_delta = comparison["p95_host_child_cpu_us_delta_pct"]
@@ -1852,6 +1934,11 @@ def markdown_report(report: dict[str, Any]) -> str:
                 else "-"
             )
             memory_cell = f"{memory_delta:.2f}%" if memory_delta is not None else "-"
+            memory_per_token_cell = (
+                f"{memory_per_token_delta:.2f}%"
+                if memory_per_token_delta is not None
+                else "-"
+            )
             host_rss_cell = f"{host_rss_delta:.2f}%" if host_rss_delta is not None else "-"
             host_cpu_cell = f"{host_cpu_delta:.2f}%" if host_cpu_delta is not None else "-"
             p95_host_cpu_cell = (
@@ -1872,7 +1959,7 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"{comparison['candidate_commit']} | {median_tps_cell} | {p05_tps_cell} | "
                 f"{wall_tps_cell} | {p05_wall_tps_cell} | "
                 f"{us_per_token_cell} | {wall_us_per_token_cell} | "
-                f"{memory_cell} | {host_rss_cell} | {host_cpu_cell} | {p95_host_cpu_cell} | "
+                f"{memory_cell} | {memory_per_token_cell} | {host_rss_cell} | {host_cpu_cell} | {p95_host_cpu_cell} | "
                 f"{host_cpu_pct_cell} | {host_tok_cpu_cell} | {token_cell} | {ttft_cell} | "
                 f"{p95_ttft_cell} | {overhead_cell} |"
             )
@@ -1882,9 +1969,9 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(["", "## Commit Points", ""])
     if report["commit_points"]:
         lines.append(
-            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | us/token Records | Wall us/token Records | Memory Records | Host RSS Records | Host CPU Records | Host CPU % Records | Host tok/CPU-s Records | Token Records | TTFT Records | Host Overhead Records | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median TTFT us | P95 TTFT us | Median Host Overhead % | Median Host CPU us | P95 Host CPU us | Median Host CPU % | Median Host tok/CPU-s | Tok/s CV | Wall Tok/s CV | Max Memory Bytes | Max Host RSS Bytes | Prompt Suite | Environment | Host Platform | Host Machine | QEMU Version |"
+            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | us/token Records | Wall us/token Records | Memory Records | Memory/token Records | Host RSS Records | Host CPU Records | Host CPU % Records | Host tok/CPU-s Records | Token Records | TTFT Records | Host Overhead Records | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median TTFT us | P95 TTFT us | Median Host Overhead % | Median Host CPU us | P95 Host CPU us | Median Host CPU % | Median Host tok/CPU-s | Tok/s CV | Wall Tok/s CV | Max Memory Bytes | Median Memory/token | Max Memory/token | Max Host RSS Bytes | Prompt Suite | Environment | Host Platform | Host Machine | QEMU Version |"
         )
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- |")
         for point in report["commit_points"]:
             p05_tps = point["p05_tok_per_s"]
             tps = point["median_tok_per_s"]
@@ -1906,6 +1993,8 @@ def markdown_report(report: dict[str, Any]) -> str:
             tps_cv = point["tok_per_s_cv_pct"]
             wall_tps_cv = point["wall_tok_per_s_cv_pct"]
             memory = point["max_memory_bytes"]
+            memory_per_token = point["median_memory_bytes_per_token"]
+            max_memory_per_token = point["max_memory_bytes_per_token"]
             host_rss = point["max_host_child_peak_rss_bytes"]
             prompt_suite = point["prompt_suite_sha256"] or "-"
             p05_tps_cell = f"{p05_tps:.3f}" if p05_tps is not None else "-"
@@ -1934,6 +2023,12 @@ def markdown_report(report: dict[str, Any]) -> str:
             tps_cv_cell = f"{tps_cv:.2f}%" if tps_cv is not None else "-"
             wall_tps_cv_cell = f"{wall_tps_cv:.2f}%" if wall_tps_cv is not None else "-"
             memory_cell = str(memory) if memory is not None else "-"
+            memory_per_token_cell = (
+                f"{memory_per_token:.3f}" if memory_per_token is not None else "-"
+            )
+            max_memory_per_token_cell = (
+                f"{max_memory_per_token:.3f}" if max_memory_per_token is not None else "-"
+            )
             host_rss_cell = str(host_rss) if host_rss is not None else "-"
             environment = point["environment_sha256"] or "-"
             host_platform = point["host_platform"] or "-"
@@ -1943,7 +2038,8 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"| {point['key']} | {point['commit']} | {point['records']} | "
                 f"{point['tok_per_s_records']} | {point['wall_tok_per_s_records']} | "
                 f"{point['us_per_token_records']} | {point['wall_us_per_token_records']} | "
-                f"{point['memory_records']} | {point['host_child_peak_rss_records']} | "
+                f"{point['memory_records']} | {point['memory_bytes_per_token_records']} | "
+                f"{point['host_child_peak_rss_records']} | "
                 f"{point['host_child_cpu_us_records']} | {point['host_child_cpu_pct_records']} | "
                 f"{point['host_child_tok_per_cpu_s_records']} | "
                 f"{point['token_records']} | {point['ttft_us_records']} | "
@@ -1953,7 +2049,8 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"{wall_us_per_token_cell} | {p95_wall_us_per_token_cell} | "
                 f"{tokens_cell} | {min_tokens_cell} | {ttft_cell} | {p95_ttft_cell} | "
                 f"{overhead_cell} | {host_cpu_cell} | {p95_host_cpu_cell} | {host_cpu_pct_cell} | {host_tok_cpu_cell} | "
-                f"{tps_cv_cell} | {wall_tps_cv_cell} | {memory_cell} | {host_rss_cell} | {prompt_suite} | "
+                f"{tps_cv_cell} | {wall_tps_cv_cell} | {memory_cell} | "
+                f"{memory_per_token_cell} | {max_memory_per_token_cell} | {host_rss_cell} | {prompt_suite} | "
                 f"{environment} | {host_platform} | {host_machine} | {qemu_version} |"
             )
     else:
@@ -1961,8 +2058,8 @@ def markdown_report(report: dict[str, Any]) -> str:
 
     lines.extend(["", "## Latest Summary", ""])
     if report["summaries"]:
-        lines.append("| Key | Records | Latest Commit | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median TTFT us | P95 TTFT us | Median Host Overhead % | Median Host CPU us | P95 Host CPU us | Median Host CPU % | Median Host tok/CPU-s | Max Memory Bytes | Max Host RSS Bytes |")
-        lines.append("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| Key | Records | Latest Commit | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median TTFT us | P95 TTFT us | Median Host Overhead % | Median Host CPU us | P95 Host CPU us | Median Host CPU % | Median Host tok/CPU-s | Max Memory Bytes | Median Memory/token | Max Memory/token | Max Host RSS Bytes |")
+        lines.append("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for key, summary in report["summaries"].items():
             p05_tps = summary["p05_tok_per_s"]
             tps = summary["median_tok_per_s"]
@@ -1982,6 +2079,8 @@ def markdown_report(report: dict[str, Any]) -> str:
             host_cpu_pct = summary["median_host_child_cpu_pct"]
             host_tok_cpu = summary["median_host_child_tok_per_cpu_s"]
             memory = summary["max_memory_bytes"]
+            memory_per_token = summary["median_memory_bytes_per_token"]
+            max_memory_per_token = summary["max_memory_bytes_per_token"]
             host_rss = summary["max_host_child_peak_rss_bytes"]
             p05_tps_cell = f"{p05_tps:.3f}" if p05_tps is not None else "-"
             tps_cell = f"{tps:.3f}" if tps is not None else "-"
@@ -2007,6 +2106,12 @@ def markdown_report(report: dict[str, Any]) -> str:
             host_cpu_pct_cell = f"{host_cpu_pct:.3f}" if host_cpu_pct is not None else "-"
             host_tok_cpu_cell = f"{host_tok_cpu:.3f}" if host_tok_cpu is not None else "-"
             memory_cell = str(memory) if memory is not None else "-"
+            memory_per_token_cell = (
+                f"{memory_per_token:.3f}" if memory_per_token is not None else "-"
+            )
+            max_memory_per_token_cell = (
+                f"{max_memory_per_token:.3f}" if max_memory_per_token is not None else "-"
+            )
             host_rss_cell = str(host_rss) if host_rss is not None else "-"
             lines.append(
                 f"| {key} | {summary['records']} | {summary['latest_commit']} | "
@@ -2015,7 +2120,8 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"{wall_us_per_token_cell} | {p95_wall_us_per_token_cell} | "
                 f"{tokens_cell} | {min_tokens_cell} | {ttft_cell} | {p95_ttft_cell} | "
                 f"{overhead_cell} | {host_cpu_cell} | {p95_host_cpu_cell} | "
-                f"{host_cpu_pct_cell} | {host_tok_cpu_cell} | {memory_cell} | {host_rss_cell} |"
+                f"{host_cpu_pct_cell} | {host_tok_cpu_cell} | {memory_cell} | "
+                f"{memory_per_token_cell} | {max_memory_per_token_cell} | {host_rss_cell} |"
             )
     else:
         lines.append("No performance records found.")
@@ -2388,6 +2494,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "us_per_token_records",
             "wall_us_per_token_records",
             "memory_records",
+            "memory_bytes_per_token_records",
             "host_child_peak_rss_records",
             "host_child_cpu_us_records",
             "host_child_cpu_pct_records",
@@ -2415,6 +2522,8 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "tok_per_s_cv_pct",
             "wall_tok_per_s_cv_pct",
             "max_memory_bytes",
+            "median_memory_bytes_per_token",
+            "max_memory_bytes_per_token",
             "max_host_child_peak_rss_bytes",
             "prompt_suite_sha256",
             "environment_sha256",
@@ -2470,6 +2579,12 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "max_memory_bytes_baseline",
             "max_memory_bytes_candidate",
             "max_memory_bytes_delta_pct",
+            "median_memory_bytes_per_token_baseline",
+            "median_memory_bytes_per_token_candidate",
+            "median_memory_bytes_per_token_delta_pct",
+            "max_memory_bytes_per_token_baseline",
+            "max_memory_bytes_per_token_candidate",
+            "max_memory_bytes_per_token_delta_pct",
             "max_host_child_peak_rss_bytes_baseline",
             "max_host_child_peak_rss_bytes_candidate",
             "max_host_child_peak_rss_bytes_delta_pct",
@@ -2596,6 +2711,7 @@ def build_report(
     p05_wall_tok_threshold_pct: float | None = None,
     token_drop_threshold_pct: float | None = None,
     min_token_drop_threshold_pct: float | None = None,
+    memory_per_token_threshold_pct: float | None = None,
     us_per_token_threshold_pct: float | None = None,
     wall_us_per_token_threshold_pct: float | None = None,
     min_commits_per_key: int = 1,
@@ -2604,6 +2720,7 @@ def build_report(
     require_us_per_token: bool = False,
     require_wall_us_per_token: bool = False,
     require_memory: bool = False,
+    require_memory_per_token: bool = False,
     require_host_child_peak_rss: bool = False,
     require_host_child_cpu_us: bool = False,
     require_host_child_cpu_pct: bool = False,
@@ -2636,6 +2753,7 @@ def build_report(
         p05_wall_tok_threshold_pct=p05_wall_tok_threshold_pct,
         token_drop_threshold_pct=token_drop_threshold_pct,
         min_token_drop_threshold_pct=min_token_drop_threshold_pct,
+        memory_per_token_threshold_pct=memory_per_token_threshold_pct,
         us_per_token_threshold_pct=us_per_token_threshold_pct,
         wall_us_per_token_threshold_pct=wall_us_per_token_threshold_pct,
         baseline_commit=baseline_commit,
@@ -2666,6 +2784,7 @@ def build_report(
         require_us_per_token=require_us_per_token,
         require_wall_us_per_token=require_wall_us_per_token,
         require_memory=require_memory,
+        require_memory_per_token=require_memory_per_token,
         require_host_child_peak_rss=require_host_child_peak_rss,
         require_host_child_cpu_us=require_host_child_cpu_us,
         require_host_child_cpu_pct=require_host_child_cpu_pct,
@@ -2712,6 +2831,7 @@ def build_report(
             "p05_wall_tok_regression_pct": p05_wall_tok_threshold_pct,
             "token_drop_regression_pct": token_drop_threshold_pct,
             "min_token_drop_regression_pct": min_token_drop_threshold_pct,
+            "memory_per_token_regression_pct": memory_per_token_threshold_pct,
             "us_per_token_regression_pct": us_per_token_threshold_pct,
             "wall_us_per_token_regression_pct": wall_us_per_token_threshold_pct,
             "min_records_per_point": min_records_per_point,
@@ -2723,6 +2843,7 @@ def build_report(
             "require_us_per_token": require_us_per_token,
             "require_wall_us_per_token": require_wall_us_per_token,
             "require_memory": require_memory,
+            "require_memory_per_token": require_memory_per_token,
             "require_host_child_peak_rss": require_host_child_peak_rss,
             "require_host_child_cpu_us": require_host_child_cpu_us,
             "require_host_child_cpu_pct": require_host_child_cpu_pct,
@@ -2846,6 +2967,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail when minimum emitted token count drops by more than this percent",
     )
     parser.add_argument(
+        "--memory-per-token-regression-pct",
+        type=float,
+        help="Fail when median memory bytes per emitted token increases by more than this percent",
+    )
+    parser.add_argument(
         "--us-per-token-regression-pct",
         type=float,
         help="Fail when median guest microseconds/token increases by more than this percent",
@@ -2906,6 +3032,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--require-memory",
         action="store_true",
         help="Fail when any benchmark key/commit point lacks memory telemetry",
+    )
+    parser.add_argument(
+        "--require-memory-per-token",
+        action="store_true",
+        help="Fail when any benchmark key/commit point lacks paired memory/token telemetry",
     )
     parser.add_argument(
         "--require-host-child-peak-rss",
@@ -3002,6 +3133,7 @@ def main(argv: list[str] | None = None) -> int:
         p05_wall_tok_threshold_pct=args.p05_wall_tok_regression_pct,
         token_drop_threshold_pct=args.token_drop_regression_pct,
         min_token_drop_threshold_pct=args.min_token_drop_regression_pct,
+        memory_per_token_threshold_pct=args.memory_per_token_regression_pct,
         us_per_token_threshold_pct=args.us_per_token_regression_pct,
         wall_us_per_token_threshold_pct=args.wall_us_per_token_regression_pct,
         min_commits_per_key=args.min_commits_per_key,
@@ -3010,6 +3142,7 @@ def main(argv: list[str] | None = None) -> int:
         require_us_per_token=args.require_us_per_token,
         require_wall_us_per_token=args.require_wall_us_per_token,
         require_memory=args.require_memory,
+        require_memory_per_token=args.require_memory_per_token,
         require_host_child_peak_rss=args.require_host_child_peak_rss,
         require_host_child_cpu_us=args.require_host_child_cpu_us,
         require_host_child_cpu_pct=args.require_host_child_cpu_pct,
