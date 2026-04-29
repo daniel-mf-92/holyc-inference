@@ -52,6 +52,7 @@ def main() -> int:
         schema_junit = datasets_dir / "dataset_schema_audit_smoke_latest_junit.xml"
         inspect_json = datasets_dir / "smoke_curated.inspect.json"
         inspect_md = datasets_dir / "smoke_curated.inspect.md"
+        inspect_csv = datasets_dir / "smoke_curated.inspect.csv"
         inspect_junit = datasets_dir / "smoke_curated.inspect.junit.xml"
         leak_json = datasets_dir / "dataset_leak_audit_smoke_latest.json"
         leak_md = datasets_dir / "dataset_leak_audit_smoke_latest.md"
@@ -333,6 +334,8 @@ def main() -> int:
             str(inspect_json),
             "--markdown",
             str(inspect_md),
+            "--csv",
+            str(inspect_csv),
             "--junit",
             str(inspect_junit),
             "--max-prompt-bytes",
@@ -372,6 +375,22 @@ def main() -> int:
         ):
             return rc
         if rc := require("HCEval Dataset Inspection" in inspect_md.read_text(encoding="utf-8"), "missing_inspect_md"):
+            return rc
+        inspect_csv_rows = list(csv.DictReader(inspect_csv.open(encoding="utf-8", newline="")))
+        if rc := require(len(inspect_csv_rows) == 3, "unexpected_inspect_csv_rows"):
+            return rc
+        if rc := require(inspect_csv_rows[0]["record_index"] == "0", "unexpected_inspect_csv_index"):
+            return rc
+        if rc := require(
+            int(inspect_csv_rows[0]["offset"]) == inspect_report["record_spans"][0]["offset"],
+            "unexpected_inspect_csv_offset",
+        ):
+            return rc
+        if rc := require(
+            int(inspect_csv_rows[0]["choice_bytes_total"])
+            == inspect_report["record_spans"][0]["choice_bytes_total"],
+            "unexpected_inspect_csv_choice_total",
+        ):
             return rc
         inspect_root = ET.parse(inspect_junit).getroot()
         if rc := require(inspect_root.attrib.get("name") == "holyc_hceval_inspect", "missing_inspect_junit"):

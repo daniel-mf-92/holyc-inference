@@ -161,7 +161,7 @@ bounds, verifies source/binary hashes against a companion manifest, and writes
 JSON, Markdown, or JUnit XML inspection reports:
 It can re-apply the same byte-size gates to already packed binaries and verifies
 manifest choice-count telemetry, `record_spans`, and `binary_layout` when
-present.
+present. Add `--csv` to emit a flat record-span table for loader offset diffs.
 
 ```bash
 python3 bench/hceval_inspect.py \
@@ -169,6 +169,7 @@ python3 bench/hceval_inspect.py \
   --manifest bench/results/datasets/smoke_eval.manifest.json \
   --output bench/results/datasets/smoke_eval.inspect.json \
   --markdown bench/results/datasets/smoke_eval.inspect.md \
+  --csv bench/results/datasets/smoke_eval.inspect.csv \
   --junit bench/results/datasets/smoke_eval.inspect.junit.xml \
   --max-prompt-bytes 4096 \
   --max-choice-bytes 1024

@@ -1,0 +1,4 @@
+record_index,record_id,offset,length,payload_bytes,prompt_bytes,provenance_bytes,choice_count,choice_bytes_total,answer_index
+0,smoke-hellaswag-1,147,328,304,69,36,4,166,0
+1,smoke-arc-1,475,160,136,51,30,4,28,0
+2,smoke-truthfulqa-1,635,290,266,62,37,4,133,0

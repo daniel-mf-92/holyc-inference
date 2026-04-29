@@ -127,14 +127,16 @@ python3 bench/hceval_inspect.py \
   --manifest bench/results/datasets/smoke_eval.manifest.json \
   --output bench/results/datasets/smoke_eval.inspect.json \
   --markdown bench/results/datasets/smoke_eval.inspect.md \
+  --csv bench/results/datasets/smoke_eval.inspect.csv \
   --max-prompt-bytes 4096 \
   --max-choice-bytes 1024
 ```
 
 Use the optional byte gates to reject local subsets that exceed the fixed buffer
 budgets chosen for a TempleOS loader before the binary reaches the guest. The
-inspection report also emits parsed `binary_layout` and `record_spans`, and
-checks them against the manifest when present.
+inspection report also emits parsed `binary_layout` and `record_spans`, can
+write those spans as CSV for offset diffs, and checks them against the manifest
+when present.
 
 ## Artifact Index
 

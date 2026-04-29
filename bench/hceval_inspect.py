@@ -10,6 +10,7 @@ QEMU operations.
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import json
 import struct
@@ -452,12 +453,34 @@ def junit_report(report: dict[str, Any]) -> str:
     return ET.tostring(suite, encoding="unicode", xml_declaration=True) + "\n"
 
 
+def write_csv(report: dict[str, Any], path: Path) -> None:
+    fieldnames = [
+        "record_index",
+        "record_id",
+        "offset",
+        "length",
+        "payload_bytes",
+        "prompt_bytes",
+        "provenance_bytes",
+        "choice_count",
+        "choice_bytes_total",
+        "answer_index",
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for span in report.get("record_spans", []):
+            writer.writerow({field: span.get(field, "") for field in fieldnames})
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, required=True, help="Input .hceval file")
     parser.add_argument("--manifest", type=Path, help="Optional companion manifest JSON")
     parser.add_argument("--output", type=Path, help="Optional JSON inspection report path")
     parser.add_argument("--markdown", type=Path, help="Optional Markdown inspection report path")
+    parser.add_argument("--csv", type=Path, help="Optional CSV record-span report path")
     parser.add_argument("--junit", type=Path, help="Optional JUnit XML inspection report path")
     parser.add_argument("--no-records", action="store_true", help="Omit full record text from JSON output")
     parser.add_argument("--max-prompt-bytes", type=int, help="Fail if any prompt exceeds this UTF-8 byte limit")
@@ -501,6 +524,10 @@ def main(argv: list[str] | None = None) -> int:
         args.markdown.parent.mkdir(parents=True, exist_ok=True)
         args.markdown.write_text(markdown_report(report), encoding="utf-8")
         print(f"wrote_markdown={args.markdown}")
+
+    if args.csv:
+        write_csv(report, args.csv)
+        print(f"wrote_csv={args.csv}")
 
     if args.junit:
         args.junit.parent.mkdir(parents=True, exist_ok=True)

@@ -207,3 +207,4 @@
 2026-04-29T04:15:25Z | Added qemu_prompt_bench timeout budget telemetry/gate with synthetic smoke coverage and refreshed benchmark artifacts.
 2026-04-29T04:23:49Z | Added benchmark result index CI smoke coverage for output artifacts, command-hash failures, air-gap rejection, stale artifacts, and environment drift.
 2026-04-29T04:33:43Z | Added benchmark result index dry-run launch-plan coverage telemetry and opt-in missing-dry-run gate with smoke coverage.
+2026-04-29T04:55:38Z | Added HCEval inspection record-span CSV export with dataset smoke coverage and refreshed inspection artifacts.

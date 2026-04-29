@@ -134,6 +134,15 @@ def main() -> int:
         if fixture_summary.get("max_host_child_peak_rss_bytes") != 2200000:
             print("missing_host_child_peak_rss_summary=true", file=sys.stderr)
             return 1
+        if fixture_summary.get("median_host_child_cpu_us") != 395000.0:
+            print("missing_host_child_cpu_summary=true", file=sys.stderr)
+            return 1
+        if fixture_summary.get("p95_host_child_cpu_us") != 399500.0:
+            print("missing_p95_host_child_cpu_summary=true", file=sys.stderr)
+            return 1
+        if fixture_summary.get("median_host_child_cpu_pct") != 54.5:
+            print("missing_host_child_cpu_pct_summary=true", file=sys.stderr)
+            return 1
         if fixture_summary.get("median_host_child_tok_per_cpu_s") != 81.0:
             print("missing_host_child_tok_per_cpu_s_summary=true", file=sys.stderr)
             return 1
@@ -154,12 +163,15 @@ def main() -> int:
             "us_per_token_records", "wall_us_per_token_records",
             "memory_records", "ttft_us_records", "host_overhead_records",
             "host_child_peak_rss_records",
+            "host_child_cpu_us_records", "host_child_cpu_pct_records",
             "host_child_tok_per_cpu_s_records",
             "p05_tok_per_s", "median_tok_per_s", "median_wall_tok_per_s",
             "p05_wall_tok_per_s",
             "median_us_per_token", "p95_us_per_token",
             "median_wall_us_per_token", "p95_wall_us_per_token",
             "median_ttft_us", "p95_ttft_us", "median_host_overhead_pct",
+            "median_host_child_cpu_us", "p95_host_child_cpu_us",
+            "median_host_child_cpu_pct",
             "median_host_child_tok_per_cpu_s",
             "wall_tok_per_s_cv_pct", "max_host_child_peak_rss_bytes",
             "environment_sha256", "host_platform", "host_machine", "qemu_version", "qemu_bin",
@@ -180,6 +192,15 @@ def main() -> int:
             return 1
         if "max_host_child_peak_rss_bytes_baseline,max_host_child_peak_rss_bytes_candidate,max_host_child_peak_rss_bytes_delta_pct" not in comparisons_csv:
             print("missing_host_child_peak_rss_comparison=true", file=sys.stderr)
+            return 1
+        if "median_host_child_cpu_us_baseline,median_host_child_cpu_us_candidate,median_host_child_cpu_us_delta_pct" not in comparisons_csv:
+            print("missing_host_child_cpu_comparison=true", file=sys.stderr)
+            return 1
+        if "p95_host_child_cpu_us_baseline,p95_host_child_cpu_us_candidate,p95_host_child_cpu_us_delta_pct" not in comparisons_csv:
+            print("missing_p95_host_child_cpu_comparison=true", file=sys.stderr)
+            return 1
+        if "median_host_child_cpu_pct_baseline,median_host_child_cpu_pct_candidate,median_host_child_cpu_pct_delta_pct" not in comparisons_csv:
+            print("missing_host_child_cpu_pct_comparison=true", file=sys.stderr)
             return 1
         if "median_host_child_tok_per_cpu_s_baseline,median_host_child_tok_per_cpu_s_candidate,median_host_child_tok_per_cpu_s_delta_pct" not in comparisons_csv:
             print("missing_host_child_tok_per_cpu_s_comparison=true", file=sys.stderr)
