@@ -70,6 +70,8 @@ def write_qemu_report(
                 "command_sha256": command_hash,
                 "launch_plan_sha256": launch_plan,
                 "prompt_suite": {
+                    "expected_token_prompts": 1,
+                    "expected_tokens_total": 32,
                     "name": "index-smoke",
                     "prompt_count": 1,
                     "suite_sha256": suite,
@@ -87,6 +89,8 @@ def write_qemu_report(
                         "prompt": "index-smoke",
                         "tokens": 32,
                         "elapsed_us": 200000,
+                        "expected_tokens": 32,
+                        "expected_tokens_match": True,
                         "wall_elapsed_us": 220000,
                         "tok_per_s": 160.0,
                         "wall_tok_per_s": 145.45,
@@ -155,6 +159,8 @@ def write_dry_run_report(path: Path, command: list[str]) -> None:
                 "model": "synthetic-smoke",
                 "quantization": "Q4_0",
                 "prompt_suite": {
+                    "expected_token_prompts": 1,
+                    "expected_tokens_total": 32,
                     "prompt_count": 1,
                     "suite_sha256": "index-suite",
                 },
@@ -305,6 +311,12 @@ def main() -> int:
         if qemu_artifact.get("memory_bytes_per_token_median") != 2099200.0:
             print("missing_index_memory_per_token=true", file=sys.stderr)
             return 1
+        if qemu_artifact.get("expected_tokens_total") != 32:
+            print("missing_index_expected_tokens_total=true", file=sys.stderr)
+            return 1
+        if qemu_artifact.get("expected_tokens_matches") != 1:
+            print("missing_index_expected_token_matches=true", file=sys.stderr)
+            return 1
         if qemu_artifact.get("serial_output_bytes_total") != 4096:
             print("missing_index_serial_output_bytes=true", file=sys.stderr)
             return 1
@@ -323,6 +335,9 @@ def main() -> int:
         if "source,artifact_type,status" not in csv_path.read_text(encoding="utf-8"):
             print("missing_index_csv=true", file=sys.stderr)
             return 1
+        if "expected_token_prompts,expected_tokens_total,expected_tokens_matches,expected_tokens_mismatches" not in csv_path.read_text(encoding="utf-8"):
+            print("missing_index_expected_token_csv=true", file=sys.stderr)
+            return 1
         if "memory_bytes_per_token_median,memory_bytes_per_token_max,serial_output_bytes_total,serial_output_bytes_max" not in csv_path.read_text(encoding="utf-8"):
             print("missing_index_resource_density_csv=true", file=sys.stderr)
             return 1
@@ -331,6 +346,9 @@ def main() -> int:
             return 1
         if "memory_bytes_per_token_median,memory_bytes_per_token_max,serial_output_bytes_total,serial_output_bytes_max" not in latest_csv_path.read_text(encoding="utf-8"):
             print("missing_latest_resource_density_csv=true", file=sys.stderr)
+            return 1
+        if "expected_token_prompts,expected_tokens_total,expected_tokens_matches,expected_tokens_mismatches" not in latest_csv_path.read_text(encoding="utf-8"):
+            print("missing_latest_expected_token_csv=true", file=sys.stderr)
             return 1
         if "key,hash_count,source_count" not in launch_plan_drift_csv_path.read_text(encoding="utf-8"):
             print("missing_launch_plan_drift_csv=true", file=sys.stderr)
@@ -413,6 +431,29 @@ def main() -> int:
         stale_report = json.loads((stale_output / "bench_result_index_latest.json").read_text(encoding="utf-8"))
         if stale_report["artifacts"][0]["freshness_status"] != "fail":
             print("stale_status_not_fail=true", file=sys.stderr)
+            return 1
+
+        token_mismatch_source = tmp_path / "token_mismatch_source"
+        token_mismatch_source.mkdir()
+        write_qemu_report(token_mismatch_source / "qemu_prompt_bench_token_mismatch.json", safe_command)
+        token_mismatch_report = json.loads(
+            (token_mismatch_source / "qemu_prompt_bench_token_mismatch.json").read_text(encoding="utf-8")
+        )
+        token_mismatch_report["benchmarks"][0]["expected_tokens_match"] = False
+        (token_mismatch_source / "qemu_prompt_bench_token_mismatch.json").write_text(
+            json.dumps(token_mismatch_report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        token_mismatch_output = tmp_path / "token_mismatch_index"
+        completed = run_index(token_mismatch_source, token_mismatch_output, "--fail-on-telemetry")
+        if completed.returncode == 0:
+            print("expected_token_mismatch_not_rejected=true", file=sys.stderr)
+            return 1
+        token_mismatch_index = json.loads(
+            (token_mismatch_output / "bench_result_index_latest.json").read_text(encoding="utf-8")
+        )
+        if token_mismatch_index["artifacts"][0]["expected_tokens_mismatches"] != 1:
+            print("expected_token_mismatch_count_missing=true", file=sys.stderr)
             return 1
 
         drift_source = tmp_path / "drift_source"

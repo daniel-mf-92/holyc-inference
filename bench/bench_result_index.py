@@ -45,6 +45,10 @@ class ArtifactSummary:
     qemu_version: str
     qemu_bin: str
     prompts: int | None
+    expected_token_prompts: int | None
+    expected_tokens_total: int | None
+    expected_tokens_matches: int | None
+    expected_tokens_mismatches: int | None
     total_tokens: int | None
     total_elapsed_us: int | None
     measured_runs: int
@@ -141,6 +145,10 @@ class LatestComparableArtifact:
     environment_sha256: str
     measured_runs: int
     total_tokens: int | None
+    expected_token_prompts: int | None
+    expected_tokens_total: int | None
+    expected_tokens_matches: int | None
+    expected_tokens_mismatches: int | None
     median_tok_per_s: float | None
     wall_tok_per_s_median: float | None
     us_per_token_median: float | None
@@ -303,6 +311,7 @@ def telemetry_status(
     prompts: int | None,
     measured_runs: int,
     median_tok_per_s: float | None,
+    expected_tokens_mismatches: int | None = None,
 ) -> tuple[str, list[str]]:
     findings: list[str] = []
     if prompts is not None and prompts <= 0:
@@ -313,6 +322,8 @@ def telemetry_status(
         findings.append("missing median tok/s")
     elif median_tok_per_s <= 0:
         findings.append(f"non-positive median tok/s: {median_tok_per_s}")
+    if expected_tokens_mismatches is not None and expected_tokens_mismatches > 0:
+        findings.append(f"expected-token mismatches: {expected_tokens_mismatches}")
     return ("fail" if findings else "pass"), [f"{artifact_type}: {finding}" for finding in findings]
 
 
@@ -482,6 +493,7 @@ def summarize_qemu_report(
         prompts,
         len(runs),
         median_tok_per_s,
+        sum(1 for row in runs if row.get("expected_tokens_match") is False),
     )
     commit_state, commit, commit_findings = commit_status(
         "qemu_prompt",
@@ -522,6 +534,10 @@ def summarize_qemu_report(
         qemu_version=environment_field(environment, "qemu_version"),
         qemu_bin=environment_field(environment, "qemu_bin"),
         prompts=prompts,
+        expected_token_prompts=parse_int(prompt_suite.get("expected_token_prompts")),
+        expected_tokens_total=parse_int(prompt_suite.get("expected_tokens_total")),
+        expected_tokens_matches=sum(1 for row in runs if row.get("expected_tokens_match") is True),
+        expected_tokens_mismatches=sum(1 for row in runs if row.get("expected_tokens_match") is False),
         total_tokens=parse_int(suite_summary.get("total_tokens")),
         total_elapsed_us=parse_int(suite_summary.get("total_elapsed_us")),
         measured_runs=len(runs),
@@ -620,6 +636,10 @@ def summarize_dry_run_report(
         qemu_version=environment_field(environment, "qemu_version"),
         qemu_bin=environment_field(environment, "qemu_bin"),
         prompts=prompts,
+        expected_token_prompts=parse_int(prompt_suite.get("expected_token_prompts")),
+        expected_tokens_total=parse_int(prompt_suite.get("expected_tokens_total")),
+        expected_tokens_matches=None,
+        expected_tokens_mismatches=None,
         total_tokens=None,
         total_elapsed_us=None,
         measured_runs=planned_measured,
@@ -715,6 +735,10 @@ def summarize_matrix_report(
                 qemu_version=environment_field(environment, "qemu_version"),
                 qemu_bin=environment_field(environment, "qemu_bin"),
                 prompts=prompts,
+                expected_token_prompts=parse_int(cell.get("expected_token_prompts")),
+                expected_tokens_total=parse_int(cell.get("expected_tokens_total")),
+                expected_tokens_matches=parse_int(cell.get("expected_tokens_matches")),
+                expected_tokens_mismatches=parse_int(cell.get("expected_tokens_mismatches")),
                 total_tokens=parse_int(cell.get("total_tokens")),
                 total_elapsed_us=parse_int(cell.get("total_elapsed_us")),
                 measured_runs=measured_runs,
@@ -1035,6 +1059,10 @@ def latest_comparable_artifacts(summaries: list[ArtifactSummary]) -> list[Latest
                 environment_sha256=selected.environment_sha256,
                 measured_runs=selected.measured_runs,
                 total_tokens=selected.total_tokens,
+                expected_token_prompts=selected.expected_token_prompts,
+                expected_tokens_total=selected.expected_tokens_total,
+                expected_tokens_matches=selected.expected_tokens_matches,
+                expected_tokens_mismatches=selected.expected_tokens_mismatches,
                 median_tok_per_s=selected.median_tok_per_s,
                 wall_tok_per_s_median=selected.wall_tok_per_s_median,
                 us_per_token_median=selected.us_per_token_median,
@@ -1096,8 +1124,8 @@ def markdown_report(report: dict[str, Any]) -> str:
     if report["artifacts"]:
         lines.extend(
             [
-                "| Type | Status | Air-gap | Telemetry | Freshness | Commit | Profile | Model | Quant | Prompt suite | Command SHA256 | Launch plan SHA256 | Env SHA256 | Host | QEMU | Prompts | Total tokens | Total elapsed us | Runs | Warmups | Age seconds | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Memory bytes/token | Max memory bytes/token | Serial bytes total | Serial bytes max | Max memory bytes | Source |",
-                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+                "| Type | Status | Air-gap | Telemetry | Freshness | Commit | Profile | Model | Quant | Prompt suite | Command SHA256 | Launch plan SHA256 | Env SHA256 | Host | QEMU | Prompts | Expected-token prompts | Expected tokens | Expected matches | Expected mismatches | Total tokens | Total elapsed us | Runs | Warmups | Age seconds | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Memory bytes/token | Max memory bytes/token | Serial bytes total | Serial bytes max | Max memory bytes | Source |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
             ]
         )
         for artifact in report["artifacts"]:
@@ -1106,7 +1134,9 @@ def markdown_report(report: dict[str, Any]) -> str:
             lines.append(
                 "| {artifact_type} | {status} | {command_airgap_status} | {telemetry_status} | {freshness_status} | {commit_status}:{commit} | {profile} | {model} | "
                 "{quantization} | {prompt_suite_sha256} | {command_sha256} | {launch_plan_sha256} | {environment_sha256} | {host_platform}/{host_machine} | {qemu} | "
-                "{prompts} | {total_tokens} | {total_elapsed_us} | {measured_runs} | {warmup_runs} | "
+                "{prompts} | {expected_token_prompts} | {expected_tokens_total} | "
+                "{expected_tokens_matches} | {expected_tokens_mismatches} | "
+                "{total_tokens} | {total_elapsed_us} | {measured_runs} | {warmup_runs} | "
                 "{generated_age_seconds} | {median_tok_per_s} | {wall_tok_per_s_median} | {ttft_us_p95} | "
                 "{host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | "
                 "{host_child_tok_per_cpu_s_median} | {host_child_peak_rss_bytes_max} | "
@@ -1124,14 +1154,16 @@ def markdown_report(report: dict[str, Any]) -> str:
                 "",
                 "## Latest Comparable Artifacts",
                 "",
-                "| Key | History | Status | Generated | Runs | Tokens | Guest tok/s | Wall tok/s | Guest us/token | Wall us/token | P95 TTFT us | Host child tok/CPU s | Host child RSS bytes | Memory bytes/token | Max memory bytes/token | Serial bytes total | Serial bytes max | Max memory bytes | Source |",
-                "| --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+                "| Key | History | Status | Generated | Runs | Expected-token prompts | Expected tokens | Expected matches | Expected mismatches | Tokens | Guest tok/s | Wall tok/s | Guest us/token | Wall us/token | P95 TTFT us | Host child tok/CPU s | Host child RSS bytes | Memory bytes/token | Max memory bytes/token | Serial bytes total | Serial bytes max | Max memory bytes | Source |",
+                "| --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
             ]
         )
         for artifact in report["latest_comparable_artifacts"]:
             values = {key: format_value(value) for key, value in artifact.items()}
             lines.append(
-                "| {key} | {history_count} | {status} | {generated_at} | {measured_runs} | {total_tokens} | "
+                "| {key} | {history_count} | {status} | {generated_at} | {measured_runs} | "
+                "{expected_token_prompts} | {expected_tokens_total} | "
+                "{expected_tokens_matches} | {expected_tokens_mismatches} | {total_tokens} | "
                 "{median_tok_per_s} | {wall_tok_per_s_median} | {us_per_token_median} | "
                 "{wall_us_per_token_median} | {ttft_us_p95} | {host_child_tok_per_cpu_s_median} | "
                 "{host_child_peak_rss_bytes_max} | {memory_bytes_per_token_median} | "
@@ -1490,6 +1522,10 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
         "qemu_version",
         "qemu_bin",
         "prompts",
+        "expected_token_prompts",
+        "expected_tokens_total",
+        "expected_tokens_matches",
+        "expected_tokens_mismatches",
         "total_tokens",
         "total_elapsed_us",
         "measured_runs",
@@ -1639,6 +1675,10 @@ def write_latest_comparable_csv(rows: list[LatestComparableArtifact], path: Path
         "launch_plan_sha256",
         "environment_sha256",
         "measured_runs",
+        "expected_token_prompts",
+        "expected_tokens_total",
+        "expected_tokens_matches",
+        "expected_tokens_mismatches",
         "total_tokens",
         "median_tok_per_s",
         "wall_tok_per_s_median",
