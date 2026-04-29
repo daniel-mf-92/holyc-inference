@@ -1,0 +1,82 @@
+{
+  "error_count": 0,
+  "findings": [],
+  "format": "hceval-order-audit",
+  "generated_at": "2026-04-29T17:29:46Z",
+  "group_by": "overall",
+  "inputs": [
+    {
+      "path": "bench/datasets/samples/smoke_eval.jsonl",
+      "rows": 3,
+      "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+    }
+  ],
+  "order_stats": [
+    {
+      "answer_histogram": {
+        "0": 3
+      },
+      "answer_sequence": [
+        0,
+        0,
+        0
+      ],
+      "leading_run": {
+        "answer_index": 0,
+        "end_index": 2,
+        "length": 3,
+        "sources": [
+          "bench/datasets/samples/smoke_eval.jsonl:1",
+          "bench/datasets/samples/smoke_eval.jsonl:2",
+          "bench/datasets/samples/smoke_eval.jsonl:3"
+        ],
+        "start_index": 0
+      },
+      "longest_run": {
+        "answer_index": 0,
+        "end_index": 2,
+        "length": 3,
+        "sources": [
+          "bench/datasets/samples/smoke_eval.jsonl:1",
+          "bench/datasets/samples/smoke_eval.jsonl:2",
+          "bench/datasets/samples/smoke_eval.jsonl:3"
+        ],
+        "start_index": 0
+      },
+      "longest_run_pct": 100.0,
+      "possible_transition_count": 2,
+      "record_count": 3,
+      "run_count": 1,
+      "runs": [
+        {
+          "answer_index": 0,
+          "end_index": 2,
+          "length": 3,
+          "sources": [
+            "bench/datasets/samples/smoke_eval.jsonl:1",
+            "bench/datasets/samples/smoke_eval.jsonl:2",
+            "bench/datasets/samples/smoke_eval.jsonl:3"
+          ],
+          "start_index": 0
+        }
+      ],
+      "scope": "overall",
+      "switch_rate": 0.0,
+      "trailing_run": {
+        "answer_index": 0,
+        "end_index": 2,
+        "length": 3,
+        "sources": [
+          "bench/datasets/samples/smoke_eval.jsonl:1",
+          "bench/datasets/samples/smoke_eval.jsonl:2",
+          "bench/datasets/samples/smoke_eval.jsonl:3"
+        ],
+        "start_index": 0
+      },
+      "transition_count": 0
+    }
+  ],
+  "record_count": 3,
+  "status": "pass",
+  "warning_count": 0
+}

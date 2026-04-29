@@ -64,6 +64,28 @@ python3 bench/dataset_choice_audit.py \
   --fail-on-findings
 ```
 
+Run `bench/dataset_order_audit.py` before packing promoted subsets when source
+row order could bias evaluation. It records answer-index sequences, transition
+counts, leading/trailing runs, and longest same-answer runs by overall dataset,
+dataset, or dataset/split scope. The gates catch long blocks of identical answer
+positions before they become HCEval binaries:
+
+```bash
+python3 bench/dataset_order_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_order_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_order_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_order_audit_smoke_latest.csv \
+  --findings-csv bench/results/datasets/dataset_order_audit_smoke_latest_findings.csv \
+  --junit bench/results/datasets/dataset_order_audit_smoke_latest_junit.xml \
+  --group-by overall \
+  --max-longest-answer-run 3 \
+  --max-longest-answer-run-pct 100 \
+  --max-edge-answer-run 3 \
+  --min-answer-switches 0 \
+  --fail-on-findings
+```
+
 Run `bench/dataset_fingerprint.py` when a curated JSONL needs stable prompt,
 choice, and prompt+choice input hashes before packing or before collecting
 HolyC/llama.cpp predictions. The hashes match the metadata expected by

@@ -1,0 +1,2 @@
+scope,record_count,transition_count,possible_transition_count,switch_rate,run_count,longest_run_answer,longest_run_length,longest_run_pct,answer_histogram
+overall,3,0,2,0.0,1,0,3,100.0,"{""0"": 3}"
