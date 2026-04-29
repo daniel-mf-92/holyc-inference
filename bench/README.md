@@ -12,7 +12,8 @@ TempleOS air-gapped; any QEMU command added under this tree must pass `-nic none
   common float math helper calls after comments and strings are stripped.
 - Raw Q4_0/Q8_0 block streams have valid block sizes, optional expected
   block/element counts, finite fp16 scales, fp16-to-Q16 scale ranges, optional
-  Q16 scale magnitude limits, zero-scale/nonzero-payload counts, quant ranges,
+  Q16 scale magnitude limits, fp16 scale exponent histograms and optional
+  exponent range gates, zero-scale/nonzero-payload counts, quant ranges,
   quant histograms, expected-element tail padding, and optional
   packing-distribution gates for distinct quant values, saturated payloads,
   non-canonical zero-scale blocks, nonzero padding quants, and zero or subnormal
@@ -35,6 +36,7 @@ Raw block streams can be checked with:
 python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin --expect-elements 4096
 python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --expect-blocks 128
 python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --max-abs-scale-q16 1048576
+python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin --min-scale-exponent -12 --max-scale-exponent 8
 python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin --min-used-quant-values 8 --max-saturation-pct 25
 python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin --fail-zero-scale-nonzero-blocks
 python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --fail-zero-scales --fail-subnormal-scales
@@ -47,6 +49,13 @@ Mixed-format audits can validate Q4_0 and Q8_0 streams in one report:
 python3 bench/quant_audit.py \
   --q4-block-file path/to/q4_blocks.bin \
   --q8-block-file path/to/q8_blocks.bin
+```
+
+`quant_audit_ci_smoke.py` creates temporary Q4_0/Q8_0 block fixtures and checks
+the raw-block, scale-exponent, Markdown, CSV, and JUnit paths:
+
+```bash
+python3 bench/quant_audit_ci_smoke.py
 ```
 
 ## Offline Eval Dataset Packer

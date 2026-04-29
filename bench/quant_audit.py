@@ -69,6 +69,11 @@ class BlockAudit:
     scale_q16_abs_max: int
     scale_q16_zero_count: int
     scale_q16_over_limit_count: int
+    scale_exponent_min: int | None
+    scale_exponent_max: int | None
+    scale_exponent_under_limit_count: int
+    scale_exponent_over_limit_count: int
+    scale_exponent_histogram: dict[str, int]
     zero_scale_nonzero_quant_block_count: int
     zero_scale_nonzero_quant_entry_count: int
     quant_min: int
@@ -210,6 +215,16 @@ def fp16_to_q16(bits: int) -> int:
     return int(round(fp16_to_float(bits) * (1 << 16)))
 
 
+def fp16_unbiased_exponent(bits: int) -> int | None:
+    exponent = (bits >> 10) & 0x1F
+    fraction = bits & 0x03FF
+    if exponent == 0:
+        return -14 if fraction else None
+    if exponent == 0x1F:
+        return None
+    return exponent - 15
+
+
 def update_scale_q16_stats(
     findings: list[str],
     stats: dict[str, int | None],
@@ -238,6 +253,51 @@ def update_scale_q16_stats(
                 block=block_index,
                 actual=abs_scale_q16,
                 limit=max_abs_scale_q16,
+                bits=scale_bits,
+            )
+        )
+
+
+def update_scale_exponent_stats(
+    findings: list[str],
+    stats: dict[str, Any],
+    block_index: int,
+    scale_bits: int,
+    min_scale_exponent: int | None,
+    max_scale_exponent: int | None,
+) -> None:
+    exponent = fp16_unbiased_exponent(scale_bits)
+    if exponent is None:
+        return
+
+    stats["min"] = exponent if stats["min"] is None else min(stats["min"], exponent)
+    stats["max"] = exponent if stats["max"] is None else max(stats["max"], exponent)
+    histogram = stats["histogram"]
+    histogram[str(exponent)] = histogram.get(str(exponent), 0) + 1
+
+    if min_scale_exponent is not None and exponent < min_scale_exponent:
+        stats["under_limit_count"] += 1
+        findings.append(
+            (
+                "block {block}: fp16 scale exponent {actual} below minimum {limit} "
+                "(bits=0x{bits:04x})"
+            ).format(
+                block=block_index,
+                actual=exponent,
+                limit=min_scale_exponent,
+                bits=scale_bits,
+            )
+        )
+    if max_scale_exponent is not None and exponent > max_scale_exponent:
+        stats["over_limit_count"] += 1
+        findings.append(
+            (
+                "block {block}: fp16 scale exponent {actual} exceeds maximum {limit} "
+                "(bits=0x{bits:04x})"
+            ).format(
+                block=block_index,
+                actual=exponent,
+                limit=max_scale_exponent,
                 bits=scale_bits,
             )
         )
@@ -393,6 +453,8 @@ def audit_q4_0_blocks(
     fail_zero_scales: bool = False,
     fail_subnormal_scales: bool = False,
     fail_nonzero_padding_quants: bool = False,
+    min_scale_exponent: int | None = None,
+    max_scale_exponent: int | None = None,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -422,6 +484,13 @@ def audit_q4_0_blocks(
         "zero_count": 0,
         "over_limit_count": 0,
     }
+    scale_exponent_stats: dict[str, Any] = {
+        "min": None,
+        "max": None,
+        "under_limit_count": 0,
+        "over_limit_count": 0,
+        "histogram": {},
+    }
 
     for block_index in range(block_count):
         offset = block_index * Q4_0_BLOCK_BYTES
@@ -438,6 +507,14 @@ def audit_q4_0_blocks(
         )
         if scale_class == "inf_nan" and not allow_inf_nan_scale:
             findings.append(f"block {block_index}: fp16 scale is inf/nan bits=0x{scale_bits:04x}")
+        update_scale_exponent_stats(
+            findings,
+            scale_exponent_stats,
+            block_index,
+            scale_bits,
+            min_scale_exponent,
+            max_scale_exponent,
+        )
 
         scale_value = fp16_to_float(scale_bits)
         scale_q16: int | None = None
@@ -551,6 +628,11 @@ def audit_q4_0_blocks(
         scale_q16_abs_max=int(scale_q16_stats["abs_max"] or 0),
         scale_q16_zero_count=int(scale_q16_stats["zero_count"] or 0),
         scale_q16_over_limit_count=int(scale_q16_stats["over_limit_count"] or 0),
+        scale_exponent_min=scale_exponent_stats["min"],
+        scale_exponent_max=scale_exponent_stats["max"],
+        scale_exponent_under_limit_count=scale_exponent_stats["under_limit_count"],
+        scale_exponent_over_limit_count=scale_exponent_stats["over_limit_count"],
+        scale_exponent_histogram=dict(sorted(scale_exponent_stats["histogram"].items(), key=lambda item: int(item[0]))),
         zero_scale_nonzero_quant_block_count=zero_scale_nonzero_quant_block_count,
         zero_scale_nonzero_quant_entry_count=zero_scale_nonzero_quant_entry_count,
         quant_min=int(quant_min),
@@ -584,6 +666,8 @@ def audit_q8_0_blocks(
     fail_zero_scales: bool = False,
     fail_subnormal_scales: bool = False,
     fail_nonzero_padding_quants: bool = False,
+    min_scale_exponent: int | None = None,
+    max_scale_exponent: int | None = None,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -613,6 +697,13 @@ def audit_q8_0_blocks(
         "zero_count": 0,
         "over_limit_count": 0,
     }
+    scale_exponent_stats: dict[str, Any] = {
+        "min": None,
+        "max": None,
+        "under_limit_count": 0,
+        "over_limit_count": 0,
+        "histogram": {},
+    }
 
     for block_index in range(block_count):
         offset = block_index * Q8_0_BLOCK_BYTES
@@ -629,6 +720,14 @@ def audit_q8_0_blocks(
         )
         if scale_class == "inf_nan" and not allow_inf_nan_scale:
             findings.append(f"block {block_index}: fp16 scale is inf/nan bits=0x{scale_bits:04x}")
+        update_scale_exponent_stats(
+            findings,
+            scale_exponent_stats,
+            block_index,
+            scale_bits,
+            min_scale_exponent,
+            max_scale_exponent,
+        )
 
         scale_value = fp16_to_float(scale_bits)
         scale_q16: int | None = None
@@ -738,6 +837,11 @@ def audit_q8_0_blocks(
         scale_q16_abs_max=int(scale_q16_stats["abs_max"] or 0),
         scale_q16_zero_count=int(scale_q16_stats["zero_count"] or 0),
         scale_q16_over_limit_count=int(scale_q16_stats["over_limit_count"] or 0),
+        scale_exponent_min=scale_exponent_stats["min"],
+        scale_exponent_max=scale_exponent_stats["max"],
+        scale_exponent_under_limit_count=scale_exponent_stats["under_limit_count"],
+        scale_exponent_over_limit_count=scale_exponent_stats["over_limit_count"],
+        scale_exponent_histogram=dict(sorted(scale_exponent_stats["histogram"].items(), key=lambda item: int(item[0]))),
         zero_scale_nonzero_quant_block_count=zero_scale_nonzero_quant_block_count,
         zero_scale_nonzero_quant_entry_count=zero_scale_nonzero_quant_entry_count,
         quant_min=int(quant_min),
@@ -772,6 +876,8 @@ def audit_blocks(
     fail_zero_scales: bool = False,
     fail_subnormal_scales: bool = False,
     fail_nonzero_padding_quants: bool = False,
+    min_scale_exponent: int | None = None,
+    max_scale_exponent: int | None = None,
 ) -> BlockAudit:
     if quant_format == "q4_0":
         return audit_q4_0_blocks(
@@ -788,6 +894,8 @@ def audit_blocks(
             fail_zero_scales,
             fail_subnormal_scales,
             fail_nonzero_padding_quants,
+            min_scale_exponent,
+            max_scale_exponent,
         )
     if quant_format == "q8_0":
         return audit_q8_0_blocks(
@@ -804,6 +912,8 @@ def audit_blocks(
             fail_zero_scales,
             fail_subnormal_scales,
             fail_nonzero_padding_quants,
+            min_scale_exponent,
+            max_scale_exponent,
         )
     raise ValueError(f"unsupported quant format: {quant_format}")
 
@@ -834,9 +944,9 @@ def markdown_report(report: dict) -> str:
         lines.extend(
             [
                 "| Format | Path | Blocks | Capacity | Scale zero/subnormal/normal/inf_nan "
-                "| Padding elements/nonzero | Scale Q16 min/max/absmax/zero/overlimit | Zero-scale nonzero blocks/entries | Quant min/max | Used values | Zero/nonzero quants "
+                "| Padding elements/nonzero | Scale Q16 min/max/absmax/zero/overlimit | Scale exponent min/max/under/over | Zero-scale nonzero blocks/entries | Quant min/max | Used values | Zero/nonzero quants "
                 "| Saturated quants | Min block used values | Worst block saturation | Findings |",
-                "| --- | --- | ---: | ---: | --- | ---: | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| --- | --- | ---: | ---: | --- | ---: | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
         for audit in block_audits:
@@ -856,11 +966,17 @@ def markdown_report(report: dict) -> str:
                 audit["scale_q16_zero_count"],
                 audit["scale_q16_over_limit_count"],
             )
+            scale_exponent = "{}/{}/{}/{}".format(
+                audit["scale_exponent_min"],
+                audit["scale_exponent_max"],
+                audit["scale_exponent_under_limit_count"],
+                audit["scale_exponent_over_limit_count"],
+            )
             lines.append(
                 (
                     "| {format} | `{path}` | {block_count} | {element_capacity} | "
                     "{scales} | {padding_element_count}/{padding_nonzero_count} | "
-                    "{scale_q16} | {zero_scale_nonzero_quant_block_count}/{zero_scale_nonzero_quant_entry_count} | "
+                    "{scale_q16} | {scale_exponent} | {zero_scale_nonzero_quant_block_count}/{zero_scale_nonzero_quant_entry_count} | "
                     "{quant_min}/{quant_max} | {quant_used_value_count} | "
                     "{quant_zero_count}/{quant_nonzero_count} | {quant_saturation_count} ({quant_saturation_pct:.3f}%) | "
                     "{min_block_used_quant_values} @ {min_block_used_quant_values_index} | "
@@ -875,6 +991,7 @@ def markdown_report(report: dict) -> str:
                     padding_element_count=audit["padding_element_count"],
                     padding_nonzero_count=audit["padding_nonzero_count"],
                     scale_q16=scale_q16,
+                    scale_exponent=scale_exponent,
                     zero_scale_nonzero_quant_block_count=audit[
                         "zero_scale_nonzero_quant_block_count"
                     ],
@@ -1125,6 +1242,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fail tail padding elements with nonzero quant payload values when --expect-elements is set",
     )
+    parser.add_argument(
+        "--min-scale-exponent",
+        type=int,
+        help="Fail finite nonzero fp16 scales whose unbiased exponent is below this value",
+    )
+    parser.add_argument(
+        "--max-scale-exponent",
+        type=int,
+        help="Fail finite nonzero fp16 scales whose unbiased exponent is above this value",
+    )
     parser.add_argument("--allow-inf-nan-scale", action="store_true", help="Do not fail on fp16 inf/nan scales")
     parser.add_argument("--output", type=Path, help="Write JSON report to this path")
     parser.add_argument("--markdown", type=Path, help="Write Markdown report to this path")
@@ -1158,6 +1285,8 @@ def main(argv: list[str] | None = None) -> int:
             args.fail_zero_scales,
             args.fail_subnormal_scales,
             args.fail_nonzero_padding_quants,
+            args.min_scale_exponent,
+            args.max_scale_exponent,
         )
         for path, quant_format in block_specs
     ]
