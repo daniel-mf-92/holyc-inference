@@ -138,6 +138,8 @@ class BenchRun:
     serial_output_bytes: int
     returncode: int
     timed_out: bool
+    exit_class: str
+    failure_reason: str | None
     command: list[str]
     command_sha256: str
     stdout_tail: str
@@ -551,6 +553,25 @@ def wall_timeout_pct(wall_elapsed_us: int, timeout_seconds: float) -> float | No
     return wall_elapsed_us * 100.0 / (timeout_seconds * 1_000_000.0)
 
 
+def classify_exit(returncode: int, timed_out: bool) -> str:
+    if timed_out:
+        return "timeout"
+    if returncode == 0:
+        return "ok"
+    if returncode == 127:
+        return "launch_error"
+    return "nonzero_exit"
+
+
+def failure_reason(returncode: int, timed_out: bool) -> str | None:
+    exit_class = classify_exit(returncode, timed_out)
+    if exit_class == "ok":
+        return None
+    if exit_class == "timeout":
+        return "timeout"
+    return f"returncode_{returncode}"
+
+
 def child_rusage() -> tuple[float, float] | None:
     if resource is None:
         return None
@@ -842,6 +863,8 @@ def run_prompt(
         serial_output_bytes=stdout_bytes + stderr_bytes,
         returncode=returncode,
         timed_out=timed_out,
+        exit_class=classify_exit(returncode, timed_out),
+        failure_reason=failure_reason(returncode, timed_out),
         command=command,
         command_sha256=command_hash(command),
         stdout_tail=tail_text(stdout),
@@ -2086,6 +2109,8 @@ def write_csv_report(runs: list[BenchRun], path: Path) -> None:
         "serial_output_bytes",
         "returncode",
         "timed_out",
+        "exit_class",
+        "failure_reason",
         "command_sha256",
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:
@@ -2186,6 +2211,8 @@ def write_launch_csv_report(report: dict[str, Any], path: Path) -> None:
         "iteration",
         "returncode",
         "timed_out",
+        "exit_class",
+        "failure_reason",
         "tokens",
         "elapsed_us",
         "wall_elapsed_us",
@@ -2251,7 +2278,10 @@ def write_junit_report(
             },
         )
         if run.returncode != 0 or run.timed_out:
-            message = f"returncode={run.returncode} timed_out={run.timed_out}"
+            message = (
+                f"exit_class={run.exit_class} returncode={run.returncode} "
+                f"timed_out={run.timed_out}"
+            )
             failure = ET.SubElement(
                 case,
                 "failure",
@@ -2267,6 +2297,8 @@ def write_junit_report(
                 f"iteration={run.iteration}\n"
                 f"returncode={run.returncode}\n"
                 f"timed_out={run.timed_out}\n"
+                f"exit_class={run.exit_class}\n"
+                f"failure_reason={format_summary_value(run.failure_reason)}\n"
                 f"tokens={format_summary_value(run.tokens)}\n"
                 f"elapsed_us={run.elapsed_us}\n"
                 f"wall_elapsed_us={run.wall_elapsed_us}\n"

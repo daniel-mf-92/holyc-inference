@@ -1310,6 +1310,9 @@ def main() -> int:
         if "launch_plan_sha256" not in measured_launch_csv or "measured" not in measured_launch_csv:
             print("missing_measured_launch_csv_fields=true", file=sys.stderr)
             return 1
+        if "exit_class" not in measured_launch_csv or "failure_reason" not in measured_launch_csv:
+            print("missing_measured_launch_exit_fields=true", file=sys.stderr)
+            return 1
         if telemetry_gates.get("min_wall_tok_per_s") != 1.0:
             print("missing_min_wall_tok_gate=true", file=sys.stderr)
             return 1
@@ -1431,6 +1434,12 @@ def main() -> int:
             for row in bench_report["benchmarks"]
         ):
             print("missing_run_guest_prompt_bytes_match=true", file=sys.stderr)
+            return 1
+        if not all(
+            row.get("exit_class") == "ok" and row.get("failure_reason") is None
+            for row in bench_report["benchmarks"]
+        ):
+            print("unexpected_run_exit_class=true", file=sys.stderr)
             return 1
         if not all(row.get("memory_bytes_per_token_median") is not None for row in bench_report["summaries"]):
             print("missing_prompt_memory_per_token=true", file=sys.stderr)
@@ -1554,6 +1563,62 @@ print("BENCH_RESULT: " + json.dumps({
         }
         if "guest_prompt_bytes_match" not in bad_prompt_bytes_metrics:
             print("missing_guest_prompt_bytes_gate_failure=true", file=sys.stderr)
+            return 1
+
+        failing_qemu = tmp_path / "qemu_nonzero_exit.py"
+        failing_qemu.write_text(
+            """#!/usr/bin/env python3
+import sys
+
+sys.stderr.write("synthetic benchmark failure\\n")
+raise SystemExit(42)
+""",
+            encoding="utf-8",
+        )
+        failing_qemu.chmod(0o755)
+        failing_qemu_dir = tmp_path / "qemu_prompt_bench_nonzero_exit"
+        failing_qemu_command = [
+            sys.executable,
+            str(ROOT / "bench" / "qemu_prompt_bench.py"),
+            "--image",
+            "/tmp/TempleOS.synthetic.img",
+            "--prompts",
+            str(ROOT / "bench" / "prompts" / "smoke.jsonl"),
+            "--qemu-bin",
+            str(failing_qemu),
+            "--profile",
+            "ci-airgap-smoke",
+            "--model",
+            "synthetic-smoke",
+            "--quantization",
+            "Q4_0",
+            "--output-dir",
+            str(failing_qemu_dir),
+        ]
+        completed = subprocess.run(
+            failing_qemu_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("nonzero_exit_bench_did_not_fail=true", file=sys.stderr)
+            return 1
+        failing_qemu_report = json.loads(
+            (failing_qemu_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8")
+        )
+        if failing_qemu_report["benchmarks"][0].get("exit_class") != "nonzero_exit":
+            print("missing_nonzero_exit_class=true", file=sys.stderr)
+            return 1
+        if failing_qemu_report["benchmarks"][0].get("failure_reason") != "returncode_42":
+            print("missing_nonzero_failure_reason=true", file=sys.stderr)
+            return 1
+        failing_qemu_csv = (failing_qemu_dir / "qemu_prompt_bench_latest.csv").read_text(
+            encoding="utf-8"
+        )
+        if "nonzero_exit" not in failing_qemu_csv or "returncode_42" not in failing_qemu_csv:
+            print("missing_nonzero_exit_csv=true", file=sys.stderr)
             return 1
 
         matrix_output_dir = tmp_path / "bench_matrix"
