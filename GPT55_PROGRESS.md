@@ -190,3 +190,4 @@
 2026-04-29T01:10:23Z | Added quant audit tail-padding telemetry and opt-in nonzero padding gates for Q4_0/Q8_0 block streams.
 2026-04-29T01:20:48Z | Added QEMU prompt benchmark OK-run percentage summaries with smoke coverage and refreshed benchmark artifacts.
 2026-04-29T01:30:09Z | Added quant audit fp16 scale exponent telemetry/gates with smoke coverage and refreshed quant artifacts.
+2026-04-29T01:40:10Z | Added benchmark trend min-points history gate with smoke coverage and refreshed trend dashboards.

@@ -123,6 +123,8 @@ def main() -> int:
             "--fail-on-empty",
             "--fail-on-airgap",
             "--fail-on-telemetry",
+            "--min-points-per-key",
+            "2",
             "--fail-on-tok-regression-pct",
             "10",
             "--fail-on-wall-tok-regression-pct",
@@ -163,9 +165,15 @@ def main() -> int:
         if thresholds["fail_on_tok_regression_pct"] != 10.0:
             print("missing_regression_threshold=true", file=sys.stderr)
             return 1
+        if thresholds["min_points_per_key"] != 2:
+            print("missing_min_points_threshold=true", file=sys.stderr)
+            return 1
         markdown = (output_dir / "bench_trend_export_latest.md").read_text(encoding="utf-8")
         if "Benchmark Trend Export" not in markdown:
             print("missing_markdown_title=true", file=sys.stderr)
+            return 1
+        if "min_points_per_key=2" not in markdown:
+            print("missing_markdown_min_points=true", file=sys.stderr)
             return 1
         if "fail_on_tok_regression_pct=10.000" not in markdown:
             print("missing_markdown_threshold=true", file=sys.stderr)
@@ -260,6 +268,44 @@ def main() -> int:
             return 1
         if "max memory grew" not in findings:
             print("missing_memory_growth_finding=true", file=sys.stderr)
+            return 1
+
+        sparse_dir = tmp_path / "sparse_results"
+        sparse_dir.mkdir()
+        write_report(
+            sparse_dir / "qemu_prompt_bench_head.json",
+            commit="sparse-head",
+            generated_at="2026-04-27T12:05:00Z",
+            tok_per_s=100.0,
+            memory=64_000_000,
+        )
+        sparse_completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "bench" / "bench_trend_export.py"),
+                "--input",
+                str(sparse_dir),
+                "--output-dir",
+                str(tmp_path / "sparse_dashboards"),
+                "--min-points-per-key",
+                "2",
+            ],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if sparse_completed.returncode == 0:
+            print("sparse_trend_history_not_rejected=true", file=sys.stderr)
+            return 1
+        sparse_report = json.loads(
+            (tmp_path / "sparse_dashboards" / "bench_trend_export_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        sparse_findings = "\n".join(sparse_report["findings"])
+        if "below minimum 2" not in sparse_findings:
+            print("missing_sparse_history_finding=true", file=sys.stderr)
             return 1
 
     return 0

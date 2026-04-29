@@ -150,6 +150,7 @@ def build_report(
     fail_on_empty: bool,
     fail_on_airgap: bool,
     fail_on_telemetry: bool,
+    min_points_per_key: int | None,
     fail_on_tok_regression_pct: float | None,
     fail_on_wall_tok_regression_pct: float | None,
     fail_on_memory_growth_pct: float | None,
@@ -167,6 +168,12 @@ def build_report(
         telemetry_failures = [point for point in all_points if point.telemetry_status == "fail"]
         if telemetry_failures:
             findings.append(f"{len(telemetry_failures)} trend point(s) are missing telemetry")
+    if min_points_per_key is not None:
+        for key, points in sorted(grouped.items()):
+            if len(points) < min_points_per_key:
+                findings.append(
+                    f"{key} has {len(points)} trend point(s), below minimum {min_points_per_key}"
+                )
 
     if fail_on_tok_regression_pct is not None:
         threshold = -abs(fail_on_tok_regression_pct)
@@ -200,6 +207,7 @@ def build_report(
         fail_on_empty
         or fail_on_airgap
         or fail_on_telemetry
+        or min_points_per_key is not None
         or fail_on_tok_regression_pct is not None
         or fail_on_wall_tok_regression_pct is not None
         or fail_on_memory_growth_pct is not None
@@ -213,6 +221,7 @@ def build_report(
             "fail_on_empty": fail_on_empty,
             "fail_on_airgap": fail_on_airgap,
             "fail_on_telemetry": fail_on_telemetry,
+            "min_points_per_key": min_points_per_key,
             "fail_on_tok_regression_pct": fail_on_tok_regression_pct,
             "fail_on_wall_tok_regression_pct": fail_on_wall_tok_regression_pct,
             "fail_on_memory_growth_pct": fail_on_memory_growth_pct,
@@ -383,6 +392,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fail-on-airgap", action="store_true")
     parser.add_argument("--fail-on-telemetry", action="store_true")
     parser.add_argument(
+        "--min-points-per-key",
+        type=int,
+        help="Fail when any comparable trend key has fewer than this many retained points",
+    )
+    parser.add_argument(
         "--fail-on-tok-regression-pct",
         type=float,
         help="Fail when latest guest tok/s falls more than this percent versus the previous point",
@@ -405,6 +419,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.max_points_per_key is not None and args.max_points_per_key <= 0:
         print("error: --max-points-per-key must be positive", file=sys.stderr)
         return 2
+    if args.min_points_per_key is not None and args.min_points_per_key <= 0:
+        print("error: --min-points-per-key must be positive", file=sys.stderr)
+        return 2
     for name in (
         "fail_on_tok_regression_pct",
         "fail_on_wall_tok_regression_pct",
@@ -425,6 +442,7 @@ def main(argv: list[str] | None = None) -> int:
         fail_on_empty=args.fail_on_empty,
         fail_on_airgap=args.fail_on_airgap,
         fail_on_telemetry=args.fail_on_telemetry,
+        min_points_per_key=args.min_points_per_key,
         fail_on_tok_regression_pct=args.fail_on_tok_regression_pct,
         fail_on_wall_tok_regression_pct=args.fail_on_wall_tok_regression_pct,
         fail_on_memory_growth_pct=args.fail_on_memory_growth_pct,

@@ -1,6 +1,6 @@
 {
   "findings": [],
-  "generated_at": "2026-04-29T00:45:36Z",
+  "generated_at": "2026-04-29T01:39:55Z",
   "latest": [
     {
       "key": "ci-airgap-smoke/synthetic-smoke/Q4_0/68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
@@ -85,21 +85,21 @@
     {
       "key": "synthetic-airgap-smoke/synthetic-smoke/Q4_0/68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
       "latest_airgap_status": "pass",
-      "latest_commit": "3d5824a5de05",
-      "latest_generated_at": "2026-04-28T23:13:20Z",
+      "latest_commit": "756c0a850ab9",
+      "latest_generated_at": "2026-04-29T01:20:02Z",
       "latest_max_memory_bytes": 67207168,
       "latest_median_tok_per_s": 160.0,
       "latest_source": "bench/results/qemu_prompt_bench_latest.json",
       "latest_status": "pass",
       "latest_telemetry_status": "pass",
-      "latest_wall_tok_per_s_median": 626.0538723100858,
+      "latest_wall_tok_per_s_median": 786.125813946996,
       "max_memory_delta_pct": 0.0,
       "median_tok_per_s_delta_pct": 0.0,
-      "points": 21,
+      "points": 22,
       "previous_max_memory_bytes": 67207168,
       "previous_median_tok_per_s": 160.0,
-      "previous_source": "bench/results/qemu_prompt_bench_20260428T231320Z.json",
-      "previous_wall_tok_per_s_median": 626.0538723100858,
+      "previous_source": "bench/results/qemu_prompt_bench_20260429T012002Z.json",
+      "previous_wall_tok_per_s_median": 786.125813946996,
       "wall_tok_per_s_delta_pct": 0.0
     },
     {
@@ -125,15 +125,16 @@
   ],
   "status": "pass",
   "thresholds": {
-    "fail_on_airgap": true,
-    "fail_on_empty": true,
-    "fail_on_memory_growth_pct": 10.0,
-    "fail_on_telemetry": true,
-    "fail_on_tok_regression_pct": 5.0,
-    "fail_on_wall_tok_regression_pct": 5.0
+    "fail_on_airgap": false,
+    "fail_on_empty": false,
+    "fail_on_memory_growth_pct": null,
+    "fail_on_telemetry": false,
+    "fail_on_tok_regression_pct": null,
+    "fail_on_wall_tok_regression_pct": null,
+    "min_points_per_key": null
   },
   "trend_keys": 6,
-  "trend_points": 85,
+  "trend_points": 86,
   "trends": {
     "ci-airgap-smoke/synthetic-smoke/Q4_0/68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a": [
       {
@@ -2019,12 +2020,36 @@
       {
         "artifact_type": "qemu_prompt",
         "command_airgap_status": "pass",
-        "command_sha256": "cd63fce9b104ed8c38566a736230f0f586e388a4959cc554564571547acc6e6a",
-        "commit": "3d5824a5de05",
+        "command_sha256": "e415146c052b9f0baa23706ffde97548f2374f6601337823b4d810c39bed48e7",
+        "commit": "756c0a850ab9",
         "environment_sha256": "21a5fe5c0e2f1cbdfbc4f36f4a5326cb6145cbf77763b3401df2b5c1619f420d",
-        "generated_at": "2026-04-28T23:13:20Z",
-        "host_child_peak_rss_bytes_max": 15187968,
-        "host_child_tok_per_cpu_s_median": 777.6025132149398,
+        "generated_at": "2026-04-29T01:20:02Z",
+        "host_child_peak_rss_bytes_max": 12369920,
+        "host_child_tok_per_cpu_s_median": 923.699982266683,
+        "key": "synthetic-airgap-smoke/synthetic-smoke/Q4_0/68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+        "max_memory_bytes": 67207168,
+        "median_tok_per_s": 160.0,
+        "model": "synthetic-smoke",
+        "profile": "synthetic-airgap-smoke",
+        "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+        "quantization": "Q4_0",
+        "source": "bench/results/qemu_prompt_bench_20260429T012002Z.json",
+        "status": "pass",
+        "telemetry_status": "pass",
+        "ttft_us_p95": 12400.0,
+        "us_per_token_median": 6250.0,
+        "wall_tok_per_s_median": 786.125813946996,
+        "wall_us_per_token_median": 1288.9166666666665
+      },
+      {
+        "artifact_type": "qemu_prompt",
+        "command_airgap_status": "pass",
+        "command_sha256": "e415146c052b9f0baa23706ffde97548f2374f6601337823b4d810c39bed48e7",
+        "commit": "756c0a850ab9",
+        "environment_sha256": "21a5fe5c0e2f1cbdfbc4f36f4a5326cb6145cbf77763b3401df2b5c1619f420d",
+        "generated_at": "2026-04-29T01:20:02Z",
+        "host_child_peak_rss_bytes_max": 12369920,
+        "host_child_tok_per_cpu_s_median": 923.699982266683,
         "key": "synthetic-airgap-smoke/synthetic-smoke/Q4_0/68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
         "max_memory_bytes": 67207168,
         "median_tok_per_s": 160.0,
@@ -2037,8 +2062,8 @@
         "telemetry_status": "pass",
         "ttft_us_p95": 12400.0,
         "us_per_token_median": 6250.0,
-        "wall_tok_per_s_median": 626.0538723100858,
-        "wall_us_per_token_median": 1622.625
+        "wall_tok_per_s_median": 786.125813946996,
+        "wall_us_per_token_median": 1288.9166666666665
       }
     ],
     "synthetic-airgap-smoke/synthetic-smoke/Q4_0/no-suite": [
