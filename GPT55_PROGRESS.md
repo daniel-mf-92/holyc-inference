@@ -223,3 +223,4 @@
 2026-04-29T07:20:48Z | Added HCEval normalized JSONL export with prompt/choice/input hashes and dataset smoke coverage.
 2026-04-29T07:33:16Z | Added benchmark trend recent-window regression gates with smoke coverage and refreshed dashboard artifacts.
 2026-04-29T07:39:49Z | Added offline eval dataset fingerprint manifests with prompt/choice/input hashes and smoke coverage.
+2026-04-29T07:48:58Z | Added eval dataset fingerprint diff gating with smoke coverage and refreshed dataset diff artifacts.

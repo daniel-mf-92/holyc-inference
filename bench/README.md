@@ -190,6 +190,38 @@ python3 bench/hceval_export.py \
   --pack-manifest bench/results/datasets/smoke_eval.manifest.json
 ```
 
+`dataset_fingerprint.py` writes stable prompt, choice, input, answer, and full
+payload hashes for local eval JSONL rows. `dataset_fingerprint_diff.py` compares
+two fingerprint reports and emits JSON, Markdown, CSV, and JUnit artifacts so CI
+can flag unreviewed eval-set drift before packed `.hceval` files are promoted.
+Use the opt-in gates to reject added/removed rows, prompt/choice changes, answer
+changes, metadata changes, or any fingerprint drift:
+
+```bash
+python3 bench/dataset_fingerprint.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_fingerprint_smoke_latest.json \
+  --jsonl bench/results/datasets/dataset_fingerprint_smoke_latest.jsonl \
+  --csv bench/results/datasets/dataset_fingerprint_smoke_latest.csv \
+  --markdown bench/results/datasets/dataset_fingerprint_smoke_latest.md \
+  --junit bench/results/datasets/dataset_fingerprint_smoke_latest_junit.xml \
+  --fail-on-duplicate-ids \
+  --fail-on-conflicting-input-answers \
+  --fail-on-findings
+
+python3 bench/dataset_fingerprint_diff.py \
+  --baseline bench/results/datasets/dataset_fingerprint_smoke_latest.json \
+  --candidate bench/results/datasets/dataset_fingerprint_smoke_latest.json \
+  --output bench/results/datasets/dataset_fingerprint_diff_smoke_latest.json \
+  --csv bench/results/datasets/dataset_fingerprint_diff_smoke_latest.csv \
+  --markdown bench/results/datasets/dataset_fingerprint_diff_smoke_latest.md \
+  --junit bench/results/datasets/dataset_fingerprint_diff_smoke_latest_junit.xml \
+  --fail-on-any-change \
+  --fail-on-findings
+
+python3 bench/dataset_fingerprint_diff_ci_smoke.py
+```
+
 `dataset_index.py` scans curated manifests, packed `.hceval` manifests, and
 inspection reports, verifies local hashes/provenance fields where possible, and
 writes JSON/Markdown/CSV/JUnit XML rollups:

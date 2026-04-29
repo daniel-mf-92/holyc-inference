@@ -1,0 +1,19 @@
+{
+  "baseline": {
+    "path": "bench/results/datasets/dataset_fingerprint_smoke_latest.json",
+    "record_count": 3,
+    "report_status": "pass"
+  },
+  "candidate": {
+    "path": "bench/results/datasets/dataset_fingerprint_smoke_latest.json",
+    "record_count": 3,
+    "report_status": "pass"
+  },
+  "change_counts": {},
+  "changes": [],
+  "findings": [],
+  "generated_at": "2026-04-29T07:48:33Z",
+  "key_field": "record_id",
+  "status": "pass",
+  "unchanged_records": 3
+}
