@@ -245,6 +245,10 @@ def has_dry_run_coverage_violations(
     return any(True for _ in violations)
 
 
+def has_environment_drift(violations: Iterable[bench_result_index.EnvironmentDrift]) -> bool:
+    return any(True for _ in violations)
+
+
 def format_value(value: object) -> str:
     if value is None or value == "":
         return "-"
@@ -264,6 +268,7 @@ def markdown_report(report: dict[str, object]) -> str:
         f"Latest keys: {len(latest)}",
         f"History artifacts: {report['history_artifacts']}",
         f"Dry-run coverage violations: {len(report.get('dry_run_coverage_violations', []))}",
+        f"Environment drift: {len(report.get('environment_drift', []))}",
         "",
     ]
     if latest:
@@ -335,6 +340,29 @@ def markdown_report(report: dict[str, object]) -> str:
             )
     elif report.get("require_dry_run_coverage"):
         lines.extend(["", "Dry-run coverage requirements satisfied."])
+
+    environment_drift = report.get("environment_drift", [])
+    if environment_drift:
+        lines.extend(
+            [
+                "",
+                "## Environment Drift",
+                "",
+                "| Comparable key | Environment hashes | Sources |",
+                "| --- | ---: | ---: |",
+            ]
+        )
+        for finding in environment_drift:
+            assert isinstance(finding, dict)
+            lines.append(
+                "| {key} | {hashes} | {sources} |".format(
+                    key=finding["key"],
+                    hashes=len(finding["hashes"]),
+                    sources=len(finding["sources"]),
+                )
+            )
+    elif report.get("require_environment_stability"):
+        lines.extend(["", "Environment stability requirements satisfied."])
     return "\n".join(lines) + "\n"
 
 
@@ -438,6 +466,23 @@ def write_dry_run_coverage_csv(
             )
 
 
+def write_environment_drift_csv(findings: list[bench_result_index.EnvironmentDrift], path: Path) -> None:
+    fields = ["key", "environment_hashes", "environment_hash_count", "sources", "source_count"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for finding in findings:
+            writer.writerow(
+                {
+                    "key": finding.key,
+                    "environment_hashes": json.dumps(finding.hashes, separators=(",", ":")),
+                    "environment_hash_count": len(finding.hashes),
+                    "sources": json.dumps(finding.sources, separators=(",", ":")),
+                    "source_count": len(finding.sources),
+                }
+            )
+
+
 def junit_report(report: dict[str, object]) -> str:
     history = [row for row in report["history"] if isinstance(row, dict)]
     failed_artifacts = [row for row in history if row.get("status") == "fail"]
@@ -454,6 +499,11 @@ def junit_report(report: dict[str, object]) -> str:
         if report.get("require_dry_run_coverage")
         else []
     )
+    environment_drift_failures = (
+        [row for row in report.get("environment_drift", []) if isinstance(row, dict)]
+        if report.get("require_environment_stability")
+        else []
+    )
     missing_latest = not report["latest_artifacts"]
     failures = (
         int(bool(failed_artifacts))
@@ -464,6 +514,7 @@ def junit_report(report: dict[str, object]) -> str:
         + int(bool(freshness_failures))
         + int(bool(history_coverage_failures))
         + int(bool(dry_run_coverage_failures))
+        + int(bool(environment_drift_failures))
         + int(missing_latest)
     )
 
@@ -471,7 +522,7 @@ def junit_report(report: dict[str, object]) -> str:
         "testsuite",
         {
             "name": "holyc_bench_artifact_manifest",
-            "tests": "9",
+            "tests": "10",
             "failures": str(failures),
         },
     )
@@ -602,6 +653,18 @@ def junit_report(report: dict[str, object]) -> str:
             for row in dry_run_coverage_failures
         )
 
+    environment_drift_case = ET.SubElement(suite, "testcase", {"name": "environment_drift"})
+    if environment_drift_failures:
+        failure = ET.SubElement(
+            environment_drift_case,
+            "failure",
+            {
+                "type": "benchmark_manifest_environment_drift",
+                "message": f"{len(environment_drift_failures)} comparable benchmark key(s) have host/QEMU environment drift",
+            },
+        )
+        failure.text = "\n".join(str(row.get("key", "")) for row in environment_drift_failures)
+
     return ET.tostring(suite, encoding="unicode") + "\n"
 
 
@@ -610,12 +673,14 @@ def write_manifest(
     output_dir: Path,
     min_history_per_key: int | None = None,
     require_dry_run_coverage: bool = False,
+    require_environment_stability: bool = False,
 ) -> tuple[
     Path,
     str,
     list[ManifestArtifact],
     list[ManifestCoverageViolation],
     list[bench_result_index.DryRunCoverageViolation],
+    list[bench_result_index.EnvironmentDrift],
 ]:
     output_dir.mkdir(parents=True, exist_ok=True)
     history = sorted(
@@ -625,9 +690,12 @@ def write_manifest(
     latest = latest_artifacts(history)
     coverage_violations = history_coverage_violations(history, min_history_per_key)
     dry_run_coverage_violations = bench_result_index.dry_run_coverage_violations(summaries)
+    environment_drift_findings = bench_result_index.environment_drift(summaries)
     status = (
         "fail"
-        if coverage_violations or (require_dry_run_coverage and dry_run_coverage_violations)
+        if coverage_violations
+        or (require_dry_run_coverage and dry_run_coverage_violations)
+        or (require_environment_stability and environment_drift_findings)
         else manifest_status(history)
     )
     report = {
@@ -636,12 +704,14 @@ def write_manifest(
         "history_artifacts": len(history),
         "min_history_per_key": min_history_per_key,
         "require_dry_run_coverage": require_dry_run_coverage,
+        "require_environment_stability": require_environment_stability,
         "latest_artifacts": [asdict(artifact) for artifact in latest],
         "history": [asdict(artifact) for artifact in history],
         "history_coverage_violations": [asdict(violation) for violation in coverage_violations],
         "dry_run_coverage_violations": [
             asdict(violation) for violation in dry_run_coverage_violations
         ],
+        "environment_drift": [asdict(finding) for finding in environment_drift_findings],
     }
 
     json_path = output_dir / "bench_artifact_manifest_latest.json"
@@ -650,6 +720,7 @@ def write_manifest(
     history_csv_path = output_dir / "bench_artifact_manifest_history_latest.csv"
     history_coverage_csv_path = output_dir / "bench_artifact_manifest_history_coverage_latest.csv"
     dry_run_coverage_csv_path = output_dir / "bench_artifact_manifest_dry_run_coverage_latest.csv"
+    environment_drift_csv_path = output_dir / "bench_artifact_manifest_environment_drift_latest.csv"
     junit_path = output_dir / "bench_artifact_manifest_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
@@ -657,8 +728,16 @@ def write_manifest(
     write_csv(history, history_csv_path)
     write_history_coverage_csv(coverage_violations, history_coverage_csv_path)
     write_dry_run_coverage_csv(dry_run_coverage_violations, dry_run_coverage_csv_path)
+    write_environment_drift_csv(environment_drift_findings, environment_drift_csv_path)
     junit_path.write_text(junit_report(report), encoding="utf-8")
-    return json_path, str(report["status"]), history, coverage_violations, dry_run_coverage_violations
+    return (
+        json_path,
+        str(report["status"]),
+        history,
+        coverage_violations,
+        dry_run_coverage_violations,
+        environment_drift_findings,
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -721,6 +800,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Return non-zero if any measured qemu_prompt artifact lacks a matching dry-run launch plan",
     )
+    parser.add_argument(
+        "--fail-on-environment-drift",
+        action="store_true",
+        help="Return non-zero if comparable benchmark artifacts have different host/QEMU environment hashes",
+    )
     return parser
 
 
@@ -747,11 +831,19 @@ def main(argv: list[str] | None = None) -> int:
             inputs,
             max_artifact_age_seconds=max_artifact_age_seconds,
         )
-        output, status, artifacts, history_coverage, dry_run_coverage = write_manifest(
+        (
+            output,
+            status,
+            artifacts,
+            history_coverage,
+            dry_run_coverage,
+            environment_drift,
+        ) = write_manifest(
             summaries,
             args.output_dir,
             min_history_per_key=args.min_history_per_key,
             require_dry_run_coverage=args.fail_on_missing_dry_run,
+            require_environment_stability=args.fail_on_environment_drift,
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -764,6 +856,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"freshness_failures={sum(1 for artifact in artifacts if artifact.freshness_status == 'fail')}")
     print(f"history_coverage_violations={len(history_coverage)}")
     print(f"dry_run_coverage_violations={len(dry_run_coverage)}")
+    print(f"environment_drift={len(environment_drift)}")
     if args.fail_on_airgap and has_airgap_failures(artifacts):
         return 1
     if args.fail_on_telemetry and has_telemetry_failures(artifacts):
@@ -779,6 +872,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.fail_on_history_coverage and has_history_coverage_violations(history_coverage):
         return 1
     if args.fail_on_missing_dry_run and has_dry_run_coverage_violations(dry_run_coverage):
+        return 1
+    if args.fail_on_environment_drift and has_environment_drift(environment_drift):
         return 1
     return 0
 

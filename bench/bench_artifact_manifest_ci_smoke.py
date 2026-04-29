@@ -25,7 +25,12 @@ def command_sha256(command: list[str]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def write_qemu_report(path: Path, command: list[str], generated_at: str | None = None) -> None:
+def write_qemu_report(
+    path: Path,
+    command: list[str],
+    generated_at: str | None = None,
+    qemu_version: str = "synthetic",
+) -> None:
     command_hash = command_sha256(command)
     generated_at = generated_at or iso_now()
     path.write_text(
@@ -43,7 +48,7 @@ def write_qemu_report(path: Path, command: list[str], generated_at: str | None =
                     "platform": "ci-smoke",
                     "machine": "host",
                     "qemu_bin": command[0],
-                    "qemu_version": "synthetic",
+                    "qemu_version": qemu_version,
                 },
                 "benchmarks": [
                     {
@@ -181,6 +186,7 @@ def main() -> int:
         history_csv_path = safe_output_dir / "bench_artifact_manifest_history_latest.csv"
         history_coverage_csv_path = safe_output_dir / "bench_artifact_manifest_history_coverage_latest.csv"
         dry_run_coverage_csv_path = safe_output_dir / "bench_artifact_manifest_dry_run_coverage_latest.csv"
+        environment_drift_csv_path = safe_output_dir / "bench_artifact_manifest_environment_drift_latest.csv"
         junit_path = safe_output_dir / "bench_artifact_manifest_junit_latest.xml"
         report = json.loads(report_path.read_text(encoding="utf-8"))
         if report["status"] != "pass":
@@ -222,6 +228,12 @@ def main() -> int:
             not in dry_run_coverage_csv_path.read_text(encoding="utf-8")
         ):
             print("missing_manifest_dry_run_coverage_csv=true", file=sys.stderr)
+            return 1
+        if (
+            "key,environment_hashes,environment_hash_count,sources,source_count"
+            not in environment_drift_csv_path.read_text(encoding="utf-8")
+        ):
+            print("missing_manifest_environment_drift_csv=true", file=sys.stderr)
             return 1
         junit_root = ET.parse(junit_path).getroot()
         if junit_root.attrib.get("name") != "holyc_bench_artifact_manifest":
@@ -312,6 +324,42 @@ def main() -> int:
         violations = sparse_report["history_coverage_violations"]
         if len(violations) != 1 or violations[0]["history_count"] != 1:
             print("unexpected_history_coverage_violation_payload=true", file=sys.stderr)
+            return 1
+
+        env_drift_source_dir = tmp_path / "env_drift_sources"
+        env_drift_source_dir.mkdir()
+        write_qemu_report(
+            env_drift_source_dir / "qemu_prompt_bench_env_a.json",
+            safe_command,
+            generated_at="2026-04-27T00:00:00Z",
+            qemu_version="synthetic-a",
+        )
+        write_qemu_report(
+            env_drift_source_dir / "qemu_prompt_bench_env_b.json",
+            safe_command,
+            generated_at="2026-04-28T00:00:00Z",
+            qemu_version="synthetic-b",
+        )
+        env_drift_output_dir = tmp_path / "env_drift_manifest"
+        completed = run_manifest(env_drift_source_dir, env_drift_output_dir, "--fail-on-environment-drift")
+        if completed.returncode == 0:
+            print("environment_drift_manifest_not_rejected=true", file=sys.stderr)
+            return 1
+        env_drift_report = json.loads(
+            (env_drift_output_dir / "bench_artifact_manifest_latest.json").read_text(encoding="utf-8")
+        )
+        environment_drift = env_drift_report["environment_drift"]
+        if (
+            env_drift_report["status"] != "fail"
+            or len(environment_drift) != 1
+            or len(environment_drift[0]["hashes"]) != 2
+            or len(environment_drift[0]["sources"]) != 2
+        ):
+            print("unexpected_environment_drift_payload=true", file=sys.stderr)
+            return 1
+        env_drift_junit = ET.parse(env_drift_output_dir / "bench_artifact_manifest_junit_latest.xml").getroot()
+        if env_drift_junit.attrib.get("failures") != "1":
+            print("unexpected_environment_drift_junit_failures=true", file=sys.stderr)
             return 1
 
         unsafe_report = tmp_path / "qemu_prompt_bench_unsafe.json"

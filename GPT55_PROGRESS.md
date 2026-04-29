@@ -216,3 +216,4 @@
 2026-04-29T06:10:02Z | Added qemu_prompt_bench suite-level total-token gating with smoke coverage and README documentation.
 2026-04-29T06:21:23Z | Added benchmark artifact manifest dry-run coverage gate with smoke coverage and refreshed manifest artifacts.
 2026-04-29T06:32:42Z | Added qemu_prompt_bench guest prompt SHA256 match telemetry/gating with smoke coverage and refreshed benchmark artifacts.
+2026-04-29T06:39:29Z | Added benchmark artifact manifest environment-drift CSV/JUnit reporting and opt-in stability gate.

@@ -198,10 +198,16 @@ known leaky fixture is rejected:
 python3 bench/dataset_ci_smoke.py
 ```
 
-`bench_artifact_manifest_ci_smoke.py` is a stdlib-only CI gate for benchmark
-artifact manifests. It builds synthetic QEMU benchmark reports, verifies the
-latest/history JSON, Markdown, CSV, and JUnit outputs, and checks that a
-NIC-enabled QEMU command is rejected:
+`bench_artifact_manifest.py` builds latest/history manifests for benchmark
+artifacts and can gate air-gap status, telemetry, commit metadata, command
+hashes, artifact freshness, per-key history coverage, matching dry-run launch
+plans, and comparable host/QEMU environment stability. Use
+`--fail-on-environment-drift` when CI should reject throughput comparisons whose
+profile/model/quantization/prompt-suite/command/launch-plan keys span multiple
+environment fingerprints. `bench_artifact_manifest_ci_smoke.py` is a
+stdlib-only CI gate for this path; it builds synthetic QEMU benchmark reports,
+verifies the latest/history JSON, Markdown, CSV, and JUnit outputs, and checks
+that a NIC-enabled QEMU command is rejected:
 
 ```bash
 python3 bench/bench_artifact_manifest_ci_smoke.py
