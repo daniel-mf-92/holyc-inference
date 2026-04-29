@@ -723,7 +723,7 @@ def main() -> int:
         ):
             return rc
         if rc := require(
-            "source,status,source_name,source_version,license,source_url,output"
+            "source,status,source_name,source_version,license,source_url,source_url_host,output"
             in provenance_csv.read_text(encoding="utf-8"),
             "missing_provenance_csv_header",
         ):

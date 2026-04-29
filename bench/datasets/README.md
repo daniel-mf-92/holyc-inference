@@ -121,7 +121,8 @@ dropped before deterministic sampling instead of rejected later by the packer.
 
 All integers are little-endian. The manifest records the source digest, binary
 digest, answer histogram, UTF-8 prompt/choice/record byte statistics, aggregate
-binary layout byte counts, record binary spans, and cleaned records.
+binary layout byte counts, record binary spans, binary-recoverable record
+fingerprints, and cleaned records.
 
 ## Sample Build
 
@@ -154,9 +155,9 @@ python3 bench/hceval_inspect.py \
 
 Use the optional byte gates to reject local subsets that exceed the fixed buffer
 budgets chosen for a TempleOS loader before the binary reaches the guest. The
-inspection report also emits parsed `binary_layout` and `record_spans`, can
-write those spans as CSV for offset diffs, and checks them against the manifest
-when present.
+inspection report also emits parsed `binary_layout`, `record_spans`, and
+`record_fingerprints`, can write spans as CSV for offset diffs, and checks them
+against the manifest when present.
 
 ## Artifact Index
 

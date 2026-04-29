@@ -135,9 +135,11 @@ Manifests include UTF-8 prompt/choice/record byte statistics, choice-count
 histograms/stats, and optional size gates can fail packing before writing
 oversized artifacts. Manifests also include `record_spans` with each record's
 binary offset, length, and payload bytes for loader-bound audits without
-changing the `.hceval` bytes. The `binary_layout` section summarizes fixed
-header, metadata, record header, payload, choice length-prefix, body, and total
-binary byte counts for loader buffer planning.
+changing the `.hceval` bytes, plus binary-recoverable `record_fingerprints` for
+prompt, choices, prompt+choices input, and answer payload drift checks. The
+`binary_layout` section summarizes fixed header, metadata, record header,
+payload, choice length-prefix, body, and total binary byte counts for loader
+buffer planning.
 For HellaSwag-shaped rows, `ctx` is preferred when present; locally staged rows
 that only carry `ctx_a`/`ctx_b` are normalized by joining those context parts
 before packing.

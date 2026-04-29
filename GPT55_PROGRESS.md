@@ -233,3 +233,4 @@
 2026-04-29T09:28:06Z | Added perf regression P95 guest/wall token-latency gates with smoke coverage and refreshed dashboards.
 2026-04-29T09:34:40Z | Added eval comparator CI smoke coverage for reports, paired metrics, CSV/JUnit artifacts, and gate failures.
 2026-04-29T09:45:18Z | Added benchmark matrix expected-cell coverage gates with dry-run smoke coverage and refreshed matrix artifacts.
+2026-04-29T10:18:03Z | Added HCEval record fingerprint manifests and inspector validation with smoke coverage and refreshed dataset artifacts.

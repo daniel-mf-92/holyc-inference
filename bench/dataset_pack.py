@@ -351,6 +351,54 @@ def record_spans(records: list[EvalRecord], dataset: str, split: str) -> list[di
     return spans
 
 
+def sha256_json(value: Any) -> str:
+    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def binary_record_payload(record: EvalRecord) -> dict[str, Any]:
+    return {
+        "answer_index": record.answer_index,
+        "choices": record.choices,
+        "prompt": record.prompt,
+        "provenance": record.provenance,
+        "record_id": record.record_id,
+    }
+
+
+def record_fingerprint(record: EvalRecord, index: int) -> dict[str, Any]:
+    prompt_hash = sha256_text(record.prompt)
+    choices_hash = sha256_json(record.choices)
+    input_hash = sha256_json({"choices_sha256": choices_hash, "prompt_sha256": prompt_hash})
+    answer_payload_hash = sha256_json(
+        {
+            "answer_index": record.answer_index,
+            "choices_sha256": choices_hash,
+            "input_sha256": input_hash,
+            "prompt_sha256": prompt_hash,
+        }
+    )
+    return {
+        "answer_index": record.answer_index,
+        "answer_payload_sha256": answer_payload_hash,
+        "choice_count": len(record.choices),
+        "choices_sha256": choices_hash,
+        "full_payload_sha256": sha256_json(binary_record_payload(record)),
+        "input_sha256": input_hash,
+        "prompt_sha256": prompt_hash,
+        "record_id": record.record_id,
+        "record_index": index,
+    }
+
+
+def record_fingerprints(records: list[EvalRecord]) -> list[dict[str, Any]]:
+    return [record_fingerprint(record, index) for index, record in enumerate(records)]
+
+
 def pack_records(records: list[EvalRecord], dataset: str, split: str) -> bytes:
     packed_metadata = metadata_bytes(dataset, split, len(records))
     body = b"".join(record_bytes(record) for record in records)
@@ -375,6 +423,7 @@ def write_outputs(records: list[EvalRecord], output: Path, manifest_path: Path, 
         "magic": MAGIC.decode("ascii"),
         "output": str(output),
         "record_count": len(records),
+        "record_fingerprints": record_fingerprints(records),
         "record_spans": record_spans(records, dataset, split),
         "records": [asdict(record) for record in records],
         "split": split,

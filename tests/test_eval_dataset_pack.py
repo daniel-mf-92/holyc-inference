@@ -122,6 +122,11 @@ def test_cli_writes_binary_and_manifest() -> None:
             "smoke-eval",
             "validation",
         )
+        records = dataset_pack.normalize_records(dataset_pack.read_jsonl(sample), "smoke-eval", "validation")
+        assert manifest_json["record_fingerprints"] == dataset_pack.record_fingerprints(records)
+        assert manifest_json["record_fingerprints"][0]["record_id"] == "smoke-hellaswag-1"
+        assert len(manifest_json["record_fingerprints"][0]["input_sha256"]) == 64
+        assert len(manifest_json["record_fingerprints"][0]["answer_payload_sha256"]) == 64
         assert manifest_json["record_spans"][0]["offset"] > dataset_pack.HEADER.size
         assert manifest_json["record_spans"][-1]["offset"] + manifest_json["record_spans"][-1]["length"] == len(payload)
 

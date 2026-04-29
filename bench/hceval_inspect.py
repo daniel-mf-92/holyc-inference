@@ -191,6 +191,10 @@ def record_spans(records: list[InspectRecord]) -> list[dict[str, Any]]:
     return spans
 
 
+def record_fingerprints(dataset: HCEvalDataset) -> list[dict[str, Any]]:
+    return dataset_pack.record_fingerprints(as_pack_records(dataset))
+
+
 def byte_stats(records: list[InspectRecord]) -> dict[str, int]:
     pack_records = [
         dataset_pack.EvalRecord(
@@ -315,6 +319,8 @@ def validate_dataset(
             findings.append("manifest binary_layout does not match parsed binary")
         if "record_spans" in manifest and manifest.get("record_spans") != record_spans(records):
             findings.append("manifest record_spans does not match parsed binary")
+        if "record_fingerprints" in manifest and manifest.get("record_fingerprints") != record_fingerprints(dataset):
+            findings.append("manifest record_fingerprints does not match parsed binary")
         manifest_records = manifest.get("records")
         if isinstance(manifest_records, list):
             source_verified = hashlib.sha256(
@@ -346,6 +352,7 @@ def build_report(path: Path, dataset: HCEvalDataset, findings: list[str]) -> dic
         "input": str(path),
         "payload_sha256": dataset.payload_sha256,
         "record_count": len(dataset.records),
+        "record_fingerprints": record_fingerprints(dataset),
         "record_spans": record_spans(dataset.records),
         "records": [asdict(record) for record in dataset.records],
         "source_sha256": dataset.source_digest,

@@ -66,6 +66,10 @@ def test_cli_writes_json_and_markdown() -> None:
         assert report["record_count"] == 3
         assert report["record_spans"][0]["record_id"] == "smoke-hellaswag-1"
         assert report["record_spans"][-1]["offset"] + report["record_spans"][-1]["length"] == input_path.stat().st_size
+        assert report["record_fingerprints"][0]["record_id"] == "smoke-hellaswag-1"
+        assert len(report["record_fingerprints"][0]["prompt_sha256"]) == 64
+        assert len(report["record_fingerprints"][0]["choices_sha256"]) == 64
+        assert len(report["record_fingerprints"][0]["input_sha256"]) == 64
         assert report["byte_stats"]["max_prompt_bytes"] > 0
         assert report["choice_count_histogram"] == {"4": 3}
         assert report["choice_count_stats"] == {
@@ -97,6 +101,21 @@ def test_manifest_record_spans_are_verified() -> None:
         findings = hceval_inspect.validate_dataset(dataset, bad_manifest)
 
         assert "manifest record_spans does not match parsed binary" in findings
+
+
+def test_manifest_record_fingerprints_are_verified() -> None:
+    input_path = ROOT / "bench" / "results" / "datasets" / "smoke_eval.hceval"
+    manifest_path = ROOT / "bench" / "results" / "datasets" / "smoke_eval.manifest.json"
+    with tempfile.TemporaryDirectory() as tmp:
+        bad_manifest = Path(tmp) / "bad.manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["record_fingerprints"][0]["input_sha256"] = "0" * 64
+        bad_manifest.write_text(json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
+
+        dataset = hceval_inspect.parse_hceval(input_path)
+        findings = hceval_inspect.validate_dataset(dataset, bad_manifest)
+
+        assert "manifest record_fingerprints does not match parsed binary" in findings
 
 
 def test_cli_size_gates_report_findings() -> None:
@@ -137,6 +156,7 @@ if __name__ == "__main__":
     test_sample_hceval_parses_and_validates()
     test_cli_writes_json_and_markdown()
     test_manifest_record_spans_are_verified()
+    test_manifest_record_fingerprints_are_verified()
     test_cli_size_gates_report_findings()
     test_truncated_payload_fails_fast()
     print("hceval_inspect_tests=ok")

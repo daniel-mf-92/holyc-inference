@@ -1,6 +1,6 @@
 # HCEval Dataset Inspection
 
-Generated: 2026-04-29T04:55:07Z
+Generated: 2026-04-29T10:10:12Z
 Status: pass
 Dataset: smoke-eval
 Split: validation
@@ -40,6 +40,6 @@ No findings.
 
 | ID | Choices | Answer | Provenance |
 | --- | ---: | ---: | --- |
-| arc-smoke-1 | 4 | 0 | synthetic ARC-shaped smoke row |
-| hellaswag-smoke-2 | 4 | 0 | synthetic HellaSwag-shaped smoke row |
-| truthfulqa-smoke-3 | 4 | 0 | synthetic TruthfulQA-shaped smoke row |
+| smoke-arc-1 | 4 | 0 | synthetic ARC-shaped smoke row |
+| smoke-hellaswag-1 | 4 | 0 | synthetic HellaSwag-shaped smoke row |
+| smoke-truthfulqa-1 | 4 | 0 | synthetic TruthfulQA-shaped smoke row |
