@@ -536,7 +536,10 @@ count, QEMU binary/path, QEMU version when discoverable, and a stable SHA256
 fingerprint of the QEMU command line. Measured reports also include the same
 deterministic launch plan and launch-plan SHA256 used by dry-runs, and write
 `qemu_prompt_bench_launches_latest.csv` with one row per warmup or measured
-launch so CI can audit actual launch order against the reviewed plan. They also
+launch so CI can audit actual launch order against the reviewed plan. The
+runner separately fingerprints the realized launch sequence and fails the
+report if observed launch order, prompt hashes, prompt byte counts, phases, or
+iterations diverge from the planned sequence. They also
 record input artifact metadata for the disk image path and any
 `--qemu-args-file` sources; pass `--hash-image` when the disk image digest
 should be recorded alongside size and mtime.
@@ -670,10 +673,10 @@ Dry-runs also write `qemu_prompt_bench_dry_run_latest.json`, Markdown, CSV, and
 JUnit XML artifacts under the selected output directory, plus
 `qemu_prompt_bench_dry_run_launches_latest.csv` with one row per planned launch.
 These artifacts record the exact `-nic none` command, the command SHA256
-fingerprint, prompt-suite hash, launch-plan SHA256, warmup count, repeat count,
-configured launch budget, prompt-count floor, and planned launch totals for CI
-review without booting a guest, plus the same host/QEMU provenance fields used
-by measured benchmark reports. Dry-run JSON, Markdown, CSV, and JUnit also include disk
+fingerprint, prompt-suite hash, launch-plan SHA256, planned launch sequence
+SHA256, warmup count, repeat count, configured launch budget, prompt-count
+floor, and planned launch totals for CI review without booting a guest, plus
+the same host/QEMU provenance fields used by measured benchmark reports. Dry-run JSON, Markdown, CSV, and JUnit also include disk
 image metadata and SHA256 hashes for any local QEMU args files, making reviewed
 launch plans reproducible before a VM is started.
 

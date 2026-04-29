@@ -16,6 +16,9 @@ ROOT = Path(__file__).resolve().parents[1]
 PROMPTS = ROOT / "bench" / "prompts" / "smoke.jsonl"
 SYNTHETIC_QEMU = ROOT / "bench" / "fixtures" / "qemu_synthetic_bench.py"
 SYNTHETIC_IMAGE = Path("/tmp/TempleOS.synthetic.img")
+sys.path.insert(0, str(ROOT / "bench"))
+
+import qemu_prompt_bench
 
 
 def require(condition: bool, message: str) -> int:
@@ -26,6 +29,23 @@ def require(condition: bool, message: str) -> int:
 
 
 def main() -> int:
+    planned = qemu_prompt_bench.dry_run_launch_plan(
+        qemu_prompt_bench.load_prompt_cases(PROMPTS),
+        warmup=0,
+        repeat=1,
+    )
+    expected_sequence = qemu_prompt_bench.launch_sequence_from_plan(planned)
+    observed_sequence = [dict(row) for row in expected_sequence]
+    observed_sequence[0]["prompt_bytes"] += 1
+    integrity = qemu_prompt_bench.launch_sequence_integrity(expected_sequence, observed_sequence)
+    if rc := require(integrity["launch_sequence_match"] is False, "expected_launch_sequence_negative_mismatch"):
+        return rc
+    if rc := require(
+        qemu_prompt_bench.launch_sequence_findings(integrity),
+        "missing_launch_sequence_negative_finding",
+    ):
+        return rc
+
     with tempfile.TemporaryDirectory(prefix="holyc-qemu-bench-ci-") as tmp:
         output_dir = Path(tmp) / "results"
         command = [
@@ -101,6 +121,23 @@ def main() -> int:
             "top_level_command_sha256_mismatch",
         ):
             return rc
+        if rc := require(
+            report["expected_launch_sequence_sha256"] == report["observed_launch_sequence_sha256"],
+            "launch_sequence_hash_mismatch",
+        ):
+            return rc
+        if rc := require(
+            report["launch_sequence_integrity"]["launch_sequence_match"] is True,
+            "launch_sequence_integrity_mismatch",
+        ):
+            return rc
+        if rc := require(
+            report["launch_sequence_integrity"]["observed_launches"] == 6,
+            "unexpected_observed_launch_count",
+        ):
+            return rc
+        if rc := require(not report["launch_sequence_findings"], "unexpected_launch_sequence_findings"):
+            return rc
         if rc := require(report["planned_warmup_launches"] == 2, "unexpected_warmup_launches"):
             return rc
         if rc := require(report["planned_measured_launches"] == 4, "unexpected_measured_launches"):
@@ -174,7 +211,20 @@ def main() -> int:
             "unexpected_launch_csv_phases",
         ):
             return rc
+        if rc := require(
+            {
+                "expected_launch_sequence_sha256",
+                "observed_launch_sequence_sha256",
+            }.issubset(launch_rows[0].keys()),
+            "missing_launch_sequence_csv_columns",
+        ):
+            return rc
         if rc := require("Phase Summary" in markdown_path.read_text(encoding="utf-8"), "missing_phase_markdown"):
+            return rc
+        if rc := require(
+            "Launch Sequence Integrity" in markdown_path.read_text(encoding="utf-8"),
+            "missing_launch_sequence_markdown",
+        ):
             return rc
         junit_root = ET.parse(junit_path).getroot()
         if rc := require(junit_root.attrib.get("failures") == "0", "unexpected_junit_failures"):
@@ -202,8 +252,15 @@ def main() -> int:
             return rc
         if rc := require(dry_report["commit"], "missing_dry_run_commit"):
             return rc
+        if rc := require(dry_report["expected_launch_sequence_sha256"], "missing_dry_run_launch_sequence_hash"):
+            return rc
         dry_csv_rows = list(csv.DictReader((dry_output_dir / "qemu_prompt_bench_dry_run_latest.csv").open(encoding="utf-8", newline="")))
         if rc := require(dry_csv_rows[0]["profile"] == "ci-airgap-smoke", "missing_dry_run_csv_profile"):
+            return rc
+        if rc := require(
+            dry_csv_rows[0]["expected_launch_sequence_sha256"] == dry_report["expected_launch_sequence_sha256"],
+            "dry_run_csv_launch_sequence_hash_mismatch",
+        ):
             return rc
         dry_junit_root = ET.parse(dry_output_dir / "qemu_prompt_bench_dry_run_junit_latest.xml").getroot()
         dry_properties = {

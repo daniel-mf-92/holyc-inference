@@ -259,6 +259,80 @@ def launch_plan_hash(plan: list[dict[str, Any]]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def launch_sequence_from_plan(plan: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "launch_index": row.get("launch_index"),
+            "phase": row.get("phase"),
+            "prompt_id": row.get("prompt_id"),
+            "prompt_sha256": row.get("prompt_sha256"),
+            "prompt_bytes": row.get("prompt_bytes"),
+            "expected_tokens": row.get("expected_tokens"),
+            "iteration": row.get("iteration"),
+        }
+        for row in sorted(plan, key=lambda item: int(item.get("launch_index") or 0))
+    ]
+
+
+def launch_sequence_from_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
+    return [
+        {
+            "launch_index": run.launch_index,
+            "phase": run.phase,
+            "prompt_id": run.prompt,
+            "prompt_sha256": run.prompt_sha256,
+            "prompt_bytes": run.prompt_bytes,
+            "expected_tokens": run.expected_tokens,
+            "iteration": run.iteration,
+        }
+        for run in sorted(runs, key=lambda item: item.launch_index)
+    ]
+
+
+def launch_sequence_hash(sequence: list[dict[str, Any]]) -> str:
+    encoded = json.dumps(sequence, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def launch_sequence_integrity(
+    expected_sequence: list[dict[str, Any]],
+    observed_sequence: list[dict[str, Any]],
+) -> dict[str, Any]:
+    matched = sum(1 for expected, observed in zip(expected_sequence, observed_sequence) if expected == observed)
+    mismatched = sum(1 for expected, observed in zip(expected_sequence, observed_sequence) if expected != observed)
+    missing = max(0, len(expected_sequence) - len(observed_sequence))
+    extra = max(0, len(observed_sequence) - len(expected_sequence))
+    expected_hash = launch_sequence_hash(expected_sequence)
+    observed_hash = launch_sequence_hash(observed_sequence)
+    return {
+        "expected_launches": len(expected_sequence),
+        "observed_launches": len(observed_sequence),
+        "matched_launches": matched,
+        "mismatched_launches": mismatched,
+        "missing_launches": missing,
+        "extra_launches": extra,
+        "expected_launch_sequence_sha256": expected_hash,
+        "observed_launch_sequence_sha256": observed_hash,
+        "launch_sequence_match": expected_hash == observed_hash,
+    }
+
+
+def launch_sequence_findings(integrity: dict[str, Any]) -> list[dict[str, Any]]:
+    if integrity.get("launch_sequence_match") is True:
+        return []
+    return [
+        {
+            "scope": "launch_sequence",
+            "launch_index": "",
+            "prompt": "",
+            "iteration": "",
+            "metric": "launch_sequence_match",
+            "value": integrity.get("observed_launch_sequence_sha256"),
+            "limit": integrity.get("expected_launch_sequence_sha256"),
+        }
+    ]
+
+
 def git_commit(root: Path) -> str:
     try:
         result = subprocess.run(
@@ -1523,6 +1597,8 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Prompt suite: {report.get('prompt_suite', {}).get('suite_sha256', '-')}",
         f"Command SHA256: {report.get('command_sha256', '-')}",
         f"Launch plan SHA256: {report.get('launch_plan_sha256', '-')}",
+        f"Expected launch sequence SHA256: {report.get('expected_launch_sequence_sha256', '-')}",
+        f"Observed launch sequence SHA256: {report.get('observed_launch_sequence_sha256', '-')}",
         f"Launch budget: {format_summary_value(report.get('max_launches'))}",
         f"Prompt count floor: {format_summary_value(report.get('min_prompt_count'))}",
         f"Total launches: {format_summary_value(report.get('planned_total_launches'))}",
@@ -1616,6 +1692,22 @@ def markdown_report(report: dict[str, Any]) -> str:
     else:
         lines.append("No benchmark runs recorded.")
 
+    launch_integrity = report.get("launch_sequence_integrity") or {}
+    if launch_integrity:
+        lines.extend(
+            [
+                "",
+                "## Launch Sequence Integrity",
+                "",
+                "| Expected launches | Observed launches | Matched | Mismatched | Missing | Extra | Match |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+                "| {expected_launches} | {observed_launches} | {matched_launches} | {mismatched_launches} | {missing_launches} | {extra_launches} | {launch_sequence_match} |".format(
+                    **{key: format_summary_value(value) for key, value in launch_integrity.items()}
+                ),
+                "",
+            ]
+        )
+
     if report.get("variability_findings"):
         lines.extend(
             [
@@ -1645,6 +1737,22 @@ def markdown_report(report: dict[str, Any]) -> str:
         for finding in report["telemetry_findings"]:
             lines.append(
                 "| {scope} | {launch_index} | {prompt} | {iteration} | {metric} | {value} | {limit} |".format(
+                    **{key: format_summary_value(value) for key, value in finding.items()}
+                )
+            )
+    if report.get("launch_sequence_findings"):
+        lines.extend(
+            [
+                "",
+                "## Launch Sequence Findings",
+                "",
+                "| Metric | Value | Limit |",
+                "| --- | --- | --- |",
+            ]
+        )
+        for finding in report["launch_sequence_findings"]:
+            lines.append(
+                "| {metric} | {value} | {limit} |".format(
                     **{key: format_summary_value(value) for key, value in finding.items()}
                 )
             )
@@ -1707,6 +1815,7 @@ def markdown_dry_run_report(report: dict[str, Any]) -> str:
         f"Prompt suite: {prompt_suite.get('suite_sha256', '-')}",
         f"Command SHA256: {report.get('command_sha256', '-')}",
         f"Launch plan SHA256: {report.get('launch_plan_sha256', '-')}",
+        f"Expected launch sequence SHA256: {report.get('expected_launch_sequence_sha256', '-')}",
         f"Prompt count: {report['prompt_count']}",
         f"Prompt count floor: {format_summary_value(report.get('min_prompt_count'))}",
         f"Warmup launches: {report['planned_warmup_launches']}",
@@ -1825,6 +1934,7 @@ def dry_run_payload(
     planned_measured = prompt_count * repeat
     planned_total = planned_warmups + planned_measured
     plan = dry_run_launch_plan(prompts, warmup=warmup, repeat=repeat)
+    launch_sequence = launch_sequence_from_plan(plan)
     return {
         "generated_at": iso_now(),
         "status": "planned",
@@ -1835,6 +1945,7 @@ def dry_run_payload(
         "quantization": quantization,
         "commit": commit,
         "launch_plan_sha256": launch_plan_hash(plan),
+        "expected_launch_sequence_sha256": launch_sequence_hash(launch_sequence),
         "launch_plan": plan,
         "prompt_count": prompt_count,
         "prompt_suite": prompt_suite_metadata(prompts_path, prompts),
@@ -1909,6 +2020,7 @@ def write_dry_run_csv_report(report: dict[str, Any], path: Path) -> None:
         "commit",
         "command_sha256",
         "launch_plan_sha256",
+        "expected_launch_sequence_sha256",
         "prompt_count",
         "prompt_suite_sha256",
         "prompt_bytes_total",
@@ -1939,6 +2051,7 @@ def write_dry_run_csv_report(report: dict[str, Any], path: Path) -> None:
         "commit": report.get("commit"),
         "command_sha256": report.get("command_sha256"),
         "launch_plan_sha256": report.get("launch_plan_sha256"),
+        "expected_launch_sequence_sha256": report.get("expected_launch_sequence_sha256"),
         "prompt_count": report.get("prompt_count"),
         "prompt_suite_sha256": prompt_suite.get("suite_sha256"),
         "prompt_bytes_total": prompt_suite.get("prompt_bytes_total"),
@@ -2039,6 +2152,7 @@ def write_dry_run_junit_report(report: dict[str, Any], path: Path) -> None:
         "min_prompt_count",
         "command_sha256",
         "launch_plan_sha256",
+        "expected_launch_sequence_sha256",
     ):
         ET.SubElement(
             properties,
@@ -2107,6 +2221,10 @@ def write_report(
     all_runs = warmup_runs + runs
     suite = suite_summary(runs)
     summaries = summarize_runs(runs)
+    expected_launch_sequence = launch_sequence_from_plan(launch_plan or [])
+    observed_launch_sequence = launch_sequence_from_runs(all_runs)
+    launch_integrity = launch_sequence_integrity(expected_launch_sequence, observed_launch_sequence)
+    launch_findings = launch_sequence_findings(launch_integrity)
     findings = variability_findings(
         suite,
         summaries,
@@ -2141,12 +2259,17 @@ def write_report(
         require_guest_prompt_bytes_match=require_guest_prompt_bytes_match,
         require_expected_tokens_match=require_expected_tokens_match,
     )
+    all_findings = findings + telemetry + launch_findings
     report = {
         "generated_at": iso_now(),
-        "status": report_status(all_runs, findings + telemetry),
+        "status": report_status(all_runs, all_findings),
         "command": all_runs[0].command if all_runs else [],
         "prompt_suite": prompt_suite or {},
         "launch_plan_sha256": launch_plan_hash(launch_plan or []),
+        "expected_launch_sequence_sha256": launch_integrity["expected_launch_sequence_sha256"],
+        "observed_launch_sequence_sha256": launch_integrity["observed_launch_sequence_sha256"],
+        "launch_sequence_integrity": launch_integrity,
+        "launch_sequence_findings": launch_findings,
         "launch_plan": launch_plan or [],
         "environment": environment or {},
         "image": image or {},
@@ -2213,7 +2336,7 @@ def write_report(
     write_summary_csv_report(report, latest_summary_csv)
     write_phase_csv_report(report, latest_phase_csv)
     write_launch_csv_report(report, latest_launch_csv)
-    write_junit_report(runs, warmup_runs, findings, telemetry, latest_junit)
+    write_junit_report(runs, warmup_runs, findings, telemetry, launch_findings, latest_junit)
     stamped = output_dir / f"qemu_prompt_bench_{report['generated_at'].replace(':', '').replace('-', '')}.json"
     stamped.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return latest
@@ -2420,6 +2543,8 @@ def write_launch_csv_report(report: dict[str, Any], path: Path) -> None:
         "generated_at",
         "command_sha256",
         "launch_plan_sha256",
+        "expected_launch_sequence_sha256",
+        "observed_launch_sequence_sha256",
         "launch_index",
         "phase",
         "prompt",
@@ -2459,13 +2584,22 @@ def write_launch_csv_report(report: dict[str, Any], path: Path) -> None:
             run_values = {
                 field: row.get(field)
                 for field in fields
-                if field not in {"generated_at", "command_sha256", "launch_plan_sha256"}
+                if field
+                not in {
+                    "generated_at",
+                    "command_sha256",
+                    "launch_plan_sha256",
+                    "expected_launch_sequence_sha256",
+                    "observed_launch_sequence_sha256",
+                }
             }
             writer.writerow(
                 {
                     "generated_at": report.get("generated_at"),
                     "command_sha256": report.get("command_sha256"),
                     "launch_plan_sha256": report.get("launch_plan_sha256"),
+                    "expected_launch_sequence_sha256": report.get("expected_launch_sequence_sha256"),
+                    "observed_launch_sequence_sha256": report.get("observed_launch_sequence_sha256"),
                     **run_values,
                 }
             )
@@ -2476,16 +2610,27 @@ def write_junit_report(
     warmups: list[BenchRun],
     variability_findings: list[dict[str, Any]],
     telemetry_findings: list[dict[str, Any]],
+    launch_sequence_findings: list[dict[str, Any]],
     path: Path,
 ) -> None:
     all_runs = [("warmup", run) for run in warmups] + [("measured", run) for run in runs]
     failed_runs = [run for _, run in all_runs if run.returncode != 0 or run.timed_out]
-    failures = len(failed_runs) + len(variability_findings) + len(telemetry_findings)
+    failures = (
+        len(failed_runs)
+        + len(variability_findings)
+        + len(telemetry_findings)
+        + len(launch_sequence_findings)
+    )
     suite = ET.Element(
         "testsuite",
         {
             "name": "holyc_qemu_prompt_bench",
-            "tests": str(len(all_runs) + len(variability_findings) + len(telemetry_findings)),
+            "tests": str(
+                len(all_runs)
+                + len(variability_findings)
+                + len(telemetry_findings)
+                + len(launch_sequence_findings)
+            ),
             "failures": str(failures),
             "errors": "0",
         },
@@ -2604,6 +2749,30 @@ def write_junit_report(
             "failure",
             {
                 "type": "benchmark_telemetry",
+                "message": message,
+            },
+        )
+        failure.text = "\n".join(f"{key}={format_summary_value(value)}" for key, value in sorted(finding.items()))
+
+    for index, finding in enumerate(launch_sequence_findings, 1):
+        metric = str(finding.get("metric", "unknown"))
+        case = ET.SubElement(
+            suite,
+            "testcase",
+            {
+                "classname": "qemu_prompt_bench.launch_sequence",
+                "name": f"{metric}:{index}",
+            },
+        )
+        message = (
+            f"{metric}={format_summary_value(finding.get('value'))} "
+            f"limit={format_summary_value(finding.get('limit'))}"
+        )
+        failure = ET.SubElement(
+            case,
+            "failure",
+            {
+                "type": "benchmark_launch_sequence",
                 "message": message,
             },
         )
