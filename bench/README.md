@@ -410,7 +410,10 @@ computed as host wall elapsed time minus guest-reported elapsed time, so QEMU
 launch/serial/host orchestration overhead can be tracked separately from guest
 decode telemetry. This is reported next to guest telemetry in JSON, Markdown,
 and CSV so suspicious guest-side timing can be compared against the
-host-observed launch duration. On Unix hosts, the runner also records
+host-observed launch duration. Per-run records also include `timeout_seconds`
+and `wall_timeout_pct`, making it visible when a benchmark technically passes
+but is consuming too much of the configured launch timeout. On Unix hosts, the
+runner also records
 `host_child_user_cpu_us`, `host_child_system_cpu_us`, `host_child_cpu_us`, and
 `host_child_cpu_pct` from child-process resource usage around each QEMU launch;
 suite and prompt summaries include median child CPU time, utilization, and
@@ -440,13 +443,14 @@ Use `--require-tokens`, `--require-tok-per-s`, `--require-memory`,
 `--require-ttft-us`, `--min-tokens`, `--min-tok-per-s`,
 `--min-wall-tok-per-s`, `--max-memory-bytes`, `--max-ttft-us`,
 `--max-host-overhead-us`, `--max-host-overhead-pct`,
-`--min-host-child-tok-per-cpu-s`, `--min-tokens-per-prompt-byte`,
-`--require-host-child-rss`, `--max-host-child-rss-bytes`, and
-`--max-serial-output-bytes` to fail measured runs that omit required telemetry,
+`--max-wall-timeout-pct`, `--min-host-child-tok-per-cpu-s`,
+`--min-tokens-per-prompt-byte`, `--require-host-child-rss`,
+`--max-host-child-rss-bytes`, and `--max-serial-output-bytes` to fail measured
+runs that omit required telemetry,
 produce too little work for a trustworthy throughput sample, exceed a
 host-observed latency, memory, RSS, orchestration overhead, or serial verbosity
-budget, exceed a first-token latency budget, or fall below a host child-CPU or
-output-density floor.
+budget, exceed a first-token latency or timeout-budget threshold, or fall below
+a host child-CPU or output-density floor.
 Telemetry gate failures are written as `telemetry_findings` in JSON/Markdown and as
 `benchmark_telemetry` failures in the JUnit report.
 

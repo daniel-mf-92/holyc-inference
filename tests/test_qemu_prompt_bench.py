@@ -125,6 +125,9 @@ print("BENCH_RESULT: " + json.dumps({"tokens": 64, "elapsed_us": 250000, "tok_pe
     assert run.returncode == 0
     assert run.tokens == 64
     assert run.elapsed_us == 250000
+    assert run.timeout_seconds == 5.0
+    assert run.wall_timeout_pct is not None
+    assert run.wall_timeout_pct > 0
     assert run.host_overhead_us == run.wall_elapsed_us - run.elapsed_us
     assert run.host_overhead_pct is not None
     assert run.tok_per_s == 256.0
@@ -284,6 +287,8 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
     assert report["planned_total_launches"] == 1
     assert report["benchmarks"][0]["tokens"] == 32
     assert report["benchmarks"][0]["prompt_bytes"] == 20
+    assert report["benchmarks"][0]["timeout_seconds"] == 300.0
+    assert report["benchmarks"][0]["wall_timeout_pct"] > 0
     assert report["benchmarks"][0]["host_overhead_us"] == (
         report["benchmarks"][0]["wall_elapsed_us"] - report["benchmarks"][0]["elapsed_us"]
     )
@@ -315,6 +320,7 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
     summary_csv_report = (output_dir / "qemu_prompt_bench_summary_latest.csv").read_text(encoding="utf-8")
     assert "prompt_sha256,prompt_bytes,iteration" in csv_report
     assert "host_overhead_us,host_overhead_pct" in csv_report
+    assert "timeout_seconds,wall_timeout_pct" in csv_report
     assert "wall_tok_per_s" in csv_report
     assert "us_per_token,wall_us_per_token" in csv_report
     assert "stdout_bytes,stderr_bytes,serial_output_bytes" in csv_report
@@ -731,6 +737,50 @@ print("tokens=12 elapsed_us=1")
     }
     assert "Telemetry Gate Findings" in markdown
     assert junit_root.attrib["failures"] == "2"
+
+
+def test_cli_wall_timeout_budget_gate_fails_near_timeout_runs(tmp_path: Path) -> None:
+    fake_qemu = tmp_path / "fake-qemu.py"
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    output_dir = tmp_path / "results"
+    prompts.write_text('{"prompt_id":"one","prompt":"Timeout budget"}\n', encoding="utf-8")
+    fake_qemu.write_text(
+        """#!/usr/bin/env python3
+print("tokens=12 elapsed_us=100000")
+""",
+        encoding="utf-8",
+    )
+    fake_qemu.chmod(0o755)
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--qemu-bin",
+            str(fake_qemu),
+            "--output-dir",
+            str(output_dir),
+            "--timeout",
+            "10",
+            "--max-wall-timeout-pct",
+            "0",
+        ]
+    )
+
+    assert status == 1
+    report = json.loads((output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8"))
+    markdown = (output_dir / "qemu_prompt_bench_latest.md").read_text(encoding="utf-8")
+    junit_root = ET.parse(output_dir / "qemu_prompt_bench_junit_latest.xml").getroot()
+
+    assert report["status"] == "fail"
+    assert report["telemetry_gates"]["max_wall_timeout_pct"] == 0.0
+    assert report["telemetry_findings"][0]["metric"] == "wall_timeout_pct"
+    assert report["telemetry_findings"][0]["value"] > 0
+    assert "wall_timeout_pct" in markdown
+    assert junit_root.attrib["failures"] == "1"
 
 
 def test_cli_serial_output_gate_fails_verbose_guest_output(tmp_path: Path) -> None:

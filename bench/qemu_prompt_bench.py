@@ -109,6 +109,8 @@ class BenchRun:
     tokens: int | None
     elapsed_us: int
     wall_elapsed_us: int
+    timeout_seconds: float
+    wall_timeout_pct: float | None
     host_overhead_us: int
     host_overhead_pct: float | None
     host_child_user_cpu_us: int | None
@@ -513,6 +515,12 @@ def host_overhead_pct(host_overhead_us: int, elapsed_us: int) -> float | None:
     return host_overhead_us * 100.0 / elapsed_us
 
 
+def wall_timeout_pct(wall_elapsed_us: int, timeout_seconds: float) -> float | None:
+    if timeout_seconds <= 0:
+        return None
+    return wall_elapsed_us * 100.0 / (timeout_seconds * 1_000_000.0)
+
+
 def child_rusage() -> tuple[float, float] | None:
     if resource is None:
         return None
@@ -704,8 +712,8 @@ def run_prompt(
     timeout: float,
     metadata: dict[str, str],
     *,
-    phase: str,
-    launch_index: int,
+    phase: str = "measured",
+    launch_index: int = 1,
     iteration: int = 1,
 ) -> BenchRun:
     started = time.monotonic_ns()
@@ -767,6 +775,8 @@ def run_prompt(
         tokens=tokens,
         elapsed_us=elapsed_us,
         wall_elapsed_us=wall_elapsed_us,
+        timeout_seconds=timeout,
+        wall_timeout_pct=wall_timeout_pct(wall_elapsed_us, timeout),
         host_overhead_us=host_overhead_us,
         host_overhead_pct=host_overhead_pct(host_overhead_us, elapsed_us),
         host_child_user_cpu_us=child_user_cpu_us,
@@ -1058,6 +1068,7 @@ def telemetry_findings(
     max_ttft_us: int | None = None,
     max_host_overhead_us: int | None = None,
     max_host_overhead_pct: float | None = None,
+    max_wall_timeout_pct: float | None = None,
     min_host_child_tok_per_cpu_s: float | None = None,
     min_tokens_per_prompt_byte: float | None = None,
     require_host_child_rss: bool = False,
@@ -1126,6 +1137,17 @@ def telemetry_findings(
                     "metric": "host_overhead_pct",
                     "value": run.host_overhead_pct,
                     "limit": max_host_overhead_pct,
+                }
+            )
+        if max_wall_timeout_pct is not None and (
+            run.wall_timeout_pct is None or run.wall_timeout_pct > max_wall_timeout_pct
+        ):
+            findings.append(
+                {
+                    **base,
+                    "metric": "wall_timeout_pct",
+                    "value": run.wall_timeout_pct,
+                    "limit": max_wall_timeout_pct,
                 }
             )
         if min_host_child_tok_per_cpu_s is not None and (
@@ -1786,6 +1808,7 @@ def write_report(
     max_ttft_us: int | None = None,
     max_host_overhead_us: int | None = None,
     max_host_overhead_pct: float | None = None,
+    max_wall_timeout_pct: float | None = None,
     min_host_child_tok_per_cpu_s: float | None = None,
     min_tokens_per_prompt_byte: float | None = None,
     require_host_child_rss: bool = False,
@@ -1822,6 +1845,7 @@ def write_report(
         max_ttft_us=max_ttft_us,
         max_host_overhead_us=max_host_overhead_us,
         max_host_overhead_pct=max_host_overhead_pct,
+        max_wall_timeout_pct=max_wall_timeout_pct,
         min_host_child_tok_per_cpu_s=min_host_child_tok_per_cpu_s,
         min_tokens_per_prompt_byte=min_tokens_per_prompt_byte,
         require_host_child_rss=require_host_child_rss,
@@ -1864,6 +1888,7 @@ def write_report(
             "max_ttft_us": max_ttft_us,
             "max_host_overhead_us": max_host_overhead_us,
             "max_host_overhead_pct": max_host_overhead_pct,
+            "max_wall_timeout_pct": max_wall_timeout_pct,
             "min_host_child_tok_per_cpu_s": min_host_child_tok_per_cpu_s,
             "min_tokens_per_prompt_byte": min_tokens_per_prompt_byte,
             "require_host_child_rss": require_host_child_rss,
@@ -1907,6 +1932,8 @@ def write_csv_report(runs: list[BenchRun], path: Path) -> None:
         "tokens",
         "elapsed_us",
         "wall_elapsed_us",
+        "timeout_seconds",
+        "wall_timeout_pct",
         "host_overhead_us",
         "host_overhead_pct",
         "host_child_user_cpu_us",
@@ -2026,6 +2053,8 @@ def write_launch_csv_report(report: dict[str, Any], path: Path) -> None:
         "tokens",
         "elapsed_us",
         "wall_elapsed_us",
+        "timeout_seconds",
+        "wall_timeout_pct",
         "tok_per_s",
         "wall_tok_per_s",
         "memory_bytes",
@@ -2105,6 +2134,8 @@ def write_junit_report(
                 f"tokens={format_summary_value(run.tokens)}\n"
                 f"elapsed_us={run.elapsed_us}\n"
                 f"wall_elapsed_us={run.wall_elapsed_us}\n"
+                f"timeout_seconds={format_summary_value(run.timeout_seconds)}\n"
+                f"wall_timeout_pct={format_summary_value(run.wall_timeout_pct)}\n"
                 f"host_overhead_us={run.host_overhead_us}\n"
                 f"host_overhead_pct={format_summary_value(run.host_overhead_pct)}\n"
                 f"host_child_user_cpu_us={format_summary_value(run.host_child_user_cpu_us)}\n"
@@ -2274,6 +2305,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail if any measured run host overhead exceeds this percentage of guest elapsed time",
     )
     parser.add_argument(
+        "--max-wall-timeout-pct",
+        type=float,
+        default=None,
+        help="Fail if any measured run consumes more than this percentage of its timeout budget",
+    )
+    parser.add_argument(
         "--min-host-child-tok-per-cpu-s",
         type=float,
         default=None,
@@ -2359,6 +2396,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.max_host_overhead_pct is not None and args.max_host_overhead_pct < 0:
         print("error: --max-host-overhead-pct must be >= 0", file=sys.stderr)
+        return 2
+    if args.max_wall_timeout_pct is not None and args.max_wall_timeout_pct < 0:
+        print("error: --max-wall-timeout-pct must be >= 0", file=sys.stderr)
         return 2
     if args.min_host_child_tok_per_cpu_s is not None and args.min_host_child_tok_per_cpu_s < 0:
         print("error: --min-host-child-tok-per-cpu-s must be >= 0", file=sys.stderr)
@@ -2454,6 +2494,7 @@ def main(argv: list[str] | None = None) -> int:
         max_ttft_us=args.max_ttft_us,
         max_host_overhead_us=args.max_host_overhead_us,
         max_host_overhead_pct=args.max_host_overhead_pct,
+        max_wall_timeout_pct=args.max_wall_timeout_pct,
         min_host_child_tok_per_cpu_s=args.min_host_child_tok_per_cpu_s,
         min_tokens_per_prompt_byte=args.min_tokens_per_prompt_byte,
         require_host_child_rss=args.require_host_child_rss,
