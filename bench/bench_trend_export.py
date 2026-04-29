@@ -36,6 +36,7 @@ class TrendPoint:
     quantization: str
     prompt_suite_sha256: str
     command_sha256: str
+    launch_plan_sha256: str
     environment_sha256: str
     commit: str
     command_airgap_status: str
@@ -76,6 +77,7 @@ def to_point(summary: bench_result_index.ArtifactSummary) -> TrendPoint:
         quantization=summary.quantization,
         prompt_suite_sha256=summary.prompt_suite_sha256,
         command_sha256=summary.command_sha256,
+        launch_plan_sha256=summary.launch_plan_sha256,
         environment_sha256=summary.environment_sha256,
         commit=summary.commit,
         command_airgap_status=summary.command_airgap_status,
@@ -159,6 +161,28 @@ def latest_rows(grouped: dict[str, list[TrendPoint]]) -> list[dict[str, object]]
     return rows
 
 
+def drift_rows(grouped: dict[str, list[TrendPoint]], field: str) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for key, points in sorted(grouped.items()):
+        by_hash: dict[str, list[TrendPoint]] = {}
+        for point in points:
+            value = str(getattr(point, field) or "")
+            by_hash.setdefault(value or "missing", []).append(point)
+        if len(by_hash) <= 1:
+            continue
+        rows.append(
+            {
+                "key": key,
+                "field": field,
+                "hashes": sorted(by_hash),
+                "points": len(points),
+                "commits": sorted({point.commit for point in points}),
+                "sources": sorted(point.source for point in points),
+            }
+        )
+    return rows
+
+
 def window_rows(grouped: dict[str, list[TrendPoint]], window_points: int) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for key, points in sorted(grouped.items()):
@@ -226,6 +250,9 @@ def build_report(
     fail_on_empty: bool,
     fail_on_airgap: bool,
     fail_on_telemetry: bool,
+    fail_on_command_drift: bool,
+    fail_on_launch_plan_drift: bool,
+    fail_on_environment_drift: bool,
     min_points_per_key: int | None,
     fail_on_tok_regression_pct: float | None,
     fail_on_wall_tok_regression_pct: float | None,
@@ -237,6 +264,9 @@ def build_report(
     all_points = [point for points in grouped.values() for point in points]
     latest = latest_rows(grouped)
     windows = window_rows(grouped, window_points)
+    command_drift = drift_rows(grouped, "command_sha256")
+    launch_plan_drift = drift_rows(grouped, "launch_plan_sha256")
+    environment_drift = drift_rows(grouped, "environment_sha256")
     findings: list[str] = []
     if not all_points:
         findings.append("no supported benchmark artifacts found")
@@ -248,6 +278,12 @@ def build_report(
         telemetry_failures = [point for point in all_points if point.telemetry_status == "fail"]
         if telemetry_failures:
             findings.append(f"{len(telemetry_failures)} trend point(s) are missing telemetry")
+    if fail_on_command_drift and command_drift:
+        findings.append(f"{len(command_drift)} trend key(s) have command_sha256 drift")
+    if fail_on_launch_plan_drift and launch_plan_drift:
+        findings.append(f"{len(launch_plan_drift)} trend key(s) have launch_plan_sha256 drift")
+    if fail_on_environment_drift and environment_drift:
+        findings.append(f"{len(environment_drift)} trend key(s) have environment_sha256 drift")
     if min_points_per_key is not None:
         for key, points in sorted(grouped.items()):
             if len(points) < min_points_per_key:
@@ -314,6 +350,9 @@ def build_report(
         fail_on_empty
         or fail_on_airgap
         or fail_on_telemetry
+        or fail_on_command_drift
+        or fail_on_launch_plan_drift
+        or fail_on_environment_drift
         or min_points_per_key is not None
         or fail_on_tok_regression_pct is not None
         or fail_on_wall_tok_regression_pct is not None
@@ -331,6 +370,9 @@ def build_report(
             "fail_on_empty": fail_on_empty,
             "fail_on_airgap": fail_on_airgap,
             "fail_on_telemetry": fail_on_telemetry,
+            "fail_on_command_drift": fail_on_command_drift,
+            "fail_on_launch_plan_drift": fail_on_launch_plan_drift,
+            "fail_on_environment_drift": fail_on_environment_drift,
             "min_points_per_key": min_points_per_key,
             "fail_on_tok_regression_pct": fail_on_tok_regression_pct,
             "fail_on_wall_tok_regression_pct": fail_on_wall_tok_regression_pct,
@@ -344,6 +386,11 @@ def build_report(
         "trend_points": len(all_points),
         "latest": latest,
         "windows": windows,
+        "drift": {
+            "command_sha256": command_drift,
+            "launch_plan_sha256": launch_plan_drift,
+            "environment_sha256": environment_drift,
+        },
         "trends": {
             key: [asdict(point) for point in points]
             for key, points in sorted(grouped.items())
@@ -404,6 +451,21 @@ def markdown_report(report: dict[str, object]) -> str:
             )
     else:
         lines.append("No supported benchmark artifacts found.")
+    drift = report.get("drift")
+    if isinstance(drift, dict):
+        drift_lines: list[str] = []
+        for field in ("command_sha256", "launch_plan_sha256", "environment_sha256"):
+            rows = drift.get(field)
+            if not isinstance(rows, list):
+                continue
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                hashes = row.get("hashes")
+                hash_count = len(hashes) if isinstance(hashes, list) else 0
+                drift_lines.append(f"- {row.get('key', '-')} {field}: {hash_count} value(s)")
+        if drift_lines:
+            lines.extend(["", "## Drift", *drift_lines])
     return "\n".join(lines) + "\n"
 
 
@@ -479,6 +541,28 @@ def write_windows_csv(rows: list[dict[str, object]], path: Path) -> None:
             writer.writerow({field: row.get(field, "") for field in fields})
 
 
+def write_drift_csv(report: dict[str, object], path: Path) -> None:
+    fields = ["key", "field", "hashes", "points", "commits", "sources"]
+    rows: list[dict[str, object]] = []
+    drift = report.get("drift")
+    if isinstance(drift, dict):
+        for entries in drift.values():
+            if isinstance(entries, list):
+                rows.extend(row for row in entries if isinstance(row, dict))
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(
+                {
+                    field: ",".join(str(item) for item in value)
+                    if isinstance(value, list)
+                    else value
+                    for field, value in ((field, row.get(field, "")) for field in fields)
+                }
+            )
+
+
 def junit_report(report: dict[str, object]) -> str:
     findings = report["findings"]
     assert isinstance(findings, list)
@@ -511,6 +595,7 @@ def write_outputs(report: dict[str, object], grouped: dict[str, list[TrendPoint]
     latest_csv_path = output_dir / "bench_trend_export_latest.csv"
     points_csv_path = output_dir / "bench_trend_export_points_latest.csv"
     windows_csv_path = output_dir / "bench_trend_export_windows_latest.csv"
+    drift_csv_path = output_dir / "bench_trend_export_drift_latest.csv"
     junit_path = output_dir / "bench_trend_export_junit_latest.xml"
 
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -522,6 +607,7 @@ def write_outputs(report: dict[str, object], grouped: dict[str, list[TrendPoint]
     windows = report["windows"]
     assert isinstance(windows, list)
     write_windows_csv([row for row in windows if isinstance(row, dict)], windows_csv_path)
+    write_drift_csv(report, drift_csv_path)
     junit_path.write_text(junit_report(report), encoding="utf-8")
     return json_path
 
@@ -550,6 +636,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fail-on-empty", action="store_true")
     parser.add_argument("--fail-on-airgap", action="store_true")
     parser.add_argument("--fail-on-telemetry", action="store_true")
+    parser.add_argument("--fail-on-command-drift", action="store_true")
+    parser.add_argument("--fail-on-launch-plan-drift", action="store_true")
+    parser.add_argument("--fail-on-environment-drift", action="store_true")
     parser.add_argument(
         "--min-points-per-key",
         type=int,
@@ -623,6 +712,9 @@ def main(argv: list[str] | None = None) -> int:
         fail_on_empty=args.fail_on_empty,
         fail_on_airgap=args.fail_on_airgap,
         fail_on_telemetry=args.fail_on_telemetry,
+        fail_on_command_drift=args.fail_on_command_drift,
+        fail_on_launch_plan_drift=args.fail_on_launch_plan_drift,
+        fail_on_environment_drift=args.fail_on_environment_drift,
         min_points_per_key=args.min_points_per_key,
         fail_on_tok_regression_pct=args.fail_on_tok_regression_pct,
         fail_on_wall_tok_regression_pct=args.fail_on_wall_tok_regression_pct,

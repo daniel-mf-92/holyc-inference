@@ -21,7 +21,17 @@ def command_sha256(command: list[str]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def write_report(path: Path, *, commit: str, generated_at: str, tok_per_s: float, memory: int) -> None:
+def write_report(
+    path: Path,
+    *,
+    commit: str,
+    generated_at: str,
+    tok_per_s: float,
+    memory: int,
+    command_extra: list[str] | None = None,
+    launch_plan_sha256: str = "trend-smoke-launch-plan",
+    qemu_version: str = "synthetic",
+) -> None:
     command = [
         "qemu-system-x86_64",
         "-nic",
@@ -31,6 +41,8 @@ def write_report(path: Path, *, commit: str, generated_at: str, tok_per_s: float
         "-drive",
         "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide",
     ]
+    if command_extra:
+        command.extend(command_extra)
     command_hash = command_sha256(command)
     path.write_text(
         json.dumps(
@@ -38,6 +50,7 @@ def write_report(path: Path, *, commit: str, generated_at: str, tok_per_s: float
                 "status": "pass",
                 "generated_at": generated_at,
                 "command_sha256": command_hash,
+                "launch_plan_sha256": launch_plan_sha256,
                 "prompt_suite": {
                     "prompt_count": 1,
                     "suite_sha256": "trend-smoke-suite",
@@ -46,7 +59,7 @@ def write_report(path: Path, *, commit: str, generated_at: str, tok_per_s: float
                     "platform": "ci-smoke",
                     "machine": "host",
                     "qemu_bin": command[0],
-                    "qemu_version": "synthetic",
+                    "qemu_version": qemu_version,
                 },
                 "benchmarks": [
                     {
@@ -130,6 +143,9 @@ def main() -> int:
             "--fail-on-empty",
             "--fail-on-airgap",
             "--fail-on-telemetry",
+            "--fail-on-command-drift",
+            "--fail-on-launch-plan-drift",
+            "--fail-on-environment-drift",
             "--min-points-per-key",
             "2",
             "--fail-on-tok-regression-pct",
@@ -190,6 +206,10 @@ def main() -> int:
         if window["guest_tok_per_s_median"] != 107.5:
             print("unexpected_window_guest_median=true", file=sys.stderr)
             return 1
+        drift = report["drift"]
+        if drift["command_sha256"] or drift["launch_plan_sha256"] or drift["environment_sha256"]:
+            print("unexpected_drift=true", file=sys.stderr)
+            return 1
         thresholds = report["thresholds"]
         if thresholds["fail_on_tok_regression_pct"] != 10.0:
             print("missing_regression_threshold=true", file=sys.stderr)
@@ -202,6 +222,9 @@ def main() -> int:
             return 1
         if thresholds["fail_on_window_tok_regression_pct"] != 10.0:
             print("missing_window_tok_threshold=true", file=sys.stderr)
+            return 1
+        if thresholds["fail_on_command_drift"] is not True:
+            print("missing_command_drift_threshold=true", file=sys.stderr)
             return 1
         markdown = (output_dir / "bench_trend_export_latest.md").read_text(encoding="utf-8")
         if "Benchmark Trend Export" not in markdown:
@@ -224,6 +247,10 @@ def main() -> int:
         windows_csv = (output_dir / "bench_trend_export_windows_latest.csv").read_text(encoding="utf-8")
         if "guest_tok_per_s_median" not in windows_csv or "trend-head" not in windows_csv:
             print("missing_windows_csv_stats=true", file=sys.stderr)
+            return 1
+        drift_csv = (output_dir / "bench_trend_export_drift_latest.csv").read_text(encoding="utf-8")
+        if "key,field,hashes,points,commits,sources" not in drift_csv:
+            print("missing_drift_csv_header=true", file=sys.stderr)
             return 1
         junit_root = ET.parse(output_dir / "bench_trend_export_junit_latest.xml").getroot()
         if junit_root.attrib.get("name") != "holyc_bench_trend_export":
@@ -345,6 +372,69 @@ def main() -> int:
         sparse_findings = "\n".join(sparse_report["findings"])
         if "below minimum 2" not in sparse_findings:
             print("missing_sparse_history_finding=true", file=sys.stderr)
+            return 1
+
+        drift_dir = tmp_path / "drift_results"
+        drift_dir.mkdir()
+        write_report(
+            drift_dir / "qemu_prompt_bench_base.json",
+            commit="drift-base",
+            generated_at="2026-04-27T12:30:00Z",
+            tok_per_s=100.0,
+            memory=64_000_000,
+            launch_plan_sha256="launch-plan-a",
+            qemu_version="synthetic-a",
+        )
+        write_report(
+            drift_dir / "qemu_prompt_bench_head.json",
+            commit="drift-head",
+            generated_at="2026-04-27T12:35:00Z",
+            tok_per_s=101.0,
+            memory=64_000_000,
+            command_extra=["-smp", "1"],
+            launch_plan_sha256="launch-plan-b",
+            qemu_version="synthetic-b",
+        )
+        drift_completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "bench" / "bench_trend_export.py"),
+                "--input",
+                str(drift_dir),
+                "--output-dir",
+                str(tmp_path / "drift_dashboards"),
+                "--fail-on-command-drift",
+                "--fail-on-launch-plan-drift",
+                "--fail-on-environment-drift",
+            ],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if drift_completed.returncode == 0:
+            print("trend_drift_not_rejected=true", file=sys.stderr)
+            return 1
+        drift_report = json.loads(
+            (tmp_path / "drift_dashboards" / "bench_trend_export_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        drift_findings = "\n".join(drift_report["findings"])
+        if "command_sha256 drift" not in drift_findings:
+            print("missing_command_drift_finding=true", file=sys.stderr)
+            return 1
+        if "launch_plan_sha256 drift" not in drift_findings:
+            print("missing_launch_plan_drift_finding=true", file=sys.stderr)
+            return 1
+        if "environment_sha256 drift" not in drift_findings:
+            print("missing_environment_drift_finding=true", file=sys.stderr)
+            return 1
+        drift_outputs = (tmp_path / "drift_dashboards" / "bench_trend_export_drift_latest.csv").read_text(
+            encoding="utf-8"
+        )
+        if "launch_plan_sha256" not in drift_outputs or "environment_sha256" not in drift_outputs:
+            print("missing_drift_csv_rows=true", file=sys.stderr)
             return 1
 
         window_regression_dir = tmp_path / "window_regression_results"

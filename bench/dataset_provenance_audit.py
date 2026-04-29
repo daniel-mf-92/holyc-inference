@@ -13,6 +13,7 @@ import csv
 import hashlib
 import json
 import sys
+import urllib.parse
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -46,6 +47,7 @@ class ProvenanceArtifact:
     source_version: str
     license: str
     source_url: str
+    source_url_host: str
     output: str
     record_count: int
     source_records: int
@@ -99,6 +101,15 @@ def is_synthetic_manifest(manifest: dict[str, Any]) -> bool:
 
 def normalized_policy_values(values: Iterable[str]) -> set[str]:
     return {clean(value).casefold() for value in values if clean(value)}
+
+
+def normalized_source_url_host(value: Any) -> str:
+    text = clean(value)
+    if not text:
+        return ""
+    parsed = urllib.parse.urlparse(text)
+    host = parsed.hostname or ""
+    return host.rstrip(".").casefold()
 
 
 def finding(path: Path, severity: str, kind: str, detail: str) -> ProvenanceFinding:
@@ -276,6 +287,8 @@ def audit_manifest(
     max_dataset_split_majority_answer_pct: float | None = None,
     allow_licenses: set[str] | None = None,
     deny_licenses: set[str] | None = None,
+    allow_source_url_hosts: set[str] | None = None,
+    deny_source_url_hosts: set[str] | None = None,
 ) -> ProvenanceArtifact | None:
     manifest = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict) or manifest.get("format") != "hceval-curated-jsonl":
@@ -286,6 +299,8 @@ def audit_manifest(
     synthetic = is_synthetic_manifest(manifest)
     license_text = clean(manifest.get("license"))
     normalized_license = license_text.casefold()
+    source_url = clean(manifest.get("source_url"))
+    source_url_host = normalized_source_url_host(source_url)
 
     for key, kind in (
         ("source_name", "missing_source_name"),
@@ -324,6 +339,49 @@ def audit_manifest(
                 "non-synthetic dataset manifest should record a source_url",
             )
         )
+
+    if source_url and is_placeholder(source_url):
+        source_url = ""
+        source_url_host = ""
+    if source_url and not source_url_host:
+        findings.append(
+            finding(
+                path,
+                "error" if (allow_source_url_hosts or deny_source_url_hosts) else "warning",
+                "invalid_source_url",
+                f"source_url {source_url!r} does not include a URL host",
+            )
+        )
+    if source_url_host and deny_source_url_hosts and source_url_host in deny_source_url_hosts:
+        findings.append(
+            finding(
+                path,
+                "error",
+                "source_url_host_denied",
+                f"source_url host {source_url_host!r} is denied by policy",
+            )
+        )
+    if allow_source_url_hosts:
+        if not source_url_host:
+            allowed_hosts = ", ".join(sorted(allow_source_url_hosts))
+            findings.append(
+                finding(
+                    path,
+                    "error",
+                    "missing_source_url_host",
+                    f"source_url host is required by policy: {allowed_hosts}",
+                )
+            )
+        elif source_url_host not in allow_source_url_hosts:
+            allowed_hosts = ", ".join(sorted(allow_source_url_hosts))
+            findings.append(
+                finding(
+                    path,
+                    "error",
+                    "source_url_host_not_allowed",
+                    f"source_url host {source_url_host!r} is not in allowed policy set: {allowed_hosts}",
+                )
+            )
 
     source_file = source_path(manifest, path)
     if source_file is None:
@@ -571,7 +629,8 @@ def audit_manifest(
         source_name=clean(manifest.get("source_name")),
         source_version=clean(manifest.get("source_version")),
         license=clean(manifest.get("license")),
-        source_url=clean(manifest.get("source_url")),
+        source_url=source_url,
+        source_url_host=source_url_host,
         output=clean(manifest.get("output")),
         record_count=parse_int(manifest.get("record_count")),
         source_records=parse_int(source.get("record_count")),
@@ -602,6 +661,8 @@ def load_artifacts(
     max_dataset_split_majority_answer_pct: float | None = None,
     allow_licenses: set[str] | None = None,
     deny_licenses: set[str] | None = None,
+    allow_source_url_hosts: set[str] | None = None,
+    deny_source_url_hosts: set[str] | None = None,
 ) -> list[ProvenanceArtifact]:
     artifacts: list[ProvenanceArtifact] = []
     for path in sorted(set(iter_manifest_files(paths))):
@@ -615,6 +676,8 @@ def load_artifacts(
             max_dataset_split_majority_answer_pct,
             allow_licenses,
             deny_licenses,
+            allow_source_url_hosts,
+            deny_source_url_hosts,
         )
         if artifact is not None:
             artifacts.append(artifact)
@@ -647,8 +710,8 @@ def markdown_report(report: dict[str, Any]) -> str:
     if report["artifacts"]:
         lines.extend(
             [
-                "| Status | Source | Source Name | Version | License | Records | Majority Answer | Findings |",
-                "| --- | --- | --- | --- | --- | ---: | ---: | ---: |",
+                "| Status | Source | Source Name | Version | License | URL Host | Records | Majority Answer | Findings |",
+                "| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: |",
             ]
         )
         for artifact in report["artifacts"]:
@@ -656,12 +719,13 @@ def markdown_report(report: dict[str, Any]) -> str:
             if artifact["majority_answer_pct"] is not None:
                 majority = f"{artifact['majority_answer_index']} ({artifact['majority_answer_pct']:.2f}%)"
             lines.append(
-                "| {status} | {source} | {source_name} | {source_version} | {license} | {record_count} | {majority} | {findings} |".format(
+                "| {status} | {source} | {source_name} | {source_version} | {license} | {source_url_host} | {record_count} | {majority} | {findings} |".format(
                     status=artifact["status"],
                     source=artifact["source"],
                     source_name=artifact["source_name"] or "-",
                     source_version=artifact["source_version"] or "-",
                     license=artifact["license"] or "-",
+                    source_url_host=artifact["source_url_host"] or "-",
                     record_count=artifact["record_count"],
                     majority=majority,
                     findings=len(artifact["findings"]),
@@ -688,6 +752,7 @@ def write_csv(artifacts: list[ProvenanceArtifact], path: Path) -> None:
         "source_version",
         "license",
         "source_url",
+        "source_url_host",
         "output",
         "record_count",
         "source_records",
@@ -835,6 +900,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         help="Denied exact license or usage note after case-folding; repeatable",
     )
+    parser.add_argument(
+        "--allow-source-url-host",
+        action="append",
+        default=[],
+        help="Allowed exact source_url hostname after case-folding; repeatable and never fetched",
+    )
+    parser.add_argument(
+        "--deny-source-url-host",
+        action="append",
+        default=[],
+        help="Denied exact source_url hostname after case-folding; repeatable and never fetched",
+    )
     parser.add_argument("--fail-on-findings", action="store_true", help="Return non-zero if any finding is emitted")
     return parser
 
@@ -868,6 +945,8 @@ def main(argv: list[str] | None = None) -> int:
     inputs = args.input or [Path("bench/results/datasets")]
     allow_licenses = normalized_policy_values(args.allow_license)
     deny_licenses = normalized_policy_values(args.deny_license)
+    allow_source_url_hosts = normalized_policy_values(args.allow_source_url_host)
+    deny_source_url_hosts = normalized_policy_values(args.deny_source_url_host)
     try:
         artifacts = load_artifacts(
             inputs,
@@ -879,6 +958,8 @@ def main(argv: list[str] | None = None) -> int:
             args.max_dataset_split_majority_answer_pct,
             allow_licenses or None,
             deny_licenses or None,
+            allow_source_url_hosts or None,
+            deny_source_url_hosts or None,
         )
         output = write_report(artifacts, args.output_dir)
     except (OSError, ValueError, json.JSONDecodeError) as exc:

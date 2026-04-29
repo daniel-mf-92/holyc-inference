@@ -779,6 +779,110 @@ def main() -> int:
         ):
             return rc
 
+        url_manifest = tmp_path / "source_url_host.manifest.json"
+        url_manifest_report = dict(curated_report)
+        url_manifest_report["source_url"] = "https://datasets.example/smoke-eval"
+        url_manifest.write_text(
+            json.dumps(url_manifest_report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        source_url_host_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_provenance_audit.py"),
+            "--input",
+            str(url_manifest),
+            "--output-dir",
+            str(tmp_path / "source-url-host-provenance"),
+            "--allow-source-url-host",
+            "datasets.example",
+            "--fail-on-findings",
+        ]
+        completed = run_command(source_url_host_command)
+        if completed.returncode != 0:
+            return completed.returncode
+        source_url_host_report = json.loads(
+            (tmp_path / "source-url-host-provenance" / "dataset_provenance_audit_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        source_url_artifact = source_url_host_report["artifacts"][0]
+        if rc := require(source_url_artifact["source_url_host"] == "datasets.example", "missing_source_url_host"):
+            return rc
+
+        denied_source_url_host_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_provenance_audit.py"),
+            "--input",
+            str(url_manifest),
+            "--output-dir",
+            str(tmp_path / "denied-source-url-host-provenance"),
+            "--deny-source-url-host",
+            "datasets.example",
+            "--fail-on-findings",
+        ]
+        completed = subprocess.run(
+            denied_source_url_host_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("denied_source_url_host_not_rejected=true", file=sys.stderr)
+            return 1
+        denied_source_url_host_failure = json.loads(
+            (tmp_path / "denied-source-url-host-provenance" / "dataset_provenance_audit_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        denied_source_url_host_kinds = {
+            finding["kind"]
+            for artifact in denied_source_url_host_failure["artifacts"]
+            for finding in artifact["findings"]
+        }
+        if rc := require(
+            "source_url_host_denied" in denied_source_url_host_kinds,
+            "missing_denied_source_url_host_finding",
+        ):
+            return rc
+
+        unallowed_source_url_host_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_provenance_audit.py"),
+            "--input",
+            str(url_manifest),
+            "--output-dir",
+            str(tmp_path / "unallowed-source-url-host-provenance"),
+            "--allow-source-url-host",
+            "other.example",
+            "--fail-on-findings",
+        ]
+        completed = subprocess.run(
+            unallowed_source_url_host_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("unallowed_source_url_host_not_rejected=true", file=sys.stderr)
+            return 1
+        unallowed_source_url_host_failure = json.loads(
+            (tmp_path / "unallowed-source-url-host-provenance" / "dataset_provenance_audit_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        unallowed_source_url_host_kinds = {
+            finding["kind"]
+            for artifact in unallowed_source_url_host_failure["artifacts"]
+            for finding in artifact["findings"]
+        }
+        if rc := require(
+            "source_url_host_not_allowed" in unallowed_source_url_host_kinds,
+            "missing_unallowed_source_url_host_finding",
+        ):
+            return rc
+
         denied_license_command = [
             sys.executable,
             str(ROOT / "bench" / "dataset_provenance_audit.py"),

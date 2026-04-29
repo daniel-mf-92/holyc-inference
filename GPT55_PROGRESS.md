@@ -227,3 +227,4 @@
 2026-04-29T08:28:58Z | Added perf regression serial output byte/token telemetry gates with smoke coverage.
 2026-04-29T08:36:41Z | Added dataset artifact-type coverage gates with smoke coverage and refreshed dataset index artifacts.
 2026-04-29T08:42:28Z | Added dataset index dataset/split coverage gates with smoke coverage and refreshed dataset index artifacts.
+2026-04-29T09:00:43Z | Added benchmark trend command/launch-plan/environment drift reporting and opt-in gates with smoke coverage.
