@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import statistics
 import sys
@@ -29,6 +30,7 @@ class BuildMetric:
     source: str
     commit: str
     command_sha256: str
+    environment_sha256: str
     benchmark: str
     profile: str
     model: str
@@ -68,6 +70,8 @@ class BuildDelta:
     candidate_commit: str
     baseline_command_sha256: str
     candidate_command_sha256: str
+    baseline_environment_sha256: str
+    candidate_environment_sha256: str
     baseline_prompt_suite_sha256: str
     candidate_prompt_suite_sha256: str
     baseline_tok_per_s: float | None
@@ -160,6 +164,15 @@ class BuildCommandDrift:
     candidate_command_sha256: str
 
 
+@dataclass(frozen=True)
+class BuildEnvironmentDrift:
+    key: str
+    baseline_build: str
+    candidate_build: str
+    baseline_environment_sha256: str
+    candidate_environment_sha256: str
+
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -218,6 +231,53 @@ def command_sha256(rows: list[dict[str, Any]]) -> str:
     if len(values) == 1:
         return values[0]
     return ",".join(values)
+
+
+def normalized_environment(environment: Any) -> dict[str, Any]:
+    if not isinstance(environment, dict):
+        return {}
+    keys = (
+        "platform",
+        "machine",
+        "processor",
+        "python",
+        "cpu_count",
+        "qemu_bin",
+        "qemu_path",
+        "qemu_version",
+    )
+    return {key: environment.get(key) for key in keys if environment.get(key) not in (None, "")}
+
+
+def environment_sha256(rows: list[dict[str, Any]]) -> str:
+    explicit = sorted(
+        {
+            first_present(row, ("environment_sha256", "environment_hash", "env_sha256"), "")
+            for row in rows
+        }
+        - {""}
+    )
+    if len(explicit) == 1:
+        return explicit[0]
+    if len(explicit) > 1:
+        return ",".join(explicit)
+
+    hashes = sorted(
+        {
+            hashlib.sha256(
+                json.dumps(
+                    normalized_environment(row.get("environment")),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()
+            for row in rows
+            if normalized_environment(row.get("environment"))
+        }
+    )
+    if len(hashes) == 1:
+        return hashes[0]
+    return ",".join(hashes)
 
 
 def duration_us(row: dict[str, Any], names: Iterable[str]) -> float | None:
@@ -423,6 +483,7 @@ def metric_from_rows(build: str, source: Path, rows: list[dict[str, Any]]) -> li
                 source=str(source),
                 commit=first_present(first, ("commit", "git_commit", "sha"), "unknown"),
                 command_sha256=command_sha256(key_rows),
+                environment_sha256=environment_sha256(key_rows),
                 benchmark=first_present(first, ("benchmark", "bench", "name", "suite"), source.stem),
                 profile=first_present(first, ("profile", "mode"), "default"),
                 model=first_present(first, ("model", "model_name"), ""),
@@ -509,6 +570,8 @@ def compare_builds(metrics: list[BuildMetric], baseline_build: str) -> list[Buil
                     candidate_commit=candidate.commit,
                     baseline_command_sha256=baseline.command_sha256,
                     candidate_command_sha256=candidate.command_sha256,
+                    baseline_environment_sha256=baseline.environment_sha256,
+                    candidate_environment_sha256=candidate.environment_sha256,
                     baseline_prompt_suite_sha256=baseline.prompt_suite_sha256,
                     candidate_prompt_suite_sha256=candidate.prompt_suite_sha256,
                     baseline_tok_per_s=baseline.median_tok_per_s,
@@ -838,6 +901,25 @@ def find_command_drift(deltas: list[BuildDelta]) -> list[BuildCommandDrift]:
     return drift
 
 
+def find_environment_drift(deltas: list[BuildDelta]) -> list[BuildEnvironmentDrift]:
+    drift: list[BuildEnvironmentDrift] = []
+    for delta in deltas:
+        if not delta.baseline_environment_sha256 or not delta.candidate_environment_sha256:
+            continue
+        if delta.baseline_environment_sha256 == delta.candidate_environment_sha256:
+            continue
+        drift.append(
+            BuildEnvironmentDrift(
+                key=delta.key,
+                baseline_build=delta.baseline_build,
+                candidate_build=delta.candidate_build,
+                baseline_environment_sha256=delta.baseline_environment_sha256,
+                candidate_environment_sha256=delta.candidate_environment_sha256,
+            )
+        )
+    return drift
+
+
 def format_value(value: Any) -> str:
     if value is None:
         return "-"
@@ -867,6 +949,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Comparison coverage violations: {len(report['comparison_coverage_violations'])}",
         f"Prompt-suite drift: {len(report['prompt_suite_drift'])}",
         f"Command drift: {len(report['command_drift'])}",
+        f"Environment drift: {len(report['environment_drift'])}",
         "",
         "## Deltas",
         "",
@@ -917,6 +1000,16 @@ def markdown_report(report: dict[str, Any]) -> str:
                     **drift
                 )
             )
+    if report["environment_drift"]:
+        lines.extend(["", "## Environment Drift", ""])
+        lines.append("| Candidate | Prompt key | Base environment SHA256 | Candidate environment SHA256 |")
+        lines.append("| --- | --- | --- | --- |")
+        for drift in report["environment_drift"]:
+            lines.append(
+                "| {candidate_build} | {key} | {baseline_environment_sha256} | {candidate_environment_sha256} |".format(
+                    **drift
+                )
+            )
     if report["comparison_coverage_violations"]:
         lines.extend(["", "## Comparison Coverage Violations", ""])
         lines.append("| Build | Role | Prompt key | Reason |")
@@ -945,6 +1038,8 @@ def write_csv(deltas: list[BuildDelta], path: Path) -> None:
         "candidate_commit",
         "baseline_command_sha256",
         "candidate_command_sha256",
+        "baseline_environment_sha256",
+        "candidate_environment_sha256",
         "baseline_prompt_suite_sha256",
         "candidate_prompt_suite_sha256",
         "baseline_tok_per_s",
@@ -1050,6 +1145,21 @@ def write_command_drift_csv(violations: list[BuildCommandDrift], path: Path) -> 
             writer.writerow({field: getattr(violation, field) for field in fields})
 
 
+def write_environment_drift_csv(violations: list[BuildEnvironmentDrift], path: Path) -> None:
+    fields = [
+        "key",
+        "baseline_build",
+        "candidate_build",
+        "baseline_environment_sha256",
+        "candidate_environment_sha256",
+    ]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for violation in violations:
+            writer.writerow({field: getattr(violation, field) for field in fields})
+
+
 def write_junit(
     deltas: list[BuildDelta],
     regressions: list[BuildRegression],
@@ -1057,6 +1167,7 @@ def write_junit(
     comparison_coverage_violations: list[BuildComparisonCoverageViolation],
     prompt_suite_drift: list[BuildPromptSuiteDrift],
     command_drift: list[BuildCommandDrift],
+    environment_drift: list[BuildEnvironmentDrift],
     path: Path,
 ) -> None:
     regression_by_key: dict[tuple[str, str], list[BuildRegression]] = {}
@@ -1071,6 +1182,9 @@ def write_junit(
     command_drift_by_key = {
         (violation.candidate_build, violation.key): violation for violation in command_drift
     }
+    environment_drift_by_key = {
+        (violation.candidate_build, violation.key): violation for violation in environment_drift
+    }
     suite = ET.Element(
         "testsuite",
         {
@@ -1082,6 +1196,7 @@ def write_junit(
                 + len(comparison_coverage_violations)
                 + len(prompt_suite_drift)
                 + len(command_drift)
+                + len(environment_drift)
             ),
             "errors": "0",
         },
@@ -1157,6 +1272,8 @@ def write_junit(
                 f"candidate_commit={delta.candidate_commit}\n"
                 f"baseline_command_sha256={delta.baseline_command_sha256}\n"
                 f"candidate_command_sha256={delta.candidate_command_sha256}\n"
+                f"baseline_environment_sha256={delta.baseline_environment_sha256}\n"
+                f"candidate_environment_sha256={delta.candidate_environment_sha256}\n"
             )
         drift = prompt_suite_drift_by_key.get((delta.candidate_build, delta.key))
         if drift is not None:
@@ -1189,6 +1306,22 @@ def write_junit(
                 f"key={delta.key}\n"
                 f"baseline_command_sha256={command_drift_record.baseline_command_sha256}\n"
                 f"candidate_command_sha256={command_drift_record.candidate_command_sha256}\n"
+            )
+        environment_drift_record = environment_drift_by_key.get((delta.candidate_build, delta.key))
+        if environment_drift_record is not None:
+            failure = ET.SubElement(
+                case,
+                "failure",
+                {
+                    "type": "build_compare_environment_drift",
+                    "message": "baseline and candidate host/QEMU environment hashes differ",
+                },
+            )
+            failure.text = (
+                f"candidate={delta.candidate_build}\n"
+                f"key={delta.key}\n"
+                f"baseline_environment_sha256={environment_drift_record.baseline_environment_sha256}\n"
+                f"candidate_environment_sha256={environment_drift_record.candidate_environment_sha256}\n"
             )
         case_coverage = coverage_by_key.get((delta.baseline_build, delta.key), []) + coverage_by_key.get(
             (delta.candidate_build, delta.key),
@@ -1284,6 +1417,7 @@ def write_report(
     comparison_coverage_violations = find_comparison_coverage_violations(metrics, baseline_build)
     prompt_suite_drift = find_prompt_suite_drift(deltas)
     command_drift = find_command_drift(deltas)
+    environment_drift = find_environment_drift(deltas)
     report = {
         "generated_at": iso_now(),
         "status": "fail"
@@ -1292,6 +1426,7 @@ def write_report(
         or comparison_coverage_violations
         or prompt_suite_drift
         or command_drift
+        or environment_drift
         else "pass",
         "baseline_build": baseline_build,
         "builds": sorted({metric.build for metric in metrics}),
@@ -1338,6 +1473,7 @@ def write_report(
         ],
         "prompt_suite_drift": [asdict(violation) for violation in prompt_suite_drift],
         "command_drift": [asdict(violation) for violation in command_drift],
+        "environment_drift": [asdict(violation) for violation in environment_drift],
     }
     json_path = output_dir / "build_compare_latest.json"
     md_path = output_dir / "build_compare_latest.md"
@@ -1346,6 +1482,7 @@ def write_report(
     comparison_coverage_csv_path = output_dir / "build_compare_comparison_coverage_latest.csv"
     prompt_suite_drift_csv_path = output_dir / "build_compare_prompt_suite_drift_latest.csv"
     command_drift_csv_path = output_dir / "build_compare_command_drift_latest.csv"
+    environment_drift_csv_path = output_dir / "build_compare_environment_drift_latest.csv"
     junit_path = output_dir / "build_compare_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
@@ -1354,6 +1491,7 @@ def write_report(
     write_comparison_coverage_csv(comparison_coverage_violations, comparison_coverage_csv_path)
     write_prompt_suite_drift_csv(prompt_suite_drift, prompt_suite_drift_csv_path)
     write_command_drift_csv(command_drift, command_drift_csv_path)
+    write_environment_drift_csv(environment_drift, environment_drift_csv_path)
     write_junit(
         deltas,
         regressions,
@@ -1361,6 +1499,7 @@ def write_report(
         comparison_coverage_violations,
         prompt_suite_drift,
         command_drift,
+        environment_drift,
         junit_path,
     )
     return json_path
@@ -1468,6 +1607,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Return non-zero when comparable builds report different QEMU command hashes",
     )
+    parser.add_argument(
+        "--fail-on-environment-drift",
+        action="store_true",
+        help="Return non-zero when comparable builds report different host/QEMU environment hashes",
+    )
     return parser
 
 
@@ -1526,6 +1670,7 @@ def main(argv: list[str] | None = None) -> int:
     comparison_coverage_violations = find_comparison_coverage_violations(metrics, baseline)
     prompt_suite_drift = find_prompt_suite_drift(deltas)
     command_drift = find_command_drift(deltas)
+    environment_drift = find_environment_drift(deltas)
     print(f"wrote_json={output}")
     print(f"compared_deltas={len(deltas)}")
     print(f"regressions={len(regressions)}")
@@ -1533,6 +1678,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"comparison_coverage_violations={len(comparison_coverage_violations)}")
     print(f"prompt_suite_drift={len(prompt_suite_drift)}")
     print(f"command_drift={len(command_drift)}")
+    print(f"environment_drift={len(environment_drift)}")
     if args.fail_on_regression and regressions:
         return 1
     if args.fail_on_coverage and coverage_violations:
@@ -1542,6 +1688,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.fail_on_prompt_suite_drift and prompt_suite_drift:
         return 1
     if args.fail_on_command_drift and command_drift:
+        return 1
+    if args.fail_on_environment_drift and environment_drift:
         return 1
     return 0
 

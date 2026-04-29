@@ -1084,11 +1084,16 @@ QEMU command SHA256s are also carried through; `--fail-on-command-drift`
 rejects comparable build pairs whose launch command fingerprints differ, with
 details written to `build_compare_command_drift_latest.csv` and the JUnit
 report.
+Host/QEMU environment fingerprints are derived from benchmark `environment`
+metadata or explicit `environment_sha256` fields; `--fail-on-environment-drift`
+rejects comparable build pairs collected under different host/QEMU identities,
+with details written to `build_compare_environment_drift_latest.csv` and the
+JUnit report.
 
 `build_compare_ci_smoke.py` is a stdlib-only CI gate for the build comparison
 dashboard. It creates synthetic local benchmark reports, checks the pass path,
-and verifies command-drift, OK-run coverage, and comparison-coverage gates
-without launching QEMU:
+and verifies command-drift, environment-drift, OK-run coverage, and
+comparison-coverage gates without launching QEMU:
 
 ```bash
 python3 bench/build_compare_ci_smoke.py
@@ -1116,7 +1121,8 @@ python3 bench/build_compare.py \
   --min-ok-runs-per-build 3 \
   --fail-on-coverage \
   --fail-on-comparison-coverage \
-  --fail-on-command-drift
+  --fail-on-command-drift \
+  --fail-on-environment-drift
 ```
 
 ## HolyC vs llama.cpp Eval Compare

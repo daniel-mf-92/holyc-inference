@@ -28,8 +28,16 @@ def qemu_report(
     serial_output_bytes: int,
     command_sha256: str = "ci-command",
     prompt_suite_sha256: str = "ci-suite",
+    environment: dict[str, Any] | None = None,
     prompt: str = "ci-short",
 ) -> dict[str, Any]:
+    environment = environment or {
+        "platform": "ci-platform",
+        "machine": "ci-machine",
+        "python": "3.14",
+        "qemu_bin": "synthetic-qemu",
+        "qemu_version": "synthetic-qemu 1.0",
+    }
     rows: list[dict[str, Any]] = []
     for index, tok_per_s in enumerate(tok_per_s_values):
         rows.append(
@@ -59,6 +67,7 @@ def qemu_report(
     return {
         "generated_at": "2026-04-29T04:00:00Z",
         "status": "pass",
+        "environment": environment,
         "prompt_suite": {"suite_sha256": prompt_suite_sha256, "prompt_count": 1},
         "benchmarks": rows,
     }
@@ -151,6 +160,7 @@ def check_pass_case(tmp_path: Path) -> None:
             "--fail-on-comparison-coverage",
             "--fail-on-prompt-suite-drift",
             "--fail-on-command-drift",
+            "--fail-on-environment-drift",
         ]
     )
     if completed.returncode != 0:
@@ -166,6 +176,7 @@ def check_pass_case(tmp_path: Path) -> None:
     assert_true(not report["comparison_coverage_violations"], "unexpected comparison coverage violation")
     assert_true(not report["prompt_suite_drift"], "unexpected prompt-suite drift")
     assert_true(not report["command_drift"], "unexpected command drift")
+    assert_true(not report["environment_drift"], "unexpected environment drift")
     delta = report["deltas"][0]
     assert_true(delta["tok_per_s_delta_pct"] > 0, "missing positive tok/s delta")
     assert_true(delta["host_child_peak_rss_delta_pct"] < 0, "missing host RSS improvement")
@@ -173,6 +184,7 @@ def check_pass_case(tmp_path: Path) -> None:
     rows = list(csv.DictReader((output_dir / "build_compare_latest.csv").open(encoding="utf-8")))
     assert_true(rows[0]["candidate_build"] == "head", "missing CSV candidate build")
     assert_true(rows[0]["candidate_host_child_peak_rss_bytes"] == "2100000", "missing CSV host RSS")
+    assert_true(rows[0]["baseline_environment_sha256"], "missing CSV baseline environment hash")
     comparison_coverage_csv = (
         output_dir / "build_compare_comparison_coverage_latest.csv"
     ).read_text(encoding="utf-8")
@@ -239,6 +251,75 @@ def check_command_drift_gate(tmp_path: Path) -> None:
     assert_true(report["command_drift"], "missing command drift report")
     drift_csv = (output_dir / "build_compare_command_drift_latest.csv").read_text(encoding="utf-8")
     assert_true("command-a,command-b" in drift_csv, "missing command drift CSV row")
+
+
+def check_environment_drift_gate(tmp_path: Path) -> None:
+    baseline = tmp_path / "environment_base.json"
+    candidate = tmp_path / "environment_head.json"
+    output_dir = tmp_path / "environment_drift_dashboard"
+    write_json(
+        baseline,
+        qemu_report(
+            commit="ci-base",
+            tok_per_s_values=[100.0, 101.0],
+            wall_tok_per_s_values=[95.0, 96.0],
+            ttft_us_values=[50000, 49000],
+            memory_bytes=1_000_000,
+            host_child_peak_rss_bytes=2_000_000,
+            host_child_tok_per_cpu_s_values=[80.0, 81.0],
+            serial_output_bytes=4096,
+            environment={
+                "platform": "ci-platform-a",
+                "machine": "ci-machine",
+                "python": "3.14",
+                "qemu_bin": "synthetic-qemu",
+                "qemu_version": "synthetic-qemu 1.0",
+            },
+        ),
+    )
+    write_json(
+        candidate,
+        qemu_report(
+            commit="ci-head",
+            tok_per_s_values=[100.0, 101.0],
+            wall_tok_per_s_values=[95.0, 96.0],
+            ttft_us_values=[50000, 49000],
+            memory_bytes=1_000_000,
+            host_child_peak_rss_bytes=2_000_000,
+            host_child_tok_per_cpu_s_values=[80.0, 81.0],
+            serial_output_bytes=4096,
+            environment={
+                "platform": "ci-platform-b",
+                "machine": "ci-machine",
+                "python": "3.14",
+                "qemu_bin": "synthetic-qemu",
+                "qemu_version": "synthetic-qemu 1.0",
+            },
+        ),
+    )
+
+    completed = run_command(
+        [
+            sys.executable,
+            str(ROOT / "bench" / "build_compare.py"),
+            "--input",
+            f"base={baseline}",
+            "--input",
+            f"head={candidate}",
+            "--baseline",
+            "base",
+            "--output-dir",
+            str(output_dir),
+            "--fail-on-environment-drift",
+        ]
+    )
+    assert_true(completed.returncode == 1, "environment drift gate did not fail")
+    report = json.loads((output_dir / "build_compare_latest.json").read_text(encoding="utf-8"))
+    assert_true(report["environment_drift"], "missing environment drift report")
+    drift_csv = (output_dir / "build_compare_environment_drift_latest.csv").read_text(encoding="utf-8")
+    assert_true("baseline_environment_sha256" in drift_csv, "missing environment drift CSV header")
+    junit_root = ET.parse(output_dir / "build_compare_junit_latest.xml").getroot()
+    assert_true(junit_root.attrib.get("failures") == "1", "environment drift JUnit did not fail")
 
 
 def check_coverage_gate(tmp_path: Path) -> None:
@@ -404,6 +485,7 @@ def main() -> int:
             tmp_path = Path(tmp)
             check_pass_case(tmp_path)
             check_command_drift_gate(tmp_path)
+            check_environment_drift_gate(tmp_path)
             check_coverage_gate(tmp_path)
             check_comparison_coverage_gate(tmp_path)
     except AssertionError as exc:
