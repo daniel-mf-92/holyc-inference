@@ -287,15 +287,18 @@ python3 bench/bench_result_index.py \
 dashboard trend files without launching QEMU. It groups comparable
 profile/model/quantization/prompt-suite points, records latest-vs-previous
 throughput and memory deltas, and writes JSON, Markdown, CSV, point-history CSV,
-recent-window CSV, drift CSV, and JUnit XML under `bench/dashboards/`. Optional
-threshold gates fail CI when latest guest tok/s or host wall-clock tok/s falls
-below an absolute floor, when latest guest tok/s, host wall-clock tok/s, or
-max-memory trends regress beyond the configured percentage, when a comparable
-trend key has too little retained history for a regression decision, or when
-command, launch-plan, or host/QEMU environment hashes drift inside a comparable
-trend key. Use `--window-points` to tune the per-key recent-window rows written
-to `bench_trend_export_windows_latest.csv`; window gates compare the first
-retained point in that recent window against the latest point.
+recent-window CSV, drift CSV, findings CSV, and JUnit XML under
+`bench/dashboards/`. Optional threshold gates fail CI when latest guest tok/s or
+host wall-clock tok/s falls below an absolute floor, when latest guest tok/s,
+host wall-clock tok/s, or max-memory trends regress beyond the configured
+percentage, when a comparable trend key has too little retained history for a
+regression decision, or when command, launch-plan, or host/QEMU environment
+hashes drift inside a comparable trend key. Use `--window-points` to tune the
+per-key recent-window rows written to `bench_trend_export_windows_latest.csv`;
+window gates compare the first retained point in that recent window against the
+latest point. Structured gate findings are also written to
+`bench_trend_export_findings_latest.csv` for dashboard filtering by gate, key,
+metric, value, and threshold.
 
 ```bash
 python3 bench/bench_trend_export.py \

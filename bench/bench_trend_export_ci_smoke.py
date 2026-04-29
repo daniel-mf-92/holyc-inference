@@ -105,6 +105,17 @@ def write_report(
     )
 
 
+def finding_gates(report: dict[str, object]) -> set[str]:
+    rows = report.get("finding_rows", [])
+    if not isinstance(rows, list):
+        return set()
+    return {
+        str(row.get("gate"))
+        for row in rows
+        if isinstance(row, dict) and row.get("gate")
+    }
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="holyc-trend-ci-") as tmp:
         tmp_path = Path(tmp)
@@ -182,6 +193,9 @@ def main() -> int:
         report = json.loads((output_dir / "bench_trend_export_latest.json").read_text(encoding="utf-8"))
         if report["status"] != "pass":
             print(f"unexpected_status={report['status']}", file=sys.stderr)
+            return 1
+        if report["finding_rows"] != []:
+            print("unexpected_pass_findings=true", file=sys.stderr)
             return 1
         if report["trend_keys"] != 1 or report["trend_points"] != 3:
             print("unexpected_trend_counts=true", file=sys.stderr)
@@ -265,6 +279,12 @@ def main() -> int:
         if "key,field,hashes,points,commits,sources" not in drift_csv:
             print("missing_drift_csv_header=true", file=sys.stderr)
             return 1
+        findings_csv = (output_dir / "bench_trend_export_findings_latest.csv").read_text(
+            encoding="utf-8"
+        )
+        if "gate,key,metric,value,threshold,message" not in findings_csv:
+            print("missing_findings_csv_header=true", file=sys.stderr)
+            return 1
         junit_root = ET.parse(output_dir / "bench_trend_export_junit_latest.xml").getroot()
         if junit_root.attrib.get("name") != "holyc_bench_trend_export":
             print("missing_junit_suite=true", file=sys.stderr)
@@ -292,6 +312,14 @@ def main() -> int:
         )
         if empty_completed.returncode == 0:
             print("empty_trend_export_not_rejected=true", file=sys.stderr)
+            return 1
+        empty_report = json.loads(
+            (tmp_path / "empty_dashboards" / "bench_trend_export_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        if finding_gates(empty_report) != {"empty"}:
+            print("missing_empty_structured_finding=true", file=sys.stderr)
             return 1
 
         regression_dir = tmp_path / "regression_results"
@@ -348,6 +376,17 @@ def main() -> int:
         if "max memory grew" not in findings:
             print("missing_memory_growth_finding=true", file=sys.stderr)
             return 1
+        finding_rows = regression_report["finding_rows"]
+        gates = {row["gate"] for row in finding_rows}
+        if not {"tok_regression_pct", "wall_tok_regression_pct", "memory_growth_pct"}.issubset(gates):
+            print("missing_structured_regression_findings=true", file=sys.stderr)
+            return 1
+        regression_findings_csv = (
+            tmp_path / "regression_dashboards" / "bench_trend_export_findings_latest.csv"
+        ).read_text(encoding="utf-8")
+        if "tok_regression_pct" not in regression_findings_csv:
+            print("missing_regression_findings_csv_row=true", file=sys.stderr)
+            return 1
 
         sparse_dir = tmp_path / "sparse_results"
         sparse_dir.mkdir()
@@ -385,6 +424,9 @@ def main() -> int:
         sparse_findings = "\n".join(sparse_report["findings"])
         if "below minimum 2" not in sparse_findings:
             print("missing_sparse_history_finding=true", file=sys.stderr)
+            return 1
+        if sparse_report["finding_rows"][0]["gate"] != "min_points_per_key":
+            print("missing_sparse_structured_finding=true", file=sys.stderr)
             return 1
 
         floor_dir = tmp_path / "floor_results"
@@ -428,6 +470,10 @@ def main() -> int:
             return 1
         if "latest wall tok/s" not in floor_findings:
             print("missing_latest_wall_tok_floor_finding=true", file=sys.stderr)
+            return 1
+        floor_gates = finding_gates(floor_report)
+        if not {"min_latest_tok_per_s", "min_latest_wall_tok_per_s"}.issubset(floor_gates):
+            print("missing_floor_structured_findings=true", file=sys.stderr)
             return 1
 
         drift_dir = tmp_path / "drift_results"
@@ -485,6 +531,10 @@ def main() -> int:
             return 1
         if "environment_sha256 drift" not in drift_findings:
             print("missing_environment_drift_finding=true", file=sys.stderr)
+            return 1
+        drift_gates = finding_gates(drift_report)
+        if not {"command_drift", "launch_plan_drift", "environment_drift"}.issubset(drift_gates):
+            print("missing_drift_structured_findings=true", file=sys.stderr)
             return 1
         drift_outputs = (tmp_path / "drift_dashboards" / "bench_trend_export_drift_latest.csv").read_text(
             encoding="utf-8"
@@ -555,6 +605,14 @@ def main() -> int:
             return 1
         if "recent-window max memory grew" not in window_findings:
             print("missing_window_memory_growth_finding=true", file=sys.stderr)
+            return 1
+        window_gates = finding_gates(window_regression_report)
+        if not {
+            "window_tok_regression_pct",
+            "window_wall_tok_regression_pct",
+            "window_memory_growth_pct",
+        }.issubset(window_gates):
+            print("missing_window_structured_findings=true", file=sys.stderr)
             return 1
 
     return 0

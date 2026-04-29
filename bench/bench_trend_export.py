@@ -51,6 +51,16 @@ class TrendPoint:
     max_memory_bytes: int | None
 
 
+@dataclass(frozen=True)
+class TrendFinding:
+    gate: str
+    key: str
+    metric: str
+    value: float | int | None
+    threshold: float | int | None
+    message: str
+
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -270,48 +280,128 @@ def build_report(
     launch_plan_drift = drift_rows(grouped, "launch_plan_sha256")
     environment_drift = drift_rows(grouped, "environment_sha256")
     findings: list[str] = []
+    finding_rows: list[TrendFinding] = []
+
+    def add_finding(
+        gate: str,
+        message: str,
+        *,
+        key: str = "",
+        metric: str = "",
+        value: float | int | None = None,
+        threshold: float | int | None = None,
+    ) -> None:
+        findings.append(message)
+        finding_rows.append(
+            TrendFinding(
+                gate=gate,
+                key=key,
+                metric=metric,
+                value=value,
+                threshold=threshold,
+                message=message,
+            )
+        )
+
     if not all_points:
-        findings.append("no supported benchmark artifacts found")
+        add_finding("empty", "no supported benchmark artifacts found")
     if fail_on_airgap:
         airgap_failures = [point for point in all_points if point.command_airgap_status == "fail"]
         if airgap_failures:
-            findings.append(f"{len(airgap_failures)} trend point(s) violate QEMU air-gap policy")
+            add_finding(
+                "airgap",
+                f"{len(airgap_failures)} trend point(s) violate QEMU air-gap policy",
+                metric="command_airgap_status",
+                value=len(airgap_failures),
+                threshold=0,
+            )
     if fail_on_telemetry:
         telemetry_failures = [point for point in all_points if point.telemetry_status == "fail"]
         if telemetry_failures:
-            findings.append(f"{len(telemetry_failures)} trend point(s) are missing telemetry")
+            add_finding(
+                "telemetry",
+                f"{len(telemetry_failures)} trend point(s) are missing telemetry",
+                metric="telemetry_status",
+                value=len(telemetry_failures),
+                threshold=0,
+            )
     if fail_on_command_drift and command_drift:
-        findings.append(f"{len(command_drift)} trend key(s) have command_sha256 drift")
+        add_finding(
+            "command_drift",
+            f"{len(command_drift)} trend key(s) have command_sha256 drift",
+            metric="command_sha256",
+            value=len(command_drift),
+            threshold=0,
+        )
     if fail_on_launch_plan_drift and launch_plan_drift:
-        findings.append(f"{len(launch_plan_drift)} trend key(s) have launch_plan_sha256 drift")
+        add_finding(
+            "launch_plan_drift",
+            f"{len(launch_plan_drift)} trend key(s) have launch_plan_sha256 drift",
+            metric="launch_plan_sha256",
+            value=len(launch_plan_drift),
+            threshold=0,
+        )
     if fail_on_environment_drift and environment_drift:
-        findings.append(f"{len(environment_drift)} trend key(s) have environment_sha256 drift")
+        add_finding(
+            "environment_drift",
+            f"{len(environment_drift)} trend key(s) have environment_sha256 drift",
+            metric="environment_sha256",
+            value=len(environment_drift),
+            threshold=0,
+        )
     if min_points_per_key is not None:
         for key, points in sorted(grouped.items()):
             if len(points) < min_points_per_key:
-                findings.append(
-                    f"{key} has {len(points)} trend point(s), below minimum {min_points_per_key}"
+                add_finding(
+                    "min_points_per_key",
+                    f"{key} has {len(points)} trend point(s), below minimum {min_points_per_key}",
+                    key=key,
+                    metric="points",
+                    value=len(points),
+                    threshold=min_points_per_key,
                 )
 
     if min_latest_tok_per_s is not None:
         for row in latest:
             latest_tok = row.get("latest_median_tok_per_s")
             if latest_tok is None:
-                findings.append(f"{row['key']} latest guest tok/s is missing")
+                add_finding(
+                    "min_latest_tok_per_s",
+                    f"{row['key']} latest guest tok/s is missing",
+                    key=str(row["key"]),
+                    metric="latest_median_tok_per_s",
+                    threshold=min_latest_tok_per_s,
+                )
             elif isinstance(latest_tok, float) and latest_tok < min_latest_tok_per_s:
-                findings.append(
+                add_finding(
+                    "min_latest_tok_per_s",
                     f"{row['key']} latest guest tok/s {latest_tok:.3f} "
-                    f"is below minimum {min_latest_tok_per_s:.3f}"
+                    f"is below minimum {min_latest_tok_per_s:.3f}",
+                    key=str(row["key"]),
+                    metric="latest_median_tok_per_s",
+                    value=latest_tok,
+                    threshold=min_latest_tok_per_s,
                 )
     if min_latest_wall_tok_per_s is not None:
         for row in latest:
             latest_wall_tok = row.get("latest_wall_tok_per_s_median")
             if latest_wall_tok is None:
-                findings.append(f"{row['key']} latest wall tok/s is missing")
+                add_finding(
+                    "min_latest_wall_tok_per_s",
+                    f"{row['key']} latest wall tok/s is missing",
+                    key=str(row["key"]),
+                    metric="latest_wall_tok_per_s_median",
+                    threshold=min_latest_wall_tok_per_s,
+                )
             elif isinstance(latest_wall_tok, float) and latest_wall_tok < min_latest_wall_tok_per_s:
-                findings.append(
+                add_finding(
+                    "min_latest_wall_tok_per_s",
                     f"{row['key']} latest wall tok/s {latest_wall_tok:.3f} "
-                    f"is below minimum {min_latest_wall_tok_per_s:.3f}"
+                    f"is below minimum {min_latest_wall_tok_per_s:.3f}",
+                    key=str(row["key"]),
+                    metric="latest_wall_tok_per_s_median",
+                    value=latest_wall_tok,
+                    threshold=min_latest_wall_tok_per_s,
                 )
 
     if fail_on_tok_regression_pct is not None:
@@ -319,54 +409,84 @@ def build_report(
         for row in latest:
             delta = row.get("median_tok_per_s_delta_pct")
             if isinstance(delta, float) and delta < threshold:
-                findings.append(
+                add_finding(
+                    "tok_regression_pct",
                     f"{row['key']} guest tok/s regressed {delta:.3f}% "
-                    f"(threshold {threshold:.3f}%)"
+                    f"(threshold {threshold:.3f}%)",
+                    key=str(row["key"]),
+                    metric="median_tok_per_s_delta_pct",
+                    value=delta,
+                    threshold=threshold,
                 )
     if fail_on_wall_tok_regression_pct is not None:
         threshold = -abs(fail_on_wall_tok_regression_pct)
         for row in latest:
             delta = row.get("wall_tok_per_s_delta_pct")
             if isinstance(delta, float) and delta < threshold:
-                findings.append(
+                add_finding(
+                    "wall_tok_regression_pct",
                     f"{row['key']} wall tok/s regressed {delta:.3f}% "
-                    f"(threshold {threshold:.3f}%)"
+                    f"(threshold {threshold:.3f}%)",
+                    key=str(row["key"]),
+                    metric="wall_tok_per_s_delta_pct",
+                    value=delta,
+                    threshold=threshold,
                 )
     if fail_on_memory_growth_pct is not None:
         threshold = abs(fail_on_memory_growth_pct)
         for row in latest:
             delta = row.get("max_memory_delta_pct")
             if isinstance(delta, float) and delta > threshold:
-                findings.append(
+                add_finding(
+                    "memory_growth_pct",
                     f"{row['key']} max memory grew {delta:.3f}% "
-                    f"(threshold {threshold:.3f}%)"
+                    f"(threshold {threshold:.3f}%)",
+                    key=str(row["key"]),
+                    metric="max_memory_delta_pct",
+                    value=delta,
+                    threshold=threshold,
                 )
     if fail_on_window_tok_regression_pct is not None:
         threshold = -abs(fail_on_window_tok_regression_pct)
         for row in windows:
             delta = row.get("guest_tok_per_s_delta_pct")
             if isinstance(delta, float) and delta < threshold:
-                findings.append(
+                add_finding(
+                    "window_tok_regression_pct",
                     f"{row['key']} recent-window guest tok/s regressed {delta:.3f}% "
-                    f"(threshold {threshold:.3f}%)"
+                    f"(threshold {threshold:.3f}%)",
+                    key=str(row["key"]),
+                    metric="guest_tok_per_s_delta_pct",
+                    value=delta,
+                    threshold=threshold,
                 )
     if fail_on_window_wall_tok_regression_pct is not None:
         threshold = -abs(fail_on_window_wall_tok_regression_pct)
         for row in windows:
             delta = row.get("wall_tok_per_s_delta_pct")
             if isinstance(delta, float) and delta < threshold:
-                findings.append(
+                add_finding(
+                    "window_wall_tok_regression_pct",
                     f"{row['key']} recent-window wall tok/s regressed {delta:.3f}% "
-                    f"(threshold {threshold:.3f}%)"
+                    f"(threshold {threshold:.3f}%)",
+                    key=str(row["key"]),
+                    metric="wall_tok_per_s_delta_pct",
+                    value=delta,
+                    threshold=threshold,
                 )
     if fail_on_window_memory_growth_pct is not None:
         threshold = abs(fail_on_window_memory_growth_pct)
         for row in windows:
             delta = row.get("max_memory_delta_pct")
             if isinstance(delta, float) and delta > threshold:
-                findings.append(
+                add_finding(
+                    "window_memory_growth_pct",
                     f"{row['key']} recent-window max memory grew {delta:.3f}% "
-                    f"(threshold {threshold:.3f}%)"
+                    f"(threshold {threshold:.3f}%)",
+                    key=str(row["key"]),
+                    metric="max_memory_delta_pct",
+                    value=delta,
+                    threshold=threshold,
                 )
 
     enabled_failure_gate = (
@@ -391,6 +511,7 @@ def build_report(
         "generated_at": iso_now(),
         "status": status,
         "findings": findings,
+        "finding_rows": [asdict(row) for row in finding_rows],
         "thresholds": {
             "fail_on_empty": fail_on_empty,
             "fail_on_airgap": fail_on_airgap,
@@ -590,6 +711,20 @@ def write_drift_csv(report: dict[str, object], path: Path) -> None:
             )
 
 
+def write_findings_csv(report: dict[str, object], path: Path) -> None:
+    fields = ["gate", "key", "metric", "value", "threshold", "message"]
+    rows = report.get("finding_rows")
+    if not isinstance(rows, list):
+        rows = []
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            writer.writerow({field: row.get(field, "") for field in fields})
+
+
 def junit_report(report: dict[str, object]) -> str:
     findings = report["findings"]
     assert isinstance(findings, list)
@@ -623,6 +758,7 @@ def write_outputs(report: dict[str, object], grouped: dict[str, list[TrendPoint]
     points_csv_path = output_dir / "bench_trend_export_points_latest.csv"
     windows_csv_path = output_dir / "bench_trend_export_windows_latest.csv"
     drift_csv_path = output_dir / "bench_trend_export_drift_latest.csv"
+    findings_csv_path = output_dir / "bench_trend_export_findings_latest.csv"
     junit_path = output_dir / "bench_trend_export_junit_latest.xml"
 
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -635,6 +771,7 @@ def write_outputs(report: dict[str, object], grouped: dict[str, list[TrendPoint]
     assert isinstance(windows, list)
     write_windows_csv([row for row in windows if isinstance(row, dict)], windows_csv_path)
     write_drift_csv(report, drift_csv_path)
+    write_findings_csv(report, findings_csv_path)
     junit_path.write_text(junit_report(report), encoding="utf-8")
     return json_path
 
