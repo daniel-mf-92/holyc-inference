@@ -723,7 +723,7 @@ def main() -> int:
         ):
             return rc
         if rc := require(
-            "source,status,source_name,source_version,license,source_url,source_url_host,output"
+            "source,status,source_name,source_version,license,source_url,source_url_scheme,source_url_host,source_url_path,output"
             in provenance_csv.read_text(encoding="utf-8"),
             "missing_provenance_csv_header",
         ):
@@ -795,6 +795,10 @@ def main() -> int:
             str(tmp_path / "source-url-host-provenance"),
             "--allow-source-url-host",
             "datasets.example",
+            "--allow-source-url-scheme",
+            "https",
+            "--allow-source-url-path-prefix",
+            "/smoke",
             "--fail-on-findings",
         ]
         completed = run_command(source_url_host_command)
@@ -806,7 +810,163 @@ def main() -> int:
             )
         )
         source_url_artifact = source_url_host_report["artifacts"][0]
+        if rc := require(source_url_artifact["source_url_scheme"] == "https", "missing_source_url_scheme"):
+            return rc
         if rc := require(source_url_artifact["source_url_host"] == "datasets.example", "missing_source_url_host"):
+            return rc
+        if rc := require(source_url_artifact["source_url_path"] == "/smoke-eval", "missing_source_url_path"):
+            return rc
+
+        denied_source_url_scheme_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_provenance_audit.py"),
+            "--input",
+            str(url_manifest),
+            "--output-dir",
+            str(tmp_path / "denied-source-url-scheme-provenance"),
+            "--deny-source-url-scheme",
+            "https",
+            "--fail-on-findings",
+        ]
+        completed = subprocess.run(
+            denied_source_url_scheme_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("denied_source_url_scheme_not_rejected=true", file=sys.stderr)
+            return 1
+        denied_source_url_scheme_failure = json.loads(
+            (tmp_path / "denied-source-url-scheme-provenance" / "dataset_provenance_audit_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        denied_source_url_scheme_kinds = {
+            finding["kind"]
+            for artifact in denied_source_url_scheme_failure["artifacts"]
+            for finding in artifact["findings"]
+        }
+        if rc := require(
+            "source_url_scheme_denied" in denied_source_url_scheme_kinds,
+            "missing_denied_source_url_scheme_finding",
+        ):
+            return rc
+
+        unallowed_source_url_scheme_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_provenance_audit.py"),
+            "--input",
+            str(url_manifest),
+            "--output-dir",
+            str(tmp_path / "unallowed-source-url-scheme-provenance"),
+            "--allow-source-url-scheme",
+            "file",
+            "--fail-on-findings",
+        ]
+        completed = subprocess.run(
+            unallowed_source_url_scheme_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("unallowed_source_url_scheme_not_rejected=true", file=sys.stderr)
+            return 1
+        unallowed_source_url_scheme_failure = json.loads(
+            (tmp_path / "unallowed-source-url-scheme-provenance" / "dataset_provenance_audit_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        unallowed_source_url_scheme_kinds = {
+            finding["kind"]
+            for artifact in unallowed_source_url_scheme_failure["artifacts"]
+            for finding in artifact["findings"]
+        }
+        if rc := require(
+            "source_url_scheme_not_allowed" in unallowed_source_url_scheme_kinds,
+            "missing_unallowed_source_url_scheme_finding",
+        ):
+            return rc
+
+        denied_source_url_path_prefix_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_provenance_audit.py"),
+            "--input",
+            str(url_manifest),
+            "--output-dir",
+            str(tmp_path / "denied-source-url-path-prefix-provenance"),
+            "--deny-source-url-path-prefix",
+            "/smoke",
+            "--fail-on-findings",
+        ]
+        completed = subprocess.run(
+            denied_source_url_path_prefix_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("denied_source_url_path_prefix_not_rejected=true", file=sys.stderr)
+            return 1
+        denied_source_url_path_prefix_failure = json.loads(
+            (
+                tmp_path
+                / "denied-source-url-path-prefix-provenance"
+                / "dataset_provenance_audit_latest.json"
+            ).read_text(encoding="utf-8")
+        )
+        denied_source_url_path_prefix_kinds = {
+            finding["kind"]
+            for artifact in denied_source_url_path_prefix_failure["artifacts"]
+            for finding in artifact["findings"]
+        }
+        if rc := require(
+            "source_url_path_prefix_denied" in denied_source_url_path_prefix_kinds,
+            "missing_denied_source_url_path_prefix_finding",
+        ):
+            return rc
+
+        unallowed_source_url_path_prefix_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_provenance_audit.py"),
+            "--input",
+            str(url_manifest),
+            "--output-dir",
+            str(tmp_path / "unallowed-source-url-path-prefix-provenance"),
+            "--allow-source-url-path-prefix",
+            "/other",
+            "--fail-on-findings",
+        ]
+        completed = subprocess.run(
+            unallowed_source_url_path_prefix_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("unallowed_source_url_path_prefix_not_rejected=true", file=sys.stderr)
+            return 1
+        unallowed_source_url_path_prefix_failure = json.loads(
+            (
+                tmp_path
+                / "unallowed-source-url-path-prefix-provenance"
+                / "dataset_provenance_audit_latest.json"
+            ).read_text(encoding="utf-8")
+        )
+        unallowed_source_url_path_prefix_kinds = {
+            finding["kind"]
+            for artifact in unallowed_source_url_path_prefix_failure["artifacts"]
+            for finding in artifact["findings"]
+        }
+        if rc := require(
+            "source_url_path_prefix_not_allowed" in unallowed_source_url_path_prefix_kinds,
+            "missing_unallowed_source_url_path_prefix_finding",
+        ):
             return rc
 
         denied_source_url_host_command = [

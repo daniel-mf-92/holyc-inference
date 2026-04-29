@@ -191,7 +191,12 @@ compact subset.
 Synthetic smoke manifests are allowed to omit `source_url`; real dataset
 manifests should record one, and `--require-source-url` turns that policy into a
 hard gate. Repeat `--allow-license` or `--deny-license` to enforce exact
-case-folded license/usage-note policy values for promoted local subsets.
+case-folded license/usage-note policy values for promoted local subsets. Repeat
+`--allow-source-url-scheme`, `--deny-source-url-scheme`,
+`--allow-source-url-host`, and `--deny-source-url-host` when promoted manifests
+must use reviewed URL schemes or hosts. Use
+`--allow-source-url-path-prefix` or `--deny-source-url-path-prefix` to pin
+reviewed source URL paths; no URL is fetched.
 
 ```bash
 python3 bench/dataset_provenance_audit.py \
@@ -200,6 +205,8 @@ python3 bench/dataset_provenance_audit.py \
   --max-provenance-pct 80 \
   --max-dataset-split-majority-answer-pct 90 \
   --allow-license synthetic-smoke \
+  --allow-source-url-scheme https \
+  --allow-source-url-path-prefix /datasets/ \
   --fail-on-findings
 ```
 

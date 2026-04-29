@@ -90,6 +90,9 @@
       "source_name": "smoke-eval",
       "source_records": 3,
       "source_url": "",
+      "source_url_host": "",
+      "source_url_path": "",
+      "source_url_scheme": "",
       "source_version": "synthetic",
       "split_answer_histograms": {
         "validation": {
@@ -106,6 +109,6 @@
       "status": "pass"
     }
   ],
-  "generated_at": "2026-04-29T00:06:40Z",
+  "generated_at": "2026-04-29T12:53:37Z",
   "status": "pass"
 }

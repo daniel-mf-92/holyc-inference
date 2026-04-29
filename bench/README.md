@@ -350,7 +350,12 @@ overall, per-dataset, per-split, and per-dataset/split answer-majority telemetry
 `--max-dataset-split-majority-answer-pct` can fail CI when curated subsets are
 label skewed or dominated by one local source/provenance string. Use repeatable
 `--allow-license` and `--deny-license` gates to enforce an exact local license
-or usage-note policy before promoting a curated subset.
+or usage-note policy before promoting a curated subset. Source URL policy can
+also be pinned offline with repeatable `--allow-source-url-scheme`,
+`--deny-source-url-scheme`, `--allow-source-url-host`, and
+`--deny-source-url-host`. Path policy can be pinned with repeatable
+`--allow-source-url-path-prefix` and `--deny-source-url-path-prefix`; the audit
+parses manifest strings only and never fetches them.
 
 ```bash
 python3 bench/dataset_provenance_audit.py \
@@ -361,6 +366,8 @@ python3 bench/dataset_provenance_audit.py \
   --max-split-majority-answer-pct 80 \
   --max-dataset-split-majority-answer-pct 90 \
   --allow-license synthetic-smoke \
+  --allow-source-url-scheme https \
+  --allow-source-url-path-prefix /datasets/ \
   --fail-on-findings
 ```
 

@@ -47,7 +47,9 @@ class ProvenanceArtifact:
     source_version: str
     license: str
     source_url: str
+    source_url_scheme: str
     source_url_host: str
+    source_url_path: str
     output: str
     record_count: int
     source_records: int
@@ -110,6 +112,24 @@ def normalized_source_url_host(value: Any) -> str:
     parsed = urllib.parse.urlparse(text)
     host = parsed.hostname or ""
     return host.rstrip(".").casefold()
+
+
+def normalized_source_url_scheme(value: Any) -> str:
+    text = clean(value)
+    if not text:
+        return ""
+    return urllib.parse.urlparse(text).scheme.casefold()
+
+
+def normalized_source_url_path(value: Any) -> str:
+    text = clean(value)
+    if not text:
+        return ""
+    return urllib.parse.urlparse(text).path
+
+
+def path_policy_values(values: Iterable[str]) -> set[str]:
+    return {clean(value) for value in values if clean(value)}
 
 
 def finding(path: Path, severity: str, kind: str, detail: str) -> ProvenanceFinding:
@@ -287,8 +307,12 @@ def audit_manifest(
     max_dataset_split_majority_answer_pct: float | None = None,
     allow_licenses: set[str] | None = None,
     deny_licenses: set[str] | None = None,
+    allow_source_url_schemes: set[str] | None = None,
+    deny_source_url_schemes: set[str] | None = None,
     allow_source_url_hosts: set[str] | None = None,
     deny_source_url_hosts: set[str] | None = None,
+    allow_source_url_path_prefixes: set[str] | None = None,
+    deny_source_url_path_prefixes: set[str] | None = None,
 ) -> ProvenanceArtifact | None:
     manifest = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict) or manifest.get("format") != "hceval-curated-jsonl":
@@ -300,7 +324,9 @@ def audit_manifest(
     license_text = clean(manifest.get("license"))
     normalized_license = license_text.casefold()
     source_url = clean(manifest.get("source_url"))
+    source_url_scheme = normalized_source_url_scheme(source_url)
     source_url_host = normalized_source_url_host(source_url)
+    source_url_path = normalized_source_url_path(source_url)
 
     for key, kind in (
         ("source_name", "missing_source_name"),
@@ -342,7 +368,48 @@ def audit_manifest(
 
     if source_url and is_placeholder(source_url):
         source_url = ""
+        source_url_scheme = ""
         source_url_host = ""
+        source_url_path = ""
+    if source_url and not source_url_scheme:
+        findings.append(
+            finding(
+                path,
+                "error" if (allow_source_url_schemes or deny_source_url_schemes) else "warning",
+                "missing_source_url_scheme",
+                f"source_url {source_url!r} does not include a URL scheme",
+            )
+        )
+    if source_url_scheme and deny_source_url_schemes and source_url_scheme in deny_source_url_schemes:
+        findings.append(
+            finding(
+                path,
+                "error",
+                "source_url_scheme_denied",
+                f"source_url scheme {source_url_scheme!r} is denied by policy",
+            )
+        )
+    if allow_source_url_schemes:
+        if not source_url_scheme:
+            allowed_schemes = ", ".join(sorted(allow_source_url_schemes))
+            findings.append(
+                finding(
+                    path,
+                    "error",
+                    "missing_source_url_scheme",
+                    f"source_url scheme is required by policy: {allowed_schemes}",
+                )
+            )
+        elif source_url_scheme not in allow_source_url_schemes:
+            allowed_schemes = ", ".join(sorted(allow_source_url_schemes))
+            findings.append(
+                finding(
+                    path,
+                    "error",
+                    "source_url_scheme_not_allowed",
+                    f"source_url scheme {source_url_scheme!r} is not in allowed policy set: {allowed_schemes}",
+                )
+            )
     if source_url and not source_url_host:
         findings.append(
             finding(
@@ -380,6 +447,51 @@ def audit_manifest(
                     "error",
                     "source_url_host_not_allowed",
                     f"source_url host {source_url_host!r} is not in allowed policy set: {allowed_hosts}",
+                )
+            )
+
+    if source_url and not source_url_path:
+        findings.append(
+            finding(
+                path,
+                "error" if (allow_source_url_path_prefixes or deny_source_url_path_prefixes) else "warning",
+                "missing_source_url_path",
+                f"source_url {source_url!r} does not include a URL path",
+            )
+        )
+    if source_url_path and deny_source_url_path_prefixes:
+        denied_prefix = next(
+            (prefix for prefix in sorted(deny_source_url_path_prefixes) if source_url_path.startswith(prefix)),
+            "",
+        )
+        if denied_prefix:
+            findings.append(
+                finding(
+                    path,
+                    "error",
+                    "source_url_path_prefix_denied",
+                    f"source_url path {source_url_path!r} starts with denied prefix {denied_prefix!r}",
+                )
+            )
+    if allow_source_url_path_prefixes:
+        if not source_url_path:
+            allowed_prefixes = ", ".join(sorted(allow_source_url_path_prefixes))
+            findings.append(
+                finding(
+                    path,
+                    "error",
+                    "missing_source_url_path",
+                    f"source_url path is required by policy: {allowed_prefixes}",
+                )
+            )
+        elif not any(source_url_path.startswith(prefix) for prefix in allow_source_url_path_prefixes):
+            allowed_prefixes = ", ".join(sorted(allow_source_url_path_prefixes))
+            findings.append(
+                finding(
+                    path,
+                    "error",
+                    "source_url_path_prefix_not_allowed",
+                    f"source_url path {source_url_path!r} does not start with an allowed prefix: {allowed_prefixes}",
                 )
             )
 
@@ -630,7 +742,9 @@ def audit_manifest(
         source_version=clean(manifest.get("source_version")),
         license=clean(manifest.get("license")),
         source_url=source_url,
+        source_url_scheme=source_url_scheme,
         source_url_host=source_url_host,
+        source_url_path=source_url_path,
         output=clean(manifest.get("output")),
         record_count=parse_int(manifest.get("record_count")),
         source_records=parse_int(source.get("record_count")),
@@ -661,8 +775,12 @@ def load_artifacts(
     max_dataset_split_majority_answer_pct: float | None = None,
     allow_licenses: set[str] | None = None,
     deny_licenses: set[str] | None = None,
+    allow_source_url_schemes: set[str] | None = None,
+    deny_source_url_schemes: set[str] | None = None,
     allow_source_url_hosts: set[str] | None = None,
     deny_source_url_hosts: set[str] | None = None,
+    allow_source_url_path_prefixes: set[str] | None = None,
+    deny_source_url_path_prefixes: set[str] | None = None,
 ) -> list[ProvenanceArtifact]:
     artifacts: list[ProvenanceArtifact] = []
     for path in sorted(set(iter_manifest_files(paths))):
@@ -676,8 +794,12 @@ def load_artifacts(
             max_dataset_split_majority_answer_pct,
             allow_licenses,
             deny_licenses,
+            allow_source_url_schemes,
+            deny_source_url_schemes,
             allow_source_url_hosts,
             deny_source_url_hosts,
+            allow_source_url_path_prefixes,
+            deny_source_url_path_prefixes,
         )
         if artifact is not None:
             artifacts.append(artifact)
@@ -710,8 +832,8 @@ def markdown_report(report: dict[str, Any]) -> str:
     if report["artifacts"]:
         lines.extend(
             [
-                "| Status | Source | Source Name | Version | License | URL Host | Records | Majority Answer | Findings |",
-                "| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: |",
+                "| Status | Source | Source Name | Version | License | URL Scheme | URL Host | URL Path | Records | Majority Answer | Findings |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: |",
             ]
         )
         for artifact in report["artifacts"]:
@@ -719,13 +841,15 @@ def markdown_report(report: dict[str, Any]) -> str:
             if artifact["majority_answer_pct"] is not None:
                 majority = f"{artifact['majority_answer_index']} ({artifact['majority_answer_pct']:.2f}%)"
             lines.append(
-                "| {status} | {source} | {source_name} | {source_version} | {license} | {source_url_host} | {record_count} | {majority} | {findings} |".format(
+                "| {status} | {source} | {source_name} | {source_version} | {license} | {source_url_scheme} | {source_url_host} | {source_url_path} | {record_count} | {majority} | {findings} |".format(
                     status=artifact["status"],
                     source=artifact["source"],
                     source_name=artifact["source_name"] or "-",
                     source_version=artifact["source_version"] or "-",
                     license=artifact["license"] or "-",
+                    source_url_scheme=artifact["source_url_scheme"] or "-",
                     source_url_host=artifact["source_url_host"] or "-",
+                    source_url_path=artifact["source_url_path"] or "-",
                     record_count=artifact["record_count"],
                     majority=majority,
                     findings=len(artifact["findings"]),
@@ -752,7 +876,9 @@ def write_csv(artifacts: list[ProvenanceArtifact], path: Path) -> None:
         "source_version",
         "license",
         "source_url",
+        "source_url_scheme",
         "source_url_host",
+        "source_url_path",
         "output",
         "record_count",
         "source_records",
@@ -901,6 +1027,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Denied exact license or usage note after case-folding; repeatable",
     )
     parser.add_argument(
+        "--allow-source-url-scheme",
+        action="append",
+        default=[],
+        help="Allowed exact source_url scheme after case-folding; repeatable and never fetched",
+    )
+    parser.add_argument(
+        "--deny-source-url-scheme",
+        action="append",
+        default=[],
+        help="Denied exact source_url scheme after case-folding; repeatable and never fetched",
+    )
+    parser.add_argument(
         "--allow-source-url-host",
         action="append",
         default=[],
@@ -911,6 +1049,18 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         help="Denied exact source_url hostname after case-folding; repeatable and never fetched",
+    )
+    parser.add_argument(
+        "--allow-source-url-path-prefix",
+        action="append",
+        default=[],
+        help="Allowed exact source_url path prefix; repeatable and never fetched",
+    )
+    parser.add_argument(
+        "--deny-source-url-path-prefix",
+        action="append",
+        default=[],
+        help="Denied exact source_url path prefix; repeatable and never fetched",
     )
     parser.add_argument("--fail-on-findings", action="store_true", help="Return non-zero if any finding is emitted")
     return parser
@@ -945,8 +1095,12 @@ def main(argv: list[str] | None = None) -> int:
     inputs = args.input or [Path("bench/results/datasets")]
     allow_licenses = normalized_policy_values(args.allow_license)
     deny_licenses = normalized_policy_values(args.deny_license)
+    allow_source_url_schemes = normalized_policy_values(args.allow_source_url_scheme)
+    deny_source_url_schemes = normalized_policy_values(args.deny_source_url_scheme)
     allow_source_url_hosts = normalized_policy_values(args.allow_source_url_host)
     deny_source_url_hosts = normalized_policy_values(args.deny_source_url_host)
+    allow_source_url_path_prefixes = path_policy_values(args.allow_source_url_path_prefix)
+    deny_source_url_path_prefixes = path_policy_values(args.deny_source_url_path_prefix)
     try:
         artifacts = load_artifacts(
             inputs,
@@ -958,8 +1112,12 @@ def main(argv: list[str] | None = None) -> int:
             args.max_dataset_split_majority_answer_pct,
             allow_licenses or None,
             deny_licenses or None,
+            allow_source_url_schemes or None,
+            deny_source_url_schemes or None,
             allow_source_url_hosts or None,
             deny_source_url_hosts or None,
+            allow_source_url_path_prefixes or None,
+            deny_source_url_path_prefixes or None,
         )
         output = write_report(artifacts, args.output_dir)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
