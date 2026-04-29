@@ -57,6 +57,29 @@ def test_network_args_are_rejected(tmp_path: Path) -> None:
         raise AssertionError("expected network device rejection")
 
 
+def test_legacy_net_none_is_rejected_for_artifact_consistency(tmp_path: Path) -> None:
+    image = tmp_path / "temple.img"
+
+    metadata = qemu_prompt_bench.command_airgap_metadata(["qemu-system-x86_64", "-nic", "none", "-net", "none"])
+
+    assert metadata["ok"] is False
+    assert "legacy `-net none` present; benchmark artifacts must use `-nic none`" in metadata["violations"]
+
+    try:
+        qemu_prompt_bench.build_command("qemu-system-x86_64", image, ["-net", "none"])
+    except ValueError as exc:
+        assert "legacy `-net none`" in str(exc)
+    else:
+        raise AssertionError("expected legacy -net none rejection")
+
+    try:
+        qemu_prompt_bench.build_command("qemu-system-x86_64", image, ["-net=none"])
+    except ValueError as exc:
+        assert "legacy `-net=none`" in str(exc)
+    else:
+        raise AssertionError("expected legacy -net=none rejection")
+
+
 def test_qemu_args_file_parsing_and_air_gap_validation(tmp_path: Path) -> None:
     image = tmp_path / "temple.img"
     text_args = tmp_path / "qemu.args"

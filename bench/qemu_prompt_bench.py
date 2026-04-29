@@ -487,12 +487,17 @@ def command_airgap_violations(args: list[str]) -> list[str]:
             violations.append(f"non-air-gapped `{arg}`")
 
         if arg == "-net":
-            if next_arg != "none":
+            if next_arg == "none":
+                violations.append("legacy `-net none` present; benchmark artifacts must use `-nic none`")
+            else:
                 violations.append(f"networking `-net {next_arg}`")
             index += 2
             continue
-        if arg.startswith("-net=") and arg != "-net=none":
-            violations.append(f"networking `{arg}`")
+        if arg.startswith("-net="):
+            if arg == "-net=none":
+                violations.append("legacy `-net=none` present; benchmark artifacts must use `-nic none`")
+            else:
+                violations.append(f"networking `{arg}`")
 
         if arg == "-netdev" or arg.startswith("-netdev"):
             violations.append(f"network backend `{arg}`")
@@ -531,12 +536,15 @@ def reject_network_args(args: list[str]) -> None:
             raise ValueError("-nic arguments must disable networking")
 
         if arg == "-net":
-            if next_arg != "none":
-                raise ValueError("-net arguments must be exactly `-net none`")
+            if next_arg == "none":
+                raise ValueError("legacy `-net none` is redundant; benchmark runs must use injected `-nic none`")
+            raise ValueError("-net arguments must not enable networking")
             index += 2
             continue
-        if arg.startswith("-net=") and arg != "-net=none":
-            raise ValueError("-net arguments must disable networking")
+        if arg.startswith("-net="):
+            if arg == "-net=none":
+                raise ValueError("legacy `-net=none` is redundant; benchmark runs must use injected `-nic none`")
+            raise ValueError("-net arguments must not enable networking")
 
         if arg == "-netdev" or arg.startswith("-netdev"):
             raise ValueError("-netdev is not allowed for air-gapped benchmark runs")

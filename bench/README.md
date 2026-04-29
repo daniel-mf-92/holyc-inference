@@ -3,6 +3,8 @@
 This directory is for host-side benchmarking, evaluation, dataset, and quantization
 validation infrastructure around the HolyC inference engine. Tools here must keep
 TempleOS air-gapped; any QEMU command added under this tree must pass `-nic none`.
+Benchmark artifacts should not add legacy `-net none`; the launcher injects
+`-nic none`, and downstream audits treat legacy `-net` flags as drift.
 
 ## Quantization Audit
 

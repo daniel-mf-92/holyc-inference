@@ -58,6 +58,20 @@ def main() -> int:
         "missing_nic_none_airgap_violation_detail",
     ):
         return rc
+    redundant_legacy_net_metadata = qemu_prompt_bench.command_airgap_metadata(
+        ["qemu-system-x86_64", "-nic", "none", "-net", "none"]
+    )
+    if rc := require(
+        redundant_legacy_net_metadata["ok"] is False,
+        "legacy_net_none_with_nic_airgap_metadata_passed",
+    ):
+        return rc
+    if rc := require(
+        "legacy `-net none` present; benchmark artifacts must use `-nic none`"
+        in redundant_legacy_net_metadata["violations"],
+        "legacy_net_none_airgap_violation_detail",
+    ):
+        return rc
     nic_user_metadata = qemu_prompt_bench.command_airgap_metadata(["qemu-system-x86_64", "-nic", "user"])
     if rc := require(nic_user_metadata["ok"] is False, "network_nic_airgap_metadata_passed"):
         return rc

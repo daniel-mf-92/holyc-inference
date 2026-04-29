@@ -273,3 +273,4 @@
 2026-04-29T20:32:48Z | Added QEMU prompt benchmark serial-output ranking export with smoke coverage and refreshed synthetic artifacts.
 2026-04-29T20:39:22Z | Added QEMU prompt benchmark expected-token coverage gate with smoke coverage and refreshed synthetic artifacts.
 2026-04-29T20:45:04Z | Added HCEval inspection fingerprint CSV export with dataset smoke coverage and refreshed binary inspection artifacts.
+2026-04-29T20:52:10Z | Tightened QEMU prompt benchmark air-gap validation to reject redundant legacy -net none flags before artifact emission.
