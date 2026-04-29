@@ -208,6 +208,23 @@ def main() -> int:
             "unexpected_suite_serial_output_lines",
         ):
             return rc
+        if rc := require(report["suite_summary"]["exit_class_ok_runs"] == 4, "unexpected_suite_exit_ok"):
+            return rc
+        if rc := require(
+            report["suite_summary"]["exit_class_timeout_runs"] == 0,
+            "unexpected_suite_exit_timeout",
+        ):
+            return rc
+        if rc := require(
+            report["suite_summary"]["exit_class_launch_error_runs"] == 0,
+            "unexpected_suite_exit_launch_error",
+        ):
+            return rc
+        if rc := require(
+            report["suite_summary"]["exit_class_nonzero_exit_runs"] == 0,
+            "unexpected_suite_exit_nonzero",
+        ):
+            return rc
         if rc := require(
             report["telemetry_gates"]["max_serial_output_lines"] == 1,
             "missing_serial_output_line_gate",
@@ -283,9 +300,13 @@ def main() -> int:
             return rc
         if rc := require(phases["warmup"]["total_tokens"] == 80, "unexpected_warmup_phase_tokens"):
             return rc
+        if rc := require(phases["warmup"]["exit_class_ok_runs"] == 2, "unexpected_warmup_exit_ok"):
+            return rc
         if rc := require(phases["measured"]["launches"] == 4, "unexpected_measured_phase_launches"):
             return rc
         if rc := require(phases["measured"]["total_tokens"] == 160, "unexpected_measured_phase_tokens"):
+            return rc
+        if rc := require(phases["measured"]["exit_class_ok_runs"] == 4, "unexpected_measured_exit_ok"):
             return rc
         if rc := require(
             phases["measured"]["serial_output_lines_total"] == 4,
@@ -325,12 +346,18 @@ def main() -> int:
                 "wall_elapsed_us_p95",
                 "serial_output_bytes_total",
                 "serial_output_lines_total",
+                "exit_class_ok_runs",
+                "exit_class_timeout_runs",
+                "exit_class_launch_error_runs",
+                "exit_class_nonzero_exit_runs",
             }.issubset(phase_rows[0].keys()),
             "missing_phase_csv_columns",
         ):
             return rc
         summary_rows = list(csv.DictReader((output_dir / "qemu_prompt_bench_summary_latest.csv").open(encoding="utf-8", newline="")))
         if rc := require(summary_rows[0]["total_wall_elapsed_us"], "missing_summary_csv_wall_elapsed"):
+            return rc
+        if rc := require(summary_rows[0]["exit_class_ok_runs"] == "4", "missing_summary_exit_ok"):
             return rc
         if rc := require(
             "guest_prompt_sha256_mismatches" in phase_rows[0],
@@ -460,6 +487,11 @@ def main() -> int:
         if rc := require(
             "Launch Sequence Integrity" in markdown_path.read_text(encoding="utf-8"),
             "missing_launch_sequence_markdown",
+        ):
+            return rc
+        if rc := require(
+            "Exit class launch error" in markdown_path.read_text(encoding="utf-8"),
+            "missing_exit_class_markdown",
         ):
             return rc
         junit_root = ET.parse(junit_path).getroot()

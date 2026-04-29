@@ -510,7 +510,10 @@ too few prompts for a comparable run. Reports
 include separate warmup records, raw measured per-run records, an overall suite
 summary, per-phase warmup/measured/all summaries, and per-prompt medians,
 OK/failed/timeout/nonzero-exit counts, min/max tok/s, P05/P95 tok/s, and
-P05-to-P95 spread percentages in JSON and Markdown. The suite summary includes
+P05-to-P95 spread percentages in JSON and Markdown. Suite, phase, and prompt
+summaries also expose exit-class counts for ok, timeout, launch-error, and
+guest nonzero exits, making launch failures distinguishable without scanning
+raw launch rows. The suite summary includes
 measured prompt count, run count, total
 prompt bytes launched, total tokens, total elapsed time,
 OK/failed/timeout/nonzero-exit counts, P05/median/P95 tok/s, P05/median/P95

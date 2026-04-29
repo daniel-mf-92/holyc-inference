@@ -52,6 +52,7 @@ NETWORK_DEVICE_MARKERS = (
     "vmxnet",
     "xen_nic",
 )
+EXIT_CLASSES = ("ok", "timeout", "launch_error", "nonzero_exit")
 RESULT_LINE_RE = re.compile(r"(?:BENCH_RESULT|bench_result)\s*[:=]\s*(\{.*\})")
 KV_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)=([^,\s]+)")
 PROC_PIDTASKINFO = 4
@@ -786,6 +787,13 @@ def prompt_integrity_summary(runs: list[BenchRun]) -> dict[str, int]:
     }
 
 
+def exit_class_summary(runs: list[BenchRun]) -> dict[str, int]:
+    counts = {exit_class: 0 for exit_class in EXIT_CLASSES}
+    for run in runs:
+        counts[run.exit_class] = counts.get(run.exit_class, 0) + 1
+    return {f"exit_class_{exit_class}_runs": counts[exit_class] for exit_class in EXIT_CLASSES}
+
+
 def process_rss_bytes(pid: int) -> int | None:
     """Return current resident set size for a direct child process when available."""
     if sys.platform == "darwin":
@@ -1207,6 +1215,7 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
                 "serial_output_lines_max": max(serial_output_line_values)
                 if serial_output_line_values
                 else None,
+                **exit_class_summary(prompt_runs),
                 **prompt_integrity_summary(prompt_runs),
             }
         )
@@ -1680,6 +1689,7 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
         "serial_output_lines_max": max(serial_output_line_values)
         if serial_output_line_values
         else None,
+        **exit_class_summary(runs),
         **prompt_integrity_summary(runs),
     }
 
@@ -1903,6 +1913,12 @@ def markdown_report(report: dict[str, Any]) -> str:
                     **{key: format_summary_value(value) for key, value in suite.items()}
                 ),
                 "",
+                "| Exit class OK | Exit class timeout | Exit class launch error | Exit class nonzero exit |",
+                "| ---: | ---: | ---: | ---: |",
+                "| {exit_class_ok_runs} | {exit_class_timeout_runs} | {exit_class_launch_error_runs} | {exit_class_nonzero_exit_runs} |".format(
+                    **{key: format_summary_value(value) for key, value in suite.items()}
+                ),
+                "",
                 "| Guest prompt SHA records | Guest prompt SHA matches | Guest prompt SHA mismatches | Guest prompt byte records | Guest prompt byte matches | Guest prompt byte mismatches |",
                 "| ---: | ---: | ---: | ---: | ---: | ---: |",
                 "| {guest_prompt_sha256_records} | {guest_prompt_sha256_matches} | {guest_prompt_sha256_mismatches} | {guest_prompt_bytes_records} | {guest_prompt_bytes_matches} | {guest_prompt_bytes_mismatches} |".format(
@@ -2075,14 +2091,14 @@ def markdown_report(report: dict[str, Any]) -> str:
                 "",
                 "## Phase Summary",
                 "",
-                "| Phase | Launches | Prompts | OK | Failed | OK % | Timed out | Nonzero exit | Total tokens | Total wall elapsed us | Median wall elapsed us | Median tok/s | Median wall tok/s | Max memory bytes | Serial output bytes total | Serial output lines total |",
-                "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| Phase | Launches | Prompts | OK | Failed | OK % | Timed out | Nonzero exit | Exit class OK | Exit class timeout | Exit class launch error | Exit class nonzero exit | Total tokens | Total wall elapsed us | Median wall elapsed us | Median tok/s | Median wall tok/s | Max memory bytes | Serial output bytes total | Serial output lines total |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
         for row in phase_rows:
             lines.append(
                 "| {phase} | {launches} | {prompts} | {ok_runs} | {failed_runs} | {ok_run_pct} | "
-                "{timed_out_runs} | {nonzero_exit_runs} | {total_tokens} | {total_wall_elapsed_us} | {wall_elapsed_us_median} | {tok_per_s_median} | "
+                "{timed_out_runs} | {nonzero_exit_runs} | {exit_class_ok_runs} | {exit_class_timeout_runs} | {exit_class_launch_error_runs} | {exit_class_nonzero_exit_runs} | {total_tokens} | {total_wall_elapsed_us} | {wall_elapsed_us_median} | {tok_per_s_median} | "
                 "{wall_tok_per_s_median} | {memory_bytes_max} | {serial_output_bytes_total} | {serial_output_lines_total} |".format(
                     **{key: format_summary_value(value) for key, value in row.items()}
                 )
@@ -2782,6 +2798,10 @@ def write_summary_csv_report(report: dict[str, Any], path: Path) -> None:
         "ok_run_pct",
         "timed_out_runs",
         "nonzero_exit_runs",
+        "exit_class_ok_runs",
+        "exit_class_timeout_runs",
+        "exit_class_launch_error_runs",
+        "exit_class_nonzero_exit_runs",
         "tokens_median",
         "total_tokens",
         "elapsed_us_median",
@@ -2866,6 +2886,10 @@ def write_phase_csv_report(report: dict[str, Any], path: Path) -> None:
         "ok_run_pct",
         "timed_out_runs",
         "nonzero_exit_runs",
+        "exit_class_ok_runs",
+        "exit_class_timeout_runs",
+        "exit_class_launch_error_runs",
+        "exit_class_nonzero_exit_runs",
         "measured_prompt_bytes_total",
         "prompt_bytes_min",
         "prompt_bytes_max",
