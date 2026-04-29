@@ -197,6 +197,31 @@ def main() -> int:
             return rc
         if rc := require(curated_report["record_count"] == 3, "unexpected_curated_record_count"):
             return rc
+        pack_report = json.loads(pack_manifest.read_text(encoding="utf-8"))
+        if rc := require(len(pack_report["record_spans"]) == 3, "unexpected_pack_span_count"):
+            return rc
+        first_span = pack_report["record_spans"][0]
+        if rc := require(first_span["record_index"] == 0, "unexpected_pack_span_index"):
+            return rc
+        if rc := require(first_span["offset"] >= 50, "unexpected_pack_span_offset"):
+            return rc
+        if rc := require(first_span["length"] > first_span["payload_bytes"], "unexpected_pack_span_length"):
+            return rc
+        if rc := require(first_span["choice_count"] == 4, "unexpected_pack_span_choice_count"):
+            return rc
+        if rc := require(len(first_span["choice_bytes"]) == 4, "unexpected_pack_span_choice_bytes"):
+            return rc
+        if rc := require(
+            first_span["choice_bytes_total"] == sum(first_span["choice_bytes"]),
+            "unexpected_pack_span_choice_total",
+        ):
+            return rc
+        if rc := require(first_span["prompt_bytes"] > 0, "unexpected_pack_span_prompt_bytes"):
+            return rc
+        if rc := require(first_span["provenance_bytes"] > 0, "unexpected_pack_span_provenance_bytes"):
+            return rc
+        if rc := require(first_span["answer_index"] == 0, "unexpected_pack_span_answer_index"):
+            return rc
         if rc := require(
             curated_report["answer_histogram"] == {"0": 3},
             "unexpected_curated_answer_histogram",
@@ -289,6 +314,11 @@ def main() -> int:
         if rc := require(inspect_report["status"] == "pass", "unexpected_inspect_status"):
             return rc
         if rc := require(inspect_report["record_count"] == 3, "unexpected_inspect_record_count"):
+            return rc
+        if rc := require(
+            inspect_report["record_spans"] == pack_report["record_spans"],
+            "unexpected_inspect_record_spans",
+        ):
             return rc
         if rc := require("HCEval Dataset Inspection" in inspect_md.read_text(encoding="utf-8"), "missing_inspect_md"):
             return rc

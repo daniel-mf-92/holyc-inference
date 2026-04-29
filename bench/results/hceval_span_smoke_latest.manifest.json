@@ -1,0 +1,121 @@
+{
+  "answer_histogram": {
+    "0": 3
+  },
+  "binary_sha256": "5d961b26360f3181caa5d0e05a4ba49fbb99ad53aa0b07bd56c742034d4f782f",
+  "byte_stats": {
+    "max_choice_bytes": 45,
+    "max_prompt_bytes": 69,
+    "max_record_payload_bytes": 304,
+    "total_choice_bytes": 327,
+    "total_prompt_bytes": 182
+  },
+  "dataset": "smoke-eval",
+  "format": "hceval-mc",
+  "magic": "HCEVAL1\u0000",
+  "output": "bench/results/hceval_span_smoke_latest.hceval",
+  "record_count": 3,
+  "record_spans": [
+    {
+      "answer_index": 0,
+      "choice_bytes": [
+        45,
+        45,
+        39,
+        37
+      ],
+      "choice_bytes_total": 166,
+      "choice_count": 4,
+      "length": 328,
+      "offset": 147,
+      "payload_bytes": 304,
+      "prompt_bytes": 69,
+      "provenance_bytes": 36,
+      "record_id": "smoke-hellaswag-1",
+      "record_index": 0
+    },
+    {
+      "answer_index": 0,
+      "choice_bytes": [
+        11,
+        5,
+        5,
+        7
+      ],
+      "choice_bytes_total": 28,
+      "choice_count": 4,
+      "length": 160,
+      "offset": 475,
+      "payload_bytes": 136,
+      "prompt_bytes": 51,
+      "provenance_bytes": 30,
+      "record_id": "smoke-arc-1",
+      "record_index": 1
+    },
+    {
+      "answer_index": 0,
+      "choice_bytes": [
+        43,
+        37,
+        20,
+        33
+      ],
+      "choice_bytes_total": 133,
+      "choice_count": 4,
+      "length": 290,
+      "offset": 635,
+      "payload_bytes": 266,
+      "prompt_bytes": 62,
+      "provenance_bytes": 37,
+      "record_id": "smoke-truthfulqa-1",
+      "record_index": 2
+    }
+  ],
+  "records": [
+    {
+      "answer_index": 0,
+      "choices": [
+        "the lights dim and the first chord rings out.",
+        "a mechanic replaces the tire beside the road.",
+        "the recipe calls for two cups of flour.",
+        "the train leaves the station at dawn."
+      ],
+      "dataset": "hellaswag-smoke",
+      "prompt": "A musician tunes a guitar before walking onstage. The crowd quiets as",
+      "provenance": "synthetic HellaSwag-shaped smoke row",
+      "record_id": "smoke-hellaswag-1",
+      "split": "validation"
+    },
+    {
+      "answer_index": 0,
+      "choices": [
+        "thermometer",
+        "ruler",
+        "scale",
+        "compass"
+      ],
+      "dataset": "arc-smoke",
+      "prompt": "Which object is best for measuring air temperature?",
+      "provenance": "synthetic ARC-shaped smoke row",
+      "record_id": "smoke-arc-1",
+      "split": "validation"
+    },
+    {
+      "answer_index": 0,
+      "choices": [
+        "Check reliable sources before accepting it.",
+        "Assume it is true if repeated online.",
+        "Ignore all evidence.",
+        "Choose the most dramatic version."
+      ],
+      "dataset": "truthfulqa-smoke",
+      "prompt": "What should you do if a claim sounds surprising and important?",
+      "provenance": "synthetic TruthfulQA-shaped smoke row",
+      "record_id": "smoke-truthfulqa-1",
+      "split": "validation"
+    }
+  ],
+  "source_sha256": "454a4036ea4020c0c8a1ee3485ccfe07a53483dfbeb0600d78684b874ad56003",
+  "split": "validation",
+  "version": 1
+}

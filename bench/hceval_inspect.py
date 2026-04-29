@@ -166,16 +166,26 @@ def answer_histogram(records: list[InspectRecord]) -> dict[str, int]:
     return histogram
 
 
-def record_spans(records: list[InspectRecord]) -> list[dict[str, int | str]]:
-    return [
-        {
-            "record_id": record.record_id,
-            "offset": record.offset,
-            "length": record.length,
-            "payload_bytes": record.length - dataset_pack.RECORD_HEADER.size,
-        }
-        for record in records
-    ]
+def record_spans(records: list[InspectRecord]) -> list[dict[str, Any]]:
+    spans: list[dict[str, Any]] = []
+    for index, record in enumerate(records):
+        choice_bytes = [len(choice.encode("utf-8")) for choice in record.choices]
+        spans.append(
+            {
+                "record_index": index,
+                "record_id": record.record_id,
+                "offset": record.offset,
+                "length": record.length,
+                "payload_bytes": record.length - dataset_pack.RECORD_HEADER.size,
+                "prompt_bytes": len(record.prompt.encode("utf-8")),
+                "provenance_bytes": len(record.provenance.encode("utf-8")),
+                "choice_count": len(record.choices),
+                "choice_bytes": choice_bytes,
+                "choice_bytes_total": sum(choice_bytes),
+                "answer_index": record.answer_index,
+            }
+        )
+    return spans
 
 
 def byte_stats(records: list[InspectRecord]) -> dict[str, int]:

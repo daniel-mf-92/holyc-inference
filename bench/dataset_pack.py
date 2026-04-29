@@ -288,20 +288,31 @@ def metadata_bytes(dataset: str, split: str, record_count: int) -> bytes:
     return json.dumps(metadata, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
-def record_spans(records: list[EvalRecord], dataset: str, split: str) -> list[dict[str, int | str]]:
-    spans: list[dict[str, int | str]] = []
+def record_span(record: EvalRecord, index: int, offset: int) -> dict[str, Any]:
+    payload = record_bytes(record)
+    choice_bytes = [len(choice.encode("utf-8")) for choice in record.choices]
+    return {
+        "record_index": index,
+        "record_id": record.record_id,
+        "offset": offset,
+        "length": len(payload),
+        "payload_bytes": len(payload) - RECORD_HEADER.size,
+        "prompt_bytes": len(record.prompt.encode("utf-8")),
+        "provenance_bytes": len(record.provenance.encode("utf-8")),
+        "choice_count": len(record.choices),
+        "choice_bytes": choice_bytes,
+        "choice_bytes_total": sum(choice_bytes),
+        "answer_index": record.answer_index,
+    }
+
+
+def record_spans(records: list[EvalRecord], dataset: str, split: str) -> list[dict[str, Any]]:
+    spans: list[dict[str, Any]] = []
     cursor = HEADER.size + len(metadata_bytes(dataset, split, len(records)))
-    for record in records:
-        payload = record_bytes(record)
-        spans.append(
-            {
-                "record_id": record.record_id,
-                "offset": cursor,
-                "length": len(payload),
-                "payload_bytes": len(payload) - RECORD_HEADER.size,
-            }
-        )
-        cursor += len(payload)
+    for index, record in enumerate(records):
+        span = record_span(record, index, cursor)
+        spans.append(span)
+        cursor += int(span["length"])
     return spans
 
 
