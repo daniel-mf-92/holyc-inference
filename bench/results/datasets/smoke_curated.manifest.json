@@ -2,7 +2,7 @@
   "answer_histogram": {
     "0": 3
   },
-  "created_at": "2026-04-29T10:08:52Z",
+  "created_at": "2026-04-29T13:23:14Z",
   "dataset_answer_histograms": {
     "arc-smoke": {
       "0": 1
@@ -49,19 +49,24 @@
   },
   "filters": {
     "balance_answer_index": true,
-    "dedupe_within_split_payloads": false,
+    "dedupe_within_split_payloads": true,
     "include_dataset": [],
     "include_split": [],
-    "max_choice_bytes": null,
-    "max_choices": null,
-    "max_prompt_bytes": null,
-    "max_record_payload_bytes": null,
+    "max_choice_bytes": 1024,
+    "max_choices": 4,
+    "max_prompt_bytes": 4096,
+    "max_record_payload_bytes": 8192,
     "max_records": 3,
     "max_records_per_dataset": null,
-    "max_records_per_dataset_split": null,
-    "max_records_per_provenance": null,
+    "max_records_per_dataset_split": 1,
+    "max_records_per_provenance": 1,
     "max_records_per_split": null,
-    "min_choices": null,
+    "min_choices": 4,
+    "require_dataset_split": [
+      "arc-smoke:validation",
+      "hellaswag-smoke:validation",
+      "truthfulqa-smoke:validation"
+    ],
     "require_provenance": false,
     "seed": "holyc-eval-v1"
   },

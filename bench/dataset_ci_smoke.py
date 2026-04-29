@@ -233,6 +233,12 @@ def main() -> int:
             "4",
             "--max-records",
             "3",
+            "--require-dataset-split",
+            "arc-smoke:validation",
+            "--require-dataset-split",
+            "hellaswag-smoke:validation",
+            "--require-dataset-split",
+            "truthfulqa-smoke:validation",
             "--max-records-per-dataset-split",
             "1",
             "--max-records-per-provenance",
@@ -264,6 +270,12 @@ def main() -> int:
         if rc := require(curated_report["total_after_deduplication"] == 3, "unexpected_deduped_record_count"):
             return rc
         if rc := require(curated_report["record_count"] == 3, "unexpected_curated_record_count"):
+            return rc
+        if rc := require(
+            curated_report["filters"]["require_dataset_split"]
+            == ["arc-smoke:validation", "hellaswag-smoke:validation", "truthfulqa-smoke:validation"],
+            "unexpected_required_dataset_splits",
+        ):
             return rc
         pack_report = json.loads(pack_manifest.read_text(encoding="utf-8"))
         if rc := require(pack_report["binary_layout"]["record_count"] == 3, "unexpected_pack_layout_record_count"):
@@ -1588,6 +1600,36 @@ def main() -> int:
             print("conflicting_payloads_not_rejected=true", file=sys.stderr)
             return 1
         if rc := require("conflicting answers" in completed.stderr, "missing_conflicting_payload_error"):
+            return rc
+
+        missing_required_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_curate.py"),
+            "--input",
+            str(SAMPLE),
+            "--output",
+            str(tmp_path / "missing_required_curated.jsonl"),
+            "--manifest",
+            str(tmp_path / "missing_required_curated.manifest.json"),
+            "--source-name",
+            "missing-required-smoke",
+            "--require-dataset-split",
+            "missing-smoke:validation",
+        ]
+        completed = subprocess.run(
+            missing_required_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("missing_required_dataset_split_not_rejected=true", file=sys.stderr)
+            return 1
+        if rc := require(
+            "required dataset/split coverage missing after curation" in completed.stderr,
+            "missing_required_dataset_split_error",
+        ):
             return rc
 
         leak_fixture = tmp_path / "leaky.jsonl"

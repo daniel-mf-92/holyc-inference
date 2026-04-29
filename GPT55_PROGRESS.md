@@ -243,3 +243,4 @@
 2026-04-29T12:52:56Z | Added dataset provenance source URL path-prefix policy gates with smoke coverage.
 2026-04-29T13:00:52Z | Added build comparison prompt-key coverage gates with smoke coverage and refreshed build comparison artifacts.
 2026-04-29T13:09:37Z | Propagated memory-per-token and serial-output telemetry through benchmark result indexes and artifact manifests.
+2026-04-29T13:19:29Z | Added dataset curation required dataset/split coverage gates with smoke coverage and refreshed curated manifest.

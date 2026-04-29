@@ -139,6 +139,37 @@ def count_by_dataset_split(records: list[dataset_pack.EvalRecord]) -> dict[str, 
     }
 
 
+def parse_dataset_split_requirements(values: list[str]) -> list[tuple[str, str]]:
+    requirements: list[tuple[str, str]] = []
+    for value in values:
+        if ":" not in value:
+            raise ValueError(f"dataset/split requirement must use DATASET:SPLIT: {value!r}")
+        dataset, split = value.split(":", 1)
+        dataset = dataset.strip()
+        split = split.strip()
+        if not dataset or not split:
+            raise ValueError(f"dataset/split requirement must use non-empty DATASET:SPLIT: {value!r}")
+        requirements.append((dataset, split))
+    return sorted(set(requirements))
+
+
+def enforce_required_dataset_splits(
+    records: list[dataset_pack.EvalRecord],
+    requirements: list[tuple[str, str]],
+) -> None:
+    if not requirements:
+        return
+
+    counts = count_by_dataset_split(records)
+    missing = [
+        f"{dataset}:{split}"
+        for dataset, split in requirements
+        if counts.get(dataset, {}).get(split, 0) < 1
+    ]
+    if missing:
+        raise ValueError(f"required dataset/split coverage missing after curation: {', '.join(missing)}")
+
+
 def apply_filters(
     records: list[dataset_pack.EvalRecord],
     include_dataset: set[str],
@@ -335,6 +366,7 @@ def build_manifest(
             "max_prompt_bytes": args.max_prompt_bytes,
             "min_choices": args.min_choices,
             "max_record_payload_bytes": args.max_record_payload_bytes,
+            "require_dataset_split": sorted(args.require_dataset_split),
             "require_provenance": args.require_provenance,
             "dedupe_within_split_payloads": args.dedupe_within_split_payloads,
             "seed": args.seed,
@@ -372,6 +404,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--default-split", default="validation", help="Split name for rows missing split")
     parser.add_argument("--include-dataset", action="append", default=[], help="Keep only this dataset; repeatable")
     parser.add_argument("--include-split", action="append", default=[], help="Keep only this split; repeatable")
+    parser.add_argument(
+        "--require-dataset-split",
+        action="append",
+        default=[],
+        metavar="DATASET:SPLIT",
+        help="Fail if this dataset/split pair has no selected record after filters, caps, and sampling; repeatable",
+    )
     parser.add_argument("--max-records", type=int, help="Deterministically sample at most this many records")
     parser.add_argument("--min-choices", type=int, help="Keep only records with at least this many answer choices")
     parser.add_argument("--max-choices", type=int, help="Keep only records with no more than this many answer choices")
@@ -473,6 +512,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     try:
+        required_dataset_splits = parse_dataset_split_requirements(args.require_dataset_split)
+        args.require_dataset_split = [f"{dataset}:{split}" for dataset, split in required_dataset_splits]
         rows = dataset_pack.read_jsonl(args.input)
         records = dataset_pack.normalize_records(rows, args.default_dataset, args.default_split)
         filtered = apply_filters(
@@ -493,6 +534,7 @@ def main(argv: list[str] | None = None) -> int:
         capped = cap_records_by_field(capped, "provenance", args.max_records_per_provenance, args.seed)
         capped = cap_records_by_dataset_split(capped, args.max_records_per_dataset_split, args.seed)
         selected = select_records(capped, args.max_records, args.seed, args.balance_answer_index)
+        enforce_required_dataset_splits(selected, required_dataset_splits)
         if not selected:
             raise ValueError("no records selected after filters")
 

@@ -106,6 +106,7 @@ python3 bench/dataset_curate.py \
   --min-choices 4 \
   --max-choices 4 \
   --max-records-per-provenance 1 \
+  --require-dataset-split arc-smoke:validation \
   --max-records 3 \
   --balance-answer-index \
   --dedupe-within-split-payloads \
@@ -122,6 +123,9 @@ counts across HellaSwag-, ARC-, TruthfulQA-, and normalized local rows.
 Use `--max-records-per-provenance` when local source files combine multiple
 staged shards and each shard should contribute at most a fixed number of rows
 before the final global sample is selected.
+Use repeatable `--require-dataset-split DATASET:SPLIT` when a curated subset
+must retain at least one selected record for specific eval slices after
+filters, caps, deduplication, and sampling.
 Use `--dedupe-within-split-payloads` to collapse repeated normalized
 dataset/split/prompt/choices/answer rows before caps and sampling. If duplicate
 within-split prompt/choices payloads disagree on the answer index, curation
