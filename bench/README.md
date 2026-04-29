@@ -286,7 +286,8 @@ dashboard trend files without launching QEMU. It groups comparable
 profile/model/quantization/prompt-suite points, records latest-vs-previous
 throughput and memory deltas, and writes JSON, Markdown, CSV, point-history CSV,
 recent-window CSV, drift CSV, and JUnit XML under `bench/dashboards/`. Optional
-threshold gates fail CI when latest guest tok/s, host wall-clock tok/s, or
+threshold gates fail CI when latest guest tok/s or host wall-clock tok/s falls
+below an absolute floor, when latest guest tok/s, host wall-clock tok/s, or
 max-memory trends regress beyond the configured percentage, when a comparable
 trend key has too little retained history for a regression decision, or when
 command, launch-plan, or host/QEMU environment hashes drift inside a comparable
@@ -304,6 +305,8 @@ python3 bench/bench_trend_export.py \
   --fail-on-airgap \
   --fail-on-telemetry \
   --min-points-per-key 2 \
+  --min-latest-tok-per-s 25 \
+  --min-latest-wall-tok-per-s 20 \
   --fail-on-tok-regression-pct 5 \
   --fail-on-wall-tok-regression-pct 5 \
   --fail-on-memory-growth-pct 10 \

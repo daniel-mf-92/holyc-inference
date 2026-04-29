@@ -148,6 +148,10 @@ def main() -> int:
             "--fail-on-environment-drift",
             "--min-points-per-key",
             "2",
+            "--min-latest-tok-per-s",
+            "100",
+            "--min-latest-wall-tok-per-s",
+            "90",
             "--fail-on-tok-regression-pct",
             "10",
             "--fail-on-wall-tok-regression-pct",
@@ -217,6 +221,12 @@ def main() -> int:
         if thresholds["min_points_per_key"] != 2:
             print("missing_min_points_threshold=true", file=sys.stderr)
             return 1
+        if thresholds["min_latest_tok_per_s"] != 100.0:
+            print("missing_min_latest_tok_threshold=true", file=sys.stderr)
+            return 1
+        if thresholds["min_latest_wall_tok_per_s"] != 90.0:
+            print("missing_min_latest_wall_tok_threshold=true", file=sys.stderr)
+            return 1
         if thresholds["window_points"] != 2:
             print("missing_window_points_threshold=true", file=sys.stderr)
             return 1
@@ -232,6 +242,9 @@ def main() -> int:
             return 1
         if "min_points_per_key=2" not in markdown:
             print("missing_markdown_min_points=true", file=sys.stderr)
+            return 1
+        if "min_latest_tok_per_s=100.000" not in markdown:
+            print("missing_markdown_min_latest_tok=true", file=sys.stderr)
             return 1
         if "fail_on_tok_regression_pct=10.000" not in markdown:
             print("missing_markdown_threshold=true", file=sys.stderr)
@@ -372,6 +385,49 @@ def main() -> int:
         sparse_findings = "\n".join(sparse_report["findings"])
         if "below minimum 2" not in sparse_findings:
             print("missing_sparse_history_finding=true", file=sys.stderr)
+            return 1
+
+        floor_dir = tmp_path / "floor_results"
+        floor_dir.mkdir()
+        write_report(
+            floor_dir / "qemu_prompt_bench_head.json",
+            commit="floor-head",
+            generated_at="2026-04-27T12:15:00Z",
+            tok_per_s=95.0,
+            memory=64_000_000,
+        )
+        floor_completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "bench" / "bench_trend_export.py"),
+                "--input",
+                str(floor_dir),
+                "--output-dir",
+                str(tmp_path / "floor_dashboards"),
+                "--min-latest-tok-per-s",
+                "100",
+                "--min-latest-wall-tok-per-s",
+                "95",
+            ],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if floor_completed.returncode == 0:
+            print("latest_tok_floor_not_rejected=true", file=sys.stderr)
+            return 1
+        floor_report = json.loads(
+            (tmp_path / "floor_dashboards" / "bench_trend_export_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        floor_findings = "\n".join(floor_report["findings"])
+        if "latest guest tok/s" not in floor_findings:
+            print("missing_latest_guest_tok_floor_finding=true", file=sys.stderr)
+            return 1
+        if "latest wall tok/s" not in floor_findings:
+            print("missing_latest_wall_tok_floor_finding=true", file=sys.stderr)
             return 1
 
         drift_dir = tmp_path / "drift_results"

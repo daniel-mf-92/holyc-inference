@@ -254,6 +254,8 @@ def build_report(
     fail_on_launch_plan_drift: bool,
     fail_on_environment_drift: bool,
     min_points_per_key: int | None,
+    min_latest_tok_per_s: float | None,
+    min_latest_wall_tok_per_s: float | None,
     fail_on_tok_regression_pct: float | None,
     fail_on_wall_tok_regression_pct: float | None,
     fail_on_memory_growth_pct: float | None,
@@ -289,6 +291,27 @@ def build_report(
             if len(points) < min_points_per_key:
                 findings.append(
                     f"{key} has {len(points)} trend point(s), below minimum {min_points_per_key}"
+                )
+
+    if min_latest_tok_per_s is not None:
+        for row in latest:
+            latest_tok = row.get("latest_median_tok_per_s")
+            if latest_tok is None:
+                findings.append(f"{row['key']} latest guest tok/s is missing")
+            elif isinstance(latest_tok, float) and latest_tok < min_latest_tok_per_s:
+                findings.append(
+                    f"{row['key']} latest guest tok/s {latest_tok:.3f} "
+                    f"is below minimum {min_latest_tok_per_s:.3f}"
+                )
+    if min_latest_wall_tok_per_s is not None:
+        for row in latest:
+            latest_wall_tok = row.get("latest_wall_tok_per_s_median")
+            if latest_wall_tok is None:
+                findings.append(f"{row['key']} latest wall tok/s is missing")
+            elif isinstance(latest_wall_tok, float) and latest_wall_tok < min_latest_wall_tok_per_s:
+                findings.append(
+                    f"{row['key']} latest wall tok/s {latest_wall_tok:.3f} "
+                    f"is below minimum {min_latest_wall_tok_per_s:.3f}"
                 )
 
     if fail_on_tok_regression_pct is not None:
@@ -354,6 +377,8 @@ def build_report(
         or fail_on_launch_plan_drift
         or fail_on_environment_drift
         or min_points_per_key is not None
+        or min_latest_tok_per_s is not None
+        or min_latest_wall_tok_per_s is not None
         or fail_on_tok_regression_pct is not None
         or fail_on_wall_tok_regression_pct is not None
         or fail_on_memory_growth_pct is not None
@@ -374,6 +399,8 @@ def build_report(
             "fail_on_launch_plan_drift": fail_on_launch_plan_drift,
             "fail_on_environment_drift": fail_on_environment_drift,
             "min_points_per_key": min_points_per_key,
+            "min_latest_tok_per_s": min_latest_tok_per_s,
+            "min_latest_wall_tok_per_s": min_latest_wall_tok_per_s,
             "fail_on_tok_regression_pct": fail_on_tok_regression_pct,
             "fail_on_wall_tok_regression_pct": fail_on_wall_tok_regression_pct,
             "fail_on_memory_growth_pct": fail_on_memory_growth_pct,
@@ -645,6 +672,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail when any comparable trend key has fewer than this many retained points",
     )
     parser.add_argument(
+        "--min-latest-tok-per-s",
+        type=float,
+        help="Fail when any latest comparable key's guest tok/s is below this absolute floor",
+    )
+    parser.add_argument(
+        "--min-latest-wall-tok-per-s",
+        type=float,
+        help="Fail when any latest comparable key's host wall-clock tok/s is below this absolute floor",
+    )
+    parser.add_argument(
         "--fail-on-tok-regression-pct",
         type=float,
         help="Fail when latest guest tok/s falls more than this percent versus the previous point",
@@ -688,6 +725,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.min_points_per_key is not None and args.min_points_per_key <= 0:
         print("error: --min-points-per-key must be positive", file=sys.stderr)
         return 2
+    for name in ("min_latest_tok_per_s", "min_latest_wall_tok_per_s"):
+        value = getattr(args, name)
+        if value is not None and value <= 0:
+            option = "--" + name.replace("_", "-")
+            print(f"error: {option} must be positive", file=sys.stderr)
+            return 2
     for name in (
         "fail_on_tok_regression_pct",
         "fail_on_wall_tok_regression_pct",
@@ -716,6 +759,8 @@ def main(argv: list[str] | None = None) -> int:
         fail_on_launch_plan_drift=args.fail_on_launch_plan_drift,
         fail_on_environment_drift=args.fail_on_environment_drift,
         min_points_per_key=args.min_points_per_key,
+        min_latest_tok_per_s=args.min_latest_tok_per_s,
+        min_latest_wall_tok_per_s=args.min_latest_wall_tok_per_s,
         fail_on_tok_regression_pct=args.fail_on_tok_regression_pct,
         fail_on_wall_tok_regression_pct=args.fail_on_wall_tok_regression_pct,
         fail_on_memory_growth_pct=args.fail_on_memory_growth_pct,

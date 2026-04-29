@@ -442,7 +442,7 @@
     ]
   },
   "findings": [],
-  "generated_at": "2026-04-29T08:59:58Z",
+  "generated_at": "2026-04-29T09:17:41Z",
   "latest": [
     {
       "key": "-/-/-/68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
@@ -599,6 +599,8 @@
     "fail_on_window_memory_growth_pct": 10.0,
     "fail_on_window_tok_regression_pct": 5.0,
     "fail_on_window_wall_tok_regression_pct": 5.0,
+    "min_latest_tok_per_s": null,
+    "min_latest_wall_tok_per_s": null,
     "min_points_per_key": 2,
     "window_points": 5
   },
