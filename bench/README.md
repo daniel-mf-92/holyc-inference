@@ -415,8 +415,11 @@ CSV, Markdown, and JSON reports surface the maximum sampled RSS separately from
 guest-reported `memory_bytes`. The same artifacts also include derived
 `us_per_token` and `wall_us_per_token` latency metrics, plus median/P95 latency
 rollups, so dashboards can compare either throughput or per-token decode cost
-without reprocessing raw elapsed times. Suite and prompt summaries include
-`ok_run_pct` next to OK, failed, timeout, and nonzero-exit counts, making
+without reprocessing raw elapsed times. Per-run, suite, prompt, CSV, and
+Markdown outputs also include `tokens_per_prompt_byte` telemetry so runs that
+look fast because they emitted too little output for the input size can be
+gated directly. Suite and prompt summaries include `ok_run_pct` next to OK,
+failed, timeout, and nonzero-exit counts, making
 partially successful benchmark sweeps visible in JSON, Markdown, and summary
 CSV artifacts.
 
@@ -431,13 +434,13 @@ Use `--require-tokens`, `--require-tok-per-s`, `--require-memory`,
 `--require-ttft-us`, `--min-tokens`, `--min-tok-per-s`,
 `--min-wall-tok-per-s`, `--max-memory-bytes`, `--max-ttft-us`,
 `--max-host-overhead-us`, `--max-host-overhead-pct`,
-`--min-host-child-tok-per-cpu-s`, `--require-host-child-rss`, and
-`--max-host-child-rss-bytes`, and `--max-serial-output-bytes` to fail measured
-runs that omit required telemetry,
+`--min-host-child-tok-per-cpu-s`, `--min-tokens-per-prompt-byte`,
+`--require-host-child-rss`, `--max-host-child-rss-bytes`, and
+`--max-serial-output-bytes` to fail measured runs that omit required telemetry,
 produce too little work for a trustworthy throughput sample, exceed a
 host-observed latency, memory, RSS, orchestration overhead, or serial verbosity
-budget, exceed a first-token latency budget, or fall below a host child-CPU
-efficiency floor.
+budget, exceed a first-token latency budget, or fall below a host child-CPU or
+output-density floor.
 Telemetry gate failures are written as `telemetry_findings` in JSON/Markdown and as
 `benchmark_telemetry` failures in the JUnit report.
 

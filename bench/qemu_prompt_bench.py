@@ -120,6 +120,7 @@ class BenchRun:
     wall_tok_per_s: float | None
     prompt_bytes_per_s: float | None
     wall_prompt_bytes_per_s: float | None
+    tokens_per_prompt_byte: float | None
     us_per_token: float | None
     wall_us_per_token: float | None
     memory_bytes: int | None
@@ -497,6 +498,12 @@ def derived_bytes_per_s(byte_count: int, elapsed_us: int) -> float | None:
     return byte_count * 1_000_000.0 / elapsed_us
 
 
+def derived_tokens_per_prompt_byte(tokens: int | None, byte_count: int) -> float | None:
+    if tokens is None or tokens < 0 or byte_count <= 0:
+        return None
+    return tokens / byte_count
+
+
 def host_overhead_pct(host_overhead_us: int, elapsed_us: int) -> float | None:
     if elapsed_us <= 0:
         return None
@@ -731,6 +738,7 @@ def run_prompt(
     prompt_byte_count = prompt_bytes(prompt_case.prompt)
     prompt_bytes_per_s = derived_bytes_per_s(prompt_byte_count, elapsed_us)
     wall_prompt_bytes_per_s = derived_bytes_per_s(prompt_byte_count, wall_elapsed_us)
+    tokens_per_prompt_byte = derived_tokens_per_prompt_byte(tokens, prompt_byte_count)
     us_per_token = derived_us_per_token(tokens, elapsed_us)
     wall_us_per_token = derived_us_per_token(tokens, wall_elapsed_us)
     memory_bytes = extract_memory_bytes(payload)
@@ -764,6 +772,7 @@ def run_prompt(
         wall_tok_per_s=wall_tok_per_s,
         prompt_bytes_per_s=prompt_bytes_per_s,
         wall_prompt_bytes_per_s=wall_prompt_bytes_per_s,
+        tokens_per_prompt_byte=tokens_per_prompt_byte,
         us_per_token=us_per_token,
         wall_us_per_token=wall_us_per_token,
         memory_bytes=memory_bytes,
@@ -795,6 +804,11 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
             run.wall_prompt_bytes_per_s
             for run in prompt_runs
             if run.wall_prompt_bytes_per_s is not None
+        ]
+        tokens_per_prompt_byte_values = [
+            run.tokens_per_prompt_byte
+            for run in prompt_runs
+            if run.tokens_per_prompt_byte is not None
         ]
         us_per_token_values = [run.us_per_token for run in prompt_runs if run.us_per_token is not None]
         wall_us_per_token_values = [
@@ -883,6 +897,9 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
                 else None,
                 "wall_prompt_bytes_per_s_median": statistics.median(wall_prompt_bytes_per_s_values)
                 if wall_prompt_bytes_per_s_values
+                else None,
+                "tokens_per_prompt_byte_median": statistics.median(tokens_per_prompt_byte_values)
+                if tokens_per_prompt_byte_values
                 else None,
                 "us_per_token_median": statistics.median(us_per_token_values)
                 if us_per_token_values
@@ -1034,6 +1051,7 @@ def telemetry_findings(
     max_host_overhead_us: int | None = None,
     max_host_overhead_pct: float | None = None,
     min_host_child_tok_per_cpu_s: float | None = None,
+    min_tokens_per_prompt_byte: float | None = None,
     require_host_child_rss: bool = False,
     max_host_child_rss_bytes: int | None = None,
     max_serial_output_bytes: int | None = None,
@@ -1113,6 +1131,18 @@ def telemetry_findings(
                     "limit": min_host_child_tok_per_cpu_s,
                 }
             )
+        if min_tokens_per_prompt_byte is not None and (
+            run.tokens_per_prompt_byte is None
+            or run.tokens_per_prompt_byte < min_tokens_per_prompt_byte
+        ):
+            findings.append(
+                {
+                    **base,
+                    "metric": "tokens_per_prompt_byte",
+                    "value": run.tokens_per_prompt_byte,
+                    "limit": min_tokens_per_prompt_byte,
+                }
+            )
         if require_host_child_rss and run.host_child_peak_rss_bytes is None:
             findings.append(
                 {**base, "metric": "host_child_peak_rss_bytes", "value": None, "limit": "present"}
@@ -1149,6 +1179,9 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
     ]
     wall_prompt_bytes_per_s_values = [
         run.wall_prompt_bytes_per_s for run in runs if run.wall_prompt_bytes_per_s is not None
+    ]
+    tokens_per_prompt_byte_values = [
+        run.tokens_per_prompt_byte for run in runs if run.tokens_per_prompt_byte is not None
     ]
     us_per_token_values = [run.us_per_token for run in runs if run.us_per_token is not None]
     wall_us_per_token_values = [run.wall_us_per_token for run in runs if run.wall_us_per_token is not None]
@@ -1222,6 +1255,9 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
         "wall_prompt_bytes_per_s_median": statistics.median(wall_prompt_bytes_per_s_values)
         if wall_prompt_bytes_per_s_values
         else None,
+        "tokens_per_prompt_byte_median": statistics.median(tokens_per_prompt_byte_values)
+        if tokens_per_prompt_byte_values
+        else None,
         "us_per_token_median": statistics.median(us_per_token_values) if us_per_token_values else None,
         "us_per_token_p95": percentile(us_per_token_values, 95.0),
         "wall_us_per_token_median": statistics.median(wall_us_per_token_values)
@@ -1279,11 +1315,11 @@ def markdown_report(report: dict[str, Any]) -> str:
             [
                 "## Suite Summary",
                 "",
-                "| Prompts | Runs | OK | Failed | OK % | Timed out | Nonzero exit | Measured prompt bytes | Total tokens | Total elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | P05 tok/s | Median tok/s | P95 tok/s | P05 wall tok/s | Median wall tok/s | P95 wall tok/s | Median prompt bytes/s | Median wall prompt bytes/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |",
-                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| Prompts | Runs | OK | Failed | OK % | Timed out | Nonzero exit | Measured prompt bytes | Total tokens | Total elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | P05 tok/s | Median tok/s | P95 tok/s | P05 wall tok/s | Median wall tok/s | P95 wall tok/s | Median prompt bytes/s | Median wall prompt bytes/s | Median tokens/prompt byte | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
                 "| {prompts} | {runs} | {ok_runs} | {failed_runs} | {ok_run_pct} | {timed_out_runs} | {nonzero_exit_runs} | {measured_prompt_bytes_total} | {total_tokens} | {total_elapsed_us} | "
                 "{host_overhead_us_median} | {host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | {host_child_tok_per_cpu_s_median} | {host_child_peak_rss_bytes_max} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_p95} | "
-                "{wall_tok_per_s_p05} | {wall_tok_per_s_median} | {wall_tok_per_s_p95} | {prompt_bytes_per_s_median} | {wall_prompt_bytes_per_s_median} | {us_per_token_median} | {us_per_token_p95} | "
+                "{wall_tok_per_s_p05} | {wall_tok_per_s_median} | {wall_tok_per_s_p95} | {prompt_bytes_per_s_median} | {wall_prompt_bytes_per_s_median} | {tokens_per_prompt_byte_median} | {us_per_token_median} | {us_per_token_p95} | "
                 "{wall_us_per_token_median} | {wall_us_per_token_p95} | {memory_bytes_max} |".format(
                     **{key: format_summary_value(value) for key, value in suite.items()}
                 ),
@@ -1306,14 +1342,14 @@ def markdown_report(report: dict[str, Any]) -> str:
         )
     if report["summaries"]:
         lines.append(
-            "| Prompt | Prompt bytes | Runs | OK | Failed | OK % | Timed out | Nonzero exit | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | Min tok/s | P05 tok/s | Median tok/s | tok/s stdev | tok/s CV % | tok/s IQR % | P05-P95 spread % | Max tok/s | P05 wall tok/s | Median wall tok/s | P95 wall tok/s | Wall tok/s IQR % | Wall P05-P95 spread % | Median prompt bytes/s | Median wall prompt bytes/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |"
+            "| Prompt | Prompt bytes | Runs | OK | Failed | OK % | Timed out | Nonzero exit | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | Min tok/s | P05 tok/s | Median tok/s | tok/s stdev | tok/s CV % | tok/s IQR % | P05-P95 spread % | Max tok/s | P05 wall tok/s | Median wall tok/s | P95 wall tok/s | Wall tok/s IQR % | Wall P05-P95 spread % | Median prompt bytes/s | Median wall prompt bytes/s | Median tokens/prompt byte | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |"
         )
-        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for summary in report["summaries"]:
             lines.append(
                 "| {prompt} | {prompt_bytes} | {runs} | {ok_runs} | {failed_runs} | {ok_run_pct} | {timed_out_runs} | {nonzero_exit_runs} | {tokens_median} | {elapsed_us_median} | "
                 "{host_overhead_us_median} | {host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | {host_child_tok_per_cpu_s_median} | {host_child_peak_rss_bytes_max} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_min} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_stdev} | {tok_per_s_cv_pct} | {tok_per_s_iqr_pct} | {tok_per_s_p05_p95_spread_pct} | "
-                "{tok_per_s_max} | {wall_tok_per_s_p05} | {wall_tok_per_s_median} | {wall_tok_per_s_p95} | {wall_tok_per_s_iqr_pct} | {wall_tok_per_s_p05_p95_spread_pct} | {prompt_bytes_per_s_median} | {wall_prompt_bytes_per_s_median} | {us_per_token_median} | {us_per_token_p95} | "
+                "{tok_per_s_max} | {wall_tok_per_s_p05} | {wall_tok_per_s_median} | {wall_tok_per_s_p95} | {wall_tok_per_s_iqr_pct} | {wall_tok_per_s_p05_p95_spread_pct} | {prompt_bytes_per_s_median} | {wall_prompt_bytes_per_s_median} | {tokens_per_prompt_byte_median} | {us_per_token_median} | {us_per_token_p95} | "
                 "{wall_us_per_token_median} | {wall_us_per_token_p95} | {memory_bytes_max} |".format(
                     **{key: format_summary_value(value) for key, value in summary.items()}
                 )
@@ -1737,6 +1773,7 @@ def write_report(
     max_host_overhead_us: int | None = None,
     max_host_overhead_pct: float | None = None,
     min_host_child_tok_per_cpu_s: float | None = None,
+    min_tokens_per_prompt_byte: float | None = None,
     require_host_child_rss: bool = False,
     max_host_child_rss_bytes: int | None = None,
     max_serial_output_bytes: int | None = None,
@@ -1772,6 +1809,7 @@ def write_report(
         max_host_overhead_us=max_host_overhead_us,
         max_host_overhead_pct=max_host_overhead_pct,
         min_host_child_tok_per_cpu_s=min_host_child_tok_per_cpu_s,
+        min_tokens_per_prompt_byte=min_tokens_per_prompt_byte,
         require_host_child_rss=require_host_child_rss,
         max_host_child_rss_bytes=max_host_child_rss_bytes,
         max_serial_output_bytes=max_serial_output_bytes,
@@ -1811,6 +1849,7 @@ def write_report(
             "max_host_overhead_us": max_host_overhead_us,
             "max_host_overhead_pct": max_host_overhead_pct,
             "min_host_child_tok_per_cpu_s": min_host_child_tok_per_cpu_s,
+            "min_tokens_per_prompt_byte": min_tokens_per_prompt_byte,
             "require_host_child_rss": require_host_child_rss,
             "max_host_child_rss_bytes": max_host_child_rss_bytes,
             "max_serial_output_bytes": max_serial_output_bytes,
@@ -1861,6 +1900,7 @@ def write_csv_report(runs: list[BenchRun], path: Path) -> None:
         "wall_tok_per_s",
         "prompt_bytes_per_s",
         "wall_prompt_bytes_per_s",
+        "tokens_per_prompt_byte",
         "us_per_token",
         "wall_us_per_token",
         "memory_bytes",
@@ -1919,6 +1959,7 @@ def write_summary_csv_report(report: dict[str, Any], path: Path) -> None:
         "wall_tok_per_s_p05_p95_spread_pct",
         "prompt_bytes_per_s_median",
         "wall_prompt_bytes_per_s_median",
+        "tokens_per_prompt_byte_median",
         "us_per_token_median",
         "us_per_token_p95",
         "wall_us_per_token_median",
@@ -2172,6 +2213,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail if any measured run is below host child-process tokens per CPU second",
     )
     parser.add_argument(
+        "--min-tokens-per-prompt-byte",
+        type=float,
+        default=None,
+        help="Fail if any measured run emits fewer tokens per prompt input byte",
+    )
+    parser.add_argument(
         "--require-host-child-rss",
         action="store_true",
         help="Fail if any measured run omits host-observed child peak RSS telemetry",
@@ -2248,6 +2295,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.min_host_child_tok_per_cpu_s is not None and args.min_host_child_tok_per_cpu_s < 0:
         print("error: --min-host-child-tok-per-cpu-s must be >= 0", file=sys.stderr)
+        return 2
+    if args.min_tokens_per_prompt_byte is not None and args.min_tokens_per_prompt_byte < 0:
+        print("error: --min-tokens-per-prompt-byte must be >= 0", file=sys.stderr)
         return 2
     if args.max_host_child_rss_bytes is not None and args.max_host_child_rss_bytes < 0:
         print("error: --max-host-child-rss-bytes must be >= 0", file=sys.stderr)
@@ -2328,6 +2378,7 @@ def main(argv: list[str] | None = None) -> int:
         max_host_overhead_us=args.max_host_overhead_us,
         max_host_overhead_pct=args.max_host_overhead_pct,
         min_host_child_tok_per_cpu_s=args.min_host_child_tok_per_cpu_s,
+        min_tokens_per_prompt_byte=args.min_tokens_per_prompt_byte,
         require_host_child_rss=args.require_host_child_rss,
         max_host_child_rss_bytes=args.max_host_child_rss_bytes,
         max_serial_output_bytes=args.max_serial_output_bytes,

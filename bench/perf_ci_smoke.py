@@ -1147,6 +1147,8 @@ def main() -> int:
             "0.1",
             "--min-wall-tok-per-s",
             "1",
+            "--min-tokens-per-prompt-byte",
+            "0.5",
             "--max-memory-bytes",
             "100000000",
             "--output-dir",
@@ -1174,6 +1176,9 @@ def main() -> int:
             return 1
         if telemetry_gates.get("max_memory_bytes") != 100000000:
             print("missing_max_memory_gate=true", file=sys.stderr)
+            return 1
+        if telemetry_gates.get("min_tokens_per_prompt_byte") != 0.5:
+            print("missing_min_tokens_per_prompt_byte_gate=true", file=sys.stderr)
             return 1
         if suite_summary.get("tok_per_s_stdev") is None:
             print("missing_suite_tok_stdev=true", file=sys.stderr)
@@ -1213,6 +1218,9 @@ def main() -> int:
             return 1
         if suite_summary.get("host_child_cpu_pct_median") is None:
             print("missing_suite_host_child_cpu_pct=true", file=sys.stderr)
+            return 1
+        if suite_summary.get("tokens_per_prompt_byte_median") is None:
+            print("missing_suite_tokens_per_prompt_byte=true", file=sys.stderr)
             return 1
         if not all("tok_per_s_cv_pct" in row for row in bench_report["summaries"]):
             print("missing_prompt_tok_cv=true", file=sys.stderr)
@@ -1257,6 +1265,12 @@ def main() -> int:
         ):
             print("missing_prompt_ttft=true", file=sys.stderr)
             return 1
+        if not all(row.get("tokens_per_prompt_byte_median") is not None for row in bench_report["summaries"]):
+            print("missing_prompt_tokens_per_prompt_byte=true", file=sys.stderr)
+            return 1
+        if not all(row.get("tokens_per_prompt_byte") is not None for row in bench_report["benchmarks"]):
+            print("missing_run_tokens_per_prompt_byte=true", file=sys.stderr)
+            return 1
         if bench_report.get("variability_findings"):
             print("unexpected_variability_findings=true", file=sys.stderr)
             return 1
@@ -1284,6 +1298,8 @@ def main() -> int:
             "1000000",
             "--max-memory-bytes",
             "1",
+            "--min-tokens-per-prompt-byte",
+            "1000",
             "--output-dir",
             str(bench_gate_fail_dir),
         ]
@@ -1301,7 +1317,7 @@ def main() -> int:
             (bench_gate_fail_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8")
         )
         gate_metrics = {finding.get("metric") for finding in bench_gate_fail_report["telemetry_findings"]}
-        if not {"wall_tok_per_s", "memory_bytes"}.issubset(gate_metrics):
+        if not {"wall_tok_per_s", "memory_bytes", "tokens_per_prompt_byte"}.issubset(gate_metrics):
             print("missing_bench_gate_failure_metrics=true", file=sys.stderr)
             return 1
 
