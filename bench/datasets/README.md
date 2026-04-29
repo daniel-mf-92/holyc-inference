@@ -171,6 +171,7 @@ python3 bench/hceval_inspect.py \
   --output bench/results/datasets/smoke_eval.inspect.json \
   --markdown bench/results/datasets/smoke_eval.inspect.md \
   --csv bench/results/datasets/smoke_eval.inspect.csv \
+  --fingerprints-csv bench/results/datasets/smoke_eval.inspect.fingerprints.csv \
   --max-prompt-bytes 4096 \
   --max-choice-bytes 1024
 ```

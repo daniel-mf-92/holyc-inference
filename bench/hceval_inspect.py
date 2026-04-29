@@ -481,6 +481,26 @@ def write_csv(report: dict[str, Any], path: Path) -> None:
             writer.writerow({field: span.get(field, "") for field in fieldnames})
 
 
+def write_fingerprints_csv(report: dict[str, Any], path: Path) -> None:
+    fieldnames = [
+        "record_index",
+        "record_id",
+        "choice_count",
+        "answer_index",
+        "prompt_sha256",
+        "choices_sha256",
+        "input_sha256",
+        "answer_payload_sha256",
+        "full_payload_sha256",
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for fingerprint in report.get("record_fingerprints", []):
+            writer.writerow({field: fingerprint.get(field, "") for field in fieldnames})
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, required=True, help="Input .hceval file")
@@ -488,6 +508,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, help="Optional JSON inspection report path")
     parser.add_argument("--markdown", type=Path, help="Optional Markdown inspection report path")
     parser.add_argument("--csv", type=Path, help="Optional CSV record-span report path")
+    parser.add_argument(
+        "--fingerprints-csv",
+        type=Path,
+        help="Optional CSV record fingerprint report path for eval input parity joins",
+    )
     parser.add_argument("--junit", type=Path, help="Optional JUnit XML inspection report path")
     parser.add_argument("--no-records", action="store_true", help="Omit full record text from JSON output")
     parser.add_argument("--max-prompt-bytes", type=int, help="Fail if any prompt exceeds this UTF-8 byte limit")
@@ -535,6 +560,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.csv:
         write_csv(report, args.csv)
         print(f"wrote_csv={args.csv}")
+
+    if args.fingerprints_csv:
+        write_fingerprints_csv(report, args.fingerprints_csv)
+        print(f"wrote_fingerprints_csv={args.fingerprints_csv}")
 
     if args.junit:
         args.junit.parent.mkdir(parents=True, exist_ok=True)

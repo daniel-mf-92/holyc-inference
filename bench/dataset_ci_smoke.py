@@ -53,6 +53,7 @@ def main() -> int:
         inspect_json = datasets_dir / "smoke_curated.inspect.json"
         inspect_md = datasets_dir / "smoke_curated.inspect.md"
         inspect_csv = datasets_dir / "smoke_curated.inspect.csv"
+        inspect_fingerprints_csv = datasets_dir / "smoke_curated.inspect.fingerprints.csv"
         inspect_junit = datasets_dir / "smoke_curated.inspect.junit.xml"
         export_jsonl = datasets_dir / "smoke_curated.export.jsonl"
         export_manifest = datasets_dir / "smoke_curated.export.manifest.json"
@@ -415,6 +416,8 @@ def main() -> int:
             str(inspect_md),
             "--csv",
             str(inspect_csv),
+            "--fingerprints-csv",
+            str(inspect_fingerprints_csv),
             "--junit",
             str(inspect_junit),
             "--max-prompt-bytes",
@@ -469,6 +472,25 @@ def main() -> int:
             int(inspect_csv_rows[0]["choice_bytes_total"])
             == inspect_report["record_spans"][0]["choice_bytes_total"],
             "unexpected_inspect_csv_choice_total",
+        ):
+            return rc
+        inspect_fingerprint_rows = list(csv.DictReader(inspect_fingerprints_csv.open(encoding="utf-8", newline="")))
+        if rc := require(len(inspect_fingerprint_rows) == 3, "unexpected_inspect_fingerprint_csv_rows"):
+            return rc
+        if rc := require(
+            inspect_fingerprint_rows[0]["record_id"] == inspect_report["record_fingerprints"][0]["record_id"],
+            "unexpected_inspect_fingerprint_csv_record_id",
+        ):
+            return rc
+        if rc := require(
+            inspect_fingerprint_rows[0]["input_sha256"]
+            == inspect_report["record_fingerprints"][0]["input_sha256"],
+            "unexpected_inspect_fingerprint_csv_input_hash",
+        ):
+            return rc
+        if rc := require(
+            len(inspect_fingerprint_rows[0]["answer_payload_sha256"]) == 64,
+            "missing_inspect_fingerprint_csv_answer_hash",
         ):
             return rc
         inspect_root = ET.parse(inspect_junit).getroot()
