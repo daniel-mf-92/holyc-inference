@@ -390,6 +390,14 @@ python3 bench/dataset_provenance_audit.py \
   --fail-on-findings
 ```
 
+The provenance audit smoke creates a local curated fixture, verifies the
+JSON/Markdown/CSV/JUnit outputs, and checks license plus source-url policy
+failure paths without fetching any remote data:
+
+```bash
+python3 bench/dataset_provenance_audit_ci_smoke.py
+```
+
 ## Offline Eval Comparator
 
 `eval_compare.py` compares local HolyC and llama.cpp multiple-choice predictions
