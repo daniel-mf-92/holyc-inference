@@ -266,3 +266,4 @@
 2026-04-29T19:37:00Z | Added QEMU prompt benchmark command-level air-gap evidence across JSON/CSV/Markdown/JUnit artifacts.
 2026-04-29T19:43:51Z | Added QEMU prompt benchmark wall-elapsed summary telemetry and per-run gating with smoke coverage.
 2026-04-29T19:50:45Z | Added standalone dataset provenance audit CI smoke coverage and refreshed provenance reports.
+2026-04-29T20:00:03Z | Added slowest-prompt ranking export to QEMU prompt benchmark artifacts with smoke coverage.

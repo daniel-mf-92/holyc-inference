@@ -125,6 +125,7 @@ def main() -> int:
         report_path = output_dir / "qemu_prompt_bench_latest.json"
         phase_csv_path = output_dir / "qemu_prompt_bench_phases_latest.csv"
         markdown_path = output_dir / "qemu_prompt_bench_latest.md"
+        prompt_rank_csv_path = output_dir / "qemu_prompt_bench_prompt_rank_latest.csv"
         launch_csv_path = output_dir / "qemu_prompt_bench_launches_latest.csv"
         launch_jsonl_path = output_dir / "qemu_prompt_bench_launches_latest.jsonl"
         junit_path = output_dir / "qemu_prompt_bench_junit_latest.xml"
@@ -230,6 +231,18 @@ def main() -> int:
             "missing_prompt_wall_elapsed_p95",
         ):
             return rc
+        if rc := require(len(report["prompt_rankings"]) == 2, "unexpected_prompt_rank_count"):
+            return rc
+        if rc := require(
+            report["prompt_rankings"][0]["slowest_rank"] == 1,
+            "missing_first_prompt_rank",
+        ):
+            return rc
+        if rc := require(
+            report["prompt_rankings"][0]["wall_us_per_token_median"] is not None,
+            "missing_prompt_rank_wall_us_per_token",
+        ):
+            return rc
 
         phases = {row["phase"]: row for row in report["phase_summaries"]}
         if rc := require(set(phases) == {"warmup", "measured", "all"}, "unexpected_phase_rows"):
@@ -292,6 +305,22 @@ def main() -> int:
             "missing_phase_prompt_integrity_columns",
         ):
             return rc
+        prompt_rank_rows = list(csv.DictReader(prompt_rank_csv_path.open(encoding="utf-8", newline="")))
+        if rc := require(len(prompt_rank_rows) == 2, "unexpected_prompt_rank_csv_rows"):
+            return rc
+        if rc := require(prompt_rank_rows[0]["slowest_rank"] == "1", "unexpected_prompt_rank_csv_rank"):
+            return rc
+        if rc := require(
+            {
+                "prompt_suite_sha256",
+                "command_sha256",
+                "wall_us_per_token_median",
+                "wall_tok_per_s_median",
+                "ttft_us_p95",
+            }.issubset(prompt_rank_rows[0].keys()),
+            "missing_prompt_rank_csv_columns",
+        ):
+            return rc
 
         launch_rows = list(csv.DictReader(launch_csv_path.open(encoding="utf-8", newline="")))
         if rc := require(len(launch_rows) == 6, "unexpected_launch_csv_rows"):
@@ -342,6 +371,11 @@ def main() -> int:
         ):
             return rc
         if rc := require("Phase Summary" in markdown_path.read_text(encoding="utf-8"), "missing_phase_markdown"):
+            return rc
+        if rc := require(
+            "Slowest Prompts" in markdown_path.read_text(encoding="utf-8"),
+            "missing_prompt_rank_markdown",
+        ):
             return rc
         if rc := require(
             "Launch Sequence Integrity" in markdown_path.read_text(encoding="utf-8"),
