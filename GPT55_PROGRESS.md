@@ -246,3 +246,4 @@
 2026-04-29T13:19:29Z | Added dataset curation required dataset/split coverage gates with smoke coverage and refreshed curated manifest.
 2026-04-29T13:36:47Z | Added qemu prompt benchmark minimum prompt-count preflight gate with dry-run smoke artifacts.
 2026-04-29T13:44:32Z | Added quant audit duplicate complete-block and identical-run gates with smoke coverage and refreshed reports.
+2026-04-29T13:52:15Z | Added benchmark trend recent-window CV telemetry/gates with smoke coverage and refreshed dashboards.

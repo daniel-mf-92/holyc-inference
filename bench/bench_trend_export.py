@@ -132,6 +132,15 @@ def max_value(values: list[float]) -> float | None:
     return max(values) if values else None
 
 
+def cv_pct(values: list[float]) -> float | None:
+    if len(values) < 2:
+        return None
+    mean = statistics.mean(values)
+    if mean == 0:
+        return None
+    return float(statistics.pstdev(values) / abs(mean) * 100.0)
+
+
 def latest_rows(grouped: dict[str, list[TrendPoint]]) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for key, points in sorted(grouped.items()):
@@ -229,11 +238,13 @@ def window_rows(grouped: dict[str, list[TrendPoint]], window_points: int) -> lis
                 "guest_tok_per_s_min": min_value(guest_values),
                 "guest_tok_per_s_median": median(guest_values),
                 "guest_tok_per_s_max": max_value(guest_values),
+                "guest_tok_per_s_cv_pct": cv_pct(guest_values),
                 "guest_tok_per_s_delta_pct": delta_pct(first.median_tok_per_s, latest.median_tok_per_s),
                 "wall_tok_per_s_points": len(wall_values),
                 "wall_tok_per_s_min": min_value(wall_values),
                 "wall_tok_per_s_median": median(wall_values),
                 "wall_tok_per_s_max": max_value(wall_values),
+                "wall_tok_per_s_cv_pct": cv_pct(wall_values),
                 "wall_tok_per_s_delta_pct": delta_pct(
                     first.wall_tok_per_s_median,
                     latest.wall_tok_per_s_median,
@@ -242,6 +253,7 @@ def window_rows(grouped: dict[str, list[TrendPoint]], window_points: int) -> lis
                 "max_memory_bytes_min": min_value(memory_values),
                 "max_memory_bytes_median": median(memory_values),
                 "max_memory_bytes_max": max_value(memory_values),
+                "max_memory_cv_pct": cv_pct(memory_values),
                 "max_memory_delta_pct": delta_pct(
                     float(first.max_memory_bytes) if first.max_memory_bytes is not None else None,
                     float(latest.max_memory_bytes) if latest.max_memory_bytes is not None else None,
@@ -272,6 +284,9 @@ def build_report(
     fail_on_window_tok_regression_pct: float | None,
     fail_on_window_wall_tok_regression_pct: float | None,
     fail_on_window_memory_growth_pct: float | None,
+    max_window_tok_cv_pct: float | None,
+    max_window_wall_tok_cv_pct: float | None,
+    max_window_memory_cv_pct: float | None,
 ) -> dict[str, object]:
     all_points = [point for points in grouped.values() for point in points]
     latest = latest_rows(grouped)
@@ -488,6 +503,48 @@ def build_report(
                     value=delta,
                     threshold=threshold,
                 )
+    if max_window_tok_cv_pct is not None:
+        threshold = max_window_tok_cv_pct
+        for row in windows:
+            value = row.get("guest_tok_per_s_cv_pct")
+            if isinstance(value, float) and value > threshold:
+                add_finding(
+                    "window_tok_cv_pct",
+                    f"{row['key']} recent-window guest tok/s CV {value:.3f}% "
+                    f"exceeds maximum {threshold:.3f}%",
+                    key=str(row["key"]),
+                    metric="guest_tok_per_s_cv_pct",
+                    value=value,
+                    threshold=threshold,
+                )
+    if max_window_wall_tok_cv_pct is not None:
+        threshold = max_window_wall_tok_cv_pct
+        for row in windows:
+            value = row.get("wall_tok_per_s_cv_pct")
+            if isinstance(value, float) and value > threshold:
+                add_finding(
+                    "window_wall_tok_cv_pct",
+                    f"{row['key']} recent-window wall tok/s CV {value:.3f}% "
+                    f"exceeds maximum {threshold:.3f}%",
+                    key=str(row["key"]),
+                    metric="wall_tok_per_s_cv_pct",
+                    value=value,
+                    threshold=threshold,
+                )
+    if max_window_memory_cv_pct is not None:
+        threshold = max_window_memory_cv_pct
+        for row in windows:
+            value = row.get("max_memory_cv_pct")
+            if isinstance(value, float) and value > threshold:
+                add_finding(
+                    "window_memory_cv_pct",
+                    f"{row['key']} recent-window max memory CV {value:.3f}% "
+                    f"exceeds maximum {threshold:.3f}%",
+                    key=str(row["key"]),
+                    metric="max_memory_cv_pct",
+                    value=value,
+                    threshold=threshold,
+                )
 
     enabled_failure_gate = (
         fail_on_empty
@@ -505,6 +562,9 @@ def build_report(
         or fail_on_window_tok_regression_pct is not None
         or fail_on_window_wall_tok_regression_pct is not None
         or fail_on_window_memory_growth_pct is not None
+        or max_window_tok_cv_pct is not None
+        or max_window_wall_tok_cv_pct is not None
+        or max_window_memory_cv_pct is not None
     )
     status = "fail" if findings and enabled_failure_gate else "pass"
     return {
@@ -528,6 +588,9 @@ def build_report(
             "fail_on_window_tok_regression_pct": fail_on_window_tok_regression_pct,
             "fail_on_window_wall_tok_regression_pct": fail_on_window_wall_tok_regression_pct,
             "fail_on_window_memory_growth_pct": fail_on_window_memory_growth_pct,
+            "max_window_tok_cv_pct": max_window_tok_cv_pct,
+            "max_window_wall_tok_cv_pct": max_window_wall_tok_cv_pct,
+            "max_window_memory_cv_pct": max_window_memory_cv_pct,
             "window_points": window_points,
         },
         "trend_keys": len(grouped),
@@ -668,16 +731,19 @@ def write_windows_csv(rows: list[dict[str, object]], path: Path) -> None:
         "guest_tok_per_s_min",
         "guest_tok_per_s_median",
         "guest_tok_per_s_max",
+        "guest_tok_per_s_cv_pct",
         "guest_tok_per_s_delta_pct",
         "wall_tok_per_s_points",
         "wall_tok_per_s_min",
         "wall_tok_per_s_median",
         "wall_tok_per_s_max",
+        "wall_tok_per_s_cv_pct",
         "wall_tok_per_s_delta_pct",
         "max_memory_points",
         "max_memory_bytes_min",
         "max_memory_bytes_median",
         "max_memory_bytes_max",
+        "max_memory_cv_pct",
         "max_memory_delta_pct",
         "window_start_source",
         "window_end_source",
@@ -848,6 +914,21 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         help="Fail when recent-window max memory grows more than this percent from window start to latest point",
     )
+    parser.add_argument(
+        "--max-window-tok-cv-pct",
+        type=float,
+        help="Fail when recent-window guest tok/s coefficient of variation exceeds this percent",
+    )
+    parser.add_argument(
+        "--max-window-wall-tok-cv-pct",
+        type=float,
+        help="Fail when recent-window host wall-clock tok/s coefficient of variation exceeds this percent",
+    )
+    parser.add_argument(
+        "--max-window-memory-cv-pct",
+        type=float,
+        help="Fail when recent-window max memory coefficient of variation exceeds this percent",
+    )
     return parser
 
 
@@ -875,6 +956,9 @@ def main(argv: list[str] | None = None) -> int:
         "fail_on_window_tok_regression_pct",
         "fail_on_window_wall_tok_regression_pct",
         "fail_on_window_memory_growth_pct",
+        "max_window_tok_cv_pct",
+        "max_window_wall_tok_cv_pct",
+        "max_window_memory_cv_pct",
     ):
         value = getattr(args, name)
         if value is not None and value < 0:
@@ -904,6 +988,9 @@ def main(argv: list[str] | None = None) -> int:
         fail_on_window_tok_regression_pct=args.fail_on_window_tok_regression_pct,
         fail_on_window_wall_tok_regression_pct=args.fail_on_window_wall_tok_regression_pct,
         fail_on_window_memory_growth_pct=args.fail_on_window_memory_growth_pct,
+        max_window_tok_cv_pct=args.max_window_tok_cv_pct,
+        max_window_wall_tok_cv_pct=args.max_window_wall_tok_cv_pct,
+        max_window_memory_cv_pct=args.max_window_memory_cv_pct,
     )
     json_path = write_outputs(report, grouped, args.output_dir)
     print(json_path)

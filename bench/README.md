@@ -306,6 +306,11 @@ window gates compare the first retained point in that recent window against the
 latest point. Structured gate findings are also written to
 `bench_trend_export_findings_latest.csv` for dashboard filtering by gate, key,
 metric, value, and threshold.
+Recent-window rows also include guest tok/s, wall tok/s, and max-memory
+coefficient-of-variation telemetry. Use `--max-window-tok-cv-pct`,
+`--max-window-wall-tok-cv-pct`, and `--max-window-memory-cv-pct` when CI should
+reject unstable retained windows even if the latest-vs-previous point does not
+cross a regression threshold.
 
 ```bash
 python3 bench/bench_trend_export.py \
@@ -324,7 +329,10 @@ python3 bench/bench_trend_export.py \
   --fail-on-memory-growth-pct 10 \
   --fail-on-window-tok-regression-pct 5 \
   --fail-on-window-wall-tok-regression-pct 5 \
-  --fail-on-window-memory-growth-pct 10
+  --fail-on-window-memory-growth-pct 10 \
+  --max-window-tok-cv-pct 8 \
+  --max-window-wall-tok-cv-pct 8 \
+  --max-window-memory-cv-pct 8
 python3 bench/bench_trend_export_ci_smoke.py
 ```
 

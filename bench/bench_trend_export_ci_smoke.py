@@ -175,6 +175,12 @@ def main() -> int:
             "10",
             "--fail-on-window-memory-growth-pct",
             "10",
+            "--max-window-tok-cv-pct",
+            "5",
+            "--max-window-wall-tok-cv-pct",
+            "5",
+            "--max-window-memory-cv-pct",
+            "5",
             "--window-points",
             "2",
         ]
@@ -224,6 +230,15 @@ def main() -> int:
         if window["guest_tok_per_s_median"] != 107.5:
             print("unexpected_window_guest_median=true", file=sys.stderr)
             return 1
+        if abs(window["guest_tok_per_s_cv_pct"] - (2.5 / 107.5 * 100.0)) > 0.000001:
+            print("unexpected_window_guest_cv=true", file=sys.stderr)
+            return 1
+        if abs(window["wall_tok_per_s_cv_pct"] - (2.5 / 102.5 * 100.0)) > 0.000001:
+            print("unexpected_window_wall_cv=true", file=sys.stderr)
+            return 1
+        if abs(window["max_memory_cv_pct"] - (500_000.0 / 65_500_000.0 * 100.0)) > 0.000001:
+            print("unexpected_window_memory_cv=true", file=sys.stderr)
+            return 1
         drift = report["drift"]
         if drift["command_sha256"] or drift["launch_plan_sha256"] or drift["environment_sha256"]:
             print("unexpected_drift=true", file=sys.stderr)
@@ -246,6 +261,9 @@ def main() -> int:
             return 1
         if thresholds["fail_on_window_tok_regression_pct"] != 10.0:
             print("missing_window_tok_threshold=true", file=sys.stderr)
+            return 1
+        if thresholds["max_window_tok_cv_pct"] != 5.0:
+            print("missing_window_tok_cv_threshold=true", file=sys.stderr)
             return 1
         if thresholds["fail_on_command_drift"] is not True:
             print("missing_command_drift_threshold=true", file=sys.stderr)
@@ -272,7 +290,7 @@ def main() -> int:
             print("missing_points_csv_history=true", file=sys.stderr)
             return 1
         windows_csv = (output_dir / "bench_trend_export_windows_latest.csv").read_text(encoding="utf-8")
-        if "guest_tok_per_s_median" not in windows_csv or "trend-head" not in windows_csv:
+        if "guest_tok_per_s_cv_pct" not in windows_csv or "trend-head" not in windows_csv:
             print("missing_windows_csv_stats=true", file=sys.stderr)
             return 1
         drift_csv = (output_dir / "bench_trend_export_drift_latest.csv").read_text(encoding="utf-8")
@@ -613,6 +631,78 @@ def main() -> int:
             "window_memory_growth_pct",
         }.issubset(window_gates):
             print("missing_window_structured_findings=true", file=sys.stderr)
+            return 1
+
+        window_cv_dir = tmp_path / "window_cv_results"
+        window_cv_dir.mkdir()
+        write_report(
+            window_cv_dir / "qemu_prompt_bench_base.json",
+            commit="window-cv-base",
+            generated_at="2026-04-27T13:30:00Z",
+            tok_per_s=100.0,
+            memory=64_000_000,
+        )
+        write_report(
+            window_cv_dir / "qemu_prompt_bench_mid.json",
+            commit="window-cv-mid",
+            generated_at="2026-04-27T13:35:00Z",
+            tok_per_s=120.0,
+            memory=80_000_000,
+        )
+        write_report(
+            window_cv_dir / "qemu_prompt_bench_head.json",
+            commit="window-cv-head",
+            generated_at="2026-04-27T13:40:00Z",
+            tok_per_s=80.0,
+            memory=96_000_000,
+        )
+        window_cv_completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "bench" / "bench_trend_export.py"),
+                "--input",
+                str(window_cv_dir),
+                "--output-dir",
+                str(tmp_path / "window_cv_dashboards"),
+                "--window-points",
+                "3",
+                "--max-window-tok-cv-pct",
+                "10",
+                "--max-window-wall-tok-cv-pct",
+                "10",
+                "--max-window-memory-cv-pct",
+                "10",
+            ],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if window_cv_completed.returncode == 0:
+            print("window_cv_variability_not_rejected=true", file=sys.stderr)
+            return 1
+        window_cv_report = json.loads(
+            (tmp_path / "window_cv_dashboards" / "bench_trend_export_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        cv_findings = "\n".join(window_cv_report["findings"])
+        if "recent-window guest tok/s CV" not in cv_findings:
+            print("missing_window_guest_cv_finding=true", file=sys.stderr)
+            return 1
+        if "recent-window wall tok/s CV" not in cv_findings:
+            print("missing_window_wall_cv_finding=true", file=sys.stderr)
+            return 1
+        if "recent-window max memory CV" not in cv_findings:
+            print("missing_window_memory_cv_finding=true", file=sys.stderr)
+            return 1
+        cv_gates = finding_gates(window_cv_report)
+        if not {
+            "window_tok_cv_pct",
+            "window_wall_tok_cv_pct",
+            "window_memory_cv_pct",
+        }.issubset(cv_gates):
+            print("missing_window_cv_structured_findings=true", file=sys.stderr)
             return 1
 
     return 0
