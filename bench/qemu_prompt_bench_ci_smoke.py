@@ -105,6 +105,8 @@ def main() -> int:
             "2",
             "--max-serial-output-lines",
             "1",
+            "--max-wall-elapsed-us",
+            "5000000",
             "--qemu-arg=-m",
             "--qemu-arg=256M",
         ]
@@ -208,6 +210,26 @@ def main() -> int:
             "missing_serial_output_line_gate",
         ):
             return rc
+        if rc := require(
+            report["telemetry_gates"]["max_wall_elapsed_us"] == 5000000,
+            "missing_wall_elapsed_gate",
+        ):
+            return rc
+        if rc := require(
+            report["suite_summary"]["total_wall_elapsed_us"] is not None,
+            "missing_suite_total_wall_elapsed",
+        ):
+            return rc
+        if rc := require(
+            report["suite_summary"]["wall_elapsed_us_median"] is not None,
+            "missing_suite_wall_elapsed_median",
+        ):
+            return rc
+        if rc := require(
+            report["summaries"][0]["wall_elapsed_us_p95"] is not None,
+            "missing_prompt_wall_elapsed_p95",
+        ):
+            return rc
 
         phases = {row["phase"]: row for row in report["phase_summaries"]}
         if rc := require(set(phases) == {"warmup", "measured", "all"}, "unexpected_phase_rows"):
@@ -235,6 +257,11 @@ def main() -> int:
             "unexpected_measured_prompt_bytes_mismatches",
         ):
             return rc
+        if rc := require(
+            phases["measured"]["wall_elapsed_us_median"] is not None,
+            "missing_measured_wall_elapsed_median",
+        ):
+            return rc
         if rc := require(phases["all"]["launches"] == 6, "unexpected_all_phase_launches"):
             return rc
         if rc := require(phases["all"]["total_tokens"] == 240, "unexpected_all_phase_tokens"):
@@ -249,11 +276,16 @@ def main() -> int:
                 "launches",
                 "total_tokens",
                 "tok_per_s_median",
+                "wall_elapsed_us_median",
+                "wall_elapsed_us_p95",
                 "serial_output_bytes_total",
                 "serial_output_lines_total",
             }.issubset(phase_rows[0].keys()),
             "missing_phase_csv_columns",
         ):
+            return rc
+        summary_rows = list(csv.DictReader((output_dir / "qemu_prompt_bench_summary_latest.csv").open(encoding="utf-8", newline="")))
+        if rc := require(summary_rows[0]["total_wall_elapsed_us"], "missing_summary_csv_wall_elapsed"):
             return rc
         if rc := require(
             "guest_prompt_sha256_mismatches" in phase_rows[0],
