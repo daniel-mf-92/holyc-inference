@@ -206,6 +206,22 @@ NIC-enabled QEMU command is rejected:
 python3 bench/bench_artifact_manifest_ci_smoke.py
 ```
 
+`bench_result_index.py` also records measured-run dry-run coverage. A measured
+`qemu_prompt` artifact is covered when the index finds a `qemu_prompt_dry_run`
+artifact with the same profile, model, quantization, prompt-suite hash, command
+hash, launch-plan hash, and environment hash. Use `--fail-on-missing-dry-run`
+when CI should require a reviewed dry-run launch plan beside every measured
+QEMU prompt benchmark artifact:
+
+```bash
+python3 bench/bench_result_index.py \
+  --input bench/results \
+  --output-dir bench/results \
+  --fail-on-airgap \
+  --fail-on-command-hash-metadata \
+  --fail-on-missing-dry-run
+```
+
 `bench_trend_export.py` turns existing benchmark JSON artifacts into compact
 dashboard trend files without launching QEMU. It groups comparable
 profile/model/quantization/prompt-suite points, records latest-vs-previous

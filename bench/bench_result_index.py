@@ -104,6 +104,14 @@ class EnvironmentDrift:
 
 
 @dataclass(frozen=True)
+class DryRunCoverageViolation:
+    key: str
+    measured_source: str
+    generated_at: str
+    candidate_dry_run_sources: list[str]
+
+
+@dataclass(frozen=True)
 class LatestComparableArtifact:
     key: str
     history_count: int
@@ -910,6 +918,46 @@ def environment_drift(summaries: list[ArtifactSummary]) -> list[EnvironmentDrift
     return findings
 
 
+def dry_run_coverage_violations(summaries: list[ArtifactSummary]) -> list[DryRunCoverageViolation]:
+    dry_run_sources_by_key: dict[str, list[str]] = {}
+    for summary in summaries:
+        if summary.artifact_type != "qemu_prompt_dry_run":
+            continue
+        dry_run_sources_by_key.setdefault(comparable_key(summary), []).append(summary.source)
+
+    violations: list[DryRunCoverageViolation] = []
+    for summary in summaries:
+        if summary.artifact_type != "qemu_prompt":
+            continue
+        key = comparable_key(summary)
+        dry_run_sources = sorted(dry_run_sources_by_key.get(key, []))
+        if dry_run_sources:
+            continue
+        prompt_key_prefix = "/".join(
+            (
+                summary.profile or "-",
+                summary.model or "-",
+                summary.quantization or "-",
+                summary.prompt_suite_sha256 or "no-suite",
+            )
+        )
+        candidates = sorted(
+            source
+            for candidate_key, sources in dry_run_sources_by_key.items()
+            if candidate_key.startswith(prompt_key_prefix + "/")
+            for source in sources
+        )
+        violations.append(
+            DryRunCoverageViolation(
+                key=key,
+                measured_source=summary.source,
+                generated_at=summary.generated_at,
+                candidate_dry_run_sources=candidates,
+            )
+        )
+    return violations
+
+
 def comparable_key(summary: ArtifactSummary) -> str:
     return "/".join(
         (
@@ -988,6 +1036,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Command drift: {len(report['command_drift'])}",
         f"Launch-plan drift: {len(report['launch_plan_drift'])}",
         f"Environment drift: {len(report['environment_drift'])}",
+        f"Dry-run coverage violations: {len(report['dry_run_coverage_violations'])}",
         "",
     ]
     if report["artifacts"]:
@@ -1115,6 +1164,27 @@ def markdown_report(report: dict[str, Any]) -> str:
             )
     else:
         lines.extend(["", "Environment drift: none detected."])
+
+    if report["dry_run_coverage_violations"]:
+        lines.extend(
+            [
+                "",
+                "## Dry-Run Coverage",
+                "",
+                "| Comparable key | Measured artifact | Candidate dry-runs |",
+                "| --- | --- | ---: |",
+            ]
+        )
+        for finding in report["dry_run_coverage_violations"]:
+            lines.append(
+                "| {key} | {measured_source} | {candidates} |".format(
+                    key=finding["key"],
+                    measured_source=finding["measured_source"],
+                    candidates=len(finding["candidate_dry_run_sources"]),
+                )
+            )
+    else:
+        lines.extend(["", "Dry-run coverage: all measured qemu_prompt artifacts have matching dry-run plans."])
     return "\n".join(lines) + "\n"
 
 
@@ -1147,7 +1217,7 @@ def junit_report(report: dict[str, Any]) -> str:
         "testsuite",
         {
             "name": "holyc_bench_result_index",
-            "tests": "10",
+            "tests": "11",
             "failures": str(failures),
         },
     )
@@ -1284,6 +1354,8 @@ def junit_report(report: dict[str, Any]) -> str:
         )
         failure.text = "\n".join(str(row.get("key", "")) for row in environment_drift_rows)
 
+    ET.SubElement(suite, "testcase", {"name": "dry_run_coverage"})
+
     return ET.tostring(suite, encoding="unicode") + "\n"
 
 
@@ -1416,6 +1488,25 @@ def write_environment_drift_csv(findings: list[EnvironmentDrift], path: Path) ->
             )
 
 
+def write_dry_run_coverage_csv(findings: list[DryRunCoverageViolation], path: Path) -> None:
+    fields = ["key", "measured_source", "generated_at", "candidate_dry_run_count", "candidate_dry_run_sources"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for finding in findings:
+            writer.writerow(
+                {
+                    "key": finding.key,
+                    "measured_source": finding.measured_source,
+                    "generated_at": finding.generated_at,
+                    "candidate_dry_run_count": len(finding.candidate_dry_run_sources),
+                    "candidate_dry_run_sources": json.dumps(
+                        finding.candidate_dry_run_sources, separators=(",", ":")
+                    ),
+                }
+            )
+
+
 def write_latest_comparable_csv(rows: list[LatestComparableArtifact], path: Path) -> None:
     fields = [
         "key",
@@ -1452,12 +1543,20 @@ def write_latest_comparable_csv(rows: list[LatestComparableArtifact], path: Path
 
 def write_report(
     summaries: list[ArtifactSummary], output_dir: Path
-) -> tuple[Path, list[PromptSuiteDrift], list[CommandDrift], list[LaunchPlanDrift], list[EnvironmentDrift]]:
+) -> tuple[
+    Path,
+    list[PromptSuiteDrift],
+    list[CommandDrift],
+    list[LaunchPlanDrift],
+    list[EnvironmentDrift],
+    list[DryRunCoverageViolation],
+]:
     output_dir.mkdir(parents=True, exist_ok=True)
     drift = prompt_suite_drift(summaries)
     command_drift_findings = command_drift(summaries)
     launch_plan_drift_findings = launch_plan_drift(summaries)
     environment_drift_findings = environment_drift(summaries)
+    dry_run_coverage_findings = dry_run_coverage_violations(summaries)
     latest = latest_comparable_artifacts(summaries)
     report = {
         "generated_at": iso_now(),
@@ -1468,6 +1567,7 @@ def write_report(
         "command_drift": [asdict(finding) for finding in command_drift_findings],
         "launch_plan_drift": [asdict(finding) for finding in launch_plan_drift_findings],
         "environment_drift": [asdict(finding) for finding in environment_drift_findings],
+        "dry_run_coverage_violations": [asdict(finding) for finding in dry_run_coverage_findings],
     }
     json_path = output_dir / "bench_result_index_latest.json"
     md_path = output_dir / "bench_result_index_latest.md"
@@ -1476,6 +1576,7 @@ def write_report(
     command_drift_csv_path = output_dir / "bench_result_index_command_drift_latest.csv"
     launch_plan_drift_csv_path = output_dir / "bench_result_index_launch_plan_drift_latest.csv"
     environment_drift_csv_path = output_dir / "bench_result_index_environment_drift_latest.csv"
+    dry_run_coverage_csv_path = output_dir / "bench_result_index_dry_run_coverage_latest.csv"
     latest_comparable_csv_path = output_dir / "bench_result_index_latest_comparable_latest.csv"
     junit_path = output_dir / "bench_result_index_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -1486,8 +1587,16 @@ def write_report(
     write_command_drift_csv(command_drift_findings, command_drift_csv_path)
     write_launch_plan_drift_csv(launch_plan_drift_findings, launch_plan_drift_csv_path)
     write_environment_drift_csv(environment_drift_findings, environment_drift_csv_path)
+    write_dry_run_coverage_csv(dry_run_coverage_findings, dry_run_coverage_csv_path)
     write_latest_comparable_csv(latest, latest_comparable_csv_path)
-    return json_path, drift, command_drift_findings, launch_plan_drift_findings, environment_drift_findings
+    return (
+        json_path,
+        drift,
+        command_drift_findings,
+        launch_plan_drift_findings,
+        environment_drift_findings,
+        dry_run_coverage_findings,
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1541,6 +1650,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Return non-zero if comparable artifacts use different host/QEMU environment hashes",
     )
     parser.add_argument(
+        "--fail-on-missing-dry-run",
+        action="store_true",
+        help="Return non-zero if a measured qemu_prompt artifact lacks a matching dry-run launch plan",
+    )
+    parser.add_argument(
         "--fail-on-stale-commit",
         action="store_true",
         help="Return non-zero if any artifact commit differs from the current git commit",
@@ -1572,9 +1686,14 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         summaries = load_summaries(inputs, max_artifact_age_seconds=max_artifact_age_seconds)
-        output, drift, command_drift_findings, launch_plan_drift_findings, environment_drift_findings = write_report(
-            summaries, args.output_dir
-        )
+        (
+            output,
+            drift,
+            command_drift_findings,
+            launch_plan_drift_findings,
+            environment_drift_findings,
+            dry_run_coverage_findings,
+        ) = write_report(summaries, args.output_dir)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -1587,6 +1706,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"command_drift={len(command_drift_findings)}")
     print(f"launch_plan_drift={len(launch_plan_drift_findings)}")
     print(f"environment_drift={len(environment_drift_findings)}")
+    print(f"dry_run_coverage_violations={len(dry_run_coverage_findings)}")
     print(f"freshness_failures={sum(1 for summary in summaries if summary.freshness_status == 'fail')}")
     if args.fail_on_airgap and has_airgap_failures(summaries):
         return 1
@@ -1603,6 +1723,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.fail_on_launch_plan_drift and launch_plan_drift_findings:
         return 1
     if args.fail_on_environment_drift and environment_drift_findings:
+        return 1
+    if args.fail_on_missing_dry_run and dry_run_coverage_findings:
         return 1
     if args.fail_on_stale_commit and commit_drift(summaries):
         return 1

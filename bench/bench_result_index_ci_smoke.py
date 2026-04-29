@@ -274,6 +274,7 @@ def main() -> int:
         csv_path = safe_output / "bench_result_index_latest.csv"
         latest_csv_path = safe_output / "bench_result_index_latest_comparable_latest.csv"
         launch_plan_drift_csv_path = safe_output / "bench_result_index_launch_plan_drift_latest.csv"
+        dry_run_coverage_csv_path = safe_output / "bench_result_index_dry_run_coverage_latest.csv"
         junit_path = safe_output / "bench_result_index_junit_latest.xml"
         report = json.loads(report_path.read_text(encoding="utf-8"))
         if report["status"] != "pass":
@@ -284,6 +285,9 @@ def main() -> int:
             return 1
         if len(report["latest_comparable_artifacts"]) != 2:
             print("unexpected_latest_comparable_count=true", file=sys.stderr)
+            return 1
+        if report["dry_run_coverage_violations"]:
+            print("unexpected_dry_run_coverage_violations=true", file=sys.stderr)
             return 1
         if any(row["command_airgap_status"] != "pass" for row in report["artifacts"]):
             print("safe_airgap_status_not_pass=true", file=sys.stderr)
@@ -299,6 +303,9 @@ def main() -> int:
             return 1
         if "key,hash_count,source_count" not in launch_plan_drift_csv_path.read_text(encoding="utf-8"):
             print("missing_launch_plan_drift_csv=true", file=sys.stderr)
+            return 1
+        if "key,measured_source,generated_at" not in dry_run_coverage_csv_path.read_text(encoding="utf-8"):
+            print("missing_dry_run_coverage_csv=true", file=sys.stderr)
             return 1
         junit_root = ET.parse(junit_path).getroot()
         if junit_root.attrib.get("name") != "holyc_bench_result_index":
@@ -421,6 +428,25 @@ def main() -> int:
         }
         if set(drift_report["environment_drift"][0]["hashes"]) != expected_hashes:
             print("environment_drift_hashes_mismatch=true", file=sys.stderr)
+            return 1
+
+        missing_dry_run_source = tmp_path / "missing_dry_run_source"
+        missing_dry_run_source.mkdir()
+        write_qemu_report(missing_dry_run_source / "qemu_prompt_bench_measured_only.json", safe_command)
+        missing_dry_run_output = tmp_path / "missing_dry_run_index"
+        completed = run_index(missing_dry_run_source, missing_dry_run_output, "--fail-on-missing-dry-run")
+        if completed.returncode == 0:
+            print("missing_dry_run_not_rejected=true", file=sys.stderr)
+            return 1
+        missing_dry_run_report = json.loads(
+            (missing_dry_run_output / "bench_result_index_latest.json").read_text(encoding="utf-8")
+        )
+        violations = missing_dry_run_report["dry_run_coverage_violations"]
+        if len(violations) != 1:
+            print("unexpected_missing_dry_run_violation_count=true", file=sys.stderr)
+            return 1
+        if "qemu_prompt_bench_measured_only.json" not in violations[0]["measured_source"]:
+            print("missing_dry_run_source_not_reported=true", file=sys.stderr)
             return 1
 
     return 0
