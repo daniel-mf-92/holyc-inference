@@ -185,7 +185,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [ ] WS12-02 Model preparation guide: download from Hugging Face → quantize → copy to TempleOS disk
 - [ ] WS12-03 Ollama model extraction: pull Ollama blob → extract GGUF → validate
 - [ ] WS12-04 Model size calculator: predict RAM/disk requirements before loading
-- [ ] WS12-05 Reference output generator: run llama.cpp on known prompts, save expected outputs
+- [x] WS12-05 Reference output generator: run llama.cpp on known prompts, save expected outputs
 
 ### WS14 — safetensors Format Support (Hugging Face Native)
 - [ ] WS14-01 Document safetensors binary format (header JSON + raw tensor data, no pickle)
@@ -2669,6 +2669,7 @@ from a locally-loaded language model, with every token logged to the Book of Tru
 - [x] IQ-1206 Implement HolyC `FPQ16MulShiftRoundCheckedNoPartialArrayCommitOnlyPreflightOnly` in `src/math/fixedpoint.HC` as diagnostics zero-write companion over `FPQ16MulShiftRoundCheckedNoPartialArrayCommitOnly` and canonical `FPQ16MulShiftRoundCheckedNoPartialArray`, enforcing immutable `{count,lhs_capacity,rhs_capacity,out_capacity,shift}` snapshots plus strict tuple parity `{required_lhs,required_rhs,required_out}` before atomic publish; add harness `tests/test_fixedpoint_q16_mul_shift_round_checked_nopartial_array_commit_only_preflight_only.py` across alias, capacity, shift-domain, and overflow vectors (WS1-01)
 
 ## In Progress Ledger
+- 2026-04-29: WS12-05 done — added `tests/reference_q4_gpt2.py` reference-fixture generator (manual/capture modes) and `tests/test_reference_q4_gpt2.py`; validated `python3 tests/test_reference_q4_gpt2.py && ./.venv/bin/python -m pytest -q tests/test_reference_q4_gpt2.py` (ok, 3 passed).
 - 2026-04-27: IQ-1788 done — added `GPUSecPerfIQ1788` strict diagnostics parity gate in `src/gpu/security_perf_matrix.HC`, added `tests/test_iq1788.py`, validated `python3 tests/test_iq1788.py && ./.venv/bin/python -m pytest -q tests/test_iq1788.py` (ok, 6 passed).
 - 2026-04-27: IQ-1785 done — added `GPUSecPerfIQ1785` in `src/gpu/security_perf_matrix.HC`, added `tests/test_iq1785.py`, validated `python3 tests/test_iq1785.py && ./.venv/bin/python -m pytest -q tests/test_iq1785.py` (ok, 6 passed).
 - 2026-04-27: IQ-1798 done — added `BotTokenEmitDiagReplayCommit` in `src/model/inference.HC`, added `tests/test_iq1798_bot_commit.py`, validated `python3 tests/test_iq1798_bot_commit.py` (ok).
