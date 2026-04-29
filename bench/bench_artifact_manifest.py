@@ -58,6 +58,10 @@ class ManifestArtifact:
     host_child_peak_rss_bytes_max: int | None
     us_per_token_median: float | None
     wall_us_per_token_median: float | None
+    memory_bytes_per_token_median: float | None
+    memory_bytes_per_token_max: float | None
+    serial_output_bytes_total: int | None
+    serial_output_bytes_max: int | None
     max_memory_bytes: int | None
     telemetry_status: str
     telemetry_findings: list[str]
@@ -140,6 +144,10 @@ def to_manifest_artifact(summary: bench_result_index.ArtifactSummary) -> Manifes
         host_child_peak_rss_bytes_max=summary.host_child_peak_rss_bytes_max,
         us_per_token_median=summary.us_per_token_median,
         wall_us_per_token_median=summary.wall_us_per_token_median,
+        memory_bytes_per_token_median=summary.memory_bytes_per_token_median,
+        memory_bytes_per_token_max=summary.memory_bytes_per_token_max,
+        serial_output_bytes_total=summary.serial_output_bytes_total,
+        serial_output_bytes_max=summary.serial_output_bytes_max,
         max_memory_bytes=summary.max_memory_bytes,
         telemetry_status=summary.telemetry_status,
         telemetry_findings=summary.telemetry_findings,
@@ -274,8 +282,8 @@ def markdown_report(report: dict[str, object]) -> str:
     if latest:
         lines.extend(
             [
-                "| Key | Status | Air-gap | Telemetry | Command Hash | Freshness | Commit | Host | QEMU | Prompts | Total tokens | Total elapsed us | Runs | Warmups | Age seconds | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Max memory bytes | Command SHA256 | Launch plan SHA256 | Env SHA256 | Artifact SHA256 | Source |",
-                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- |",
+                "| Key | Status | Air-gap | Telemetry | Command Hash | Freshness | Commit | Host | QEMU | Prompts | Total tokens | Total elapsed us | Runs | Warmups | Age seconds | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Memory bytes/token | Max memory bytes/token | Serial bytes total | Serial bytes max | Max memory bytes | Command SHA256 | Launch plan SHA256 | Env SHA256 | Artifact SHA256 | Source |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- |",
             ]
         )
         for artifact in latest:
@@ -288,7 +296,9 @@ def markdown_report(report: dict[str, object]) -> str:
                 "{ttft_us_p95} | {host_overhead_pct_median} | {host_child_cpu_us_median} | "
                 "{host_child_cpu_pct_median} | {host_child_tok_per_cpu_s_median} | "
                 "{host_child_peak_rss_bytes_max} | {us_per_token_median} | {wall_us_per_token_median} | "
-                "{max_memory_bytes} | {command_sha256} | {launch_plan_sha256} | {environment_sha256} | "
+                "{memory_bytes_per_token_median} | {memory_bytes_per_token_max} | "
+                "{serial_output_bytes_total} | {serial_output_bytes_max} | {max_memory_bytes} | "
+                "{command_sha256} | {launch_plan_sha256} | {environment_sha256} | "
                 "{sha256} | {source} |".format(**values)
             )
     else:
@@ -400,6 +410,10 @@ def write_csv(artifacts: list[ManifestArtifact], path: Path) -> None:
         "host_child_peak_rss_bytes_max",
         "us_per_token_median",
         "wall_us_per_token_median",
+        "memory_bytes_per_token_median",
+        "memory_bytes_per_token_max",
+        "serial_output_bytes_total",
+        "serial_output_bytes_max",
         "max_memory_bytes",
         "telemetry_status",
         "telemetry_findings",

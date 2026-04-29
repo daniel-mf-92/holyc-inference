@@ -63,6 +63,8 @@ def write_qemu_report(
                         "tokens": 32,
                         "elapsed_us": 200000,
                         "tok_per_s": 160.0,
+                        "memory_bytes_per_token": 2099200.0,
+                        "serial_output_bytes": 4096,
                         "returncode": 0,
                         "timed_out": False,
                     }
@@ -73,6 +75,10 @@ def write_qemu_report(
                         "tok_per_s_median": 160.0,
                         "wall_tok_per_s_median": 150.0,
                         "ttft_us_p95": 12000.0,
+                        "memory_bytes_per_token_median": 2099200.0,
+                        "memory_bytes_per_token_max": 2099200.0,
+                        "serial_output_bytes_total": 4096,
+                        "serial_output_bytes_max": 4096,
                         "memory_bytes_max": 67174400,
                     }
                 ],
@@ -83,6 +89,10 @@ def write_qemu_report(
                     "tok_per_s_median": 160.0,
                     "wall_tok_per_s_median": 150.0,
                     "ttft_us_p95": 12000.0,
+                    "memory_bytes_per_token_median": 2099200.0,
+                    "memory_bytes_per_token_max": 2099200.0,
+                    "serial_output_bytes_total": 4096,
+                    "serial_output_bytes_max": 4096,
                     "memory_bytes_max": 67174400,
                 },
             },
@@ -208,11 +218,20 @@ def main() -> int:
         if artifact.get("sha256") != hashlib.sha256(safe_report.read_bytes()).hexdigest():
             print("manifest_artifact_hash_mismatch=true", file=sys.stderr)
             return 1
+        if artifact.get("memory_bytes_per_token_median") != 2099200.0:
+            print("missing_manifest_memory_per_token=true", file=sys.stderr)
+            return 1
+        if artifact.get("serial_output_bytes_total") != 4096:
+            print("missing_manifest_serial_output_bytes=true", file=sys.stderr)
+            return 1
         if "Benchmark Artifact Manifest" not in markdown_path.read_text(encoding="utf-8"):
             print("missing_manifest_markdown=true", file=sys.stderr)
             return 1
         if "key,source,artifact_type,status" not in csv_path.read_text(encoding="utf-8"):
             print("missing_manifest_csv=true", file=sys.stderr)
+            return 1
+        if "memory_bytes_per_token_median,memory_bytes_per_token_max,serial_output_bytes_total,serial_output_bytes_max" not in csv_path.read_text(encoding="utf-8"):
+            print("missing_manifest_resource_density_csv=true", file=sys.stderr)
             return 1
         if "key,source,artifact_type,status" not in history_csv_path.read_text(encoding="utf-8"):
             print("missing_manifest_history_csv=true", file=sys.stderr)

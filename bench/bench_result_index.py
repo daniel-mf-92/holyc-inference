@@ -59,6 +59,10 @@ class ArtifactSummary:
     host_child_peak_rss_bytes_max: int | None
     us_per_token_median: float | None
     wall_us_per_token_median: float | None
+    memory_bytes_per_token_median: float | None
+    memory_bytes_per_token_max: float | None
+    serial_output_bytes_total: int | None
+    serial_output_bytes_max: int | None
     max_memory_bytes: int | None
     telemetry_status: str
     telemetry_findings: list[str]
@@ -135,6 +139,10 @@ class LatestComparableArtifact:
     ttft_us_p95: float | None
     host_child_tok_per_cpu_s_median: float | None
     host_child_peak_rss_bytes_max: int | None
+    memory_bytes_per_token_median: float | None
+    memory_bytes_per_token_max: float | None
+    serial_output_bytes_total: int | None
+    serial_output_bytes_max: int | None
     max_memory_bytes: int | None
 
 
@@ -518,6 +526,10 @@ def summarize_qemu_report(
         host_child_peak_rss_bytes_max=parse_int(summary_float(report, summaries, "host_child_peak_rss_bytes_max")),
         us_per_token_median=summary_float(report, summaries, "us_per_token_median"),
         wall_us_per_token_median=summary_float(report, summaries, "wall_us_per_token_median"),
+        memory_bytes_per_token_median=summary_float(report, summaries, "memory_bytes_per_token_median"),
+        memory_bytes_per_token_max=summary_float(report, summaries, "memory_bytes_per_token_max"),
+        serial_output_bytes_total=parse_int(suite_summary.get("serial_output_bytes_total")),
+        serial_output_bytes_max=parse_int(suite_summary.get("serial_output_bytes_max")),
         max_memory_bytes=max_memory_bytes,
         telemetry_status=telem_status,
         telemetry_findings=telem_findings,
@@ -612,6 +624,10 @@ def summarize_dry_run_report(
         host_child_peak_rss_bytes_max=None,
         us_per_token_median=None,
         wall_us_per_token_median=None,
+        memory_bytes_per_token_median=None,
+        memory_bytes_per_token_max=None,
+        serial_output_bytes_total=None,
+        serial_output_bytes_max=None,
         max_memory_bytes=None,
         telemetry_status=telem_status,
         telemetry_findings=telem_findings,
@@ -703,6 +719,10 @@ def summarize_matrix_report(
                 host_child_peak_rss_bytes_max=parse_int(cell.get("host_child_peak_rss_bytes_max")),
                 us_per_token_median=parse_float(cell.get("us_per_token_median")),
                 wall_us_per_token_median=parse_float(cell.get("wall_us_per_token_median")),
+                memory_bytes_per_token_median=parse_float(cell.get("memory_bytes_per_token_median")),
+                memory_bytes_per_token_max=parse_float(cell.get("memory_bytes_per_token_max")),
+                serial_output_bytes_total=parse_int(cell.get("serial_output_bytes_total")),
+                serial_output_bytes_max=parse_int(cell.get("serial_output_bytes_max")),
                 max_memory_bytes=parse_int(cell.get("max_memory_bytes")),
                 telemetry_status=telem_status,
                 telemetry_findings=telem_findings,
@@ -1012,6 +1032,10 @@ def latest_comparable_artifacts(summaries: list[ArtifactSummary]) -> list[Latest
                 ttft_us_p95=selected.ttft_us_p95,
                 host_child_tok_per_cpu_s_median=selected.host_child_tok_per_cpu_s_median,
                 host_child_peak_rss_bytes_max=selected.host_child_peak_rss_bytes_max,
+                memory_bytes_per_token_median=selected.memory_bytes_per_token_median,
+                memory_bytes_per_token_max=selected.memory_bytes_per_token_max,
+                serial_output_bytes_total=selected.serial_output_bytes_total,
+                serial_output_bytes_max=selected.serial_output_bytes_max,
                 max_memory_bytes=selected.max_memory_bytes,
             )
         )
@@ -1042,8 +1066,8 @@ def markdown_report(report: dict[str, Any]) -> str:
     if report["artifacts"]:
         lines.extend(
             [
-                "| Type | Status | Air-gap | Telemetry | Freshness | Commit | Profile | Model | Quant | Prompt suite | Command SHA256 | Launch plan SHA256 | Env SHA256 | Host | QEMU | Prompts | Total tokens | Total elapsed us | Runs | Warmups | Age seconds | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Max memory bytes | Source |",
-                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+                "| Type | Status | Air-gap | Telemetry | Freshness | Commit | Profile | Model | Quant | Prompt suite | Command SHA256 | Launch plan SHA256 | Env SHA256 | Host | QEMU | Prompts | Total tokens | Total elapsed us | Runs | Warmups | Age seconds | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Memory bytes/token | Max memory bytes/token | Serial bytes total | Serial bytes max | Max memory bytes | Source |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
             ]
         )
         for artifact in report["artifacts"]:
@@ -1057,6 +1081,8 @@ def markdown_report(report: dict[str, Any]) -> str:
                 "{host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | "
                 "{host_child_tok_per_cpu_s_median} | {host_child_peak_rss_bytes_max} | "
                 "{us_per_token_median} | {wall_us_per_token_median} | "
+                "{memory_bytes_per_token_median} | {memory_bytes_per_token_max} | "
+                "{serial_output_bytes_total} | {serial_output_bytes_max} | "
                 "{max_memory_bytes} | {source} |".format(**values)
             )
     else:
@@ -1068,8 +1094,8 @@ def markdown_report(report: dict[str, Any]) -> str:
                 "",
                 "## Latest Comparable Artifacts",
                 "",
-                "| Key | History | Status | Generated | Runs | Tokens | Guest tok/s | Wall tok/s | Guest us/token | Wall us/token | P95 TTFT us | Host child tok/CPU s | Host child RSS bytes | Max memory bytes | Source |",
-                "| --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+                "| Key | History | Status | Generated | Runs | Tokens | Guest tok/s | Wall tok/s | Guest us/token | Wall us/token | P95 TTFT us | Host child tok/CPU s | Host child RSS bytes | Memory bytes/token | Max memory bytes/token | Serial bytes total | Serial bytes max | Max memory bytes | Source |",
+                "| --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
             ]
         )
         for artifact in report["latest_comparable_artifacts"]:
@@ -1078,7 +1104,9 @@ def markdown_report(report: dict[str, Any]) -> str:
                 "| {key} | {history_count} | {status} | {generated_at} | {measured_runs} | {total_tokens} | "
                 "{median_tok_per_s} | {wall_tok_per_s_median} | {us_per_token_median} | "
                 "{wall_us_per_token_median} | {ttft_us_p95} | {host_child_tok_per_cpu_s_median} | "
-                "{host_child_peak_rss_bytes_max} | {max_memory_bytes} | {source} |".format(**values)
+                "{host_child_peak_rss_bytes_max} | {memory_bytes_per_token_median} | "
+                "{memory_bytes_per_token_max} | {serial_output_bytes_total} | "
+                "{serial_output_bytes_max} | {max_memory_bytes} | {source} |".format(**values)
             )
 
     if report["prompt_suite_drift"]:
@@ -1408,6 +1436,10 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
         "host_child_peak_rss_bytes_max",
         "us_per_token_median",
         "wall_us_per_token_median",
+        "memory_bytes_per_token_median",
+        "memory_bytes_per_token_max",
+        "serial_output_bytes_total",
+        "serial_output_bytes_max",
         "max_memory_bytes",
         "telemetry_status",
         "telemetry_findings",
@@ -1547,6 +1579,10 @@ def write_latest_comparable_csv(rows: list[LatestComparableArtifact], path: Path
         "ttft_us_p95",
         "host_child_tok_per_cpu_s_median",
         "host_child_peak_rss_bytes_max",
+        "memory_bytes_per_token_median",
+        "memory_bytes_per_token_max",
+        "serial_output_bytes_total",
+        "serial_output_bytes_max",
         "max_memory_bytes",
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:

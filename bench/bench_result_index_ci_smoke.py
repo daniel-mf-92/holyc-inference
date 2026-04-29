@@ -92,6 +92,8 @@ def write_qemu_report(
                         "wall_tok_per_s": 145.45,
                         "ttft_us": 12000,
                         "memory_bytes": 67174400,
+                        "memory_bytes_per_token": 2099200.0,
+                        "serial_output_bytes": 4096,
                         "returncode": 0,
                         "timed_out": False,
                     }
@@ -109,6 +111,10 @@ def write_qemu_report(
                         "host_child_peak_rss_bytes_max": 73400320,
                         "us_per_token_median": 6250.0,
                         "wall_us_per_token_median": 6875.0,
+                        "memory_bytes_per_token_median": 2099200.0,
+                        "memory_bytes_per_token_max": 2099200.0,
+                        "serial_output_bytes_total": 4096,
+                        "serial_output_bytes_max": 4096,
                         "memory_bytes_max": 67174400,
                     }
                 ],
@@ -120,6 +126,10 @@ def write_qemu_report(
                     "wall_tok_per_s_median": 145.45,
                     "ttft_us_p95": 12000.0,
                     "host_overhead_pct_median": 10.0,
+                    "memory_bytes_per_token_median": 2099200.0,
+                    "memory_bytes_per_token_max": 2099200.0,
+                    "serial_output_bytes_total": 4096,
+                    "serial_output_bytes_max": 4096,
                     "memory_bytes_max": 67174400,
                 },
             },
@@ -205,6 +215,10 @@ def write_matrix_report(path: Path, command: list[str]) -> None:
                         "ttft_us_p95": 10000.0,
                         "host_child_tok_per_cpu_s_median": 210.0,
                         "host_child_peak_rss_bytes_max": 73400320,
+                        "memory_bytes_per_token_median": 1049600.0,
+                        "memory_bytes_per_token_max": 1049600.0,
+                        "serial_output_bytes_total": 8192,
+                        "serial_output_bytes_max": 8192,
                         "max_memory_bytes": 67174400,
                     }
                 ],
@@ -286,6 +300,13 @@ def main() -> int:
         if len(report["latest_comparable_artifacts"]) != 2:
             print("unexpected_latest_comparable_count=true", file=sys.stderr)
             return 1
+        qemu_artifact = next(row for row in report["artifacts"] if row["artifact_type"] == "qemu_prompt")
+        if qemu_artifact.get("memory_bytes_per_token_median") != 2099200.0:
+            print("missing_index_memory_per_token=true", file=sys.stderr)
+            return 1
+        if qemu_artifact.get("serial_output_bytes_total") != 4096:
+            print("missing_index_serial_output_bytes=true", file=sys.stderr)
+            return 1
         if report["dry_run_coverage_violations"]:
             print("unexpected_dry_run_coverage_violations=true", file=sys.stderr)
             return 1
@@ -298,8 +319,14 @@ def main() -> int:
         if "source,artifact_type,status" not in csv_path.read_text(encoding="utf-8"):
             print("missing_index_csv=true", file=sys.stderr)
             return 1
+        if "memory_bytes_per_token_median,memory_bytes_per_token_max,serial_output_bytes_total,serial_output_bytes_max" not in csv_path.read_text(encoding="utf-8"):
+            print("missing_index_resource_density_csv=true", file=sys.stderr)
+            return 1
         if "key,history_count,source" not in latest_csv_path.read_text(encoding="utf-8"):
             print("missing_latest_comparable_csv=true", file=sys.stderr)
+            return 1
+        if "memory_bytes_per_token_median,memory_bytes_per_token_max,serial_output_bytes_total,serial_output_bytes_max" not in latest_csv_path.read_text(encoding="utf-8"):
+            print("missing_latest_resource_density_csv=true", file=sys.stderr)
             return 1
         if "key,hash_count,source_count" not in launch_plan_drift_csv_path.read_text(encoding="utf-8"):
             print("missing_launch_plan_drift_csv=true", file=sys.stderr)

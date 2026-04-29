@@ -253,9 +253,10 @@ python3 bench/dataset_ci_smoke.py
 ```
 
 `bench_artifact_manifest.py` builds latest/history manifests for benchmark
-artifacts and can gate air-gap status, telemetry, commit metadata, command
-hashes, artifact freshness, per-key history coverage, matching dry-run launch
-plans, and comparable host/QEMU environment stability. Use
+artifacts, including memory-per-token and serial-output telemetry when present,
+and can gate air-gap status, telemetry, commit metadata, command hashes,
+artifact freshness, per-key history coverage, matching dry-run launch plans,
+and comparable host/QEMU environment stability. Use
 `--fail-on-environment-drift` when CI should reject throughput comparisons whose
 profile/model/quantization/prompt-suite/command/launch-plan keys span multiple
 environment fingerprints. `bench_artifact_manifest_ci_smoke.py` is a
@@ -747,11 +748,12 @@ python3 bench/bench_matrix.py \
 
 `bench_result_index.py` scans existing QEMU prompt, QEMU prompt dry-run, and
 matrix JSON reports, rolls their tok/s, wall-clock tok/s, TTFT, host-overhead,
-per-token latency, host child CPU efficiency/RSS, memory, prompt-suite,
-emitted-token, elapsed-time, and run-count metadata into a single
-JSON/Markdown/CSV/JUnit XML index, and checks each recorded QEMU command for
-explicit `-nic none` air-gap compliance. Dry-run reports are indexed as planned
-launch artifacts: their command hash is recomputed, planned warmup/measured
+per-token latency, host child CPU efficiency/RSS, memory, memory-per-token,
+serial-output, prompt-suite, emitted-token, elapsed-time, and run-count
+metadata into a single JSON/Markdown/CSV/JUnit XML index, and checks each
+recorded QEMU command for explicit `-nic none` air-gap compliance. Dry-run
+reports are indexed as planned launch artifacts: their command hash is
+recomputed, planned warmup/measured
 launch counts are checked against the launch plan, and they are excluded from
 latest comparable throughput rollups because they have no measured tok/s. It
 also reports prompt-suite drift when comparable profile/model/quantization
