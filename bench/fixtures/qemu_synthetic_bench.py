@@ -35,6 +35,7 @@ def main() -> int:
                 "elapsed_us": elapsed_us,
                 "time_to_first_token_us": ttft_us,
                 "memory_bytes": memory_bytes,
+                "prompt_bytes": len(prompt.encode("utf-8")),
                 "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
             }
         )

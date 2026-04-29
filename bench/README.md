@@ -403,9 +403,12 @@ benchmark changes can be separated from prompt-suite size drift. Per-run
 records also include optional guest-reported prompt SHA256 telemetry from
 `prompt_sha256`, `input_sha256`, `prompt_hash`, or `input_hash`, plus a
 host-side match flag so CI can prove the guest benchmarked the exact prompt
-sent by the host. Per-run records also include stdout, stderr, and combined
-serial output byte counts. Suite and prompt summaries roll those up so verbose
-guest logging can be gated
+sent by the host. They also record optional guest-reported prompt byte counts
+from `prompt_bytes`, `input_bytes`, `prompt_size_bytes`, or `input_size_bytes`
+with a host-side match flag, giving CI a cheap independent check that the guest
+consumed the same input length. Per-run records also include stdout, stderr,
+and combined serial output byte counts. Suite and prompt summaries roll those
+up so verbose guest logging can be gated
 separately from decode throughput. Optional first-token latency telemetry is
 normalized from `ttft_us`, `time_to_first_token_us`, `first_token_us`, and their
 `_ms` or `_s` variants into `ttft_us`; suite and per-prompt reports include
@@ -430,7 +433,7 @@ Prompt files can be JSON, JSONL, or plain text split with `---`. Guest output ma
 include a JSON line such as:
 
 ```text
-BENCH_RESULT: {"tokens": 128, "elapsed_us": 500000, "ttft_us": 42000, "tok_per_s": 256.0, "prompt_sha256": "..."}
+BENCH_RESULT: {"tokens": 128, "elapsed_us": 500000, "ttft_us": 42000, "tok_per_s": 256.0, "prompt_sha256": "...", "prompt_bytes": 512}
 ```
 
 Memory telemetry is optional. The runner normalizes `memory_bytes`,
@@ -482,13 +485,13 @@ Use `--require-tokens`, `--require-tok-per-s`, `--require-memory`,
 `--max-wall-timeout-pct`, `--min-host-child-tok-per-cpu-s`,
 `--min-tokens-per-prompt-byte`, `--require-host-child-rss`,
 `--max-host-child-rss-bytes`, `--max-memory-bytes-per-token`,
-`--max-serial-output-bytes`, and `--require-guest-prompt-sha256-match` to fail
-measured runs or suites that omit required
+`--max-serial-output-bytes`, `--require-guest-prompt-sha256-match`, and
+`--require-guest-prompt-bytes-match` to fail measured runs or suites that omit required
 telemetry, produce too little work for a trustworthy throughput sample, exceed
 a host-observed latency, memory, RSS, orchestration overhead, or serial
 verbosity budget, exceed a first-token latency or timeout-budget threshold, fall
 below a host child-CPU or output-density floor, or report a missing/mismatched
-guest prompt hash.
+guest prompt hash or byte count.
 Telemetry gate failures are written as `telemetry_findings` in JSON/Markdown and as
 `benchmark_telemetry` failures in the JUnit report.
 
@@ -520,6 +523,7 @@ python3 bench/qemu_prompt_bench.py \
   --max-memory-bytes-per-token 16777216 \
   --max-serial-output-bytes 65536 \
   --require-guest-prompt-sha256-match \
+  --require-guest-prompt-bytes-match \
   --qemu-args-file bench/fixtures/local-qemu.args \
   --hash-image \
   -- -m 512M

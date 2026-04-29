@@ -1252,6 +1252,7 @@ def main() -> int:
             "100000000",
             "--max-memory-bytes-per-token",
             "3000000",
+            "--require-guest-prompt-bytes-match",
             "--output-dir",
             str(bench_output_dir),
         ]
@@ -1300,6 +1301,9 @@ def main() -> int:
             return 1
         if telemetry_gates.get("max_memory_bytes_per_token") != 3000000.0:
             print("missing_max_memory_per_token_gate=true", file=sys.stderr)
+            return 1
+        if telemetry_gates.get("require_guest_prompt_bytes_match") is not True:
+            print("missing_guest_prompt_bytes_gate=true", file=sys.stderr)
             return 1
         if telemetry_gates.get("min_tokens_per_prompt_byte") != 0.5:
             print("missing_min_tokens_per_prompt_byte_gate=true", file=sys.stderr)
@@ -1404,6 +1408,13 @@ def main() -> int:
         if not all(row.get("tokens_per_prompt_byte") is not None for row in bench_report["benchmarks"]):
             print("missing_run_tokens_per_prompt_byte=true", file=sys.stderr)
             return 1
+        if not all(
+            row.get("guest_prompt_bytes") == row.get("prompt_bytes")
+            and row.get("guest_prompt_bytes_match") is True
+            for row in bench_report["benchmarks"]
+        ):
+            print("missing_run_guest_prompt_bytes_match=true", file=sys.stderr)
+            return 1
         if not all(row.get("memory_bytes_per_token_median") is not None for row in bench_report["summaries"]):
             print("missing_prompt_memory_per_token=true", file=sys.stderr)
             return 1
@@ -1468,6 +1479,64 @@ def main() -> int:
             "total_tokens",
         }.issubset(gate_metrics):
             print("missing_bench_gate_failure_metrics=true", file=sys.stderr)
+            return 1
+
+        bad_prompt_bytes_qemu = tmp_path / "qemu_bad_prompt_bytes.py"
+        bad_prompt_bytes_qemu.write_text(
+            """#!/usr/bin/env python3
+import hashlib
+import json
+import sys
+
+prompt = sys.stdin.read()
+print("BENCH_RESULT: " + json.dumps({
+    "tokens": 8,
+    "elapsed_us": 100000,
+    "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+    "prompt_bytes": len(prompt.encode("utf-8")) + 1,
+}))
+""",
+            encoding="utf-8",
+        )
+        bad_prompt_bytes_qemu.chmod(0o755)
+        bad_prompt_bytes_dir = tmp_path / "qemu_prompt_bench_bad_prompt_bytes"
+        bad_prompt_bytes_command = [
+            sys.executable,
+            str(ROOT / "bench" / "qemu_prompt_bench.py"),
+            "--image",
+            "/tmp/TempleOS.synthetic.img",
+            "--prompts",
+            str(ROOT / "bench" / "prompts" / "smoke.jsonl"),
+            "--qemu-bin",
+            str(bad_prompt_bytes_qemu),
+            "--profile",
+            "ci-airgap-smoke",
+            "--model",
+            "synthetic-smoke",
+            "--quantization",
+            "Q4_0",
+            "--require-guest-prompt-bytes-match",
+            "--output-dir",
+            str(bad_prompt_bytes_dir),
+        ]
+        completed = subprocess.run(
+            bad_prompt_bytes_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("guest_prompt_bytes_gate_did_not_fail=true", file=sys.stderr)
+            return 1
+        bad_prompt_bytes_report = json.loads(
+            (bad_prompt_bytes_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8")
+        )
+        bad_prompt_bytes_metrics = {
+            finding.get("metric") for finding in bad_prompt_bytes_report["telemetry_findings"]
+        }
+        if "guest_prompt_bytes_match" not in bad_prompt_bytes_metrics:
+            print("missing_guest_prompt_bytes_gate_failure=true", file=sys.stderr)
             return 1
 
         matrix_output_dir = tmp_path / "bench_matrix"

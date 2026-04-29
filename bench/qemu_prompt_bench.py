@@ -105,6 +105,8 @@ class BenchRun:
     guest_prompt_sha256: str | None
     guest_prompt_sha256_match: bool | None
     prompt_bytes: int
+    guest_prompt_bytes: int | None
+    guest_prompt_bytes_match: bool | None
     iteration: int
     commit: str
     timestamp: str
@@ -473,6 +475,14 @@ def extract_guest_prompt_sha256(payload: dict[str, Any]) -> str | None:
     return None
 
 
+def extract_guest_prompt_bytes(payload: dict[str, Any]) -> int | None:
+    for key in ("prompt_bytes", "input_bytes", "prompt_size_bytes", "input_size_bytes"):
+        parsed = parse_int(payload.get(key))
+        if parsed is not None and parsed >= 0:
+            return parsed
+    return None
+
+
 def extract_elapsed_us(payload: dict[str, Any], wall_elapsed_us: int) -> int:
     for key in ("elapsed_us", "elapsed_usec", "duration_us", "total_us"):
         parsed = parse_int(payload.get(key))
@@ -766,6 +776,7 @@ def run_prompt(
     tokens = extract_tokens(payload)
     host_prompt_sha256 = prompt_hash(prompt_case.prompt)
     guest_prompt_sha256 = extract_guest_prompt_sha256(payload)
+    guest_prompt_bytes = extract_guest_prompt_bytes(payload)
     elapsed_us = extract_elapsed_us(payload, wall_elapsed_us)
     host_overhead_us = wall_elapsed_us - elapsed_us
     ttft_us = extract_ttft_us(payload)
@@ -796,6 +807,10 @@ def run_prompt(
         if guest_prompt_sha256 is None
         else guest_prompt_sha256 == host_prompt_sha256,
         prompt_bytes=prompt_byte_count,
+        guest_prompt_bytes=guest_prompt_bytes,
+        guest_prompt_bytes_match=None
+        if guest_prompt_bytes is None
+        else guest_prompt_bytes == prompt_byte_count,
         iteration=iteration,
         commit=metadata["commit"],
         timestamp=iso_now(),
@@ -1117,6 +1132,7 @@ def telemetry_findings(
     max_memory_bytes_per_token: float | None = None,
     max_serial_output_bytes: int | None = None,
     require_guest_prompt_sha256_match: bool = False,
+    require_guest_prompt_bytes_match: bool = False,
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     if min_total_tokens is not None:
@@ -1275,6 +1291,15 @@ def telemetry_findings(
                     "metric": "guest_prompt_sha256_match",
                     "value": run.guest_prompt_sha256,
                     "limit": run.prompt_sha256,
+                }
+            )
+        if require_guest_prompt_bytes_match and run.guest_prompt_bytes_match is not True:
+            findings.append(
+                {
+                    **base,
+                    "metric": "guest_prompt_bytes_match",
+                    "value": run.guest_prompt_bytes,
+                    "limit": run.prompt_bytes,
                 }
             )
     return findings
@@ -1904,6 +1929,7 @@ def write_report(
     max_memory_bytes_per_token: float | None = None,
     max_serial_output_bytes: int | None = None,
     require_guest_prompt_sha256_match: bool = False,
+    require_guest_prompt_bytes_match: bool = False,
     max_launches: int | None = None,
     environment: dict[str, Any] | None = None,
     image: dict[str, Any] | None = None,
@@ -1945,6 +1971,7 @@ def write_report(
         max_memory_bytes_per_token=max_memory_bytes_per_token,
         max_serial_output_bytes=max_serial_output_bytes,
         require_guest_prompt_sha256_match=require_guest_prompt_sha256_match,
+        require_guest_prompt_bytes_match=require_guest_prompt_bytes_match,
     )
     report = {
         "generated_at": iso_now(),
@@ -1991,6 +2018,7 @@ def write_report(
             "max_memory_bytes_per_token": max_memory_bytes_per_token,
             "max_serial_output_bytes": max_serial_output_bytes,
             "require_guest_prompt_sha256_match": require_guest_prompt_sha256_match,
+            "require_guest_prompt_bytes_match": require_guest_prompt_bytes_match,
         },
         "telemetry_findings": telemetry,
         "benchmarks": [asdict(run) for run in runs],
@@ -2025,6 +2053,8 @@ def write_csv_report(runs: list[BenchRun], path: Path) -> None:
         "guest_prompt_sha256",
         "guest_prompt_sha256_match",
         "prompt_bytes",
+        "guest_prompt_bytes",
+        "guest_prompt_bytes_match",
         "phase",
         "launch_index",
         "iteration",
@@ -2151,6 +2181,8 @@ def write_launch_csv_report(report: dict[str, Any], path: Path) -> None:
         "guest_prompt_sha256",
         "guest_prompt_sha256_match",
         "prompt_bytes",
+        "guest_prompt_bytes",
+        "guest_prompt_bytes_match",
         "iteration",
         "returncode",
         "timed_out",
@@ -2255,6 +2287,8 @@ def write_junit_report(
                 f"wall_prompt_bytes_per_s={format_summary_value(run.wall_prompt_bytes_per_s)}\n"
                 f"guest_prompt_sha256={format_summary_value(run.guest_prompt_sha256)}\n"
                 f"guest_prompt_sha256_match={format_summary_value(run.guest_prompt_sha256_match)}\n"
+                f"guest_prompt_bytes={format_summary_value(run.guest_prompt_bytes)}\n"
+                f"guest_prompt_bytes_match={format_summary_value(run.guest_prompt_bytes_match)}\n"
                 f"us_per_token={format_summary_value(run.us_per_token)}\n"
                 f"wall_us_per_token={format_summary_value(run.wall_us_per_token)}\n"
                 f"memory_bytes_per_token={format_summary_value(run.memory_bytes_per_token)}\n"
@@ -2463,6 +2497,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fail if guest-reported prompt SHA-256 is missing or differs from the host prompt",
     )
+    parser.add_argument(
+        "--require-guest-prompt-bytes-match",
+        action="store_true",
+        help="Fail if guest-reported prompt byte count is missing or differs from the host prompt",
+    )
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--profile", default="default")
     parser.add_argument("--model", default="")
@@ -2633,6 +2672,7 @@ def main(argv: list[str] | None = None) -> int:
         max_memory_bytes_per_token=args.max_memory_bytes_per_token,
         max_serial_output_bytes=args.max_serial_output_bytes,
         require_guest_prompt_sha256_match=args.require_guest_prompt_sha256_match,
+        require_guest_prompt_bytes_match=args.require_guest_prompt_bytes_match,
         max_launches=args.max_launches,
         environment=host_environment(args.qemu_bin),
         image=image,
