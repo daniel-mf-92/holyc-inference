@@ -124,6 +124,8 @@ print("BENCH_RESULT: " + json.dumps({"tokens": 64, "elapsed_us": 250000, "tok_pe
 
     assert run.returncode == 0
     assert run.tokens == 64
+    assert run.guest_prompt_sha256 is None
+    assert run.guest_prompt_sha256_match is None
     assert run.elapsed_us == 250000
     assert run.timeout_seconds == 5.0
     assert run.wall_timeout_pct is not None
@@ -318,7 +320,7 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
     assert report["environment"]["qemu_version"] is None
     csv_report = (output_dir / "qemu_prompt_bench_latest.csv").read_text(encoding="utf-8")
     summary_csv_report = (output_dir / "qemu_prompt_bench_summary_latest.csv").read_text(encoding="utf-8")
-    assert "prompt_sha256,prompt_bytes,iteration" in csv_report
+    assert "prompt_sha256,guest_prompt_sha256,guest_prompt_sha256_match,prompt_bytes" in csv_report
     assert "host_overhead_us,host_overhead_pct" in csv_report
     assert "timeout_seconds,wall_timeout_pct" in csv_report
     assert "wall_tok_per_s" in csv_report
@@ -833,6 +835,102 @@ print("verbose debug line", file=sys.stderr)
         }
     ]
     assert junit_root.attrib["failures"] == "1"
+
+
+def test_cli_guest_prompt_sha256_gate_fails_missing_or_mismatch(tmp_path: Path) -> None:
+    fake_qemu = tmp_path / "fake-qemu.py"
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    output_dir = tmp_path / "results"
+    prompts.write_text(
+        '{"prompt_id":"missing","prompt":"Missing hash"}\n{"prompt_id":"bad","prompt":"Bad hash"}\n',
+        encoding="utf-8",
+    )
+    fake_qemu.write_text(
+        """#!/usr/bin/env python3
+import os
+prompt_id = os.environ["HOLYC_BENCH_PROMPT_ID"]
+if prompt_id == "bad":
+    print("tokens=12 elapsed_us=100000 prompt_sha256=" + ("0" * 64))
+else:
+    print("tokens=12 elapsed_us=100000")
+""",
+        encoding="utf-8",
+    )
+    fake_qemu.chmod(0o755)
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--qemu-bin",
+            str(fake_qemu),
+            "--output-dir",
+            str(output_dir),
+            "--require-guest-prompt-sha256-match",
+        ]
+    )
+
+    assert status == 1
+    report = json.loads((output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8"))
+    markdown = (output_dir / "qemu_prompt_bench_latest.md").read_text(encoding="utf-8")
+    csv_report = (output_dir / "qemu_prompt_bench_latest.csv").read_text(encoding="utf-8")
+    launch_csv = (output_dir / "qemu_prompt_bench_launches_latest.csv").read_text(encoding="utf-8")
+    junit_root = ET.parse(output_dir / "qemu_prompt_bench_junit_latest.xml").getroot()
+
+    assert report["status"] == "fail"
+    assert report["telemetry_gates"]["require_guest_prompt_sha256_match"] is True
+    assert [run["guest_prompt_sha256_match"] for run in report["benchmarks"]] == [None, False]
+    assert [finding["metric"] for finding in report["telemetry_findings"]] == [
+        "guest_prompt_sha256_match",
+        "guest_prompt_sha256_match",
+    ]
+    assert {finding["prompt"] for finding in report["telemetry_findings"]} == {"missing", "bad"}
+    assert "guest_prompt_sha256_match" in markdown
+    assert "guest_prompt_sha256_match" in csv_report
+    assert "guest_prompt_sha256_match" in launch_csv
+    assert junit_root.attrib["failures"] == "2"
+
+
+def test_cli_guest_prompt_sha256_gate_passes_matching_hash(tmp_path: Path) -> None:
+    fake_qemu = tmp_path / "fake-qemu.py"
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    output_dir = tmp_path / "results"
+    prompts.write_text('{"prompt_id":"one","prompt":"Exact prompt"}\n', encoding="utf-8")
+    fake_qemu.write_text(
+        """#!/usr/bin/env python3
+import hashlib
+import os
+prompt = os.environ["HOLYC_BENCH_PROMPT"]
+print(f"tokens=12 elapsed_us=100000 prompt_sha256={hashlib.sha256(prompt.encode()).hexdigest()}")
+""",
+        encoding="utf-8",
+    )
+    fake_qemu.chmod(0o755)
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--qemu-bin",
+            str(fake_qemu),
+            "--output-dir",
+            str(output_dir),
+            "--require-guest-prompt-sha256-match",
+        ]
+    )
+
+    assert status == 0
+    report = json.loads((output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8"))
+    assert report["status"] == "pass"
+    assert report["benchmarks"][0]["guest_prompt_sha256"] == report["benchmarks"][0]["prompt_sha256"]
+    assert report["benchmarks"][0]["guest_prompt_sha256_match"] is True
+    assert report["telemetry_findings"] == []
 
 
 def test_cli_junit_reports_failed_qemu_run(tmp_path: Path) -> None:

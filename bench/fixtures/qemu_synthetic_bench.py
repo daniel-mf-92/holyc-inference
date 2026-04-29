@@ -8,6 +8,7 @@ report generation can be refreshed without booting a guest.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
@@ -34,6 +35,7 @@ def main() -> int:
                 "elapsed_us": elapsed_us,
                 "time_to_first_token_us": ttft_us,
                 "memory_bytes": memory_bytes,
+                "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
             }
         )
     )
