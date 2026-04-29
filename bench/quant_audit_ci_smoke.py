@@ -97,6 +97,8 @@ def main() -> int:
             "1",
             "--min-quant-positive-count",
             "1",
+            "--max-quant-sign-balance-delta",
+            "2",
             "--output",
             str(pass_json),
             "--markdown",
@@ -357,6 +359,8 @@ def main() -> int:
             str(bad_q8_unsigned),
             "--min-quant-negative-count",
             "1",
+            "--max-quant-sign-balance-delta",
+            "8",
             "--output",
             str(bad_q8_unsigned_json),
         ]
@@ -385,6 +389,11 @@ def main() -> int:
         if rc := require(
             any("negative quant payload entries 0 below minimum 1" in finding for finding in bad_q8_unsigned_audit["findings"]),
             "missing_unsigned_quant_finding",
+        ):
+            return rc
+        if rc := require(
+            any("quant sign balance delta 31 exceeds limit 8" in finding for finding in bad_q8_unsigned_audit["findings"]),
+            "missing_unsigned_quant_balance_finding",
         ):
             return rc
 

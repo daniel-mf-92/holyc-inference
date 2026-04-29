@@ -498,6 +498,7 @@ def check_quant_sign_distribution(
     quant_histogram: dict[str, int],
     min_quant_negative_count: int | None,
     min_quant_positive_count: int | None,
+    max_quant_sign_balance_delta: int | None,
 ) -> tuple[int, int, int]:
     negative_count = sum(
         count for value, count in quant_histogram.items() if int(value) < 0
@@ -525,6 +526,16 @@ def check_quant_sign_distribution(
             "positive quant payload entries {actual} below minimum {limit}".format(
                 actual=positive_count,
                 limit=min_quant_positive_count,
+            )
+        )
+    if (
+        max_quant_sign_balance_delta is not None
+        and balance_delta > max_quant_sign_balance_delta
+    ):
+        findings.append(
+            "quant sign balance delta {actual} exceeds limit {limit}".format(
+                actual=balance_delta,
+                limit=max_quant_sign_balance_delta,
             )
         )
 
@@ -622,6 +633,7 @@ def audit_q4_0_blocks(
     min_q4_nibble_lane_used_quant_values: int | None = None,
     min_quant_negative_count: int | None = None,
     min_quant_positive_count: int | None = None,
+    max_quant_sign_balance_delta: int | None = None,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -814,6 +826,7 @@ def audit_q4_0_blocks(
         quant_histogram,
         min_quant_negative_count,
         min_quant_positive_count,
+        max_quant_sign_balance_delta,
     )
     (
         q4_low_nibble_used_value_count,
@@ -904,6 +917,7 @@ def audit_q8_0_blocks(
     min_q4_nibble_lane_used_quant_values: int | None = None,
     min_quant_negative_count: int | None = None,
     min_quant_positive_count: int | None = None,
+    max_quant_sign_balance_delta: int | None = None,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -1086,6 +1100,7 @@ def audit_q8_0_blocks(
         quant_histogram,
         min_quant_negative_count,
         min_quant_positive_count,
+        max_quant_sign_balance_delta,
     )
 
     return BlockAudit(
@@ -1167,6 +1182,7 @@ def audit_blocks(
     min_q4_nibble_lane_used_quant_values: int | None = None,
     min_quant_negative_count: int | None = None,
     min_quant_positive_count: int | None = None,
+    max_quant_sign_balance_delta: int | None = None,
 ) -> BlockAudit:
     if quant_format == "q4_0":
         return audit_q4_0_blocks(
@@ -1191,6 +1207,7 @@ def audit_blocks(
             min_q4_nibble_lane_used_quant_values,
             min_quant_negative_count,
             min_quant_positive_count,
+            max_quant_sign_balance_delta,
         )
     if quant_format == "q8_0":
         return audit_q8_0_blocks(
@@ -1215,6 +1232,7 @@ def audit_blocks(
             min_q4_nibble_lane_used_quant_values,
             min_quant_negative_count,
             min_quant_positive_count,
+            max_quant_sign_balance_delta,
         )
     raise ValueError(f"unsupported quant format: {quant_format}")
 
@@ -1611,6 +1629,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Fail block streams whose signed quant payload has fewer positive entries than this",
     )
+    parser.add_argument(
+        "--max-quant-sign-balance-delta",
+        type=int,
+        help="Fail block streams whose absolute negative-vs-positive payload count delta exceeds this",
+    )
     parser.add_argument("--allow-inf-nan-scale", action="store_true", help="Do not fail on fp16 inf/nan scales")
     parser.add_argument("--output", type=Path, help="Write JSON report to this path")
     parser.add_argument("--markdown", type=Path, help="Write Markdown report to this path")
@@ -1652,6 +1675,7 @@ def main(argv: list[str] | None = None) -> int:
             args.min_q4_nibble_lane_used_quant_values,
             args.min_quant_negative_count,
             args.min_quant_positive_count,
+            args.max_quant_sign_balance_delta,
         )
         for path, quant_format in block_specs
     ]
