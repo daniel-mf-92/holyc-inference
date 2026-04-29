@@ -24,6 +24,7 @@ def write_report(
     wall_tok_per_s: float | None = None,
     ttft_us: int | None = None,
     memory_bytes: int = 4096,
+    serial_output_bytes: int = 8192,
     prompt_suite_sha256: str = "suite-a",
     command_sha256: str = "command-a",
 ) -> None:
@@ -38,6 +39,7 @@ def write_report(
         "elapsed_us": elapsed_us,
         "tok_per_s": tok_per_s,
         "memory_bytes": memory_bytes,
+        "serial_output_bytes": serial_output_bytes,
         "command_sha256": command_sha256,
         "returncode": 0,
         "timed_out": False,
@@ -155,6 +157,9 @@ def test_compare_builds_computes_tok_per_s_and_elapsed_deltas(tmp_path: Path) ->
     assert deltas[0].baseline_memory_bytes == 4096
     assert deltas[0].candidate_memory_bytes == 5120
     assert deltas[0].memory_delta_pct == 25.0
+    assert deltas[0].baseline_serial_output_bytes == 8192
+    assert deltas[0].candidate_serial_output_bytes == 8192
+    assert deltas[0].serial_output_delta_pct == 0.0
     assert deltas[0].key == "qemu_prompt/secure-local/tiny/Q4_0/smoke"
 
 
@@ -198,6 +203,8 @@ def test_cli_writes_json_markdown_and_csv_reports(tmp_path: Path) -> None:
     assert csv_rows[0]["wall_tok_per_s_p05_delta_pct"] == "-10.0"
     assert csv_rows[0]["ttft_delta_pct"] == "10.0"
     assert csv_rows[0]["memory_delta_pct"] == "50.0"
+    assert csv_rows[0]["candidate_serial_output_bytes"] == "8192"
+    assert csv_rows[0]["serial_output_delta_pct"] == "0.0"
     assert junit_root.attrib["name"] == "holyc_build_compare"
     assert junit_root.attrib["tests"] == "1"
     assert junit_root.attrib["failures"] == "1"
@@ -242,6 +249,43 @@ def test_cli_can_gate_memory_growth(tmp_path: Path) -> None:
     assert payload["regressions"][0]["metric"] == "memory_bytes"
     assert payload["regressions"][0]["delta_pct"] == 25.0
     assert "memory_bytes changed by 25.000%" in junit_root.find("./testcase/failure").attrib["message"]
+
+
+def test_cli_can_gate_serial_output_growth(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    candidate = tmp_path / "candidate.json"
+    output_dir = tmp_path / "results"
+    write_report(baseline, "base", 100.0, 200000, serial_output_bytes=4096)
+    write_report(candidate, "head", 100.0, 200000, serial_output_bytes=6144)
+
+    status = build_compare.main(
+        [
+            "--input",
+            f"base={baseline}",
+            "--input",
+            f"head={candidate}",
+            "--output-dir",
+            str(output_dir),
+            "--max-serial-output-growth-pct",
+            "25",
+            "--fail-on-regression",
+        ]
+    )
+
+    payload = json.loads((output_dir / "build_compare_latest.json").read_text(encoding="utf-8"))
+    csv_rows = list(csv.DictReader((output_dir / "build_compare_latest.csv").open(newline="", encoding="utf-8")))
+    junit_root = ET.parse(output_dir / "build_compare_junit_latest.xml").getroot()
+
+    assert status == 1
+    assert payload["status"] == "fail"
+    assert payload["max_serial_output_growth_pct"] == 25.0
+    assert payload["deltas"][0]["baseline_serial_output_bytes"] == 4096
+    assert payload["deltas"][0]["candidate_serial_output_bytes"] == 6144
+    assert payload["deltas"][0]["serial_output_delta_pct"] == 50.0
+    assert payload["regressions"][0]["metric"] == "serial_output_bytes"
+    assert csv_rows[0]["serial_output_delta_pct"] == "50.0"
+    assert "serial_output_bytes changed by 50.000%" in junit_root.find("./testcase/failure").attrib["message"]
+    assert "Serial output regressions: 1" in (output_dir / "build_compare_latest.md").read_text(encoding="utf-8")
 
 
 def test_cli_can_gate_wall_clock_throughput_regression(tmp_path: Path) -> None:
@@ -662,6 +706,7 @@ if __name__ == "__main__":
         test_compare_builds_computes_tok_per_s_and_elapsed_deltas(tmp_path)
         test_cli_writes_json_markdown_and_csv_reports(tmp_path)
         test_cli_can_gate_memory_growth(tmp_path)
+        test_cli_can_gate_serial_output_growth(tmp_path)
         test_cli_can_gate_wall_clock_throughput_regression(tmp_path)
         test_cli_can_gate_p05_throughput_regression(tmp_path)
         test_cli_can_gate_p05_wall_clock_throughput_regression(tmp_path)

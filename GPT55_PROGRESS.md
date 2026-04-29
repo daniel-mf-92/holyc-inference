@@ -198,3 +198,4 @@
 2026-04-29T02:24:21Z | Added perf regression minimum emitted-token drop gate with smoke coverage and refreshed dashboards.
 2026-04-29T02:32:32Z | Added qemu_source_audit args-file reference following for JSON/YAML benchmark configs with smoke coverage and refreshed source audit artifacts.
 2026-04-29T02:49:52Z | Added qemu_prompt_bench tokens-per-prompt-byte telemetry/gate with smoke coverage and refreshed benchmark artifacts.
+2026-04-29T02:56:58Z | Added build_compare serial output byte delta telemetry and optional growth gating with refreshed comparison artifacts.

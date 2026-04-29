@@ -50,6 +50,7 @@ class BuildMetric:
     median_host_child_cpu_pct: float | None
     median_host_child_tok_per_cpu_s: float | None
     max_host_child_peak_rss_bytes: int | None
+    max_serial_output_bytes: int | None
     max_memory_bytes: int | None
 
     @property
@@ -105,6 +106,9 @@ class BuildDelta:
     baseline_host_child_peak_rss_bytes: int | None
     candidate_host_child_peak_rss_bytes: int | None
     host_child_peak_rss_delta_pct: float | None
+    baseline_serial_output_bytes: int | None
+    candidate_serial_output_bytes: int | None
+    serial_output_delta_pct: float | None
     baseline_memory_bytes: int | None
     candidate_memory_bytes: int | None
     memory_delta_pct: float | None
@@ -387,6 +391,19 @@ def metric_from_rows(build: str, source: Path, rows: list[dict[str, Any]]) -> li
             is not None
             and value >= 0
         ]
+        serial_output_values = [
+            value
+            for row in key_rows
+            if (
+                value := parse_int(
+                    row.get("serial_output_bytes")
+                    if row.get("serial_output_bytes") is not None
+                    else row.get("serial_bytes")
+                )
+            )
+            is not None
+            and value >= 0
+        ]
         ok_runs = sum(
             1
             for row in key_rows
@@ -431,6 +448,7 @@ def metric_from_rows(build: str, source: Path, rows: list[dict[str, Any]]) -> li
                 max_host_child_peak_rss_bytes=(
                     max(host_child_peak_rss_values) if host_child_peak_rss_values else None
                 ),
+                max_serial_output_bytes=max(serial_output_values) if serial_output_values else None,
                 max_memory_bytes=max(memory_values) if memory_values else None,
             )
         )
@@ -545,6 +563,12 @@ def compare_builds(metrics: list[BuildMetric], baseline_build: str) -> list[Buil
                         candidate.max_host_child_peak_rss_bytes,
                         baseline.max_host_child_peak_rss_bytes,
                     ),
+                    baseline_serial_output_bytes=baseline.max_serial_output_bytes,
+                    candidate_serial_output_bytes=candidate.max_serial_output_bytes,
+                    serial_output_delta_pct=pct_delta(
+                        candidate.max_serial_output_bytes,
+                        baseline.max_serial_output_bytes,
+                    ),
                     baseline_memory_bytes=baseline.max_memory_bytes,
                     candidate_memory_bytes=candidate.max_memory_bytes,
                     memory_delta_pct=pct_delta(candidate.max_memory_bytes, baseline.max_memory_bytes),
@@ -570,6 +594,7 @@ def find_regressions(
     max_host_child_cpu_pct_growth_pct: float | None = None,
     max_host_child_tok_per_cpu_s_regression_pct: float | None = None,
     max_host_child_rss_growth_pct: float | None = None,
+    max_serial_output_growth_pct: float | None = None,
 ) -> list[BuildRegression]:
     threshold = -abs(max_tok_regression_pct)
     wall_threshold = -abs(max_wall_tok_regression_pct) if max_wall_tok_regression_pct is not None else None
@@ -665,6 +690,7 @@ def find_regressions(
             ("host_child_cpu_us", delta.host_child_cpu_us_delta_pct, max_host_child_cpu_growth_pct),
             ("host_child_cpu_pct", delta.host_child_cpu_pct_delta_pct, max_host_child_cpu_pct_growth_pct),
             ("host_child_peak_rss_bytes", delta.host_child_peak_rss_delta_pct, max_host_child_rss_growth_pct),
+            ("serial_output_bytes", delta.serial_output_delta_pct, max_serial_output_growth_pct),
         )
         for metric, value, limit in growth_checks:
             if limit is not None and value is not None and value >= abs(limit):
@@ -792,6 +818,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"TTFT regressions: {len([row for row in report['regressions'] if row['metric'] == 'ttft_us'])}",
         f"Token latency regressions: {len([row for row in report['regressions'] if row['metric'] in {'us_per_token', 'wall_us_per_token'}])}",
         f"Host child CPU/RSS regressions: {len([row for row in report['regressions'] if row['metric'] in {'host_child_cpu_us', 'host_child_cpu_pct', 'host_child_tok_per_cpu_s', 'host_child_peak_rss_bytes'}])}",
+        f"Serial output regressions: {len([row for row in report['regressions'] if row['metric'] == 'serial_output_bytes'])}",
         f"Memory regressions: {len([row for row in report['regressions'] if row['metric'] == 'memory_bytes'])}",
         f"Coverage violations: {len(report['coverage_violations'])}",
         f"Prompt-suite drift: {len(report['prompt_suite_drift'])}",
@@ -802,9 +829,9 @@ def markdown_report(report: dict[str, Any]) -> str:
     ]
     if report["deltas"]:
         lines.append(
-            "| Candidate | Prompt key | Base tok/s | Candidate tok/s | Tok/s delta % | Base P05 tok/s | Candidate P05 tok/s | P05 tok/s delta % | Base wall tok/s | Candidate wall tok/s | Wall tok/s delta % | Base P05 wall tok/s | Candidate P05 wall tok/s | P05 wall tok/s delta % | Base elapsed us | Candidate elapsed us | Elapsed delta % | Base TTFT us | Candidate TTFT us | TTFT delta % | Base us/token | Candidate us/token | us/token delta % | Base wall us/token | Candidate wall us/token | Wall us/token delta % | Base child CPU us | Candidate child CPU us | Child CPU us delta % | Base child CPU % | Candidate child CPU % | Child CPU % delta % | Base child tok/CPU s | Candidate child tok/CPU s | Child tok/CPU s delta % | Base child RSS bytes | Candidate child RSS bytes | Child RSS delta % | Base memory bytes | Candidate memory bytes | Memory delta % |"
+            "| Candidate | Prompt key | Base tok/s | Candidate tok/s | Tok/s delta % | Base P05 tok/s | Candidate P05 tok/s | P05 tok/s delta % | Base wall tok/s | Candidate wall tok/s | Wall tok/s delta % | Base P05 wall tok/s | Candidate P05 wall tok/s | P05 wall tok/s delta % | Base elapsed us | Candidate elapsed us | Elapsed delta % | Base TTFT us | Candidate TTFT us | TTFT delta % | Base us/token | Candidate us/token | us/token delta % | Base wall us/token | Candidate wall us/token | Wall us/token delta % | Base child CPU us | Candidate child CPU us | Child CPU us delta % | Base child CPU % | Candidate child CPU % | Child CPU % delta % | Base child tok/CPU s | Candidate child tok/CPU s | Child tok/CPU s delta % | Base child RSS bytes | Candidate child RSS bytes | Child RSS delta % | Base serial bytes | Candidate serial bytes | Serial delta % | Base memory bytes | Candidate memory bytes | Memory delta % |"
         )
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for delta in report["deltas"]:
             lines.append(
                 "| {candidate_build} | {key} | {baseline_tok_per_s} | {candidate_tok_per_s} | "
@@ -819,6 +846,7 @@ def markdown_report(report: dict[str, Any]) -> str:
                 "{baseline_host_child_cpu_pct} | {candidate_host_child_cpu_pct} | {host_child_cpu_pct_delta_pct} | "
                 "{baseline_host_child_tok_per_cpu_s} | {candidate_host_child_tok_per_cpu_s} | {host_child_tok_per_cpu_s_delta_pct} | "
                 "{baseline_host_child_peak_rss_bytes} | {candidate_host_child_peak_rss_bytes} | {host_child_peak_rss_delta_pct} | "
+                "{baseline_serial_output_bytes} | {candidate_serial_output_bytes} | {serial_output_delta_pct} | "
                 "{baseline_memory_bytes} | {candidate_memory_bytes} | {memory_delta_pct} |".format(
                     **{key: format_value(value) for key, value in delta.items()}
                 )
@@ -905,6 +933,9 @@ def write_csv(deltas: list[BuildDelta], path: Path) -> None:
         "baseline_host_child_peak_rss_bytes",
         "candidate_host_child_peak_rss_bytes",
         "host_child_peak_rss_delta_pct",
+        "baseline_serial_output_bytes",
+        "candidate_serial_output_bytes",
+        "serial_output_delta_pct",
         "baseline_memory_bytes",
         "candidate_memory_bytes",
         "memory_delta_pct",
@@ -1049,6 +1080,9 @@ def write_junit(
                 f"baseline_host_child_peak_rss_bytes={format_value(delta.baseline_host_child_peak_rss_bytes)}\n"
                 f"candidate_host_child_peak_rss_bytes={format_value(delta.candidate_host_child_peak_rss_bytes)}\n"
                 f"host_child_peak_rss_delta_pct={format_value(delta.host_child_peak_rss_delta_pct)}\n"
+                f"baseline_serial_output_bytes={format_value(delta.baseline_serial_output_bytes)}\n"
+                f"candidate_serial_output_bytes={format_value(delta.candidate_serial_output_bytes)}\n"
+                f"serial_output_delta_pct={format_value(delta.serial_output_delta_pct)}\n"
                 f"baseline_memory_bytes={format_value(delta.baseline_memory_bytes)}\n"
                 f"candidate_memory_bytes={format_value(delta.candidate_memory_bytes)}\n"
                 f"memory_delta_pct={format_value(delta.memory_delta_pct)}\n"
@@ -1136,6 +1170,7 @@ def write_report(
     max_host_child_cpu_pct_growth_pct: float | None = None,
     max_host_child_tok_per_cpu_s_regression_pct: float | None = None,
     max_host_child_rss_growth_pct: float | None = None,
+    max_serial_output_growth_pct: float | None = None,
     min_ok_runs_per_build: int = 0,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1153,6 +1188,7 @@ def write_report(
         max_host_child_cpu_pct_growth_pct=max_host_child_cpu_pct_growth_pct,
         max_host_child_tok_per_cpu_s_regression_pct=max_host_child_tok_per_cpu_s_regression_pct,
         max_host_child_rss_growth_pct=max_host_child_rss_growth_pct,
+        max_serial_output_growth_pct=max_serial_output_growth_pct,
     )
     coverage_violations = find_coverage_violations(deltas, min_ok_runs_per_build)
     prompt_suite_drift = find_prompt_suite_drift(deltas)
@@ -1191,6 +1227,9 @@ def write_report(
         else None,
         "max_host_child_rss_growth_pct": abs(max_host_child_rss_growth_pct)
         if max_host_child_rss_growth_pct is not None
+        else None,
+        "max_serial_output_growth_pct": abs(max_serial_output_growth_pct)
+        if max_serial_output_growth_pct is not None
         else None,
         "min_ok_runs_per_build": max(0, min_ok_runs_per_build),
         "metrics": [asdict(metric) for metric in metrics],
@@ -1292,6 +1331,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Allowed direct-child peak RSS growth before a regression is reported; omitted disables host RSS gating",
     )
     parser.add_argument(
+        "--max-serial-output-growth-pct",
+        type=float,
+        help="Allowed serial output byte growth before a regression is reported; omitted disables serial-output gating",
+    )
+    parser.add_argument(
         "--min-ok-runs-per-build",
         type=int,
         default=0,
@@ -1344,6 +1388,7 @@ def main(argv: list[str] | None = None) -> int:
         max_host_child_cpu_pct_growth_pct=args.max_host_child_cpu_pct_growth_pct,
         max_host_child_tok_per_cpu_s_regression_pct=args.max_host_child_tok_per_cpu_s_regression_pct,
         max_host_child_rss_growth_pct=args.max_host_child_rss_growth_pct,
+        max_serial_output_growth_pct=args.max_serial_output_growth_pct,
         min_ok_runs_per_build=args.min_ok_runs_per_build,
     )
     regressions = find_regressions(
@@ -1360,6 +1405,7 @@ def main(argv: list[str] | None = None) -> int:
         max_host_child_cpu_pct_growth_pct=args.max_host_child_cpu_pct_growth_pct,
         max_host_child_tok_per_cpu_s_regression_pct=args.max_host_child_tok_per_cpu_s_regression_pct,
         max_host_child_rss_growth_pct=args.max_host_child_rss_growth_pct,
+        max_serial_output_growth_pct=args.max_serial_output_growth_pct,
     )
     coverage_violations = find_coverage_violations(deltas, args.min_ok_runs_per_build)
     prompt_suite_drift = find_prompt_suite_drift(deltas)
