@@ -192,3 +192,4 @@
 2026-04-29T01:20:48Z | Added QEMU prompt benchmark OK-run percentage summaries with smoke coverage and refreshed benchmark artifacts.
 2026-04-29T01:30:09Z | Added quant audit fp16 scale exponent telemetry/gates with smoke coverage and refreshed quant artifacts.
 2026-04-29T01:40:10Z | Added benchmark trend min-points history gate with smoke coverage and refreshed trend dashboards.
+2026-04-29T01:51:16Z | Added qemu_prompt_bench prompt input byte/s telemetry with synthetic smoke validation and refreshed benchmark artifacts.
