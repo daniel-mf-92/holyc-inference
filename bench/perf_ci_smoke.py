@@ -60,6 +60,7 @@ def main() -> int:
             output_dir / "perf_regression_comparison_coverage_violations_latest.csv"
         )
         prompt_suite_drift_path = output_dir / "perf_regression_prompt_suite_drift_latest.csv"
+        environment_drift_path = output_dir / "perf_regression_environment_drift_latest.csv"
         telemetry_coverage_path = (
             output_dir / "perf_regression_telemetry_coverage_violations_latest.csv"
         )
@@ -87,6 +88,9 @@ def main() -> int:
             return 1
         if report["prompt_suite_drift_violations"]:
             print("unexpected_prompt_suite_drift=true", file=sys.stderr)
+            return 1
+        if "environment_drift_violations" not in report:
+            print("missing_environment_drift_report=true", file=sys.stderr)
             return 1
         if report["telemetry_coverage_violations"]:
             print("unexpected_telemetry_coverage_violations=true", file=sys.stderr)
@@ -158,6 +162,7 @@ def main() -> int:
             "median_ttft_us", "p95_ttft_us", "median_host_overhead_pct",
             "median_host_child_tok_per_cpu_s",
             "wall_tok_per_s_cv_pct", "max_host_child_peak_rss_bytes",
+            "environment_sha256", "host_platform", "host_machine", "qemu_version", "qemu_bin",
         }
         if not required_commit_points_columns.issubset(commit_points_header):
             missing = sorted(required_commit_points_columns - set(commit_points_header))
@@ -187,6 +192,84 @@ def main() -> int:
             return 1
         if "median_wall_us_per_token_baseline,median_wall_us_per_token_candidate,median_wall_us_per_token_delta_pct" not in comparisons_csv:
             print("missing_wall_us_per_token_comparison=true", file=sys.stderr)
+            return 1
+        environment_drift_csv = environment_drift_path.read_text(encoding="utf-8")
+        if "key,environment_sha256s,commits,host_platforms,host_machines,qemu_versions,qemu_bins,sources" not in environment_drift_csv:
+            print("missing_environment_drift_csv=true", file=sys.stderr)
+            return 1
+
+        environment_drift_fixture = tmp_path / "environment_drift.jsonl"
+        environment_drift_fixture.write_text(
+            "\n".join(
+                [
+                    json.dumps(
+                        {
+                            "timestamp": "2026-04-27T15:00:00Z",
+                            "commit": "env-base",
+                            "benchmark": "qemu_prompt",
+                            "profile": "ci-airgap-smoke",
+                            "model": "synthetic-smoke",
+                            "quantization": "Q4_0",
+                            "prompt": "ci-env",
+                            "tok_per_s": 100.0,
+                            "environment": {
+                                "platform": "macOS-A",
+                                "machine": "arm64",
+                                "qemu_version": "QEMU synthetic A",
+                                "qemu_bin": "qemu-system-x86_64",
+                            },
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "timestamp": "2026-04-27T15:05:00Z",
+                            "commit": "env-head",
+                            "benchmark": "qemu_prompt",
+                            "profile": "ci-airgap-smoke",
+                            "model": "synthetic-smoke",
+                            "quantization": "Q4_0",
+                            "prompt": "ci-env",
+                            "tok_per_s": 101.0,
+                            "environment": {
+                                "platform": "macOS-B",
+                                "machine": "arm64",
+                                "qemu_version": "QEMU synthetic B",
+                                "qemu_bin": "qemu-system-x86_64",
+                            },
+                        }
+                    ),
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        environment_drift_command = [
+            sys.executable,
+            str(ROOT / "bench" / "perf_regression.py"),
+            "--input",
+            str(environment_drift_fixture),
+            "--output-dir",
+            str(tmp_path / "environment_drift_dashboard"),
+            "--fail-on-environment-drift",
+            "--fail-on-regression",
+        ]
+        completed = subprocess.run(
+            environment_drift_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("environment_drift_not_rejected=true", file=sys.stderr)
+            return 1
+        drift_report = json.loads(
+            (tmp_path / "environment_drift_dashboard" / "perf_regression_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        if len(drift_report["environment_drift_violations"]) != 1:
+            print("missing_environment_drift_violation=true", file=sys.stderr)
             return 1
 
         ttft_regression_fixture = tmp_path / "p95_ttft_regression.jsonl"

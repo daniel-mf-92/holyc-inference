@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import statistics
 import sys
@@ -46,6 +47,11 @@ class PerfRecord:
     ttft_us: int | None = None
     host_overhead_pct: float | None = None
     prompt_suite_sha256: str = ""
+    environment_sha256: str = ""
+    host_platform: str = ""
+    host_machine: str = ""
+    qemu_version: str = ""
+    qemu_bin: str = ""
 
     @property
     def key(self) -> str:
@@ -100,6 +106,11 @@ class CommitPoint:
     max_memory_bytes: int | None
     max_host_child_peak_rss_bytes: int | None
     prompt_suite_sha256: str
+    environment_sha256: str
+    host_platform: str
+    host_machine: str
+    qemu_version: str
+    qemu_bin: str
 
 
 @dataclass(frozen=True)
@@ -159,6 +170,18 @@ class TelemetryCoverageViolation:
     metric: str
     records: int
     present_records: int
+
+
+@dataclass(frozen=True)
+class EnvironmentDriftViolation:
+    key: str
+    environment_sha256s: list[str]
+    commits: list[str]
+    host_platforms: list[str]
+    host_machines: list[str]
+    qemu_versions: list[str]
+    qemu_bins: list[str]
+    sources: list[str]
 
 
 @dataclass(frozen=True)
@@ -270,6 +293,35 @@ def prompt_suite_sha256(row: dict[str, Any]) -> str:
     return ""
 
 
+def normalized_environment(row: dict[str, Any]) -> dict[str, str]:
+    environment = row.get("environment")
+    fields: dict[str, Any] = {}
+    if isinstance(environment, dict):
+        fields.update(environment)
+    aliases = {
+        "platform": ("host_platform", "platform"),
+        "machine": ("host_machine", "machine"),
+        "qemu_version": ("qemu_version",),
+        "qemu_bin": ("qemu_bin",),
+    }
+    normalized: dict[str, str] = {}
+    for output_name, names in aliases.items():
+        value = first_present(fields, names) or first_present(row, names)
+        if value:
+            normalized[output_name] = value
+    return normalized
+
+
+def environment_sha256(row: dict[str, Any], normalized: dict[str, str]) -> str:
+    explicit = first_present(row, ("environment_sha256", "environment_hash", "env_sha256"))
+    if explicit:
+        return explicit
+    if not normalized:
+        return ""
+    payload = json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
 def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str) -> PerfRecord | None:
     tok_per_s = parse_float(row.get("tok_per_s"))
     tok_per_s_milli = parse_float(row.get("tok_per_s_milli"))
@@ -344,6 +396,7 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
     ):
         return None
 
+    environment = normalized_environment(row)
     return PerfRecord(
         source=str(source),
         commit=first_present(row, ("commit", "git_commit", "sha"), "unknown"),
@@ -364,6 +417,11 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
         ttft_us=ttft_us,
         host_overhead_pct=host_overhead_pct,
         prompt_suite_sha256=prompt_suite_sha256(row),
+        environment_sha256=environment_sha256(row, environment),
+        host_platform=environment.get("platform", ""),
+        host_machine=environment.get("machine", ""),
+        qemu_version=environment.get("qemu_version", ""),
+        qemu_bin=environment.get("qemu_bin", ""),
     )
 
 
@@ -582,6 +640,13 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
         prompt_hashes = sorted(
             {record.prompt_suite_sha256 for record in commit_records if record.prompt_suite_sha256}
         )
+        environment_hashes = sorted(
+            {record.environment_sha256 for record in commit_records if record.environment_sha256}
+        )
+        host_platforms = sorted({record.host_platform for record in commit_records if record.host_platform})
+        host_machines = sorted({record.host_machine for record in commit_records if record.host_machine})
+        qemu_versions = sorted({record.qemu_version for record in commit_records if record.qemu_version})
+        qemu_bins = sorted({record.qemu_bin for record in commit_records if record.qemu_bin})
         points.append(
             CommitPoint(
                 key=key,
@@ -631,6 +696,11 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                     max(host_child_peak_rss_values) if host_child_peak_rss_values else None
                 ),
                 prompt_suite_sha256=";".join(prompt_hashes),
+                environment_sha256=";".join(environment_hashes),
+                host_platform=";".join(host_platforms),
+                host_machine=";".join(host_machines),
+                qemu_version=";".join(qemu_versions),
+                qemu_bin=";".join(qemu_bins),
             )
         )
     return sorted(points, key=lambda point: (point.key, point.latest_timestamp, point.commit))
@@ -1256,6 +1326,38 @@ def detect_prompt_suite_drift(records: list[PerfRecord]) -> list[PromptSuiteDrif
     return violations
 
 
+def detect_environment_drift(records: list[PerfRecord]) -> list[EnvironmentDriftViolation]:
+    by_key: dict[str, list[PerfRecord]] = {}
+    for record in records:
+        if record.environment_sha256:
+            by_key.setdefault(record.key, []).append(record)
+
+    violations: list[EnvironmentDriftViolation] = []
+    for key, key_records in sorted(by_key.items()):
+        hashes = sorted({record.environment_sha256 for record in key_records})
+        if len(hashes) <= 1:
+            continue
+        violations.append(
+            EnvironmentDriftViolation(
+                key=key,
+                environment_sha256s=hashes,
+                commits=sorted({record.commit for record in key_records}),
+                host_platforms=sorted(
+                    {record.host_platform for record in key_records if record.host_platform}
+                ),
+                host_machines=sorted(
+                    {record.host_machine for record in key_records if record.host_machine}
+                ),
+                qemu_versions=sorted(
+                    {record.qemu_version for record in key_records if record.qemu_version}
+                ),
+                qemu_bins=sorted({record.qemu_bin for record in key_records if record.qemu_bin}),
+                sources=sorted({record.source for record in key_records}),
+            )
+        )
+    return violations
+
+
 def detect_telemetry_coverage_violations(
     points: list[CommitPoint],
     *,
@@ -1331,6 +1433,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Commit coverage violations: {len(report['commit_coverage_violations'])}",
         f"Comparison coverage violations: {len(report['comparison_coverage_violations'])}",
         f"Prompt-suite drift violations: {len(report['prompt_suite_drift_violations'])}",
+        f"Environment drift violations: {len(report['environment_drift_violations'])}",
         f"Telemetry coverage violations: {len(report['telemetry_coverage_violations'])}",
         "",
         "## Regressions",
@@ -1422,6 +1525,19 @@ def markdown_report(report: dict[str, Any]) -> str:
     else:
         lines.append("Prompt-suite hashes are consistent for comparable benchmark keys.")
 
+    lines.extend(["", "## Environment Drift", ""])
+    if report["environment_drift_violations"]:
+        lines.append("| Key | Environment Hashes | Commits | Host Platforms | QEMU Versions |")
+        lines.append("| --- | ---: | ---: | ---: | ---: |")
+        for violation in report["environment_drift_violations"]:
+            lines.append(
+                f"| {violation['key']} | {len(violation['environment_sha256s'])} | "
+                f"{len(violation['commits'])} | {len(violation['host_platforms'])} | "
+                f"{len(violation['qemu_versions'])} |"
+            )
+    else:
+        lines.append("Host/QEMU environment hashes are consistent for comparable benchmark keys.")
+
     lines.extend(["", "## Telemetry Coverage", ""])
     if report["telemetry_coverage_violations"]:
         lines.append("| Key | Commit | Metric | Records | Present Records |")
@@ -1492,9 +1608,9 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(["", "## Commit Points", ""])
     if report["commit_points"]:
         lines.append(
-            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | us/token Records | Wall us/token Records | Memory Records | Host RSS Records | Host tok/CPU-s Records | Token Records | TTFT Records | Host Overhead Records | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median TTFT us | P95 TTFT us | Median Host Overhead % | Median Host tok/CPU-s | Tok/s CV | Wall Tok/s CV | Max Memory Bytes | Max Host RSS Bytes | Prompt Suite |"
+            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | us/token Records | Wall us/token Records | Memory Records | Host RSS Records | Host tok/CPU-s Records | Token Records | TTFT Records | Host Overhead Records | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median TTFT us | P95 TTFT us | Median Host Overhead % | Median Host tok/CPU-s | Tok/s CV | Wall Tok/s CV | Max Memory Bytes | Max Host RSS Bytes | Prompt Suite | Environment | Host Platform | Host Machine | QEMU Version |"
         )
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- |")
         for point in report["commit_points"]:
             p05_tps = point["p05_tok_per_s"]
             tps = point["median_tok_per_s"]
@@ -1539,6 +1655,10 @@ def markdown_report(report: dict[str, Any]) -> str:
             wall_tps_cv_cell = f"{wall_tps_cv:.2f}%" if wall_tps_cv is not None else "-"
             memory_cell = str(memory) if memory is not None else "-"
             host_rss_cell = str(host_rss) if host_rss is not None else "-"
+            environment = point["environment_sha256"] or "-"
+            host_platform = point["host_platform"] or "-"
+            host_machine = point["host_machine"] or "-"
+            qemu_version = point["qemu_version"] or "-"
             lines.append(
                 f"| {point['key']} | {point['commit']} | {point['records']} | "
                 f"{point['tok_per_s_records']} | {point['wall_tok_per_s_records']} | "
@@ -1551,7 +1671,8 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"{us_per_token_cell} | {p95_us_per_token_cell} | "
                 f"{wall_us_per_token_cell} | {p95_wall_us_per_token_cell} | "
                 f"{tokens_cell} | {min_tokens_cell} | {ttft_cell} | {p95_ttft_cell} | {overhead_cell} | {host_tok_cpu_cell} | "
-                f"{tps_cv_cell} | {wall_tps_cv_cell} | {memory_cell} | {host_rss_cell} | {prompt_suite} |"
+                f"{tps_cv_cell} | {wall_tps_cv_cell} | {memory_cell} | {host_rss_cell} | {prompt_suite} | "
+                f"{environment} | {host_platform} | {host_machine} | {qemu_version} |"
             )
     else:
         lines.append("No commit-level performance points found.")
@@ -1627,6 +1748,11 @@ def junit_report(report: dict[str, Any]) -> str:
     commit_coverage_violations = report.get("commit_coverage_violations", [])
     comparison_coverage_violations = report.get("comparison_coverage_violations", [])
     prompt_suite_drift_violations = report.get("prompt_suite_drift_violations", [])
+    environment_drift_violations = (
+        report.get("environment_drift_violations", [])
+        if report.get("thresholds", {}).get("fail_on_environment_drift")
+        else []
+    )
     telemetry_coverage_violations = report.get("telemetry_coverage_violations", [])
     failures = (
         len(report["regressions"])
@@ -1636,6 +1762,7 @@ def junit_report(report: dict[str, Any]) -> str:
         + len(commit_coverage_violations)
         + len(comparison_coverage_violations)
         + len(prompt_suite_drift_violations)
+        + len(environment_drift_violations)
         + len(telemetry_coverage_violations)
     )
     tests = failures or 1
@@ -1846,6 +1973,34 @@ def junit_report(report: dict[str, Any]) -> str:
                 f"key={violation['key']}"
             )
 
+        for violation in environment_drift_violations:
+            case = ET.SubElement(
+                suite,
+                "testcase",
+                {
+                    "classname": "perf_regression.environment_drift",
+                    "name": violation["key"],
+                },
+            )
+            failure = ET.SubElement(
+                case,
+                "failure",
+                {
+                    "type": "environment_drift",
+                    "message": (
+                        f"{len(violation['environment_sha256s'])} host/QEMU environments "
+                        "for comparable key"
+                    ),
+                },
+            )
+            failure.text = (
+                f"environment_sha256s={json.dumps(violation['environment_sha256s'], separators=(',', ':'))}\n"
+                f"commits={json.dumps(violation['commits'], separators=(',', ':'))}\n"
+                f"qemu_versions={json.dumps(violation['qemu_versions'], separators=(',', ':'))}\n"
+                f"sources={json.dumps(violation['sources'], separators=(',', ':'))}\n"
+                f"key={violation['key']}"
+            )
+
         for violation in telemetry_coverage_violations:
             case = ET.SubElement(
                 suite,
@@ -1895,6 +2050,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
         output_dir / "perf_regression_comparison_coverage_violations_latest.csv"
     )
     prompt_suite_drift_csv = output_dir / "perf_regression_prompt_suite_drift_latest.csv"
+    environment_drift_csv = output_dir / "perf_regression_environment_drift_latest.csv"
     telemetry_coverage_csv = output_dir / "perf_regression_telemetry_coverage_violations_latest.csv"
 
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -1937,6 +2093,11 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "max_memory_bytes",
             "max_host_child_peak_rss_bytes",
             "prompt_suite_sha256",
+            "environment_sha256",
+            "host_platform",
+            "host_machine",
+            "qemu_version",
+            "qemu_bin",
         ],
     )
     write_csv(
@@ -2039,6 +2200,20 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
         ["key", "hashes", "commits", "sources"],
     )
     write_csv(
+        environment_drift_csv,
+        report["environment_drift_violations"],
+        [
+            "key",
+            "environment_sha256s",
+            "commits",
+            "host_platforms",
+            "host_machines",
+            "qemu_versions",
+            "qemu_bins",
+            "sources",
+        ],
+    )
+    write_csv(
         telemetry_coverage_csv,
         report["telemetry_coverage_violations"],
         ["key", "commit", "metric", "records", "present_records"],
@@ -2056,6 +2231,7 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
     print(f"wrote_commit_coverage_violations_csv={commit_coverage_violations_csv}")
     print(f"wrote_comparison_coverage_violations_csv={comparison_coverage_violations_csv}")
     print(f"wrote_prompt_suite_drift_csv={prompt_suite_drift_csv}")
+    print(f"wrote_environment_drift_csv={environment_drift_csv}")
     print(f"wrote_telemetry_coverage_csv={telemetry_coverage_csv}")
 
 
@@ -2090,6 +2266,7 @@ def build_report(
     require_tokens: bool = False,
     require_ttft_us: bool = False,
     require_host_overhead_pct: bool = False,
+    fail_on_environment_drift: bool = False,
 ) -> dict[str, Any]:
     points = commit_points(records)
     regressions = detect_regressions(
@@ -2119,6 +2296,7 @@ def build_report(
         points, baseline_commit, candidate_commit
     )
     prompt_suite_drift_violations = detect_prompt_suite_drift(records)
+    environment_drift_violations = detect_environment_drift(records)
     telemetry_coverage_violations = detect_telemetry_coverage_violations(
         points,
         require_tok_per_s=require_tok_per_s,
@@ -2144,6 +2322,7 @@ def build_report(
             or commit_coverage_violations
             or comparison_coverage_violations
             or prompt_suite_drift_violations
+            or (fail_on_environment_drift and environment_drift_violations)
             or telemetry_coverage_violations
             else "pass"
         ),
@@ -2180,6 +2359,7 @@ def build_report(
             "require_tokens": require_tokens,
             "require_ttft_us": require_ttft_us,
             "require_host_overhead_pct": require_host_overhead_pct,
+            "fail_on_environment_drift": fail_on_environment_drift,
         },
         "summaries": summarize(records),
         "commit_points": [asdict(point) for point in points],
@@ -2198,6 +2378,9 @@ def build_report(
         ],
         "prompt_suite_drift_violations": [
             asdict(violation) for violation in prompt_suite_drift_violations
+        ],
+        "environment_drift_violations": [
+            asdict(violation) for violation in environment_drift_violations
         ],
         "telemetry_coverage_violations": [
             asdict(violation) for violation in telemetry_coverage_violations
@@ -2350,6 +2533,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fail when any benchmark key/commit point lacks QEMU host overhead telemetry",
     )
+    parser.add_argument(
+        "--fail-on-environment-drift",
+        action="store_true",
+        help="Fail when comparable benchmark records use different host/QEMU environment hashes",
+    )
     parser.add_argument("--fail-on-regression", action="store_true")
     return parser
 
@@ -2389,6 +2577,7 @@ def main(argv: list[str] | None = None) -> int:
         require_tokens=args.require_tokens,
         require_ttft_us=args.require_ttft_us,
         require_host_overhead_pct=args.require_host_overhead_pct,
+        fail_on_environment_drift=args.fail_on_environment_drift,
     )
 
     write_dashboard_outputs(report, args.output_dir)
