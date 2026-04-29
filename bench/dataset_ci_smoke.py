@@ -198,6 +198,29 @@ def main() -> int:
         if rc := require(curated_report["record_count"] == 3, "unexpected_curated_record_count"):
             return rc
         pack_report = json.loads(pack_manifest.read_text(encoding="utf-8"))
+        if rc := require(pack_report["binary_layout"]["record_count"] == 3, "unexpected_pack_layout_record_count"):
+            return rc
+        if rc := require(pack_report["binary_layout"]["fixed_header_bytes"] == 52, "unexpected_pack_header_bytes"):
+            return rc
+        if rc := require(pack_report["binary_layout"]["record_header_bytes"] == 72, "unexpected_pack_record_headers"):
+            return rc
+        if rc := require(
+            pack_report["binary_layout"]["choice_length_prefix_bytes"] == 48,
+            "unexpected_pack_choice_prefix_bytes",
+        ):
+            return rc
+        if rc := require(
+            pack_report["binary_layout"]["binary_bytes"] == packed.stat().st_size,
+            "unexpected_pack_binary_bytes",
+        ):
+            return rc
+        if rc := require(
+            pack_report["binary_layout"]["body_bytes"]
+            == pack_report["binary_layout"]["record_header_bytes"]
+            + pack_report["binary_layout"]["record_payload_bytes"],
+            "unexpected_pack_body_bytes",
+        ):
+            return rc
         if rc := require(len(pack_report["record_spans"]) == 3, "unexpected_pack_span_count"):
             return rc
         first_span = pack_report["record_spans"][0]
@@ -318,6 +341,11 @@ def main() -> int:
         if rc := require(
             inspect_report["record_spans"] == pack_report["record_spans"],
             "unexpected_inspect_record_spans",
+        ):
+            return rc
+        if rc := require(
+            inspect_report["binary_layout"] == pack_report["binary_layout"],
+            "unexpected_inspect_binary_layout",
         ):
             return rc
         if rc := require("HCEval Dataset Inspection" in inspect_md.read_text(encoding="utf-8"), "missing_inspect_md"):

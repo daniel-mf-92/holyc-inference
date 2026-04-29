@@ -1,6 +1,6 @@
 # HCEval Dataset Inspection
 
-Generated: 2026-04-28T22:11:35Z
+Generated: 2026-04-29T00:06:26Z
 Status: pass
 Dataset: smoke-eval
 Split: validation
@@ -17,6 +17,16 @@ No findings.
 - Max record payload bytes: 304
 - Total prompt bytes: 182
 - Total choice bytes: 327
+
+## Binary Layout
+
+- Fixed header bytes: 52
+- Metadata bytes: 95
+- Record header bytes: 72
+- Record payload bytes: 706
+- Choice length-prefix bytes: 48
+- Body bytes: 778
+- Binary bytes: 925
 
 ## Records
 

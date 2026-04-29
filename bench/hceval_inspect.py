@@ -42,6 +42,7 @@ class InspectRecord:
 @dataclass(frozen=True)
 class HCEvalDataset:
     metadata: dict[str, Any]
+    metadata_bytes: int
     records: list[InspectRecord]
     source_digest: str
     payload_sha256: str
@@ -135,6 +136,7 @@ def parse_hceval(path: Path) -> HCEvalDataset:
 
     return HCEvalDataset(
         metadata=metadata,
+        metadata_bytes=metadata_len,
         records=records,
         source_digest=source_digest.hex(),
         payload_sha256=hashlib.sha256(payload).hexdigest(),
@@ -204,6 +206,21 @@ def byte_stats(records: list[InspectRecord]) -> dict[str, int]:
     return dataset_pack.byte_stats(pack_records)
 
 
+def binary_layout(dataset: HCEvalDataset) -> dict[str, int]:
+    body_bytes = sum(record.length for record in dataset.records)
+    choice_count = sum(len(record.choices) for record in dataset.records)
+    return {
+        "binary_bytes": dataset_pack.HEADER.size + dataset.metadata_bytes + body_bytes,
+        "body_bytes": body_bytes,
+        "choice_length_prefix_bytes": choice_count * 4,
+        "fixed_header_bytes": dataset_pack.HEADER.size,
+        "metadata_bytes": dataset.metadata_bytes,
+        "record_count": len(dataset.records),
+        "record_header_bytes": len(dataset.records) * dataset_pack.RECORD_HEADER.size,
+        "record_payload_bytes": sum(record.length - dataset_pack.RECORD_HEADER.size for record in dataset.records),
+    }
+
+
 def validate_dataset(
     dataset: HCEvalDataset,
     manifest_path: Path | None = None,
@@ -267,6 +284,8 @@ def validate_dataset(
             findings.append("manifest split does not match metadata")
         if "byte_stats" in manifest and manifest.get("byte_stats") != byte_stats(records):
             findings.append("manifest byte_stats does not match parsed records")
+        if "binary_layout" in manifest and manifest.get("binary_layout") != binary_layout(dataset):
+            findings.append("manifest binary_layout does not match parsed binary")
         if "record_spans" in manifest and manifest.get("record_spans") != record_spans(records):
             findings.append("manifest record_spans does not match parsed binary")
         manifest_records = manifest.get("records")
@@ -289,6 +308,7 @@ def validate_dataset(
 def build_report(path: Path, dataset: HCEvalDataset, findings: list[str]) -> dict[str, Any]:
     return {
         "answer_histogram": answer_histogram(dataset.records),
+        "binary_layout": binary_layout(dataset),
         "byte_stats": byte_stats(dataset.records),
         "dataset": dataset.metadata.get("dataset", ""),
         "findings": findings,
@@ -334,6 +354,16 @@ def markdown_report(report: dict[str, Any]) -> str:
             f"- Max record payload bytes: {report['byte_stats']['max_record_payload_bytes']}",
             f"- Total prompt bytes: {report['byte_stats']['total_prompt_bytes']}",
             f"- Total choice bytes: {report['byte_stats']['total_choice_bytes']}",
+            "",
+            "## Binary Layout",
+            "",
+            f"- Fixed header bytes: {report['binary_layout']['fixed_header_bytes']}",
+            f"- Metadata bytes: {report['binary_layout']['metadata_bytes']}",
+            f"- Record header bytes: {report['binary_layout']['record_header_bytes']}",
+            f"- Record payload bytes: {report['binary_layout']['record_payload_bytes']}",
+            f"- Choice length-prefix bytes: {report['binary_layout']['choice_length_prefix_bytes']}",
+            f"- Body bytes: {report['binary_layout']['body_bytes']}",
+            f"- Binary bytes: {report['binary_layout']['binary_bytes']}",
         ]
     )
 

@@ -2,6 +2,16 @@
   "answer_histogram": {
     "0": 3
   },
+  "binary_layout": {
+    "binary_bytes": 925,
+    "body_bytes": 778,
+    "choice_length_prefix_bytes": 48,
+    "fixed_header_bytes": 52,
+    "metadata_bytes": 95,
+    "record_count": 3,
+    "record_header_bytes": 72,
+    "record_payload_bytes": 706
+  },
   "binary_sha256": "7673822187499c96fc823bf5ab164e118a99b0d796c7460f47060b426af5aac4",
   "byte_stats": {
     "max_choice_bytes": 45,
@@ -17,22 +27,58 @@
   "record_count": 3,
   "record_spans": [
     {
+      "answer_index": 0,
+      "choice_bytes": [
+        11,
+        5,
+        5,
+        7
+      ],
+      "choice_bytes_total": 28,
+      "choice_count": 4,
       "length": 160,
       "offset": 147,
       "payload_bytes": 136,
-      "record_id": "smoke-arc-1"
+      "prompt_bytes": 51,
+      "provenance_bytes": 30,
+      "record_id": "smoke-arc-1",
+      "record_index": 0
     },
     {
+      "answer_index": 0,
+      "choice_bytes": [
+        45,
+        45,
+        39,
+        37
+      ],
+      "choice_bytes_total": 166,
+      "choice_count": 4,
       "length": 328,
       "offset": 307,
       "payload_bytes": 304,
-      "record_id": "smoke-hellaswag-1"
+      "prompt_bytes": 69,
+      "provenance_bytes": 36,
+      "record_id": "smoke-hellaswag-1",
+      "record_index": 1
     },
     {
+      "answer_index": 0,
+      "choice_bytes": [
+        43,
+        37,
+        20,
+        33
+      ],
+      "choice_bytes_total": 133,
+      "choice_count": 4,
       "length": 290,
       "offset": 635,
       "payload_bytes": 266,
-      "record_id": "smoke-truthfulqa-1"
+      "prompt_bytes": 62,
+      "provenance_bytes": 37,
+      "record_id": "smoke-truthfulqa-1",
+      "record_index": 2
     }
   ],
   "records": [

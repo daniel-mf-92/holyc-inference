@@ -242,6 +242,22 @@ def byte_stats(records: list[EvalRecord]) -> dict[str, int]:
     }
 
 
+def binary_layout(records: list[EvalRecord], dataset: str, split: str) -> dict[str, int]:
+    packed_metadata = metadata_bytes(dataset, split, len(records))
+    record_lengths = [len(record_bytes(record)) for record in records]
+    choice_count = sum(len(record.choices) for record in records)
+    return {
+        "binary_bytes": HEADER.size + len(packed_metadata) + sum(record_lengths),
+        "body_bytes": sum(record_lengths),
+        "choice_length_prefix_bytes": choice_count * 4,
+        "fixed_header_bytes": HEADER.size,
+        "metadata_bytes": len(packed_metadata),
+        "record_count": len(records),
+        "record_header_bytes": len(records) * RECORD_HEADER.size,
+        "record_payload_bytes": sum(length - RECORD_HEADER.size for length in record_lengths),
+    }
+
+
 def size_limit_findings(
     records: list[EvalRecord],
     max_prompt_bytes: int | None = None,
@@ -330,6 +346,7 @@ def write_outputs(records: list[EvalRecord], output: Path, manifest_path: Path, 
 
     manifest = {
         "answer_histogram": answer_histogram(records),
+        "binary_layout": binary_layout(records, dataset, split),
         "binary_sha256": hashlib.sha256(payload).hexdigest(),
         "byte_stats": byte_stats(records),
         "dataset": dataset,
