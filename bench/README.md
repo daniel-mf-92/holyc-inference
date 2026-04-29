@@ -1101,7 +1101,9 @@ mismatches unless `--allow-token-count-mismatch` is passed. If both engine
 outputs include `dataset`/`split` metadata for an id, conflicting metadata is
 rejected before reporting. Optional quality gates can fail CI when aggregate
 NLL drift, HolyC/llama.cpp perplexity ratio, or per-record NLL delta
-distribution bounds exceed configured thresholds.
+distribution bounds exceed configured thresholds. Use `--min-record-count` and
+`--min-token-count` to prevent accidentally promoting tiny perplexity runs with
+too little coverage.
 
 Example:
 
@@ -1113,12 +1115,21 @@ python3 bench/perplexity_compare.py \
   --split validation \
   --model synthetic-smoke \
   --quantization Q4_0 \
+  --min-record-count 3 \
+  --min-token-count 11 \
   --max-nll-delta 0.02 \
   --max-perplexity-ratio 1.05 \
   --max-p95-abs-record-nll-delta 0.05 \
   --max-record-nll-delta 0.10 \
   --fail-on-regression \
   --output-stem perplexity_compare_smoke_latest
+```
+
+`perplexity_compare_ci_smoke.py` exercises JSON, Markdown, CSV, breakdown CSV,
+JUnit, and coverage-gate failure paths without launching QEMU:
+
+```bash
+python3 bench/perplexity_compare_ci_smoke.py
 ```
 
 ## Perf Regression Dashboard

@@ -427,6 +427,8 @@ def breakdown_rows(rows: list[CompareRow], default_dataset: str, default_split: 
 def find_regressions(
     summary: dict[str, Any],
     *,
+    min_record_count: int | None = None,
+    min_token_count: int | None = None,
     max_nll_delta: float | None = None,
     max_perplexity_ratio: float | None = None,
     max_p95_abs_record_nll_delta: float | None = None,
@@ -434,6 +436,32 @@ def find_regressions(
     max_record_nll_delta: float | None = None,
 ) -> list[PerplexityRegression]:
     regressions: list[PerplexityRegression] = []
+    if min_record_count is not None and summary["record_count"] < min_record_count:
+        regressions.append(
+            PerplexityRegression(
+                metric="record_count",
+                value=float(summary["record_count"]),
+                threshold=float(min_record_count),
+                message=(
+                    f"Aligned record count {summary['record_count']} is below minimum "
+                    f"{min_record_count}"
+                ),
+            )
+        )
+    if min_token_count is not None:
+        engine_token_count = min(summary["holyc"]["token_count"], summary["llama"]["token_count"])
+        if engine_token_count < min_token_count:
+            regressions.append(
+                PerplexityRegression(
+                    metric="min_engine_token_count",
+                    value=float(engine_token_count),
+                    threshold=float(min_token_count),
+                    message=(
+                        f"Minimum engine token count {engine_token_count} is below minimum "
+                        f"{min_token_count}"
+                    ),
+                )
+            )
     if max_nll_delta is not None and summary["nll_delta_holyc_minus_llama"] > max_nll_delta:
         regressions.append(
             PerplexityRegression(
@@ -678,6 +706,8 @@ def write_report(
     args.output_dir.mkdir(parents=True, exist_ok=True)
     regressions = find_regressions(
         summary,
+        min_record_count=args.min_record_count,
+        min_token_count=args.min_token_count,
         max_nll_delta=args.max_nll_delta,
         max_perplexity_ratio=args.max_perplexity_ratio,
         max_p95_abs_record_nll_delta=args.max_p95_abs_record_nll_delta,
@@ -691,6 +721,8 @@ def write_report(
         "generated_at": iso_now(),
         "holyc_sha256": file_sha256(holyc_path),
         "llama_sha256": file_sha256(llama_path),
+        "min_record_count": args.min_record_count,
+        "min_token_count": args.min_token_count,
         "max_nll_delta": args.max_nll_delta,
         "max_perplexity_ratio": args.max_perplexity_ratio,
         "max_p95_abs_record_nll_delta": args.max_p95_abs_record_nll_delta,
@@ -728,6 +760,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--quantization", default="")
     parser.add_argument("--allow-token-count-mismatch", action="store_true")
     parser.add_argument(
+        "--min-record-count",
+        type=int,
+        help="Minimum aligned record count required before CI gate failure",
+    )
+    parser.add_argument(
+        "--min-token-count",
+        type=int,
+        help="Minimum token count required for both engines before CI gate failure",
+    )
+    parser.add_argument(
         "--max-nll-delta",
         type=float,
         help="Maximum allowed HolyC NLL/token increase versus llama.cpp before CI gate failure",
@@ -764,6 +806,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    for field_name in ("min_record_count", "min_token_count"):
+        value = getattr(args, field_name)
+        if value is not None and value <= 0:
+            print(f"error: --{field_name.replace('_', '-')} must be positive", file=sys.stderr)
+            return 2
     try:
         holyc = load_records(args.holyc)
         llama = load_records(args.llama)
@@ -785,6 +832,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"ppl_delta_holyc_minus_llama={summary['perplexity_delta_holyc_minus_llama']:.6f}")
     regressions = find_regressions(
         summary,
+        min_record_count=args.min_record_count,
+        min_token_count=args.min_token_count,
         max_nll_delta=args.max_nll_delta,
         max_perplexity_ratio=args.max_perplexity_ratio,
         max_p95_abs_record_nll_delta=args.max_p95_abs_record_nll_delta,
