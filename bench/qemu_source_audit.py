@@ -45,6 +45,7 @@ DEFAULT_EXCLUDE_PARTS = {
     "bench/dashboards",
 }
 QEMU_ARG_FRAGMENT_KEYS = {"qemu_args", "qemu_extra_args", "qemu_flags"}
+QEMU_ARG_FILE_KEYS = {"qemu_args_file", "qemu_args_files"}
 
 
 @dataclass(frozen=True)
@@ -193,6 +194,29 @@ def iter_json_arg_fragments(payload: Any, path: str = "$") -> Iterable[tuple[str
             yield from iter_json_arg_fragments(value, f"{path}[{index}]")
 
 
+def json_string_or_string_list(value: Any) -> list[str] | None:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return list(value)
+    return None
+
+
+def iter_json_arg_file_refs(payload: Any, path: str = "$") -> Iterable[tuple[str, list[str]]]:
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            child_path = f"{path}.{key}"
+            if key in QEMU_ARG_FILE_KEYS:
+                refs = json_string_or_string_list(value)
+                if refs is not None:
+                    yield child_path, refs
+                    continue
+            yield from iter_json_arg_file_refs(value, child_path)
+    elif isinstance(payload, list):
+        for index, value in enumerate(payload):
+            yield from iter_json_arg_file_refs(value, f"{path}[{index}]")
+
+
 def audit_json_arg_fragments(path: Path) -> tuple[int, list[SourceFinding]]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -213,6 +237,17 @@ def audit_json_arg_fragments(path: Path) -> tuple[int, list[SourceFinding]]:
                 )
             )
     return fragments_checked, findings
+
+
+def audit_json_arg_file_refs(
+    path: Path,
+    audited_args_files: set[Path],
+) -> tuple[int, list[SourceFinding]]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return 0, []
+    return audit_arg_file_refs(path, iter_json_arg_file_refs(payload), audited_args_files)
 
 
 def strip_unquoted_comment(text: str) -> str:
@@ -271,7 +306,7 @@ def split_inline_yaml_list(value: str) -> list[str] | None:
         return [parse_yaml_scalar(item) for item in inner.split(",")]
 
 
-def yaml_arg_key_line(text: str) -> tuple[int, str, str] | None:
+def yaml_key_line(text: str, keys: set[str]) -> tuple[int, str, str] | None:
     stripped = text.rstrip()
     if not stripped:
         return None
@@ -283,9 +318,17 @@ def yaml_arg_key_line(text: str) -> tuple[int, str, str] | None:
         return None
     key, value = body.split(":", 1)
     key = key.strip().strip("'\"")
-    if key not in QEMU_ARG_FRAGMENT_KEYS:
+    if key not in keys:
         return None
     return indent, key, value.strip()
+
+
+def yaml_arg_key_line(text: str) -> tuple[int, str, str] | None:
+    return yaml_key_line(text, QEMU_ARG_FRAGMENT_KEYS)
+
+
+def yaml_arg_file_key_line(text: str) -> tuple[int, str, str] | None:
+    return yaml_key_line(text, QEMU_ARG_FILE_KEYS)
 
 
 def yaml_list_item(text: str) -> tuple[int, str] | None:
@@ -347,6 +390,51 @@ def audit_yaml_arg_fragments(path: Path) -> tuple[int, list[SourceFinding]]:
     return fragments_checked, findings
 
 
+def parse_yaml_string_or_list(raw_value: str, lines: list[str], index: int, key_indent: int) -> tuple[list[str], int]:
+    refs = split_inline_yaml_list(raw_value)
+    if refs is not None:
+        return refs, index
+    if raw_value:
+        return [parse_yaml_scalar(raw_value)], index
+
+    refs = []
+    scan = index + 1
+    while scan < len(lines):
+        item = yaml_list_item(lines[scan])
+        if item is None:
+            if strip_unquoted_comment(lines[scan]).strip():
+                break
+            scan += 1
+            continue
+        item_indent, item_value = item
+        if item_indent <= key_indent:
+            break
+        refs.append(parse_yaml_scalar(item_value))
+        scan += 1
+    return refs, scan - 1
+
+
+def iter_yaml_arg_file_refs(path: Path) -> Iterable[tuple[str, list[str]]]:
+    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    index = 0
+    while index < len(lines):
+        parsed_key = yaml_arg_file_key_line(lines[index])
+        if parsed_key is None:
+            index += 1
+            continue
+        key_indent, key, raw_value = parsed_key
+        refs, next_index = parse_yaml_string_or_list(raw_value, lines, index, key_indent)
+        yield f"$.{key}", refs
+        index = next_index + 1
+
+
+def audit_yaml_arg_file_refs(
+    path: Path,
+    audited_args_files: set[Path],
+) -> tuple[int, list[SourceFinding]]:
+    return audit_arg_file_refs(path, iter_yaml_arg_file_refs(path), audited_args_files)
+
+
 def audit_args_file_fragments(path: Path) -> tuple[int, list[SourceFinding]]:
     fragments_checked = 0
     findings: list[SourceFinding] = []
@@ -372,20 +460,67 @@ def audit_args_file_fragments(path: Path) -> tuple[int, list[SourceFinding]]:
     return fragments_checked, findings
 
 
+def resolve_arg_file_ref(config_path: Path, ref: str) -> Path:
+    path = Path(ref)
+    return path if path.is_absolute() else config_path.parent / path
+
+
+def audit_args_file_once(path: Path, audited_args_files: set[Path]) -> tuple[int, list[SourceFinding]]:
+    key = path.resolve(strict=False)
+    if key in audited_args_files:
+        return 0, []
+    audited_args_files.add(key)
+    return audit_args_file_fragments(path)
+
+
+def audit_arg_file_refs(
+    config_path: Path,
+    refs_by_path: Iterable[tuple[str, list[str]]],
+    audited_args_files: set[Path],
+) -> tuple[int, list[SourceFinding]]:
+    fragments_checked = 0
+    findings: list[SourceFinding] = []
+    for json_path, refs in refs_by_path:
+        for ref in refs:
+            ref_path = resolve_arg_file_ref(config_path, ref)
+            if not ref_path.is_file():
+                findings.append(
+                    SourceFinding(
+                        source=str(config_path),
+                        line=1,
+                        reason=f"{json_path}: referenced qemu args file not found: {ref}",
+                        command=[],
+                        text=ref,
+                    )
+                )
+                continue
+            checked, ref_findings = audit_args_file_once(ref_path, audited_args_files)
+            fragments_checked += checked
+            findings.extend(ref_findings)
+    return fragments_checked, findings
+
+
 def audit(paths: Iterable[Path], excludes: set[str]) -> tuple[int, list[SourceFinding]]:
     commands_checked = 0
     findings: list[SourceFinding] = []
+    audited_args_files: set[Path] = set()
     for path in iter_source_files(paths, excludes):
         if path.suffix.lower() == ".json":
             fragments_checked, json_findings = audit_json_arg_fragments(path)
             commands_checked += fragments_checked
             findings.extend(json_findings)
+            ref_fragments_checked, ref_findings = audit_json_arg_file_refs(path, audited_args_files)
+            commands_checked += ref_fragments_checked
+            findings.extend(ref_findings)
         elif path.suffix.lower() in {".yaml", ".yml"}:
             fragments_checked, yaml_findings = audit_yaml_arg_fragments(path)
             commands_checked += fragments_checked
             findings.extend(yaml_findings)
+            ref_fragments_checked, ref_findings = audit_yaml_arg_file_refs(path, audited_args_files)
+            commands_checked += ref_fragments_checked
+            findings.extend(ref_findings)
         elif path.suffix.lower() == ".args":
-            fragments_checked, args_findings = audit_args_file_fragments(path)
+            fragments_checked, args_findings = audit_args_file_once(path, audited_args_files)
             commands_checked += fragments_checked
             findings.extend(args_findings)
 

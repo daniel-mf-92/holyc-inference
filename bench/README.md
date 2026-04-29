@@ -497,11 +497,12 @@ for literal `qemu-system*` launch snippets and applies the same air-gap command
 rules. This catches unsafe copied commands before they become benchmark scripts
 or operator runbooks. It also checks JSON `qemu_args`/`qemu_extra_args`/
 `qemu_flags` fragments, standalone JSON QEMU args arrays, YAML
-`qemu_args`/`qemu_extra_args`/`qemu_flags` fragments, and `.args` files for
-network-enabling options such as `-netdev`, non-`none` `-nic`, and virtual NIC
-devices. Fragment audits do not require `-nic none` because the launcher injects
-it; they only reject options that re-enable networking. Raw QEMU examples must
-keep `-nic none` explicit:
+`qemu_args`/`qemu_extra_args`/`qemu_flags` fragments, `qemu_args_file`/
+`qemu_args_files` references resolved relative to the config file that names
+them, and `.args` files for network-enabling options such as `-netdev`,
+non-`none` `-nic`, and virtual NIC devices. Fragment audits do not require
+`-nic none` because the launcher injects it; they only reject options that
+re-enable networking. Raw QEMU examples must keep `-nic none` explicit:
 
 ```bash
 qemu-system-x86_64 \
