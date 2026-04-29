@@ -87,6 +87,7 @@ def write_qemu_report(
                         "model": "synthetic-smoke",
                         "quantization": "Q4_0",
                         "prompt": "index-smoke",
+                        "prompt_bytes": 80,
                         "tokens": 32,
                         "elapsed_us": 200000,
                         "expected_tokens": 32,
@@ -94,6 +95,9 @@ def write_qemu_report(
                         "wall_elapsed_us": 220000,
                         "tok_per_s": 160.0,
                         "wall_tok_per_s": 145.45,
+                        "prompt_bytes_per_s": 400.0,
+                        "wall_prompt_bytes_per_s": 363.64,
+                        "tokens_per_prompt_byte": 0.4,
                         "ttft_us": 12000,
                         "memory_bytes": 67174400,
                         "memory_bytes_per_token": 2099200.0,
@@ -113,6 +117,10 @@ def write_qemu_report(
                         "host_child_cpu_pct_median": 81.8,
                         "host_child_tok_per_cpu_s_median": 177.78,
                         "host_child_peak_rss_bytes_max": 73400320,
+                        "prompt_bytes": 80,
+                        "prompt_bytes_per_s_median": 400.0,
+                        "wall_prompt_bytes_per_s_median": 363.64,
+                        "tokens_per_prompt_byte_median": 0.4,
                         "us_per_token_median": 6250.0,
                         "wall_us_per_token_median": 6875.0,
                         "memory_bytes_per_token_median": 2099200.0,
@@ -124,10 +132,16 @@ def write_qemu_report(
                 ],
                 "suite_summary": {
                     "prompts": 1,
+                    "measured_prompt_bytes_total": 80,
+                    "prompt_bytes_min": 80,
+                    "prompt_bytes_max": 80,
                     "total_tokens": 32,
                     "total_elapsed_us": 200000,
                     "tok_per_s_median": 160.0,
                     "wall_tok_per_s_median": 145.45,
+                    "prompt_bytes_per_s_median": 400.0,
+                    "wall_prompt_bytes_per_s_median": 363.64,
+                    "tokens_per_prompt_byte_median": 0.4,
                     "ttft_us_p95": 12000.0,
                     "host_overhead_pct_median": 10.0,
                     "memory_bytes_per_token_median": 2099200.0,
@@ -216,8 +230,14 @@ def write_matrix_report(path: Path, command: list[str]) -> None:
                         "warmup_runs": 0,
                         "total_tokens": 64,
                         "total_elapsed_us": 320000,
+                        "measured_prompt_bytes_total": 128,
+                        "prompt_bytes_min": 128,
+                        "prompt_bytes_max": 128,
                         "median_tok_per_s": 200.0,
                         "wall_tok_per_s_median": 190.0,
+                        "prompt_bytes_per_s_median": 400.0,
+                        "wall_prompt_bytes_per_s_median": 380.0,
+                        "tokens_per_prompt_byte_median": 0.5,
                         "ttft_us_p95": 10000.0,
                         "host_child_tok_per_cpu_s_median": 210.0,
                         "host_child_peak_rss_bytes_max": 73400320,
@@ -317,6 +337,15 @@ def main() -> int:
         if qemu_artifact.get("expected_tokens_matches") != 1:
             print("missing_index_expected_token_matches=true", file=sys.stderr)
             return 1
+        if qemu_artifact.get("measured_prompt_bytes_total") != 80:
+            print("missing_index_prompt_bytes_total=true", file=sys.stderr)
+            return 1
+        if qemu_artifact.get("prompt_bytes_per_s_median") != 400.0:
+            print("missing_index_prompt_bytes_per_s=true", file=sys.stderr)
+            return 1
+        if qemu_artifact.get("tokens_per_prompt_byte_median") != 0.4:
+            print("missing_index_tokens_per_prompt_byte=true", file=sys.stderr)
+            return 1
         if qemu_artifact.get("serial_output_bytes_total") != 4096:
             print("missing_index_serial_output_bytes=true", file=sys.stderr)
             return 1
@@ -338,6 +367,9 @@ def main() -> int:
         if "expected_token_prompts,expected_tokens_total,expected_tokens_matches,expected_tokens_mismatches" not in csv_path.read_text(encoding="utf-8"):
             print("missing_index_expected_token_csv=true", file=sys.stderr)
             return 1
+        if "measured_prompt_bytes_total,prompt_bytes_min,prompt_bytes_max,prompt_bytes_per_s_median,wall_prompt_bytes_per_s_median,tokens_per_prompt_byte_median" not in csv_path.read_text(encoding="utf-8"):
+            print("missing_index_prompt_efficiency_csv=true", file=sys.stderr)
+            return 1
         if "memory_bytes_per_token_median,memory_bytes_per_token_max,serial_output_bytes_total,serial_output_bytes_max" not in csv_path.read_text(encoding="utf-8"):
             print("missing_index_resource_density_csv=true", file=sys.stderr)
             return 1
@@ -349,6 +381,9 @@ def main() -> int:
             return 1
         if "expected_token_prompts,expected_tokens_total,expected_tokens_matches,expected_tokens_mismatches" not in latest_csv_path.read_text(encoding="utf-8"):
             print("missing_latest_expected_token_csv=true", file=sys.stderr)
+            return 1
+        if "measured_prompt_bytes_total,prompt_bytes_min,prompt_bytes_max,prompt_bytes_per_s_median,wall_prompt_bytes_per_s_median,tokens_per_prompt_byte_median" not in latest_csv_path.read_text(encoding="utf-8"):
+            print("missing_latest_prompt_efficiency_csv=true", file=sys.stderr)
             return 1
         if "key,hash_count,source_count" not in launch_plan_drift_csv_path.read_text(encoding="utf-8"):
             print("missing_launch_plan_drift_csv=true", file=sys.stderr)

@@ -826,8 +826,9 @@ python3 bench/bench_matrix.py \
 `bench_result_index.py` scans existing QEMU prompt, QEMU prompt dry-run, and
 matrix JSON reports, rolls their tok/s, wall-clock tok/s, TTFT, host-overhead,
 per-token latency, host child CPU efficiency/RSS, memory, memory-per-token,
-serial-output, prompt-suite, expected-token parity, elapsed-time, and run-count
-metadata into a single JSON/Markdown/CSV/JUnit XML index, and checks each
+serial-output, prompt-byte efficiency, prompt-suite, expected-token parity,
+elapsed-time, and run-count metadata into a single JSON/Markdown/CSV/JUnit XML
+index, and checks each
 recorded QEMU command for explicit `-nic none` air-gap compliance. Dry-run
 reports are indexed as planned launch artifacts: their command hash is
 recomputed, planned warmup/measured
@@ -838,6 +839,11 @@ also carries `expected_token_prompts`, `expected_tokens_total`,
 index and latest-comparable CSVs; `--fail-on-telemetry` rejects measured
 artifacts with any expected-token mismatches so tok/s comparisons cannot hide
 short or overlong decodes.
+Measured artifacts also carry `measured_prompt_bytes_total`,
+`prompt_bytes_min`, `prompt_bytes_max`, `prompt_bytes_per_s_median`,
+`wall_prompt_bytes_per_s_median`, and `tokens_per_prompt_byte_median` through
+the index and latest-comparable CSVs so dashboards can distinguish token
+throughput regressions from prompt-size or prompt-efficiency drift.
 also reports prompt-suite drift when comparable profile/model/quantization
 artifacts carry different non-empty suite hashes, and command drift when
 comparable artifacts carry different `command_sha256` values. It also
