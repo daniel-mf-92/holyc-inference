@@ -113,6 +113,18 @@ def main() -> int:
         if fixture_summary.get("median_wall_tok_per_s") != 95.5:
             print("missing_wall_tok_summary=true", file=sys.stderr)
             return 1
+        if fixture_summary.get("median_elapsed_us") != 1000000.0:
+            print("missing_elapsed_summary=true", file=sys.stderr)
+            return 1
+        if fixture_summary.get("p95_elapsed_us") != 1000000.0:
+            print("missing_p95_elapsed_summary=true", file=sys.stderr)
+            return 1
+        if fixture_summary.get("median_wall_elapsed_us") != 1047149.5:
+            print("missing_wall_elapsed_summary=true", file=sys.stderr)
+            return 1
+        if fixture_summary.get("p95_wall_elapsed_us") != 1052083.75:
+            print("missing_p95_wall_elapsed_summary=true", file=sys.stderr)
+            return 1
         if fixture_summary.get("p05_wall_tok_per_s") != 95.05:
             print("missing_p05_wall_tok_summary=true", file=sys.stderr)
             return 1
@@ -187,6 +199,7 @@ def main() -> int:
         required_commit_points_columns = {
             "key", "commit", "latest_timestamp", "records",
             "tok_per_s_records", "wall_tok_per_s_records",
+            "elapsed_us_records", "wall_elapsed_us_records",
             "us_per_token_records", "wall_us_per_token_records",
             "memory_records", "memory_bytes_per_token_records",
             "ttft_us_records", "host_overhead_records",
@@ -199,6 +212,8 @@ def main() -> int:
             "serial_output_bytes_per_token_records",
             "p05_tok_per_s", "median_tok_per_s", "median_wall_tok_per_s",
             "p05_wall_tok_per_s",
+            "median_elapsed_us", "p95_elapsed_us",
+            "median_wall_elapsed_us", "p95_wall_elapsed_us",
             "median_us_per_token", "p95_us_per_token",
             "median_wall_us_per_token", "p95_wall_us_per_token",
             "median_tokens", "min_tokens",
@@ -262,6 +277,12 @@ def main() -> int:
             return 1
         if "p05_wall_tok_per_s_baseline,p05_wall_tok_per_s_candidate,p05_wall_tok_per_s_delta_pct" not in comparisons_csv:
             print("missing_p05_wall_tok_comparison=true", file=sys.stderr)
+            return 1
+        if "median_elapsed_us_baseline,median_elapsed_us_candidate,median_elapsed_us_delta_pct" not in comparisons_csv:
+            print("missing_elapsed_comparison=true", file=sys.stderr)
+            return 1
+        if "p95_wall_elapsed_us_baseline,p95_wall_elapsed_us_candidate,p95_wall_elapsed_us_delta_pct" not in comparisons_csv:
+            print("missing_p95_wall_elapsed_comparison=true", file=sys.stderr)
             return 1
         if "median_us_per_token_baseline,median_us_per_token_candidate,median_us_per_token_delta_pct" not in comparisons_csv:
             print("missing_us_per_token_comparison=true", file=sys.stderr)

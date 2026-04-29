@@ -233,6 +233,79 @@ def test_detects_optional_p95_token_latency_regressions(tmp_path: Path) -> None:
     assert "Token latency regressions: 2" in perf_regression.markdown_report(report)
 
 
+def test_detects_optional_elapsed_duration_regressions(tmp_path: Path) -> None:
+    result = tmp_path / "perf.jsonl"
+    write_jsonl(
+        result,
+        [
+            {
+                "timestamp": "2026-04-27T10:00:00Z",
+                "commit": "base",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "elapsed_ms": 100.0,
+                "wall_elapsed_us": 120000,
+            },
+            {
+                "timestamp": "2026-04-27T10:01:00Z",
+                "commit": "base",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "elapsed_us": 100000,
+                "wall_elapsed_us": 120000,
+            },
+            {
+                "timestamp": "2026-04-27T11:00:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "duration_us": 150000,
+                "host_wall_elapsed_us": 210000,
+            },
+            {
+                "timestamp": "2026-04-27T11:01:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "elapsed_us": 100000,
+                "wall_elapsed_us": 120000,
+            },
+        ],
+    )
+
+    records = perf_regression.load_records([result])
+    report = perf_regression.build_report(
+        records,
+        100.0,
+        100.0,
+        elapsed_us_threshold_pct=20.0,
+        p95_elapsed_us_threshold_pct=20.0,
+        wall_elapsed_us_threshold_pct=20.0,
+        p95_wall_elapsed_us_threshold_pct=20.0,
+        require_elapsed_us=True,
+        require_wall_elapsed_us=True,
+    )
+
+    assert [record.elapsed_us for record in records] == [100000, 100000, 150000, 100000]
+    assert [record.wall_elapsed_us for record in records] == [120000, 120000, 210000, 120000]
+    assert report["status"] == "fail"
+    assert report["commit_points"][0]["elapsed_us_records"] == 2
+    assert report["commit_points"][0]["median_elapsed_us"] == 100000.0
+    assert report["commit_points"][1]["median_wall_elapsed_us"] == 165000.0
+    assert report["comparisons"][0]["median_elapsed_us_delta_pct"] == 25.0
+    assert [regression["metric"] for regression in report["regressions"]] == [
+        "elapsed_us",
+        "elapsed_us_p95",
+        "wall_elapsed_us",
+        "wall_elapsed_us_p95",
+    ]
+    assert report["telemetry_coverage_violations"] == []
+
+
 def test_detects_optional_wall_tok_per_s_regressions(tmp_path: Path) -> None:
     result = tmp_path / "perf.jsonl"
     write_jsonl(

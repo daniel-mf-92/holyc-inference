@@ -38,6 +38,8 @@ class PerfRecord:
     prompt: str
     tok_per_s: float | None = None
     wall_tok_per_s: float | None = None
+    elapsed_us: int | None = None
+    wall_elapsed_us: int | None = None
     us_per_token: float | None = None
     wall_us_per_token: float | None = None
     memory_bytes: int | None = None
@@ -86,6 +88,8 @@ class CommitPoint:
     records: int
     tok_per_s_records: int
     wall_tok_per_s_records: int
+    elapsed_us_records: int
+    wall_elapsed_us_records: int
     us_per_token_records: int
     wall_us_per_token_records: int
     memory_records: int
@@ -107,6 +111,10 @@ class CommitPoint:
     p05_tok_per_s: float | None
     median_wall_tok_per_s: float | None
     p05_wall_tok_per_s: float | None
+    median_elapsed_us: float | None
+    p95_elapsed_us: float | None
+    median_wall_elapsed_us: float | None
+    p95_wall_elapsed_us: float | None
     median_us_per_token: float | None
     p95_us_per_token: float | None
     median_wall_us_per_token: float | None
@@ -244,6 +252,18 @@ class ComparisonRow:
     p05_wall_tok_per_s_baseline: float | None
     p05_wall_tok_per_s_candidate: float | None
     p05_wall_tok_per_s_delta_pct: float | None
+    median_elapsed_us_baseline: float | None
+    median_elapsed_us_candidate: float | None
+    median_elapsed_us_delta_pct: float | None
+    p95_elapsed_us_baseline: float | None
+    p95_elapsed_us_candidate: float | None
+    p95_elapsed_us_delta_pct: float | None
+    median_wall_elapsed_us_baseline: float | None
+    median_wall_elapsed_us_candidate: float | None
+    median_wall_elapsed_us_delta_pct: float | None
+    p95_wall_elapsed_us_baseline: float | None
+    p95_wall_elapsed_us_candidate: float | None
+    p95_wall_elapsed_us_delta_pct: float | None
     median_us_per_token_baseline: float | None
     median_us_per_token_candidate: float | None
     median_us_per_token_delta_pct: float | None
@@ -424,6 +444,16 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
     )
     if wall_tok_per_s is None and wall_tok_per_s_milli is not None:
         wall_tok_per_s = wall_tok_per_s_milli / 1000.0
+    elapsed_us = parse_duration_us(row, "elapsed_us", "elapsed", "duration_us", "duration")
+    wall_elapsed_us = parse_duration_us(
+        row,
+        "wall_elapsed_us",
+        "wall_elapsed",
+        "host_elapsed_us",
+        "host_wall_elapsed_us",
+        "wall_duration_us",
+        "host_duration_us",
+    )
     us_per_token = parse_float(row.get("us_per_token") or row.get("us_per_token_median"))
     wall_us_per_token = parse_float(
         row.get("wall_us_per_token")
@@ -512,6 +542,8 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
     if (
         tok_per_s is None
         and wall_tok_per_s is None
+        and elapsed_us is None
+        and wall_elapsed_us is None
         and us_per_token is None
         and wall_us_per_token is None
         and memory_bytes is None
@@ -542,6 +574,8 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
         prompt=first_present(row, ("prompt", "prompt_id", "case", "scenario"), ""),
         tok_per_s=tok_per_s,
         wall_tok_per_s=wall_tok_per_s,
+        elapsed_us=elapsed_us,
+        wall_elapsed_us=wall_elapsed_us,
         us_per_token=us_per_token,
         wall_us_per_token=wall_us_per_token,
         memory_bytes=memory_bytes,
@@ -689,6 +723,14 @@ def summarize(records: list[PerfRecord]) -> dict[str, dict[str, Any]]:
         wall_tps_values = [
             record.wall_tok_per_s for record in key_records if record.wall_tok_per_s is not None
         ]
+        elapsed_values = [
+            record.elapsed_us for record in key_records if record.elapsed_us is not None
+        ]
+        wall_elapsed_values = [
+            record.wall_elapsed_us
+            for record in key_records
+            if record.wall_elapsed_us is not None
+        ]
         us_per_token_values = [
             record.us_per_token for record in key_records if record.us_per_token is not None
         ]
@@ -751,6 +793,16 @@ def summarize(records: list[PerfRecord]) -> dict[str, dict[str, Any]]:
             "p05_tok_per_s": percentile(tps_values, 5.0),
             "median_wall_tok_per_s": statistics.median(wall_tps_values) if wall_tps_values else None,
             "p05_wall_tok_per_s": percentile(wall_tps_values, 5.0),
+            "median_elapsed_us": (
+                statistics.median(elapsed_values) if elapsed_values else None
+            ),
+            "p95_elapsed_us": percentile([float(value) for value in elapsed_values], 95.0),
+            "median_wall_elapsed_us": (
+                statistics.median(wall_elapsed_values) if wall_elapsed_values else None
+            ),
+            "p95_wall_elapsed_us": percentile(
+                [float(value) for value in wall_elapsed_values], 95.0
+            ),
             "median_us_per_token": (
                 statistics.median(us_per_token_values) if us_per_token_values else None
             ),
@@ -853,6 +905,14 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
         wall_tps_values = [
             record.wall_tok_per_s for record in commit_records if record.wall_tok_per_s is not None
         ]
+        elapsed_values = [
+            record.elapsed_us for record in commit_records if record.elapsed_us is not None
+        ]
+        wall_elapsed_values = [
+            record.wall_elapsed_us
+            for record in commit_records
+            if record.wall_elapsed_us is not None
+        ]
         us_per_token_values = [
             record.us_per_token for record in commit_records if record.us_per_token is not None
         ]
@@ -930,6 +990,8 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                 records=len(commit_records),
                 tok_per_s_records=len(tps_values),
                 wall_tok_per_s_records=len(wall_tps_values),
+                elapsed_us_records=len(elapsed_values),
+                wall_elapsed_us_records=len(wall_elapsed_values),
                 us_per_token_records=len(us_per_token_values),
                 wall_us_per_token_records=len(wall_us_per_token_values),
                 memory_records=len(memory_values),
@@ -951,6 +1013,16 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                 p05_tok_per_s=percentile(tps_values, 5.0),
                 median_wall_tok_per_s=statistics.median(wall_tps_values) if wall_tps_values else None,
                 p05_wall_tok_per_s=percentile(wall_tps_values, 5.0),
+                median_elapsed_us=(
+                    statistics.median(elapsed_values) if elapsed_values else None
+                ),
+                p95_elapsed_us=percentile([float(value) for value in elapsed_values], 95.0),
+                median_wall_elapsed_us=(
+                    statistics.median(wall_elapsed_values) if wall_elapsed_values else None
+                ),
+                p95_wall_elapsed_us=percentile(
+                    [float(value) for value in wall_elapsed_values], 95.0
+                ),
                 median_us_per_token=(
                     statistics.median(us_per_token_values) if us_per_token_values else None
                 ),
@@ -1126,6 +1198,26 @@ def comparison_rows(
                 p05_wall_tok_per_s_candidate=candidate.p05_wall_tok_per_s,
                 p05_wall_tok_per_s_delta_pct=throughput_delta_pct(
                     baseline.p05_wall_tok_per_s, candidate.p05_wall_tok_per_s
+                ),
+                median_elapsed_us_baseline=baseline.median_elapsed_us,
+                median_elapsed_us_candidate=candidate.median_elapsed_us,
+                median_elapsed_us_delta_pct=growth_delta_pct(
+                    baseline.median_elapsed_us, candidate.median_elapsed_us
+                ),
+                p95_elapsed_us_baseline=baseline.p95_elapsed_us,
+                p95_elapsed_us_candidate=candidate.p95_elapsed_us,
+                p95_elapsed_us_delta_pct=growth_delta_pct(
+                    baseline.p95_elapsed_us, candidate.p95_elapsed_us
+                ),
+                median_wall_elapsed_us_baseline=baseline.median_wall_elapsed_us,
+                median_wall_elapsed_us_candidate=candidate.median_wall_elapsed_us,
+                median_wall_elapsed_us_delta_pct=growth_delta_pct(
+                    baseline.median_wall_elapsed_us, candidate.median_wall_elapsed_us
+                ),
+                p95_wall_elapsed_us_baseline=baseline.p95_wall_elapsed_us,
+                p95_wall_elapsed_us_candidate=candidate.p95_wall_elapsed_us,
+                p95_wall_elapsed_us_delta_pct=growth_delta_pct(
+                    baseline.p95_wall_elapsed_us, candidate.p95_wall_elapsed_us
                 ),
                 median_us_per_token_baseline=baseline.median_us_per_token,
                 median_us_per_token_candidate=candidate.median_us_per_token,
@@ -1307,6 +1399,10 @@ def detect_regressions(
     host_overhead_threshold_pct: float | None = None,
     p05_tok_threshold_pct: float | None = None,
     p05_wall_tok_threshold_pct: float | None = None,
+    elapsed_us_threshold_pct: float | None = None,
+    p95_elapsed_us_threshold_pct: float | None = None,
+    wall_elapsed_us_threshold_pct: float | None = None,
+    p95_wall_elapsed_us_threshold_pct: float | None = None,
     token_drop_threshold_pct: float | None = None,
     min_token_drop_threshold_pct: float | None = None,
     memory_per_token_threshold_pct: float | None = None,
@@ -1443,6 +1539,102 @@ def detect_regressions(
                         candidate_value=candidate.median_us_per_token,
                         delta_pct=delta_pct,
                         threshold_pct=us_per_token_threshold_pct,
+                    )
+                )
+
+        if (
+            elapsed_us_threshold_pct is not None
+            and baseline.median_elapsed_us
+            and candidate.median_elapsed_us is not None
+        ):
+            delta_pct = (
+                (candidate.median_elapsed_us - baseline.median_elapsed_us)
+                * 100.0
+                / baseline.median_elapsed_us
+            )
+            if delta_pct > elapsed_us_threshold_pct:
+                regressions.append(
+                    Regression(
+                        key=key,
+                        metric="elapsed_us",
+                        baseline_commit=baseline.commit,
+                        candidate_commit=candidate.commit,
+                        baseline_value=baseline.median_elapsed_us,
+                        candidate_value=candidate.median_elapsed_us,
+                        delta_pct=delta_pct,
+                        threshold_pct=elapsed_us_threshold_pct,
+                    )
+                )
+
+        if (
+            p95_elapsed_us_threshold_pct is not None
+            and baseline.p95_elapsed_us
+            and candidate.p95_elapsed_us is not None
+        ):
+            delta_pct = (
+                (candidate.p95_elapsed_us - baseline.p95_elapsed_us)
+                * 100.0
+                / baseline.p95_elapsed_us
+            )
+            if delta_pct > p95_elapsed_us_threshold_pct:
+                regressions.append(
+                    Regression(
+                        key=key,
+                        metric="elapsed_us_p95",
+                        baseline_commit=baseline.commit,
+                        candidate_commit=candidate.commit,
+                        baseline_value=baseline.p95_elapsed_us,
+                        candidate_value=candidate.p95_elapsed_us,
+                        delta_pct=delta_pct,
+                        threshold_pct=p95_elapsed_us_threshold_pct,
+                    )
+                )
+
+        if (
+            wall_elapsed_us_threshold_pct is not None
+            and baseline.median_wall_elapsed_us
+            and candidate.median_wall_elapsed_us is not None
+        ):
+            delta_pct = (
+                (candidate.median_wall_elapsed_us - baseline.median_wall_elapsed_us)
+                * 100.0
+                / baseline.median_wall_elapsed_us
+            )
+            if delta_pct > wall_elapsed_us_threshold_pct:
+                regressions.append(
+                    Regression(
+                        key=key,
+                        metric="wall_elapsed_us",
+                        baseline_commit=baseline.commit,
+                        candidate_commit=candidate.commit,
+                        baseline_value=baseline.median_wall_elapsed_us,
+                        candidate_value=candidate.median_wall_elapsed_us,
+                        delta_pct=delta_pct,
+                        threshold_pct=wall_elapsed_us_threshold_pct,
+                    )
+                )
+
+        if (
+            p95_wall_elapsed_us_threshold_pct is not None
+            and baseline.p95_wall_elapsed_us
+            and candidate.p95_wall_elapsed_us is not None
+        ):
+            delta_pct = (
+                (candidate.p95_wall_elapsed_us - baseline.p95_wall_elapsed_us)
+                * 100.0
+                / baseline.p95_wall_elapsed_us
+            )
+            if delta_pct > p95_wall_elapsed_us_threshold_pct:
+                regressions.append(
+                    Regression(
+                        key=key,
+                        metric="wall_elapsed_us_p95",
+                        baseline_commit=baseline.commit,
+                        candidate_commit=candidate.commit,
+                        baseline_value=baseline.p95_wall_elapsed_us,
+                        candidate_value=candidate.p95_wall_elapsed_us,
+                        delta_pct=delta_pct,
+                        threshold_pct=p95_wall_elapsed_us_threshold_pct,
                     )
                 )
 
@@ -2085,6 +2277,8 @@ def detect_telemetry_coverage_violations(
     *,
     require_tok_per_s: bool = False,
     require_wall_tok_per_s: bool = False,
+    require_elapsed_us: bool = False,
+    require_wall_elapsed_us: bool = False,
     require_us_per_token: bool = False,
     require_wall_us_per_token: bool = False,
     require_memory: bool = False,
@@ -2102,6 +2296,8 @@ def detect_telemetry_coverage_violations(
     required = [
         ("tok_per_s", require_tok_per_s, "tok_per_s_records"),
         ("wall_tok_per_s", require_wall_tok_per_s, "wall_tok_per_s_records"),
+        ("elapsed_us", require_elapsed_us, "elapsed_us_records"),
+        ("wall_elapsed_us", require_wall_elapsed_us, "wall_elapsed_us_records"),
         ("us_per_token", require_us_per_token, "us_per_token_records"),
         ("wall_us_per_token", require_wall_us_per_token, "wall_us_per_token_records"),
         ("memory_bytes", require_memory, "memory_records"),
@@ -2161,6 +2357,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Regressions: {len(report['regressions'])}",
         f"P05 throughput regressions: {len([row for row in report['regressions'] if row['metric'] == 'tok_per_s_p05'])}",
         f"P05 wall throughput regressions: {len([row for row in report['regressions'] if row['metric'] == 'wall_tok_per_s_p05'])}",
+        f"Elapsed duration regressions: {len([row for row in report['regressions'] if row['metric'] in {'elapsed_us', 'elapsed_us_p95', 'wall_elapsed_us', 'wall_elapsed_us_p95'}])}",
         f"Token latency regressions: {len([row for row in report['regressions'] if row['metric'] in {'us_per_token', 'us_per_token_p95', 'wall_us_per_token', 'wall_us_per_token_p95'}])}",
         f"P95 TTFT regressions: {len([row for row in report['regressions'] if row['metric'] == 'ttft_us_p95'])}",
         f"Host overhead regressions: {len([row for row in report['regressions'] if row['metric'] == 'host_overhead_pct'])}",
@@ -3052,6 +3249,8 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "records",
             "tok_per_s_records",
             "wall_tok_per_s_records",
+            "elapsed_us_records",
+            "wall_elapsed_us_records",
             "us_per_token_records",
             "wall_us_per_token_records",
             "memory_records",
@@ -3073,6 +3272,10 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "median_tok_per_s",
             "p05_wall_tok_per_s",
             "median_wall_tok_per_s",
+            "median_elapsed_us",
+            "p95_elapsed_us",
+            "median_wall_elapsed_us",
+            "p95_wall_elapsed_us",
             "median_us_per_token",
             "p95_us_per_token",
             "median_wall_us_per_token",
@@ -3146,6 +3349,18 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "p05_wall_tok_per_s_baseline",
             "p05_wall_tok_per_s_candidate",
             "p05_wall_tok_per_s_delta_pct",
+            "median_elapsed_us_baseline",
+            "median_elapsed_us_candidate",
+            "median_elapsed_us_delta_pct",
+            "p95_elapsed_us_baseline",
+            "p95_elapsed_us_candidate",
+            "p95_elapsed_us_delta_pct",
+            "median_wall_elapsed_us_baseline",
+            "median_wall_elapsed_us_candidate",
+            "median_wall_elapsed_us_delta_pct",
+            "p95_wall_elapsed_us_baseline",
+            "p95_wall_elapsed_us_candidate",
+            "p95_wall_elapsed_us_delta_pct",
             "median_us_per_token_baseline",
             "median_us_per_token_candidate",
             "median_us_per_token_delta_pct",
@@ -3318,6 +3533,10 @@ def build_report(
     host_overhead_threshold_pct: float | None = None,
     p05_tok_threshold_pct: float | None = None,
     p05_wall_tok_threshold_pct: float | None = None,
+    elapsed_us_threshold_pct: float | None = None,
+    p95_elapsed_us_threshold_pct: float | None = None,
+    wall_elapsed_us_threshold_pct: float | None = None,
+    p95_wall_elapsed_us_threshold_pct: float | None = None,
     token_drop_threshold_pct: float | None = None,
     min_token_drop_threshold_pct: float | None = None,
     memory_per_token_threshold_pct: float | None = None,
@@ -3330,6 +3549,8 @@ def build_report(
     min_commits_per_key: int = 1,
     require_tok_per_s: bool = False,
     require_wall_tok_per_s: bool = False,
+    require_elapsed_us: bool = False,
+    require_wall_elapsed_us: bool = False,
     require_us_per_token: bool = False,
     require_wall_us_per_token: bool = False,
     require_memory: bool = False,
@@ -3366,6 +3587,10 @@ def build_report(
         host_overhead_threshold_pct=host_overhead_threshold_pct,
         p05_tok_threshold_pct=p05_tok_threshold_pct,
         p05_wall_tok_threshold_pct=p05_wall_tok_threshold_pct,
+        elapsed_us_threshold_pct=elapsed_us_threshold_pct,
+        p95_elapsed_us_threshold_pct=p95_elapsed_us_threshold_pct,
+        wall_elapsed_us_threshold_pct=wall_elapsed_us_threshold_pct,
+        p95_wall_elapsed_us_threshold_pct=p95_wall_elapsed_us_threshold_pct,
         token_drop_threshold_pct=token_drop_threshold_pct,
         min_token_drop_threshold_pct=min_token_drop_threshold_pct,
         memory_per_token_threshold_pct=memory_per_token_threshold_pct,
@@ -3400,6 +3625,8 @@ def build_report(
         points,
         require_tok_per_s=require_tok_per_s,
         require_wall_tok_per_s=require_wall_tok_per_s,
+        require_elapsed_us=require_elapsed_us,
+        require_wall_elapsed_us=require_wall_elapsed_us,
         require_us_per_token=require_us_per_token,
         require_wall_us_per_token=require_wall_us_per_token,
         require_memory=require_memory,
@@ -3450,6 +3677,10 @@ def build_report(
             "host_overhead_regression_pct": host_overhead_threshold_pct,
             "p05_tok_regression_pct": p05_tok_threshold_pct,
             "p05_wall_tok_regression_pct": p05_wall_tok_threshold_pct,
+            "elapsed_us_regression_pct": elapsed_us_threshold_pct,
+            "p95_elapsed_us_regression_pct": p95_elapsed_us_threshold_pct,
+            "wall_elapsed_us_regression_pct": wall_elapsed_us_threshold_pct,
+            "p95_wall_elapsed_us_regression_pct": p95_wall_elapsed_us_threshold_pct,
             "token_drop_regression_pct": token_drop_threshold_pct,
             "min_token_drop_regression_pct": min_token_drop_threshold_pct,
             "memory_per_token_regression_pct": memory_per_token_threshold_pct,
@@ -3465,6 +3696,8 @@ def build_report(
             "min_commits_per_key": min_commits_per_key,
             "require_tok_per_s": require_tok_per_s,
             "require_wall_tok_per_s": require_wall_tok_per_s,
+            "require_elapsed_us": require_elapsed_us,
+            "require_wall_elapsed_us": require_wall_elapsed_us,
             "require_us_per_token": require_us_per_token,
             "require_wall_us_per_token": require_wall_us_per_token,
             "require_memory": require_memory,
@@ -3584,6 +3817,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail when P05 host wall-clock tok/s drops by more than this percent",
     )
     parser.add_argument(
+        "--elapsed-us-regression-pct",
+        type=float,
+        help="Fail when median guest elapsed microseconds increases by more than this percent",
+    )
+    parser.add_argument(
+        "--p95-elapsed-us-regression-pct",
+        type=float,
+        help="Fail when P95 guest elapsed microseconds increases by more than this percent",
+    )
+    parser.add_argument(
+        "--wall-elapsed-us-regression-pct",
+        type=float,
+        help="Fail when median host wall elapsed microseconds increases by more than this percent",
+    )
+    parser.add_argument(
+        "--p95-wall-elapsed-us-regression-pct",
+        type=float,
+        help="Fail when P95 host wall elapsed microseconds increases by more than this percent",
+    )
+    parser.add_argument(
         "--token-drop-regression-pct",
         type=float,
         help="Fail when median emitted token count drops by more than this percent",
@@ -3664,6 +3917,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--require-wall-tok-per-s",
         action="store_true",
         help="Fail when any benchmark key/commit point lacks host wall-clock tok/s telemetry",
+    )
+    parser.add_argument(
+        "--require-elapsed-us",
+        action="store_true",
+        help="Fail when any benchmark key/commit point lacks guest elapsed-time telemetry",
+    )
+    parser.add_argument(
+        "--require-wall-elapsed-us",
+        action="store_true",
+        help="Fail when any benchmark key/commit point lacks host wall elapsed-time telemetry",
     )
     parser.add_argument(
         "--require-us-per-token",
@@ -3788,6 +4051,10 @@ def main(argv: list[str] | None = None) -> int:
         host_overhead_threshold_pct=args.host_overhead_regression_pct,
         p05_tok_threshold_pct=args.p05_tok_regression_pct,
         p05_wall_tok_threshold_pct=args.p05_wall_tok_regression_pct,
+        elapsed_us_threshold_pct=args.elapsed_us_regression_pct,
+        p95_elapsed_us_threshold_pct=args.p95_elapsed_us_regression_pct,
+        wall_elapsed_us_threshold_pct=args.wall_elapsed_us_regression_pct,
+        p95_wall_elapsed_us_threshold_pct=args.p95_wall_elapsed_us_regression_pct,
         token_drop_threshold_pct=args.token_drop_regression_pct,
         min_token_drop_threshold_pct=args.min_token_drop_regression_pct,
         memory_per_token_threshold_pct=args.memory_per_token_regression_pct,
@@ -3800,6 +4067,8 @@ def main(argv: list[str] | None = None) -> int:
         min_commits_per_key=args.min_commits_per_key,
         require_tok_per_s=args.require_tok_per_s,
         require_wall_tok_per_s=args.require_wall_tok_per_s,
+        require_elapsed_us=args.require_elapsed_us,
+        require_wall_elapsed_us=args.require_wall_elapsed_us,
         require_us_per_token=args.require_us_per_token,
         require_wall_us_per_token=args.require_wall_us_per_token,
         require_memory=args.require_memory,
