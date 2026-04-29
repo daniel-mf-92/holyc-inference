@@ -250,3 +250,4 @@
 2026-04-29T14:09:35Z | Added QEMU source air-gap audit CI smoke coverage and refreshed source audit artifacts.
 2026-04-29T14:37:01Z | Added qemu prompt benchmark phase summaries/CSV with synthetic smoke coverage and refreshed artifacts.
 2026-04-29T15:23:07Z | Added qemu prompt benchmark top-level provenance metadata and indexer fallback coverage.
+2026-04-29T16:10:50Z | Added qemu prompt benchmark prompt-integrity summary telemetry with smoke coverage and refreshed artifacts.

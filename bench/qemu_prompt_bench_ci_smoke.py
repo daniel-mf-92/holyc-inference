@@ -113,6 +113,16 @@ def main() -> int:
             return rc
         if rc := require(report["suite_summary"]["ok_run_pct"] == 100.0, "unexpected_suite_ok_pct"):
             return rc
+        if rc := require(
+            report["suite_summary"]["guest_prompt_sha256_matches"] == 4,
+            "unexpected_suite_guest_prompt_sha256_matches",
+        ):
+            return rc
+        if rc := require(
+            report["suite_summary"]["guest_prompt_bytes_matches"] == 4,
+            "unexpected_suite_guest_prompt_bytes_matches",
+        ):
+            return rc
 
         phases = {row["phase"]: row for row in report["phase_summaries"]}
         if rc := require(set(phases) == {"warmup", "measured", "all"}, "unexpected_phase_rows"):
@@ -124,6 +134,16 @@ def main() -> int:
         if rc := require(phases["measured"]["launches"] == 4, "unexpected_measured_phase_launches"):
             return rc
         if rc := require(phases["measured"]["total_tokens"] == 160, "unexpected_measured_phase_tokens"):
+            return rc
+        if rc := require(
+            phases["measured"]["guest_prompt_sha256_mismatches"] == 0,
+            "unexpected_measured_prompt_sha256_mismatches",
+        ):
+            return rc
+        if rc := require(
+            phases["measured"]["guest_prompt_bytes_mismatches"] == 0,
+            "unexpected_measured_prompt_bytes_mismatches",
+        ):
             return rc
         if rc := require(phases["all"]["launches"] == 6, "unexpected_all_phase_launches"):
             return rc
@@ -138,6 +158,11 @@ def main() -> int:
                 phase_rows[0].keys()
             ),
             "missing_phase_csv_columns",
+        ):
+            return rc
+        if rc := require(
+            "guest_prompt_sha256_mismatches" in phase_rows[0],
+            "missing_phase_prompt_integrity_columns",
         ):
             return rc
 

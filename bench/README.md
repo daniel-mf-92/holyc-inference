@@ -513,9 +513,11 @@ host-side match flag so CI can prove the guest benchmarked the exact prompt
 sent by the host. They also record optional guest-reported prompt byte counts
 from `prompt_bytes`, `input_bytes`, `prompt_size_bytes`, or `input_size_bytes`
 with a host-side match flag, giving CI a cheap independent check that the guest
-consumed the same input length. Per-run records also include stdout, stderr,
-and combined serial output byte counts. Suite and prompt summaries roll those
-up so verbose guest logging can be gated
+consumed the same input length. Suite, phase, and prompt summaries include
+guest prompt hash/byte record, match, and mismatch counts so prompt-integrity
+coverage is visible without scanning every launch row. Per-run records also
+include stdout, stderr, and combined serial output byte counts. Suite and
+prompt summaries roll those up so verbose guest logging can be gated
 separately from decode throughput. Optional first-token latency telemetry is
 normalized from `ttft_us`, `time_to_first_token_us`, `first_token_us`, and their
 `_ms` or `_s` variants into `ttft_us`; suite and per-prompt reports include

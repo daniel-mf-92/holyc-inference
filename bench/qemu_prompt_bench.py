@@ -624,6 +624,19 @@ def ok_run_pct(ok_runs: int, total_runs: int) -> float | None:
     return ok_runs * 100.0 / total_runs
 
 
+def prompt_integrity_summary(runs: list[BenchRun]) -> dict[str, int]:
+    sha_records = [run for run in runs if run.guest_prompt_sha256_match is not None]
+    byte_records = [run for run in runs if run.guest_prompt_bytes_match is not None]
+    return {
+        "guest_prompt_sha256_records": len(sha_records),
+        "guest_prompt_sha256_matches": sum(1 for run in sha_records if run.guest_prompt_sha256_match is True),
+        "guest_prompt_sha256_mismatches": sum(1 for run in sha_records if run.guest_prompt_sha256_match is False),
+        "guest_prompt_bytes_records": len(byte_records),
+        "guest_prompt_bytes_matches": sum(1 for run in byte_records if run.guest_prompt_bytes_match is True),
+        "guest_prompt_bytes_mismatches": sum(1 for run in byte_records if run.guest_prompt_bytes_match is False),
+    }
+
+
 def process_rss_bytes(pid: int) -> int | None:
     """Return current resident set size for a direct child process when available."""
     if sys.platform == "darwin":
@@ -1030,6 +1043,7 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
                 else None,
                 "serial_output_bytes_total": sum(serial_output_values),
                 "serial_output_bytes_max": max(serial_output_values) if serial_output_values else None,
+                **prompt_integrity_summary(prompt_runs),
             }
         )
     return summaries
@@ -1471,6 +1485,7 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
         else None,
         "serial_output_bytes_total": sum(serial_output_values),
         "serial_output_bytes_max": max(serial_output_values) if serial_output_values else None,
+        **prompt_integrity_summary(runs),
     }
 
 
@@ -1556,6 +1571,12 @@ def markdown_report(report: dict[str, Any]) -> str:
                 "| Serial output bytes total | Serial output bytes max |",
                 "| ---: | ---: |",
                 "| {serial_output_bytes_total} | {serial_output_bytes_max} |".format(
+                    **{key: format_summary_value(value) for key, value in suite.items()}
+                ),
+                "",
+                "| Guest prompt SHA records | Guest prompt SHA matches | Guest prompt SHA mismatches | Guest prompt byte records | Guest prompt byte matches | Guest prompt byte mismatches |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| {guest_prompt_sha256_records} | {guest_prompt_sha256_matches} | {guest_prompt_sha256_mismatches} | {guest_prompt_bytes_records} | {guest_prompt_bytes_matches} | {guest_prompt_bytes_mismatches} |".format(
                     **{key: format_summary_value(value) for key, value in suite.items()}
                 ),
                 "",
@@ -2308,6 +2329,12 @@ def write_summary_csv_report(report: dict[str, Any], path: Path) -> None:
         "memory_bytes_per_token_max",
         "serial_output_bytes_total",
         "serial_output_bytes_max",
+        "guest_prompt_sha256_records",
+        "guest_prompt_sha256_matches",
+        "guest_prompt_sha256_mismatches",
+        "guest_prompt_bytes_records",
+        "guest_prompt_bytes_matches",
+        "guest_prompt_bytes_mismatches",
     ]
     rows: list[dict[str, Any]] = []
     suite = report.get("suite_summary") or {}
@@ -2368,6 +2395,12 @@ def write_phase_csv_report(report: dict[str, Any], path: Path) -> None:
         "memory_bytes_per_token_max",
         "serial_output_bytes_total",
         "serial_output_bytes_max",
+        "guest_prompt_sha256_records",
+        "guest_prompt_sha256_matches",
+        "guest_prompt_sha256_mismatches",
+        "guest_prompt_bytes_records",
+        "guest_prompt_bytes_matches",
+        "guest_prompt_bytes_mismatches",
     ]
     phase_rows = report.get("phase_summaries") if isinstance(report.get("phase_summaries"), list) else []
     with path.open("w", newline="", encoding="utf-8") as handle:
