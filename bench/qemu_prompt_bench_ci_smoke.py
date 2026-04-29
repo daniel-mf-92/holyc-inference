@@ -86,6 +86,21 @@ def main() -> int:
 
         if rc := require(report["status"] == "pass", "unexpected_qemu_bench_status"):
             return rc
+        if rc := require(report["profile"] == "ci-airgap-smoke", "missing_top_level_profile"):
+            return rc
+        if rc := require(report["model"] == "synthetic-smoke", "missing_top_level_model"):
+            return rc
+        if rc := require(report["quantization"] == "Q4_0", "missing_top_level_quantization"):
+            return rc
+        if rc := require(report["commit"], "missing_top_level_commit"):
+            return rc
+        if rc := require(report["command"] == report["benchmarks"][0]["command"], "top_level_command_mismatch"):
+            return rc
+        if rc := require(
+            report["command_sha256"] == report["benchmarks"][0]["command_sha256"],
+            "top_level_command_sha256_mismatch",
+        ):
+            return rc
         if rc := require(report["planned_warmup_launches"] == 2, "unexpected_warmup_launches"):
             return rc
         if rc := require(report["planned_measured_launches"] == 4, "unexpected_measured_launches"):
@@ -138,6 +153,39 @@ def main() -> int:
             return rc
         junit_root = ET.parse(junit_path).getroot()
         if rc := require(junit_root.attrib.get("failures") == "0", "unexpected_junit_failures"):
+            return rc
+
+        dry_output_dir = Path(tmp) / "dry_results"
+        dry_command = command + ["--dry-run", "--output-dir", str(dry_output_dir)]
+        completed = subprocess.run(
+            dry_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode != 0:
+            sys.stdout.write(completed.stdout)
+            sys.stderr.write(completed.stderr)
+            return completed.returncode
+        dry_report = json.loads((dry_output_dir / "qemu_prompt_bench_dry_run_latest.json").read_text(encoding="utf-8"))
+        if rc := require(dry_report["profile"] == "ci-airgap-smoke", "missing_dry_run_profile"):
+            return rc
+        if rc := require(dry_report["model"] == "synthetic-smoke", "missing_dry_run_model"):
+            return rc
+        if rc := require(dry_report["quantization"] == "Q4_0", "missing_dry_run_quantization"):
+            return rc
+        if rc := require(dry_report["commit"], "missing_dry_run_commit"):
+            return rc
+        dry_csv_rows = list(csv.DictReader((dry_output_dir / "qemu_prompt_bench_dry_run_latest.csv").open(encoding="utf-8", newline="")))
+        if rc := require(dry_csv_rows[0]["profile"] == "ci-airgap-smoke", "missing_dry_run_csv_profile"):
+            return rc
+        dry_junit_root = ET.parse(dry_output_dir / "qemu_prompt_bench_dry_run_junit_latest.xml").getroot()
+        dry_properties = {
+            item.attrib.get("name"): item.attrib.get("value")
+            for item in dry_junit_root.findall(".//property")
+        }
+        if rc := require(dry_properties.get("commit"), "missing_dry_run_junit_commit"):
             return rc
 
     return 0

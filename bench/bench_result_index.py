@@ -452,10 +452,12 @@ def summarize_qemu_report(
         for row in summaries
         if (value := parse_int(row.get("memory_bytes_max"))) is not None
     ]
-    airgap_status, findings = aggregate_command_status(
-        [(f"measured[{index}]", row_command(row)) for index, row in enumerate(runs)]
-        + [(f"warmup[{index}]", row_command(row)) for index, row in enumerate(warmups)]
-    )
+    command_rows = [(f"measured[{index}]", row_command(row)) for index, row in enumerate(runs)] + [
+        (f"warmup[{index}]", row_command(row)) for index, row in enumerate(warmups)
+    ]
+    if not command_rows and report.get("command"):
+        command_rows.append(("report", row_command(report)))
+    airgap_status, findings = aggregate_command_status(command_rows)
 
     prompts = parse_int(prompt_suite.get("prompt_count"))
     if prompts is None:
@@ -474,14 +476,13 @@ def summarize_qemu_report(
     )
     commit_state, commit, commit_findings = commit_status(
         "qemu_prompt",
-        [row.get("commit") for row in runs + warmups if isinstance(row, dict)],
+        [report.get("commit")] + [row.get("commit") for row in runs + warmups if isinstance(row, dict)],
     )
     command_hash_state, command_sha256, command_hash_findings = command_hash_status(
         "qemu_prompt",
         [report.get("command_sha256")]
         + [row.get("command_sha256") for row in runs + warmups if isinstance(row, dict)],
-        [(f"measured[{index}]", row_command(row)) for index, row in enumerate(runs)]
-        + [(f"warmup[{index}]", row_command(row)) for index, row in enumerate(warmups)],
+        command_rows,
     )
     if command_hash_state == "fail":
         findings.extend(command_hash_findings)

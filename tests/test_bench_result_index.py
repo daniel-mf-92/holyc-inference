@@ -71,6 +71,42 @@ def test_indexes_qemu_prompt_report_with_airgap_status(tmp_path: Path) -> None:
     assert summary.max_memory_bytes == 4096
 
 
+def test_indexes_qemu_prompt_report_uses_top_level_metadata(tmp_path: Path) -> None:
+    command = ["qemu-system-x86_64", "-nic", "none"]
+    report = tmp_path / "qemu_prompt_bench_latest.json"
+    report.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-04-27T20:00:00Z",
+                "status": "pass",
+                "profile": "top-profile",
+                "model": "top-model",
+                "quantization": "Q8_0",
+                "commit": "abc123def456",
+                "command": command,
+                "command_sha256": bench_result_index.command_hash(command),
+                "prompt_suite": {"suite_sha256": "f" * 64, "prompt_count": 1},
+                "suite_summary": {"tok_per_s_median": 64.0},
+                "benchmarks": [{"benchmark": "qemu_prompt", "returncode": 0, "timed_out": False}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summaries = bench_result_index.load_summaries([tmp_path])
+
+    assert len(summaries) == 1
+    summary = summaries[0]
+    assert summary.profile == "top-profile"
+    assert summary.model == "top-model"
+    assert summary.quantization == "Q8_0"
+    assert summary.commit == "abc123def456"
+    assert summary.commit_status == "pass"
+    assert summary.command_sha256 == bench_result_index.command_hash(command)
+    assert summary.command_airgap_status == "pass"
+    assert summary.command_hash_status == "pass"
+
+
 def test_indexes_qemu_prompt_dry_run_launch_plan(tmp_path: Path) -> None:
     command = [
         "qemu-system-x86_64",

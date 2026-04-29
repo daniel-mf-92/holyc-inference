@@ -1,12 +1,16 @@
 # QEMU Prompt Benchmark Dry Run
 
-Generated: 2026-04-29T13:36:47Z
+Generated: 2026-04-29T15:32:18Z
 Status: planned
+Profile: ci-airgap-smoke
+Model: synthetic-smoke
+Quantization: Q4_0
+Commit: a8c04df16fa5
 Prompt suite: 68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a
-Command SHA256: e415146c052b9f0baa23706ffde97548f2374f6601337823b4d810c39bed48e7
+Command SHA256: 633b78c56d2f2d5c6739b10ca9b48d66a6bb83328887ac7aceabb4ab48fd1c96
 Launch plan SHA256: 1984f18af8d221fea7e13bfa2403bd87662cb633f728095187b698a10b4f99c5
 Prompt count: 2
-Prompt count floor: 1
+Prompt count floor: 2
 Warmup launches: 2
 Measured launches: 4
 Total launches: 6
@@ -14,7 +18,7 @@ Total launches: 6
 ## Command
 
 ```text
-bench/fixtures/qemu_synthetic_bench.py -nic none -serial stdio -display none -drive file=/tmp/TempleOS.synthetic.img,format=raw,if=ide
+bench/fixtures/qemu_synthetic_bench.py -nic none -serial stdio -display none -drive file=/tmp/TempleOS.synthetic.img,format=raw,if=ide -m 256M
 ```
 
 ## Inputs

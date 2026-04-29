@@ -1,22 +1,26 @@
 <?xml version='1.0' encoding='utf-8'?>
 <testsuite name="holyc_qemu_prompt_bench_dry_run" tests="1" failures="0" errors="0">
-  <testcase classname="qemu_prompt_bench.dry_run" name="e415146c052b9f0baa23706ffde97548f2374f6601337823b4d810c39bed48e7">
+  <testcase classname="qemu_prompt_bench.dry_run" name="633b78c56d2f2d5c6739b10ca9b48d66a6bb83328887ac7aceabb4ab48fd1c96">
     <properties>
       <property name="status" value="planned" />
+      <property name="profile" value="ci-airgap-smoke" />
+      <property name="model" value="synthetic-smoke" />
+      <property name="quantization" value="Q4_0" />
+      <property name="commit" value="a8c04df16fa5" />
       <property name="prompt_count" value="2" />
       <property name="planned_warmup_launches" value="2" />
       <property name="planned_measured_launches" value="4" />
       <property name="planned_total_launches" value="6" />
-      <property name="max_launches" value="10" />
-      <property name="min_prompt_count" value="1" />
-      <property name="command_sha256" value="e415146c052b9f0baa23706ffde97548f2374f6601337823b4d810c39bed48e7" />
+      <property name="max_launches" value="6" />
+      <property name="min_prompt_count" value="2" />
+      <property name="command_sha256" value="633b78c56d2f2d5c6739b10ca9b48d66a6bb83328887ac7aceabb4ab48fd1c96" />
       <property name="launch_plan_sha256" value="1984f18af8d221fea7e13bfa2403bd87662cb633f728095187b698a10b4f99c5" />
       <property name="image_path" value="/tmp/TempleOS.synthetic.img" />
       <property name="image_exists" value="False" />
       <property name="image_size_bytes" value="-" />
       <property name="image_sha256" value="-" />
       <property name="qemu_args_file_count" value="0" />
-      <property name="command" value="bench/fixtures/qemu_synthetic_bench.py -nic none -serial stdio -display none -drive file=/tmp/TempleOS.synthetic.img,format=raw,if=ide" />
+      <property name="command" value="bench/fixtures/qemu_synthetic_bench.py -nic none -serial stdio -display none -drive file=/tmp/TempleOS.synthetic.img,format=raw,if=ide -m 256M" />
     </properties>
   </testcase>
 </testsuite>

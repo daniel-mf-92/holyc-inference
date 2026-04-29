@@ -249,3 +249,4 @@
 2026-04-29T13:52:15Z | Added benchmark trend recent-window CV telemetry/gates with smoke coverage and refreshed dashboards.
 2026-04-29T14:09:35Z | Added QEMU source air-gap audit CI smoke coverage and refreshed source audit artifacts.
 2026-04-29T14:37:01Z | Added qemu prompt benchmark phase summaries/CSV with synthetic smoke coverage and refreshed artifacts.
+2026-04-29T15:23:07Z | Added qemu prompt benchmark top-level provenance metadata and indexer fallback coverage.
