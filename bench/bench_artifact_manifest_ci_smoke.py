@@ -89,6 +89,44 @@ def write_qemu_report(path: Path, command: list[str], generated_at: str | None =
     )
 
 
+def write_dry_run_report(path: Path, command: list[str], generated_at: str | None = None) -> None:
+    command_hash = command_sha256(command)
+    generated_at = generated_at or iso_now()
+    path.write_text(
+        json.dumps(
+            {
+                "status": "planned",
+                "generated_at": generated_at,
+                "command": command,
+                "command_sha256": command_hash,
+                "commit": "manifest-smoke",
+                "profile": "ci-airgap-smoke",
+                "model": "synthetic-smoke",
+                "quantization": "Q4_0",
+                "prompt_suite": {
+                    "prompt_count": 1,
+                    "suite_sha256": "manifest-smoke-suite",
+                },
+                "launch_plan_sha256": "",
+                "planned_warmup_launches": 0,
+                "planned_measured_launches": 1,
+                "planned_total_launches": 1,
+                "launch_plan": [{"phase": "measured", "prompt_id": "manifest-smoke"}],
+                "environment": {
+                    "platform": "ci-smoke",
+                    "machine": "host",
+                    "qemu_bin": command[0],
+                    "qemu_version": "synthetic",
+                },
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def run_manifest(input_path: Path, output_dir: Path, *extra_args: str) -> subprocess.CompletedProcess[str]:
     command = [
         sys.executable,
@@ -142,6 +180,7 @@ def main() -> int:
         csv_path = safe_output_dir / "bench_artifact_manifest_latest.csv"
         history_csv_path = safe_output_dir / "bench_artifact_manifest_history_latest.csv"
         history_coverage_csv_path = safe_output_dir / "bench_artifact_manifest_history_coverage_latest.csv"
+        dry_run_coverage_csv_path = safe_output_dir / "bench_artifact_manifest_dry_run_coverage_latest.csv"
         junit_path = safe_output_dir / "bench_artifact_manifest_junit_latest.xml"
         report = json.loads(report_path.read_text(encoding="utf-8"))
         if report["status"] != "pass":
@@ -177,6 +216,12 @@ def main() -> int:
             not in history_coverage_csv_path.read_text(encoding="utf-8")
         ):
             print("missing_manifest_history_coverage_csv=true", file=sys.stderr)
+            return 1
+        if (
+            "key,measured_source,generated_at"
+            not in dry_run_coverage_csv_path.read_text(encoding="utf-8")
+        ):
+            print("missing_manifest_dry_run_coverage_csv=true", file=sys.stderr)
             return 1
         junit_root = ET.parse(junit_path).getroot()
         if junit_root.attrib.get("name") != "holyc_bench_artifact_manifest":
@@ -215,6 +260,39 @@ def main() -> int:
         )
         if coverage_report["history_coverage_violations"]:
             print("unexpected_history_coverage_violation=true", file=sys.stderr)
+            return 1
+
+        dry_run_source_dir = tmp_path / "dry_run_sources"
+        dry_run_source_dir.mkdir()
+        write_qemu_report(dry_run_source_dir / "qemu_prompt_bench_measured.json", safe_command)
+        write_dry_run_report(dry_run_source_dir / "qemu_prompt_bench_dry_run.json", safe_command)
+        dry_run_output_dir = tmp_path / "dry_run_manifest"
+        completed = run_manifest(dry_run_source_dir, dry_run_output_dir, "--fail-on-missing-dry-run")
+        if completed.returncode != 0:
+            sys.stdout.write(completed.stdout)
+            sys.stderr.write(completed.stderr)
+            return completed.returncode
+        dry_run_manifest = json.loads(
+            (dry_run_output_dir / "bench_artifact_manifest_latest.json").read_text(encoding="utf-8")
+        )
+        if dry_run_manifest["dry_run_coverage_violations"]:
+            print("unexpected_dry_run_coverage_violation=true", file=sys.stderr)
+            return 1
+
+        missing_dry_run_output_dir = tmp_path / "missing_dry_run_manifest"
+        completed = run_manifest(safe_report, missing_dry_run_output_dir, "--fail-on-missing-dry-run")
+        if completed.returncode == 0:
+            print("missing_dry_run_manifest_not_rejected=true", file=sys.stderr)
+            return 1
+        missing_dry_run_manifest = json.loads(
+            (missing_dry_run_output_dir / "bench_artifact_manifest_latest.json").read_text(encoding="utf-8")
+        )
+        dry_run_violations = missing_dry_run_manifest["dry_run_coverage_violations"]
+        if (
+            len(dry_run_violations) != 1
+            or "qemu_prompt_bench_safe.json" not in dry_run_violations[0]["measured_source"]
+        ):
+            print("unexpected_dry_run_coverage_violation_payload=true", file=sys.stderr)
             return 1
 
         sparse_output_dir = tmp_path / "sparse_manifest"

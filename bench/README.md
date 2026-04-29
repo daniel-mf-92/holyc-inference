@@ -710,13 +710,13 @@ selects the newest artifact for each profile/model/quantization/prompt-suite
 key, preserves prompt count, wall-clock throughput, TTFT, host overhead,
 host child CPU/RSS, emitted-token totals, elapsed guest time, and guest/wall
 per-token latency telemetry, writes both
-latest-key and full-history CSV exports, keeps the same recorded-command
+latest-key, full-history, and missing dry-run coverage CSV exports, keeps the same recorded-command
 air-gap, command SHA256, and commit
 metadata checks while preserving environment fingerprints, and writes
 `bench_artifact_manifest_junit_latest.xml` so CI can
 surface failed artifacts, air-gap violations, missing telemetry, stale
 artifacts, inconsistent command hashes, inconsistent commit metadata, sparse
-per-key history, and empty manifests directly. Empty manifests are marked failed so missing benchmark
+per-key history, missing measured-run dry-run plans, and empty manifests directly. Empty manifests are marked failed so missing benchmark
 uploads do not pass silently. For current-job manifests,
 `--fail-on-stale-commit` returns non-zero when any artifact was produced from a
 different commit than the current checkout. `--max-artifact-age-hours` records
@@ -726,7 +726,10 @@ any artifact exceeds that age. Use `--fail-on-airgap`, `--fail-on-telemetry`,
 failure classes independently. Use `--min-history-per-key` with
 `--fail-on-history-coverage` when a CI consumer needs at least N retained
 artifacts for every profile/model/quantization/prompt-suite key before trend or
-regression decisions are trusted.
+regression decisions are trusted. Use `--fail-on-missing-dry-run` when measured
+QEMU prompt artifacts must have a matching reviewed dry-run launch plan with the
+same profile, model, quantization, prompt-suite hash, command hash, launch-plan
+hash, and environment hash.
 
 ```bash
 python3 bench/bench_artifact_manifest.py \
@@ -737,6 +740,7 @@ python3 bench/bench_artifact_manifest.py \
   --fail-on-stale-artifact \
   --min-history-per-key 2 \
   --fail-on-history-coverage \
+  --fail-on-missing-dry-run \
   --fail-on-airgap \
   --fail-on-telemetry \
   --fail-on-command-hash-metadata
