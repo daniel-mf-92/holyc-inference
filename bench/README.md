@@ -693,6 +693,12 @@ python3 bench/qemu_source_audit.py \
   --junit bench/results/qemu_source_audit_junit_latest.xml
 ```
 
+Exercise the audit parser and failing gates without launching QEMU:
+
+```bash
+python3 bench/qemu_source_audit_ci_smoke.py
+```
+
 Refresh the committed smoke report without booting a guest:
 
 ```bash
