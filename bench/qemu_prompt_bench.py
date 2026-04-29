@@ -1366,6 +1366,7 @@ def telemetry_findings(
     max_memory_bytes_per_token: float | None = None,
     max_serial_output_bytes: int | None = None,
     max_serial_output_lines: int | None = None,
+    require_expected_tokens: bool = False,
     require_guest_prompt_sha256_match: bool = False,
     require_guest_prompt_bytes_match: bool = False,
     require_expected_tokens_match: bool = False,
@@ -1396,6 +1397,15 @@ def telemetry_findings(
             findings.append({**base, "metric": "tokens", "value": None, "limit": "present"})
         if min_tokens is not None and (run.tokens is None or run.tokens < min_tokens):
             findings.append({**base, "metric": "tokens", "value": run.tokens, "limit": min_tokens})
+        if require_expected_tokens and run.expected_tokens is None:
+            findings.append(
+                {
+                    **base,
+                    "metric": "expected_tokens",
+                    "value": None,
+                    "limit": "present",
+                }
+            )
         if (
             require_expected_tokens_match
             and run.expected_tokens is not None
@@ -2622,6 +2632,7 @@ def write_report(
     max_memory_bytes_per_token: float | None = None,
     max_serial_output_bytes: int | None = None,
     max_serial_output_lines: int | None = None,
+    require_expected_tokens: bool = False,
     require_guest_prompt_sha256_match: bool = False,
     require_guest_prompt_bytes_match: bool = False,
     require_expected_tokens_match: bool = False,
@@ -2676,6 +2687,7 @@ def write_report(
         max_memory_bytes_per_token=max_memory_bytes_per_token,
         max_serial_output_bytes=max_serial_output_bytes,
         max_serial_output_lines=max_serial_output_lines,
+        require_expected_tokens=require_expected_tokens,
         require_guest_prompt_sha256_match=require_guest_prompt_sha256_match,
         require_guest_prompt_bytes_match=require_guest_prompt_bytes_match,
         require_expected_tokens_match=require_expected_tokens_match,
@@ -2743,6 +2755,7 @@ def write_report(
             "max_memory_bytes_per_token": max_memory_bytes_per_token,
             "max_serial_output_bytes": max_serial_output_bytes,
             "max_serial_output_lines": max_serial_output_lines,
+            "require_expected_tokens": require_expected_tokens,
             "require_guest_prompt_sha256_match": require_guest_prompt_sha256_match,
             "require_guest_prompt_bytes_match": require_guest_prompt_bytes_match,
             "require_expected_tokens_match": require_expected_tokens_match,
@@ -3648,6 +3661,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail if any measured run emits more combined stdout/stderr serial lines",
     )
     parser.add_argument(
+        "--require-expected-tokens",
+        action="store_true",
+        help="Fail if any measured run's prompt omits expected_tokens metadata",
+    )
+    parser.add_argument(
         "--require-guest-prompt-sha256-match",
         action="store_true",
         help="Fail if guest-reported prompt SHA-256 is missing or differs from the host prompt",
@@ -3848,6 +3866,7 @@ def main(argv: list[str] | None = None) -> int:
         max_memory_bytes_per_token=args.max_memory_bytes_per_token,
         max_serial_output_bytes=args.max_serial_output_bytes,
         max_serial_output_lines=args.max_serial_output_lines,
+        require_expected_tokens=args.require_expected_tokens,
         require_guest_prompt_sha256_match=args.require_guest_prompt_sha256_match,
         require_guest_prompt_bytes_match=args.require_guest_prompt_bytes_match,
         require_expected_tokens_match=args.require_expected_tokens_match,

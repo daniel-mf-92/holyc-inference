@@ -572,8 +572,10 @@ record input artifact metadata for the disk image path and any
 should be recorded alongside size and mtime.
 JSON and JSONL prompt rows can declare `expected_tokens` or
 `expected_generated_tokens` to pin intended decode length for comparable
-throughput runs. Use `--require-expected-tokens-match` when CI should fail any
-measured run whose emitted token count differs from the prompt-declared count.
+throughput runs. Use `--require-expected-tokens` when CI should fail any
+measured run whose prompt omits that baseline, and use
+`--require-expected-tokens-match` when CI should fail any measured run whose
+emitted token count differs from the prompt-declared count.
 Expected-token metadata is reported separately and does not alter the prompt
 suite hash, which remains tied to prompt IDs and prompt text.
 
@@ -634,13 +636,13 @@ Use `--require-tokens`, `--require-tok-per-s`, `--require-memory`,
 `--min-tokens-per-prompt-byte`, `--require-host-child-rss`,
 `--max-host-child-rss-bytes`, `--max-memory-bytes-per-token`,
 `--max-serial-output-bytes`, `--max-serial-output-lines`,
-`--require-guest-prompt-sha256-match`, and
+`--require-expected-tokens`, `--require-guest-prompt-sha256-match`, and
 `--require-guest-prompt-bytes-match` to fail measured runs or suites that omit required
 telemetry, produce too little work for a trustworthy throughput sample, exceed
 a host-observed latency, memory, RSS, orchestration overhead, or serial
 verbosity budget, exceed a first-token latency or timeout-budget threshold, fall
-below a host child-CPU or output-density floor, or report a missing/mismatched
-guest prompt hash or byte count.
+below a host child-CPU or output-density floor, omit expected-token baselines,
+or report a missing/mismatched guest prompt hash or byte count.
 Telemetry gate failures are written as `telemetry_findings` in JSON/Markdown and as
 `benchmark_telemetry` failures in the JUnit report.
 
@@ -680,6 +682,7 @@ python3 bench/qemu_prompt_bench.py \
   --max-memory-bytes-per-token 16777216 \
   --max-serial-output-bytes 65536 \
   --max-serial-output-lines 256 \
+  --require-expected-tokens \
   --require-guest-prompt-sha256-match \
   --require-guest-prompt-bytes-match \
   --qemu-args-file bench/fixtures/local-qemu.args \

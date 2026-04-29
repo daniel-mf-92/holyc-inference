@@ -98,6 +98,7 @@ def main() -> int:
             "--require-ttft-us",
             "--require-guest-prompt-sha256-match",
             "--require-guest-prompt-bytes-match",
+            "--require-expected-tokens",
             "--require-expected-tokens-match",
             "--max-launches",
             "6",
@@ -229,6 +230,11 @@ def main() -> int:
         if rc := require(
             report["telemetry_gates"]["max_serial_output_lines"] == 1,
             "missing_serial_output_line_gate",
+        ):
+            return rc
+        if rc := require(
+            report["telemetry_gates"]["require_expected_tokens"] is True,
+            "missing_expected_tokens_gate",
         ):
             return rc
         if rc := require(
@@ -501,6 +507,63 @@ def main() -> int:
         if rc := require(
             launch_jsonl_rows[0]["prompt_suite_sha256"] == report["prompt_suite"]["suite_sha256"],
             "launch_jsonl_prompt_suite_hash_mismatch",
+        ):
+            return rc
+
+        no_expected_prompts = Path(tmp) / "missing_expected.jsonl"
+        no_expected_prompts.write_text(
+            '{"prompt_id":"missing-expected","prompt":"Emit a short deterministic answer."}\n',
+            encoding="utf-8",
+        )
+        missing_expected_output_dir = Path(tmp) / "missing_expected_results"
+        missing_expected_command = [
+            sys.executable,
+            str(ROOT / "bench" / "qemu_prompt_bench.py"),
+            "--image",
+            str(SYNTHETIC_IMAGE),
+            "--prompts",
+            str(no_expected_prompts),
+            "--qemu-bin",
+            str(SYNTHETIC_QEMU),
+            "--repeat",
+            "1",
+            "--timeout",
+            "5",
+            "--output-dir",
+            str(missing_expected_output_dir),
+            "--profile",
+            "ci-airgap-smoke",
+            "--model",
+            "synthetic-smoke",
+            "--quantization",
+            "Q4_0",
+            "--require-expected-tokens",
+        ]
+        missing_expected_completed = subprocess.run(
+            missing_expected_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if rc := require(
+            missing_expected_completed.returncode == 1,
+            "missing_expected_tokens_gate_did_not_fail",
+        ):
+            sys.stdout.write(missing_expected_completed.stdout)
+            sys.stderr.write(missing_expected_completed.stderr)
+            return rc
+        missing_expected_report = json.loads(
+            (missing_expected_output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8")
+        )
+        if rc := require(missing_expected_report["status"] == "fail", "missing_expected_report_not_failed"):
+            return rc
+        if rc := require(
+            any(
+                finding.get("metric") == "expected_tokens"
+                for finding in missing_expected_report["telemetry_findings"]
+            ),
+            "missing_expected_tokens_finding",
         ):
             return rc
         if rc := require("Phase Summary" in markdown_path.read_text(encoding="utf-8"), "missing_phase_markdown"):
