@@ -61,6 +61,7 @@ class MatrixCellResult:
     report: str
     command: list[str]
     command_sha256: str
+    launch_plan_sha256: str
     prompts: int
     prompt_suite_sha256: str
     prompt_bytes_total: int
@@ -293,6 +294,9 @@ def run_cell(
             report=str(report_path),
             command=command,
             command_sha256=qemu_prompt_bench.command_hash(command),
+            launch_plan_sha256=qemu_prompt_bench.launch_plan_hash(
+                qemu_prompt_bench.dry_run_launch_plan(prompt_cases, warmup=warmup, repeat=repeat)
+            ),
             prompts=prompt_count,
             prompt_suite_sha256=prompt_suite_sha256,
             prompt_bytes_total=prompt_bytes_total,
@@ -367,6 +371,7 @@ def run_cell(
         report=str(report_path),
         command=command,
         command_sha256=str(report.get("command_sha256") or qemu_prompt_bench.command_hash(command)),
+        launch_plan_sha256=str(report.get("launch_plan_sha256", "")),
         prompts=prompt_count,
         prompt_suite_sha256=str(
             (report.get("prompt_suite") or {}).get("suite_sha256") or prompt_suite_sha256
@@ -417,9 +422,9 @@ def markdown_report(report: dict[str, Any]) -> str:
     ]
     if report["cells"]:
         lines.append(
-            "| Profile | Model | Quantization | Commit | Status | Prompts | Prompt bytes | Prompt byte range | Total tokens | Total elapsed us | Prompt suite | Command SHA256 | Runs | Warmups | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Max memory bytes | Variability findings |"
+            "| Profile | Model | Quantization | Commit | Status | Prompts | Prompt bytes | Prompt byte range | Total tokens | Total elapsed us | Prompt suite | Command SHA256 | Launch plan SHA256 | Runs | Warmups | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Max memory bytes | Variability findings |"
         )
-        lines.append("| --- | --- | --- | --- | --- | ---: | ---: | --- | ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | --- | --- | --- | ---: | ---: | --- | ---: | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for cell in report["cells"]:
             median = cell["median_tok_per_s"]
             memory = cell["max_memory_bytes"]
@@ -452,7 +457,7 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"| {cell['profile']} | {cell['model']} | {cell['quantization']} | {cell['commit'] or '-'} | {cell['status']} | "
                 f"{cell['prompts']} | {cell['prompt_bytes_total']} | {prompt_byte_range} | "
                 f"{format_gate(cell['total_tokens'])} | {format_gate(cell['total_elapsed_us'])} | "
-                f"{cell['prompt_suite_sha256']} | {cell['command_sha256']} | "
+                f"{cell['prompt_suite_sha256']} | {cell['command_sha256']} | {cell['launch_plan_sha256']} | "
                 f"{cell['measured_runs']} | {cell['warmup_runs']} | "
                 f"{median_cell} | {wall_tok_cell} | {ttft_cell} | {overhead_cell} | "
                 f"{child_cpu_us_cell} | {child_cpu_pct_cell} | {child_tok_per_cpu_cell} | {child_rss_cell} | {us_per_token_cell} | "
@@ -519,6 +524,7 @@ def write_matrix_csv(cells: list[MatrixCellResult], path: Path) -> None:
         "output_dir",
         "report",
         "command_sha256",
+        "launch_plan_sha256",
         "prompts",
         "prompt_suite_sha256",
         "prompt_bytes_total",
@@ -758,6 +764,7 @@ def write_matrix_junit(cells: list[MatrixCellResult], path: Path) -> None:
                 f"prompt_bytes_min={cell.prompt_bytes_min}",
                 f"prompt_bytes_max={cell.prompt_bytes_max}",
                 f"command_sha256={cell.command_sha256}",
+                f"launch_plan_sha256={cell.launch_plan_sha256}",
                 f"measured_runs={cell.measured_runs}",
                 f"warmup_runs={cell.warmup_runs}",
                 f"median_tok_per_s={cell.median_tok_per_s}",

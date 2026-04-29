@@ -203,3 +203,4 @@
 2026-04-29T03:24:42Z | Added measured qemu_prompt_bench launch-plan hashes, launch indexes, launch CSV artifacts, smoke coverage, and refreshed benchmark outputs.
 2026-04-29T03:31:04Z | Added quant audit fp16 scale sign telemetry and optional negative-scale gates with smoke coverage.
 2026-04-29T03:39:32Z | Added qemu_prompt_bench dry-run launch-plan indexing with air-gap/hash telemetry and refreshed benchmark result index artifacts.
+2026-04-29T04:01:25Z | Added launch-plan hash drift tracking/gating to benchmark result indexes and refreshed manifest/index artifacts.

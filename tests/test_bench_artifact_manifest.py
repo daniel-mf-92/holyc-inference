@@ -28,6 +28,7 @@ def make_summary(source: Path, **overrides: object) -> bench_result_index.Artifa
         "quantization": "Q4_0",
         "prompt_suite_sha256": "a" * 64,
         "command_sha256": "b" * 64,
+        "launch_plan_sha256": "c" * 64,
         "prompts": 2,
         "measured_runs": 2,
         "warmup_runs": 0,
@@ -135,7 +136,7 @@ def test_manifest_status_and_junit_fail_on_inconsistent_commit_metadata(tmp_path
 
     root = ET.parse(tmp_path / "bench_artifact_manifest_junit_latest.xml").getroot()
     assert root.attrib["name"] == "holyc_bench_artifact_manifest"
-    assert root.attrib["tests"] == "7"
+    assert root.attrib["tests"] == "8"
     assert root.attrib["failures"] == "1"
     failure = root.find("./testcase[@name='commit_metadata']/failure")
     assert failure is not None
