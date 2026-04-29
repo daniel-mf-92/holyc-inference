@@ -1491,6 +1491,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Command SHA256: {report.get('command_sha256', '-')}",
         f"Launch plan SHA256: {report.get('launch_plan_sha256', '-')}",
         f"Launch budget: {format_summary_value(report.get('max_launches'))}",
+        f"Prompt count floor: {format_summary_value(report.get('min_prompt_count'))}",
         f"Total launches: {format_summary_value(report.get('planned_total_launches'))}",
         f"Warmup runs: {len(report['warmups'])}",
         f"Runs: {len(report['benchmarks'])}",
@@ -1645,6 +1646,7 @@ def markdown_dry_run_report(report: dict[str, Any]) -> str:
         f"Command SHA256: {report.get('command_sha256', '-')}",
         f"Launch plan SHA256: {report.get('launch_plan_sha256', '-')}",
         f"Prompt count: {report['prompt_count']}",
+        f"Prompt count floor: {format_summary_value(report.get('min_prompt_count'))}",
         f"Warmup launches: {report['planned_warmup_launches']}",
         f"Measured launches: {report['planned_measured_launches']}",
         f"Total launches: {report['planned_total_launches']}",
@@ -1747,6 +1749,7 @@ def dry_run_payload(
     warmup: int,
     repeat: int,
     max_launches: int | None = None,
+    min_prompt_count: int | None = None,
     environment: dict[str, Any] | None = None,
     image: dict[str, Any] | None = None,
     qemu_args_files: list[dict[str, Any]] | None = None,
@@ -1771,10 +1774,21 @@ def dry_run_payload(
         "warmup": warmup,
         "repeat": repeat,
         "max_launches": max_launches,
+        "min_prompt_count": min_prompt_count,
         "planned_warmup_launches": planned_warmups,
         "planned_measured_launches": planned_measured,
         "planned_total_launches": planned_total,
     }
+
+
+def validate_prompt_count(prompts: list[PromptCase], min_prompt_count: int | None) -> None:
+    if min_prompt_count is None:
+        return
+    if len(prompts) < min_prompt_count:
+        raise ValueError(
+            f"prompt count ({len(prompts)}) is below --min-prompt-count ({min_prompt_count}); "
+            "use a larger prompt suite or lower the coverage gate"
+        )
 
 
 def validate_launch_budget(
@@ -1834,6 +1848,7 @@ def write_dry_run_csv_report(report: dict[str, Any], path: Path) -> None:
         "planned_measured_launches",
         "planned_total_launches",
         "max_launches",
+        "min_prompt_count",
         "image_path",
         "image_exists",
         "image_size_bytes",
@@ -1859,6 +1874,7 @@ def write_dry_run_csv_report(report: dict[str, Any], path: Path) -> None:
         "planned_measured_launches": report.get("planned_measured_launches"),
         "planned_total_launches": report.get("planned_total_launches"),
         "max_launches": report.get("max_launches"),
+        "min_prompt_count": report.get("min_prompt_count"),
         "image_path": image.get("path"),
         "image_exists": image.get("exists"),
         "image_size_bytes": image.get("size_bytes"),
@@ -1938,6 +1954,7 @@ def write_dry_run_junit_report(report: dict[str, Any], path: Path) -> None:
         "planned_measured_launches",
         "planned_total_launches",
         "max_launches",
+        "min_prompt_count",
         "command_sha256",
         "launch_plan_sha256",
     ):
@@ -1998,6 +2015,7 @@ def write_report(
     require_guest_prompt_bytes_match: bool = False,
     require_expected_tokens_match: bool = False,
     max_launches: int | None = None,
+    min_prompt_count: int | None = None,
     environment: dict[str, Any] | None = None,
     image: dict[str, Any] | None = None,
     qemu_args_files: list[dict[str, Any]] | None = None,
@@ -2052,6 +2070,7 @@ def write_report(
         "qemu_args_files": qemu_args_files or [],
         "command_sha256": command_hash(all_runs[0].command) if all_runs else command_hash([]),
         "max_launches": max_launches,
+        "min_prompt_count": min_prompt_count,
         "planned_warmup_launches": len(warmup_runs),
         "planned_measured_launches": len(runs),
         "planned_total_launches": len(all_runs),
@@ -2088,6 +2107,7 @@ def write_report(
             "require_guest_prompt_sha256_match": require_guest_prompt_sha256_match,
             "require_guest_prompt_bytes_match": require_guest_prompt_bytes_match,
             "require_expected_tokens_match": require_expected_tokens_match,
+            "min_prompt_count": min_prompt_count,
         },
         "telemetry_findings": telemetry,
         "benchmarks": [asdict(run) for run in runs],
@@ -2475,6 +2495,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail before launching QEMU if prompts * (warmup + repeat) exceeds this count",
     )
     parser.add_argument(
+        "--min-prompt-count",
+        type=int,
+        default=None,
+        help="Fail before launching QEMU if the prompt suite has fewer prompts",
+    )
+    parser.add_argument(
         "--max-suite-cv-pct",
         type=float,
         default=None,
@@ -2616,6 +2642,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.max_launches is not None and args.max_launches < 0:
         print("error: --max-launches must be >= 0", file=sys.stderr)
         return 2
+    if args.min_prompt_count is not None and args.min_prompt_count < 0:
+        print("error: --min-prompt-count must be >= 0", file=sys.stderr)
+        return 2
     if args.max_suite_cv_pct is not None and args.max_suite_cv_pct < 0:
         print("error: --max-suite-cv-pct must be >= 0", file=sys.stderr)
         return 2
@@ -2674,6 +2703,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         root = Path(__file__).resolve().parents[1]
         prompts = load_prompt_cases(args.prompts)
+        validate_prompt_count(prompts, args.min_prompt_count)
         validate_launch_budget(
             prompts,
             warmup=args.warmup,
@@ -2697,6 +2727,7 @@ def main(argv: list[str] | None = None) -> int:
             warmup=args.warmup,
             repeat=args.repeat,
             max_launches=args.max_launches,
+            min_prompt_count=args.min_prompt_count,
             environment=host_environment(args.qemu_bin),
             image=image,
             qemu_args_files=qemu_args_files,
@@ -2764,6 +2795,7 @@ def main(argv: list[str] | None = None) -> int:
         require_guest_prompt_bytes_match=args.require_guest_prompt_bytes_match,
         require_expected_tokens_match=args.require_expected_tokens_match,
         max_launches=args.max_launches,
+        min_prompt_count=args.min_prompt_count,
         environment=host_environment(args.qemu_bin),
         image=image,
         qemu_args_files=qemu_args_files,

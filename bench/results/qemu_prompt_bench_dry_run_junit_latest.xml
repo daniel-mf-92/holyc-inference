@@ -8,8 +8,9 @@
       <property name="planned_measured_launches" value="4" />
       <property name="planned_total_launches" value="6" />
       <property name="max_launches" value="10" />
+      <property name="min_prompt_count" value="1" />
       <property name="command_sha256" value="e415146c052b9f0baa23706ffde97548f2374f6601337823b4d810c39bed48e7" />
-      <property name="launch_plan_sha256" value="0e6e0a7f4f79bd3404fa242861cd90d1b5e7ec08fce24797dc36bddcb8535a86" />
+      <property name="launch_plan_sha256" value="1984f18af8d221fea7e13bfa2403bd87662cb633f728095187b698a10b4f99c5" />
       <property name="image_path" value="/tmp/TempleOS.synthetic.img" />
       <property name="image_exists" value="False" />
       <property name="image_size_bytes" value="-" />

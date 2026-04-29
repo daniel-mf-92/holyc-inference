@@ -174,6 +174,8 @@ def test_cli_dry_run_validates_without_launching_qemu(tmp_path: Path, capsys) ->
             "--output-dir",
             str(output_dir),
             "--dry-run",
+            "--min-prompt-count",
+            "1",
             "--warmup",
             "1",
             "--repeat",
@@ -196,6 +198,7 @@ def test_cli_dry_run_validates_without_launching_qemu(tmp_path: Path, capsys) ->
     assert payload["planned_measured_launches"] == 2
     assert payload["planned_total_launches"] == 3
     assert payload["max_launches"] is None
+    assert payload["min_prompt_count"] == 1
     assert payload["command"][1:3] == ["-nic", "none"]
     assert payload["command_sha256"] == qemu_prompt_bench.command_hash(payload["command"])
     assert len(payload["command_sha256"]) == 64
@@ -213,8 +216,35 @@ def test_cli_dry_run_validates_without_launching_qemu(tmp_path: Path, capsys) ->
     assert "QEMU Prompt Benchmark Dry Run" in markdown
     assert f"Command SHA256: {payload['command_sha256']}" in markdown
     assert "Total launches: 3" in markdown
+    assert "Prompt count floor: 1" in markdown
     assert "## Inputs" in markdown
     assert "Environment" in markdown
+
+
+def test_cli_min_prompt_count_fails_before_dry_run_launch_plan(tmp_path: Path, capsys) -> None:
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    output_dir = tmp_path / "results"
+    prompts.write_text('{"prompt_id":"one","prompt":"A"}\n', encoding="utf-8")
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--output-dir",
+            str(output_dir),
+            "--dry-run",
+            "--min-prompt-count",
+            "2",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert status == 2
+    assert "prompt count (1) is below --min-prompt-count (2)" in captured.err
+    assert not (output_dir / "qemu_prompt_bench_dry_run_latest.json").exists()
 
 
 def test_cli_dry_run_accepts_qemu_args_file(tmp_path: Path, capsys) -> None:
@@ -280,6 +310,8 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
             str(fake_qemu),
             "--output-dir",
             str(output_dir),
+            "--min-prompt-count",
+            "1",
         ]
     )
 
@@ -290,6 +322,8 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
     assert report["prompt_suite"]["prompt_count"] == 1
     assert report["prompt_suite"]["prompt_bytes_total"] == 20
     assert report["max_launches"] is None
+    assert report["min_prompt_count"] == 1
+    assert report["telemetry_gates"]["min_prompt_count"] == 1
     assert report["planned_total_launches"] == 1
     assert report["benchmarks"][0]["tokens"] == 32
     assert report["benchmarks"][0]["prompt_bytes"] == 20

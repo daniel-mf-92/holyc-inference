@@ -482,7 +482,9 @@ network rejection before any dry run or guest launch.
 Use `--warmup N` to launch each prompt before measurement without mixing those
 runs into throughput dashboards, and `--repeat N` to run every prompt multiple
 times. Use `--max-launches N` to fail before booting QEMU when
-`prompts * (warmup + repeat)` would exceed the expected launch budget. Reports
+`prompts * (warmup + repeat)` would exceed the expected launch budget, and
+`--min-prompt-count N` to fail before booting QEMU when a benchmark suite has
+too few prompts for a comparable run. Reports
 include separate warmup records, raw measured per-run records, an overall suite
 summary, and per-prompt medians, OK/failed/timeout/nonzero-exit counts,
 min/max tok/s, P05/P95 tok/s, and P05-to-P95 spread percentages in JSON and
@@ -606,6 +608,7 @@ python3 bench/qemu_prompt_bench.py \
   --warmup 1 \
   --repeat 5 \
   --max-launches 30 \
+  --min-prompt-count 3 \
   --max-prompt-cv-pct 5 \
   --max-prompt-iqr-pct 5 \
   --require-tokens \
@@ -636,6 +639,7 @@ python3 bench/qemu_prompt_bench.py \
   --image path/to/TempleOS.img \
   --prompts bench/prompts/smoke.jsonl \
   --max-launches 10 \
+  --min-prompt-count 1 \
   --dry-run
 ```
 
@@ -644,9 +648,9 @@ JUnit XML artifacts under the selected output directory, plus
 `qemu_prompt_bench_dry_run_launches_latest.csv` with one row per planned launch.
 These artifacts record the exact `-nic none` command, the command SHA256
 fingerprint, prompt-suite hash, launch-plan SHA256, warmup count, repeat count,
-configured launch budget, and planned launch totals for CI review without
-booting a guest, plus the same host/QEMU provenance fields used by measured
-benchmark reports. Dry-run JSON, Markdown, CSV, and JUnit also include disk
+configured launch budget, prompt-count floor, and planned launch totals for CI
+review without booting a guest, plus the same host/QEMU provenance fields used
+by measured benchmark reports. Dry-run JSON, Markdown, CSV, and JUnit also include disk
 image metadata and SHA256 hashes for any local QEMU args files, making reviewed
 launch plans reproducible before a VM is started.
 
