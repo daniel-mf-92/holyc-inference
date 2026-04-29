@@ -82,6 +82,9 @@ class BlockAudit:
     quant_min: int
     quant_max: int
     quant_zero_count: int
+    quant_negative_count: int
+    quant_positive_count: int
+    quant_sign_balance_delta: int
     quant_nonzero_count: int
     quant_used_value_count: int
     quant_saturation_count: int
@@ -490,6 +493,44 @@ def check_quant_distribution(
     return nonzero_count, used_value_count, saturation_count, saturation_pct
 
 
+def check_quant_sign_distribution(
+    findings: list[str],
+    quant_histogram: dict[str, int],
+    min_quant_negative_count: int | None,
+    min_quant_positive_count: int | None,
+) -> tuple[int, int, int]:
+    negative_count = sum(
+        count for value, count in quant_histogram.items() if int(value) < 0
+    )
+    positive_count = sum(
+        count for value, count in quant_histogram.items() if int(value) > 0
+    )
+    balance_delta = abs(negative_count - positive_count)
+
+    if (
+        min_quant_negative_count is not None
+        and negative_count < min_quant_negative_count
+    ):
+        findings.append(
+            "negative quant payload entries {actual} below minimum {limit}".format(
+                actual=negative_count,
+                limit=min_quant_negative_count,
+            )
+        )
+    if (
+        min_quant_positive_count is not None
+        and positive_count < min_quant_positive_count
+    ):
+        findings.append(
+            "positive quant payload entries {actual} below minimum {limit}".format(
+                actual=positive_count,
+                limit=min_quant_positive_count,
+            )
+        )
+
+    return negative_count, positive_count, balance_delta
+
+
 def check_block_quant_distribution(
     findings: list[str],
     block_index: int,
@@ -579,6 +620,8 @@ def audit_q4_0_blocks(
     max_duplicate_block_pct: float | None = None,
     max_identical_block_run: int | None = None,
     min_q4_nibble_lane_used_quant_values: int | None = None,
+    min_quant_negative_count: int | None = None,
+    min_quant_positive_count: int | None = None,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -763,6 +806,16 @@ def audit_q4_0_blocks(
         max_saturation_pct,
     )
     (
+        quant_negative_count,
+        quant_positive_count,
+        quant_sign_balance_delta,
+    ) = check_quant_sign_distribution(
+        findings,
+        quant_histogram,
+        min_quant_negative_count,
+        min_quant_positive_count,
+    )
+    (
         q4_low_nibble_used_value_count,
         q4_high_nibble_used_value_count,
         q4_nibble_lane_used_value_delta,
@@ -802,6 +855,9 @@ def audit_q4_0_blocks(
         quant_min=int(quant_min),
         quant_max=int(quant_max),
         quant_zero_count=quant_zero_count,
+        quant_negative_count=quant_negative_count,
+        quant_positive_count=quant_positive_count,
+        quant_sign_balance_delta=quant_sign_balance_delta,
         quant_nonzero_count=quant_nonzero_count,
         quant_used_value_count=quant_used_value_count,
         quant_saturation_count=quant_saturation_count,
@@ -846,6 +902,8 @@ def audit_q8_0_blocks(
     max_duplicate_block_pct: float | None = None,
     max_identical_block_run: int | None = None,
     min_q4_nibble_lane_used_quant_values: int | None = None,
+    min_quant_negative_count: int | None = None,
+    min_quant_positive_count: int | None = None,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -1019,6 +1077,16 @@ def audit_q8_0_blocks(
         min_used_quant_values,
         max_saturation_pct,
     )
+    (
+        quant_negative_count,
+        quant_positive_count,
+        quant_sign_balance_delta,
+    ) = check_quant_sign_distribution(
+        findings,
+        quant_histogram,
+        min_quant_negative_count,
+        min_quant_positive_count,
+    )
 
     return BlockAudit(
         format="q8_0",
@@ -1049,6 +1117,9 @@ def audit_q8_0_blocks(
         quant_min=int(quant_min),
         quant_max=int(quant_max),
         quant_zero_count=quant_zero_count,
+        quant_negative_count=quant_negative_count,
+        quant_positive_count=quant_positive_count,
+        quant_sign_balance_delta=quant_sign_balance_delta,
         quant_nonzero_count=quant_nonzero_count,
         quant_used_value_count=quant_used_value_count,
         quant_saturation_count=quant_saturation_count,
@@ -1094,6 +1165,8 @@ def audit_blocks(
     max_duplicate_block_pct: float | None = None,
     max_identical_block_run: int | None = None,
     min_q4_nibble_lane_used_quant_values: int | None = None,
+    min_quant_negative_count: int | None = None,
+    min_quant_positive_count: int | None = None,
 ) -> BlockAudit:
     if quant_format == "q4_0":
         return audit_q4_0_blocks(
@@ -1116,6 +1189,8 @@ def audit_blocks(
             max_duplicate_block_pct,
             max_identical_block_run,
             min_q4_nibble_lane_used_quant_values,
+            min_quant_negative_count,
+            min_quant_positive_count,
         )
     if quant_format == "q8_0":
         return audit_q8_0_blocks(
@@ -1138,6 +1213,8 @@ def audit_blocks(
             max_duplicate_block_pct,
             max_identical_block_run,
             min_q4_nibble_lane_used_quant_values,
+            min_quant_negative_count,
+            min_quant_positive_count,
         )
     raise ValueError(f"unsupported quant format: {quant_format}")
 
@@ -1169,7 +1246,7 @@ def markdown_report(report: dict) -> str:
             [
                 "| Format | Path | Blocks | Capacity | Scale zero/subnormal/normal/inf_nan "
                 "| Scale sign +/- | Padding elements/nonzero | Scale Q16 min/max/absmax/zero/overlimit | Scale exponent min/max/under/over | Zero-scale nonzero blocks/entries | Quant min/max | Used values | Zero/nonzero quants "
-                "| Saturated quants | Min block used values | Worst block saturation | Duplicate blocks | Max identical run | Q4 low/high lane used values | Findings |",
+                "| Saturated quants | Quant sign -/+ delta | Min block used values | Worst block saturation | Duplicate blocks | Max identical run | Q4 low/high lane used values | Findings |",
                 "| --- | --- | ---: | ---: | --- | ---: | ---: | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
@@ -1207,6 +1284,7 @@ def markdown_report(report: dict) -> str:
                     "{scale_q16} | {scale_exponent} | {zero_scale_nonzero_quant_block_count}/{zero_scale_nonzero_quant_entry_count} | "
                     "{quant_min}/{quant_max} | {quant_used_value_count} | "
                     "{quant_zero_count}/{quant_nonzero_count} | {quant_saturation_count} ({quant_saturation_pct:.3f}%) | "
+                    "{quant_negative_count}/{quant_positive_count} delta {quant_sign_balance_delta} | "
                     "{min_block_used_quant_values} @ {min_block_used_quant_values_index} | "
                     "{worst_block_saturation_count} ({worst_block_saturation_pct:.3f}%) @ {worst_block_saturation_index} | "
                     "{duplicate_block_count} ({duplicate_block_pct:.3f}%) across {repeated_block_value_count} values | "
@@ -1235,6 +1313,9 @@ def markdown_report(report: dict) -> str:
                     quant_used_value_count=audit["quant_used_value_count"],
                     quant_zero_count=audit["quant_zero_count"],
                     quant_nonzero_count=audit["quant_nonzero_count"],
+                    quant_negative_count=audit["quant_negative_count"],
+                    quant_positive_count=audit["quant_positive_count"],
+                    quant_sign_balance_delta=audit["quant_sign_balance_delta"],
                     quant_saturation_count=audit["quant_saturation_count"],
                     quant_saturation_pct=audit["quant_saturation_pct"],
                     min_block_used_quant_values=audit["min_block_used_quant_values"],
@@ -1520,6 +1601,16 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Fail Q4_0 block streams when either low- or high-nibble lane uses fewer distinct quant values than this",
     )
+    parser.add_argument(
+        "--min-quant-negative-count",
+        type=int,
+        help="Fail block streams whose signed quant payload has fewer negative entries than this",
+    )
+    parser.add_argument(
+        "--min-quant-positive-count",
+        type=int,
+        help="Fail block streams whose signed quant payload has fewer positive entries than this",
+    )
     parser.add_argument("--allow-inf-nan-scale", action="store_true", help="Do not fail on fp16 inf/nan scales")
     parser.add_argument("--output", type=Path, help="Write JSON report to this path")
     parser.add_argument("--markdown", type=Path, help="Write Markdown report to this path")
@@ -1559,6 +1650,8 @@ def main(argv: list[str] | None = None) -> int:
             args.max_duplicate_block_pct,
             args.max_identical_block_run,
             args.min_q4_nibble_lane_used_quant_values,
+            args.min_quant_negative_count,
+            args.min_quant_positive_count,
         )
         for path, quant_format in block_specs
     ]

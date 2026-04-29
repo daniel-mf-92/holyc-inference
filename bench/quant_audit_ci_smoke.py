@@ -93,6 +93,10 @@ def main() -> int:
             "1",
             "--min-q4-nibble-lane-used-quant-values",
             "16",
+            "--min-quant-negative-count",
+            "1",
+            "--min-quant-positive-count",
+            "1",
             "--output",
             str(pass_json),
             "--markdown",
@@ -126,6 +130,8 @@ def main() -> int:
                 return rc
             if rc := require(audit["scale_exponent_over_limit_count"] == 0, "unexpected_over_limit"):
                 return rc
+            if rc := require(audit["quant_negative_count"] == 16, "missing_negative_quant_count"):
+                return rc
             if rc := require(audit["duplicate_block_count"] == 0, "unexpected_duplicate_blocks"):
                 return rc
             if rc := require(audit["repeated_block_value_count"] == 0, "unexpected_repeated_block_values"):
@@ -133,15 +139,26 @@ def main() -> int:
             if rc := require(audit["max_identical_block_run"] == 1, "unexpected_identical_block_run"):
                 return rc
         q4_audit = next(audit for audit in report["block_audits"] if audit["format"] == "q4_0")
+        if rc := require(q4_audit["quant_positive_count"] == 14, "missing_q4_positive_quant_count"):
+            return rc
+        if rc := require(q4_audit["quant_sign_balance_delta"] == 2, "unexpected_q4_quant_sign_delta"):
+            return rc
         if rc := require(q4_audit["q4_low_nibble_used_value_count"] == 16, "missing_low_lane_used_values"):
             return rc
         if rc := require(q4_audit["q4_high_nibble_used_value_count"] == 16, "missing_high_lane_used_values"):
             return rc
         if rc := require(q4_audit["q4_nibble_lane_used_value_delta"] == 0, "unexpected_lane_used_delta"):
             return rc
+        q8_audit = next(audit for audit in report["block_audits"] if audit["format"] == "q8_0")
+        if rc := require(q8_audit["quant_positive_count"] == 15, "missing_q8_positive_quant_count"):
+            return rc
+        if rc := require(q8_audit["quant_sign_balance_delta"] == 1, "unexpected_q8_quant_sign_delta"):
+            return rc
         if rc := require("Scale exponent min/max/under/over" in pass_md.read_text(encoding="utf-8"), "missing_markdown_exponent"):
             return rc
         if rc := require("Q4 low/high lane used values" in pass_md.read_text(encoding="utf-8"), "missing_markdown_q4_lane"):
+            return rc
+        if rc := require("Quant sign -/+ delta" in pass_md.read_text(encoding="utf-8"), "missing_markdown_quant_sign"):
             return rc
         if rc := require("Scale sign +/-" in pass_md.read_text(encoding="utf-8"), "missing_markdown_scale_sign"):
             return rc
@@ -323,6 +340,51 @@ def main() -> int:
         if rc := require(
             any("Q4_0 high nibble lane used quant values 1 below minimum 4" in finding for finding in bad_q4_lane_audit["findings"]),
             "missing_bad_high_lane_finding",
+        ):
+            return rc
+
+        bad_q8_unsigned = tmp_path / "q8_bad_unsigned_payload.bin"
+        bad_q8_unsigned.write_bytes(struct.pack("<H32b", 0x3C00, *([0] + list(range(1, 32)))))
+        bad_q8_unsigned_json = tmp_path / "bad_q8_unsigned_payload_quant_audit.json"
+        bad_q8_unsigned_command = [
+            sys.executable,
+            str(ROOT / "bench" / "quant_audit.py"),
+            "--source-root",
+            str(source_root),
+            "--format",
+            "q8_0",
+            "--block-file",
+            str(bad_q8_unsigned),
+            "--min-quant-negative-count",
+            "1",
+            "--output",
+            str(bad_q8_unsigned_json),
+        ]
+        completed = subprocess.run(
+            bad_q8_unsigned_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("bad_q8_unsigned_payload_not_rejected=true", file=sys.stderr)
+            return 1
+        bad_q8_unsigned_report = json.loads(bad_q8_unsigned_json.read_text(encoding="utf-8"))
+        bad_q8_unsigned_audit = bad_q8_unsigned_report["block_audits"][0]
+        if rc := require(
+            bad_q8_unsigned_audit["quant_negative_count"] == 0,
+            "unexpected_unsigned_negative_quant_count",
+        ):
+            return rc
+        if rc := require(
+            bad_q8_unsigned_audit["quant_positive_count"] == 31,
+            "missing_unsigned_positive_quant_count",
+        ):
+            return rc
+        if rc := require(
+            any("negative quant payload entries 0 below minimum 1" in finding for finding in bad_q8_unsigned_audit["findings"]),
+            "missing_unsigned_quant_finding",
         ):
             return rc
 

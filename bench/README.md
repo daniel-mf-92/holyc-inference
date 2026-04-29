@@ -15,10 +15,11 @@ TempleOS air-gapped; any QEMU command added under this tree must pass `-nic none
   Q16 scale magnitude limits, fp16 scale exponent histograms and optional
   exponent range gates, fp16 scale sign counts and optional negative-scale
   gates, zero-scale/nonzero-payload counts, quant ranges,
-  quant histograms, expected-element tail padding, and optional
+  quant histograms, signed quant payload coverage, expected-element tail padding, and optional
   packing-distribution gates for distinct quant values, saturated payloads,
   duplicate complete blocks, identical block runs, non-canonical zero-scale
-  blocks, nonzero padding quants, Q4_0 low/high nibble-lane diversity, and
+  blocks, nonzero padding quants, minimum negative/positive quant payload counts,
+  Q4_0 low/high nibble-lane diversity, and
   zero or subnormal fp16 scale fields.
 
 Example:
@@ -45,6 +46,7 @@ python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --fai
 python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --fail-negative-scales
 python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin --expect-elements 4095 --fail-nonzero-padding-quants
 python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --max-duplicate-block-pct 5 --max-identical-block-run 2
+python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --min-quant-negative-count 1 --min-quant-positive-count 1
 python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin --min-q4-nibble-lane-used-quant-values 8
 ```
 
@@ -57,8 +59,8 @@ python3 bench/quant_audit.py \
 ```
 
 `quant_audit_ci_smoke.py` creates temporary Q4_0/Q8_0 block fixtures and checks
-the raw-block, scale-exponent, scale-sign, duplicate-block/run, Q4_0
-nibble-lane diversity, Markdown, CSV, and JUnit paths:
+the raw-block, scale-exponent, scale-sign, duplicate-block/run, signed
+quant-payload coverage, Q4_0 nibble-lane diversity, Markdown, CSV, and JUnit paths:
 
 ```bash
 python3 bench/quant_audit_ci_smoke.py
