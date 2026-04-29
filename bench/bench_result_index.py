@@ -95,6 +95,32 @@ class EnvironmentDrift:
     sources: list[str]
 
 
+@dataclass(frozen=True)
+class LatestComparableArtifact:
+    key: str
+    history_count: int
+    source: str
+    artifact_type: str
+    status: str
+    generated_at: str
+    profile: str
+    model: str
+    quantization: str
+    prompt_suite_sha256: str
+    command_sha256: str
+    environment_sha256: str
+    measured_runs: int
+    total_tokens: int | None
+    median_tok_per_s: float | None
+    wall_tok_per_s_median: float | None
+    us_per_token_median: float | None
+    wall_us_per_token_median: float | None
+    ttft_us_p95: float | None
+    host_child_tok_per_cpu_s_median: float | None
+    host_child_peak_rss_bytes_max: int | None
+    max_memory_bytes: int | None
+
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -723,6 +749,62 @@ def environment_drift(summaries: list[ArtifactSummary]) -> list[EnvironmentDrift
     return findings
 
 
+def comparable_key(summary: ArtifactSummary) -> str:
+    return "/".join(
+        (
+            summary.profile or "-",
+            summary.model or "-",
+            summary.quantization or "-",
+            summary.prompt_suite_sha256 or "no-suite",
+            summary.command_sha256 or "no-command",
+            summary.environment_sha256 or "no-env",
+        )
+    )
+
+
+def latest_comparable_artifacts(summaries: list[ArtifactSummary]) -> list[LatestComparableArtifact]:
+    by_key: dict[str, list[ArtifactSummary]] = {}
+    for summary in summaries:
+        by_key.setdefault(comparable_key(summary), []).append(summary)
+
+    latest: list[LatestComparableArtifact] = []
+    for key, grouped in sorted(by_key.items()):
+        selected = max(
+            grouped,
+            key=lambda item: (
+                parse_iso_datetime(item.generated_at) or datetime.min.replace(tzinfo=timezone.utc),
+                item.source,
+            ),
+        )
+        latest.append(
+            LatestComparableArtifact(
+                key=key,
+                history_count=len(grouped),
+                source=selected.source,
+                artifact_type=selected.artifact_type,
+                status=selected.status,
+                generated_at=selected.generated_at,
+                profile=selected.profile,
+                model=selected.model,
+                quantization=selected.quantization,
+                prompt_suite_sha256=selected.prompt_suite_sha256,
+                command_sha256=selected.command_sha256,
+                environment_sha256=selected.environment_sha256,
+                measured_runs=selected.measured_runs,
+                total_tokens=selected.total_tokens,
+                median_tok_per_s=selected.median_tok_per_s,
+                wall_tok_per_s_median=selected.wall_tok_per_s_median,
+                us_per_token_median=selected.us_per_token_median,
+                wall_us_per_token_median=selected.wall_us_per_token_median,
+                ttft_us_p95=selected.ttft_us_p95,
+                host_child_tok_per_cpu_s_median=selected.host_child_tok_per_cpu_s_median,
+                host_child_peak_rss_bytes_max=selected.host_child_peak_rss_bytes_max,
+                max_memory_bytes=selected.max_memory_bytes,
+            )
+        )
+    return latest
+
+
 def format_value(value: Any) -> str:
     if value is None or value == "":
         return "-"
@@ -764,6 +846,25 @@ def markdown_report(report: dict[str, Any]) -> str:
             )
     else:
         lines.append("No supported benchmark artifacts found.")
+
+    if report["latest_comparable_artifacts"]:
+        lines.extend(
+            [
+                "",
+                "## Latest Comparable Artifacts",
+                "",
+                "| Key | History | Status | Generated | Runs | Tokens | Guest tok/s | Wall tok/s | Guest us/token | Wall us/token | P95 TTFT us | Host child tok/CPU s | Host child RSS bytes | Max memory bytes | Source |",
+                "| --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+            ]
+        )
+        for artifact in report["latest_comparable_artifacts"]:
+            values = {key: format_value(value) for key, value in artifact.items()}
+            lines.append(
+                "| {key} | {history_count} | {status} | {generated_at} | {measured_runs} | {total_tokens} | "
+                "{median_tok_per_s} | {wall_tok_per_s_median} | {us_per_token_median} | "
+                "{wall_us_per_token_median} | {ttft_us_p95} | {host_child_tok_per_cpu_s_median} | "
+                "{host_child_peak_rss_bytes_max} | {max_memory_bytes} | {source} |".format(**values)
+            )
 
     if report["prompt_suite_drift"]:
         lines.extend(
@@ -1096,6 +1197,39 @@ def write_environment_drift_csv(findings: list[EnvironmentDrift], path: Path) ->
             )
 
 
+def write_latest_comparable_csv(rows: list[LatestComparableArtifact], path: Path) -> None:
+    fields = [
+        "key",
+        "history_count",
+        "source",
+        "artifact_type",
+        "status",
+        "generated_at",
+        "profile",
+        "model",
+        "quantization",
+        "prompt_suite_sha256",
+        "command_sha256",
+        "environment_sha256",
+        "measured_runs",
+        "total_tokens",
+        "median_tok_per_s",
+        "wall_tok_per_s_median",
+        "us_per_token_median",
+        "wall_us_per_token_median",
+        "ttft_us_p95",
+        "host_child_tok_per_cpu_s_median",
+        "host_child_peak_rss_bytes_max",
+        "max_memory_bytes",
+    ]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for row in rows:
+            payload = asdict(row)
+            writer.writerow({field: payload[field] for field in fields})
+
+
 def write_report(
     summaries: list[ArtifactSummary], output_dir: Path
 ) -> tuple[Path, list[PromptSuiteDrift], list[CommandDrift], list[EnvironmentDrift]]:
@@ -1103,10 +1237,12 @@ def write_report(
     drift = prompt_suite_drift(summaries)
     command_drift_findings = command_drift(summaries)
     environment_drift_findings = environment_drift(summaries)
+    latest = latest_comparable_artifacts(summaries)
     report = {
         "generated_at": iso_now(),
         "status": index_status(summaries),
         "artifacts": [asdict(summary) for summary in summaries],
+        "latest_comparable_artifacts": [asdict(row) for row in latest],
         "prompt_suite_drift": [asdict(finding) for finding in drift],
         "command_drift": [asdict(finding) for finding in command_drift_findings],
         "environment_drift": [asdict(finding) for finding in environment_drift_findings],
@@ -1117,6 +1253,7 @@ def write_report(
     drift_csv_path = output_dir / "bench_result_index_prompt_suite_drift_latest.csv"
     command_drift_csv_path = output_dir / "bench_result_index_command_drift_latest.csv"
     environment_drift_csv_path = output_dir / "bench_result_index_environment_drift_latest.csv"
+    latest_comparable_csv_path = output_dir / "bench_result_index_latest_comparable_latest.csv"
     junit_path = output_dir / "bench_result_index_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
@@ -1125,6 +1262,7 @@ def write_report(
     write_drift_csv(drift, drift_csv_path)
     write_command_drift_csv(command_drift_findings, command_drift_csv_path)
     write_environment_drift_csv(environment_drift_findings, environment_drift_csv_path)
+    write_latest_comparable_csv(latest, latest_comparable_csv_path)
     return json_path, drift, command_drift_findings, environment_drift_findings
 
 

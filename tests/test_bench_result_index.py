@@ -490,6 +490,61 @@ def test_reports_prompt_suite_drift_for_comparable_artifacts(tmp_path: Path) -> 
     assert drift[0].hashes == ["a" * 64, "b" * 64]
 
 
+def test_latest_comparable_artifacts_selects_latest_per_stable_key(tmp_path: Path) -> None:
+    command = [
+        "qemu-system-x86_64",
+        "-nic",
+        "none",
+        "-drive",
+        "file=TempleOS.img,format=raw,if=ide",
+    ]
+    command_hash = bench_result_index.command_hash(command)
+    for index, (generated_at, tok_per_s) in enumerate(
+        (
+            ("2026-04-27T20:00:00Z", 100.0),
+            ("2026-04-27T21:00:00Z", 125.0),
+        ),
+        1,
+    ):
+        report_dir = tmp_path / f"run{index}"
+        report_dir.mkdir()
+        (report_dir / "qemu_prompt_bench_latest.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": generated_at,
+                    "status": "pass",
+                    "command_sha256": command_hash,
+                    "environment": {"platform": "ci", "machine": "host", "qemu_bin": "qemu-system-x86_64"},
+                    "prompt_suite": {"suite_sha256": "c" * 64, "prompt_count": 1},
+                    "suite_summary": {
+                        "total_tokens": 16 * index,
+                        "tok_per_s_median": tok_per_s,
+                        "wall_tok_per_s_median": tok_per_s - 5.0,
+                    },
+                    "benchmarks": [
+                        {
+                            "profile": "secure",
+                            "model": "tiny",
+                            "quantization": "Q4_0",
+                            "command": command,
+                            "command_sha256": command_hash,
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    latest = bench_result_index.latest_comparable_artifacts(bench_result_index.load_summaries([tmp_path]))
+
+    assert len(latest) == 1
+    assert latest[0].history_count == 2
+    assert latest[0].generated_at == "2026-04-27T21:00:00Z"
+    assert latest[0].median_tok_per_s == 125.0
+    assert latest[0].total_tokens == 32
+    assert latest[0].key.startswith("secure/tiny/Q4_0/")
+
+
 def test_cli_writes_json_markdown_and_csv(tmp_path: Path) -> None:
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"
@@ -532,9 +587,11 @@ def test_cli_writes_json_markdown_and_csv(tmp_path: Path) -> None:
 
     assert payload["status"] == "pass"
     assert payload["artifacts"][0]["prompt_suite_sha256"] == "c" * 64
+    assert payload["latest_comparable_artifacts"][0]["history_count"] == 1
     assert payload["prompt_suite_drift"] == []
     assert payload["command_drift"] == []
     assert "Benchmark Result Index" in markdown
+    assert "Latest Comparable Artifacts" in markdown
     assert "Prompt suite drift: none detected." in markdown
     assert "Command drift: none detected." in markdown
     assert "Host child tok/CPU s" in markdown
@@ -545,6 +602,11 @@ def test_cli_writes_json_markdown_and_csv(tmp_path: Path) -> None:
     assert rows[0]["telemetry_status"] == "pass"
     assert rows[0]["freshness_status"] == "unchecked"
     assert rows[0]["generated_age_seconds"] != ""
+    latest_rows = list(
+        csv.DictReader((output_dir / "bench_result_index_latest_comparable_latest.csv").open(encoding="utf-8"))
+    )
+    assert latest_rows[0]["history_count"] == "1"
+    assert latest_rows[0]["median_tok_per_s"] == "160.0"
     assert junit_root.attrib["name"] == "holyc_bench_result_index"
     assert junit_root.attrib["failures"] == "0"
 

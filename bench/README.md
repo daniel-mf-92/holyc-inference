@@ -551,6 +551,11 @@ hashes, and command drift when comparable artifacts carry different
 `command_sha256` values. It also fingerprints host/QEMU environment metadata and
 reports environment drift when comparable artifacts use the same prompt suite
 and command hash but were produced under different host or QEMU identities.
+The JSON and Markdown reports also include a latest-per-comparable-key rollup,
+with the matching CSV at `bench_result_index_latest_comparable_latest.csv`, so
+dashboards can ingest only the newest artifact for each stable
+profile/model/quantization/prompt-suite/command/environment key without
+discarding historical rows from the full index.
 These drift checks catch accidental prompt, launch, or host changes before
 throughput numbers are compared. The index marks artifacts with
 missing required telemetry, such as zero measured runs or absent median tok/s,
