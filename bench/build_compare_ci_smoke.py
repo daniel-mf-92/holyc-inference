@@ -28,6 +28,7 @@ def qemu_report(
     serial_output_bytes: int,
     command_sha256: str = "ci-command",
     prompt_suite_sha256: str = "ci-suite",
+    prompt: str = "ci-short",
 ) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     for index, tok_per_s in enumerate(tok_per_s_values):
@@ -38,7 +39,7 @@ def qemu_report(
                 "profile": "ci-airgap-smoke",
                 "model": "synthetic-smoke",
                 "quantization": "Q4_0",
-                "prompt": "ci-short",
+                "prompt": prompt,
                 "tokens": 32,
                 "elapsed_us": int(32_000_000 / tok_per_s),
                 "tok_per_s": tok_per_s,
@@ -147,6 +148,7 @@ def check_pass_case(tmp_path: Path) -> None:
             "2",
             "--fail-on-regression",
             "--fail-on-coverage",
+            "--fail-on-comparison-coverage",
             "--fail-on-prompt-suite-drift",
             "--fail-on-command-drift",
         ]
@@ -161,6 +163,7 @@ def check_pass_case(tmp_path: Path) -> None:
     assert_true(len(report["deltas"]) == 1, "missing build delta")
     assert_true(not report["regressions"], "unexpected regression")
     assert_true(not report["coverage_violations"], "unexpected coverage violation")
+    assert_true(not report["comparison_coverage_violations"], "unexpected comparison coverage violation")
     assert_true(not report["prompt_suite_drift"], "unexpected prompt-suite drift")
     assert_true(not report["command_drift"], "unexpected command drift")
     delta = report["deltas"][0]
@@ -170,6 +173,10 @@ def check_pass_case(tmp_path: Path) -> None:
     rows = list(csv.DictReader((output_dir / "build_compare_latest.csv").open(encoding="utf-8")))
     assert_true(rows[0]["candidate_build"] == "head", "missing CSV candidate build")
     assert_true(rows[0]["candidate_host_child_peak_rss_bytes"] == "2100000", "missing CSV host RSS")
+    comparison_coverage_csv = (
+        output_dir / "build_compare_comparison_coverage_latest.csv"
+    ).read_text(encoding="utf-8")
+    assert_true("key,build,role,reason" in comparison_coverage_csv, "missing comparison coverage CSV")
     assert_true(
         "Build Benchmark Compare" in (output_dir / "build_compare_latest.md").read_text(encoding="utf-8"),
         "missing Markdown title",
@@ -291,6 +298,106 @@ def check_coverage_gate(tmp_path: Path) -> None:
     assert_true("minimum_ok_runs" in coverage_csv, "missing coverage CSV header")
 
 
+def check_comparison_coverage_gate(tmp_path: Path) -> None:
+    baseline = tmp_path / "comparison_base.json"
+    candidate = tmp_path / "comparison_head.json"
+    output_dir = tmp_path / "comparison_coverage_dashboard"
+    write_json(
+        baseline,
+        {
+            "generated_at": "2026-04-29T04:00:00Z",
+            "status": "pass",
+            "benchmarks": [
+                *qemu_report(
+                    commit="ci-base",
+                    tok_per_s_values=[100.0, 101.0],
+                    wall_tok_per_s_values=[95.0, 96.0],
+                    ttft_us_values=[50000, 49000],
+                    memory_bytes=1_000_000,
+                    host_child_peak_rss_bytes=2_000_000,
+                    host_child_tok_per_cpu_s_values=[80.0, 81.0],
+                    serial_output_bytes=4096,
+                    prompt="ci-short",
+                )["benchmarks"],
+                *qemu_report(
+                    commit="ci-base",
+                    tok_per_s_values=[98.0, 99.0],
+                    wall_tok_per_s_values=[93.0, 94.0],
+                    ttft_us_values=[51000, 50000],
+                    memory_bytes=1_000_000,
+                    host_child_peak_rss_bytes=2_000_000,
+                    host_child_tok_per_cpu_s_values=[78.0, 79.0],
+                    serial_output_bytes=4096,
+                    prompt="baseline-only",
+                )["benchmarks"],
+            ],
+        },
+    )
+    write_json(
+        candidate,
+        {
+            "generated_at": "2026-04-29T04:00:00Z",
+            "status": "pass",
+            "benchmarks": [
+                *qemu_report(
+                    commit="ci-head",
+                    tok_per_s_values=[100.0, 101.0],
+                    wall_tok_per_s_values=[95.0, 96.0],
+                    ttft_us_values=[50000, 49000],
+                    memory_bytes=1_000_000,
+                    host_child_peak_rss_bytes=2_000_000,
+                    host_child_tok_per_cpu_s_values=[80.0, 81.0],
+                    serial_output_bytes=4096,
+                    prompt="ci-short",
+                )["benchmarks"],
+                *qemu_report(
+                    commit="ci-head",
+                    tok_per_s_values=[97.0, 98.0],
+                    wall_tok_per_s_values=[92.0, 93.0],
+                    ttft_us_values=[52000, 51000],
+                    memory_bytes=1_000_000,
+                    host_child_peak_rss_bytes=2_000_000,
+                    host_child_tok_per_cpu_s_values=[77.0, 78.0],
+                    serial_output_bytes=4096,
+                    prompt="candidate-only",
+                )["benchmarks"],
+            ],
+        },
+    )
+
+    completed = run_command(
+        [
+            sys.executable,
+            str(ROOT / "bench" / "build_compare.py"),
+            "--input",
+            f"base={baseline}",
+            "--input",
+            f"head={candidate}",
+            "--baseline",
+            "base",
+            "--output-dir",
+            str(output_dir),
+            "--fail-on-comparison-coverage",
+        ]
+    )
+    assert_true(completed.returncode == 1, "comparison coverage gate did not fail")
+    report = json.loads((output_dir / "build_compare_latest.json").read_text(encoding="utf-8"))
+    violations = report["comparison_coverage_violations"]
+    assert_true(len(violations) == 2, "missing comparison coverage violations")
+    reasons = {violation["reason"] for violation in violations}
+    assert_true(
+        reasons == {"missing_candidate_key", "missing_baseline_key"},
+        "wrong comparison coverage reasons",
+    )
+    comparison_csv = (output_dir / "build_compare_comparison_coverage_latest.csv").read_text(
+        encoding="utf-8"
+    )
+    assert_true("missing_candidate_key" in comparison_csv, "missing comparison coverage CSV row")
+    assert_true("missing_baseline_key" in comparison_csv, "missing baseline comparison coverage CSV row")
+    junit_root = ET.parse(output_dir / "build_compare_junit_latest.xml").getroot()
+    assert_true(junit_root.attrib.get("failures") == "2", "comparison coverage JUnit did not fail")
+
+
 def main() -> int:
     try:
         with tempfile.TemporaryDirectory(prefix="holyc-build-compare-ci-") as tmp:
@@ -298,6 +405,7 @@ def main() -> int:
             check_pass_case(tmp_path)
             check_command_drift_gate(tmp_path)
             check_coverage_gate(tmp_path)
+            check_comparison_coverage_gate(tmp_path)
     except AssertionError as exc:
         print(f"build_compare_ci_smoke_failed={exc}", file=sys.stderr)
         return 1

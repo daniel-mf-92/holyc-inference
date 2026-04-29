@@ -241,3 +241,4 @@
 2026-04-29T11:38:15Z | Added qemu prompt benchmark expected-token telemetry and declared decode-length gates with smoke coverage.
 2026-04-29T11:56:04Z | Added structured benchmark trend finding rows/CSV with smoke coverage and refreshed dashboard artifacts.
 2026-04-29T12:52:56Z | Added dataset provenance source URL path-prefix policy gates with smoke coverage.
+2026-04-29T13:00:52Z | Added build comparison prompt-key coverage gates with smoke coverage and refreshed build comparison artifacts.

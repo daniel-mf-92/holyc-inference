@@ -1,6 +1,6 @@
 # Build Benchmark Compare
 
-Generated: 2026-04-29T03:13:43Z
+Generated: 2026-04-29T13:01:38Z
 Status: pass
 Baseline: base
 Builds: base, head
@@ -14,6 +14,7 @@ Host child CPU/RSS regressions: 0
 Serial output regressions: 0
 Memory regressions: 0
 Coverage violations: 0
+Comparison coverage violations: 0
 Prompt-suite drift: 0
 Command drift: 0
 

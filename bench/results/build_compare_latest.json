@@ -5,6 +5,7 @@
     "head"
   ],
   "command_drift": [],
+  "comparison_coverage_violations": [],
   "coverage_violations": [],
   "deltas": [
     {
@@ -118,7 +119,7 @@
       "wall_us_per_token_delta_pct": -24.973182463061004
     }
   ],
-  "generated_at": "2026-04-29T03:13:43Z",
+  "generated_at": "2026-04-29T13:01:38Z",
   "max_host_child_cpu_growth_pct": null,
   "max_host_child_cpu_pct_growth_pct": null,
   "max_host_child_rss_growth_pct": 2000.0,

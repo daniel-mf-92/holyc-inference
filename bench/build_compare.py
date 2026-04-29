@@ -135,6 +135,14 @@ class BuildCoverageViolation:
 
 
 @dataclass(frozen=True)
+class BuildComparisonCoverageViolation:
+    key: str
+    build: str
+    role: str
+    reason: str
+
+
+@dataclass(frozen=True)
 class BuildPromptSuiteDrift:
     key: str
     baseline_build: str
@@ -579,6 +587,41 @@ def compare_builds(metrics: list[BuildMetric], baseline_build: str) -> list[Buil
     return sorted(deltas, key=lambda delta: (delta.candidate_build, delta.key))
 
 
+def find_comparison_coverage_violations(
+    metrics: list[BuildMetric],
+    baseline_build: str,
+) -> list[BuildComparisonCoverageViolation]:
+    baseline_keys = {metric.key for metric in metrics if metric.build == baseline_build}
+    candidate_builds = sorted({metric.build for metric in metrics if metric.build != baseline_build})
+    keys_by_build = {
+        build: {metric.key for metric in metrics if metric.build == build}
+        for build in [baseline_build] + candidate_builds
+    }
+
+    violations: list[BuildComparisonCoverageViolation] = []
+    for candidate_build in candidate_builds:
+        candidate_keys = keys_by_build[candidate_build]
+        for key in sorted(baseline_keys - candidate_keys):
+            violations.append(
+                BuildComparisonCoverageViolation(
+                    key=key,
+                    build=candidate_build,
+                    role="candidate",
+                    reason="missing_candidate_key",
+                )
+            )
+        for key in sorted(candidate_keys - baseline_keys):
+            violations.append(
+                BuildComparisonCoverageViolation(
+                    key=key,
+                    build=baseline_build,
+                    role="baseline",
+                    reason="missing_baseline_key",
+                )
+            )
+    return violations
+
+
 def find_regressions(
     deltas: list[BuildDelta],
     max_tok_regression_pct: float,
@@ -821,6 +864,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Serial output regressions: {len([row for row in report['regressions'] if row['metric'] == 'serial_output_bytes'])}",
         f"Memory regressions: {len([row for row in report['regressions'] if row['metric'] == 'memory_bytes'])}",
         f"Coverage violations: {len(report['coverage_violations'])}",
+        f"Comparison coverage violations: {len(report['comparison_coverage_violations'])}",
         f"Prompt-suite drift: {len(report['prompt_suite_drift'])}",
         f"Command drift: {len(report['command_drift'])}",
         "",
@@ -873,6 +917,12 @@ def markdown_report(report: dict[str, Any]) -> str:
                     **drift
                 )
             )
+    if report["comparison_coverage_violations"]:
+        lines.extend(["", "## Comparison Coverage Violations", ""])
+        lines.append("| Build | Role | Prompt key | Reason |")
+        lines.append("| --- | --- | --- | --- |")
+        for violation in report["comparison_coverage_violations"]:
+            lines.append("| {build} | {role} | {key} | {reason} |".format(**violation))
     if report["coverage_violations"]:
         lines.extend(["", "## Coverage Violations", ""])
         lines.append("| Build | Role | Prompt key | OK runs | Minimum OK runs |")
@@ -958,6 +1008,18 @@ def write_coverage_csv(violations: list[BuildCoverageViolation], path: Path) -> 
             writer.writerow({field: getattr(violation, field) for field in fields})
 
 
+def write_comparison_coverage_csv(
+    violations: list[BuildComparisonCoverageViolation],
+    path: Path,
+) -> None:
+    fields = ["key", "build", "role", "reason"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for violation in violations:
+            writer.writerow({field: getattr(violation, field) for field in fields})
+
+
 def write_prompt_suite_drift_csv(violations: list[BuildPromptSuiteDrift], path: Path) -> None:
     fields = [
         "key",
@@ -992,6 +1054,7 @@ def write_junit(
     deltas: list[BuildDelta],
     regressions: list[BuildRegression],
     coverage_violations: list[BuildCoverageViolation],
+    comparison_coverage_violations: list[BuildComparisonCoverageViolation],
     prompt_suite_drift: list[BuildPromptSuiteDrift],
     command_drift: list[BuildCommandDrift],
     path: Path,
@@ -1012,9 +1075,13 @@ def write_junit(
         "testsuite",
         {
             "name": "holyc_build_compare",
-            "tests": str(len(deltas)),
+            "tests": str(len(deltas) + len(comparison_coverage_violations)),
             "failures": str(
-                len(regressions) + len(coverage_violations) + len(prompt_suite_drift) + len(command_drift)
+                len(regressions)
+                + len(coverage_violations)
+                + len(comparison_coverage_violations)
+                + len(prompt_suite_drift)
+                + len(command_drift)
             ),
             "errors": "0",
         },
@@ -1146,6 +1213,29 @@ def write_junit(
                 f"ok_runs={violation.ok_runs}\n"
                 f"minimum_ok_runs={violation.minimum_ok_runs}\n"
             )
+    for violation in comparison_coverage_violations:
+        case = ET.SubElement(
+            suite,
+            "testcase",
+            {
+                "classname": "build_compare",
+                "name": f"{violation.build}:{violation.key}:comparison_coverage",
+            },
+        )
+        failure = ET.SubElement(
+            case,
+            "failure",
+            {
+                "type": "build_compare_comparison_coverage",
+                "message": f"{violation.role} comparison key is missing",
+            },
+        )
+        failure.text = (
+            f"build={violation.build}\n"
+            f"role={violation.role}\n"
+            f"key={violation.key}\n"
+            f"reason={violation.reason}\n"
+        )
     ET.indent(suite)
     ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
     with path.open("ab") as handle:
@@ -1191,11 +1281,18 @@ def write_report(
         max_serial_output_growth_pct=max_serial_output_growth_pct,
     )
     coverage_violations = find_coverage_violations(deltas, min_ok_runs_per_build)
+    comparison_coverage_violations = find_comparison_coverage_violations(metrics, baseline_build)
     prompt_suite_drift = find_prompt_suite_drift(deltas)
     command_drift = find_command_drift(deltas)
     report = {
         "generated_at": iso_now(),
-        "status": "fail" if regressions or coverage_violations or prompt_suite_drift or command_drift else "pass",
+        "status": "fail"
+        if regressions
+        or coverage_violations
+        or comparison_coverage_violations
+        or prompt_suite_drift
+        or command_drift
+        else "pass",
         "baseline_build": baseline_build,
         "builds": sorted({metric.build for metric in metrics}),
         "max_tok_regression_pct": abs(max_tok_regression_pct),
@@ -1236,6 +1333,9 @@ def write_report(
         "deltas": [asdict(delta) for delta in deltas],
         "regressions": [asdict(regression) for regression in regressions],
         "coverage_violations": [asdict(violation) for violation in coverage_violations],
+        "comparison_coverage_violations": [
+            asdict(violation) for violation in comparison_coverage_violations
+        ],
         "prompt_suite_drift": [asdict(violation) for violation in prompt_suite_drift],
         "command_drift": [asdict(violation) for violation in command_drift],
     }
@@ -1243,6 +1343,7 @@ def write_report(
     md_path = output_dir / "build_compare_latest.md"
     csv_path = output_dir / "build_compare_latest.csv"
     coverage_csv_path = output_dir / "build_compare_coverage_violations_latest.csv"
+    comparison_coverage_csv_path = output_dir / "build_compare_comparison_coverage_latest.csv"
     prompt_suite_drift_csv_path = output_dir / "build_compare_prompt_suite_drift_latest.csv"
     command_drift_csv_path = output_dir / "build_compare_command_drift_latest.csv"
     junit_path = output_dir / "build_compare_junit_latest.xml"
@@ -1250,9 +1351,18 @@ def write_report(
     md_path.write_text(markdown_report(report), encoding="utf-8")
     write_csv(deltas, csv_path)
     write_coverage_csv(coverage_violations, coverage_csv_path)
+    write_comparison_coverage_csv(comparison_coverage_violations, comparison_coverage_csv_path)
     write_prompt_suite_drift_csv(prompt_suite_drift, prompt_suite_drift_csv_path)
     write_command_drift_csv(command_drift, command_drift_csv_path)
-    write_junit(deltas, regressions, coverage_violations, prompt_suite_drift, command_drift, junit_path)
+    write_junit(
+        deltas,
+        regressions,
+        coverage_violations,
+        comparison_coverage_violations,
+        prompt_suite_drift,
+        command_drift,
+        junit_path,
+    )
     return json_path
 
 
@@ -1344,6 +1454,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fail-on-regression", action="store_true", help="Return non-zero on benchmark regression")
     parser.add_argument("--fail-on-coverage", action="store_true", help="Return non-zero on OK-run coverage violations")
     parser.add_argument(
+        "--fail-on-comparison-coverage",
+        action="store_true",
+        help="Return non-zero when baseline and candidate builds do not expose the same prompt keys",
+    )
+    parser.add_argument(
         "--fail-on-prompt-suite-drift",
         action="store_true",
         help="Return non-zero when comparable builds report different prompt-suite hashes",
@@ -1408,17 +1523,21 @@ def main(argv: list[str] | None = None) -> int:
         max_serial_output_growth_pct=args.max_serial_output_growth_pct,
     )
     coverage_violations = find_coverage_violations(deltas, args.min_ok_runs_per_build)
+    comparison_coverage_violations = find_comparison_coverage_violations(metrics, baseline)
     prompt_suite_drift = find_prompt_suite_drift(deltas)
     command_drift = find_command_drift(deltas)
     print(f"wrote_json={output}")
     print(f"compared_deltas={len(deltas)}")
     print(f"regressions={len(regressions)}")
     print(f"coverage_violations={len(coverage_violations)}")
+    print(f"comparison_coverage_violations={len(comparison_coverage_violations)}")
     print(f"prompt_suite_drift={len(prompt_suite_drift)}")
     print(f"command_drift={len(command_drift)}")
     if args.fail_on_regression and regressions:
         return 1
     if args.fail_on_coverage and coverage_violations:
+        return 1
+    if args.fail_on_comparison_coverage and comparison_coverage_violations:
         return 1
     if args.fail_on_prompt_suite_drift and prompt_suite_drift:
         return 1

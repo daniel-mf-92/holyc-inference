@@ -1004,6 +1004,10 @@ add `--max-memory-growth-pct` to gate peak memory growth. Use
 the baseline or candidate build has too few successful runs for a prompt key.
 Coverage violations are written to
 `build_compare_coverage_violations_latest.csv` and surfaced in the JUnit report.
+Use `--fail-on-comparison-coverage` to reject build pairs whose prompt keys do
+not match exactly; missing baseline/candidate keys are written to
+`build_compare_comparison_coverage_latest.csv` and surfaced in JUnit so dropped
+prompts cannot be hidden by the comparable-delta join.
 Prompt-suite SHA256s are carried through from QEMU prompt benchmark reports;
 `--fail-on-prompt-suite-drift` rejects comparable build pairs whose prompt-suite
 hashes differ, with details written to
@@ -1015,7 +1019,8 @@ report.
 
 `build_compare_ci_smoke.py` is a stdlib-only CI gate for the build comparison
 dashboard. It creates synthetic local benchmark reports, checks the pass path,
-and verifies command-drift and OK-run coverage gates without launching QEMU:
+and verifies command-drift, OK-run coverage, and comparison-coverage gates
+without launching QEMU:
 
 ```bash
 python3 bench/build_compare_ci_smoke.py
@@ -1042,6 +1047,7 @@ python3 bench/build_compare.py \
   --max-memory-growth-pct 10 \
   --min-ok-runs-per-build 3 \
   --fail-on-coverage \
+  --fail-on-comparison-coverage \
   --fail-on-command-drift
 ```
 
