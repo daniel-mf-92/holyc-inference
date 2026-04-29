@@ -193,6 +193,23 @@ NIC-enabled QEMU command is rejected:
 python3 bench/bench_artifact_manifest_ci_smoke.py
 ```
 
+`bench_trend_export.py` turns existing benchmark JSON artifacts into compact
+dashboard trend files without launching QEMU. It groups comparable
+profile/model/quantization/prompt-suite points, records latest-vs-previous
+throughput and memory deltas, and writes JSON, Markdown, CSV, point-history CSV,
+and JUnit XML under `bench/dashboards/`.
+
+```bash
+python3 bench/bench_trend_export.py \
+  --input bench/results \
+  --output-dir bench/dashboards \
+  --max-points-per-key 25 \
+  --fail-on-empty \
+  --fail-on-airgap \
+  --fail-on-telemetry
+python3 bench/bench_trend_export_ci_smoke.py
+```
+
 `dataset_leak_audit.py` checks local eval JSONL before packing for duplicate
 record IDs, normalized prompt reuse across splits, repeated prompt+choice
 payloads across splits, and conflicting answers for the same payload. It never

@@ -184,3 +184,4 @@
 2026-04-29T00:07:06Z | Added HCEval aggregate binary layout telemetry with manifest/inspection validation and refreshed dataset artifacts.
 2026-04-29T00:16:45Z | Added HCEval choice-count telemetry to manifests/inspection with smoke validation and refreshed dataset artifacts.
 2026-04-29T00:24:01Z | Added latest comparable benchmark artifact rollups to bench_result_index with smoke coverage and refreshed index artifacts.
+2026-04-29T00:39:32Z | Added benchmark trend export dashboards with smoke coverage and refreshed trend artifacts.
