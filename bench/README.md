@@ -779,6 +779,11 @@ python3 bench/perf_regression.py \
   --require-tokens \
   --require-ttft-us \
   --require-host-overhead-pct \
+  --require-environment-sha256 \
+  --require-host-platform \
+  --require-host-machine \
+  --require-qemu-version \
+  --require-qemu-bin \
   --require-memory \
   --require-host-child-peak-rss \
   --require-host-child-tok-per-cpu-s \
@@ -819,9 +824,12 @@ prompt cannot hide behind a healthy median. `--require-tok-per-s`,
 `--require-wall-tok-per-s`, `--require-us-per-token`,
 `--require-wall-us-per-token`, `--require-tokens`, `--require-ttft-us`,
 `--require-host-overhead-pct`, `--require-memory`, and
-`--require-host-child-peak-rss`, and `--require-host-child-tok-per-cpu-s` fail the dashboard when
-any benchmark key/commit point has zero samples for that telemetry field. This
-catches malformed or partially uploaded artifacts before CI treats missing
+`--require-host-child-peak-rss`, and `--require-host-child-tok-per-cpu-s` fail
+the dashboard when any benchmark key/commit point has zero samples for that
+telemetry field. `--require-environment-sha256`, `--require-host-platform`,
+`--require-host-machine`, `--require-qemu-version`, and `--require-qemu-bin`
+similarly require host/QEMU provenance fields for every commit point. These
+gates catch malformed or partially uploaded artifacts before CI treats missing
 metrics as merely non-comparable.
 Prompt-suite hashes from QEMU benchmark reports are carried into commit points;
 the dashboard fails when comparable benchmark/profile/model/quantization/prompt
@@ -1009,8 +1017,8 @@ files are collapsed by benchmark key and commit before the latest distinct
 commits are compared. Outputs include JSON, Markdown, JUnit XML, commit-point
 CSV, baseline/candidate comparison CSV, regression CSV, sample-coverage CSV,
 commit-coverage CSV, comparison-coverage CSV, prompt-suite drift CSV,
-telemetry-coverage CSV, tok/s variability CSV, and wall tok/s variability CSV
-artifacts.
+environment-coverage CSV, telemetry-coverage CSV, tok/s variability CSV, and
+wall tok/s variability CSV artifacts.
 
 Example:
 
@@ -1044,6 +1052,11 @@ python3 bench/perf_regression.py \
   --require-tokens \
   --require-ttft-us \
   --require-host-overhead-pct \
+  --require-environment-sha256 \
+  --require-host-platform \
+  --require-host-machine \
+  --require-qemu-version \
+  --require-qemu-bin \
   --require-host-child-peak-rss \
   --require-host-child-tok-per-cpu-s \
   --fail-on-regression

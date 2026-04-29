@@ -874,6 +874,69 @@ def test_required_telemetry_flags_missing_commit_point_metrics(tmp_path: Path) -
     ]
 
 
+def test_required_environment_flags_missing_commit_point_metadata(tmp_path: Path) -> None:
+    result = tmp_path / "perf.jsonl"
+    write_jsonl(
+        result,
+        [
+            {
+                "timestamp": "2026-04-27T10:00:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "prompt": "short",
+                "tok_per_s": 100.0,
+                "environment": {
+                    "platform": "macOS-15.4-arm64",
+                    "machine": "arm64",
+                },
+            }
+        ],
+    )
+
+    records = perf_regression.load_records([result])
+    report = perf_regression.build_report(
+        records,
+        5.0,
+        10.0,
+        require_environment_sha256=True,
+        require_host_platform=True,
+        require_host_machine=True,
+        require_qemu_version=True,
+        require_qemu_bin=True,
+    )
+
+    assert report["status"] == "fail"
+    assert report["thresholds"]["require_environment_sha256"] is True
+    assert report["thresholds"]["require_qemu_bin"] is True
+    assert report["commit_points"][0]["environment_sha256"]
+    assert report["environment_coverage_violations"] == [
+        {
+            "key": "decode/secure-local/-/Q4_0/short",
+            "commit": "head",
+            "field": "qemu_version",
+            "records": 1,
+            "present_records": 0,
+        },
+        {
+            "key": "decode/secure-local/-/Q4_0/short",
+            "commit": "head",
+            "field": "qemu_bin",
+            "records": 1,
+            "present_records": 0,
+        },
+    ]
+    assert "Environment coverage violations: 2" in perf_regression.markdown_report(report)
+
+    junit_root = ET.fromstring(perf_regression.junit_report(report))
+    assert junit_root.attrib["failures"] == "2"
+    assert [failure.attrib["type"] for failure in junit_root.findall(".//failure")] == [
+        "environment_coverage",
+        "environment_coverage",
+    ]
+
+
 def test_junit_report_marks_perf_failures() -> None:
     report = {
         "generated_at": "2026-04-27T20:00:00Z",
@@ -990,6 +1053,9 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
         output_dir / "perf_regression_comparison_coverage_violations_latest.csv"
     ).exists()
     assert (output_dir / "perf_regression_prompt_suite_drift_latest.csv").exists()
+    assert (
+        output_dir / "perf_regression_environment_coverage_violations_latest.csv"
+    ).exists()
     markdown = (output_dir / "perf_regression_latest.md").read_text(encoding="utf-8")
     assert "Perf Regression Dashboard" in markdown
     assert "Commit Points" in markdown
@@ -999,6 +1065,7 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
     assert "Comparison Coverage" in markdown
     assert "Comparisons" in markdown
     assert "Prompt Suite Drift" in markdown
+    assert "Environment Coverage" in markdown
     assert "Telemetry Coverage" in markdown
     assert "prompt/dev-local/-/-/-" in markdown
     commit_points_csv = (output_dir / "perf_regression_commit_points_latest.csv").read_text(
@@ -1025,6 +1092,9 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
     prompt_suite_drift_csv = (
         output_dir / "perf_regression_prompt_suite_drift_latest.csv"
     ).read_text(encoding="utf-8")
+    environment_coverage_csv = (
+        output_dir / "perf_regression_environment_coverage_violations_latest.csv"
+    ).read_text(encoding="utf-8")
     telemetry_coverage_csv = (
         output_dir / "perf_regression_telemetry_coverage_violations_latest.csv"
     ).read_text(encoding="utf-8")
@@ -1040,4 +1110,5 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
     assert "key,commits,minimum_commits,latest_commit" in commit_coverage_violations_csv
     assert "key,baseline_commit,candidate_commit,missing_commits" in comparison_coverage_violations_csv
     assert "key,hashes,commits,sources" in prompt_suite_drift_csv
+    assert "key,commit,field,records,present_records" in environment_coverage_csv
     assert "key,commit,metric,records,present_records" in telemetry_coverage_csv

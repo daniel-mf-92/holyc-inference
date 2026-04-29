@@ -209,3 +209,4 @@
 2026-04-29T04:33:43Z | Added benchmark result index dry-run launch-plan coverage telemetry and opt-in missing-dry-run gate with smoke coverage.
 2026-04-29T04:55:38Z | Added HCEval inspection record-span CSV export with dataset smoke coverage and refreshed inspection artifacts.
 2026-04-29T05:05:54Z | Added eval_compare top-score tie telemetry/gating with smoke coverage and refreshed eval artifacts.
+2026-04-29T05:17:55Z | Added perf regression host/QEMU environment metadata coverage gates with CSV/JUnit smoke coverage and refreshed dashboards.

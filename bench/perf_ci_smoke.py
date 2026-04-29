@@ -61,6 +61,9 @@ def main() -> int:
         )
         prompt_suite_drift_path = output_dir / "perf_regression_prompt_suite_drift_latest.csv"
         environment_drift_path = output_dir / "perf_regression_environment_drift_latest.csv"
+        environment_coverage_path = (
+            output_dir / "perf_regression_environment_coverage_violations_latest.csv"
+        )
         telemetry_coverage_path = (
             output_dir / "perf_regression_telemetry_coverage_violations_latest.csv"
         )
@@ -91,6 +94,12 @@ def main() -> int:
             return 1
         if "environment_drift_violations" not in report:
             print("missing_environment_drift_report=true", file=sys.stderr)
+            return 1
+        if "environment_coverage_violations" not in report:
+            print("missing_environment_coverage_report=true", file=sys.stderr)
+            return 1
+        if report["environment_coverage_violations"]:
+            print("unexpected_environment_coverage_violations=true", file=sys.stderr)
             return 1
         if report["telemetry_coverage_violations"]:
             print("unexpected_telemetry_coverage_violations=true", file=sys.stderr)
@@ -218,6 +227,11 @@ def main() -> int:
         if "key,environment_sha256s,commits,host_platforms,host_machines,qemu_versions,qemu_bins,sources" not in environment_drift_csv:
             print("missing_environment_drift_csv=true", file=sys.stderr)
             return 1
+        if "key,commit,field,records,present_records" not in environment_coverage_path.read_text(
+            encoding="utf-8"
+        ):
+            print("missing_environment_coverage_csv=true", file=sys.stderr)
+            return 1
 
         environment_drift_fixture = tmp_path / "environment_drift.jsonl"
         environment_drift_fixture.write_text(
@@ -291,6 +305,62 @@ def main() -> int:
         )
         if len(drift_report["environment_drift_violations"]) != 1:
             print("missing_environment_drift_violation=true", file=sys.stderr)
+            return 1
+
+        environment_coverage_fixture = tmp_path / "environment_coverage.jsonl"
+        environment_coverage_fixture.write_text(
+            json.dumps(
+                {
+                    "timestamp": "2026-04-27T15:00:00Z",
+                    "commit": "env-coverage-head",
+                    "benchmark": "qemu_prompt",
+                    "profile": "ci-airgap-smoke",
+                    "model": "synthetic-smoke",
+                    "quantization": "Q4_0",
+                    "prompt": "ci-env-coverage",
+                    "tok_per_s": 100.0,
+                    "environment": {
+                        "platform": "macOS synthetic",
+                        "machine": "arm64",
+                    },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        environment_coverage_command = [
+            sys.executable,
+            str(ROOT / "bench" / "perf_regression.py"),
+            "--input",
+            str(environment_coverage_fixture),
+            "--output-dir",
+            str(tmp_path / "environment_coverage_dashboard"),
+            "--require-environment-sha256",
+            "--require-host-platform",
+            "--require-host-machine",
+            "--require-qemu-version",
+            "--require-qemu-bin",
+            "--fail-on-regression",
+        ]
+        completed = subprocess.run(
+            environment_coverage_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("environment_coverage_not_rejected=true", file=sys.stderr)
+            return 1
+        coverage_report = json.loads(
+            (
+                tmp_path
+                / "environment_coverage_dashboard"
+                / "perf_regression_latest.json"
+            ).read_text(encoding="utf-8")
+        )
+        if len(coverage_report["environment_coverage_violations"]) != 2:
+            print("missing_environment_coverage_violation=true", file=sys.stderr)
             return 1
 
         ttft_regression_fixture = tmp_path / "p95_ttft_regression.jsonl"
