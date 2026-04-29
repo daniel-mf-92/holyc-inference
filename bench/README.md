@@ -464,16 +464,16 @@ findings are written into the JSON and Markdown reports as
 and variability gate failures directly from the benchmark job.
 Use `--require-tokens`, `--require-tok-per-s`, `--require-memory`,
 `--require-ttft-us`, `--min-tokens`, `--min-tok-per-s`,
-`--min-wall-tok-per-s`, `--max-memory-bytes`, `--max-ttft-us`,
-`--max-host-overhead-us`, `--max-host-overhead-pct`,
+`--min-total-tokens`, `--min-wall-tok-per-s`, `--max-memory-bytes`,
+`--max-ttft-us`, `--max-host-overhead-us`, `--max-host-overhead-pct`,
 `--max-wall-timeout-pct`, `--min-host-child-tok-per-cpu-s`,
 `--min-tokens-per-prompt-byte`, `--require-host-child-rss`,
 `--max-host-child-rss-bytes`, `--max-memory-bytes-per-token`, and
-`--max-serial-output-bytes` to fail measured runs that omit required telemetry,
-produce too little work for a trustworthy throughput sample, exceed a
-host-observed latency, memory, RSS, orchestration overhead, or serial verbosity
-budget, exceed a first-token latency or timeout-budget threshold, or fall below
-a host child-CPU or output-density floor.
+`--max-serial-output-bytes` to fail measured runs or suites that omit required
+telemetry, produce too little work for a trustworthy throughput sample, exceed
+a host-observed latency, memory, RSS, orchestration overhead, or serial
+verbosity budget, exceed a first-token latency or timeout-budget threshold, or
+fall below a host child-CPU or output-density floor.
 Telemetry gate failures are written as `telemetry_findings` in JSON/Markdown and as
 `benchmark_telemetry` failures in the JUnit report.
 
@@ -494,6 +494,7 @@ python3 bench/qemu_prompt_bench.py \
   --require-tok-per-s \
   --require-ttft-us \
   --min-tokens 16 \
+  --min-total-tokens 512 \
   --min-wall-tok-per-s 10 \
   --max-memory-bytes 536870912 \
   --max-ttft-us 1000000 \

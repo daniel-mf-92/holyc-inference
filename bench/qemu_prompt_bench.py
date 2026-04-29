@@ -1076,12 +1076,14 @@ def variability_findings(
 
 def telemetry_findings(
     runs: list[BenchRun],
+    suite: dict[str, Any],
     *,
     require_tokens: bool = False,
     require_tok_per_s: bool = False,
     require_memory: bool = False,
     require_ttft_us: bool = False,
     min_tokens: int | None = None,
+    min_total_tokens: int | None = None,
     min_tok_per_s: float | None = None,
     min_wall_tok_per_s: float | None = None,
     max_memory_bytes: int | None = None,
@@ -1097,6 +1099,20 @@ def telemetry_findings(
     max_serial_output_bytes: int | None = None,
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
+    if min_total_tokens is not None:
+        total_tokens = parse_int(suite.get("total_tokens"))
+        if total_tokens is None or total_tokens < min_total_tokens:
+            findings.append(
+                {
+                    "scope": "suite",
+                    "launch_index": "",
+                    "prompt": "",
+                    "iteration": "",
+                    "metric": "total_tokens",
+                    "value": total_tokens,
+                    "limit": min_total_tokens,
+                }
+            )
     for run in runs:
         base = {
             "scope": "measured_run",
@@ -1844,6 +1860,7 @@ def write_report(
     require_memory: bool = False,
     require_ttft_us: bool = False,
     min_tokens: int | None = None,
+    min_total_tokens: int | None = None,
     min_tok_per_s: float | None = None,
     min_wall_tok_per_s: float | None = None,
     max_memory_bytes: int | None = None,
@@ -1877,11 +1894,13 @@ def write_report(
     )
     telemetry = telemetry_findings(
         runs,
+        suite,
         require_tokens=require_tokens,
         require_tok_per_s=require_tok_per_s,
         require_memory=require_memory,
         require_ttft_us=require_ttft_us,
         min_tokens=min_tokens,
+        min_total_tokens=min_total_tokens,
         min_tok_per_s=min_tok_per_s,
         min_wall_tok_per_s=min_wall_tok_per_s,
         max_memory_bytes=max_memory_bytes,
@@ -1926,6 +1945,7 @@ def write_report(
             "require_memory": require_memory,
             "require_ttft_us": require_ttft_us,
             "min_tokens": min_tokens,
+            "min_total_tokens": min_total_tokens,
             "min_tok_per_s": min_tok_per_s,
             "min_wall_tok_per_s": min_wall_tok_per_s,
             "max_memory_bytes": max_memory_bytes,
@@ -2327,6 +2347,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--require-memory", action="store_true", help="Fail if any measured run omits memory telemetry")
     parser.add_argument("--require-ttft-us", action="store_true", help="Fail if any measured run omits TTFT telemetry")
     parser.add_argument("--min-tokens", type=int, default=None, help="Fail if any measured run emits fewer tokens")
+    parser.add_argument(
+        "--min-total-tokens",
+        type=int,
+        default=None,
+        help="Fail if the measured suite emits fewer total tokens",
+    )
     parser.add_argument("--min-tok-per-s", type=float, default=None, help="Fail if any measured run is below tok/s")
     parser.add_argument(
         "--min-wall-tok-per-s",
@@ -2433,6 +2459,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.min_tokens is not None and args.min_tokens < 0:
         print("error: --min-tokens must be >= 0", file=sys.stderr)
+        return 2
+    if args.min_total_tokens is not None and args.min_total_tokens < 0:
+        print("error: --min-total-tokens must be >= 0", file=sys.stderr)
         return 2
     if args.min_tok_per_s is not None and args.min_tok_per_s < 0:
         print("error: --min-tok-per-s must be >= 0", file=sys.stderr)
@@ -2546,6 +2575,7 @@ def main(argv: list[str] | None = None) -> int:
         require_memory=args.require_memory,
         require_ttft_us=args.require_ttft_us,
         min_tokens=args.min_tokens,
+        min_total_tokens=args.min_total_tokens,
         min_tok_per_s=args.min_tok_per_s,
         min_wall_tok_per_s=args.min_wall_tok_per_s,
         max_memory_bytes=args.max_memory_bytes,
