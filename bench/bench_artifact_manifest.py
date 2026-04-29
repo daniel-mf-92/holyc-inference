@@ -87,6 +87,15 @@ class ManifestCoverageViolation:
     sources: list[str]
 
 
+@dataclass(frozen=True)
+class ManifestSampleViolation:
+    key: str
+    source: str
+    metric: str
+    observed: int | None
+    required: int
+
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -219,6 +228,43 @@ def history_coverage_violations(
     return violations
 
 
+def sample_coverage_violations(
+    artifacts: Iterable[ManifestArtifact],
+    min_measured_runs: int | None,
+    min_total_tokens: int | None,
+) -> list[ManifestSampleViolation]:
+    violations: list[ManifestSampleViolation] = []
+    if min_measured_runs is None and min_total_tokens is None:
+        return violations
+
+    for artifact in artifacts:
+        if artifact.artifact_type == "qemu_prompt_dry_run":
+            continue
+        if min_measured_runs is not None and artifact.measured_runs < min_measured_runs:
+            violations.append(
+                ManifestSampleViolation(
+                    key=artifact.key,
+                    source=artifact.source,
+                    metric="measured_runs",
+                    observed=artifact.measured_runs,
+                    required=min_measured_runs,
+                )
+            )
+        if min_total_tokens is not None:
+            total_tokens = artifact.total_tokens
+            if total_tokens is None or total_tokens < min_total_tokens:
+                violations.append(
+                    ManifestSampleViolation(
+                        key=artifact.key,
+                        source=artifact.source,
+                        metric="total_tokens",
+                        observed=total_tokens,
+                        required=min_total_tokens,
+                    )
+                )
+    return violations
+
+
 def has_airgap_failures(artifacts: Iterable[ManifestArtifact]) -> bool:
     return any(artifact.command_airgap_status == "fail" for artifact in artifacts)
 
@@ -244,6 +290,10 @@ def has_stale_artifacts(artifacts: Iterable[ManifestArtifact]) -> bool:
 
 
 def has_history_coverage_violations(violations: Iterable[ManifestCoverageViolation]) -> bool:
+    return any(True for _ in violations)
+
+
+def has_sample_coverage_violations(violations: Iterable[ManifestSampleViolation]) -> bool:
     return any(True for _ in violations)
 
 
@@ -276,6 +326,7 @@ def markdown_report(report: dict[str, object]) -> str:
         f"Latest keys: {len(latest)}",
         f"History artifacts: {report['history_artifacts']}",
         f"Dry-run coverage violations: {len(report.get('dry_run_coverage_violations', []))}",
+        f"Sample coverage violations: {len(report.get('sample_coverage_violations', []))}",
         f"Environment drift: {len(report.get('environment_drift', []))}",
         "",
     ]
@@ -350,6 +401,31 @@ def markdown_report(report: dict[str, object]) -> str:
             )
     elif report.get("require_dry_run_coverage"):
         lines.extend(["", "Dry-run coverage requirements satisfied."])
+
+    sample_coverage = report.get("sample_coverage_violations", [])
+    if sample_coverage:
+        lines.extend(
+            [
+                "",
+                "## Sample Coverage Violations",
+                "",
+                "| Key | Source | Metric | Observed | Required |",
+                "| --- | --- | --- | ---: | ---: |",
+            ]
+        )
+        for violation in sample_coverage:
+            assert isinstance(violation, dict)
+            lines.append(
+                "| {key} | {source} | {metric} | {observed} | {required} |".format(
+                    key=violation["key"],
+                    source=violation["source"],
+                    metric=violation["metric"],
+                    observed=format_value(violation["observed"]),
+                    required=violation["required"],
+                )
+            )
+    elif report.get("min_measured_runs") is not None or report.get("min_total_tokens") is not None:
+        lines.extend(["", "Sample coverage requirements satisfied."])
 
     environment_drift = report.get("environment_drift", [])
     if environment_drift:
@@ -458,6 +534,15 @@ def write_history_coverage_csv(violations: list[ManifestCoverageViolation], path
             )
 
 
+def write_sample_coverage_csv(violations: list[ManifestSampleViolation], path: Path) -> None:
+    fields = ["key", "source", "metric", "observed", "required"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for violation in violations:
+            writer.writerow(asdict(violation))
+
+
 def write_dry_run_coverage_csv(
     violations: list[bench_result_index.DryRunCoverageViolation],
     path: Path,
@@ -508,6 +593,9 @@ def junit_report(report: dict[str, object]) -> str:
     history_coverage_failures = [
         row for row in report.get("history_coverage_violations", []) if isinstance(row, dict)
     ]
+    sample_coverage_failures = [
+        row for row in report.get("sample_coverage_violations", []) if isinstance(row, dict)
+    ]
     dry_run_coverage_failures = (
         [row for row in report.get("dry_run_coverage_violations", []) if isinstance(row, dict)]
         if report.get("require_dry_run_coverage")
@@ -527,6 +615,7 @@ def junit_report(report: dict[str, object]) -> str:
         + int(bool(commit_failures))
         + int(bool(freshness_failures))
         + int(bool(history_coverage_failures))
+        + int(bool(sample_coverage_failures))
         + int(bool(dry_run_coverage_failures))
         + int(bool(environment_drift_failures))
         + int(missing_latest)
@@ -536,7 +625,7 @@ def junit_report(report: dict[str, object]) -> str:
         "testsuite",
         {
             "name": "holyc_bench_artifact_manifest",
-            "tests": "10",
+            "tests": "11",
             "failures": str(failures),
         },
     )
@@ -652,6 +741,21 @@ def junit_report(report: dict[str, object]) -> str:
             for row in history_coverage_failures
         )
 
+    sample_coverage_case = ET.SubElement(suite, "testcase", {"name": "sample_coverage"})
+    if sample_coverage_failures:
+        failure = ET.SubElement(
+            sample_coverage_case,
+            "failure",
+            {
+                "type": "benchmark_manifest_sample_coverage",
+                "message": f"{len(sample_coverage_failures)} benchmark sample coverage violation(s)",
+            },
+        )
+        failure.text = "\n".join(
+            f"{row.get('source', '')}: {row.get('metric', '')} {row.get('observed', '')}/{row.get('required', '')}"
+            for row in sample_coverage_failures
+        )
+
     dry_run_coverage_case = ET.SubElement(suite, "testcase", {"name": "dry_run_coverage"})
     if dry_run_coverage_failures:
         failure = ET.SubElement(
@@ -686,6 +790,8 @@ def write_manifest(
     summaries: list[bench_result_index.ArtifactSummary],
     output_dir: Path,
     min_history_per_key: int | None = None,
+    min_measured_runs: int | None = None,
+    min_total_tokens: int | None = None,
     require_dry_run_coverage: bool = False,
     require_environment_stability: bool = False,
 ) -> tuple[
@@ -693,6 +799,7 @@ def write_manifest(
     str,
     list[ManifestArtifact],
     list[ManifestCoverageViolation],
+    list[ManifestSampleViolation],
     list[bench_result_index.DryRunCoverageViolation],
     list[bench_result_index.EnvironmentDrift],
 ]:
@@ -703,11 +810,13 @@ def write_manifest(
     )
     latest = latest_artifacts(history)
     coverage_violations = history_coverage_violations(history, min_history_per_key)
+    sample_violations = sample_coverage_violations(history, min_measured_runs, min_total_tokens)
     dry_run_coverage_violations = bench_result_index.dry_run_coverage_violations(summaries)
     environment_drift_findings = bench_result_index.environment_drift(summaries)
     status = (
         "fail"
         if coverage_violations
+        or sample_violations
         or (require_dry_run_coverage and dry_run_coverage_violations)
         or (require_environment_stability and environment_drift_findings)
         else manifest_status(history)
@@ -717,11 +826,14 @@ def write_manifest(
         "status": status,
         "history_artifacts": len(history),
         "min_history_per_key": min_history_per_key,
+        "min_measured_runs": min_measured_runs,
+        "min_total_tokens": min_total_tokens,
         "require_dry_run_coverage": require_dry_run_coverage,
         "require_environment_stability": require_environment_stability,
         "latest_artifacts": [asdict(artifact) for artifact in latest],
         "history": [asdict(artifact) for artifact in history],
         "history_coverage_violations": [asdict(violation) for violation in coverage_violations],
+        "sample_coverage_violations": [asdict(violation) for violation in sample_violations],
         "dry_run_coverage_violations": [
             asdict(violation) for violation in dry_run_coverage_violations
         ],
@@ -733,6 +845,7 @@ def write_manifest(
     csv_path = output_dir / "bench_artifact_manifest_latest.csv"
     history_csv_path = output_dir / "bench_artifact_manifest_history_latest.csv"
     history_coverage_csv_path = output_dir / "bench_artifact_manifest_history_coverage_latest.csv"
+    sample_coverage_csv_path = output_dir / "bench_artifact_manifest_sample_coverage_latest.csv"
     dry_run_coverage_csv_path = output_dir / "bench_artifact_manifest_dry_run_coverage_latest.csv"
     environment_drift_csv_path = output_dir / "bench_artifact_manifest_environment_drift_latest.csv"
     junit_path = output_dir / "bench_artifact_manifest_junit_latest.xml"
@@ -741,6 +854,7 @@ def write_manifest(
     write_csv(latest, csv_path)
     write_csv(history, history_csv_path)
     write_history_coverage_csv(coverage_violations, history_coverage_csv_path)
+    write_sample_coverage_csv(sample_violations, sample_coverage_csv_path)
     write_dry_run_coverage_csv(dry_run_coverage_violations, dry_run_coverage_csv_path)
     write_environment_drift_csv(environment_drift_findings, environment_drift_csv_path)
     junit_path.write_text(junit_report(report), encoding="utf-8")
@@ -749,6 +863,7 @@ def write_manifest(
         str(report["status"]),
         history,
         coverage_violations,
+        sample_violations,
         dry_run_coverage_violations,
         environment_drift_findings,
     )
@@ -810,6 +925,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Return non-zero if any manifest key has fewer than --min-history-per-key artifacts",
     )
     parser.add_argument(
+        "--min-measured-runs",
+        type=int,
+        help="Require each measured benchmark artifact to include at least this many measured runs",
+    )
+    parser.add_argument(
+        "--min-total-tokens",
+        type=int,
+        help="Require each measured benchmark artifact to include at least this many generated tokens",
+    )
+    parser.add_argument(
+        "--fail-on-sample-coverage",
+        action="store_true",
+        help="Return non-zero if any artifact violates --min-measured-runs or --min-total-tokens",
+    )
+    parser.add_argument(
         "--fail-on-missing-dry-run",
         action="store_true",
         help="Return non-zero if any measured qemu_prompt artifact lacks a matching dry-run launch plan",
@@ -840,6 +970,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.fail_on_history_coverage and args.min_history_per_key is None:
         print("error: --fail-on-history-coverage requires --min-history-per-key", file=sys.stderr)
         return 2
+    if args.min_measured_runs is not None and args.min_measured_runs <= 0:
+        print("error: --min-measured-runs must be positive", file=sys.stderr)
+        return 2
+    if args.min_total_tokens is not None and args.min_total_tokens <= 0:
+        print("error: --min-total-tokens must be positive", file=sys.stderr)
+        return 2
+    if args.fail_on_sample_coverage and args.min_measured_runs is None and args.min_total_tokens is None:
+        print(
+            "error: --fail-on-sample-coverage requires --min-measured-runs or --min-total-tokens",
+            file=sys.stderr,
+        )
+        return 2
     try:
         summaries = bench_result_index.load_summaries(
             inputs,
@@ -850,12 +992,15 @@ def main(argv: list[str] | None = None) -> int:
             status,
             artifacts,
             history_coverage,
+            sample_coverage,
             dry_run_coverage,
             environment_drift,
         ) = write_manifest(
             summaries,
             args.output_dir,
             min_history_per_key=args.min_history_per_key,
+            min_measured_runs=args.min_measured_runs,
+            min_total_tokens=args.min_total_tokens,
             require_dry_run_coverage=args.fail_on_missing_dry_run,
             require_environment_stability=args.fail_on_environment_drift,
         )
@@ -869,6 +1014,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"command_hash_failures={sum(1 for artifact in artifacts if artifact.command_hash_status == 'fail')}")
     print(f"freshness_failures={sum(1 for artifact in artifacts if artifact.freshness_status == 'fail')}")
     print(f"history_coverage_violations={len(history_coverage)}")
+    print(f"sample_coverage_violations={len(sample_coverage)}")
     print(f"dry_run_coverage_violations={len(dry_run_coverage)}")
     print(f"environment_drift={len(environment_drift)}")
     if args.fail_on_airgap and has_airgap_failures(artifacts):
@@ -884,6 +1030,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.fail_on_stale_artifact and has_stale_artifacts(artifacts):
         return 1
     if args.fail_on_history_coverage and has_history_coverage_violations(history_coverage):
+        return 1
+    if args.fail_on_sample_coverage and has_sample_coverage_violations(sample_coverage):
         return 1
     if args.fail_on_missing_dry_run and has_dry_run_coverage_violations(dry_run_coverage):
         return 1

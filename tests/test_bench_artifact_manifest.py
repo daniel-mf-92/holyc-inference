@@ -29,7 +29,14 @@ def make_summary(source: Path, **overrides: object) -> bench_result_index.Artifa
         "prompt_suite_sha256": "a" * 64,
         "command_sha256": "b" * 64,
         "launch_plan_sha256": "c" * 64,
+        "environment_sha256": "d" * 64,
+        "host_platform": "ci",
+        "host_machine": "host",
+        "qemu_version": "synthetic",
+        "qemu_bin": "qemu-system-x86_64",
         "prompts": 2,
+        "total_tokens": 64,
+        "total_elapsed_us": 500000,
         "measured_runs": 2,
         "warmup_runs": 0,
         "median_tok_per_s": 128.0,
@@ -43,6 +50,10 @@ def make_summary(source: Path, **overrides: object) -> bench_result_index.Artifa
         "us_per_token_median": None,
         "wall_us_per_token_median": None,
         "max_memory_bytes": 4096,
+        "memory_bytes_per_token_median": None,
+        "memory_bytes_per_token_max": None,
+        "serial_output_bytes_total": None,
+        "serial_output_bytes_max": None,
         "telemetry_status": "pass",
         "telemetry_findings": [],
         "command_hash_status": "pass",
@@ -65,7 +76,7 @@ def test_manifest_includes_commit_metadata_in_json_markdown_and_csv(tmp_path: Pa
     source = tmp_path / "qemu_prompt_bench_latest.json"
     source.write_text('{"status":"pass"}\n', encoding="utf-8")
 
-    output_path, status, _history = bench_artifact_manifest.write_manifest([make_summary(source)], tmp_path)
+    output_path, status, *_ = bench_artifact_manifest.write_manifest([make_summary(source)], tmp_path)
 
     assert status == "pass"
     payload = json.loads(output_path.read_text(encoding="utf-8"))
@@ -87,7 +98,7 @@ def test_manifest_carries_host_child_efficiency_and_rss(tmp_path: Path) -> None:
     source = tmp_path / "qemu_prompt_bench_latest.json"
     source.write_text('{"status":"pass"}\n', encoding="utf-8")
 
-    output_path, status, _history = bench_artifact_manifest.write_manifest(
+    output_path, status, *_ = bench_artifact_manifest.write_manifest(
         [
             make_summary(
                 source,
@@ -128,7 +139,7 @@ def test_manifest_status_and_junit_fail_on_inconsistent_commit_metadata(tmp_path
         commit_findings=["qemu_prompt: mixed commits: abc123,def456"],
     )
 
-    output_path, status, _history = bench_artifact_manifest.write_manifest([summary], tmp_path)
+    output_path, status, *_ = bench_artifact_manifest.write_manifest([summary], tmp_path)
 
     assert status == "fail"
     payload = json.loads(output_path.read_text(encoding="utf-8"))
@@ -136,11 +147,44 @@ def test_manifest_status_and_junit_fail_on_inconsistent_commit_metadata(tmp_path
 
     root = ET.parse(tmp_path / "bench_artifact_manifest_junit_latest.xml").getroot()
     assert root.attrib["name"] == "holyc_bench_artifact_manifest"
-    assert root.attrib["tests"] == "8"
+    assert root.attrib["tests"] == "11"
     assert root.attrib["failures"] == "1"
     failure = root.find("./testcase[@name='commit_metadata']/failure")
     assert failure is not None
     assert failure.attrib["type"] == "benchmark_commit_metadata_failure"
+
+
+def test_manifest_sample_coverage_gates_runs_and_tokens(tmp_path: Path) -> None:
+    source = tmp_path / "qemu_prompt_bench_latest.json"
+    source.write_text('{"status":"pass"}\n', encoding="utf-8")
+
+    output_path, status, _history, _history_coverage, sample_coverage, *_ = bench_artifact_manifest.write_manifest(
+        [make_summary(source, measured_runs=1, total_tokens=16)],
+        tmp_path,
+        min_measured_runs=3,
+        min_total_tokens=64,
+    )
+
+    assert status == "fail"
+    assert [(item.metric, item.observed, item.required) for item in sample_coverage] == [
+        ("measured_runs", 1, 3),
+        ("total_tokens", 16, 64),
+    ]
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["min_measured_runs"] == 3
+    assert payload["min_total_tokens"] == 64
+    assert len(payload["sample_coverage_violations"]) == 2
+
+    markdown = (tmp_path / "bench_artifact_manifest_latest.md").read_text(encoding="utf-8")
+    assert "Sample Coverage Violations" in markdown
+    rows = list(csv.DictReader((tmp_path / "bench_artifact_manifest_sample_coverage_latest.csv").open(encoding="utf-8")))
+    assert [row["metric"] for row in rows] == ["measured_runs", "total_tokens"]
+
+    root = ET.parse(tmp_path / "bench_artifact_manifest_junit_latest.xml").getroot()
+    assert root.attrib["failures"] == "1"
+    failure = root.find("./testcase[@name='sample_coverage']/failure")
+    assert failure is not None
+    assert failure.attrib["type"] == "benchmark_manifest_sample_coverage"
 
 
 def test_manifest_history_csv_keeps_superseded_artifacts(tmp_path: Path) -> None:

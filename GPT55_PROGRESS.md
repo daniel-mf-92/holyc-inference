@@ -251,3 +251,5 @@
 2026-04-29T14:37:01Z | Added qemu prompt benchmark phase summaries/CSV with synthetic smoke coverage and refreshed artifacts.
 2026-04-29T15:23:07Z | Added qemu prompt benchmark top-level provenance metadata and indexer fallback coverage.
 2026-04-29T16:10:50Z | Added qemu prompt benchmark prompt-integrity summary telemetry with smoke coverage and refreshed artifacts.
+2026-04-29T16:44:45Z | Added benchmark result-index history coverage gate with CSV/JUnit reporting and refreshed index artifacts.
+2026-04-29T16:51:55Z | Added benchmark artifact manifest sample coverage gate for measured runs/tokens with smoke coverage and refreshed artifacts.

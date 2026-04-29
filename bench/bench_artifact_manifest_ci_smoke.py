@@ -195,6 +195,7 @@ def main() -> int:
         csv_path = safe_output_dir / "bench_artifact_manifest_latest.csv"
         history_csv_path = safe_output_dir / "bench_artifact_manifest_history_latest.csv"
         history_coverage_csv_path = safe_output_dir / "bench_artifact_manifest_history_coverage_latest.csv"
+        sample_coverage_csv_path = safe_output_dir / "bench_artifact_manifest_sample_coverage_latest.csv"
         dry_run_coverage_csv_path = safe_output_dir / "bench_artifact_manifest_dry_run_coverage_latest.csv"
         environment_drift_csv_path = safe_output_dir / "bench_artifact_manifest_environment_drift_latest.csv"
         junit_path = safe_output_dir / "bench_artifact_manifest_junit_latest.xml"
@@ -241,6 +242,12 @@ def main() -> int:
             not in history_coverage_csv_path.read_text(encoding="utf-8")
         ):
             print("missing_manifest_history_coverage_csv=true", file=sys.stderr)
+            return 1
+        if (
+            "key,source,metric,observed,required"
+            not in sample_coverage_csv_path.read_text(encoding="utf-8")
+        ):
+            print("missing_manifest_sample_coverage_csv=true", file=sys.stderr)
             return 1
         if (
             "key,measured_source,generated_at"
@@ -343,6 +350,34 @@ def main() -> int:
         violations = sparse_report["history_coverage_violations"]
         if len(violations) != 1 or violations[0]["history_count"] != 1:
             print("unexpected_history_coverage_violation_payload=true", file=sys.stderr)
+            return 1
+
+        sample_output_dir = tmp_path / "sample_manifest"
+        completed = run_manifest(
+            safe_report,
+            sample_output_dir,
+            "--min-measured-runs",
+            "2",
+            "--min-total-tokens",
+            "64",
+            "--fail-on-sample-coverage",
+        )
+        if completed.returncode == 0:
+            print("sparse_manifest_sample_coverage_not_rejected=true", file=sys.stderr)
+            return 1
+        sample_report = json.loads(
+            (sample_output_dir / "bench_artifact_manifest_latest.json").read_text(encoding="utf-8")
+        )
+        sample_violations = sample_report["sample_coverage_violations"]
+        if (
+            sample_report["status"] != "fail"
+            or [row["metric"] for row in sample_violations] != ["measured_runs", "total_tokens"]
+        ):
+            print("unexpected_sample_coverage_violation_payload=true", file=sys.stderr)
+            return 1
+        sample_junit = ET.parse(sample_output_dir / "bench_artifact_manifest_junit_latest.xml").getroot()
+        if sample_junit.attrib.get("failures") != "1":
+            print("unexpected_sample_coverage_junit_failures=true", file=sys.stderr)
             return 1
 
         env_drift_source_dir = tmp_path / "env_drift_sources"

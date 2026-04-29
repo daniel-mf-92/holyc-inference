@@ -116,6 +116,15 @@ class DryRunCoverageViolation:
 
 
 @dataclass(frozen=True)
+class HistoryCoverageViolation:
+    key: str
+    history_count: int
+    min_history: int
+    latest_source: str
+    latest_generated_at: str
+
+
+@dataclass(frozen=True)
 class LatestComparableArtifact:
     key: str
     history_count: int
@@ -1043,6 +1052,25 @@ def latest_comparable_artifacts(summaries: list[ArtifactSummary]) -> list[Latest
     return latest
 
 
+def history_coverage_violations(
+    latest: list[LatestComparableArtifact],
+    min_history_per_key: int,
+) -> list[HistoryCoverageViolation]:
+    if min_history_per_key <= 1:
+        return []
+    return [
+        HistoryCoverageViolation(
+            key=row.key,
+            history_count=row.history_count,
+            min_history=min_history_per_key,
+            latest_source=row.source,
+            latest_generated_at=row.generated_at,
+        )
+        for row in latest
+        if row.history_count < min_history_per_key
+    ]
+
+
 def format_value(value: Any) -> str:
     if value is None or value == "":
         return "-"
@@ -1062,6 +1090,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Launch-plan drift: {len(report['launch_plan_drift'])}",
         f"Environment drift: {len(report['environment_drift'])}",
         f"Dry-run coverage violations: {len(report['dry_run_coverage_violations'])}",
+        f"History coverage violations: {len(report['history_coverage_violations'])}",
         "",
     ]
     if report["artifacts"]:
@@ -1214,6 +1243,25 @@ def markdown_report(report: dict[str, Any]) -> str:
             )
     else:
         lines.extend(["", "Dry-run coverage: all measured qemu_prompt artifacts have matching dry-run plans."])
+
+    if report["history_coverage_violations"]:
+        lines.extend(
+            [
+                "",
+                "## History Coverage",
+                "",
+                "| Comparable key | History | Required | Latest generated | Latest source |",
+                "| --- | ---: | ---: | --- | --- |",
+            ]
+        )
+        for finding in report["history_coverage_violations"]:
+            lines.append(
+                "| {key} | {history_count} | {min_history} | {latest_generated_at} | {latest_source} |".format(
+                    **{key: format_value(value) for key, value in finding.items()}
+                )
+            )
+    else:
+        lines.extend(["", "History coverage: all comparable keys satisfy the configured minimum."])
     return "\n".join(lines) + "\n"
 
 
@@ -1225,6 +1273,9 @@ def junit_report(report: dict[str, Any]) -> str:
     environment_drift_rows = [row for row in report.get("environment_drift", []) if isinstance(row, dict)]
     dry_run_coverage_rows = [
         row for row in report.get("dry_run_coverage_violations", []) if isinstance(row, dict)
+    ]
+    history_coverage_rows = [
+        row for row in report.get("history_coverage_violations", []) if isinstance(row, dict)
     ]
     failed_artifacts = [row for row in artifacts if row.get("status") == "fail"]
     airgap_failures = [row for row in artifacts if row.get("command_airgap_status") == "fail"]
@@ -1244,13 +1295,14 @@ def junit_report(report: dict[str, Any]) -> str:
         + int(bool(launch_plan_drift_rows))
         + int(bool(environment_drift_rows))
         + int(bool(dry_run_coverage_rows))
+        + int(bool(history_coverage_rows))
     )
 
     suite = ET.Element(
         "testsuite",
         {
             "name": "holyc_bench_result_index",
-            "tests": "11",
+            "tests": "12",
             "failures": str(failures),
         },
     )
@@ -1399,6 +1451,21 @@ def junit_report(report: dict[str, Any]) -> str:
         )
         failure.text = "\n".join(
             f"{row.get('key', '')}: {row.get('measured_source', '')}" for row in dry_run_coverage_rows
+        )
+
+    history_coverage_case = ET.SubElement(suite, "testcase", {"name": "history_coverage"})
+    if history_coverage_rows:
+        failure = ET.SubElement(
+            history_coverage_case,
+            "failure",
+            {
+                "type": "history_coverage_missing",
+                "message": f"{len(history_coverage_rows)} comparable benchmark key(s) lack required history",
+            },
+        )
+        failure.text = "\n".join(
+            f"{row.get('key', '')}: {row.get('history_count', '')}/{row.get('min_history', '')}"
+            for row in history_coverage_rows
         )
 
     return ET.tostring(suite, encoding="unicode") + "\n"
@@ -1594,8 +1661,17 @@ def write_latest_comparable_csv(rows: list[LatestComparableArtifact], path: Path
             writer.writerow({field: payload[field] for field in fields})
 
 
+def write_history_coverage_csv(findings: list[HistoryCoverageViolation], path: Path) -> None:
+    fields = ["key", "history_count", "min_history", "latest_source", "latest_generated_at"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for finding in findings:
+            writer.writerow(asdict(finding))
+
+
 def write_report(
-    summaries: list[ArtifactSummary], output_dir: Path
+    summaries: list[ArtifactSummary], output_dir: Path, min_history_per_key: int = 1
 ) -> tuple[
     Path,
     list[PromptSuiteDrift],
@@ -1603,6 +1679,7 @@ def write_report(
     list[LaunchPlanDrift],
     list[EnvironmentDrift],
     list[DryRunCoverageViolation],
+    list[HistoryCoverageViolation],
 ]:
     output_dir.mkdir(parents=True, exist_ok=True)
     drift = prompt_suite_drift(summaries)
@@ -1611,6 +1688,7 @@ def write_report(
     environment_drift_findings = environment_drift(summaries)
     dry_run_coverage_findings = dry_run_coverage_violations(summaries)
     latest = latest_comparable_artifacts(summaries)
+    history_coverage_findings = history_coverage_violations(latest, min_history_per_key)
     report = {
         "generated_at": iso_now(),
         "status": index_status(summaries),
@@ -1621,6 +1699,7 @@ def write_report(
         "launch_plan_drift": [asdict(finding) for finding in launch_plan_drift_findings],
         "environment_drift": [asdict(finding) for finding in environment_drift_findings],
         "dry_run_coverage_violations": [asdict(finding) for finding in dry_run_coverage_findings],
+        "history_coverage_violations": [asdict(finding) for finding in history_coverage_findings],
     }
     json_path = output_dir / "bench_result_index_latest.json"
     md_path = output_dir / "bench_result_index_latest.md"
@@ -1631,6 +1710,7 @@ def write_report(
     environment_drift_csv_path = output_dir / "bench_result_index_environment_drift_latest.csv"
     dry_run_coverage_csv_path = output_dir / "bench_result_index_dry_run_coverage_latest.csv"
     latest_comparable_csv_path = output_dir / "bench_result_index_latest_comparable_latest.csv"
+    history_coverage_csv_path = output_dir / "bench_result_index_history_coverage_latest.csv"
     junit_path = output_dir / "bench_result_index_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
@@ -1642,6 +1722,7 @@ def write_report(
     write_environment_drift_csv(environment_drift_findings, environment_drift_csv_path)
     write_dry_run_coverage_csv(dry_run_coverage_findings, dry_run_coverage_csv_path)
     write_latest_comparable_csv(latest, latest_comparable_csv_path)
+    write_history_coverage_csv(history_coverage_findings, history_coverage_csv_path)
     return (
         json_path,
         drift,
@@ -1649,6 +1730,7 @@ def write_report(
         launch_plan_drift_findings,
         environment_drift_findings,
         dry_run_coverage_findings,
+        history_coverage_findings,
     )
 
 
@@ -1708,6 +1790,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Return non-zero if a measured qemu_prompt artifact lacks a matching dry-run launch plan",
     )
     parser.add_argument(
+        "--min-history-per-key",
+        type=int,
+        default=1,
+        help="Minimum measured artifact history count required for each comparable benchmark key",
+    )
+    parser.add_argument(
+        "--fail-on-history-coverage",
+        action="store_true",
+        help="Return non-zero if any comparable benchmark key has fewer than --min-history-per-key artifacts",
+    )
+    parser.add_argument(
         "--fail-on-stale-commit",
         action="store_true",
         help="Return non-zero if any artifact commit differs from the current git commit",
@@ -1737,6 +1830,12 @@ def main(argv: list[str] | None = None) -> int:
     elif args.fail_on_stale_artifact:
         print("error: --fail-on-stale-artifact requires --max-artifact-age-hours", file=sys.stderr)
         return 2
+    if args.min_history_per_key < 1:
+        print("error: --min-history-per-key must be at least 1", file=sys.stderr)
+        return 2
+    if args.fail_on_history_coverage and args.min_history_per_key <= 1:
+        print("error: --fail-on-history-coverage requires --min-history-per-key greater than 1", file=sys.stderr)
+        return 2
     try:
         summaries = load_summaries(inputs, max_artifact_age_seconds=max_artifact_age_seconds)
         (
@@ -1746,7 +1845,8 @@ def main(argv: list[str] | None = None) -> int:
             launch_plan_drift_findings,
             environment_drift_findings,
             dry_run_coverage_findings,
-        ) = write_report(summaries, args.output_dir)
+            history_coverage_findings,
+        ) = write_report(summaries, args.output_dir, min_history_per_key=args.min_history_per_key)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -1760,6 +1860,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"launch_plan_drift={len(launch_plan_drift_findings)}")
     print(f"environment_drift={len(environment_drift_findings)}")
     print(f"dry_run_coverage_violations={len(dry_run_coverage_findings)}")
+    print(f"history_coverage_violations={len(history_coverage_findings)}")
     print(f"freshness_failures={sum(1 for summary in summaries if summary.freshness_status == 'fail')}")
     if args.fail_on_airgap and has_airgap_failures(summaries):
         return 1
@@ -1778,6 +1879,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.fail_on_environment_drift and environment_drift_findings:
         return 1
     if args.fail_on_missing_dry_run and dry_run_coverage_findings:
+        return 1
+    if args.fail_on_history_coverage and history_coverage_findings:
         return 1
     if args.fail_on_stale_commit and commit_drift(summaries):
         return 1

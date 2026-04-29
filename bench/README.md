@@ -261,8 +261,8 @@ python3 bench/dataset_ci_smoke.py
 `bench_artifact_manifest.py` builds latest/history manifests for benchmark
 artifacts, including memory-per-token and serial-output telemetry when present,
 and can gate air-gap status, telemetry, commit metadata, command hashes,
-artifact freshness, per-key history coverage, matching dry-run launch plans,
-and comparable host/QEMU environment stability. Use
+artifact freshness, per-key history coverage, minimum measured runs/tokens,
+matching dry-run launch plans, and comparable host/QEMU environment stability. Use
 `--fail-on-environment-drift` when CI should reject throughput comparisons whose
 profile/model/quantization/prompt-suite/command/launch-plan keys span multiple
 environment fingerprints. `bench_artifact_manifest_ci_smoke.py` is a
@@ -804,6 +804,10 @@ with the matching CSV at `bench_result_index_latest_comparable_latest.csv`, so
 dashboards can ingest only the newest artifact for each stable
 profile/model/quantization/prompt-suite/command/environment key without
 discarding historical rows from the full index.
+Use `--min-history-per-key` with `--fail-on-history-coverage` when CI should
+reject comparable keys that have too few measured artifacts for trend or
+regression dashboards; violations are exported to
+`bench_result_index_history_coverage_latest.csv` and surfaced in JUnit.
 These drift checks catch accidental prompt, launch, or host changes before
 throughput numbers are compared. The index marks artifacts with
 missing required telemetry, such as zero measured runs or absent median tok/s,
@@ -814,7 +818,8 @@ as valid data. The drift findings are also written to
 `bench_result_index_environment_drift_latest.csv`, and
 `bench_result_index_junit_latest.xml` exposes artifact failures, air-gap
 violations, missing telemetry, inconsistent commit metadata, inconsistent
-command hash metadata, prompt drift, command drift, and environment drift as CI test failures. It
+command hash metadata, prompt drift, command drift, environment drift, and
+history coverage failures as CI test failures. It
 also recomputes `command_sha256` from each recorded command and treats mismatches
 as inconsistent command hash metadata, which catches stale or hand-edited
 benchmark artifacts before they reach dashboards. It
@@ -825,8 +830,8 @@ than the current checkout. It can also enforce freshness with
 timestamp is too old. Use `--fail-on-airgap`, `--fail-on-telemetry`,
 `--fail-on-commit-metadata`, `--fail-on-command-hash-metadata`,
 `--fail-on-drift`, `--fail-on-command-drift`,
-`--fail-on-environment-drift`, and `--fail-on-stale-artifact` to gate those
-failure classes independently.
+`--fail-on-environment-drift`, `--fail-on-history-coverage`, and
+`--fail-on-stale-artifact` to gate those failure classes independently.
 
 Example:
 
@@ -837,7 +842,9 @@ python3 bench/bench_result_index.py \
   --fail-on-airgap \
   --fail-on-drift \
   --fail-on-command-drift \
-  --fail-on-environment-drift
+  --fail-on-environment-drift \
+  --min-history-per-key 2 \
+  --fail-on-history-coverage
 ```
 
 For a single CI job output directory that should only contain artifacts from
@@ -856,7 +863,8 @@ python3 bench/bench_result_index.py \
 builds synthetic QEMU prompt, dry-run, and matrix reports, verifies the JSON,
 Markdown, CSV, latest-comparable CSV, launch-plan drift CSV, and JUnit outputs,
 and checks that command-hash mismatches, NIC-enabled QEMU commands, stale
-artifacts, and environment drift are rejected by their opt-in gates:
+artifacts, environment drift, and insufficient comparable history are rejected
+by their opt-in gates:
 
 ```bash
 python3 bench/bench_result_index_ci_smoke.py
@@ -875,7 +883,8 @@ metadata checks while preserving environment fingerprints, and writes
 `bench_artifact_manifest_junit_latest.xml` so CI can
 surface failed artifacts, air-gap violations, missing telemetry, stale
 artifacts, inconsistent command hashes, inconsistent commit metadata, sparse
-per-key history, missing measured-run dry-run plans, and empty manifests directly. Empty manifests are marked failed so missing benchmark
+per-key history, sample coverage failures, missing measured-run dry-run plans,
+and empty manifests directly. Empty manifests are marked failed so missing benchmark
 uploads do not pass silently. For current-job manifests,
 `--fail-on-stale-commit` returns non-zero when any artifact was produced from a
 different commit than the current checkout. `--max-artifact-age-hours` records
@@ -885,10 +894,13 @@ any artifact exceeds that age. Use `--fail-on-airgap`, `--fail-on-telemetry`,
 failure classes independently. Use `--min-history-per-key` with
 `--fail-on-history-coverage` when a CI consumer needs at least N retained
 artifacts for every profile/model/quantization/prompt-suite key before trend or
-regression decisions are trusted. Use `--fail-on-missing-dry-run` when measured
-QEMU prompt artifacts must have a matching reviewed dry-run launch plan with the
-same profile, model, quantization, prompt-suite hash, command hash, launch-plan
-hash, and environment hash.
+regression decisions are trusted. Use `--min-measured-runs`,
+`--min-total-tokens`, and `--fail-on-sample-coverage` when promoted artifacts
+must have enough measured samples before dashboard consumers ingest them. Use
+`--fail-on-missing-dry-run` when measured QEMU prompt artifacts must have a
+matching reviewed dry-run launch plan with the same profile, model,
+quantization, prompt-suite hash, command hash, launch-plan hash, and
+environment hash.
 
 ```bash
 python3 bench/bench_artifact_manifest.py \
@@ -899,6 +911,9 @@ python3 bench/bench_artifact_manifest.py \
   --fail-on-stale-artifact \
   --min-history-per-key 2 \
   --fail-on-history-coverage \
+  --min-measured-runs 3 \
+  --min-total-tokens 512 \
+  --fail-on-sample-coverage \
   --fail-on-missing-dry-run \
   --fail-on-airgap \
   --fail-on-telemetry \

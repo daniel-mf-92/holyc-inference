@@ -289,6 +289,7 @@ def main() -> int:
         latest_csv_path = safe_output / "bench_result_index_latest_comparable_latest.csv"
         launch_plan_drift_csv_path = safe_output / "bench_result_index_launch_plan_drift_latest.csv"
         dry_run_coverage_csv_path = safe_output / "bench_result_index_dry_run_coverage_latest.csv"
+        history_coverage_csv_path = safe_output / "bench_result_index_history_coverage_latest.csv"
         junit_path = safe_output / "bench_result_index_junit_latest.xml"
         report = json.loads(report_path.read_text(encoding="utf-8"))
         if report["status"] != "pass":
@@ -309,6 +310,9 @@ def main() -> int:
             return 1
         if report["dry_run_coverage_violations"]:
             print("unexpected_dry_run_coverage_violations=true", file=sys.stderr)
+            return 1
+        if report["history_coverage_violations"]:
+            print("unexpected_history_coverage_violations=true", file=sys.stderr)
             return 1
         if any(row["command_airgap_status"] != "pass" for row in report["artifacts"]):
             print("safe_airgap_status_not_pass=true", file=sys.stderr)
@@ -333,6 +337,9 @@ def main() -> int:
             return 1
         if "key,measured_source,generated_at" not in dry_run_coverage_csv_path.read_text(encoding="utf-8"):
             print("missing_dry_run_coverage_csv=true", file=sys.stderr)
+            return 1
+        if "key,history_count,min_history" not in history_coverage_csv_path.read_text(encoding="utf-8"):
+            print("missing_history_coverage_csv=true", file=sys.stderr)
             return 1
         junit_root = ET.parse(junit_path).getroot()
         if junit_root.attrib.get("name") != "holyc_bench_result_index":
@@ -484,6 +491,33 @@ def main() -> int:
         dry_run_case = missing_dry_run_junit.find("./testcase[@name='dry_run_coverage']")
         if dry_run_case is None or dry_run_case.find("failure") is None:
             print("missing_dry_run_junit_failure_case=true", file=sys.stderr)
+            return 1
+
+        history_source = tmp_path / "history_source"
+        history_source.mkdir()
+        write_qemu_report(history_source / "qemu_prompt_bench_single_history.json", safe_command)
+        history_output = tmp_path / "history_index"
+        completed = run_index(
+            history_source,
+            history_output,
+            "--min-history-per-key",
+            "2",
+            "--fail-on-history-coverage",
+        )
+        if completed.returncode == 0:
+            print("history_coverage_not_rejected=true", file=sys.stderr)
+            return 1
+        history_report = json.loads(
+            (history_output / "bench_result_index_latest.json").read_text(encoding="utf-8")
+        )
+        history_violations = history_report["history_coverage_violations"]
+        if len(history_violations) != 1 or history_violations[0]["history_count"] != 1:
+            print("unexpected_history_coverage_violation=true", file=sys.stderr)
+            return 1
+        history_junit = ET.parse(history_output / "bench_result_index_junit_latest.xml").getroot()
+        history_case = history_junit.find("./testcase[@name='history_coverage']")
+        if history_case is None or history_case.find("failure") is None:
+            print("missing_history_coverage_junit_failure_case=true", file=sys.stderr)
             return 1
 
     return 0

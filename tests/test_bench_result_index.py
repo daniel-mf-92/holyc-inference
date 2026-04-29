@@ -529,7 +529,7 @@ def test_mixed_commit_metadata_fails_index_and_junit(tmp_path: Path) -> None:
 
     assert summaries[0].commit_status == "fail"
     assert bench_result_index.index_status(summaries) == "fail"
-    assert root.attrib["tests"] == "10"
+    assert root.attrib["tests"] == "12"
     assert root.attrib["failures"] == "1"
     failure = root.find("./testcase[@name='commit_metadata']/failure")
     assert failure is not None
@@ -671,6 +671,71 @@ def test_latest_comparable_artifacts_selects_latest_per_stable_key(tmp_path: Pat
     assert latest[0].key.startswith("secure/tiny/Q4_0/")
 
 
+def test_history_coverage_gate_reports_underfilled_comparable_keys(tmp_path: Path) -> None:
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    input_dir.mkdir()
+    command = ["qemu-system-x86_64", "-nic", "none"]
+    command_hash = bench_result_index.command_hash(command)
+    environment = {"platform": "ci", "machine": "host", "qemu_bin": "qemu-system-x86_64"}
+    for index, quantization in enumerate(("Q4_0", "Q4_0", "Q8_0"), 1):
+        report_dir = input_dir / f"run{index}"
+        report_dir.mkdir()
+        (report_dir / "qemu_prompt_bench_latest.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": f"2026-04-27T20:0{index}:00Z",
+                    "status": "pass",
+                    "command_sha256": command_hash,
+                    "launch_plan_sha256": "l" * 64,
+                    "environment": environment,
+                    "prompt_suite": {"suite_sha256": "c" * 64, "prompt_count": 1},
+                    "suite_summary": {"tok_per_s_median": 100.0 + index},
+                    "benchmarks": [
+                        {
+                            "profile": "synthetic",
+                            "model": "smoke",
+                            "quantization": quantization,
+                            "command": command,
+                            "command_sha256": command_hash,
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    status = bench_result_index.main(
+        [
+            "--input",
+            str(input_dir),
+            "--output-dir",
+            str(output_dir),
+            "--min-history-per-key",
+            "2",
+            "--fail-on-history-coverage",
+        ]
+    )
+
+    assert status == 1
+    payload = json.loads((output_dir / "bench_result_index_latest.json").read_text(encoding="utf-8"))
+    markdown = (output_dir / "bench_result_index_latest.md").read_text(encoding="utf-8")
+    rows = list(
+        csv.DictReader((output_dir / "bench_result_index_history_coverage_latest.csv").open(encoding="utf-8"))
+    )
+    junit_root = ET.parse(output_dir / "bench_result_index_junit_latest.xml").getroot()
+
+    assert len(payload["history_coverage_violations"]) == 1
+    assert payload["history_coverage_violations"][0]["history_count"] == 1
+    assert "/Q8_0/" in payload["history_coverage_violations"][0]["key"]
+    assert "## History Coverage" in markdown
+    assert rows[0]["history_count"] == "1"
+    assert rows[0]["min_history"] == "2"
+    failure = junit_root.find("./testcase[@name='history_coverage']/failure")
+    assert failure is not None
+    assert failure.attrib["type"] == "history_coverage_missing"
+
+
 def test_cli_writes_json_markdown_and_csv(tmp_path: Path) -> None:
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"
@@ -720,6 +785,7 @@ def test_cli_writes_json_markdown_and_csv(tmp_path: Path) -> None:
     assert "Latest Comparable Artifacts" in markdown
     assert "Prompt suite drift: none detected." in markdown
     assert "Command drift: none detected." in markdown
+    assert "History coverage: all comparable keys satisfy the configured minimum." in markdown
     assert "Host child tok/CPU s" in markdown
     assert "command_sha256" in rows[0]
     assert "host_child_tok_per_cpu_s_median" in rows[0]
@@ -733,6 +799,10 @@ def test_cli_writes_json_markdown_and_csv(tmp_path: Path) -> None:
     )
     assert latest_rows[0]["history_count"] == "1"
     assert latest_rows[0]["median_tok_per_s"] == "160.0"
+    history_rows = list(
+        csv.DictReader((output_dir / "bench_result_index_history_coverage_latest.csv").open(encoding="utf-8"))
+    )
+    assert history_rows == []
     assert junit_root.attrib["name"] == "holyc_bench_result_index"
     assert junit_root.attrib["failures"] == "0"
 
@@ -987,7 +1057,7 @@ def test_mixed_command_hash_metadata_fails_index_and_junit(tmp_path: Path) -> No
 
     assert summaries[0].command_hash_status == "fail"
     assert bench_result_index.index_status(summaries) == "fail"
-    assert root.attrib["tests"] == "10"
+    assert root.attrib["tests"] == "12"
     assert root.attrib["failures"] == "1"
     failure = root.find("./testcase[@name='command_hash_metadata']/failure")
     assert failure is not None
@@ -1016,7 +1086,7 @@ def test_junit_report_marks_artifact_airgap_and_drift_failures() -> None:
     root = ET.fromstring(bench_result_index.junit_report(report))
 
     assert root.attrib["name"] == "holyc_bench_result_index"
-    assert root.attrib["tests"] == "10"
+    assert root.attrib["tests"] == "12"
     assert root.attrib["failures"] == "5"
     failures = root.findall("./testcase/failure")
     assert {failure.attrib["type"] for failure in failures} == {
