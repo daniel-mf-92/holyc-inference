@@ -268,3 +268,4 @@
 2026-04-29T19:50:45Z | Added standalone dataset provenance audit CI smoke coverage and refreshed provenance reports.
 2026-04-29T20:00:03Z | Added slowest-prompt ranking export to QEMU prompt benchmark artifacts with smoke coverage.
 2026-04-29T20:10:46Z | Added QEMU prompt benchmark variability ranking export with smoke coverage and refreshed artifacts.
+2026-04-29T20:18:04Z | Added QEMU prompt benchmark prompt-efficiency ranking export with smoke coverage and refreshed artifacts.

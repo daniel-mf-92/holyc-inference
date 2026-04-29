@@ -127,6 +127,7 @@ def main() -> int:
         markdown_path = output_dir / "qemu_prompt_bench_latest.md"
         prompt_rank_csv_path = output_dir / "qemu_prompt_bench_prompt_rank_latest.csv"
         prompt_variability_csv_path = output_dir / "qemu_prompt_bench_prompt_variability_latest.csv"
+        prompt_efficiency_csv_path = output_dir / "qemu_prompt_bench_prompt_efficiency_latest.csv"
         launch_csv_path = output_dir / "qemu_prompt_bench_launches_latest.csv"
         launch_jsonl_path = output_dir / "qemu_prompt_bench_launches_latest.jsonl"
         junit_path = output_dir / "qemu_prompt_bench_junit_latest.xml"
@@ -259,6 +260,21 @@ def main() -> int:
             "missing_prompt_variability_wall_iqr",
         ):
             return rc
+        if rc := require(
+            len(report["prompt_efficiency_rankings"]) == 2,
+            "unexpected_prompt_efficiency_rank_count",
+        ):
+            return rc
+        if rc := require(
+            report["prompt_efficiency_rankings"][0]["efficiency_rank"] == 1,
+            "missing_first_prompt_efficiency_rank",
+        ):
+            return rc
+        if rc := require(
+            report["prompt_efficiency_rankings"][0]["wall_prompt_bytes_per_s_median"] is not None,
+            "missing_prompt_efficiency_wall_prompt_bytes_per_s",
+        ):
+            return rc
 
         phases = {row["phase"]: row for row in report["phase_summaries"]}
         if rc := require(set(phases) == {"warmup", "measured", "all"}, "unexpected_phase_rows"):
@@ -356,6 +372,25 @@ def main() -> int:
             "missing_prompt_variability_csv_columns",
         ):
             return rc
+        prompt_efficiency_rows = list(csv.DictReader(prompt_efficiency_csv_path.open(encoding="utf-8", newline="")))
+        if rc := require(len(prompt_efficiency_rows) == 2, "unexpected_prompt_efficiency_csv_rows"):
+            return rc
+        if rc := require(
+            prompt_efficiency_rows[0]["efficiency_rank"] == "1",
+            "unexpected_prompt_efficiency_csv_rank",
+        ):
+            return rc
+        if rc := require(
+            {
+                "prompt_suite_sha256",
+                "command_sha256",
+                "wall_prompt_bytes_per_s_median",
+                "tokens_per_prompt_byte_median",
+                "wall_tok_per_s_median",
+            }.issubset(prompt_efficiency_rows[0].keys()),
+            "missing_prompt_efficiency_csv_columns",
+        ):
+            return rc
 
         launch_rows = list(csv.DictReader(launch_csv_path.open(encoding="utf-8", newline="")))
         if rc := require(len(launch_rows) == 6, "unexpected_launch_csv_rows"):
@@ -415,6 +450,11 @@ def main() -> int:
         if rc := require(
             "Prompt Variability" in markdown_path.read_text(encoding="utf-8"),
             "missing_prompt_variability_markdown",
+        ):
+            return rc
+        if rc := require(
+            "Prompt Efficiency" in markdown_path.read_text(encoding="utf-8"),
+            "missing_prompt_efficiency_markdown",
         ):
             return rc
         if rc := require(

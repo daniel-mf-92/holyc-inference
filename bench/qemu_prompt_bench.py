@@ -1788,6 +1788,51 @@ def prompt_variability_rank_rows(summaries: list[dict[str, Any]]) -> list[dict[s
     return rows
 
 
+def prompt_efficiency_rank_rows(summaries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def efficiency_key(row: dict[str, Any]) -> tuple[int, float, float, float, str]:
+        wall_prompt_bytes_per_s = parse_float(row.get("wall_prompt_bytes_per_s_median"))
+        tokens_per_prompt_byte = parse_float(row.get("tokens_per_prompt_byte_median"))
+        wall_tok_per_s = parse_float(row.get("wall_tok_per_s_median"))
+        if wall_prompt_bytes_per_s is not None:
+            return (
+                0,
+                -wall_prompt_bytes_per_s,
+                -(tokens_per_prompt_byte or 0.0),
+                -(wall_tok_per_s or 0.0),
+                str(row.get("prompt", "")),
+            )
+        if tokens_per_prompt_byte is not None:
+            return (1, -tokens_per_prompt_byte, 0.0, -(wall_tok_per_s or 0.0), str(row.get("prompt", "")))
+        if wall_tok_per_s is not None:
+            return (2, -wall_tok_per_s, 0.0, 0.0, str(row.get("prompt", "")))
+        return (3, 0.0, 0.0, 0.0, str(row.get("prompt", "")))
+
+    rows: list[dict[str, Any]] = []
+    for rank, summary in enumerate(sorted(summaries, key=efficiency_key), 1):
+        rows.append(
+            {
+                "efficiency_rank": rank,
+                "prompt": summary.get("prompt"),
+                "prompt_bytes": summary.get("prompt_bytes"),
+                "runs": summary.get("runs"),
+                "ok_runs": summary.get("ok_runs"),
+                "failed_runs": summary.get("failed_runs"),
+                "tokens_median": summary.get("tokens_median"),
+                "wall_prompt_bytes_per_s_median": summary.get("wall_prompt_bytes_per_s_median"),
+                "prompt_bytes_per_s_median": summary.get("prompt_bytes_per_s_median"),
+                "tokens_per_prompt_byte_median": summary.get("tokens_per_prompt_byte_median"),
+                "wall_tok_per_s_median": summary.get("wall_tok_per_s_median"),
+                "tok_per_s_median": summary.get("tok_per_s_median"),
+                "wall_elapsed_us_median": summary.get("wall_elapsed_us_median"),
+                "ttft_us_p95": summary.get("ttft_us_p95"),
+                "memory_bytes_max": summary.get("memory_bytes_max"),
+                "serial_output_bytes_total": summary.get("serial_output_bytes_total"),
+                "serial_output_lines_total": summary.get("serial_output_lines_total"),
+            }
+        )
+    return rows
+
+
 def report_status(all_runs: list[BenchRun], findings: list[dict[str, Any]]) -> str:
     runs_ok = all(run.returncode == 0 and not run.timed_out for run in all_runs)
     return "pass" if runs_ok and not findings else "fail"
@@ -1917,6 +1962,27 @@ def markdown_report(report: dict[str, Any]) -> str:
             for row in variability_ranks[:10]:
                 lines.append(
                     "| {variability_rank} | {prompt} | {wall_tok_per_s_iqr_pct} | {wall_tok_per_s_p05_p95_spread_pct} | {tok_per_s_cv_pct} | {wall_tok_per_s_median} | {tokens_median} | {ttft_us_p95} |".format(
+                        **{key: format_summary_value(value) for key, value in row.items()}
+                    )
+                )
+        efficiency_ranks = (
+            report.get("prompt_efficiency_rankings")
+            if isinstance(report.get("prompt_efficiency_rankings"), list)
+            else []
+        )
+        if efficiency_ranks:
+            lines.extend(
+                [
+                    "",
+                    "## Prompt Efficiency",
+                    "",
+                    "| Rank | Prompt | Median wall prompt bytes/s | Median tokens/prompt byte | Median wall tok/s | Median tokens | Median wall elapsed us | P95 TTFT us |",
+                    "| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+                ]
+            )
+            for row in efficiency_ranks[:10]:
+                lines.append(
+                    "| {efficiency_rank} | {prompt} | {wall_prompt_bytes_per_s_median} | {tokens_per_prompt_byte_median} | {wall_tok_per_s_median} | {tokens_median} | {wall_elapsed_us_median} | {ttft_us_p95} |".format(
                         **{key: format_summary_value(value) for key, value in row.items()}
                     )
                 )
@@ -2502,6 +2568,7 @@ def write_report(
     summaries = summarize_runs(runs)
     prompt_rankings = prompt_rank_rows(summaries)
     prompt_variability_rankings = prompt_variability_rank_rows(summaries)
+    prompt_efficiency_rankings = prompt_efficiency_rank_rows(summaries)
     expected_launch_sequence = launch_sequence_from_plan(launch_plan or [])
     observed_launch_sequence = launch_sequence_from_runs(all_runs)
     launch_integrity = launch_sequence_integrity(expected_launch_sequence, observed_launch_sequence)
@@ -2573,6 +2640,7 @@ def write_report(
         "summaries": summaries,
         "prompt_rankings": prompt_rankings,
         "prompt_variability_rankings": prompt_variability_rankings,
+        "prompt_efficiency_rankings": prompt_efficiency_rankings,
         "phase_summaries": phase_summaries(warmup_runs, runs),
         "variability_gates": {
             "max_suite_cv_pct": max_suite_cv_pct,
@@ -2618,6 +2686,7 @@ def write_report(
     latest_phase_csv = output_dir / "qemu_prompt_bench_phases_latest.csv"
     latest_prompt_rank_csv = output_dir / "qemu_prompt_bench_prompt_rank_latest.csv"
     latest_prompt_variability_csv = output_dir / "qemu_prompt_bench_prompt_variability_latest.csv"
+    latest_prompt_efficiency_csv = output_dir / "qemu_prompt_bench_prompt_efficiency_latest.csv"
     latest_launch_csv = output_dir / "qemu_prompt_bench_launches_latest.csv"
     latest_junit = output_dir / "qemu_prompt_bench_junit_latest.xml"
     latest.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -2627,6 +2696,7 @@ def write_report(
     write_phase_csv_report(report, latest_phase_csv)
     write_prompt_rank_csv_report(report, latest_prompt_rank_csv)
     write_prompt_variability_csv_report(report, latest_prompt_variability_csv)
+    write_prompt_efficiency_csv_report(report, latest_prompt_efficiency_csv)
     write_launch_csv_report(report, latest_launch_csv)
     write_launch_jsonl_report(report, output_dir / "qemu_prompt_bench_launches_latest.jsonl")
     write_junit_report(runs, warmup_runs, findings, telemetry, launch_findings, latest_junit)
@@ -2925,6 +2995,55 @@ def write_prompt_variability_csv_report(report: dict[str, Any], path: Path) -> N
     rows = (
         report.get("prompt_variability_rankings")
         if isinstance(report.get("prompt_variability_rankings"), list)
+        else []
+    )
+    base = {
+        "generated_at": report.get("generated_at"),
+        "profile": report.get("profile"),
+        "model": report.get("model"),
+        "quantization": report.get("quantization"),
+        "commit": report.get("commit"),
+        "prompt_suite_sha256": prompt_suite.get("suite_sha256"),
+        "command_sha256": report.get("command_sha256"),
+    }
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: {**base, **row}.get(field) for field in fields})
+
+
+def write_prompt_efficiency_csv_report(report: dict[str, Any], path: Path) -> None:
+    fields = [
+        "generated_at",
+        "profile",
+        "model",
+        "quantization",
+        "commit",
+        "prompt_suite_sha256",
+        "command_sha256",
+        "efficiency_rank",
+        "prompt",
+        "prompt_bytes",
+        "runs",
+        "ok_runs",
+        "failed_runs",
+        "tokens_median",
+        "wall_prompt_bytes_per_s_median",
+        "prompt_bytes_per_s_median",
+        "tokens_per_prompt_byte_median",
+        "wall_tok_per_s_median",
+        "tok_per_s_median",
+        "wall_elapsed_us_median",
+        "ttft_us_p95",
+        "memory_bytes_max",
+        "serial_output_bytes_total",
+        "serial_output_lines_total",
+    ]
+    prompt_suite = report.get("prompt_suite") or {}
+    rows = (
+        report.get("prompt_efficiency_rankings")
+        if isinstance(report.get("prompt_efficiency_rankings"), list)
         else []
     )
     base = {
