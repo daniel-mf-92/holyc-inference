@@ -81,6 +81,8 @@ def test_q4_0_block_audit_reports_signed_nibble_range(tmp_path: Path) -> None:
     assert audit.worst_block_saturation_pct == 6.25
     assert audit.worst_block_saturation_index == 0
     assert audit.scale_normal_count == 1
+    assert audit.scale_positive_count == 1
+    assert audit.scale_negative_count == 0
     assert audit.scale_q16_min == 65536
     assert audit.scale_q16_max == 65536
     assert audit.scale_q16_abs_max == 65536
@@ -218,6 +220,24 @@ def test_block_audit_can_fail_subnormal_fp16_scales(tmp_path: Path) -> None:
     assert "block 0: fp16 scale is subnormal bits=0x0001" in audit.findings
 
 
+def test_block_audit_counts_and_can_fail_negative_fp16_scales(tmp_path: Path) -> None:
+    block_file = tmp_path / "q8.bin"
+    block_file.write_bytes(half_bits(-0.5) + bytes([0] * 32))
+
+    audit = quant_audit.audit_q8_0_blocks(
+        block_file,
+        allow_inf_nan_scale=False,
+        fail_negative_scales=True,
+    )
+
+    assert audit.scale_positive_count == 0
+    assert audit.scale_negative_count == 1
+    assert audit.scale_q16_min == -32768
+    assert audit.scale_q16_max == -32768
+    assert audit.scale_q16_abs_max == 32768
+    assert "block 0: fp16 scale sign is negative bits=0xb800" in audit.findings
+
+
 def test_block_audit_reports_zero_scale_nonzero_quant_payload(tmp_path: Path) -> None:
     block_file = tmp_path / "q4.bin"
     block_file.write_bytes(half_bits(0.0) + bytes([0x89] * 16))
@@ -349,10 +369,13 @@ def test_cli_fails_on_q16_scale_limit(tmp_path: Path) -> None:
     report = output.read_text(encoding="utf-8")
     assert '"scale_q16_abs_max": 65536' in report
     assert '"scale_q16_over_limit_count": 1' in report
+    assert '"scale_positive_count": 1' in report
+    assert '"scale_negative_count": 0' in report
     assert '"min_block_used_quant_values": 1' in report
     assert '"worst_block_saturation_count": 0' in report
     markdown_text = markdown.read_text(encoding="utf-8")
     assert "Scale Q16 min/max/absmax/zero/overlimit" in markdown_text
+    assert "Scale sign +/-" in markdown_text
     assert "Padding elements/nonzero" in markdown_text
     assert "Zero-scale nonzero blocks/entries" in markdown_text
     assert "Used values" in markdown_text

@@ -64,6 +64,8 @@ class BlockAudit:
     scale_subnormal_count: int
     scale_normal_count: int
     scale_inf_nan_count: int
+    scale_positive_count: int
+    scale_negative_count: int
     scale_q16_min: int
     scale_q16_max: int
     scale_q16_abs_max: int
@@ -207,6 +209,10 @@ def fp16_class(bits: int) -> str:
     return "normal"
 
 
+def fp16_is_negative(bits: int) -> bool:
+    return bool(bits & 0x8000)
+
+
 def fp16_to_float(bits: int) -> float:
     return struct.unpack("<e", struct.pack("<H", bits))[0]
 
@@ -330,11 +336,14 @@ def check_scale_class_gates(
     scale_class: str,
     fail_zero_scales: bool,
     fail_subnormal_scales: bool,
+    fail_negative_scales: bool,
 ) -> None:
     if fail_zero_scales and scale_class == "zero":
         findings.append(f"block {block_index}: fp16 scale is zero bits=0x{scale_bits:04x}")
     if fail_subnormal_scales and scale_class == "subnormal":
         findings.append(f"block {block_index}: fp16 scale is subnormal bits=0x{scale_bits:04x}")
+    if fail_negative_scales and fp16_is_negative(scale_bits):
+        findings.append(f"block {block_index}: fp16 scale sign is negative bits=0x{scale_bits:04x}")
 
 
 def check_expected_shape(
@@ -452,6 +461,7 @@ def audit_q4_0_blocks(
     fail_zero_scale_nonzero_blocks: bool = False,
     fail_zero_scales: bool = False,
     fail_subnormal_scales: bool = False,
+    fail_negative_scales: bool = False,
     fail_nonzero_padding_quants: bool = False,
     min_scale_exponent: int | None = None,
     max_scale_exponent: int | None = None,
@@ -464,6 +474,7 @@ def audit_q4_0_blocks(
     block_count = len(data) // Q4_0_BLOCK_BYTES
     check_expected_shape(findings, block_count, expect_blocks, expect_elements)
     counts = {"zero": 0, "subnormal": 0, "normal": 0, "inf_nan": 0}
+    sign_counts = {"positive": 0, "negative": 0}
     quant_min = math.inf
     quant_max = -math.inf
     quant_zero_count = 0
@@ -497,6 +508,7 @@ def audit_q4_0_blocks(
         scale_bits = int.from_bytes(data[offset : offset + 2], "little")
         scale_class = fp16_class(scale_bits)
         counts[scale_class] += 1
+        sign_counts["negative" if fp16_is_negative(scale_bits) else "positive"] += 1
         check_scale_class_gates(
             findings,
             block_index,
@@ -504,6 +516,7 @@ def audit_q4_0_blocks(
             scale_class,
             fail_zero_scales,
             fail_subnormal_scales,
+            fail_negative_scales,
         )
         if scale_class == "inf_nan" and not allow_inf_nan_scale:
             findings.append(f"block {block_index}: fp16 scale is inf/nan bits=0x{scale_bits:04x}")
@@ -623,6 +636,8 @@ def audit_q4_0_blocks(
         scale_subnormal_count=counts["subnormal"],
         scale_normal_count=counts["normal"],
         scale_inf_nan_count=counts["inf_nan"],
+        scale_positive_count=sign_counts["positive"],
+        scale_negative_count=sign_counts["negative"],
         scale_q16_min=int(scale_q16_stats["min"] or 0),
         scale_q16_max=int(scale_q16_stats["max"] or 0),
         scale_q16_abs_max=int(scale_q16_stats["abs_max"] or 0),
@@ -665,6 +680,7 @@ def audit_q8_0_blocks(
     fail_zero_scale_nonzero_blocks: bool = False,
     fail_zero_scales: bool = False,
     fail_subnormal_scales: bool = False,
+    fail_negative_scales: bool = False,
     fail_nonzero_padding_quants: bool = False,
     min_scale_exponent: int | None = None,
     max_scale_exponent: int | None = None,
@@ -677,6 +693,7 @@ def audit_q8_0_blocks(
     block_count = len(data) // Q8_0_BLOCK_BYTES
     check_expected_shape(findings, block_count, expect_blocks, expect_elements)
     counts = {"zero": 0, "subnormal": 0, "normal": 0, "inf_nan": 0}
+    sign_counts = {"positive": 0, "negative": 0}
     quant_min = math.inf
     quant_max = -math.inf
     quant_zero_count = 0
@@ -710,6 +727,7 @@ def audit_q8_0_blocks(
         scale_bits = int.from_bytes(data[offset : offset + 2], "little")
         scale_class = fp16_class(scale_bits)
         counts[scale_class] += 1
+        sign_counts["negative" if fp16_is_negative(scale_bits) else "positive"] += 1
         check_scale_class_gates(
             findings,
             block_index,
@@ -717,6 +735,7 @@ def audit_q8_0_blocks(
             scale_class,
             fail_zero_scales,
             fail_subnormal_scales,
+            fail_negative_scales,
         )
         if scale_class == "inf_nan" and not allow_inf_nan_scale:
             findings.append(f"block {block_index}: fp16 scale is inf/nan bits=0x{scale_bits:04x}")
@@ -832,6 +851,8 @@ def audit_q8_0_blocks(
         scale_subnormal_count=counts["subnormal"],
         scale_normal_count=counts["normal"],
         scale_inf_nan_count=counts["inf_nan"],
+        scale_positive_count=sign_counts["positive"],
+        scale_negative_count=sign_counts["negative"],
         scale_q16_min=int(scale_q16_stats["min"] or 0),
         scale_q16_max=int(scale_q16_stats["max"] or 0),
         scale_q16_abs_max=int(scale_q16_stats["abs_max"] or 0),
@@ -875,6 +896,7 @@ def audit_blocks(
     fail_zero_scale_nonzero_blocks: bool = False,
     fail_zero_scales: bool = False,
     fail_subnormal_scales: bool = False,
+    fail_negative_scales: bool = False,
     fail_nonzero_padding_quants: bool = False,
     min_scale_exponent: int | None = None,
     max_scale_exponent: int | None = None,
@@ -893,6 +915,7 @@ def audit_blocks(
             fail_zero_scale_nonzero_blocks,
             fail_zero_scales,
             fail_subnormal_scales,
+            fail_negative_scales,
             fail_nonzero_padding_quants,
             min_scale_exponent,
             max_scale_exponent,
@@ -911,6 +934,7 @@ def audit_blocks(
             fail_zero_scale_nonzero_blocks,
             fail_zero_scales,
             fail_subnormal_scales,
+            fail_negative_scales,
             fail_nonzero_padding_quants,
             min_scale_exponent,
             max_scale_exponent,
@@ -944,9 +968,9 @@ def markdown_report(report: dict) -> str:
         lines.extend(
             [
                 "| Format | Path | Blocks | Capacity | Scale zero/subnormal/normal/inf_nan "
-                "| Padding elements/nonzero | Scale Q16 min/max/absmax/zero/overlimit | Scale exponent min/max/under/over | Zero-scale nonzero blocks/entries | Quant min/max | Used values | Zero/nonzero quants "
+                "| Scale sign +/- | Padding elements/nonzero | Scale Q16 min/max/absmax/zero/overlimit | Scale exponent min/max/under/over | Zero-scale nonzero blocks/entries | Quant min/max | Used values | Zero/nonzero quants "
                 "| Saturated quants | Min block used values | Worst block saturation | Findings |",
-                "| --- | --- | ---: | ---: | --- | ---: | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| --- | --- | ---: | ---: | --- | ---: | ---: | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
         for audit in block_audits:
@@ -972,10 +996,14 @@ def markdown_report(report: dict) -> str:
                 audit["scale_exponent_under_limit_count"],
                 audit["scale_exponent_over_limit_count"],
             )
+            scale_sign = "{}/{}".format(
+                audit["scale_positive_count"],
+                audit["scale_negative_count"],
+            )
             lines.append(
                 (
                     "| {format} | `{path}` | {block_count} | {element_capacity} | "
-                    "{scales} | {padding_element_count}/{padding_nonzero_count} | "
+                    "{scales} | {scale_sign} | {padding_element_count}/{padding_nonzero_count} | "
                     "{scale_q16} | {scale_exponent} | {zero_scale_nonzero_quant_block_count}/{zero_scale_nonzero_quant_entry_count} | "
                     "{quant_min}/{quant_max} | {quant_used_value_count} | "
                     "{quant_zero_count}/{quant_nonzero_count} | {quant_saturation_count} ({quant_saturation_pct:.3f}%) | "
@@ -992,6 +1020,7 @@ def markdown_report(report: dict) -> str:
                     padding_nonzero_count=audit["padding_nonzero_count"],
                     scale_q16=scale_q16,
                     scale_exponent=scale_exponent,
+                    scale_sign=scale_sign,
                     zero_scale_nonzero_quant_block_count=audit[
                         "zero_scale_nonzero_quant_block_count"
                     ],
@@ -1238,6 +1267,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail any raw block whose fp16 scale field is subnormal",
     )
     parser.add_argument(
+        "--fail-negative-scales",
+        action="store_true",
+        help="Fail any raw block whose fp16 scale field has the sign bit set",
+    )
+    parser.add_argument(
         "--fail-nonzero-padding-quants",
         action="store_true",
         help="Fail tail padding elements with nonzero quant payload values when --expect-elements is set",
@@ -1284,6 +1318,7 @@ def main(argv: list[str] | None = None) -> int:
             args.fail_zero_scale_nonzero_blocks,
             args.fail_zero_scales,
             args.fail_subnormal_scales,
+            args.fail_negative_scales,
             args.fail_nonzero_padding_quants,
             args.min_scale_exponent,
             args.max_scale_exponent,

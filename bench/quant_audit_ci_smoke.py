@@ -106,6 +106,10 @@ def main() -> int:
         if rc := require(len(report["block_audits"]) == 2, "unexpected_block_audit_count"):
             return rc
         for audit in report["block_audits"]:
+            if rc := require(audit["scale_positive_count"] == 1, "missing_scale_positive_count"):
+                return rc
+            if rc := require(audit["scale_negative_count"] == 0, "unexpected_scale_negative_count"):
+                return rc
             if rc := require(audit["scale_exponent_min"] == 0, "missing_scale_exponent_min"):
                 return rc
             if rc := require(audit["scale_exponent_max"] == 0, "missing_scale_exponent_max"):
@@ -117,6 +121,8 @@ def main() -> int:
             if rc := require(audit["scale_exponent_over_limit_count"] == 0, "unexpected_over_limit"):
                 return rc
         if rc := require("Scale exponent min/max/under/over" in pass_md.read_text(encoding="utf-8"), "missing_markdown_exponent"):
+            return rc
+        if rc := require("Scale sign +/-" in pass_md.read_text(encoding="utf-8"), "missing_markdown_scale_sign"):
             return rc
         if rc := require(
             "scope,path,line,column,format,kind,reason,text" in pass_csv.read_text(encoding="utf-8"),
@@ -163,6 +169,42 @@ def main() -> int:
         if rc := require(
             any("fp16 scale exponent -14 below minimum 0" in finding for finding in bad_audit["findings"]),
             "missing_scale_exponent_finding",
+        ):
+            return rc
+
+        bad_q8 = tmp_path / "q8_bad_negative_scale.bin"
+        write_q8_block(bad_q8, 0xBC00)
+        bad_negative_json = tmp_path / "bad_negative_quant_audit.json"
+        bad_negative_command = [
+            sys.executable,
+            str(ROOT / "bench" / "quant_audit.py"),
+            "--source-root",
+            str(source_root),
+            "--format",
+            "q8_0",
+            "--block-file",
+            str(bad_q8),
+            "--fail-negative-scales",
+            "--output",
+            str(bad_negative_json),
+        ]
+        completed = subprocess.run(
+            bad_negative_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("bad_negative_scale_not_rejected=true", file=sys.stderr)
+            return 1
+        bad_negative_report = json.loads(bad_negative_json.read_text(encoding="utf-8"))
+        bad_negative_audit = bad_negative_report["block_audits"][0]
+        if rc := require(bad_negative_audit["scale_negative_count"] == 1, "missing_negative_scale_count"):
+            return rc
+        if rc := require(
+            any("fp16 scale sign is negative" in finding for finding in bad_negative_audit["findings"]),
+            "missing_negative_scale_finding",
         ):
             return rc
 

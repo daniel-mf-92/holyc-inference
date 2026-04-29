@@ -201,3 +201,4 @@
 2026-04-29T02:56:58Z | Added build_compare serial output byte delta telemetry and optional growth gating with refreshed comparison artifacts.
 2026-04-29T03:14:00Z | Added build_compare CI smoke gate for synthetic pass, command-drift, and OK-run coverage paths with refreshed comparison artifacts.
 2026-04-29T03:24:42Z | Added measured qemu_prompt_bench launch-plan hashes, launch indexes, launch CSV artifacts, smoke coverage, and refreshed benchmark outputs.
+2026-04-29T03:31:04Z | Added quant audit fp16 scale sign telemetry and optional negative-scale gates with smoke coverage.
