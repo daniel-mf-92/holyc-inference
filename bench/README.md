@@ -227,12 +227,17 @@ inspection reports, verifies local hashes/provenance fields where possible, and
 writes JSON/Markdown/CSV/JUnit XML rollups:
 Relative artifact paths are resolved from the current working directory first,
 then from the manifest/report directory so archived dataset bundles remain
-self-validating after they are moved.
+self-validating after they are moved. Use `--require-dataset-split DATASET:SPLIT`
+with `--fail-on-dataset-split-coverage` when CI should prove promoted dataset
+artifacts include required eval slices, such as `arc:validation`, before they
+are consumed by HolyC-vs-llama comparisons.
 
 ```bash
 python3 bench/dataset_index.py \
   --input bench/results/datasets \
   --output-dir bench/results/datasets \
+  --require-dataset-split smoke-eval:validation \
+  --fail-on-dataset-split-coverage \
   --fail-on-findings
 ```
 

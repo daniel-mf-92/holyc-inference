@@ -1,10 +1,12 @@
 # Eval Dataset Artifact Index
 
-Generated: 2026-04-29T08:36:35Z
+Generated: 2026-04-29T08:41:56Z
 Status: pass
 Artifacts: 5
 Required artifact types: curated_manifest, inspect_report, pack_manifest
 Artifact type coverage violations: 0
+Required dataset/splits: arc-smoke:validation, smoke-eval:validation
+Dataset/split coverage violations: 0
 
 | Type | Status | Dataset | Split | Records | License | Findings | Source |
 | --- | --- | --- | --- | ---: | --- | ---: | --- |
@@ -15,5 +17,7 @@ Artifact type coverage violations: 0
 | pack_manifest | pass | smoke-eval | validation | 3 | - | 0 | bench/results/datasets/smoke_eval.manifest.json |
 
 Artifact type coverage requirements satisfied.
+
+Dataset/split coverage requirements satisfied.
 
 Findings: none.

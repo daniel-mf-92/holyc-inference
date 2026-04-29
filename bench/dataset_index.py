@@ -53,6 +53,14 @@ class ArtifactTypeCoverageViolation:
     sources: list[str]
 
 
+@dataclass(frozen=True)
+class DatasetSplitCoverageViolation:
+    dataset: str
+    split: str
+    present_count: int
+    sources: list[str]
+
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -332,8 +340,47 @@ def artifact_type_coverage_violations(
     return violations
 
 
+def parse_dataset_split_requirement(value: str) -> tuple[str, str]:
+    if ":" not in value:
+        raise argparse.ArgumentTypeError("expected DATASET:SPLIT")
+    dataset, split = (part.strip() for part in value.split(":", 1))
+    if not dataset or not split:
+        raise argparse.ArgumentTypeError("expected non-empty DATASET:SPLIT")
+    return dataset, split
+
+
+def dataset_split_values(value: str) -> set[str]:
+    return {part.strip() for part in value.split(",") if part.strip()}
+
+
+def dataset_split_coverage_violations(
+    artifacts: list[DatasetArtifact],
+    required_dataset_splits: Iterable[tuple[str, str]],
+) -> list[DatasetSplitCoverageViolation]:
+    violations: list[DatasetSplitCoverageViolation] = []
+    for dataset, split in sorted(set(required_dataset_splits)):
+        present = [
+            artifact
+            for artifact in artifacts
+            if dataset in dataset_split_values(artifact.dataset)
+            and split in dataset_split_values(artifact.split)
+        ]
+        if present:
+            continue
+        violations.append(
+            DatasetSplitCoverageViolation(
+                dataset=dataset,
+                split=split,
+                present_count=0,
+                sources=[],
+            )
+        )
+    return violations
+
+
 def markdown_report(report: dict[str, Any]) -> str:
     coverage_violations = report.get("artifact_type_coverage_violations", [])
+    dataset_split_violations = report.get("dataset_split_coverage_violations", [])
     lines = [
         "# Eval Dataset Artifact Index",
         "",
@@ -342,6 +389,8 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Artifacts: {len(report['artifacts'])}",
         f"Required artifact types: {', '.join(report.get('required_artifact_types', [])) or '-'}",
         f"Artifact type coverage violations: {len(coverage_violations)}",
+        f"Required dataset/splits: {', '.join(report.get('required_dataset_splits', [])) or '-'}",
+        f"Dataset/split coverage violations: {len(dataset_split_violations)}",
         "",
     ]
     if report["artifacts"]:
@@ -383,6 +432,21 @@ def markdown_report(report: dict[str, Any]) -> str:
     elif report.get("required_artifact_types"):
         lines.extend(["", "Artifact type coverage requirements satisfied."])
 
+    if dataset_split_violations:
+        lines.extend(
+            [
+                "",
+                "## Dataset/Split Coverage Violations",
+                "",
+                "| Dataset | Split | Present |",
+                "| --- | --- | ---: |",
+            ]
+        )
+        for violation in dataset_split_violations:
+            lines.append(f"| {violation['dataset']} | {violation['split']} | {violation['present_count']} |")
+    elif report.get("required_dataset_splits"):
+        lines.extend(["", "Dataset/split coverage requirements satisfied."])
+
     failing = [artifact for artifact in report["artifacts"] if artifact["findings"]]
     if failing:
         lines.extend(["", "## Findings", ""])
@@ -402,13 +466,21 @@ def junit_report(report: dict[str, Any]) -> str:
     coverage_violations = [
         row for row in report.get("artifact_type_coverage_violations", []) if isinstance(row, dict)
     ]
-    failures = int(bool(failed_artifacts)) + int(bool(finding_artifacts)) + int(bool(coverage_violations))
+    dataset_split_violations = [
+        row for row in report.get("dataset_split_coverage_violations", []) if isinstance(row, dict)
+    ]
+    failures = (
+        int(bool(failed_artifacts))
+        + int(bool(finding_artifacts))
+        + int(bool(coverage_violations))
+        + int(bool(dataset_split_violations))
+    )
 
     suite = ET.Element(
         "testsuite",
         {
             "name": "holyc_dataset_index",
-            "tests": "3",
+            "tests": "4",
             "failures": str(failures),
         },
     )
@@ -451,6 +523,20 @@ def junit_report(report: dict[str, Any]) -> str:
             },
         )
         failure.text = "\n".join(str(row.get("artifact_type", "")) for row in coverage_violations)
+
+    dataset_split_case = ET.SubElement(suite, "testcase", {"name": "dataset_split_coverage"})
+    if dataset_split_violations:
+        failure = ET.SubElement(
+            dataset_split_case,
+            "failure",
+            {
+                "type": "dataset_split_missing",
+                "message": f"{len(dataset_split_violations)} required dataset/split pair(s) are missing",
+            },
+        )
+        failure.text = "\n".join(
+            f"{row.get('dataset', '')}:{row.get('split', '')}" for row in dataset_split_violations
+        )
 
     return ET.tostring(suite, encoding="unicode") + "\n"
 
@@ -497,15 +583,34 @@ def write_coverage_csv(violations: list[ArtifactTypeCoverageViolation], path: Pa
             )
 
 
+def write_dataset_split_coverage_csv(violations: list[DatasetSplitCoverageViolation], path: Path) -> None:
+    fields = ["dataset", "split", "present_count", "sources"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for violation in violations:
+            writer.writerow(
+                {
+                    "dataset": violation.dataset,
+                    "split": violation.split,
+                    "present_count": violation.present_count,
+                    "sources": json.dumps(violation.sources, separators=(",", ":")),
+                }
+            )
+
+
 def write_report(
     artifacts: list[DatasetArtifact],
     output_dir: Path,
     required_artifact_types: list[str] | None = None,
-) -> tuple[Path, list[ArtifactTypeCoverageViolation]]:
+    required_dataset_splits: list[tuple[str, str]] | None = None,
+) -> tuple[Path, list[ArtifactTypeCoverageViolation], list[DatasetSplitCoverageViolation]]:
     output_dir.mkdir(parents=True, exist_ok=True)
     required_artifact_types = required_artifact_types or []
+    required_dataset_splits = required_dataset_splits or []
     coverage_violations = artifact_type_coverage_violations(artifacts, required_artifact_types)
-    status = "fail" if coverage_violations else index_status(artifacts)
+    dataset_split_violations = dataset_split_coverage_violations(artifacts, required_dataset_splits)
+    status = "fail" if coverage_violations or dataset_split_violations else index_status(artifacts)
     report = {
         "generated_at": iso_now(),
         "status": status,
@@ -513,19 +618,27 @@ def write_report(
         "artifact_type_coverage_violations": [
             asdict(violation) for violation in coverage_violations
         ],
+        "required_dataset_splits": [
+            f"{dataset}:{split}" for dataset, split in sorted(set(required_dataset_splits))
+        ],
+        "dataset_split_coverage_violations": [
+            asdict(violation) for violation in dataset_split_violations
+        ],
         "artifacts": [asdict(artifact) for artifact in artifacts],
     }
     json_path = output_dir / "dataset_index_latest.json"
     md_path = output_dir / "dataset_index_latest.md"
     csv_path = output_dir / "dataset_index_latest.csv"
     coverage_csv_path = output_dir / "dataset_index_artifact_type_coverage_latest.csv"
+    dataset_split_coverage_csv_path = output_dir / "dataset_index_dataset_split_coverage_latest.csv"
     junit_path = output_dir / "dataset_index_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
     junit_path.write_text(junit_report(report), encoding="utf-8")
     write_csv(artifacts, csv_path)
     write_coverage_csv(coverage_violations, coverage_csv_path)
-    return json_path, coverage_violations
+    write_dataset_split_coverage_csv(dataset_split_violations, dataset_split_coverage_csv_path)
+    return json_path, coverage_violations, dataset_split_violations
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -551,6 +664,19 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Return non-zero if any --require-artifact-type gate is missing",
     )
+    parser.add_argument(
+        "--require-dataset-split",
+        action="append",
+        type=parse_dataset_split_requirement,
+        default=[],
+        metavar="DATASET:SPLIT",
+        help="Require at least one indexed artifact covering this dataset/split pair; may be repeated",
+    )
+    parser.add_argument(
+        "--fail-on-dataset-split-coverage",
+        action="store_true",
+        help="Return non-zero if any --require-dataset-split gate is missing",
+    )
     return parser
 
 
@@ -559,17 +685,25 @@ def main(argv: list[str] | None = None) -> int:
     inputs = args.input or [Path("bench/results/datasets")]
     try:
         artifacts = load_artifacts(inputs)
-        output, coverage_violations = write_report(artifacts, args.output_dir, args.require_artifact_type)
+        output, coverage_violations, dataset_split_violations = write_report(
+            artifacts,
+            args.output_dir,
+            args.require_artifact_type,
+            args.require_dataset_split,
+        )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    status = "fail" if coverage_violations else index_status(artifacts)
+    status = "fail" if coverage_violations or dataset_split_violations else index_status(artifacts)
     print(f"wrote_json={output}")
     print(f"status={status}")
     print(f"artifacts={len(artifacts)}")
     print(f"artifact_type_coverage_violations={len(coverage_violations)}")
+    print(f"dataset_split_coverage_violations={len(dataset_split_violations)}")
     if args.fail_on_coverage and coverage_violations:
+        return 1
+    if args.fail_on_dataset_split_coverage and dataset_split_violations:
         return 1
     if args.fail_on_findings and index_status(artifacts) == "fail":
         return 1

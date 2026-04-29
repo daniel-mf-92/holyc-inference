@@ -92,11 +92,16 @@
       "status": "pass"
     }
   ],
-  "generated_at": "2026-04-29T08:36:35Z",
+  "dataset_split_coverage_violations": [],
+  "generated_at": "2026-04-29T08:41:56Z",
   "required_artifact_types": [
     "curated_manifest",
     "inspect_report",
     "pack_manifest"
+  ],
+  "required_dataset_splits": [
+    "arc-smoke:validation",
+    "smoke-eval:validation"
   ],
   "status": "pass"
 }

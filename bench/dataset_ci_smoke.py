@@ -552,7 +552,12 @@ def main() -> int:
             "pack_manifest",
             "--require-artifact-type",
             "inspect_report",
+            "--require-dataset-split",
+            "smoke-eval:validation",
+            "--require-dataset-split",
+            "arc-smoke:validation",
             "--fail-on-coverage",
+            "--fail-on-dataset-split-coverage",
             "--fail-on-findings",
         ]
         completed = run_command(index_command)
@@ -579,6 +584,16 @@ def main() -> int:
         ):
             return rc
         if rc := require(
+            index_report["required_dataset_splits"] == ["arc-smoke:validation", "smoke-eval:validation"],
+            "unexpected_index_required_dataset_splits",
+        ):
+            return rc
+        if rc := require(
+            index_report["dataset_split_coverage_violations"] == [],
+            "unexpected_index_dataset_split_coverage_violations",
+        ):
+            return rc
+        if rc := require(
             "Eval Dataset Artifact Index" in (datasets_dir / "dataset_index_latest.md").read_text(encoding="utf-8"),
             "missing_index_markdown",
         ):
@@ -587,6 +602,12 @@ def main() -> int:
             "artifact_type,present_count,sources"
             in (datasets_dir / "dataset_index_artifact_type_coverage_latest.csv").read_text(encoding="utf-8"),
             "missing_index_coverage_csv",
+        ):
+            return rc
+        if rc := require(
+            "dataset,split,present_count,sources"
+            in (datasets_dir / "dataset_index_dataset_split_coverage_latest.csv").read_text(encoding="utf-8"),
+            "missing_index_dataset_split_coverage_csv",
         ):
             return rc
         index_root = ET.parse(datasets_dir / "dataset_index_junit_latest.xml").getroot()
@@ -626,6 +647,43 @@ def main() -> int:
         if rc := require(
             missing_index_root.attrib.get("failures") == "1",
             "unexpected_missing_index_junit_failures",
+        ):
+            return rc
+
+        missing_dataset_split_dir = tmp_path / "missing_dataset_split_index"
+        missing_dataset_split_dir.mkdir()
+        missing_dataset_split_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_index.py"),
+            "--input",
+            str(curated_manifest),
+            "--output-dir",
+            str(missing_dataset_split_dir),
+            "--require-dataset-split",
+            "absent-dataset:validation",
+            "--fail-on-dataset-split-coverage",
+        ]
+        completed = run_command(missing_dataset_split_command)
+        if rc := require(completed.returncode == 1, "missing_dataset_split_coverage_not_rejected"):
+            return rc
+        missing_dataset_split_report = json.loads(
+            (missing_dataset_split_dir / "dataset_index_latest.json").read_text(encoding="utf-8")
+        )
+        if rc := require(
+            missing_dataset_split_report["status"] == "fail",
+            "unexpected_missing_dataset_split_status",
+        ):
+            return rc
+        if rc := require(
+            missing_dataset_split_report["dataset_split_coverage_violations"]
+            == [{"dataset": "absent-dataset", "split": "validation", "present_count": 0, "sources": []}],
+            "unexpected_missing_dataset_split_payload",
+        ):
+            return rc
+        missing_dataset_split_root = ET.parse(missing_dataset_split_dir / "dataset_index_junit_latest.xml").getroot()
+        if rc := require(
+            missing_dataset_split_root.attrib.get("failures") == "1",
+            "unexpected_missing_dataset_split_junit_failures",
         ):
             return rc
 

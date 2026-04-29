@@ -1,1 +1,1 @@
-<testsuite name="holyc_dataset_index" tests="3" failures="0"><testcase name="artifact_status" /><testcase name="artifact_findings" /><testcase name="artifact_type_coverage" /></testsuite>
+<testsuite name="holyc_dataset_index" tests="4" failures="0"><testcase name="artifact_status" /><testcase name="artifact_findings" /><testcase name="artifact_type_coverage" /><testcase name="dataset_split_coverage" /></testsuite>
