@@ -205,3 +205,4 @@
 2026-04-29T03:39:32Z | Added qemu_prompt_bench dry-run launch-plan indexing with air-gap/hash telemetry and refreshed benchmark result index artifacts.
 2026-04-29T04:01:25Z | Added launch-plan hash drift tracking/gating to benchmark result indexes and refreshed manifest/index artifacts.
 2026-04-29T04:15:25Z | Added qemu_prompt_bench timeout budget telemetry/gate with synthetic smoke coverage and refreshed benchmark artifacts.
+2026-04-29T04:23:49Z | Added benchmark result index CI smoke coverage for output artifacts, command-hash failures, air-gap rejection, stale artifacts, and environment drift.

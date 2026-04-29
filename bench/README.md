@@ -668,6 +668,16 @@ python3 bench/bench_result_index.py \
   --fail-on-stale-artifact
 ```
 
+`bench_result_index_ci_smoke.py` is a stdlib-only CI gate for the indexer. It
+builds synthetic QEMU prompt, dry-run, and matrix reports, verifies the JSON,
+Markdown, CSV, latest-comparable CSV, launch-plan drift CSV, and JUnit outputs,
+and checks that command-hash mismatches, NIC-enabled QEMU commands, stale
+artifacts, and environment drift are rejected by their opt-in gates:
+
+```bash
+python3 bench/bench_result_index_ci_smoke.py
+```
+
 `bench_artifact_manifest.py` builds on the same indexer and writes a
 deterministic latest-artifact manifest for CI upload/download consumers. It
 records SHA256 and byte size for each benchmark JSON, retains compact history,
