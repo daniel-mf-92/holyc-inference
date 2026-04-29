@@ -112,6 +112,13 @@ def main() -> int:
             tok_per_s=105.0,
             memory=65_000_000,
         )
+        write_report(
+            input_dir / "qemu_prompt_bench_newer.json",
+            commit="trend-newer",
+            generated_at="2026-04-27T10:10:00Z",
+            tok_per_s=110.0,
+            memory=66_000_000,
+        )
 
         command = [
             sys.executable,
@@ -131,6 +138,8 @@ def main() -> int:
             "10",
             "--fail-on-memory-growth-pct",
             "10",
+            "--window-points",
+            "2",
         ]
         completed = subprocess.run(
             command,
@@ -148,18 +157,32 @@ def main() -> int:
         if report["status"] != "pass":
             print(f"unexpected_status={report['status']}", file=sys.stderr)
             return 1
-        if report["trend_keys"] != 1 or report["trend_points"] != 2:
+        if report["trend_keys"] != 1 or report["trend_points"] != 3:
             print("unexpected_trend_counts=true", file=sys.stderr)
             return 1
         latest = report["latest"][0]
-        if latest["latest_commit"] != "trend-head":
+        if latest["latest_commit"] != "trend-newer":
             print("latest_commit_not_head=true", file=sys.stderr)
             return 1
-        if latest["median_tok_per_s_delta_pct"] != 5.0:
+        if abs(latest["median_tok_per_s_delta_pct"] - (500.0 / 105.0)) > 0.000001:
             print("unexpected_tok_delta=true", file=sys.stderr)
             return 1
-        if latest["max_memory_delta_pct"] != 1.5625:
+        if abs(latest["max_memory_delta_pct"] - (100.0 / 65.0)) > 0.000001:
             print("unexpected_memory_delta=true", file=sys.stderr)
+            return 1
+        windows = report["windows"]
+        if len(windows) != 1:
+            print("missing_window_report=true", file=sys.stderr)
+            return 1
+        window = windows[0]
+        if window["window_points"] != 2 or window["window_start_commit"] != "trend-head":
+            print("unexpected_window_span=true", file=sys.stderr)
+            return 1
+        if window["guest_tok_per_s_min"] != 105.0 or window["guest_tok_per_s_max"] != 110.0:
+            print("unexpected_window_guest_stats=true", file=sys.stderr)
+            return 1
+        if window["guest_tok_per_s_median"] != 107.5:
+            print("unexpected_window_guest_median=true", file=sys.stderr)
             return 1
         thresholds = report["thresholds"]
         if thresholds["fail_on_tok_regression_pct"] != 10.0:
@@ -167,6 +190,9 @@ def main() -> int:
             return 1
         if thresholds["min_points_per_key"] != 2:
             print("missing_min_points_threshold=true", file=sys.stderr)
+            return 1
+        if thresholds["window_points"] != 2:
+            print("missing_window_points_threshold=true", file=sys.stderr)
             return 1
         markdown = (output_dir / "bench_trend_export_latest.md").read_text(encoding="utf-8")
         if "Benchmark Trend Export" not in markdown:
@@ -183,8 +209,12 @@ def main() -> int:
             print("missing_latest_csv_delta=true", file=sys.stderr)
             return 1
         points_csv = (output_dir / "bench_trend_export_points_latest.csv").read_text(encoding="utf-8")
-        if "trend-base" not in points_csv or "trend-head" not in points_csv:
+        if "trend-base" not in points_csv or "trend-head" not in points_csv or "trend-newer" not in points_csv:
             print("missing_points_csv_history=true", file=sys.stderr)
+            return 1
+        windows_csv = (output_dir / "bench_trend_export_windows_latest.csv").read_text(encoding="utf-8")
+        if "guest_tok_per_s_median" not in windows_csv or "trend-head" not in windows_csv:
+            print("missing_windows_csv_stats=true", file=sys.stderr)
             return 1
         junit_root = ET.parse(output_dir / "bench_trend_export_junit_latest.xml").getroot()
         if junit_root.attrib.get("name") != "holyc_bench_trend_export":

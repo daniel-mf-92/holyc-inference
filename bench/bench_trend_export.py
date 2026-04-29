@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import statistics
 import sys
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
@@ -105,6 +106,20 @@ def delta_pct(previous: float | None, latest: float | None) -> float | None:
     return ((latest - previous) / previous) * 100.0
 
 
+def median(values: list[float]) -> float | None:
+    if not values:
+        return None
+    return float(statistics.median(values))
+
+
+def min_value(values: list[float]) -> float | None:
+    return min(values) if values else None
+
+
+def max_value(values: list[float]) -> float | None:
+    return max(values) if values else None
+
+
 def latest_rows(grouped: dict[str, list[TrendPoint]]) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for key, points in sorted(grouped.items()):
@@ -144,9 +159,70 @@ def latest_rows(grouped: dict[str, list[TrendPoint]]) -> list[dict[str, object]]
     return rows
 
 
+def window_rows(grouped: dict[str, list[TrendPoint]], window_points: int) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for key, points in sorted(grouped.items()):
+        window = points[-window_points:]
+        if not window:
+            continue
+        first = window[0]
+        latest = window[-1]
+        guest_values = [
+            float(point.median_tok_per_s)
+            for point in window
+            if point.median_tok_per_s is not None
+        ]
+        wall_values = [
+            float(point.wall_tok_per_s_median)
+            for point in window
+            if point.wall_tok_per_s_median is not None
+        ]
+        memory_values = [
+            float(point.max_memory_bytes)
+            for point in window
+            if point.max_memory_bytes is not None
+        ]
+        rows.append(
+            {
+                "key": key,
+                "window_points_requested": window_points,
+                "window_points": len(window),
+                "window_start_generated_at": first.generated_at,
+                "window_end_generated_at": latest.generated_at,
+                "window_start_commit": first.commit,
+                "window_end_commit": latest.commit,
+                "guest_tok_per_s_points": len(guest_values),
+                "guest_tok_per_s_min": min_value(guest_values),
+                "guest_tok_per_s_median": median(guest_values),
+                "guest_tok_per_s_max": max_value(guest_values),
+                "guest_tok_per_s_delta_pct": delta_pct(first.median_tok_per_s, latest.median_tok_per_s),
+                "wall_tok_per_s_points": len(wall_values),
+                "wall_tok_per_s_min": min_value(wall_values),
+                "wall_tok_per_s_median": median(wall_values),
+                "wall_tok_per_s_max": max_value(wall_values),
+                "wall_tok_per_s_delta_pct": delta_pct(
+                    first.wall_tok_per_s_median,
+                    latest.wall_tok_per_s_median,
+                ),
+                "max_memory_points": len(memory_values),
+                "max_memory_bytes_min": min_value(memory_values),
+                "max_memory_bytes_median": median(memory_values),
+                "max_memory_bytes_max": max_value(memory_values),
+                "max_memory_delta_pct": delta_pct(
+                    float(first.max_memory_bytes) if first.max_memory_bytes is not None else None,
+                    float(latest.max_memory_bytes) if latest.max_memory_bytes is not None else None,
+                ),
+                "window_start_source": first.source,
+                "window_end_source": latest.source,
+            }
+        )
+    return rows
+
+
 def build_report(
     grouped: dict[str, list[TrendPoint]],
     *,
+    window_points: int,
     fail_on_empty: bool,
     fail_on_airgap: bool,
     fail_on_telemetry: bool,
@@ -157,6 +233,7 @@ def build_report(
 ) -> dict[str, object]:
     all_points = [point for points in grouped.values() for point in points]
     latest = latest_rows(grouped)
+    windows = window_rows(grouped, window_points)
     findings: list[str] = []
     if not all_points:
         findings.append("no supported benchmark artifacts found")
@@ -225,10 +302,12 @@ def build_report(
             "fail_on_tok_regression_pct": fail_on_tok_regression_pct,
             "fail_on_wall_tok_regression_pct": fail_on_wall_tok_regression_pct,
             "fail_on_memory_growth_pct": fail_on_memory_growth_pct,
+            "window_points": window_points,
         },
         "trend_keys": len(grouped),
         "trend_points": len(all_points),
         "latest": latest,
+        "windows": windows,
         "trends": {
             key: [asdict(point) for point in points]
             for key, points in sorted(grouped.items())
@@ -330,6 +409,40 @@ def write_points_csv(grouped: dict[str, list[TrendPoint]], path: Path) -> None:
                 writer.writerow(asdict(point))
 
 
+def write_windows_csv(rows: list[dict[str, object]], path: Path) -> None:
+    fields = [
+        "key",
+        "window_points_requested",
+        "window_points",
+        "window_start_generated_at",
+        "window_end_generated_at",
+        "window_start_commit",
+        "window_end_commit",
+        "guest_tok_per_s_points",
+        "guest_tok_per_s_min",
+        "guest_tok_per_s_median",
+        "guest_tok_per_s_max",
+        "guest_tok_per_s_delta_pct",
+        "wall_tok_per_s_points",
+        "wall_tok_per_s_min",
+        "wall_tok_per_s_median",
+        "wall_tok_per_s_max",
+        "wall_tok_per_s_delta_pct",
+        "max_memory_points",
+        "max_memory_bytes_min",
+        "max_memory_bytes_median",
+        "max_memory_bytes_max",
+        "max_memory_delta_pct",
+        "window_start_source",
+        "window_end_source",
+    ]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: row.get(field, "") for field in fields})
+
+
 def junit_report(report: dict[str, object]) -> str:
     findings = report["findings"]
     assert isinstance(findings, list)
@@ -361,6 +474,7 @@ def write_outputs(report: dict[str, object], grouped: dict[str, list[TrendPoint]
     markdown_path = output_dir / "bench_trend_export_latest.md"
     latest_csv_path = output_dir / "bench_trend_export_latest.csv"
     points_csv_path = output_dir / "bench_trend_export_points_latest.csv"
+    windows_csv_path = output_dir / "bench_trend_export_windows_latest.csv"
     junit_path = output_dir / "bench_trend_export_junit_latest.xml"
 
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -369,6 +483,9 @@ def write_outputs(report: dict[str, object], grouped: dict[str, list[TrendPoint]
     assert isinstance(latest, list)
     write_csv([row for row in latest if isinstance(row, dict)], latest_csv_path)
     write_points_csv(grouped, points_csv_path)
+    windows = report["windows"]
+    assert isinstance(windows, list)
+    write_windows_csv([row for row in windows if isinstance(row, dict)], windows_csv_path)
     junit_path.write_text(junit_report(report), encoding="utf-8")
     return json_path
 
@@ -387,6 +504,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-points-per-key",
         type=int,
         help="Keep only the latest N points per comparable trend key",
+    )
+    parser.add_argument(
+        "--window-points",
+        type=int,
+        default=5,
+        help="Write recent-window stats using the latest N retained points per comparable key",
     )
     parser.add_argument("--fail-on-empty", action="store_true")
     parser.add_argument("--fail-on-airgap", action="store_true")
@@ -419,6 +542,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.max_points_per_key is not None and args.max_points_per_key <= 0:
         print("error: --max-points-per-key must be positive", file=sys.stderr)
         return 2
+    if args.window_points <= 0:
+        print("error: --window-points must be positive", file=sys.stderr)
+        return 2
     if args.min_points_per_key is not None and args.min_points_per_key <= 0:
         print("error: --min-points-per-key must be positive", file=sys.stderr)
         return 2
@@ -439,6 +565,7 @@ def main(argv: list[str] | None = None) -> int:
     grouped = group_points(points, args.max_points_per_key)
     report = build_report(
         grouped,
+        window_points=args.window_points,
         fail_on_empty=args.fail_on_empty,
         fail_on_airgap=args.fail_on_airgap,
         fail_on_telemetry=args.fail_on_telemetry,
