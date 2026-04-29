@@ -25,9 +25,9 @@ def command_sha256(command: list[str]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def write_qemu_report(path: Path, command: list[str]) -> None:
+def write_qemu_report(path: Path, command: list[str], generated_at: str | None = None) -> None:
     command_hash = command_sha256(command)
-    generated_at = iso_now()
+    generated_at = generated_at or iso_now()
     path.write_text(
         json.dumps(
             {
@@ -141,6 +141,7 @@ def main() -> int:
         markdown_path = safe_output_dir / "bench_artifact_manifest_latest.md"
         csv_path = safe_output_dir / "bench_artifact_manifest_latest.csv"
         history_csv_path = safe_output_dir / "bench_artifact_manifest_history_latest.csv"
+        history_coverage_csv_path = safe_output_dir / "bench_artifact_manifest_history_coverage_latest.csv"
         junit_path = safe_output_dir / "bench_artifact_manifest_junit_latest.xml"
         report = json.loads(report_path.read_text(encoding="utf-8"))
         if report["status"] != "pass":
@@ -171,12 +172,68 @@ def main() -> int:
         if "key,source,artifact_type,status" not in history_csv_path.read_text(encoding="utf-8"):
             print("missing_manifest_history_csv=true", file=sys.stderr)
             return 1
+        if (
+            "key,history_count,required_history_count,sources"
+            not in history_coverage_csv_path.read_text(encoding="utf-8")
+        ):
+            print("missing_manifest_history_coverage_csv=true", file=sys.stderr)
+            return 1
         junit_root = ET.parse(junit_path).getroot()
         if junit_root.attrib.get("name") != "holyc_bench_artifact_manifest":
             print("missing_manifest_junit_suite=true", file=sys.stderr)
             return 1
         if junit_root.attrib.get("failures") != "0":
             print("unexpected_manifest_junit_failures=true", file=sys.stderr)
+            return 1
+
+        coverage_source_dir = tmp_path / "coverage_sources"
+        coverage_source_dir.mkdir()
+        write_qemu_report(
+            coverage_source_dir / "qemu_prompt_bench_old.json",
+            safe_command,
+            generated_at="2026-04-27T00:00:00Z",
+        )
+        write_qemu_report(
+            coverage_source_dir / "qemu_prompt_bench_new.json",
+            safe_command,
+            generated_at="2026-04-28T00:00:00Z",
+        )
+        coverage_output_dir = tmp_path / "coverage_manifest"
+        completed = run_manifest(
+            coverage_source_dir,
+            coverage_output_dir,
+            "--min-history-per-key",
+            "2",
+            "--fail-on-history-coverage",
+        )
+        if completed.returncode != 0:
+            sys.stdout.write(completed.stdout)
+            sys.stderr.write(completed.stderr)
+            return completed.returncode
+        coverage_report = json.loads(
+            (coverage_output_dir / "bench_artifact_manifest_latest.json").read_text(encoding="utf-8")
+        )
+        if coverage_report["history_coverage_violations"]:
+            print("unexpected_history_coverage_violation=true", file=sys.stderr)
+            return 1
+
+        sparse_output_dir = tmp_path / "sparse_manifest"
+        completed = run_manifest(
+            safe_report,
+            sparse_output_dir,
+            "--min-history-per-key",
+            "2",
+            "--fail-on-history-coverage",
+        )
+        if completed.returncode == 0:
+            print("sparse_manifest_history_coverage_not_rejected=true", file=sys.stderr)
+            return 1
+        sparse_report = json.loads(
+            (sparse_output_dir / "bench_artifact_manifest_latest.json").read_text(encoding="utf-8")
+        )
+        violations = sparse_report["history_coverage_violations"]
+        if len(violations) != 1 or violations[0]["history_count"] != 1:
+            print("unexpected_history_coverage_violation_payload=true", file=sys.stderr)
             return 1
 
         unsafe_report = tmp_path / "qemu_prompt_bench_unsafe.json"

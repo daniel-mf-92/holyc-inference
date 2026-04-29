@@ -194,3 +194,4 @@
 2026-04-29T01:40:10Z | Added benchmark trend min-points history gate with smoke coverage and refreshed trend dashboards.
 2026-04-29T01:51:16Z | Added qemu_prompt_bench prompt input byte/s telemetry with synthetic smoke validation and refreshed benchmark artifacts.
 2026-04-29T02:03:35Z | Added qemu_prompt_bench serial output byte telemetry/gates with synthetic smoke validation and refreshed benchmark artifacts.
+2026-04-29T02:16:21Z | Added benchmark artifact manifest per-key history coverage gates with smoke coverage and refreshed manifest artifacts.

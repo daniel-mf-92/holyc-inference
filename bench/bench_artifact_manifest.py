@@ -74,6 +74,14 @@ class ManifestArtifact:
     bytes: int
 
 
+@dataclass(frozen=True)
+class ManifestCoverageViolation:
+    key: str
+    history_count: int
+    required_history_count: int
+    sources: list[str]
+
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -176,6 +184,31 @@ def manifest_status(artifacts: list[ManifestArtifact]) -> str:
     return "pass"
 
 
+def history_coverage_violations(
+    artifacts: Iterable[ManifestArtifact],
+    min_history_per_key: int | None,
+) -> list[ManifestCoverageViolation]:
+    if min_history_per_key is None:
+        return []
+    by_key: dict[str, list[ManifestArtifact]] = {}
+    for artifact in artifacts:
+        by_key.setdefault(artifact.key, []).append(artifact)
+
+    violations: list[ManifestCoverageViolation] = []
+    for key, grouped in sorted(by_key.items()):
+        if len(grouped) >= min_history_per_key:
+            continue
+        violations.append(
+            ManifestCoverageViolation(
+                key=key,
+                history_count=len(grouped),
+                required_history_count=min_history_per_key,
+                sources=sorted(artifact.source for artifact in grouped),
+            )
+        )
+    return violations
+
+
 def has_airgap_failures(artifacts: Iterable[ManifestArtifact]) -> bool:
     return any(artifact.command_airgap_status == "fail" for artifact in artifacts)
 
@@ -198,6 +231,10 @@ def has_stale_commits(artifacts: Iterable[ManifestArtifact]) -> bool:
 
 def has_stale_artifacts(artifacts: Iterable[ManifestArtifact]) -> bool:
     return any(artifact.freshness_status == "fail" for artifact in artifacts)
+
+
+def has_history_coverage_violations(violations: Iterable[ManifestCoverageViolation]) -> bool:
+    return any(True for _ in violations)
 
 
 def format_value(value: object) -> str:
@@ -242,6 +279,30 @@ def markdown_report(report: dict[str, object]) -> str:
             )
     else:
         lines.append("No supported benchmark artifacts found.")
+
+    coverage = report.get("history_coverage_violations", [])
+    if coverage:
+        lines.extend(
+            [
+                "",
+                "## History Coverage Violations",
+                "",
+                "| Key | History | Required | Sources |",
+                "| --- | ---: | ---: | ---: |",
+            ]
+        )
+        for violation in coverage:
+            assert isinstance(violation, dict)
+            lines.append(
+                "| {key} | {history_count} | {required_history_count} | {sources} |".format(
+                    key=violation["key"],
+                    history_count=violation["history_count"],
+                    required_history_count=violation["required_history_count"],
+                    sources=len(violation["sources"]),
+                )
+            )
+    elif report.get("min_history_per_key") is not None:
+        lines.extend(["", "History coverage requirements satisfied."])
     return "\n".join(lines) + "\n"
 
 
@@ -306,6 +367,22 @@ def write_csv(artifacts: list[ManifestArtifact], path: Path) -> None:
             writer.writerow({field: row[field] for field in fields})
 
 
+def write_history_coverage_csv(violations: list[ManifestCoverageViolation], path: Path) -> None:
+    fields = ["key", "history_count", "required_history_count", "sources"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for violation in violations:
+            writer.writerow(
+                {
+                    "key": violation.key,
+                    "history_count": violation.history_count,
+                    "required_history_count": violation.required_history_count,
+                    "sources": json.dumps(violation.sources, separators=(",", ":")),
+                }
+            )
+
+
 def junit_report(report: dict[str, object]) -> str:
     history = [row for row in report["history"] if isinstance(row, dict)]
     failed_artifacts = [row for row in history if row.get("status") == "fail"]
@@ -314,6 +391,9 @@ def junit_report(report: dict[str, object]) -> str:
     command_hash_failures = [row for row in history if row.get("command_hash_status") == "fail"]
     commit_failures = [row for row in history if row.get("commit_status") == "fail"]
     freshness_failures = [row for row in history if row.get("freshness_status") == "fail"]
+    history_coverage_failures = [
+        row for row in report.get("history_coverage_violations", []) if isinstance(row, dict)
+    ]
     missing_latest = not report["latest_artifacts"]
     failures = (
         int(bool(failed_artifacts))
@@ -322,6 +402,7 @@ def junit_report(report: dict[str, object]) -> str:
         + int(bool(command_hash_failures))
         + int(bool(commit_failures))
         + int(bool(freshness_failures))
+        + int(bool(history_coverage_failures))
         + int(missing_latest)
     )
 
@@ -329,7 +410,7 @@ def junit_report(report: dict[str, object]) -> str:
         "testsuite",
         {
             "name": "holyc_bench_artifact_manifest",
-            "tests": "7",
+            "tests": "8",
             "failures": str(failures),
         },
     )
@@ -430,37 +511,60 @@ def junit_report(report: dict[str, object]) -> str:
             for row in freshness_failures
         )
 
+    history_coverage_case = ET.SubElement(suite, "testcase", {"name": "history_coverage"})
+    if history_coverage_failures:
+        failure = ET.SubElement(
+            history_coverage_case,
+            "failure",
+            {
+                "type": "benchmark_manifest_history_coverage",
+                "message": f"{len(history_coverage_failures)} benchmark key(s) lack required history",
+            },
+        )
+        failure.text = "\n".join(
+            f"{row.get('key', '')}: {row.get('history_count', 0)}/{row.get('required_history_count', 0)}"
+            for row in history_coverage_failures
+        )
+
     return ET.tostring(suite, encoding="unicode") + "\n"
 
 
 def write_manifest(
-    summaries: list[bench_result_index.ArtifactSummary], output_dir: Path
-) -> tuple[Path, str, list[ManifestArtifact]]:
+    summaries: list[bench_result_index.ArtifactSummary],
+    output_dir: Path,
+    min_history_per_key: int | None = None,
+) -> tuple[Path, str, list[ManifestArtifact], list[ManifestCoverageViolation]]:
     output_dir.mkdir(parents=True, exist_ok=True)
     history = sorted(
         (to_manifest_artifact(summary) for summary in summaries),
         key=lambda item: (item.key, item.generated_at, item.source),
     )
     latest = latest_artifacts(history)
+    coverage_violations = history_coverage_violations(history, min_history_per_key)
+    status = "fail" if coverage_violations else manifest_status(history)
     report = {
         "generated_at": iso_now(),
-        "status": manifest_status(history),
+        "status": status,
         "history_artifacts": len(history),
+        "min_history_per_key": min_history_per_key,
         "latest_artifacts": [asdict(artifact) for artifact in latest],
         "history": [asdict(artifact) for artifact in history],
+        "history_coverage_violations": [asdict(violation) for violation in coverage_violations],
     }
 
     json_path = output_dir / "bench_artifact_manifest_latest.json"
     md_path = output_dir / "bench_artifact_manifest_latest.md"
     csv_path = output_dir / "bench_artifact_manifest_latest.csv"
     history_csv_path = output_dir / "bench_artifact_manifest_history_latest.csv"
+    history_coverage_csv_path = output_dir / "bench_artifact_manifest_history_coverage_latest.csv"
     junit_path = output_dir / "bench_artifact_manifest_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
     write_csv(latest, csv_path)
     write_csv(history, history_csv_path)
+    write_history_coverage_csv(coverage_violations, history_coverage_csv_path)
     junit_path.write_text(junit_report(report), encoding="utf-8")
-    return json_path, str(report["status"]), history
+    return json_path, str(report["status"]), history, coverage_violations
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -508,6 +612,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Return non-zero if any artifact exceeds --max-artifact-age-hours",
     )
+    parser.add_argument(
+        "--min-history-per-key",
+        type=int,
+        help="Require at least this many artifacts per profile/model/quantization/prompt-suite key",
+    )
+    parser.add_argument(
+        "--fail-on-history-coverage",
+        action="store_true",
+        help="Return non-zero if any manifest key has fewer than --min-history-per-key artifacts",
+    )
     return parser
 
 
@@ -523,12 +637,22 @@ def main(argv: list[str] | None = None) -> int:
     elif args.fail_on_stale_artifact:
         print("error: --fail-on-stale-artifact requires --max-artifact-age-hours", file=sys.stderr)
         return 2
+    if args.min_history_per_key is not None and args.min_history_per_key <= 0:
+        print("error: --min-history-per-key must be positive", file=sys.stderr)
+        return 2
+    if args.fail_on_history_coverage and args.min_history_per_key is None:
+        print("error: --fail-on-history-coverage requires --min-history-per-key", file=sys.stderr)
+        return 2
     try:
         summaries = bench_result_index.load_summaries(
             inputs,
             max_artifact_age_seconds=max_artifact_age_seconds,
         )
-        output, status, artifacts = write_manifest(summaries, args.output_dir)
+        output, status, artifacts, history_coverage = write_manifest(
+            summaries,
+            args.output_dir,
+            min_history_per_key=args.min_history_per_key,
+        )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -538,6 +662,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"artifacts={len(summaries)}")
     print(f"command_hash_failures={sum(1 for artifact in artifacts if artifact.command_hash_status == 'fail')}")
     print(f"freshness_failures={sum(1 for artifact in artifacts if artifact.freshness_status == 'fail')}")
+    print(f"history_coverage_violations={len(history_coverage)}")
     if args.fail_on_airgap and has_airgap_failures(artifacts):
         return 1
     if args.fail_on_telemetry and has_telemetry_failures(artifacts):
@@ -549,6 +674,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.fail_on_stale_commit and has_stale_commits(artifacts):
         return 1
     if args.fail_on_stale_artifact and has_stale_artifacts(artifacts):
+        return 1
+    if args.fail_on_history_coverage and has_history_coverage_violations(history_coverage):
         return 1
     return 0
 
