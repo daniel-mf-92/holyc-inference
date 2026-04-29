@@ -46,6 +46,7 @@ class PerfRecord:
     host_child_cpu_pct: float | None = None
     host_child_tok_per_cpu_s: float | None = None
     tokens: int | None = None
+    serial_output_bytes: int | None = None
     ttft_us: int | None = None
     host_overhead_pct: float | None = None
     prompt_suite_sha256: str = ""
@@ -90,6 +91,8 @@ class CommitPoint:
     host_child_cpu_pct_records: int
     host_child_tok_per_cpu_s_records: int
     token_records: int
+    serial_output_bytes_records: int
+    serial_output_bytes_per_token_records: int
     ttft_us_records: int
     host_overhead_records: int
     median_tok_per_s: float | None
@@ -102,6 +105,10 @@ class CommitPoint:
     p95_wall_us_per_token: float | None
     median_tokens: float | None
     min_tokens: int | None
+    median_serial_output_bytes: float | None
+    max_serial_output_bytes: int | None
+    median_serial_output_bytes_per_token: float | None
+    max_serial_output_bytes_per_token: float | None
     median_ttft_us: float | None
     p95_ttft_us: float | None
     median_host_overhead_pct: float | None
@@ -260,6 +267,18 @@ class ComparisonRow:
     min_tokens_baseline: int | None
     min_tokens_candidate: int | None
     min_tokens_delta_pct: float | None
+    median_serial_output_bytes_baseline: float | None
+    median_serial_output_bytes_candidate: float | None
+    median_serial_output_bytes_delta_pct: float | None
+    max_serial_output_bytes_baseline: int | None
+    max_serial_output_bytes_candidate: int | None
+    max_serial_output_bytes_delta_pct: float | None
+    median_serial_output_bytes_per_token_baseline: float | None
+    median_serial_output_bytes_per_token_candidate: float | None
+    median_serial_output_bytes_per_token_delta_pct: float | None
+    max_serial_output_bytes_per_token_baseline: float | None
+    max_serial_output_bytes_per_token_candidate: float | None
+    max_serial_output_bytes_per_token_delta_pct: float | None
     median_ttft_us_baseline: float | None
     median_ttft_us_candidate: float | None
     median_ttft_us_delta_pct: float | None
@@ -418,6 +437,12 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
         or row.get("generated_tokens")
         or row.get("completion_tokens")
     )
+    serial_output_bytes = parse_int(
+        row.get("serial_output_bytes")
+        or row.get("serial_bytes")
+        or row.get("output_bytes")
+        or row.get("qemu_serial_output_bytes")
+    )
 
     ttft_us = parse_duration_us(
         row,
@@ -442,6 +467,7 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
         and host_child_cpu_pct is None
         and host_child_tok_per_cpu_s is None
         and tokens is None
+        and serial_output_bytes is None
         and ttft_us is None
         and host_overhead_pct is None
     ):
@@ -467,6 +493,7 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
         host_child_cpu_pct=host_child_cpu_pct,
         host_child_tok_per_cpu_s=host_child_tok_per_cpu_s,
         tokens=tokens,
+        serial_output_bytes=serial_output_bytes,
         ttft_us=ttft_us,
         host_overhead_pct=host_overhead_pct,
         prompt_suite_sha256=prompt_suite_sha256(row),
@@ -570,6 +597,16 @@ def memory_bytes_per_token_values(records: list[PerfRecord]) -> list[float]:
     ]
 
 
+def serial_output_bytes_per_token_values(records: list[PerfRecord]) -> list[float]:
+    return [
+        float(record.serial_output_bytes) / float(record.tokens)
+        for record in records
+        if record.serial_output_bytes is not None
+        and record.tokens is not None
+        and record.tokens > 0
+    ]
+
+
 def summarize(records: list[PerfRecord]) -> dict[str, dict[str, Any]]:
     by_key: dict[str, list[PerfRecord]] = {}
     for record in records:
@@ -610,6 +647,12 @@ def summarize(records: list[PerfRecord]) -> dict[str, dict[str, Any]]:
             if record.host_child_tok_per_cpu_s is not None
         ]
         token_values = [record.tokens for record in key_records if record.tokens is not None]
+        serial_output_values = [
+            record.serial_output_bytes
+            for record in key_records
+            if record.serial_output_bytes is not None
+        ]
+        serial_output_per_token_values = serial_output_bytes_per_token_values(key_records)
         ttft_values = [record.ttft_us for record in key_records if record.ttft_us is not None]
         host_overhead_values = [
             record.host_overhead_pct
@@ -633,6 +676,18 @@ def summarize(records: list[PerfRecord]) -> dict[str, dict[str, Any]]:
             "p95_wall_us_per_token": percentile(wall_us_per_token_values, 95.0),
             "median_tokens": statistics.median(token_values) if token_values else None,
             "min_tokens": min(token_values) if token_values else None,
+            "median_serial_output_bytes": (
+                statistics.median(serial_output_values) if serial_output_values else None
+            ),
+            "max_serial_output_bytes": max(serial_output_values) if serial_output_values else None,
+            "median_serial_output_bytes_per_token": (
+                statistics.median(serial_output_per_token_values)
+                if serial_output_per_token_values
+                else None
+            ),
+            "max_serial_output_bytes_per_token": (
+                max(serial_output_per_token_values) if serial_output_per_token_values else None
+            ),
             "median_ttft_us": statistics.median(ttft_values) if ttft_values else None,
             "p95_ttft_us": percentile([float(value) for value in ttft_values], 95.0),
             "median_host_overhead_pct": (
@@ -725,6 +780,12 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
             if record.host_child_tok_per_cpu_s is not None
         ]
         token_values = [record.tokens for record in commit_records if record.tokens is not None]
+        serial_output_values = [
+            record.serial_output_bytes
+            for record in commit_records
+            if record.serial_output_bytes is not None
+        ]
+        serial_output_per_token_values = serial_output_bytes_per_token_values(commit_records)
         ttft_values = [record.ttft_us for record in commit_records if record.ttft_us is not None]
         host_overhead_values = [
             record.host_overhead_pct
@@ -760,6 +821,8 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                 host_child_cpu_pct_records=len(host_child_cpu_pct_values),
                 host_child_tok_per_cpu_s_records=len(host_child_tok_per_cpu_s_values),
                 token_records=len(token_values),
+                serial_output_bytes_records=len(serial_output_values),
+                serial_output_bytes_per_token_records=len(serial_output_per_token_values),
                 ttft_us_records=len(ttft_values),
                 host_overhead_records=len(host_overhead_values),
                 median_tok_per_s=statistics.median(tps_values) if tps_values else None,
@@ -778,6 +841,22 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                 p95_wall_us_per_token=percentile(wall_us_per_token_values, 95.0),
                 median_tokens=statistics.median(token_values) if token_values else None,
                 min_tokens=min(token_values) if token_values else None,
+                median_serial_output_bytes=(
+                    statistics.median(serial_output_values) if serial_output_values else None
+                ),
+                max_serial_output_bytes=(
+                    max(serial_output_values) if serial_output_values else None
+                ),
+                median_serial_output_bytes_per_token=(
+                    statistics.median(serial_output_per_token_values)
+                    if serial_output_per_token_values
+                    else None
+                ),
+                max_serial_output_bytes_per_token=(
+                    max(serial_output_per_token_values)
+                    if serial_output_per_token_values
+                    else None
+                ),
                 median_ttft_us=statistics.median(ttft_values) if ttft_values else None,
                 p95_ttft_us=percentile([float(value) for value in ttft_values], 95.0),
                 median_host_overhead_pct=(
@@ -976,6 +1055,38 @@ def comparison_rows(
                 min_tokens_baseline=baseline.min_tokens,
                 min_tokens_candidate=candidate.min_tokens,
                 min_tokens_delta_pct=throughput_delta_pct(baseline.min_tokens, candidate.min_tokens),
+                median_serial_output_bytes_baseline=baseline.median_serial_output_bytes,
+                median_serial_output_bytes_candidate=candidate.median_serial_output_bytes,
+                median_serial_output_bytes_delta_pct=growth_delta_pct(
+                    baseline.median_serial_output_bytes,
+                    candidate.median_serial_output_bytes,
+                ),
+                max_serial_output_bytes_baseline=baseline.max_serial_output_bytes,
+                max_serial_output_bytes_candidate=candidate.max_serial_output_bytes,
+                max_serial_output_bytes_delta_pct=growth_delta_pct(
+                    baseline.max_serial_output_bytes,
+                    candidate.max_serial_output_bytes,
+                ),
+                median_serial_output_bytes_per_token_baseline=(
+                    baseline.median_serial_output_bytes_per_token
+                ),
+                median_serial_output_bytes_per_token_candidate=(
+                    candidate.median_serial_output_bytes_per_token
+                ),
+                median_serial_output_bytes_per_token_delta_pct=growth_delta_pct(
+                    baseline.median_serial_output_bytes_per_token,
+                    candidate.median_serial_output_bytes_per_token,
+                ),
+                max_serial_output_bytes_per_token_baseline=(
+                    baseline.max_serial_output_bytes_per_token
+                ),
+                max_serial_output_bytes_per_token_candidate=(
+                    candidate.max_serial_output_bytes_per_token
+                ),
+                max_serial_output_bytes_per_token_delta_pct=growth_delta_pct(
+                    baseline.max_serial_output_bytes_per_token,
+                    candidate.max_serial_output_bytes_per_token,
+                ),
                 median_ttft_us_baseline=baseline.median_ttft_us,
                 median_ttft_us_candidate=candidate.median_ttft_us,
                 median_ttft_us_delta_pct=growth_delta_pct(
@@ -1012,6 +1123,8 @@ def detect_regressions(
     token_drop_threshold_pct: float | None = None,
     min_token_drop_threshold_pct: float | None = None,
     memory_per_token_threshold_pct: float | None = None,
+    serial_output_threshold_pct: float | None = None,
+    serial_output_per_token_threshold_pct: float | None = None,
     us_per_token_threshold_pct: float | None = None,
     wall_us_per_token_threshold_pct: float | None = None,
     baseline_commit: str | None = None,
@@ -1390,6 +1503,60 @@ def detect_regressions(
                 )
 
         if (
+            serial_output_threshold_pct is not None
+            and baseline.median_serial_output_bytes
+            and candidate.median_serial_output_bytes is not None
+        ):
+            delta_pct = (
+                (
+                    candidate.median_serial_output_bytes
+                    - baseline.median_serial_output_bytes
+                )
+                * 100.0
+                / baseline.median_serial_output_bytes
+            )
+            if delta_pct > serial_output_threshold_pct:
+                regressions.append(
+                    Regression(
+                        key=key,
+                        metric="serial_output_bytes",
+                        baseline_commit=baseline.commit,
+                        candidate_commit=candidate.commit,
+                        baseline_value=baseline.median_serial_output_bytes,
+                        candidate_value=candidate.median_serial_output_bytes,
+                        delta_pct=delta_pct,
+                        threshold_pct=serial_output_threshold_pct,
+                    )
+                )
+
+        if (
+            serial_output_per_token_threshold_pct is not None
+            and baseline.median_serial_output_bytes_per_token
+            and candidate.median_serial_output_bytes_per_token is not None
+        ):
+            delta_pct = (
+                (
+                    candidate.median_serial_output_bytes_per_token
+                    - baseline.median_serial_output_bytes_per_token
+                )
+                * 100.0
+                / baseline.median_serial_output_bytes_per_token
+            )
+            if delta_pct > serial_output_per_token_threshold_pct:
+                regressions.append(
+                    Regression(
+                        key=key,
+                        metric="serial_output_bytes_per_token",
+                        baseline_commit=baseline.commit,
+                        candidate_commit=candidate.commit,
+                        baseline_value=baseline.median_serial_output_bytes_per_token,
+                        candidate_value=candidate.median_serial_output_bytes_per_token,
+                        delta_pct=delta_pct,
+                        threshold_pct=serial_output_per_token_threshold_pct,
+                    )
+                )
+
+        if (
             ttft_threshold_pct is not None
             and baseline.median_ttft_us
             and candidate.median_ttft_us is not None
@@ -1690,6 +1857,8 @@ def detect_telemetry_coverage_violations(
     require_host_child_cpu_pct: bool = False,
     require_host_child_tok_per_cpu_s: bool = False,
     require_tokens: bool = False,
+    require_serial_output_bytes: bool = False,
+    require_serial_output_bytes_per_token: bool = False,
     require_ttft_us: bool = False,
     require_host_overhead_pct: bool = False,
 ) -> list[TelemetryCoverageViolation]:
@@ -1717,6 +1886,12 @@ def detect_telemetry_coverage_violations(
             "host_child_tok_per_cpu_s_records",
         ),
         ("tokens", require_tokens, "token_records"),
+        ("serial_output_bytes", require_serial_output_bytes, "serial_output_bytes_records"),
+        (
+            "serial_output_bytes_per_token",
+            require_serial_output_bytes_per_token,
+            "serial_output_bytes_per_token_records",
+        ),
         ("ttft_us", require_ttft_us, "ttft_us_records"),
         ("host_overhead_pct", require_host_overhead_pct, "host_overhead_records"),
     ]
@@ -1756,6 +1931,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Host child CPU regressions: {len([row for row in report['regressions'] if row['metric'] in {'host_child_cpu_us', 'host_child_cpu_us_p95', 'host_child_cpu_pct'}])}",
         f"Host child tok/CPU-s regressions: {len([row for row in report['regressions'] if row['metric'] == 'host_child_tok_per_cpu_s'])}",
         f"Memory/token regressions: {len([row for row in report['regressions'] if row['metric'] == 'memory_bytes_per_token'])}",
+        f"Serial output regressions: {len([row for row in report['regressions'] if row['metric'] in {'serial_output_bytes', 'serial_output_bytes_per_token'}])}",
         f"Token-count regressions: {len([row for row in report['regressions'] if row['metric'] in {'tokens', 'min_tokens'}])}",
         f"Sample violations: {len(report['sample_violations'])}",
         f"Variability violations: {len(report['variability_violations'])}",
@@ -1898,9 +2074,9 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(["", "## Comparisons", ""])
     if report["comparisons"]:
         lines.append(
-            "| Key | Baseline | Candidate | Median tok/s Delta | P05 tok/s Delta | Wall tok/s Delta | P05 wall tok/s Delta | us/token Delta | Wall us/token Delta | Memory Delta | Memory/token Delta | Host RSS Delta | Host CPU Delta | P95 Host CPU Delta | Host CPU % Delta | Host tok/CPU-s Delta | Token Drop | Median TTFT Delta | P95 TTFT Delta | Host Overhead Delta |"
+            "| Key | Baseline | Candidate | Median tok/s Delta | P05 tok/s Delta | Wall tok/s Delta | P05 wall tok/s Delta | us/token Delta | Wall us/token Delta | Memory Delta | Memory/token Delta | Host RSS Delta | Host CPU Delta | P95 Host CPU Delta | Host CPU % Delta | Host tok/CPU-s Delta | Token Drop | Serial Output Delta | Serial Output/token Delta | Median TTFT Delta | P95 TTFT Delta | Host Overhead Delta |"
         )
-        lines.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for comparison in report["comparisons"]:
             median_tps_delta = comparison["median_tok_per_s_delta_pct"]
             p05_tps_delta = comparison["p05_tok_per_s_delta_pct"]
@@ -1916,6 +2092,8 @@ def markdown_report(report: dict[str, Any]) -> str:
             host_cpu_pct_delta = comparison["median_host_child_cpu_pct_delta_pct"]
             host_tok_cpu_delta = comparison["median_host_child_tok_per_cpu_s_delta_pct"]
             token_delta = comparison["median_tokens_delta_pct"]
+            serial_delta = comparison["median_serial_output_bytes_delta_pct"]
+            serial_per_token_delta = comparison["median_serial_output_bytes_per_token_delta_pct"]
             ttft_delta = comparison["median_ttft_us_delta_pct"]
             p95_ttft_delta = comparison["p95_ttft_us_delta_pct"]
             overhead_delta = comparison["median_host_overhead_pct_delta_pct"]
@@ -1951,6 +2129,12 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"{host_tok_cpu_delta:.2f}%" if host_tok_cpu_delta is not None else "-"
             )
             token_cell = f"{token_delta:.2f}%" if token_delta is not None else "-"
+            serial_cell = f"{serial_delta:.2f}%" if serial_delta is not None else "-"
+            serial_per_token_cell = (
+                f"{serial_per_token_delta:.2f}%"
+                if serial_per_token_delta is not None
+                else "-"
+            )
             ttft_cell = f"{ttft_delta:.2f}%" if ttft_delta is not None else "-"
             p95_ttft_cell = f"{p95_ttft_delta:.2f}%" if p95_ttft_delta is not None else "-"
             overhead_cell = f"{overhead_delta:.2f}%" if overhead_delta is not None else "-"
@@ -1960,7 +2144,8 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"{wall_tps_cell} | {p05_wall_tps_cell} | "
                 f"{us_per_token_cell} | {wall_us_per_token_cell} | "
                 f"{memory_cell} | {memory_per_token_cell} | {host_rss_cell} | {host_cpu_cell} | {p95_host_cpu_cell} | "
-                f"{host_cpu_pct_cell} | {host_tok_cpu_cell} | {token_cell} | {ttft_cell} | "
+                f"{host_cpu_pct_cell} | {host_tok_cpu_cell} | {token_cell} | "
+                f"{serial_cell} | {serial_per_token_cell} | {ttft_cell} | "
                 f"{p95_ttft_cell} | {overhead_cell} |"
             )
     else:
@@ -1969,9 +2154,9 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(["", "## Commit Points", ""])
     if report["commit_points"]:
         lines.append(
-            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | us/token Records | Wall us/token Records | Memory Records | Memory/token Records | Host RSS Records | Host CPU Records | Host CPU % Records | Host tok/CPU-s Records | Token Records | TTFT Records | Host Overhead Records | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median TTFT us | P95 TTFT us | Median Host Overhead % | Median Host CPU us | P95 Host CPU us | Median Host CPU % | Median Host tok/CPU-s | Tok/s CV | Wall Tok/s CV | Max Memory Bytes | Median Memory/token | Max Memory/token | Max Host RSS Bytes | Prompt Suite | Environment | Host Platform | Host Machine | QEMU Version |"
+            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | us/token Records | Wall us/token Records | Memory Records | Memory/token Records | Host RSS Records | Host CPU Records | Host CPU % Records | Host tok/CPU-s Records | Token Records | Serial Output Records | Serial Output/token Records | TTFT Records | Host Overhead Records | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median Serial Output | Max Serial Output | Median Serial Output/token | Max Serial Output/token | Median TTFT us | P95 TTFT us | Median Host Overhead % | Median Host CPU us | P95 Host CPU us | Median Host CPU % | Median Host tok/CPU-s | Tok/s CV | Wall Tok/s CV | Max Memory Bytes | Median Memory/token | Max Memory/token | Max Host RSS Bytes | Prompt Suite | Environment | Host Platform | Host Machine | QEMU Version |"
         )
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- |")
         for point in report["commit_points"]:
             p05_tps = point["p05_tok_per_s"]
             tps = point["median_tok_per_s"]
@@ -1983,6 +2168,10 @@ def markdown_report(report: dict[str, Any]) -> str:
             p95_wall_us_per_token = point["p95_wall_us_per_token"]
             tokens = point["median_tokens"]
             min_tokens = point["min_tokens"]
+            serial_output = point["median_serial_output_bytes"]
+            max_serial_output = point["max_serial_output_bytes"]
+            serial_output_per_token = point["median_serial_output_bytes_per_token"]
+            max_serial_output_per_token = point["max_serial_output_bytes_per_token"]
             ttft = point["median_ttft_us"]
             p95_ttft = point["p95_ttft_us"]
             overhead = point["median_host_overhead_pct"]
@@ -2013,6 +2202,22 @@ def markdown_report(report: dict[str, Any]) -> str:
             )
             tokens_cell = f"{tokens:.1f}" if tokens is not None else "-"
             min_tokens_cell = str(min_tokens) if min_tokens is not None else "-"
+            serial_output_cell = (
+                f"{serial_output:.1f}" if serial_output is not None else "-"
+            )
+            max_serial_output_cell = (
+                str(max_serial_output) if max_serial_output is not None else "-"
+            )
+            serial_output_per_token_cell = (
+                f"{serial_output_per_token:.3f}"
+                if serial_output_per_token is not None
+                else "-"
+            )
+            max_serial_output_per_token_cell = (
+                f"{max_serial_output_per_token:.3f}"
+                if max_serial_output_per_token is not None
+                else "-"
+            )
             ttft_cell = f"{ttft:.1f}" if ttft is not None else "-"
             p95_ttft_cell = f"{p95_ttft:.1f}" if p95_ttft is not None else "-"
             overhead_cell = f"{overhead:.3f}" if overhead is not None else "-"
@@ -2042,12 +2247,16 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"{point['host_child_peak_rss_records']} | "
                 f"{point['host_child_cpu_us_records']} | {point['host_child_cpu_pct_records']} | "
                 f"{point['host_child_tok_per_cpu_s_records']} | "
-                f"{point['token_records']} | {point['ttft_us_records']} | "
+                f"{point['token_records']} | {point['serial_output_bytes_records']} | "
+                f"{point['serial_output_bytes_per_token_records']} | "
+                f"{point['ttft_us_records']} | "
                 f"{point['host_overhead_records']} | {p05_tps_cell} | {tps_cell} | "
                 f"{p05_wall_tps_cell} | {wall_tps_cell} | "
                 f"{us_per_token_cell} | {p95_us_per_token_cell} | "
                 f"{wall_us_per_token_cell} | {p95_wall_us_per_token_cell} | "
-                f"{tokens_cell} | {min_tokens_cell} | {ttft_cell} | {p95_ttft_cell} | "
+                f"{tokens_cell} | {min_tokens_cell} | {serial_output_cell} | "
+                f"{max_serial_output_cell} | {serial_output_per_token_cell} | "
+                f"{max_serial_output_per_token_cell} | {ttft_cell} | {p95_ttft_cell} | "
                 f"{overhead_cell} | {host_cpu_cell} | {p95_host_cpu_cell} | {host_cpu_pct_cell} | {host_tok_cpu_cell} | "
                 f"{tps_cv_cell} | {wall_tps_cv_cell} | {memory_cell} | "
                 f"{memory_per_token_cell} | {max_memory_per_token_cell} | {host_rss_cell} | {prompt_suite} | "
@@ -2058,8 +2267,8 @@ def markdown_report(report: dict[str, Any]) -> str:
 
     lines.extend(["", "## Latest Summary", ""])
     if report["summaries"]:
-        lines.append("| Key | Records | Latest Commit | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median TTFT us | P95 TTFT us | Median Host Overhead % | Median Host CPU us | P95 Host CPU us | Median Host CPU % | Median Host tok/CPU-s | Max Memory Bytes | Median Memory/token | Max Memory/token | Max Host RSS Bytes |")
-        lines.append("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| Key | Records | Latest Commit | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median Serial Output | Max Serial Output | Median Serial Output/token | Max Serial Output/token | Median TTFT us | P95 TTFT us | Median Host Overhead % | Median Host CPU us | P95 Host CPU us | Median Host CPU % | Median Host tok/CPU-s | Max Memory Bytes | Median Memory/token | Max Memory/token | Max Host RSS Bytes |")
+        lines.append("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for key, summary in report["summaries"].items():
             p05_tps = summary["p05_tok_per_s"]
             tps = summary["median_tok_per_s"]
@@ -2071,6 +2280,10 @@ def markdown_report(report: dict[str, Any]) -> str:
             p95_wall_us_per_token = summary["p95_wall_us_per_token"]
             tokens = summary["median_tokens"]
             min_tokens = summary["min_tokens"]
+            serial_output = summary["median_serial_output_bytes"]
+            max_serial_output = summary["max_serial_output_bytes"]
+            serial_output_per_token = summary["median_serial_output_bytes_per_token"]
+            max_serial_output_per_token = summary["max_serial_output_bytes_per_token"]
             ttft = summary["median_ttft_us"]
             p95_ttft = summary["p95_ttft_us"]
             overhead = summary["median_host_overhead_pct"]
@@ -2098,6 +2311,22 @@ def markdown_report(report: dict[str, Any]) -> str:
             )
             tokens_cell = f"{tokens:.1f}" if tokens is not None else "-"
             min_tokens_cell = str(min_tokens) if min_tokens is not None else "-"
+            serial_output_cell = (
+                f"{serial_output:.1f}" if serial_output is not None else "-"
+            )
+            max_serial_output_cell = (
+                str(max_serial_output) if max_serial_output is not None else "-"
+            )
+            serial_output_per_token_cell = (
+                f"{serial_output_per_token:.3f}"
+                if serial_output_per_token is not None
+                else "-"
+            )
+            max_serial_output_per_token_cell = (
+                f"{max_serial_output_per_token:.3f}"
+                if max_serial_output_per_token is not None
+                else "-"
+            )
             ttft_cell = f"{ttft:.1f}" if ttft is not None else "-"
             p95_ttft_cell = f"{p95_ttft:.1f}" if p95_ttft is not None else "-"
             overhead_cell = f"{overhead:.3f}" if overhead is not None else "-"
@@ -2118,7 +2347,9 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"{p05_tps_cell} | {tps_cell} | {p05_wall_tps_cell} | {wall_tps_cell} | "
                 f"{us_per_token_cell} | {p95_us_per_token_cell} | "
                 f"{wall_us_per_token_cell} | {p95_wall_us_per_token_cell} | "
-                f"{tokens_cell} | {min_tokens_cell} | {ttft_cell} | {p95_ttft_cell} | "
+                f"{tokens_cell} | {min_tokens_cell} | {serial_output_cell} | "
+                f"{max_serial_output_cell} | {serial_output_per_token_cell} | "
+                f"{max_serial_output_per_token_cell} | {ttft_cell} | {p95_ttft_cell} | "
                 f"{overhead_cell} | {host_cpu_cell} | {p95_host_cpu_cell} | "
                 f"{host_cpu_pct_cell} | {host_tok_cpu_cell} | {memory_cell} | "
                 f"{memory_per_token_cell} | {max_memory_per_token_cell} | {host_rss_cell} |"
@@ -2500,6 +2731,8 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "host_child_cpu_pct_records",
             "host_child_tok_per_cpu_s_records",
             "token_records",
+            "serial_output_bytes_records",
+            "serial_output_bytes_per_token_records",
             "ttft_us_records",
             "host_overhead_records",
             "p05_tok_per_s",
@@ -2512,6 +2745,10 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "p95_wall_us_per_token",
             "median_tokens",
             "min_tokens",
+            "median_serial_output_bytes",
+            "max_serial_output_bytes",
+            "median_serial_output_bytes_per_token",
+            "max_serial_output_bytes_per_token",
             "median_ttft_us",
             "p95_ttft_us",
             "median_host_overhead_pct",
@@ -2606,6 +2843,18 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "min_tokens_baseline",
             "min_tokens_candidate",
             "min_tokens_delta_pct",
+            "median_serial_output_bytes_baseline",
+            "median_serial_output_bytes_candidate",
+            "median_serial_output_bytes_delta_pct",
+            "max_serial_output_bytes_baseline",
+            "max_serial_output_bytes_candidate",
+            "max_serial_output_bytes_delta_pct",
+            "median_serial_output_bytes_per_token_baseline",
+            "median_serial_output_bytes_per_token_candidate",
+            "median_serial_output_bytes_per_token_delta_pct",
+            "max_serial_output_bytes_per_token_baseline",
+            "max_serial_output_bytes_per_token_candidate",
+            "max_serial_output_bytes_per_token_delta_pct",
             "median_ttft_us_baseline",
             "median_ttft_us_candidate",
             "median_ttft_us_delta_pct",
@@ -2712,6 +2961,8 @@ def build_report(
     token_drop_threshold_pct: float | None = None,
     min_token_drop_threshold_pct: float | None = None,
     memory_per_token_threshold_pct: float | None = None,
+    serial_output_threshold_pct: float | None = None,
+    serial_output_per_token_threshold_pct: float | None = None,
     us_per_token_threshold_pct: float | None = None,
     wall_us_per_token_threshold_pct: float | None = None,
     min_commits_per_key: int = 1,
@@ -2726,6 +2977,8 @@ def build_report(
     require_host_child_cpu_pct: bool = False,
     require_host_child_tok_per_cpu_s: bool = False,
     require_tokens: bool = False,
+    require_serial_output_bytes: bool = False,
+    require_serial_output_bytes_per_token: bool = False,
     require_ttft_us: bool = False,
     require_host_overhead_pct: bool = False,
     require_environment_sha256: bool = False,
@@ -2754,6 +3007,8 @@ def build_report(
         token_drop_threshold_pct=token_drop_threshold_pct,
         min_token_drop_threshold_pct=min_token_drop_threshold_pct,
         memory_per_token_threshold_pct=memory_per_token_threshold_pct,
+        serial_output_threshold_pct=serial_output_threshold_pct,
+        serial_output_per_token_threshold_pct=serial_output_per_token_threshold_pct,
         us_per_token_threshold_pct=us_per_token_threshold_pct,
         wall_us_per_token_threshold_pct=wall_us_per_token_threshold_pct,
         baseline_commit=baseline_commit,
@@ -2790,6 +3045,8 @@ def build_report(
         require_host_child_cpu_pct=require_host_child_cpu_pct,
         require_host_child_tok_per_cpu_s=require_host_child_tok_per_cpu_s,
         require_tokens=require_tokens,
+        require_serial_output_bytes=require_serial_output_bytes,
+        require_serial_output_bytes_per_token=require_serial_output_bytes_per_token,
         require_ttft_us=require_ttft_us,
         require_host_overhead_pct=require_host_overhead_pct,
     )
@@ -2832,6 +3089,8 @@ def build_report(
             "token_drop_regression_pct": token_drop_threshold_pct,
             "min_token_drop_regression_pct": min_token_drop_threshold_pct,
             "memory_per_token_regression_pct": memory_per_token_threshold_pct,
+            "serial_output_regression_pct": serial_output_threshold_pct,
+            "serial_output_per_token_regression_pct": serial_output_per_token_threshold_pct,
             "us_per_token_regression_pct": us_per_token_threshold_pct,
             "wall_us_per_token_regression_pct": wall_us_per_token_threshold_pct,
             "min_records_per_point": min_records_per_point,
@@ -2849,6 +3108,8 @@ def build_report(
             "require_host_child_cpu_pct": require_host_child_cpu_pct,
             "require_host_child_tok_per_cpu_s": require_host_child_tok_per_cpu_s,
             "require_tokens": require_tokens,
+            "require_serial_output_bytes": require_serial_output_bytes,
+            "require_serial_output_bytes_per_token": require_serial_output_bytes_per_token,
             "require_ttft_us": require_ttft_us,
             "require_host_overhead_pct": require_host_overhead_pct,
             "require_environment_sha256": require_environment_sha256,
@@ -2972,6 +3233,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail when median memory bytes per emitted token increases by more than this percent",
     )
     parser.add_argument(
+        "--serial-output-regression-pct",
+        type=float,
+        help="Fail when median serial output bytes increases by more than this percent",
+    )
+    parser.add_argument(
+        "--serial-output-per-token-regression-pct",
+        type=float,
+        help="Fail when median serial output bytes per emitted token increases by more than this percent",
+    )
+    parser.add_argument(
         "--us-per-token-regression-pct",
         type=float,
         help="Fail when median guest microseconds/token increases by more than this percent",
@@ -3064,6 +3335,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail when any benchmark key/commit point lacks emitted-token telemetry",
     )
     parser.add_argument(
+        "--require-serial-output-bytes",
+        action="store_true",
+        help="Fail when any benchmark key/commit point lacks serial output byte telemetry",
+    )
+    parser.add_argument(
+        "--require-serial-output-bytes-per-token",
+        action="store_true",
+        help="Fail when any benchmark key/commit point lacks paired serial output/token telemetry",
+    )
+    parser.add_argument(
         "--require-ttft-us",
         action="store_true",
         help="Fail when any benchmark key/commit point lacks first-token latency telemetry",
@@ -3134,6 +3415,8 @@ def main(argv: list[str] | None = None) -> int:
         token_drop_threshold_pct=args.token_drop_regression_pct,
         min_token_drop_threshold_pct=args.min_token_drop_regression_pct,
         memory_per_token_threshold_pct=args.memory_per_token_regression_pct,
+        serial_output_threshold_pct=args.serial_output_regression_pct,
+        serial_output_per_token_threshold_pct=args.serial_output_per_token_regression_pct,
         us_per_token_threshold_pct=args.us_per_token_regression_pct,
         wall_us_per_token_threshold_pct=args.wall_us_per_token_regression_pct,
         min_commits_per_key=args.min_commits_per_key,
@@ -3148,6 +3431,8 @@ def main(argv: list[str] | None = None) -> int:
         require_host_child_cpu_pct=args.require_host_child_cpu_pct,
         require_host_child_tok_per_cpu_s=args.require_host_child_tok_per_cpu_s,
         require_tokens=args.require_tokens,
+        require_serial_output_bytes=args.require_serial_output_bytes,
+        require_serial_output_bytes_per_token=args.require_serial_output_bytes_per_token,
         require_ttft_us=args.require_ttft_us,
         require_host_overhead_pct=args.require_host_overhead_pct,
         require_environment_sha256=args.require_environment_sha256,

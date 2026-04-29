@@ -104,6 +104,52 @@ def test_detects_optional_memory_per_token_regressions(tmp_path: Path) -> None:
     assert report["telemetry_coverage_violations"] == []
 
 
+def test_detects_optional_serial_output_per_token_regressions(tmp_path: Path) -> None:
+    result = tmp_path / "perf.jsonl"
+    write_jsonl(
+        result,
+        [
+            {
+                "timestamp": "2026-04-27T10:00:00Z",
+                "commit": "base",
+                "benchmark": "qemu_prompt",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "tokens": 100,
+                "serial_output_bytes": 200,
+            },
+            {
+                "timestamp": "2026-04-27T11:00:00Z",
+                "commit": "head",
+                "benchmark": "qemu_prompt",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "tokens": 50,
+                "serial_output_bytes": 200,
+            },
+        ],
+    )
+
+    records = perf_regression.load_records([result])
+    report = perf_regression.build_report(
+        records,
+        5.0,
+        100.0,
+        serial_output_per_token_threshold_pct=50.0,
+        require_serial_output_bytes=True,
+        require_serial_output_bytes_per_token=True,
+    )
+
+    assert records[0].serial_output_bytes == 200
+    assert report["status"] == "fail"
+    assert report["commit_points"][0]["serial_output_bytes_records"] == 1
+    assert report["commit_points"][0]["median_serial_output_bytes_per_token"] == 2.0
+    assert report["commit_points"][1]["median_serial_output_bytes_per_token"] == 4.0
+    assert report["comparisons"][0]["median_serial_output_bytes_per_token_delta_pct"] == 100.0
+    assert report["regressions"][0]["metric"] == "serial_output_bytes_per_token"
+    assert report["telemetry_coverage_violations"] == []
+
+
 def test_detects_optional_wall_tok_per_s_regressions(tmp_path: Path) -> None:
     result = tmp_path / "perf.jsonl"
     write_jsonl(
@@ -581,6 +627,18 @@ def test_report_includes_baseline_candidate_comparison_rows() -> None:
             "min_tokens_baseline": None,
             "min_tokens_candidate": None,
             "min_tokens_delta_pct": None,
+            "median_serial_output_bytes_baseline": None,
+            "median_serial_output_bytes_candidate": None,
+            "median_serial_output_bytes_delta_pct": None,
+            "max_serial_output_bytes_baseline": None,
+            "max_serial_output_bytes_candidate": None,
+            "max_serial_output_bytes_delta_pct": None,
+            "median_serial_output_bytes_per_token_baseline": None,
+            "median_serial_output_bytes_per_token_candidate": None,
+            "median_serial_output_bytes_per_token_delta_pct": None,
+            "max_serial_output_bytes_per_token_baseline": None,
+            "max_serial_output_bytes_per_token_candidate": None,
+            "max_serial_output_bytes_per_token_delta_pct": None,
             "median_ttft_us_baseline": 50000,
             "median_ttft_us_candidate": 55000,
             "median_ttft_us_delta_pct": 10.0,
@@ -1170,7 +1228,7 @@ def test_cli_writes_dashboard_files(tmp_path: Path) -> None:
         "key,commit,latest_timestamp,records,tok_per_s_records,wall_tok_per_s_records,us_per_token_records,wall_us_per_token_records,memory_records,memory_bytes_per_token_records"
         in commit_points_csv
     )
-    assert "prompt/dev-local/-/-/-,abc,2026-04-27T10:00:00Z,1,1,0,0,0,0,0,0,0,0,0,0,1,0,42.0,42.0" in commit_points_csv
+    assert "prompt/dev-local/-/-/-,abc,2026-04-27T10:00:00Z,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,42.0,42.0" in commit_points_csv
     assert "key,metric,baseline_commit,candidate_commit,baseline_value,candidate_value" in regressions_csv
     assert "key,baseline_commit,candidate_commit,baseline_latest_timestamp" in comparisons_csv
     assert "key,commit,records,minimum_records" in sample_violations_csv

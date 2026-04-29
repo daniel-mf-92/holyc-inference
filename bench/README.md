@@ -822,7 +822,8 @@ python3 bench/bench_artifact_manifest.py \
 `perf_regression.py` scans JSON, JSONL, and CSV benchmark artifacts, groups
 results by benchmark/profile/model/quantization/prompt plus commit, and writes
 guest tok/s, host wall-clock tok/s, guest/wall microseconds per token, emitted
-token counts, QEMU host overhead percentage, guest memory, host child peak RSS,
+token counts, serial output bytes, serial output bytes per emitted token, QEMU
+host overhead percentage, guest memory, host child peak RSS,
 host child tok/CPU-second efficiency, first-token latency, and
 sample-coverage dashboards
 under `bench/dashboards/`.
@@ -847,6 +848,8 @@ python3 bench/perf_regression.py \
   --wall-us-per-token-regression-pct 7.5 \
   --token-drop-regression-pct 5 \
   --min-token-drop-regression-pct 25 \
+  --serial-output-regression-pct 25 \
+  --serial-output-per-token-regression-pct 25 \
   --p95-ttft-regression-pct 15 \
   --host-overhead-regression-pct 25 \
   --host-child-peak-rss-regression-pct 10 \
@@ -856,6 +859,8 @@ python3 bench/perf_regression.py \
   --require-us-per-token \
   --require-wall-us-per-token \
   --require-tokens \
+  --require-serial-output-bytes \
+  --require-serial-output-bytes-per-token \
   --require-ttft-us \
   --require-host-overhead-pct \
   --require-environment-sha256 \
@@ -902,8 +907,10 @@ applies the same check to the minimum emitted token count so one truncated
 prompt cannot hide behind a healthy median. `--require-tok-per-s`,
 `--require-wall-tok-per-s`, `--require-us-per-token`,
 `--require-wall-us-per-token`, `--require-tokens`, `--require-ttft-us`,
-`--require-host-overhead-pct`, `--require-memory`, and
-`--require-host-child-peak-rss`, and `--require-host-child-tok-per-cpu-s` fail
+`--require-serial-output-bytes`,
+`--require-serial-output-bytes-per-token`, `--require-host-overhead-pct`,
+`--require-memory`, `--require-host-child-peak-rss`, and
+`--require-host-child-tok-per-cpu-s` fail
 the dashboard when any benchmark key/commit point has zero samples for that
 telemetry field. `--require-environment-sha256`, `--require-host-platform`,
 `--require-host-machine`, `--require-qemu-version`, and `--require-qemu-bin`
@@ -1092,7 +1099,10 @@ memory fields such as `memory_bytes` or `max_rss_bytes`, optional host RSS
 fields such as `host_child_peak_rss_bytes` or `qemu_peak_rss_bytes`, optional
 host CPU efficiency fields such as `host_child_tok_per_cpu_s`, and
 emitted-token fields such as `tokens`, `output_tokens`, `generated_tokens`, or
-`completion_tokens`.
+`completion_tokens`. It also accepts serial output byte fields such as
+`serial_output_bytes`, `serial_bytes`, `output_bytes`, or
+`qemu_serial_output_bytes`, and can derive serial bytes per emitted token when
+both counters are present.
 Regression checks compare
 commit-level aggregates, so repeated runs and duplicate latest/stamped result
 files are collapsed by benchmark key and commit before the latest distinct
@@ -1124,6 +1134,8 @@ python3 bench/perf_regression.py \
   --wall-us-per-token-regression-pct 7.5 \
   --token-drop-regression-pct 5 \
   --min-token-drop-regression-pct 25 \
+  --serial-output-regression-pct 25 \
+  --serial-output-per-token-regression-pct 25 \
   --ttft-regression-pct 15 \
   --p95-ttft-regression-pct 15 \
   --host-overhead-regression-pct 25 \
@@ -1132,6 +1144,8 @@ python3 bench/perf_regression.py \
   --require-us-per-token \
   --require-wall-us-per-token \
   --require-tokens \
+  --require-serial-output-bytes \
+  --require-serial-output-bytes-per-token \
   --require-ttft-us \
   --require-host-overhead-pct \
   --require-environment-sha256 \

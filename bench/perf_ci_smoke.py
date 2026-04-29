@@ -155,6 +155,12 @@ def main() -> int:
         if fixture_summary.get("median_host_child_tok_per_cpu_s") != 81.0:
             print("missing_host_child_tok_per_cpu_s_summary=true", file=sys.stderr)
             return 1
+        if fixture_summary.get("median_serial_output_bytes") != 2048.0:
+            print("missing_serial_output_summary=true", file=sys.stderr)
+            return 1
+        if fixture_summary.get("median_serial_output_bytes_per_token") != 20.37861386138614:
+            print("missing_serial_output_per_token_summary=true", file=sys.stderr)
+            return 1
         if "Perf Regression Dashboard" not in markdown_path.read_text(encoding="utf-8"):
             print("missing_markdown_dashboard=true", file=sys.stderr)
             return 1
@@ -175,10 +181,15 @@ def main() -> int:
             "host_child_peak_rss_records",
             "host_child_cpu_us_records", "host_child_cpu_pct_records",
             "host_child_tok_per_cpu_s_records",
+            "token_records", "serial_output_bytes_records",
+            "serial_output_bytes_per_token_records",
             "p05_tok_per_s", "median_tok_per_s", "median_wall_tok_per_s",
             "p05_wall_tok_per_s",
             "median_us_per_token", "p95_us_per_token",
             "median_wall_us_per_token", "p95_wall_us_per_token",
+            "median_tokens", "min_tokens",
+            "median_serial_output_bytes", "max_serial_output_bytes",
+            "median_serial_output_bytes_per_token", "max_serial_output_bytes_per_token",
             "median_ttft_us", "p95_ttft_us", "median_host_overhead_pct",
             "median_host_child_cpu_us", "p95_host_child_cpu_us",
             "median_host_child_cpu_pct",
@@ -219,6 +230,12 @@ def main() -> int:
             return 1
         if "median_host_child_tok_per_cpu_s_baseline,median_host_child_tok_per_cpu_s_candidate,median_host_child_tok_per_cpu_s_delta_pct" not in comparisons_csv:
             print("missing_host_child_tok_per_cpu_s_comparison=true", file=sys.stderr)
+            return 1
+        if "median_serial_output_bytes_baseline,median_serial_output_bytes_candidate,median_serial_output_bytes_delta_pct" not in comparisons_csv:
+            print("missing_serial_output_comparison=true", file=sys.stderr)
+            return 1
+        if "median_serial_output_bytes_per_token_baseline,median_serial_output_bytes_per_token_candidate,median_serial_output_bytes_per_token_delta_pct" not in comparisons_csv:
+            print("missing_serial_output_per_token_comparison=true", file=sys.stderr)
             return 1
         if "p05_wall_tok_per_s_baseline,p05_wall_tok_per_s_candidate,p05_wall_tok_per_s_delta_pct" not in comparisons_csv:
             print("missing_p05_wall_tok_comparison=true", file=sys.stderr)
