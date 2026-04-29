@@ -831,6 +831,20 @@ def main() -> int:
             + "\n",
             encoding="utf-8",
         )
+        source_audit_yaml_fixture = tmp_path / "qemu_source_audit_matrix.yml"
+        source_audit_yaml_fixture.write_text(
+            "\n".join(
+                [
+                    "profiles:",
+                    "  - name: safe-yaml-fragment",
+                    "    qemu_args:",
+                    "      - -m",
+                    "      - 512M",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
         source_audit_output = tmp_path / "qemu_source_audit.json"
         source_audit_markdown = tmp_path / "qemu_source_audit.md.out"
         source_audit_csv = tmp_path / "qemu_source_audit.csv"
@@ -842,6 +856,8 @@ def main() -> int:
             str(source_audit_fixture),
             "--input",
             str(source_audit_matrix_fixture),
+            "--input",
+            str(source_audit_yaml_fixture),
             "--output",
             str(source_audit_output),
             "--markdown",
@@ -869,7 +885,7 @@ def main() -> int:
                 file=sys.stderr,
             )
             return 1
-        if source_audit_report["commands_checked"] != 2:
+        if source_audit_report["commands_checked"] != 3:
             print("missing_qemu_source_command_audit=true", file=sys.stderr)
             return 1
         if "QEMU Source Air-Gap Audit" not in source_audit_markdown.read_text(encoding="utf-8"):
@@ -906,6 +922,18 @@ def main() -> int:
             + "\n",
             encoding="utf-8",
         )
+        unsafe_source_yaml_fixture = tmp_path / "unsafe_qemu_source_args.yml"
+        unsafe_source_yaml_fixture.write_text(
+            "\n".join(
+                [
+                    "profiles:",
+                    "  - name: unsafe-yaml-fragment",
+                    "    qemu_extra_args: ['-netdev', 'user,id=n0']",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
         unsafe_source_command = [
             sys.executable,
             str(ROOT / "bench" / "qemu_source_audit.py"),
@@ -913,6 +941,8 @@ def main() -> int:
             str(unsafe_source_fixture),
             "--input",
             str(unsafe_source_args_fixture),
+            "--input",
+            str(unsafe_source_yaml_fixture),
             "--output",
             str(tmp_path / "unsafe_qemu_source_audit.json"),
         ]

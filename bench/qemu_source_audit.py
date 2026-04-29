@@ -10,6 +10,7 @@ It does not launch QEMU.
 from __future__ import annotations
 
 import argparse
+import ast
 import csv
 import json
 import shlex
@@ -43,6 +44,7 @@ DEFAULT_EXCLUDE_PARTS = {
     "bench/results",
     "bench/dashboards",
 }
+QEMU_ARG_FRAGMENT_KEYS = {"qemu_args", "qemu_extra_args", "qemu_flags"}
 
 
 @dataclass(frozen=True)
@@ -181,7 +183,7 @@ def iter_json_arg_fragments(payload: Any, path: str = "$") -> Iterable[tuple[str
     if isinstance(payload, dict):
         for key, value in payload.items():
             child_path = f"{path}.{key}"
-            if key in {"qemu_args", "qemu_extra_args", "qemu_flags"} and isinstance(value, list):
+            if key in QEMU_ARG_FRAGMENT_KEYS and isinstance(value, list):
                 if all(isinstance(item, str) for item in value):
                     yield child_path, list(value)
                     continue
@@ -210,6 +212,138 @@ def audit_json_arg_fragments(path: Path) -> tuple[int, list[SourceFinding]]:
                     text=json.dumps(args, separators=(",", ":")),
                 )
             )
+    return fragments_checked, findings
+
+
+def strip_unquoted_comment(text: str) -> str:
+    quote = ""
+    escaped = False
+    for index, char in enumerate(text):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\" and quote:
+            escaped = True
+            continue
+        if char in {"'", '"'}:
+            if quote == char:
+                quote = ""
+            elif not quote:
+                quote = char
+            continue
+        if char == "#" and not quote:
+            return text[:index].rstrip()
+    return text.rstrip()
+
+
+def parse_yaml_scalar(value: str) -> str:
+    stripped = strip_unquoted_comment(value).strip()
+    if len(stripped) >= 2 and stripped[0] == stripped[-1] and stripped[0] in {"'", '"'}:
+        try:
+            parsed = ast.literal_eval(stripped)
+        except (SyntaxError, ValueError):
+            parsed = stripped[1:-1]
+        return str(parsed)
+    return stripped
+
+
+def split_inline_yaml_list(value: str) -> list[str] | None:
+    stripped = strip_unquoted_comment(value).strip()
+    if not (stripped.startswith("[") and stripped.endswith("]")):
+        return None
+    try:
+        parsed = json.loads(stripped)
+    except json.JSONDecodeError:
+        try:
+            parsed = ast.literal_eval(stripped)
+        except (SyntaxError, ValueError):
+            parsed = None
+    if isinstance(parsed, list) and all(isinstance(item, str) for item in parsed):
+        return list(parsed)
+
+    inner = stripped[1:-1].strip()
+    if not inner:
+        return []
+    reader = csv.reader([inner], skipinitialspace=True)
+    try:
+        return [parse_yaml_scalar(item) for item in next(reader)]
+    except csv.Error:
+        return [parse_yaml_scalar(item) for item in inner.split(",")]
+
+
+def yaml_arg_key_line(text: str) -> tuple[int, str, str] | None:
+    stripped = text.rstrip()
+    if not stripped:
+        return None
+    indent = len(stripped) - len(stripped.lstrip(" "))
+    body = stripped.lstrip()
+    if body.startswith("- "):
+        body = body[2:].lstrip()
+    if ":" not in body:
+        return None
+    key, value = body.split(":", 1)
+    key = key.strip().strip("'\"")
+    if key not in QEMU_ARG_FRAGMENT_KEYS:
+        return None
+    return indent, key, value.strip()
+
+
+def yaml_list_item(text: str) -> tuple[int, str] | None:
+    stripped = text.rstrip()
+    if not stripped:
+        return None
+    indent = len(stripped) - len(stripped.lstrip(" "))
+    body = stripped.lstrip()
+    if not body.startswith("- "):
+        return None
+    return indent, body[2:].strip()
+
+
+def audit_yaml_arg_fragments(path: Path) -> tuple[int, list[SourceFinding]]:
+    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    fragments_checked = 0
+    findings: list[SourceFinding] = []
+    index = 0
+    while index < len(lines):
+        line_number = index + 1
+        parsed_key = yaml_arg_key_line(lines[index])
+        if parsed_key is None:
+            index += 1
+            continue
+
+        key_indent, key, raw_value = parsed_key
+        args = split_inline_yaml_list(raw_value)
+        if args is None and raw_value:
+            args = shlex.split(raw_value)
+        if args is None:
+            args = []
+            scan = index + 1
+            while scan < len(lines):
+                item = yaml_list_item(lines[scan])
+                if item is None:
+                    if strip_unquoted_comment(lines[scan]).strip():
+                        break
+                    scan += 1
+                    continue
+                item_indent, item_value = item
+                if item_indent <= key_indent:
+                    break
+                args.append(parse_yaml_scalar(item_value))
+                scan += 1
+            index = scan - 1
+
+        fragments_checked += 1
+        for violation in fragment_violations(args):
+            findings.append(
+                SourceFinding(
+                    source=str(path),
+                    line=line_number,
+                    reason=f"$.{key}: {violation}",
+                    command=args,
+                    text=strip_unquoted_comment(lines[line_number - 1]).strip(),
+                )
+            )
+        index += 1
     return fragments_checked, findings
 
 
@@ -246,6 +380,10 @@ def audit(paths: Iterable[Path], excludes: set[str]) -> tuple[int, list[SourceFi
             fragments_checked, json_findings = audit_json_arg_fragments(path)
             commands_checked += fragments_checked
             findings.extend(json_findings)
+        elif path.suffix.lower() in {".yaml", ".yml"}:
+            fragments_checked, yaml_findings = audit_yaml_arg_fragments(path)
+            commands_checked += fragments_checked
+            findings.extend(yaml_findings)
         elif path.suffix.lower() == ".args":
             fragments_checked, args_findings = audit_args_file_fragments(path)
             commands_checked += fragments_checked

@@ -65,6 +65,35 @@ def test_audit_rejects_json_nested_qemu_args_fragment(tmp_path: Path) -> None:
     assert findings[0].reason == "$.profiles[0].qemu_args: non-air-gapped `-nic user`"
 
 
+def test_audit_checks_yaml_qemu_args_fragments(tmp_path: Path) -> None:
+    matrix = tmp_path / "bench_matrix.yml"
+    matrix.write_text(
+        "\n".join(
+            [
+                "profiles:",
+                "  - name: safe",
+                "    qemu_args:",
+                "      - -m",
+                "      - 512M",
+                "  - name: unsafe",
+                "    qemu_extra_args: ['-netdev', 'user,id=n0']",
+                "quantizations:",
+                "  - name: q4",
+                "    qemu_flags: [-device, virtio-net-pci]",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    commands_checked, findings = qemu_source_audit.audit([matrix], set())
+
+    assert commands_checked == 3
+    assert len(findings) == 2
+    assert findings[0].reason == "$.qemu_extra_args: network backend `-netdev`"
+    assert findings[1].reason == "$.qemu_flags: network device `virtio-net-pci`"
+
+
 def test_cli_writes_reports_for_standalone_json_args_violation(tmp_path: Path) -> None:
     args_json = tmp_path / "qemu_args.json"
     args_json.write_text(json.dumps(["-device", "virtio-net-pci"]) + "\n", encoding="utf-8")
