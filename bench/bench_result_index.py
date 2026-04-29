@@ -1194,6 +1194,9 @@ def junit_report(report: dict[str, Any]) -> str:
     command_drift_rows = [row for row in report.get("command_drift", []) if isinstance(row, dict)]
     launch_plan_drift_rows = [row for row in report.get("launch_plan_drift", []) if isinstance(row, dict)]
     environment_drift_rows = [row for row in report.get("environment_drift", []) if isinstance(row, dict)]
+    dry_run_coverage_rows = [
+        row for row in report.get("dry_run_coverage_violations", []) if isinstance(row, dict)
+    ]
     failed_artifacts = [row for row in artifacts if row.get("status") == "fail"]
     airgap_failures = [row for row in artifacts if row.get("command_airgap_status") == "fail"]
     telemetry_failures = [row for row in artifacts if row.get("telemetry_status") == "fail"]
@@ -1211,6 +1214,7 @@ def junit_report(report: dict[str, Any]) -> str:
         + int(bool(command_drift_rows))
         + int(bool(launch_plan_drift_rows))
         + int(bool(environment_drift_rows))
+        + int(bool(dry_run_coverage_rows))
     )
 
     suite = ET.Element(
@@ -1354,7 +1358,19 @@ def junit_report(report: dict[str, Any]) -> str:
         )
         failure.text = "\n".join(str(row.get("key", "")) for row in environment_drift_rows)
 
-    ET.SubElement(suite, "testcase", {"name": "dry_run_coverage"})
+    dry_run_coverage_case = ET.SubElement(suite, "testcase", {"name": "dry_run_coverage"})
+    if dry_run_coverage_rows:
+        failure = ET.SubElement(
+            dry_run_coverage_case,
+            "failure",
+            {
+                "type": "dry_run_coverage_missing",
+                "message": f"{len(dry_run_coverage_rows)} measured benchmark artifact(s) lack matching dry-run plans",
+            },
+        )
+        failure.text = "\n".join(
+            f"{row.get('key', '')}: {row.get('measured_source', '')}" for row in dry_run_coverage_rows
+        )
 
     return ET.tostring(suite, encoding="unicode") + "\n"
 

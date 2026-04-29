@@ -448,6 +448,16 @@ def main() -> int:
         if "qemu_prompt_bench_measured_only.json" not in violations[0]["measured_source"]:
             print("missing_dry_run_source_not_reported=true", file=sys.stderr)
             return 1
+        missing_dry_run_junit = ET.parse(
+            missing_dry_run_output / "bench_result_index_junit_latest.xml"
+        ).getroot()
+        if missing_dry_run_junit.attrib.get("failures") == "0":
+            print("missing_dry_run_junit_not_failed=true", file=sys.stderr)
+            return 1
+        dry_run_case = missing_dry_run_junit.find("./testcase[@name='dry_run_coverage']")
+        if dry_run_case is None or dry_run_case.find("failure") is None:
+            print("missing_dry_run_junit_failure_case=true", file=sys.stderr)
+            return 1
 
     return 0
 
