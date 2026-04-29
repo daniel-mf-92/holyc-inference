@@ -54,6 +54,8 @@ def main() -> int:
         inspect_md = datasets_dir / "smoke_curated.inspect.md"
         inspect_csv = datasets_dir / "smoke_curated.inspect.csv"
         inspect_junit = datasets_dir / "smoke_curated.inspect.junit.xml"
+        export_jsonl = datasets_dir / "smoke_curated.export.jsonl"
+        export_manifest = datasets_dir / "smoke_curated.export.manifest.json"
         leak_json = datasets_dir / "dataset_leak_audit_smoke_latest.json"
         leak_md = datasets_dir / "dataset_leak_audit_smoke_latest.md"
         leak_csv = datasets_dir / "dataset_leak_audit_smoke_latest.csv"
@@ -396,6 +398,49 @@ def main() -> int:
         if rc := require(inspect_root.attrib.get("name") == "holyc_hceval_inspect", "missing_inspect_junit"):
             return rc
         if rc := require(inspect_root.attrib.get("failures") == "0", "unexpected_inspect_junit_failures"):
+            return rc
+
+        export_command = [
+            sys.executable,
+            str(ROOT / "bench" / "hceval_export.py"),
+            "--input",
+            str(packed),
+            "--output",
+            str(export_jsonl),
+            "--manifest",
+            str(export_manifest),
+            "--pack-manifest",
+            str(pack_manifest),
+        ]
+        completed = run_command(export_command)
+        if completed.returncode != 0:
+            return completed.returncode
+
+        export_rows = [json.loads(line) for line in export_jsonl.read_text(encoding="utf-8").splitlines()]
+        export_report = json.loads(export_manifest.read_text(encoding="utf-8"))
+        if rc := require(len(export_rows) == 3, "unexpected_export_row_count"):
+            return rc
+        if rc := require(export_report["record_count"] == 3, "unexpected_export_manifest_count"):
+            return rc
+        if rc := require(export_report["source_sha256"] == pack_report["source_sha256"], "unexpected_export_source"):
+            return rc
+        if rc := require(
+            export_report["written_source_sha256"] == pack_report["source_sha256"],
+            "unexpected_export_written_source",
+        ):
+            return rc
+        if rc := require(export_report["source_sha256_matches"] is True, "unexpected_export_source_match"):
+            return rc
+        if rc := require(
+            all({"prompt_sha256", "choices_sha256", "input_sha256"} <= set(row) for row in export_rows),
+            "missing_export_hashes",
+        ):
+            return rc
+        if rc := require(export_rows[0]["prompt_sha256"], "missing_export_prompt_hash"):
+            return rc
+        if rc := require(export_rows[0]["choices_sha256"], "missing_export_choices_hash"):
+            return rc
+        if rc := require(export_rows[0]["input_sha256"], "missing_export_input_hash"):
             return rc
 
         leak_command = [

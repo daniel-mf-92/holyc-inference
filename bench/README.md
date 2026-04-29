@@ -175,6 +175,21 @@ python3 bench/hceval_inspect.py \
   --max-choice-bytes 1024
 ```
 
+`hceval_export.py` converts a packed `.hceval` file back into normalized JSONL
+for `eval_compare.py` gold inputs and `eval_input_audit.py` hash-parity checks.
+Pass the pack manifest when exporting mixed-dataset packs so per-record
+dataset/split provenance is restored. Rows include `prompt_sha256`,
+`choices_sha256`, and `input_sha256` by default so HolyC and llama.cpp
+prediction files can prove they scored the same prompt and choice payloads.
+
+```bash
+python3 bench/hceval_export.py \
+  --input bench/results/datasets/smoke_eval.hceval \
+  --output bench/results/datasets/smoke_eval.export.jsonl \
+  --manifest bench/results/datasets/smoke_eval.export.manifest.json \
+  --pack-manifest bench/results/datasets/smoke_eval.manifest.json
+```
+
 `dataset_index.py` scans curated manifests, packed `.hceval` manifests, and
 inspection reports, verifies local hashes/provenance fields where possible, and
 writes JSON/Markdown/CSV/JUnit XML rollups:
