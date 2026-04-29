@@ -389,6 +389,9 @@ binomial p-value so HolyC-vs-llama quality deltas can be interpreted as paired
 eval outcomes on the same records. `--max-mcnemar-loss-p` optionally fails CI
 only when llama.cpp has more discordant wins than HolyC and the paired p-value
 is at or below the configured threshold.
+`eval_compare_ci_smoke.py` is a stdlib-only smoke gate for the comparator; it
+checks report artifacts, paired metrics, CSV/JUnit outputs, and an intentional
+score-coverage regression failure without launching QEMU.
 
 ```bash
 python3 bench/eval_compare.py \
@@ -407,6 +410,8 @@ python3 bench/eval_compare.py \
   --max-holyc-nll-delta 0.05 \
   --max-holyc-score-tie-rate 0.01 \
   --fail-on-regression
+
+python3 bench/eval_compare_ci_smoke.py
 ```
 
 `perplexity_compare.py` also supports opt-in quality gates for full-token
