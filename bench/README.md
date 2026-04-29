@@ -540,7 +540,10 @@ count, QEMU binary/path, QEMU version when discoverable, and a stable SHA256
 fingerprint of the QEMU command line. Measured reports also include the same
 deterministic launch plan and launch-plan SHA256 used by dry-runs, and write
 `qemu_prompt_bench_launches_latest.csv` with one row per warmup or measured
-launch so CI can audit actual launch order against the reviewed plan. The
+launch so CI can audit actual launch order against the reviewed plan. They also
+write `qemu_prompt_bench_launches_latest.jsonl` with the same ordered launch
+records plus report-level hashes, status, profile, model, quantization, commit,
+and prompt-suite SHA256 for direct ingestion by perf-regression jobs. The
 runner separately fingerprints the realized launch sequence and fails the
 report if observed launch order, prompt hashes, prompt byte counts, phases, or
 iterations diverge from the planned sequence. They also

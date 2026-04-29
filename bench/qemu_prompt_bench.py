@@ -2365,6 +2365,7 @@ def write_report(
     write_summary_csv_report(report, latest_summary_csv)
     write_phase_csv_report(report, latest_phase_csv)
     write_launch_csv_report(report, latest_launch_csv)
+    write_launch_jsonl_report(report, output_dir / "qemu_prompt_bench_launches_latest.jsonl")
     write_junit_report(runs, warmup_runs, findings, telemetry, launch_findings, latest_junit)
     stamped = output_dir / f"qemu_prompt_bench_{report['generated_at'].replace(':', '').replace('-', '')}.json"
     stamped.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -2637,6 +2638,44 @@ def write_launch_csv_report(report: dict[str, Any], path: Path) -> None:
                     "observed_launch_sequence_sha256": report.get("observed_launch_sequence_sha256"),
                     **run_values,
                 }
+            )
+
+
+def launch_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = []
+    for key in ("warmups", "benchmarks"):
+        values = report.get(key)
+        if isinstance(values, list):
+            rows.extend(row for row in values if isinstance(row, dict))
+    return sorted(rows, key=lambda item: int(item.get("launch_index") or 0))
+
+
+def write_launch_jsonl_report(report: dict[str, Any], path: Path) -> None:
+    top_level_fields = {
+        "generated_at": report.get("generated_at"),
+        "status": report.get("status"),
+        "command_sha256": report.get("command_sha256"),
+        "launch_plan_sha256": report.get("launch_plan_sha256"),
+        "expected_launch_sequence_sha256": report.get("expected_launch_sequence_sha256"),
+        "observed_launch_sequence_sha256": report.get("observed_launch_sequence_sha256"),
+        "prompt_suite_sha256": (report.get("prompt_suite") or {}).get("suite_sha256"),
+        "profile": report.get("profile"),
+        "model": report.get("model"),
+        "quantization": report.get("quantization"),
+        "commit": report.get("commit"),
+    }
+    with path.open("w", encoding="utf-8") as handle:
+        for row in launch_rows(report):
+            handle.write(
+                json.dumps(
+                    {
+                        **top_level_fields,
+                        **row,
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                + "\n"
             )
 
 

@@ -103,6 +103,7 @@ def main() -> int:
         phase_csv_path = output_dir / "qemu_prompt_bench_phases_latest.csv"
         markdown_path = output_dir / "qemu_prompt_bench_latest.md"
         launch_csv_path = output_dir / "qemu_prompt_bench_launches_latest.csv"
+        launch_jsonl_path = output_dir / "qemu_prompt_bench_launches_latest.jsonl"
         junit_path = output_dir / "qemu_prompt_bench_junit_latest.xml"
         report = json.loads(report_path.read_text(encoding="utf-8"))
 
@@ -240,6 +241,28 @@ def main() -> int:
                 "serial_output_lines",
             }.issubset(launch_rows[0].keys()),
             "missing_launch_sequence_csv_columns",
+        ):
+            return rc
+        launch_jsonl_rows = [
+            json.loads(line)
+            for line in launch_jsonl_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        if rc := require(len(launch_jsonl_rows) == 6, "unexpected_launch_jsonl_rows"):
+            return rc
+        if rc := require(
+            {row["phase"] for row in launch_jsonl_rows} == {"warmup", "measured"},
+            "unexpected_launch_jsonl_phases",
+        ):
+            return rc
+        if rc := require(
+            launch_jsonl_rows[0]["launch_plan_sha256"] == report["launch_plan_sha256"],
+            "launch_jsonl_plan_hash_mismatch",
+        ):
+            return rc
+        if rc := require(
+            launch_jsonl_rows[0]["prompt_suite_sha256"] == report["prompt_suite"]["suite_sha256"],
+            "launch_jsonl_prompt_suite_hash_mismatch",
         ):
             return rc
         if rc := require("Phase Summary" in markdown_path.read_text(encoding="utf-8"), "missing_phase_markdown"):
