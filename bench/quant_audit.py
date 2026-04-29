@@ -96,6 +96,11 @@ class BlockAudit:
     repeated_block_value_count: int
     max_identical_block_run: int
     max_identical_block_run_start: int
+    q4_low_nibble_used_value_count: int
+    q4_high_nibble_used_value_count: int
+    q4_nibble_lane_used_value_delta: int
+    q4_low_nibble_quant_histogram: dict[str, int]
+    q4_high_nibble_quant_histogram: dict[str, int]
     quant_histogram: dict[str, int]
     findings: list[str]
 
@@ -521,6 +526,39 @@ def check_block_quant_distribution(
     return used_value_count, saturation_count, saturation_pct
 
 
+def q4_nibble_lane_histogram() -> dict[str, int]:
+    return empty_histogram(-8, 7)
+
+
+def check_q4_nibble_lane_distribution(
+    findings: list[str],
+    low_histogram: dict[str, int],
+    high_histogram: dict[str, int],
+    min_q4_nibble_lane_used_quant_values: int | None,
+) -> tuple[int, int, int]:
+    low_used = sum(1 for count in low_histogram.values() if count)
+    high_used = sum(1 for count in high_histogram.values() if count)
+    delta = abs(low_used - high_used)
+
+    if min_q4_nibble_lane_used_quant_values is not None:
+        if low_used < min_q4_nibble_lane_used_quant_values:
+            findings.append(
+                "Q4_0 low nibble lane used quant values {actual} below minimum {limit}".format(
+                    actual=low_used,
+                    limit=min_q4_nibble_lane_used_quant_values,
+                )
+            )
+        if high_used < min_q4_nibble_lane_used_quant_values:
+            findings.append(
+                "Q4_0 high nibble lane used quant values {actual} below minimum {limit}".format(
+                    actual=high_used,
+                    limit=min_q4_nibble_lane_used_quant_values,
+                )
+            )
+
+    return low_used, high_used, delta
+
+
 def audit_q4_0_blocks(
     path: Path,
     allow_inf_nan_scale: bool,
@@ -540,6 +578,7 @@ def audit_q4_0_blocks(
     max_scale_exponent: int | None = None,
     max_duplicate_block_pct: float | None = None,
     max_identical_block_run: int | None = None,
+    min_q4_nibble_lane_used_quant_values: int | None = None,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -582,6 +621,8 @@ def audit_q4_0_blocks(
     worst_block_saturation_count = 0
     worst_block_saturation_pct = 0.0
     worst_block_saturation_index = -1
+    low_nibble_histogram = q4_nibble_lane_histogram()
+    high_nibble_histogram = q4_nibble_lane_histogram()
     scale_q16_stats: dict[str, int | None] = {
         "min": None,
         "max": None,
@@ -643,11 +684,15 @@ def audit_q4_0_blocks(
         block_histogram = {value: 0 for value in range(-8, 8)}
         element_index = 0
         for byte in packed:
-            for nibble in (byte & 0x0F, (byte >> 4) & 0x0F):
+            for lane, nibble in (("low", byte & 0x0F), ("high", (byte >> 4) & 0x0F)):
                 signed = nibble - 8
                 quant_min = min(quant_min, signed)
                 quant_max = max(quant_max, signed)
                 quant_histogram[str(signed)] += 1
+                if lane == "low":
+                    low_nibble_histogram[str(signed)] += 1
+                else:
+                    high_nibble_histogram[str(signed)] += 1
                 block_histogram[signed] += 1
                 if signed == 0:
                     quant_zero_count += 1
@@ -717,6 +762,16 @@ def audit_q4_0_blocks(
         min_used_quant_values,
         max_saturation_pct,
     )
+    (
+        q4_low_nibble_used_value_count,
+        q4_high_nibble_used_value_count,
+        q4_nibble_lane_used_value_delta,
+    ) = check_q4_nibble_lane_distribution(
+        findings,
+        low_nibble_histogram,
+        high_nibble_histogram,
+        min_q4_nibble_lane_used_quant_values,
+    )
 
     return BlockAudit(
         format="q4_0",
@@ -761,6 +816,11 @@ def audit_q4_0_blocks(
         repeated_block_value_count=repeated_block_value_count,
         max_identical_block_run=max_identical_block_run_seen,
         max_identical_block_run_start=max_identical_block_run_start,
+        q4_low_nibble_used_value_count=q4_low_nibble_used_value_count,
+        q4_high_nibble_used_value_count=q4_high_nibble_used_value_count,
+        q4_nibble_lane_used_value_delta=q4_nibble_lane_used_value_delta,
+        q4_low_nibble_quant_histogram=low_nibble_histogram,
+        q4_high_nibble_quant_histogram=high_nibble_histogram,
         quant_histogram=quant_histogram,
         findings=findings,
     )
@@ -785,6 +845,7 @@ def audit_q8_0_blocks(
     max_scale_exponent: int | None = None,
     max_duplicate_block_pct: float | None = None,
     max_identical_block_run: int | None = None,
+    min_q4_nibble_lane_used_quant_values: int | None = None,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -1002,6 +1063,11 @@ def audit_q8_0_blocks(
         repeated_block_value_count=repeated_block_value_count,
         max_identical_block_run=max_identical_block_run_seen,
         max_identical_block_run_start=max_identical_block_run_start,
+        q4_low_nibble_used_value_count=0,
+        q4_high_nibble_used_value_count=0,
+        q4_nibble_lane_used_value_delta=0,
+        q4_low_nibble_quant_histogram={},
+        q4_high_nibble_quant_histogram={},
         quant_histogram=quant_histogram,
         findings=findings,
     )
@@ -1027,6 +1093,7 @@ def audit_blocks(
     max_scale_exponent: int | None = None,
     max_duplicate_block_pct: float | None = None,
     max_identical_block_run: int | None = None,
+    min_q4_nibble_lane_used_quant_values: int | None = None,
 ) -> BlockAudit:
     if quant_format == "q4_0":
         return audit_q4_0_blocks(
@@ -1048,6 +1115,7 @@ def audit_blocks(
             max_scale_exponent,
             max_duplicate_block_pct,
             max_identical_block_run,
+            min_q4_nibble_lane_used_quant_values,
         )
     if quant_format == "q8_0":
         return audit_q8_0_blocks(
@@ -1069,6 +1137,7 @@ def audit_blocks(
             max_scale_exponent,
             max_duplicate_block_pct,
             max_identical_block_run,
+            min_q4_nibble_lane_used_quant_values,
         )
     raise ValueError(f"unsupported quant format: {quant_format}")
 
@@ -1100,8 +1169,8 @@ def markdown_report(report: dict) -> str:
             [
                 "| Format | Path | Blocks | Capacity | Scale zero/subnormal/normal/inf_nan "
                 "| Scale sign +/- | Padding elements/nonzero | Scale Q16 min/max/absmax/zero/overlimit | Scale exponent min/max/under/over | Zero-scale nonzero blocks/entries | Quant min/max | Used values | Zero/nonzero quants "
-                "| Saturated quants | Min block used values | Worst block saturation | Duplicate blocks | Max identical run | Findings |",
-                "| --- | --- | ---: | ---: | --- | ---: | ---: | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| Saturated quants | Min block used values | Worst block saturation | Duplicate blocks | Max identical run | Q4 low/high lane used values | Findings |",
+                "| --- | --- | ---: | ---: | --- | ---: | ---: | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
         for audit in block_audits:
@@ -1142,6 +1211,7 @@ def markdown_report(report: dict) -> str:
                     "{worst_block_saturation_count} ({worst_block_saturation_pct:.3f}%) @ {worst_block_saturation_index} | "
                     "{duplicate_block_count} ({duplicate_block_pct:.3f}%) across {repeated_block_value_count} values | "
                     "{max_identical_block_run} @ {max_identical_block_run_start} | "
+                    "{q4_low_nibble_used_value_count}/{q4_high_nibble_used_value_count} (delta {q4_nibble_lane_used_value_delta}) | "
                     "{findings} |"
                 ).format(
                     format=audit["format"],
@@ -1180,6 +1250,15 @@ def markdown_report(report: dict) -> str:
                     max_identical_block_run=audit["max_identical_block_run"],
                     max_identical_block_run_start=audit[
                         "max_identical_block_run_start"
+                    ],
+                    q4_low_nibble_used_value_count=audit[
+                        "q4_low_nibble_used_value_count"
+                    ],
+                    q4_high_nibble_used_value_count=audit[
+                        "q4_high_nibble_used_value_count"
+                    ],
+                    q4_nibble_lane_used_value_delta=audit[
+                        "q4_nibble_lane_used_value_delta"
                     ],
                     findings=len(audit["findings"]),
                 )
@@ -1436,6 +1515,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Fail raw block streams with more than this many identical complete blocks in a row",
     )
+    parser.add_argument(
+        "--min-q4-nibble-lane-used-quant-values",
+        type=int,
+        help="Fail Q4_0 block streams when either low- or high-nibble lane uses fewer distinct quant values than this",
+    )
     parser.add_argument("--allow-inf-nan-scale", action="store_true", help="Do not fail on fp16 inf/nan scales")
     parser.add_argument("--output", type=Path, help="Write JSON report to this path")
     parser.add_argument("--markdown", type=Path, help="Write Markdown report to this path")
@@ -1474,6 +1558,7 @@ def main(argv: list[str] | None = None) -> int:
             args.max_scale_exponent,
             args.max_duplicate_block_pct,
             args.max_identical_block_run,
+            args.min_q4_nibble_lane_used_quant_values,
         )
         for path, quant_format in block_specs
     ]

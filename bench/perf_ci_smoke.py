@@ -155,6 +155,18 @@ def main() -> int:
         if fixture_summary.get("median_host_child_tok_per_cpu_s") != 81.0:
             print("missing_host_child_tok_per_cpu_s_summary=true", file=sys.stderr)
             return 1
+        if fixture_summary.get("median_prompt_bytes") != 50.0:
+            print("missing_prompt_bytes_summary=true", file=sys.stderr)
+            return 1
+        if fixture_summary.get("median_prompt_bytes_per_s") != 502.5:
+            print("missing_prompt_bytes_per_s_summary=true", file=sys.stderr)
+            return 1
+        if fixture_summary.get("median_wall_prompt_bytes_per_s") != 477.5:
+            print("missing_wall_prompt_bytes_per_s_summary=true", file=sys.stderr)
+            return 1
+        if fixture_summary.get("median_tokens_per_prompt_byte") != 2.01:
+            print("missing_tokens_per_prompt_byte_summary=true", file=sys.stderr)
+            return 1
         if fixture_summary.get("median_serial_output_bytes") != 2048.0:
             print("missing_serial_output_summary=true", file=sys.stderr)
             return 1
@@ -181,13 +193,18 @@ def main() -> int:
             "host_child_peak_rss_records",
             "host_child_cpu_us_records", "host_child_cpu_pct_records",
             "host_child_tok_per_cpu_s_records",
-            "token_records", "serial_output_bytes_records",
+            "token_records", "prompt_bytes_records",
+            "prompt_bytes_per_s_records", "wall_prompt_bytes_per_s_records",
+            "tokens_per_prompt_byte_records", "serial_output_bytes_records",
             "serial_output_bytes_per_token_records",
             "p05_tok_per_s", "median_tok_per_s", "median_wall_tok_per_s",
             "p05_wall_tok_per_s",
             "median_us_per_token", "p95_us_per_token",
             "median_wall_us_per_token", "p95_wall_us_per_token",
             "median_tokens", "min_tokens",
+            "median_prompt_bytes", "max_prompt_bytes",
+            "median_prompt_bytes_per_s", "median_wall_prompt_bytes_per_s",
+            "median_tokens_per_prompt_byte",
             "median_serial_output_bytes", "max_serial_output_bytes",
             "median_serial_output_bytes_per_token", "max_serial_output_bytes_per_token",
             "median_ttft_us", "p95_ttft_us", "median_host_overhead_pct",
@@ -236,6 +253,12 @@ def main() -> int:
             return 1
         if "median_serial_output_bytes_per_token_baseline,median_serial_output_bytes_per_token_candidate,median_serial_output_bytes_per_token_delta_pct" not in comparisons_csv:
             print("missing_serial_output_per_token_comparison=true", file=sys.stderr)
+            return 1
+        if "median_prompt_bytes_per_s_baseline,median_prompt_bytes_per_s_candidate,median_prompt_bytes_per_s_delta_pct" not in comparisons_csv:
+            print("missing_prompt_bytes_per_s_comparison=true", file=sys.stderr)
+            return 1
+        if "median_tokens_per_prompt_byte_baseline,median_tokens_per_prompt_byte_candidate,median_tokens_per_prompt_byte_delta_pct" not in comparisons_csv:
+            print("missing_tokens_per_prompt_byte_comparison=true", file=sys.stderr)
             return 1
         if "p05_wall_tok_per_s_baseline,p05_wall_tok_per_s_candidate,p05_wall_tok_per_s_delta_pct" not in comparisons_csv:
             print("missing_p05_wall_tok_comparison=true", file=sys.stderr)

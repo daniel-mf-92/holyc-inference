@@ -256,3 +256,4 @@
 2026-04-29T17:02:04Z | Added qemu prompt benchmark realized launch-sequence integrity hashing with smoke coverage and refreshed artifacts.
 2026-04-29T17:13:38Z | Added benchmark result-index expected-token parity telemetry with smoke coverage and refreshed index artifacts.
 2026-04-29T17:30:44Z | Added dataset order-bias audit for answer-position runs/transitions with CSV/JUnit smoke coverage and refreshed artifacts.
+2026-04-29T17:57:06Z | Added Q4_0 nibble-lane diversity telemetry and optional packing gate to host-side quant audit.

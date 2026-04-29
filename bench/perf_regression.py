@@ -46,6 +46,10 @@ class PerfRecord:
     host_child_cpu_pct: float | None = None
     host_child_tok_per_cpu_s: float | None = None
     tokens: int | None = None
+    prompt_bytes: int | None = None
+    prompt_bytes_per_s: float | None = None
+    wall_prompt_bytes_per_s: float | None = None
+    tokens_per_prompt_byte: float | None = None
     serial_output_bytes: int | None = None
     ttft_us: int | None = None
     host_overhead_pct: float | None = None
@@ -91,6 +95,10 @@ class CommitPoint:
     host_child_cpu_pct_records: int
     host_child_tok_per_cpu_s_records: int
     token_records: int
+    prompt_bytes_records: int
+    prompt_bytes_per_s_records: int
+    wall_prompt_bytes_per_s_records: int
+    tokens_per_prompt_byte_records: int
     serial_output_bytes_records: int
     serial_output_bytes_per_token_records: int
     ttft_us_records: int
@@ -105,6 +113,11 @@ class CommitPoint:
     p95_wall_us_per_token: float | None
     median_tokens: float | None
     min_tokens: int | None
+    median_prompt_bytes: float | None
+    max_prompt_bytes: int | None
+    median_prompt_bytes_per_s: float | None
+    median_wall_prompt_bytes_per_s: float | None
+    median_tokens_per_prompt_byte: float | None
     median_serial_output_bytes: float | None
     max_serial_output_bytes: int | None
     median_serial_output_bytes_per_token: float | None
@@ -273,6 +286,21 @@ class ComparisonRow:
     min_tokens_baseline: int | None
     min_tokens_candidate: int | None
     min_tokens_delta_pct: float | None
+    median_prompt_bytes_baseline: float | None
+    median_prompt_bytes_candidate: float | None
+    median_prompt_bytes_delta_pct: float | None
+    max_prompt_bytes_baseline: int | None
+    max_prompt_bytes_candidate: int | None
+    max_prompt_bytes_delta_pct: float | None
+    median_prompt_bytes_per_s_baseline: float | None
+    median_prompt_bytes_per_s_candidate: float | None
+    median_prompt_bytes_per_s_delta_pct: float | None
+    median_wall_prompt_bytes_per_s_baseline: float | None
+    median_wall_prompt_bytes_per_s_candidate: float | None
+    median_wall_prompt_bytes_per_s_delta_pct: float | None
+    median_tokens_per_prompt_byte_baseline: float | None
+    median_tokens_per_prompt_byte_candidate: float | None
+    median_tokens_per_prompt_byte_delta_pct: float | None
     median_serial_output_bytes_baseline: float | None
     median_serial_output_bytes_candidate: float | None
     median_serial_output_bytes_delta_pct: float | None
@@ -443,6 +471,25 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
         or row.get("generated_tokens")
         or row.get("completion_tokens")
     )
+    prompt_bytes = parse_int(
+        row.get("prompt_bytes")
+        or row.get("input_bytes")
+        or row.get("prompt_size_bytes")
+        or row.get("input_size_bytes")
+    )
+    prompt_bytes_per_s = parse_float(row.get("prompt_bytes_per_s") or row.get("input_bytes_per_s"))
+    wall_prompt_bytes_per_s = parse_float(
+        row.get("wall_prompt_bytes_per_s")
+        or row.get("host_prompt_bytes_per_s")
+        or row.get("host_wall_prompt_bytes_per_s")
+    )
+    tokens_per_prompt_byte = parse_float(
+        row.get("tokens_per_prompt_byte")
+        or row.get("tokens_per_input_byte")
+        or row.get("output_tokens_per_prompt_byte")
+    )
+    if tokens_per_prompt_byte is None and tokens is not None and prompt_bytes is not None and prompt_bytes > 0:
+        tokens_per_prompt_byte = float(tokens) / float(prompt_bytes)
     serial_output_bytes = parse_int(
         row.get("serial_output_bytes")
         or row.get("serial_bytes")
@@ -473,6 +520,10 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
         and host_child_cpu_pct is None
         and host_child_tok_per_cpu_s is None
         and tokens is None
+        and prompt_bytes is None
+        and prompt_bytes_per_s is None
+        and wall_prompt_bytes_per_s is None
+        and tokens_per_prompt_byte is None
         and serial_output_bytes is None
         and ttft_us is None
         and host_overhead_pct is None
@@ -499,6 +550,10 @@ def normalize_record(row: dict[str, Any], source: Path, fallback_timestamp: str)
         host_child_cpu_pct=host_child_cpu_pct,
         host_child_tok_per_cpu_s=host_child_tok_per_cpu_s,
         tokens=tokens,
+        prompt_bytes=prompt_bytes,
+        prompt_bytes_per_s=prompt_bytes_per_s,
+        wall_prompt_bytes_per_s=wall_prompt_bytes_per_s,
+        tokens_per_prompt_byte=tokens_per_prompt_byte,
         serial_output_bytes=serial_output_bytes,
         ttft_us=ttft_us,
         host_overhead_pct=host_overhead_pct,
@@ -613,6 +668,16 @@ def serial_output_bytes_per_token_values(records: list[PerfRecord]) -> list[floa
     ]
 
 
+def tokens_per_prompt_byte_values(records: list[PerfRecord]) -> list[float]:
+    values: list[float] = []
+    for record in records:
+        if record.tokens_per_prompt_byte is not None:
+            values.append(record.tokens_per_prompt_byte)
+        elif record.tokens is not None and record.prompt_bytes is not None and record.prompt_bytes > 0:
+            values.append(float(record.tokens) / float(record.prompt_bytes))
+    return values
+
+
 def summarize(records: list[PerfRecord]) -> dict[str, dict[str, Any]]:
     by_key: dict[str, list[PerfRecord]] = {}
     for record in records:
@@ -653,6 +718,20 @@ def summarize(records: list[PerfRecord]) -> dict[str, dict[str, Any]]:
             if record.host_child_tok_per_cpu_s is not None
         ]
         token_values = [record.tokens for record in key_records if record.tokens is not None]
+        prompt_byte_values = [
+            record.prompt_bytes for record in key_records if record.prompt_bytes is not None
+        ]
+        prompt_bytes_per_s_values = [
+            record.prompt_bytes_per_s
+            for record in key_records
+            if record.prompt_bytes_per_s is not None
+        ]
+        wall_prompt_bytes_per_s_values = [
+            record.wall_prompt_bytes_per_s
+            for record in key_records
+            if record.wall_prompt_bytes_per_s is not None
+        ]
+        tokens_per_prompt_byte_value = tokens_per_prompt_byte_values(key_records)
         serial_output_values = [
             record.serial_output_bytes
             for record in key_records
@@ -682,6 +761,25 @@ def summarize(records: list[PerfRecord]) -> dict[str, dict[str, Any]]:
             "p95_wall_us_per_token": percentile(wall_us_per_token_values, 95.0),
             "median_tokens": statistics.median(token_values) if token_values else None,
             "min_tokens": min(token_values) if token_values else None,
+            "median_prompt_bytes": (
+                statistics.median(prompt_byte_values) if prompt_byte_values else None
+            ),
+            "max_prompt_bytes": max(prompt_byte_values) if prompt_byte_values else None,
+            "median_prompt_bytes_per_s": (
+                statistics.median(prompt_bytes_per_s_values)
+                if prompt_bytes_per_s_values
+                else None
+            ),
+            "median_wall_prompt_bytes_per_s": (
+                statistics.median(wall_prompt_bytes_per_s_values)
+                if wall_prompt_bytes_per_s_values
+                else None
+            ),
+            "median_tokens_per_prompt_byte": (
+                statistics.median(tokens_per_prompt_byte_value)
+                if tokens_per_prompt_byte_value
+                else None
+            ),
             "median_serial_output_bytes": (
                 statistics.median(serial_output_values) if serial_output_values else None
             ),
@@ -786,6 +884,20 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
             if record.host_child_tok_per_cpu_s is not None
         ]
         token_values = [record.tokens for record in commit_records if record.tokens is not None]
+        prompt_byte_values = [
+            record.prompt_bytes for record in commit_records if record.prompt_bytes is not None
+        ]
+        prompt_bytes_per_s_values = [
+            record.prompt_bytes_per_s
+            for record in commit_records
+            if record.prompt_bytes_per_s is not None
+        ]
+        wall_prompt_bytes_per_s_values = [
+            record.wall_prompt_bytes_per_s
+            for record in commit_records
+            if record.wall_prompt_bytes_per_s is not None
+        ]
+        tokens_per_prompt_byte_value = tokens_per_prompt_byte_values(commit_records)
         serial_output_values = [
             record.serial_output_bytes
             for record in commit_records
@@ -827,6 +939,10 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                 host_child_cpu_pct_records=len(host_child_cpu_pct_values),
                 host_child_tok_per_cpu_s_records=len(host_child_tok_per_cpu_s_values),
                 token_records=len(token_values),
+                prompt_bytes_records=len(prompt_byte_values),
+                prompt_bytes_per_s_records=len(prompt_bytes_per_s_values),
+                wall_prompt_bytes_per_s_records=len(wall_prompt_bytes_per_s_values),
+                tokens_per_prompt_byte_records=len(tokens_per_prompt_byte_value),
                 serial_output_bytes_records=len(serial_output_values),
                 serial_output_bytes_per_token_records=len(serial_output_per_token_values),
                 ttft_us_records=len(ttft_values),
@@ -847,6 +963,25 @@ def commit_points(records: list[PerfRecord]) -> list[CommitPoint]:
                 p95_wall_us_per_token=percentile(wall_us_per_token_values, 95.0),
                 median_tokens=statistics.median(token_values) if token_values else None,
                 min_tokens=min(token_values) if token_values else None,
+                median_prompt_bytes=(
+                    statistics.median(prompt_byte_values) if prompt_byte_values else None
+                ),
+                max_prompt_bytes=max(prompt_byte_values) if prompt_byte_values else None,
+                median_prompt_bytes_per_s=(
+                    statistics.median(prompt_bytes_per_s_values)
+                    if prompt_bytes_per_s_values
+                    else None
+                ),
+                median_wall_prompt_bytes_per_s=(
+                    statistics.median(wall_prompt_bytes_per_s_values)
+                    if wall_prompt_bytes_per_s_values
+                    else None
+                ),
+                median_tokens_per_prompt_byte=(
+                    statistics.median(tokens_per_prompt_byte_value)
+                    if tokens_per_prompt_byte_value
+                    else None
+                ),
                 median_serial_output_bytes=(
                     statistics.median(serial_output_values) if serial_output_values else None
                 ),
@@ -1071,6 +1206,42 @@ def comparison_rows(
                 min_tokens_baseline=baseline.min_tokens,
                 min_tokens_candidate=candidate.min_tokens,
                 min_tokens_delta_pct=throughput_delta_pct(baseline.min_tokens, candidate.min_tokens),
+                median_prompt_bytes_baseline=baseline.median_prompt_bytes,
+                median_prompt_bytes_candidate=candidate.median_prompt_bytes,
+                median_prompt_bytes_delta_pct=growth_delta_pct(
+                    baseline.median_prompt_bytes, candidate.median_prompt_bytes
+                ),
+                max_prompt_bytes_baseline=baseline.max_prompt_bytes,
+                max_prompt_bytes_candidate=candidate.max_prompt_bytes,
+                max_prompt_bytes_delta_pct=growth_delta_pct(
+                    baseline.max_prompt_bytes, candidate.max_prompt_bytes
+                ),
+                median_prompt_bytes_per_s_baseline=baseline.median_prompt_bytes_per_s,
+                median_prompt_bytes_per_s_candidate=candidate.median_prompt_bytes_per_s,
+                median_prompt_bytes_per_s_delta_pct=throughput_delta_pct(
+                    baseline.median_prompt_bytes_per_s,
+                    candidate.median_prompt_bytes_per_s,
+                ),
+                median_wall_prompt_bytes_per_s_baseline=(
+                    baseline.median_wall_prompt_bytes_per_s
+                ),
+                median_wall_prompt_bytes_per_s_candidate=(
+                    candidate.median_wall_prompt_bytes_per_s
+                ),
+                median_wall_prompt_bytes_per_s_delta_pct=throughput_delta_pct(
+                    baseline.median_wall_prompt_bytes_per_s,
+                    candidate.median_wall_prompt_bytes_per_s,
+                ),
+                median_tokens_per_prompt_byte_baseline=(
+                    baseline.median_tokens_per_prompt_byte
+                ),
+                median_tokens_per_prompt_byte_candidate=(
+                    candidate.median_tokens_per_prompt_byte
+                ),
+                median_tokens_per_prompt_byte_delta_pct=throughput_delta_pct(
+                    baseline.median_tokens_per_prompt_byte,
+                    candidate.median_tokens_per_prompt_byte,
+                ),
                 median_serial_output_bytes_baseline=baseline.median_serial_output_bytes,
                 median_serial_output_bytes_candidate=candidate.median_serial_output_bytes,
                 median_serial_output_bytes_delta_pct=growth_delta_pct(
@@ -2140,9 +2311,9 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(["", "## Comparisons", ""])
     if report["comparisons"]:
         lines.append(
-            "| Key | Baseline | Candidate | Median tok/s Delta | P05 tok/s Delta | Wall tok/s Delta | P05 wall tok/s Delta | us/token Delta | P95 us/token Delta | Wall us/token Delta | P95 wall us/token Delta | Memory Delta | Memory/token Delta | Host RSS Delta | Host CPU Delta | P95 Host CPU Delta | Host CPU % Delta | Host tok/CPU-s Delta | Token Drop | Serial Output Delta | Serial Output/token Delta | Median TTFT Delta | P95 TTFT Delta | Host Overhead Delta |"
+            "| Key | Baseline | Candidate | Median tok/s Delta | P05 tok/s Delta | Wall tok/s Delta | P05 wall tok/s Delta | us/token Delta | P95 us/token Delta | Wall us/token Delta | P95 wall us/token Delta | Memory Delta | Memory/token Delta | Host RSS Delta | Host CPU Delta | P95 Host CPU Delta | Host CPU % Delta | Host tok/CPU-s Delta | Token Drop | Prompt Bytes Delta | Prompt Bytes/s Delta | Wall Prompt Bytes/s Delta | Tokens/Prompt Byte Delta | Serial Output Delta | Serial Output/token Delta | Median TTFT Delta | P95 TTFT Delta | Host Overhead Delta |"
         )
-        lines.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for comparison in report["comparisons"]:
             median_tps_delta = comparison["median_tok_per_s_delta_pct"]
             p05_tps_delta = comparison["p05_tok_per_s_delta_pct"]
@@ -2160,6 +2331,14 @@ def markdown_report(report: dict[str, Any]) -> str:
             host_cpu_pct_delta = comparison["median_host_child_cpu_pct_delta_pct"]
             host_tok_cpu_delta = comparison["median_host_child_tok_per_cpu_s_delta_pct"]
             token_delta = comparison["median_tokens_delta_pct"]
+            prompt_bytes_delta = comparison["median_prompt_bytes_delta_pct"]
+            prompt_bytes_per_s_delta = comparison["median_prompt_bytes_per_s_delta_pct"]
+            wall_prompt_bytes_per_s_delta = comparison[
+                "median_wall_prompt_bytes_per_s_delta_pct"
+            ]
+            tokens_per_prompt_byte_delta = comparison[
+                "median_tokens_per_prompt_byte_delta_pct"
+            ]
             serial_delta = comparison["median_serial_output_bytes_delta_pct"]
             serial_per_token_delta = comparison["median_serial_output_bytes_per_token_delta_pct"]
             ttft_delta = comparison["median_ttft_us_delta_pct"]
@@ -2207,6 +2386,24 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"{host_tok_cpu_delta:.2f}%" if host_tok_cpu_delta is not None else "-"
             )
             token_cell = f"{token_delta:.2f}%" if token_delta is not None else "-"
+            prompt_bytes_cell = (
+                f"{prompt_bytes_delta:.2f}%" if prompt_bytes_delta is not None else "-"
+            )
+            prompt_bytes_per_s_cell = (
+                f"{prompt_bytes_per_s_delta:.2f}%"
+                if prompt_bytes_per_s_delta is not None
+                else "-"
+            )
+            wall_prompt_bytes_per_s_cell = (
+                f"{wall_prompt_bytes_per_s_delta:.2f}%"
+                if wall_prompt_bytes_per_s_delta is not None
+                else "-"
+            )
+            tokens_per_prompt_byte_cell = (
+                f"{tokens_per_prompt_byte_delta:.2f}%"
+                if tokens_per_prompt_byte_delta is not None
+                else "-"
+            )
             serial_cell = f"{serial_delta:.2f}%" if serial_delta is not None else "-"
             serial_per_token_cell = (
                 f"{serial_per_token_delta:.2f}%"
@@ -2224,6 +2421,8 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"{wall_us_per_token_cell} | {p95_wall_us_per_token_cell} | "
                 f"{memory_cell} | {memory_per_token_cell} | {host_rss_cell} | {host_cpu_cell} | {p95_host_cpu_cell} | "
                 f"{host_cpu_pct_cell} | {host_tok_cpu_cell} | {token_cell} | "
+                f"{prompt_bytes_cell} | {prompt_bytes_per_s_cell} | {wall_prompt_bytes_per_s_cell} | "
+                f"{tokens_per_prompt_byte_cell} | "
                 f"{serial_cell} | {serial_per_token_cell} | {ttft_cell} | "
                 f"{p95_ttft_cell} | {overhead_cell} |"
             )
@@ -2233,9 +2432,9 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(["", "## Commit Points", ""])
     if report["commit_points"]:
         lines.append(
-            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | us/token Records | Wall us/token Records | Memory Records | Memory/token Records | Host RSS Records | Host CPU Records | Host CPU % Records | Host tok/CPU-s Records | Token Records | Serial Output Records | Serial Output/token Records | TTFT Records | Host Overhead Records | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median Serial Output | Max Serial Output | Median Serial Output/token | Max Serial Output/token | Median TTFT us | P95 TTFT us | Median Host Overhead % | Median Host CPU us | P95 Host CPU us | Median Host CPU % | Median Host tok/CPU-s | Tok/s CV | Wall Tok/s CV | Max Memory Bytes | Median Memory/token | Max Memory/token | Max Host RSS Bytes | Prompt Suite | Environment | Host Platform | Host Machine | QEMU Version |"
+            "| Key | Commit | Records | Tok/s Records | Wall Tok/s Records | us/token Records | Wall us/token Records | Memory Records | Memory/token Records | Host RSS Records | Host CPU Records | Host CPU % Records | Host tok/CPU-s Records | Token Records | Prompt Byte Records | Prompt Bytes/s Records | Wall Prompt Bytes/s Records | Tokens/Prompt Byte Records | Serial Output Records | Serial Output/token Records | TTFT Records | Host Overhead Records | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median Prompt Bytes | Max Prompt Bytes | Median Prompt Bytes/s | Median Wall Prompt Bytes/s | Median Tokens/Prompt Byte | Median Serial Output | Max Serial Output | Median Serial Output/token | Max Serial Output/token | Median TTFT us | P95 TTFT us | Median Host Overhead % | Median Host CPU us | P95 Host CPU us | Median Host CPU % | Median Host tok/CPU-s | Tok/s CV | Wall Tok/s CV | Max Memory Bytes | Median Memory/token | Max Memory/token | Max Host RSS Bytes | Prompt Suite | Environment | Host Platform | Host Machine | QEMU Version |"
         )
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- |")
         for point in report["commit_points"]:
             p05_tps = point["p05_tok_per_s"]
             tps = point["median_tok_per_s"]
@@ -2247,6 +2446,11 @@ def markdown_report(report: dict[str, Any]) -> str:
             p95_wall_us_per_token = point["p95_wall_us_per_token"]
             tokens = point["median_tokens"]
             min_tokens = point["min_tokens"]
+            prompt_bytes = point["median_prompt_bytes"]
+            max_prompt_bytes = point["max_prompt_bytes"]
+            prompt_bytes_per_s = point["median_prompt_bytes_per_s"]
+            wall_prompt_bytes_per_s = point["median_wall_prompt_bytes_per_s"]
+            tokens_per_prompt_byte = point["median_tokens_per_prompt_byte"]
             serial_output = point["median_serial_output_bytes"]
             max_serial_output = point["max_serial_output_bytes"]
             serial_output_per_token = point["median_serial_output_bytes_per_token"]
@@ -2281,6 +2485,23 @@ def markdown_report(report: dict[str, Any]) -> str:
             )
             tokens_cell = f"{tokens:.1f}" if tokens is not None else "-"
             min_tokens_cell = str(min_tokens) if min_tokens is not None else "-"
+            prompt_bytes_cell = f"{prompt_bytes:.1f}" if prompt_bytes is not None else "-"
+            max_prompt_bytes_cell = (
+                str(max_prompt_bytes) if max_prompt_bytes is not None else "-"
+            )
+            prompt_bytes_per_s_cell = (
+                f"{prompt_bytes_per_s:.3f}" if prompt_bytes_per_s is not None else "-"
+            )
+            wall_prompt_bytes_per_s_cell = (
+                f"{wall_prompt_bytes_per_s:.3f}"
+                if wall_prompt_bytes_per_s is not None
+                else "-"
+            )
+            tokens_per_prompt_byte_cell = (
+                f"{tokens_per_prompt_byte:.6f}"
+                if tokens_per_prompt_byte is not None
+                else "-"
+            )
             serial_output_cell = (
                 f"{serial_output:.1f}" if serial_output is not None else "-"
             )
@@ -2326,14 +2547,19 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"{point['host_child_peak_rss_records']} | "
                 f"{point['host_child_cpu_us_records']} | {point['host_child_cpu_pct_records']} | "
                 f"{point['host_child_tok_per_cpu_s_records']} | "
-                f"{point['token_records']} | {point['serial_output_bytes_records']} | "
+                f"{point['token_records']} | {point['prompt_bytes_records']} | "
+                f"{point['prompt_bytes_per_s_records']} | "
+                f"{point['wall_prompt_bytes_per_s_records']} | "
+                f"{point['tokens_per_prompt_byte_records']} | {point['serial_output_bytes_records']} | "
                 f"{point['serial_output_bytes_per_token_records']} | "
                 f"{point['ttft_us_records']} | "
                 f"{point['host_overhead_records']} | {p05_tps_cell} | {tps_cell} | "
                 f"{p05_wall_tps_cell} | {wall_tps_cell} | "
                 f"{us_per_token_cell} | {p95_us_per_token_cell} | "
                 f"{wall_us_per_token_cell} | {p95_wall_us_per_token_cell} | "
-                f"{tokens_cell} | {min_tokens_cell} | {serial_output_cell} | "
+                f"{tokens_cell} | {min_tokens_cell} | {prompt_bytes_cell} | "
+                f"{max_prompt_bytes_cell} | {prompt_bytes_per_s_cell} | "
+                f"{wall_prompt_bytes_per_s_cell} | {tokens_per_prompt_byte_cell} | {serial_output_cell} | "
                 f"{max_serial_output_cell} | {serial_output_per_token_cell} | "
                 f"{max_serial_output_per_token_cell} | {ttft_cell} | {p95_ttft_cell} | "
                 f"{overhead_cell} | {host_cpu_cell} | {p95_host_cpu_cell} | {host_cpu_pct_cell} | {host_tok_cpu_cell} | "
@@ -2346,8 +2572,8 @@ def markdown_report(report: dict[str, Any]) -> str:
 
     lines.extend(["", "## Latest Summary", ""])
     if report["summaries"]:
-        lines.append("| Key | Records | Latest Commit | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median Serial Output | Max Serial Output | Median Serial Output/token | Max Serial Output/token | Median TTFT us | P95 TTFT us | Median Host Overhead % | Median Host CPU us | P95 Host CPU us | Median Host CPU % | Median Host tok/CPU-s | Max Memory Bytes | Median Memory/token | Max Memory/token | Max Host RSS Bytes |")
-        lines.append("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| Key | Records | Latest Commit | P05 tok/s | Median tok/s | P05 wall tok/s | Median wall tok/s | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Median Tokens | Min Tokens | Median Prompt Bytes | Max Prompt Bytes | Median Prompt Bytes/s | Median Wall Prompt Bytes/s | Median Tokens/Prompt Byte | Median Serial Output | Max Serial Output | Median Serial Output/token | Max Serial Output/token | Median TTFT us | P95 TTFT us | Median Host Overhead % | Median Host CPU us | P95 Host CPU us | Median Host CPU % | Median Host tok/CPU-s | Max Memory Bytes | Median Memory/token | Max Memory/token | Max Host RSS Bytes |")
+        lines.append("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for key, summary in report["summaries"].items():
             p05_tps = summary["p05_tok_per_s"]
             tps = summary["median_tok_per_s"]
@@ -2359,6 +2585,11 @@ def markdown_report(report: dict[str, Any]) -> str:
             p95_wall_us_per_token = summary["p95_wall_us_per_token"]
             tokens = summary["median_tokens"]
             min_tokens = summary["min_tokens"]
+            prompt_bytes = summary["median_prompt_bytes"]
+            max_prompt_bytes = summary["max_prompt_bytes"]
+            prompt_bytes_per_s = summary["median_prompt_bytes_per_s"]
+            wall_prompt_bytes_per_s = summary["median_wall_prompt_bytes_per_s"]
+            tokens_per_prompt_byte = summary["median_tokens_per_prompt_byte"]
             serial_output = summary["median_serial_output_bytes"]
             max_serial_output = summary["max_serial_output_bytes"]
             serial_output_per_token = summary["median_serial_output_bytes_per_token"]
@@ -2390,6 +2621,23 @@ def markdown_report(report: dict[str, Any]) -> str:
             )
             tokens_cell = f"{tokens:.1f}" if tokens is not None else "-"
             min_tokens_cell = str(min_tokens) if min_tokens is not None else "-"
+            prompt_bytes_cell = f"{prompt_bytes:.1f}" if prompt_bytes is not None else "-"
+            max_prompt_bytes_cell = (
+                str(max_prompt_bytes) if max_prompt_bytes is not None else "-"
+            )
+            prompt_bytes_per_s_cell = (
+                f"{prompt_bytes_per_s:.3f}" if prompt_bytes_per_s is not None else "-"
+            )
+            wall_prompt_bytes_per_s_cell = (
+                f"{wall_prompt_bytes_per_s:.3f}"
+                if wall_prompt_bytes_per_s is not None
+                else "-"
+            )
+            tokens_per_prompt_byte_cell = (
+                f"{tokens_per_prompt_byte:.6f}"
+                if tokens_per_prompt_byte is not None
+                else "-"
+            )
             serial_output_cell = (
                 f"{serial_output:.1f}" if serial_output is not None else "-"
             )
@@ -2426,7 +2674,10 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"{p05_tps_cell} | {tps_cell} | {p05_wall_tps_cell} | {wall_tps_cell} | "
                 f"{us_per_token_cell} | {p95_us_per_token_cell} | "
                 f"{wall_us_per_token_cell} | {p95_wall_us_per_token_cell} | "
-                f"{tokens_cell} | {min_tokens_cell} | {serial_output_cell} | "
+                f"{tokens_cell} | {min_tokens_cell} | {prompt_bytes_cell} | "
+                f"{max_prompt_bytes_cell} | {prompt_bytes_per_s_cell} | "
+                f"{wall_prompt_bytes_per_s_cell} | {tokens_per_prompt_byte_cell} | "
+                f"{serial_output_cell} | "
                 f"{max_serial_output_cell} | {serial_output_per_token_cell} | "
                 f"{max_serial_output_per_token_cell} | {ttft_cell} | {p95_ttft_cell} | "
                 f"{overhead_cell} | {host_cpu_cell} | {p95_host_cpu_cell} | "
@@ -2810,6 +3061,10 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "host_child_cpu_pct_records",
             "host_child_tok_per_cpu_s_records",
             "token_records",
+            "prompt_bytes_records",
+            "prompt_bytes_per_s_records",
+            "wall_prompt_bytes_per_s_records",
+            "tokens_per_prompt_byte_records",
             "serial_output_bytes_records",
             "serial_output_bytes_per_token_records",
             "ttft_us_records",
@@ -2824,6 +3079,11 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "p95_wall_us_per_token",
             "median_tokens",
             "min_tokens",
+            "median_prompt_bytes",
+            "max_prompt_bytes",
+            "median_prompt_bytes_per_s",
+            "median_wall_prompt_bytes_per_s",
+            "median_tokens_per_prompt_byte",
             "median_serial_output_bytes",
             "max_serial_output_bytes",
             "median_serial_output_bytes_per_token",
@@ -2928,6 +3188,21 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "min_tokens_baseline",
             "min_tokens_candidate",
             "min_tokens_delta_pct",
+            "median_prompt_bytes_baseline",
+            "median_prompt_bytes_candidate",
+            "median_prompt_bytes_delta_pct",
+            "max_prompt_bytes_baseline",
+            "max_prompt_bytes_candidate",
+            "max_prompt_bytes_delta_pct",
+            "median_prompt_bytes_per_s_baseline",
+            "median_prompt_bytes_per_s_candidate",
+            "median_prompt_bytes_per_s_delta_pct",
+            "median_wall_prompt_bytes_per_s_baseline",
+            "median_wall_prompt_bytes_per_s_candidate",
+            "median_wall_prompt_bytes_per_s_delta_pct",
+            "median_tokens_per_prompt_byte_baseline",
+            "median_tokens_per_prompt_byte_candidate",
+            "median_tokens_per_prompt_byte_delta_pct",
             "median_serial_output_bytes_baseline",
             "median_serial_output_bytes_candidate",
             "median_serial_output_bytes_delta_pct",

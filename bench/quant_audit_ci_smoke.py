@@ -45,7 +45,7 @@ def write_clean_source(source_root: Path) -> None:
 
 
 def write_q4_block(path: Path, scale_bits: int) -> None:
-    payload = bytes(range(16))
+    payload = bytes((value | (value << 4)) for value in range(16))
     path.write_bytes(struct.pack("<H", scale_bits) + payload)
 
 
@@ -91,6 +91,8 @@ def main() -> int:
             "0",
             "--max-identical-block-run",
             "1",
+            "--min-q4-nibble-lane-used-quant-values",
+            "16",
             "--output",
             str(pass_json),
             "--markdown",
@@ -130,7 +132,16 @@ def main() -> int:
                 return rc
             if rc := require(audit["max_identical_block_run"] == 1, "unexpected_identical_block_run"):
                 return rc
+        q4_audit = next(audit for audit in report["block_audits"] if audit["format"] == "q4_0")
+        if rc := require(q4_audit["q4_low_nibble_used_value_count"] == 16, "missing_low_lane_used_values"):
+            return rc
+        if rc := require(q4_audit["q4_high_nibble_used_value_count"] == 16, "missing_high_lane_used_values"):
+            return rc
+        if rc := require(q4_audit["q4_nibble_lane_used_value_delta"] == 0, "unexpected_lane_used_delta"):
+            return rc
         if rc := require("Scale exponent min/max/under/over" in pass_md.read_text(encoding="utf-8"), "missing_markdown_exponent"):
+            return rc
+        if rc := require("Q4 low/high lane used values" in pass_md.read_text(encoding="utf-8"), "missing_markdown_q4_lane"):
             return rc
         if rc := require("Scale sign +/-" in pass_md.read_text(encoding="utf-8"), "missing_markdown_scale_sign"):
             return rc
@@ -264,6 +275,54 @@ def main() -> int:
         if rc := require(
             any("identical block run 3 exceeds limit 2" in finding for finding in duplicate_audit["findings"]),
             "missing_identical_run_finding",
+        ):
+            return rc
+
+        bad_q4_lane = tmp_path / "q4_bad_nibble_lane.bin"
+        bad_q4_lane.write_bytes(
+            struct.pack("<H", 0x3C00)
+            + bytes((low | (8 << 4)) for low in range(16))
+        )
+        bad_q4_lane_json = tmp_path / "bad_q4_nibble_lane_quant_audit.json"
+        bad_q4_lane_command = [
+            sys.executable,
+            str(ROOT / "bench" / "quant_audit.py"),
+            "--source-root",
+            str(source_root),
+            "--format",
+            "q4_0",
+            "--block-file",
+            str(bad_q4_lane),
+            "--min-q4-nibble-lane-used-quant-values",
+            "4",
+            "--output",
+            str(bad_q4_lane_json),
+        ]
+        completed = subprocess.run(
+            bad_q4_lane_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("bad_q4_nibble_lane_not_rejected=true", file=sys.stderr)
+            return 1
+        bad_q4_lane_report = json.loads(bad_q4_lane_json.read_text(encoding="utf-8"))
+        bad_q4_lane_audit = bad_q4_lane_report["block_audits"][0]
+        if rc := require(
+            bad_q4_lane_audit["q4_low_nibble_used_value_count"] == 16,
+            "missing_bad_low_lane_used_values",
+        ):
+            return rc
+        if rc := require(
+            bad_q4_lane_audit["q4_high_nibble_used_value_count"] == 1,
+            "missing_bad_high_lane_used_values",
+        ):
+            return rc
+        if rc := require(
+            any("Q4_0 high nibble lane used quant values 1 below minimum 4" in finding for finding in bad_q4_lane_audit["findings"]),
+            "missing_bad_high_lane_finding",
         ):
             return rc
 
