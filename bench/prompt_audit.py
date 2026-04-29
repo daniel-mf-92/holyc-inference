@@ -103,6 +103,7 @@ def build_report(
     *,
     min_prompts: int,
     max_prompt_bytes: int | None,
+    expect_suite_sha256: str | None,
     fail_on_duplicate_text: bool,
 ) -> dict[str, Any]:
     cases = qemu_prompt_bench.load_prompt_cases(prompts)
@@ -124,6 +125,15 @@ def build_report(
             "error",
             "",
             f"prompt count {len(stats)} is below required minimum {min_prompts}",
+        )
+
+    actual_suite_sha256 = suite_hash(stats)
+    if expect_suite_sha256 is not None and actual_suite_sha256 != expect_suite_sha256:
+        append_issue(
+            issues,
+            "error",
+            "",
+            f"prompt suite sha256 {actual_suite_sha256} does not match expected {expect_suite_sha256}",
         )
 
     seen_ids: dict[str, int] = {}
@@ -175,6 +185,7 @@ def build_report(
         "limits": {
             "min_prompts": min_prompts,
             "max_prompt_bytes": max_prompt_bytes,
+            "expect_suite_sha256": expect_suite_sha256,
             "fail_on_duplicate_text": fail_on_duplicate_text,
         },
     }
@@ -310,6 +321,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-prompts", type=int, default=1)
     parser.add_argument("--max-prompt-bytes", type=int)
     parser.add_argument(
+        "--expect-suite-sha256",
+        help="Fail when the order-sensitive prompt suite SHA256 differs from this pinned value",
+    )
+    parser.add_argument(
         "--fail-on-duplicate-text",
         action="store_true",
         help="Treat duplicate prompt text as an error instead of a warning",
@@ -331,6 +346,7 @@ def main(argv: list[str] | None = None) -> int:
             args.prompts,
             min_prompts=args.min_prompts,
             max_prompt_bytes=args.max_prompt_bytes,
+            expect_suite_sha256=args.expect_suite_sha256,
             fail_on_duplicate_text=args.fail_on_duplicate_text,
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:

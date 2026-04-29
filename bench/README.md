@@ -427,10 +427,10 @@ fail.
 
 `prompt_audit.py` validates benchmark prompt files before a guest run. It
 checks prompt ID uniqueness, duplicate prompt text, byte/line stats, optional
-minimum prompt count and maximum prompt byte limits, then writes a stable suite
-hash so benchmark artifacts can name the exact prompt set they used. It can
-also write CSV and JUnit XML artifacts so CI can upload prompt stats and fail
-directly on prompt-suite errors.
+minimum prompt count, maximum prompt byte limits, and an optional pinned suite
+hash, then writes a stable suite hash so benchmark artifacts can name the exact
+prompt set they used. It can also write CSV and JUnit XML artifacts so CI can
+upload prompt stats and fail directly on prompt-suite errors.
 
 Example:
 
@@ -442,7 +442,15 @@ python3 bench/prompt_audit.py \
   --csv bench/results/prompt_audit_smoke_latest.csv \
   --junit bench/results/prompt_audit_smoke_latest_junit.xml \
   --min-prompts 2 \
-  --max-prompt-bytes 1024
+  --max-prompt-bytes 1024 \
+  --expect-suite-sha256 <pinned-suite-sha256>
+```
+
+The prompt audit smoke covers both the pinned-suite pass path and the drift
+failure path:
+
+```bash
+python3 bench/prompt_audit_ci_smoke.py
 ```
 
 `qemu_prompt_bench.py` launches an air-gapped QEMU guest once per prompt, captures

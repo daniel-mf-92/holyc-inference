@@ -235,3 +235,4 @@
 2026-04-29T09:45:18Z | Added benchmark matrix expected-cell coverage gates with dry-run smoke coverage and refreshed matrix artifacts.
 2026-04-29T10:18:03Z | Added HCEval record fingerprint manifests and inspector validation with smoke coverage and refreshed dataset artifacts.
 2026-04-29T10:33:43Z | Added qemu prompt benchmark exit classification telemetry for nonzero/timeout failures with smoke coverage and refreshed artifacts.
+2026-04-29T10:48:43Z | Added prompt audit pinned suite hash drift gate with smoke coverage and refreshed prompt audit artifacts.
