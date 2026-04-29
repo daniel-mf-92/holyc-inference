@@ -16,7 +16,7 @@
   "error_count": 0,
   "findings": [],
   "format": "hceval-choice-audit",
-  "generated_at": "2026-04-29T05:50:28Z",
+  "generated_at": "2026-04-29T21:15:52Z",
   "inputs": [
     {
       "path": "bench/datasets/samples/smoke_eval.jsonl",
@@ -25,6 +25,65 @@
     }
   ],
   "record_count": 3,
+  "record_telemetry": [
+    {
+      "answer_index": 0,
+      "choice_count": 4,
+      "choice_label_prefix_count": 0,
+      "choice_length_ratio": 1.2162162162162162,
+      "choice_overlap_pair_count": 0,
+      "dataset": "hellaswag-smoke",
+      "duplicate_choice_group_count": 0,
+      "duplicate_choice_text_count": 0,
+      "max_choice_bytes": 45,
+      "min_choice_bytes": 37,
+      "prompt_choice_leak_count": 0,
+      "prompt_choice_leak_indexes": "",
+      "prompt_contains_correct_choice": false,
+      "record_id": "smoke-hellaswag-1",
+      "source": "bench/datasets/samples/smoke_eval.jsonl:1",
+      "split": "validation",
+      "total_choice_bytes": 166
+    },
+    {
+      "answer_index": 0,
+      "choice_count": 4,
+      "choice_label_prefix_count": 0,
+      "choice_length_ratio": 2.2,
+      "choice_overlap_pair_count": 0,
+      "dataset": "arc-smoke",
+      "duplicate_choice_group_count": 0,
+      "duplicate_choice_text_count": 0,
+      "max_choice_bytes": 11,
+      "min_choice_bytes": 5,
+      "prompt_choice_leak_count": 0,
+      "prompt_choice_leak_indexes": "",
+      "prompt_contains_correct_choice": false,
+      "record_id": "smoke-arc-1",
+      "source": "bench/datasets/samples/smoke_eval.jsonl:2",
+      "split": "validation",
+      "total_choice_bytes": 28
+    },
+    {
+      "answer_index": 0,
+      "choice_count": 4,
+      "choice_label_prefix_count": 0,
+      "choice_length_ratio": 2.15,
+      "choice_overlap_pair_count": 0,
+      "dataset": "truthfulqa-smoke",
+      "duplicate_choice_group_count": 0,
+      "duplicate_choice_text_count": 0,
+      "max_choice_bytes": 43,
+      "min_choice_bytes": 20,
+      "prompt_choice_leak_count": 0,
+      "prompt_choice_leak_indexes": "",
+      "prompt_contains_correct_choice": false,
+      "record_id": "smoke-truthfulqa-1",
+      "source": "bench/datasets/samples/smoke_eval.jsonl:3",
+      "split": "validation",
+      "total_choice_bytes": 133
+    }
+  ],
   "status": "pass",
   "warning_count": 0
 }

@@ -53,6 +53,7 @@ python3 bench/dataset_choice_audit.py \
   --output bench/results/datasets/dataset_choice_audit_smoke_latest.json \
   --markdown bench/results/datasets/dataset_choice_audit_smoke_latest.md \
   --csv bench/results/datasets/dataset_choice_audit_smoke_latest.csv \
+  --record-csv bench/results/datasets/dataset_choice_audit_smoke_records_latest.csv \
   --junit bench/results/datasets/dataset_choice_audit_smoke_latest_junit.xml \
   --fail-on-duplicate-choices \
   --fail-on-choice-overlap \
@@ -63,6 +64,10 @@ python3 bench/dataset_choice_audit.py \
   --fail-on-length-skew \
   --fail-on-findings
 ```
+
+The optional `--record-csv` export writes one row per normalized eval record
+with choice byte ranges, duplicate/overlap counts, label-prefix counts, and
+prompt leak telemetry for quick review before packing.
 
 Run `bench/dataset_order_audit.py` before packing promoted subsets when source
 row order could bias evaluation. It records answer-index sequences, transition

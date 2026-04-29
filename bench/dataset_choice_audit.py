@@ -186,6 +186,67 @@ def choice_overlap_pairs(choices: list[str], min_overlap_chars: int) -> list[dic
     return pairs
 
 
+def record_telemetry(
+    loaded: LoadedRecord,
+    min_choice_overlap_chars: int,
+    min_answer_leak_chars: int,
+    min_choice_leak_chars: int,
+) -> dict[str, Any]:
+    record = loaded.record
+    choice_lengths = [len(choice.encode("utf-8")) for choice in record.choices]
+    stable_choices = [stable_text_key(choice) for choice in record.choices]
+    prompt = stable_text_key(record.prompt)
+    duplicate_groups = duplicate_choice_groups(record.choices)
+    overlap_pairs = choice_overlap_pairs(record.choices, min_choice_overlap_chars)
+    answer_choice = stable_choices[record.answer_index]
+    leaked_choice_indexes = [
+        index
+        for index, choice_key in enumerate(stable_choices)
+        if choice_key and len(choice_key) >= min_choice_leak_chars and choice_key in prompt
+    ]
+    label_prefix_count = sum(1 for choice in record.choices if LABEL_PREFIX_RE.match(choice))
+    min_choice_bytes = min(choice_lengths, default=0)
+    max_choice_bytes = max(choice_lengths, default=0)
+    return {
+        "source": source_ref(loaded),
+        "dataset": record.dataset,
+        "split": record.split,
+        "record_id": record.record_id,
+        "choice_count": len(record.choices),
+        "answer_index": record.answer_index,
+        "min_choice_bytes": min_choice_bytes,
+        "max_choice_bytes": max_choice_bytes,
+        "total_choice_bytes": sum(choice_lengths),
+        "choice_length_ratio": choice_length_ratio(record.choices),
+        "duplicate_choice_group_count": len(duplicate_groups),
+        "duplicate_choice_text_count": sum(len(indexes) for indexes in duplicate_groups.values()),
+        "choice_overlap_pair_count": len(overlap_pairs),
+        "choice_label_prefix_count": label_prefix_count,
+        "prompt_contains_correct_choice": (
+            bool(answer_choice and len(answer_choice) >= min_answer_leak_chars and answer_choice in prompt)
+        ),
+        "prompt_choice_leak_count": len(leaked_choice_indexes),
+        "prompt_choice_leak_indexes": ",".join(str(index) for index in leaked_choice_indexes),
+    }
+
+
+def build_record_telemetry(
+    records: list[LoadedRecord],
+    min_choice_overlap_chars: int,
+    min_answer_leak_chars: int,
+    min_choice_leak_chars: int,
+) -> list[dict[str, Any]]:
+    return [
+        record_telemetry(
+            loaded,
+            min_choice_overlap_chars,
+            min_answer_leak_chars,
+            min_choice_leak_chars,
+        )
+        for loaded in records
+    ]
+
+
 def audit_records(
     records: list[LoadedRecord],
     fail_on_duplicate_choices: bool,
@@ -359,6 +420,34 @@ def write_csv(report: dict[str, Any], path: Path) -> None:
             writer.writerow(finding)
 
 
+def write_record_csv(records: list[dict[str, Any]], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "source",
+        "dataset",
+        "split",
+        "record_id",
+        "choice_count",
+        "answer_index",
+        "min_choice_bytes",
+        "max_choice_bytes",
+        "total_choice_bytes",
+        "choice_length_ratio",
+        "duplicate_choice_group_count",
+        "duplicate_choice_text_count",
+        "choice_overlap_pair_count",
+        "choice_label_prefix_count",
+        "prompt_contains_correct_choice",
+        "prompt_choice_leak_count",
+        "prompt_choice_leak_indexes",
+    ]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in records:
+            writer.writerow(row)
+
+
 def write_junit(report: dict[str, Any], path: Path) -> None:
     error_findings = [finding for finding in report["findings"] if finding["severity"] == "error"]
     testcase_count = len(error_findings) + (1 if not error_findings else 0)
@@ -393,6 +482,7 @@ def write_outputs(
     output: Path,
     markdown: Path | None,
     csv_path: Path | None,
+    record_csv: Path | None,
     junit: Path | None,
 ) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -402,6 +492,8 @@ def write_outputs(
         markdown.write_text(markdown_report(report), encoding="utf-8")
     if csv_path:
         write_csv(report, csv_path)
+    if record_csv:
+        write_record_csv(report["record_telemetry"], record_csv)
     if junit:
         write_junit(report, junit)
 
@@ -412,6 +504,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, required=True, help="Output JSON report")
     parser.add_argument("--markdown", type=Path, help="Optional Markdown report")
     parser.add_argument("--csv", type=Path, help="Optional CSV findings output")
+    parser.add_argument("--record-csv", type=Path, help="Optional per-record choice telemetry CSV output")
     parser.add_argument("--junit", type=Path, help="Optional JUnit XML output")
     parser.add_argument("--default-dataset", default="eval", help="Dataset name for rows missing dataset")
     parser.add_argument("--default-split", default="validation", help="Split name for rows missing split")
@@ -491,13 +584,21 @@ def main(argv: list[str] | None = None) -> int:
         findings,
     )
     report = build_report(inputs, records, findings)
-    write_outputs(report, args.output, args.markdown, args.csv, args.junit)
+    report["record_telemetry"] = build_record_telemetry(
+        records,
+        args.min_choice_overlap_chars,
+        args.min_answer_leak_chars,
+        args.min_choice_leak_chars,
+    )
+    write_outputs(report, args.output, args.markdown, args.csv, args.record_csv, args.junit)
 
     print(f"wrote_report={args.output}")
     if args.markdown:
         print(f"wrote_markdown={args.markdown}")
     if args.csv:
         print(f"wrote_csv={args.csv}")
+    if args.record_csv:
+        print(f"wrote_record_csv={args.record_csv}")
     if args.junit:
         print(f"wrote_junit={args.junit}")
     print(f"status={report['status']}")

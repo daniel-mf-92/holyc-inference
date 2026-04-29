@@ -42,6 +42,7 @@ def main() -> int:
         pass_json = tmp_path / "dataset_choice_audit_smoke_latest.json"
         pass_md = tmp_path / "dataset_choice_audit_smoke_latest.md"
         pass_csv = tmp_path / "dataset_choice_audit_smoke_latest.csv"
+        pass_record_csv = tmp_path / "dataset_choice_audit_smoke_records_latest.csv"
         pass_junit = tmp_path / "dataset_choice_audit_smoke_latest_junit.xml"
 
         pass_command = [
@@ -55,6 +56,8 @@ def main() -> int:
             str(pass_md),
             "--csv",
             str(pass_csv),
+            "--record-csv",
+            str(pass_record_csv),
             "--junit",
             str(pass_junit),
             "--fail-on-duplicate-choices",
@@ -80,11 +83,23 @@ def main() -> int:
             return rc
         if rc := require(pass_report["findings"] == [], "unexpected_pass_findings"):
             return rc
+        if rc := require(len(pass_report["record_telemetry"]) == 3, "missing_record_telemetry"):
+            return rc
+        if rc := require(
+            all(row["choice_count"] == 4 for row in pass_report["record_telemetry"]),
+            "unexpected_record_choice_counts",
+        ):
+            return rc
         if rc := require("Dataset Choice Audit" in pass_md.read_text(encoding="utf-8"), "missing_markdown"):
             return rc
         if rc := require(
             "severity,kind,source,dataset,split,record_id,detail" in pass_csv.read_text(encoding="utf-8"),
             "missing_csv_header",
+        ):
+            return rc
+        if rc := require(
+            "source,dataset,split,record_id,choice_count,answer_index" in pass_record_csv.read_text(encoding="utf-8"),
+            "missing_record_csv_header",
         ):
             return rc
         junit_root = ET.parse(pass_junit).getroot()
@@ -180,6 +195,7 @@ def main() -> int:
             encoding="utf-8",
         )
         bad_output = tmp_path / "bad_choice_audit.json"
+        bad_record_csv = tmp_path / "bad_choice_audit_records.csv"
         bad_command = [
             sys.executable,
             str(ROOT / "bench" / "dataset_choice_audit.py"),
@@ -187,6 +203,8 @@ def main() -> int:
             str(bad_jsonl),
             "--output",
             str(bad_output),
+            "--record-csv",
+            str(bad_record_csv),
             "--fail-on-duplicate-choices",
             "--fail-on-choice-overlap",
             "--fail-on-label-prefixes",
@@ -223,6 +241,19 @@ def main() -> int:
         }:
             if rc := require(expected in kinds, f"missing_{expected}"):
                 return rc
+        telemetry_by_id = {row["record_id"]: row for row in bad_report["record_telemetry"]}
+        if rc := require(
+            telemetry_by_id["dup-choice"]["duplicate_choice_group_count"] == 1,
+            "missing_duplicate_record_telemetry",
+        ):
+            return rc
+        if rc := require(
+            telemetry_by_id["distractor-leak"]["prompt_choice_leak_count"] == 1,
+            "missing_leak_record_telemetry",
+        ):
+            return rc
+        if rc := require("prompt_choice_leak_count" in bad_record_csv.read_text(encoding="utf-8"), "missing_bad_record_csv"):
+            return rc
 
     print("dataset_choice_audit_ci_smoke=pass")
     return 0
