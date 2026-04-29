@@ -87,6 +87,10 @@ def main() -> int:
             "-1",
             "--max-scale-exponent",
             "1",
+            "--max-duplicate-block-pct",
+            "0",
+            "--max-identical-block-run",
+            "1",
             "--output",
             str(pass_json),
             "--markdown",
@@ -120,9 +124,17 @@ def main() -> int:
                 return rc
             if rc := require(audit["scale_exponent_over_limit_count"] == 0, "unexpected_over_limit"):
                 return rc
+            if rc := require(audit["duplicate_block_count"] == 0, "unexpected_duplicate_blocks"):
+                return rc
+            if rc := require(audit["repeated_block_value_count"] == 0, "unexpected_repeated_block_values"):
+                return rc
+            if rc := require(audit["max_identical_block_run"] == 1, "unexpected_identical_block_run"):
+                return rc
         if rc := require("Scale exponent min/max/under/over" in pass_md.read_text(encoding="utf-8"), "missing_markdown_exponent"):
             return rc
         if rc := require("Scale sign +/-" in pass_md.read_text(encoding="utf-8"), "missing_markdown_scale_sign"):
+            return rc
+        if rc := require("Duplicate blocks" in pass_md.read_text(encoding="utf-8"), "missing_markdown_duplicate_blocks"):
             return rc
         if rc := require(
             "scope,path,line,column,format,kind,reason,text" in pass_csv.read_text(encoding="utf-8"),
@@ -205,6 +217,53 @@ def main() -> int:
         if rc := require(
             any("fp16 scale sign is negative" in finding for finding in bad_negative_audit["findings"]),
             "missing_negative_scale_finding",
+        ):
+            return rc
+
+        duplicate_q8 = tmp_path / "q8_duplicate_blocks.bin"
+        q8_block = struct.pack("<H32b", 0x3C00, *range(-16, 16))
+        duplicate_q8.write_bytes(q8_block * 3)
+        duplicate_json = tmp_path / "bad_duplicate_quant_audit.json"
+        duplicate_command = [
+            sys.executable,
+            str(ROOT / "bench" / "quant_audit.py"),
+            "--source-root",
+            str(source_root),
+            "--format",
+            "q8_0",
+            "--block-file",
+            str(duplicate_q8),
+            "--max-duplicate-block-pct",
+            "50",
+            "--max-identical-block-run",
+            "2",
+            "--output",
+            str(duplicate_json),
+        ]
+        completed = subprocess.run(
+            duplicate_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("duplicate_blocks_not_rejected=true", file=sys.stderr)
+            return 1
+        duplicate_report = json.loads(duplicate_json.read_text(encoding="utf-8"))
+        duplicate_audit = duplicate_report["block_audits"][0]
+        if rc := require(duplicate_audit["duplicate_block_count"] == 2, "missing_duplicate_block_count"):
+            return rc
+        if rc := require(duplicate_audit["max_identical_block_run"] == 3, "missing_identical_block_run"):
+            return rc
+        if rc := require(
+            any("duplicate blocks 2/3" in finding for finding in duplicate_audit["findings"]),
+            "missing_duplicate_block_finding",
+        ):
+            return rc
+        if rc := require(
+            any("identical block run 3 exceeds limit 2" in finding for finding in duplicate_audit["findings"]),
+            "missing_identical_run_finding",
         ):
             return rc
 

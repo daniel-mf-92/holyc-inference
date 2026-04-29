@@ -314,6 +314,28 @@ def test_block_audit_checks_per_block_distribution_gates(tmp_path: Path) -> None
     )
 
 
+def test_block_audit_checks_duplicate_complete_blocks(tmp_path: Path) -> None:
+    block_file = tmp_path / "q4.bin"
+    block = half_bits(1.0) + bytes([0x88] * 16)
+    block_file.write_bytes(block * 3)
+
+    audit = quant_audit.audit_q4_0_blocks(
+        block_file,
+        allow_inf_nan_scale=False,
+        max_duplicate_block_pct=50.0,
+        max_identical_block_run=2,
+    )
+
+    assert audit.block_count == 3
+    assert audit.duplicate_block_count == 2
+    assert audit.duplicate_block_pct == 100.0 * 2 / 3
+    assert audit.repeated_block_value_count == 1
+    assert audit.max_identical_block_run == 3
+    assert audit.max_identical_block_run_start == 0
+    assert "duplicate blocks 2/3 (66.667%) exceeds limit 50.000%" in audit.findings
+    assert "identical block run 3 exceeds limit 2 starting at block 0" in audit.findings
+
+
 def test_cli_writes_pass_report(tmp_path: Path) -> None:
     source = tmp_path / "ok.HC"
     output = tmp_path / "report.json"

@@ -17,8 +17,8 @@ TempleOS air-gapped; any QEMU command added under this tree must pass `-nic none
   gates, zero-scale/nonzero-payload counts, quant ranges,
   quant histograms, expected-element tail padding, and optional
   packing-distribution gates for distinct quant values, saturated payloads,
-  non-canonical zero-scale blocks, nonzero padding quants, and zero or subnormal
-  fp16 scale fields.
+  duplicate complete blocks, identical block runs, non-canonical zero-scale
+  blocks, nonzero padding quants, and zero or subnormal fp16 scale fields.
 
 Example:
 
@@ -43,6 +43,7 @@ python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin --fai
 python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --fail-zero-scales --fail-subnormal-scales
 python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --fail-negative-scales
 python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin --expect-elements 4095 --fail-nonzero-padding-quants
+python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --max-duplicate-block-pct 5 --max-identical-block-run 2
 ```
 
 Mixed-format audits can validate Q4_0 and Q8_0 streams in one report:
@@ -54,7 +55,8 @@ python3 bench/quant_audit.py \
 ```
 
 `quant_audit_ci_smoke.py` creates temporary Q4_0/Q8_0 block fixtures and checks
-the raw-block, scale-exponent, scale-sign, Markdown, CSV, and JUnit paths:
+the raw-block, scale-exponent, scale-sign, duplicate-block/run, Markdown, CSV,
+and JUnit paths:
 
 ```bash
 python3 bench/quant_audit_ci_smoke.py

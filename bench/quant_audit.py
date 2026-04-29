@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import re
@@ -90,6 +91,11 @@ class BlockAudit:
     worst_block_saturation_count: int
     worst_block_saturation_pct: float
     worst_block_saturation_index: int
+    duplicate_block_count: int
+    duplicate_block_pct: float
+    repeated_block_value_count: int
+    max_identical_block_run: int
+    max_identical_block_run_start: int
     quant_histogram: dict[str, int]
     findings: list[str]
 
@@ -382,6 +388,73 @@ def empty_histogram(min_value: int, max_value: int) -> dict[str, int]:
     return {str(value): 0 for value in range(min_value, max_value + 1)}
 
 
+def analyze_block_repetition(data: bytes, block_size: int) -> tuple[int, int, int, int]:
+    block_count = len(data) // block_size
+    if block_count == 0:
+        return 0, 0, 0, -1
+
+    digest_counts: dict[str, int] = {}
+    max_run = 1
+    max_run_start = 0
+    current_run = 1
+    current_run_start = 0
+    previous: bytes | None = None
+
+    for block_index in range(block_count):
+        block = data[block_index * block_size : (block_index + 1) * block_size]
+        digest = hashlib.sha256(block).hexdigest()
+        digest_counts[digest] = digest_counts.get(digest, 0) + 1
+
+        if previous is not None and block == previous:
+            current_run += 1
+        else:
+            current_run = 1
+            current_run_start = block_index
+        if current_run > max_run:
+            max_run = current_run
+            max_run_start = current_run_start
+        previous = block
+
+    duplicate_block_count = sum(count - 1 for count in digest_counts.values() if count > 1)
+    repeated_block_value_count = sum(1 for count in digest_counts.values() if count > 1)
+    return duplicate_block_count, repeated_block_value_count, max_run, max_run_start
+
+
+def check_block_repetition_gates(
+    findings: list[str],
+    block_count: int,
+    duplicate_block_count: int,
+    duplicate_block_pct: float,
+    max_identical_block_run: int,
+    max_identical_block_run_start: int,
+    max_duplicate_block_pct: float | None,
+    max_identical_block_run_limit: int | None,
+) -> None:
+    if (
+        max_duplicate_block_pct is not None
+        and duplicate_block_pct > max_duplicate_block_pct
+    ):
+        findings.append(
+            "duplicate blocks {count}/{total} ({pct:.3f}%) exceeds limit {limit:.3f}%".format(
+                count=duplicate_block_count,
+                total=block_count,
+                pct=duplicate_block_pct,
+                limit=max_duplicate_block_pct,
+            )
+        )
+    if (
+        max_identical_block_run_limit is not None
+        and max_identical_block_run > max_identical_block_run_limit
+    ):
+        findings.append(
+            "identical block run {run} exceeds limit {limit} starting at block {start}".format(
+                run=max_identical_block_run,
+                limit=max_identical_block_run_limit,
+                start=max_identical_block_run_start,
+            )
+        )
+
+
 def check_quant_distribution(
     findings: list[str],
     quant_histogram: dict[str, int],
@@ -465,6 +538,8 @@ def audit_q4_0_blocks(
     fail_nonzero_padding_quants: bool = False,
     min_scale_exponent: int | None = None,
     max_scale_exponent: int | None = None,
+    max_duplicate_block_pct: float | None = None,
+    max_identical_block_run: int | None = None,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -473,6 +548,25 @@ def audit_q4_0_blocks(
 
     block_count = len(data) // Q4_0_BLOCK_BYTES
     check_expected_shape(findings, block_count, expect_blocks, expect_elements)
+    (
+        duplicate_block_count,
+        repeated_block_value_count,
+        max_identical_block_run_seen,
+        max_identical_block_run_start,
+    ) = analyze_block_repetition(data, Q4_0_BLOCK_BYTES)
+    duplicate_block_pct = (
+        duplicate_block_count * 100.0 / block_count if block_count else 0.0
+    )
+    check_block_repetition_gates(
+        findings,
+        block_count,
+        duplicate_block_count,
+        duplicate_block_pct,
+        max_identical_block_run_seen,
+        max_identical_block_run_start,
+        max_duplicate_block_pct,
+        max_identical_block_run,
+    )
     counts = {"zero": 0, "subnormal": 0, "normal": 0, "inf_nan": 0}
     sign_counts = {"positive": 0, "negative": 0}
     quant_min = math.inf
@@ -662,6 +756,11 @@ def audit_q4_0_blocks(
         worst_block_saturation_count=worst_block_saturation_count,
         worst_block_saturation_pct=worst_block_saturation_pct,
         worst_block_saturation_index=worst_block_saturation_index,
+        duplicate_block_count=duplicate_block_count,
+        duplicate_block_pct=duplicate_block_pct,
+        repeated_block_value_count=repeated_block_value_count,
+        max_identical_block_run=max_identical_block_run_seen,
+        max_identical_block_run_start=max_identical_block_run_start,
         quant_histogram=quant_histogram,
         findings=findings,
     )
@@ -684,6 +783,8 @@ def audit_q8_0_blocks(
     fail_nonzero_padding_quants: bool = False,
     min_scale_exponent: int | None = None,
     max_scale_exponent: int | None = None,
+    max_duplicate_block_pct: float | None = None,
+    max_identical_block_run: int | None = None,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -692,6 +793,25 @@ def audit_q8_0_blocks(
 
     block_count = len(data) // Q8_0_BLOCK_BYTES
     check_expected_shape(findings, block_count, expect_blocks, expect_elements)
+    (
+        duplicate_block_count,
+        repeated_block_value_count,
+        max_identical_block_run_seen,
+        max_identical_block_run_start,
+    ) = analyze_block_repetition(data, Q8_0_BLOCK_BYTES)
+    duplicate_block_pct = (
+        duplicate_block_count * 100.0 / block_count if block_count else 0.0
+    )
+    check_block_repetition_gates(
+        findings,
+        block_count,
+        duplicate_block_count,
+        duplicate_block_pct,
+        max_identical_block_run_seen,
+        max_identical_block_run_start,
+        max_duplicate_block_pct,
+        max_identical_block_run,
+    )
     counts = {"zero": 0, "subnormal": 0, "normal": 0, "inf_nan": 0}
     sign_counts = {"positive": 0, "negative": 0}
     quant_min = math.inf
@@ -877,6 +997,11 @@ def audit_q8_0_blocks(
         worst_block_saturation_count=worst_block_saturation_count,
         worst_block_saturation_pct=worst_block_saturation_pct,
         worst_block_saturation_index=worst_block_saturation_index,
+        duplicate_block_count=duplicate_block_count,
+        duplicate_block_pct=duplicate_block_pct,
+        repeated_block_value_count=repeated_block_value_count,
+        max_identical_block_run=max_identical_block_run_seen,
+        max_identical_block_run_start=max_identical_block_run_start,
         quant_histogram=quant_histogram,
         findings=findings,
     )
@@ -900,6 +1025,8 @@ def audit_blocks(
     fail_nonzero_padding_quants: bool = False,
     min_scale_exponent: int | None = None,
     max_scale_exponent: int | None = None,
+    max_duplicate_block_pct: float | None = None,
+    max_identical_block_run: int | None = None,
 ) -> BlockAudit:
     if quant_format == "q4_0":
         return audit_q4_0_blocks(
@@ -919,6 +1046,8 @@ def audit_blocks(
             fail_nonzero_padding_quants,
             min_scale_exponent,
             max_scale_exponent,
+            max_duplicate_block_pct,
+            max_identical_block_run,
         )
     if quant_format == "q8_0":
         return audit_q8_0_blocks(
@@ -938,6 +1067,8 @@ def audit_blocks(
             fail_nonzero_padding_quants,
             min_scale_exponent,
             max_scale_exponent,
+            max_duplicate_block_pct,
+            max_identical_block_run,
         )
     raise ValueError(f"unsupported quant format: {quant_format}")
 
@@ -969,8 +1100,8 @@ def markdown_report(report: dict) -> str:
             [
                 "| Format | Path | Blocks | Capacity | Scale zero/subnormal/normal/inf_nan "
                 "| Scale sign +/- | Padding elements/nonzero | Scale Q16 min/max/absmax/zero/overlimit | Scale exponent min/max/under/over | Zero-scale nonzero blocks/entries | Quant min/max | Used values | Zero/nonzero quants "
-                "| Saturated quants | Min block used values | Worst block saturation | Findings |",
-                "| --- | --- | ---: | ---: | --- | ---: | ---: | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| Saturated quants | Min block used values | Worst block saturation | Duplicate blocks | Max identical run | Findings |",
+                "| --- | --- | ---: | ---: | --- | ---: | ---: | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
         for audit in block_audits:
@@ -1009,6 +1140,8 @@ def markdown_report(report: dict) -> str:
                     "{quant_zero_count}/{quant_nonzero_count} | {quant_saturation_count} ({quant_saturation_pct:.3f}%) | "
                     "{min_block_used_quant_values} @ {min_block_used_quant_values_index} | "
                     "{worst_block_saturation_count} ({worst_block_saturation_pct:.3f}%) @ {worst_block_saturation_index} | "
+                    "{duplicate_block_count} ({duplicate_block_pct:.3f}%) across {repeated_block_value_count} values | "
+                    "{max_identical_block_run} @ {max_identical_block_run_start} | "
                     "{findings} |"
                 ).format(
                     format=audit["format"],
@@ -1041,6 +1174,13 @@ def markdown_report(report: dict) -> str:
                     worst_block_saturation_count=audit["worst_block_saturation_count"],
                     worst_block_saturation_pct=audit["worst_block_saturation_pct"],
                     worst_block_saturation_index=audit["worst_block_saturation_index"],
+                    duplicate_block_count=audit["duplicate_block_count"],
+                    duplicate_block_pct=audit["duplicate_block_pct"],
+                    repeated_block_value_count=audit["repeated_block_value_count"],
+                    max_identical_block_run=audit["max_identical_block_run"],
+                    max_identical_block_run_start=audit[
+                        "max_identical_block_run_start"
+                    ],
                     findings=len(audit["findings"]),
                 )
             )
@@ -1286,6 +1426,16 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Fail finite nonzero fp16 scales whose unbiased exponent is above this value",
     )
+    parser.add_argument(
+        "--max-duplicate-block-pct",
+        type=float,
+        help="Fail raw block streams whose exact duplicate complete-block percentage exceeds this limit",
+    )
+    parser.add_argument(
+        "--max-identical-block-run",
+        type=int,
+        help="Fail raw block streams with more than this many identical complete blocks in a row",
+    )
     parser.add_argument("--allow-inf-nan-scale", action="store_true", help="Do not fail on fp16 inf/nan scales")
     parser.add_argument("--output", type=Path, help="Write JSON report to this path")
     parser.add_argument("--markdown", type=Path, help="Write Markdown report to this path")
@@ -1322,6 +1472,8 @@ def main(argv: list[str] | None = None) -> int:
             args.fail_nonzero_padding_quants,
             args.min_scale_exponent,
             args.max_scale_exponent,
+            args.max_duplicate_block_pct,
+            args.max_identical_block_run,
         )
         for path, quant_format in block_specs
     ]
