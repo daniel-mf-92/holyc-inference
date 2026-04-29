@@ -277,3 +277,4 @@
 2026-04-29T20:52:10Z | Tightened QEMU prompt benchmark air-gap validation to reject redundant legacy -net none flags before artifact emission.
 2026-04-29T21:05:43Z | Added prompt-byte efficiency telemetry to benchmark result index with smoke coverage and refreshed index artifacts.
 2026-04-29T21:16:26Z | Added per-record choice telemetry CSV export to dataset choice audit with smoke coverage and refreshed artifacts.
+2026-04-29T21:24:03Z | Added bench_result_index freshness-failure CSV output with smoke coverage and latest CSV artifact.

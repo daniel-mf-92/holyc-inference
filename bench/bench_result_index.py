@@ -1763,6 +1763,35 @@ def write_history_coverage_csv(findings: list[HistoryCoverageViolation], path: P
             writer.writerow(asdict(finding))
 
 
+def write_freshness_failures_csv(summaries: list[ArtifactSummary], path: Path) -> None:
+    fields = [
+        "source",
+        "artifact_type",
+        "generated_at",
+        "generated_age_seconds",
+        "freshness_status",
+        "freshness_findings",
+    ]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for summary in summaries:
+            if summary.freshness_status != "fail":
+                continue
+            writer.writerow(
+                {
+                    "source": summary.source,
+                    "artifact_type": summary.artifact_type,
+                    "generated_at": summary.generated_at,
+                    "generated_age_seconds": summary.generated_age_seconds,
+                    "freshness_status": summary.freshness_status,
+                    "freshness_findings": json.dumps(
+                        summary.freshness_findings, separators=(",", ":")
+                    ),
+                }
+            )
+
+
 def write_report(
     summaries: list[ArtifactSummary], output_dir: Path, min_history_per_key: int = 1
 ) -> tuple[
@@ -1804,6 +1833,7 @@ def write_report(
     dry_run_coverage_csv_path = output_dir / "bench_result_index_dry_run_coverage_latest.csv"
     latest_comparable_csv_path = output_dir / "bench_result_index_latest_comparable_latest.csv"
     history_coverage_csv_path = output_dir / "bench_result_index_history_coverage_latest.csv"
+    freshness_failures_csv_path = output_dir / "bench_result_index_freshness_failures_latest.csv"
     junit_path = output_dir / "bench_result_index_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
@@ -1816,6 +1846,7 @@ def write_report(
     write_dry_run_coverage_csv(dry_run_coverage_findings, dry_run_coverage_csv_path)
     write_latest_comparable_csv(latest, latest_comparable_csv_path)
     write_history_coverage_csv(history_coverage_findings, history_coverage_csv_path)
+    write_freshness_failures_csv(summaries, freshness_failures_csv_path)
     return (
         json_path,
         drift,

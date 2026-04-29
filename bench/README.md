@@ -878,7 +878,8 @@ never launches QEMU. The index also records per-artifact commit metadata and can
 optionally fail when benchmark artifacts were produced from a different commit
 than the current checkout. It can also enforce freshness with
 `--max-artifact-age-hours`, marking artifacts stale when their `generated_at`
-timestamp is too old. Use `--fail-on-airgap`, `--fail-on-telemetry`,
+timestamp is too old and exporting stale rows to
+`bench_result_index_freshness_failures_latest.csv`. Use `--fail-on-airgap`, `--fail-on-telemetry`,
 `--fail-on-commit-metadata`, `--fail-on-command-hash-metadata`,
 `--fail-on-drift`, `--fail-on-command-drift`,
 `--fail-on-environment-drift`, `--fail-on-history-coverage`, and
@@ -912,8 +913,8 @@ python3 bench/bench_result_index.py \
 
 `bench_result_index_ci_smoke.py` is a stdlib-only CI gate for the indexer. It
 builds synthetic QEMU prompt, dry-run, and matrix reports, verifies the JSON,
-Markdown, CSV, latest-comparable CSV, launch-plan drift CSV, and JUnit outputs,
-and checks that command-hash mismatches, NIC-enabled QEMU commands, stale
+Markdown, CSV, latest-comparable CSV, launch-plan drift CSV, freshness-failure
+CSV, and JUnit outputs, and checks that command-hash mismatches, NIC-enabled QEMU commands, stale
 artifacts, environment drift, and insufficient comparable history are rejected
 by their opt-in gates:
 

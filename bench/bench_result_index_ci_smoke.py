@@ -316,6 +316,7 @@ def main() -> int:
         launch_plan_drift_csv_path = safe_output / "bench_result_index_launch_plan_drift_latest.csv"
         dry_run_coverage_csv_path = safe_output / "bench_result_index_dry_run_coverage_latest.csv"
         history_coverage_csv_path = safe_output / "bench_result_index_history_coverage_latest.csv"
+        freshness_failures_csv_path = safe_output / "bench_result_index_freshness_failures_latest.csv"
         junit_path = safe_output / "bench_result_index_junit_latest.xml"
         report = json.loads(report_path.read_text(encoding="utf-8"))
         if report["status"] != "pass":
@@ -394,6 +395,12 @@ def main() -> int:
         if "key,history_count,min_history" not in history_coverage_csv_path.read_text(encoding="utf-8"):
             print("missing_history_coverage_csv=true", file=sys.stderr)
             return 1
+        if (
+            "source,artifact_type,generated_at,generated_age_seconds,freshness_status,freshness_findings"
+            not in freshness_failures_csv_path.read_text(encoding="utf-8")
+        ):
+            print("missing_index_freshness_failures_csv=true", file=sys.stderr)
+            return 1
         junit_root = ET.parse(junit_path).getroot()
         if junit_root.attrib.get("name") != "holyc_bench_result_index":
             print("missing_index_junit_suite=true", file=sys.stderr)
@@ -466,6 +473,12 @@ def main() -> int:
         stale_report = json.loads((stale_output / "bench_result_index_latest.json").read_text(encoding="utf-8"))
         if stale_report["artifacts"][0]["freshness_status"] != "fail":
             print("stale_status_not_fail=true", file=sys.stderr)
+            return 1
+        stale_csv = (
+            stale_output / "bench_result_index_freshness_failures_latest.csv"
+        ).read_text(encoding="utf-8")
+        if "qemu_prompt_bench_stale.json" not in stale_csv or "freshness_status" not in stale_csv:
+            print("missing_stale_index_freshness_failure_csv_row=true", file=sys.stderr)
             return 1
 
         token_mismatch_source = tmp_path / "token_mismatch_source"
