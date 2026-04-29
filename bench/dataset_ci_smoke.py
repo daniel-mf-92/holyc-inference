@@ -546,6 +546,13 @@ def main() -> int:
             str(datasets_dir),
             "--output-dir",
             str(datasets_dir),
+            "--require-artifact-type",
+            "curated_manifest",
+            "--require-artifact-type",
+            "pack_manifest",
+            "--require-artifact-type",
+            "inspect_report",
+            "--fail-on-coverage",
             "--fail-on-findings",
         ]
         completed = run_command(index_command)
@@ -558,14 +565,68 @@ def main() -> int:
         if rc := require(len(index_report["artifacts"]) == 3, "unexpected_index_artifact_count"):
             return rc
         if rc := require(
+            index_report["required_artifact_types"] == [
+                "curated_manifest",
+                "inspect_report",
+                "pack_manifest",
+            ],
+            "unexpected_index_required_artifact_types",
+        ):
+            return rc
+        if rc := require(
+            index_report["artifact_type_coverage_violations"] == [],
+            "unexpected_index_coverage_violations",
+        ):
+            return rc
+        if rc := require(
             "Eval Dataset Artifact Index" in (datasets_dir / "dataset_index_latest.md").read_text(encoding="utf-8"),
             "missing_index_markdown",
+        ):
+            return rc
+        if rc := require(
+            "artifact_type,present_count,sources"
+            in (datasets_dir / "dataset_index_artifact_type_coverage_latest.csv").read_text(encoding="utf-8"),
+            "missing_index_coverage_csv",
         ):
             return rc
         index_root = ET.parse(datasets_dir / "dataset_index_junit_latest.xml").getroot()
         if rc := require(index_root.attrib.get("name") == "holyc_dataset_index", "missing_index_junit"):
             return rc
         if rc := require(index_root.attrib.get("failures") == "0", "unexpected_index_junit_failures"):
+            return rc
+
+        missing_index_dir = tmp_path / "missing_index"
+        missing_index_dir.mkdir()
+        missing_index_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_index.py"),
+            "--input",
+            str(curated_manifest),
+            "--output-dir",
+            str(missing_index_dir),
+            "--require-artifact-type",
+            "curated_manifest",
+            "--require-artifact-type",
+            "pack_manifest",
+            "--fail-on-coverage",
+        ]
+        completed = run_command(missing_index_command)
+        if rc := require(completed.returncode == 1, "missing_index_coverage_not_rejected"):
+            return rc
+        missing_index_report = json.loads((missing_index_dir / "dataset_index_latest.json").read_text(encoding="utf-8"))
+        if rc := require(missing_index_report["status"] == "fail", "unexpected_missing_index_status"):
+            return rc
+        if rc := require(
+            missing_index_report["artifact_type_coverage_violations"]
+            == [{"artifact_type": "pack_manifest", "present_count": 0, "sources": []}],
+            "unexpected_missing_index_coverage_payload",
+        ):
+            return rc
+        missing_index_root = ET.parse(missing_index_dir / "dataset_index_junit_latest.xml").getroot()
+        if rc := require(
+            missing_index_root.attrib.get("failures") == "1",
+            "unexpected_missing_index_junit_failures",
+        ):
             return rc
 
         provenance_command = [

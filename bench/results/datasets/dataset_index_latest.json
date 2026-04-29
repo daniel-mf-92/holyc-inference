@@ -1,4 +1,5 @@
 {
+  "artifact_type_coverage_violations": [],
   "artifacts": [
     {
       "answer_histogram": {
@@ -91,6 +92,11 @@
       "status": "pass"
     }
   ],
-  "generated_at": "2026-04-29T00:13:50Z",
+  "generated_at": "2026-04-29T08:36:35Z",
+  "required_artifact_types": [
+    "curated_manifest",
+    "inspect_report",
+    "pack_manifest"
+  ],
   "status": "pass"
 }

@@ -225,3 +225,4 @@
 2026-04-29T07:39:49Z | Added offline eval dataset fingerprint manifests with prompt/choice/input hashes and smoke coverage.
 2026-04-29T07:48:58Z | Added eval dataset fingerprint diff gating with smoke coverage and refreshed dataset diff artifacts.
 2026-04-29T08:28:58Z | Added perf regression serial output byte/token telemetry gates with smoke coverage.
+2026-04-29T08:36:41Z | Added dataset artifact-type coverage gates with smoke coverage and refreshed dataset index artifacts.

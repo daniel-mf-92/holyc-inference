@@ -46,6 +46,13 @@ class DatasetArtifact:
     findings: list[str]
 
 
+@dataclass(frozen=True)
+class ArtifactTypeCoverageViolation:
+    artifact_type: str
+    present_count: int
+    sources: list[str]
+
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -302,13 +309,39 @@ def index_status(artifacts: list[DatasetArtifact]) -> str:
     return "fail" if any(artifact.status == "fail" for artifact in artifacts) else "pass"
 
 
+def artifact_type_coverage_violations(
+    artifacts: list[DatasetArtifact],
+    required_types: Iterable[str],
+) -> list[ArtifactTypeCoverageViolation]:
+    by_type: dict[str, list[DatasetArtifact]] = {}
+    for artifact in artifacts:
+        by_type.setdefault(artifact.artifact_type, []).append(artifact)
+
+    violations: list[ArtifactTypeCoverageViolation] = []
+    for artifact_type in sorted(set(required_types)):
+        present = by_type.get(artifact_type, [])
+        if present:
+            continue
+        violations.append(
+            ArtifactTypeCoverageViolation(
+                artifact_type=artifact_type,
+                present_count=0,
+                sources=[],
+            )
+        )
+    return violations
+
+
 def markdown_report(report: dict[str, Any]) -> str:
+    coverage_violations = report.get("artifact_type_coverage_violations", [])
     lines = [
         "# Eval Dataset Artifact Index",
         "",
         f"Generated: {report['generated_at']}",
         f"Status: {report['status']}",
         f"Artifacts: {len(report['artifacts'])}",
+        f"Required artifact types: {', '.join(report.get('required_artifact_types', [])) or '-'}",
+        f"Artifact type coverage violations: {len(coverage_violations)}",
         "",
     ]
     if report["artifacts"]:
@@ -335,6 +368,21 @@ def markdown_report(report: dict[str, Any]) -> str:
     else:
         lines.append("No dataset artifacts found.")
 
+    if coverage_violations:
+        lines.extend(
+            [
+                "",
+                "## Artifact Type Coverage Violations",
+                "",
+                "| Artifact type | Present |",
+                "| --- | ---: |",
+            ]
+        )
+        for violation in coverage_violations:
+            lines.append(f"| {violation['artifact_type']} | {violation['present_count']} |")
+    elif report.get("required_artifact_types"):
+        lines.extend(["", "Artifact type coverage requirements satisfied."])
+
     failing = [artifact for artifact in report["artifacts"] if artifact["findings"]]
     if failing:
         lines.extend(["", "## Findings", ""])
@@ -351,13 +399,16 @@ def junit_report(report: dict[str, Any]) -> str:
     artifacts = [row for row in report["artifacts"] if isinstance(row, dict)]
     failed_artifacts = [row for row in artifacts if row.get("status") == "fail"]
     finding_artifacts = [row for row in artifacts if row.get("findings")]
-    failures = int(bool(failed_artifacts)) + int(bool(finding_artifacts))
+    coverage_violations = [
+        row for row in report.get("artifact_type_coverage_violations", []) if isinstance(row, dict)
+    ]
+    failures = int(bool(failed_artifacts)) + int(bool(finding_artifacts)) + int(bool(coverage_violations))
 
     suite = ET.Element(
         "testsuite",
         {
             "name": "holyc_dataset_index",
-            "tests": "2",
+            "tests": "3",
             "failures": str(failures),
         },
     )
@@ -389,6 +440,18 @@ def junit_report(report: dict[str, Any]) -> str:
             for row in finding_artifacts
         )
 
+    coverage_case = ET.SubElement(suite, "testcase", {"name": "artifact_type_coverage"})
+    if coverage_violations:
+        failure = ET.SubElement(
+            coverage_case,
+            "failure",
+            {
+                "type": "dataset_artifact_type_missing",
+                "message": f"{len(coverage_violations)} required artifact type(s) are missing",
+            },
+        )
+        failure.text = "\n".join(str(row.get("artifact_type", "")) for row in coverage_violations)
+
     return ET.tostring(suite, encoding="unicode") + "\n"
 
 
@@ -419,22 +482,50 @@ def write_csv(artifacts: list[DatasetArtifact], path: Path) -> None:
             writer.writerow({field: row[field] for field in fields})
 
 
-def write_report(artifacts: list[DatasetArtifact], output_dir: Path) -> Path:
+def write_coverage_csv(violations: list[ArtifactTypeCoverageViolation], path: Path) -> None:
+    fields = ["artifact_type", "present_count", "sources"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for violation in violations:
+            writer.writerow(
+                {
+                    "artifact_type": violation.artifact_type,
+                    "present_count": violation.present_count,
+                    "sources": json.dumps(violation.sources, separators=(",", ":")),
+                }
+            )
+
+
+def write_report(
+    artifacts: list[DatasetArtifact],
+    output_dir: Path,
+    required_artifact_types: list[str] | None = None,
+) -> tuple[Path, list[ArtifactTypeCoverageViolation]]:
     output_dir.mkdir(parents=True, exist_ok=True)
+    required_artifact_types = required_artifact_types or []
+    coverage_violations = artifact_type_coverage_violations(artifacts, required_artifact_types)
+    status = "fail" if coverage_violations else index_status(artifacts)
     report = {
         "generated_at": iso_now(),
-        "status": index_status(artifacts),
+        "status": status,
+        "required_artifact_types": sorted(set(required_artifact_types)),
+        "artifact_type_coverage_violations": [
+            asdict(violation) for violation in coverage_violations
+        ],
         "artifacts": [asdict(artifact) for artifact in artifacts],
     }
     json_path = output_dir / "dataset_index_latest.json"
     md_path = output_dir / "dataset_index_latest.md"
     csv_path = output_dir / "dataset_index_latest.csv"
+    coverage_csv_path = output_dir / "dataset_index_artifact_type_coverage_latest.csv"
     junit_path = output_dir / "dataset_index_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
     junit_path.write_text(junit_report(report), encoding="utf-8")
     write_csv(artifacts, csv_path)
-    return json_path
+    write_coverage_csv(coverage_violations, coverage_csv_path)
+    return json_path, coverage_violations
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -448,6 +539,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results/datasets"))
     parser.add_argument("--fail-on-findings", action="store_true", help="Return non-zero if any artifact fails")
+    parser.add_argument(
+        "--require-artifact-type",
+        action="append",
+        choices=["curated_manifest", "pack_manifest", "inspect_report"],
+        default=[],
+        help="Require at least one artifact of this type in the index; may be repeated",
+    )
+    parser.add_argument(
+        "--fail-on-coverage",
+        action="store_true",
+        help="Return non-zero if any --require-artifact-type gate is missing",
+    )
     return parser
 
 
@@ -456,16 +559,19 @@ def main(argv: list[str] | None = None) -> int:
     inputs = args.input or [Path("bench/results/datasets")]
     try:
         artifacts = load_artifacts(inputs)
-        output = write_report(artifacts, args.output_dir)
+        output, coverage_violations = write_report(artifacts, args.output_dir, args.require_artifact_type)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    status = index_status(artifacts)
+    status = "fail" if coverage_violations else index_status(artifacts)
     print(f"wrote_json={output}")
     print(f"status={status}")
     print(f"artifacts={len(artifacts)}")
-    if args.fail_on_findings and status == "fail":
+    print(f"artifact_type_coverage_violations={len(coverage_violations)}")
+    if args.fail_on_coverage and coverage_violations:
+        return 1
+    if args.fail_on_findings and index_status(artifacts) == "fail":
         return 1
     return 0
 

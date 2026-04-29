@@ -167,8 +167,16 @@ reports into one local provenance/hash rollup:
 python3 bench/dataset_index.py \
   --input bench/results/datasets \
   --output-dir bench/results/datasets \
+  --require-artifact-type curated_manifest \
+  --require-artifact-type pack_manifest \
+  --require-artifact-type inspect_report \
+  --fail-on-coverage \
   --fail-on-findings
 ```
+
+Use the artifact-type coverage gate when promoting packed eval bundles so CI
+fails if the curated JSONL manifest, packed `.hceval` manifest, or binary
+inspection report is absent from the local artifact set.
 
 ## Provenance Audit
 
