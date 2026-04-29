@@ -291,7 +291,7 @@ python3 bench/dataset_provenance_audit.py \
 `eval_compare.py` compares local HolyC and llama.cpp multiple-choice predictions
 against the same gold JSONL and writes JSON, Markdown, per-record CSV,
 per-dataset/split breakdown CSV, confusion-matrix CSV, calibration-bin CSV, and
-score-NLL CSV, engine-disagreement CSV, and JUnit XML reports.
+score-NLL CSV, score-tie CSV, engine-disagreement CSV, and JUnit XML reports.
 Optional quality gates can fail CI when HolyC accuracy, engine agreement,
 accuracy delta versus llama.cpp, or a paired exact McNemar loss falls outside
 configured bounds.
@@ -308,6 +308,9 @@ score coverage, mean confidence, Brier score, expected calibration error, mean
 gold-answer negative log likelihood, and choice-set perplexity.
 Reports also rank the gold answer within each score vector and summarize top-1,
 top-2, top-3, mean gold rank, and mean reciprocal rank for each engine.
+Reports also count top-score ties in scored rows, and
+`--max-holyc-score-tie-rate` can fail CI when HolyC emits ambiguous tied best
+choices too often.
 Reports also include paired correctness counts and an exact two-sided McNemar
 binomial p-value so HolyC-vs-llama quality deltas can be interpreted as paired
 eval outcomes on the same records. `--max-mcnemar-loss-p` optionally fails CI
@@ -329,6 +332,7 @@ python3 bench/eval_compare.py \
   --max-mcnemar-loss-p 0.05 \
   --min-holyc-nll-coverage 0.95 \
   --max-holyc-nll-delta 0.05 \
+  --max-holyc-score-tie-rate 0.01 \
   --fail-on-regression
 ```
 
@@ -905,7 +909,7 @@ llama.cpp against the same local gold JSONL dataset. It aligns by record id,
 supports prediction indexes, labels, exact choice text, or score arrays, and
 writes JSON, Markdown, per-record CSV, per-dataset/split breakdown CSV,
 confusion-matrix CSV, calibration-bin CSV, score-margin CSV,
-score-NLL CSV, engine-disagreement CSV, and JUnit XML reports to `bench/results/`.
+score-NLL CSV, score-tie CSV, engine-disagreement CSV, and JUnit XML reports to `bench/results/`.
 Reports include accuracy, agreement, macro-F1, per-answer F1,
 per-dataset/split breakdowns, and confusion matrices for each engine.
 Score-vector reports include calibration, gold-rank, mean gold-answer NLL,
@@ -913,7 +917,9 @@ choice-set perplexity, and predicted-vs-runner-up margin telemetry; use
 `--min-holyc-margin-coverage` and `--min-holyc-mean-margin` to fail CI when
 HolyC score margins are missing or too weak. Use `--min-holyc-nll-coverage`,
 `--max-holyc-mean-nll`, and `--max-holyc-nll-delta` to gate score-vector
-cross-entropy. Accuracy and agreement summaries also include stdlib-only Wilson
+cross-entropy. Top-score tie telemetry catches ambiguous argmax cases; use
+`--max-holyc-score-tie-rate` to gate tied best-choice rows. Accuracy and
+agreement summaries also include stdlib-only Wilson
 confidence intervals; use `--confidence-level` to select 0.80, 0.90, 0.95,
 0.98, or 0.99. Add `--gate-dataset-breakdowns` to apply the same quality gates
 to each dataset/split bucket, which prevents mixed eval suites from hiding

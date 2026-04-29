@@ -49,6 +49,8 @@ def test_smoke_predictions_compare_cleanly() -> None:
     assert summary["holyc_rank_metrics"]["mean_reciprocal_rank"] == 1.0
     assert summary["holyc_margin_metrics"]["scored_count"] == 1
     assert summary["holyc_margin_metrics"]["score_coverage"] == 1 / 3
+    assert summary["holyc_tie_metrics"]["scored_count"] == 1
+    assert summary["holyc_tie_metrics"]["tie_rate"] == 0.0
     assert [item["dataset"] for item in summary["dataset_breakdown"]] == [
         "arc-smoke",
         "hellaswag-smoke",
@@ -97,6 +99,7 @@ def test_cli_writes_json_and_markdown_report() -> None:
             csv.DictReader((Path(tmp) / "smoke_calibration_bins.csv").open(newline="", encoding="utf-8"))
         )
         margin_rows = list(csv.DictReader((Path(tmp) / "smoke_margins.csv").open(newline="", encoding="utf-8")))
+        tie_rows = list(csv.DictReader((Path(tmp) / "smoke_score_ties.csv").open(newline="", encoding="utf-8")))
         disagreement_rows = list(
             csv.DictReader((Path(tmp) / "smoke_disagreements.csv").open(newline="", encoding="utf-8"))
         )
@@ -107,6 +110,7 @@ def test_cli_writes_json_and_markdown_report() -> None:
         assert payload["summary"]["class_count"] == 4
         assert payload["summary"]["holyc_calibration"]["scored_count"] == 1
         assert payload["summary"]["llama_calibration"]["score_coverage"] == 1 / 3
+        assert payload["summary"]["holyc_tie_metrics"]["tie_rate"] == 0.0
         holyc_interval = payload["summary"]["confidence_intervals"]["holyc_accuracy"]
         assert holyc_interval["method"] == "wilson"
         assert holyc_interval["successes"] == 3
@@ -125,15 +129,20 @@ def test_cli_writes_json_and_markdown_report() -> None:
         assert "## Score Calibration" in markdown
         assert "## Score Ranking" in markdown
         assert "## Score Margins" in markdown
+        assert "## Score Ties" in markdown
         assert "No quality gate regressions." in markdown
         assert len(csv_rows) == 3
         assert len(breakdown_rows) == 3
         assert len(calibration_rows) == 20
         assert len(margin_rows) == 8
+        assert len(tie_rows) == 8
         assert {row["engine"] for row in calibration_rows} == {"holyc", "llama"}
         assert margin_rows[0]["scope"] == "overall"
         assert margin_rows[0]["engine"] == "holyc"
         assert margin_rows[0]["scored_count"] == "1"
+        assert tie_rows[0]["scope"] == "overall"
+        assert tie_rows[0]["engine"] == "holyc"
+        assert tie_rows[0]["tie_rate"] == "0.0"
         assert calibration_rows[0]["bin_index"] == "0"
         assert calibration_rows[-1]["bin_index"] == "9"
         assert breakdown_rows[0]["dataset"] == "arc-smoke"
@@ -144,6 +153,7 @@ def test_cli_writes_json_and_markdown_report() -> None:
         assert csv_rows[0]["engines_agree"] == "True"
         assert csv_rows[0]["holyc_confidence"] != ""
         assert csv_rows[0]["holyc_gold_rank"] == "1"
+        assert csv_rows[0]["holyc_top_score_tie_count"] == "1"
         assert junit_root.attrib["name"] == "holyc_eval_compare"
         assert junit_root.attrib["failures"] == "0"
 
@@ -172,6 +182,7 @@ def test_compare_reports_macro_f1_and_confusion_matrix() -> None:
     assert summary["holyc_confusion_matrix"]["matrix"] == [[1, 1], [0, 1]]
     assert summary["llama_confusion_matrix"]["matrix"] == [[2, 0], [1, 0]]
     assert summary["holyc_calibration"]["scored_count"] == 0
+    assert summary["holyc_tie_metrics"]["scored_count"] == 0
 
 
 def test_compare_reports_score_vector_calibration() -> None:
@@ -209,6 +220,8 @@ def test_compare_reports_score_vector_calibration() -> None:
     assert summary["holyc_margin_metrics"]["low_margin_threshold"] == 0.10
     assert round(summary["holyc_margin_metrics"]["mean_margin"], 4) == 0.7616
     assert summary["llama_margin_metrics"]["mean_margin"] > summary["holyc_margin_metrics"]["mean_margin"]
+    assert summary["holyc_tie_metrics"]["tied_count"] == 0
+    assert summary["holyc_tie_metrics"]["max_top_score_tie_count"] == 1
 
 
 def test_confidence_level_can_be_configured() -> None:
@@ -584,6 +597,77 @@ def test_cli_can_gate_holyc_margin_telemetry() -> None:
         assert junit_root.attrib["failures"] == "2"
 
 
+def test_cli_can_gate_holyc_top_score_ties() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        gold = tmp_path / "gold.jsonl"
+        holyc = tmp_path / "holyc.jsonl"
+        llama = tmp_path / "llama.jsonl"
+        gold.write_text(
+            "\n".join(
+                [
+                    '{"id":"tie-a","dataset":"unit","split":"validation","prompt":"A?","choices":["A","B"],"answer_index":0}',
+                    '{"id":"tie-b","dataset":"unit","split":"validation","prompt":"B?","choices":["A","B"],"answer_index":1}',
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        holyc.write_text(
+            "\n".join(
+                [
+                    '{"id":"tie-a","scores":[1.0,1.0]}',
+                    '{"id":"tie-b","scores":[0.0,2.0]}',
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        llama.write_text(
+            "\n".join(
+                [
+                    '{"id":"tie-a","scores":[2.0,0.0]}',
+                    '{"id":"tie-b","scores":[0.0,2.0]}',
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        status = eval_compare.main(
+            [
+                "--gold",
+                str(gold),
+                "--holyc",
+                str(holyc),
+                "--llama",
+                str(llama),
+                "--dataset",
+                "unit",
+                "--split",
+                "validation",
+                "--output-dir",
+                tmp,
+                "--output-stem",
+                "tie_gated",
+                "--max-holyc-score-tie-rate",
+                "0.1",
+                "--fail-on-regression",
+            ]
+        )
+        payload = json.loads((tmp_path / "tie_gated.json").read_text(encoding="utf-8"))
+        tie_rows = list(csv.DictReader((tmp_path / "tie_gated_score_ties.csv").open(newline="", encoding="utf-8")))
+        junit_root = ET.parse(tmp_path / "tie_gated_junit.xml").getroot()
+
+        assert status == 1
+        assert payload["max_holyc_score_tie_rate"] == 0.1
+        assert payload["summary"]["holyc_tie_metrics"]["tied_count"] == 1
+        assert payload["summary"]["holyc_tie_metrics"]["tie_rate"] == 0.5
+        assert payload["regressions"][0]["metric"] == "holyc_score_tie_rate"
+        assert tie_rows[0]["tie_rate"] == "0.5"
+        assert junit_root.attrib["failures"] == "1"
+
+
 def test_mcnemar_gate_does_not_fail_when_holyc_wins() -> None:
     summary = {
         "accuracy_delta_holyc_minus_llama": 1.0,
@@ -616,5 +700,6 @@ if __name__ == "__main__":
     test_cli_can_gate_dataset_breakdown_regressions()
     test_cli_can_gate_significant_paired_mcnemar_loss()
     test_cli_can_gate_holyc_margin_telemetry()
+    test_cli_can_gate_holyc_top_score_ties()
     test_mcnemar_gate_does_not_fail_when_holyc_wins()
     print("eval_compare_tests=ok")

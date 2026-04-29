@@ -1,0 +1,9 @@
+scope,dataset,split,engine,total_count,scored_count,score_coverage,tied_count,tie_rate,max_top_score_tie_count
+overall,,,holyc,3,1,0.3333333333333333,0,0.0,1
+overall,,,llama,3,1,0.3333333333333333,0,0.0,1
+dataset_split,arc-smoke,validation,holyc,1,1,1.0,0,0.0,1
+dataset_split,arc-smoke,validation,llama,1,0,0.0,0,0.0,0
+dataset_split,hellaswag-smoke,validation,holyc,1,0,0.0,0,0.0,0
+dataset_split,hellaswag-smoke,validation,llama,1,0,0.0,0,0.0,0
+dataset_split,truthfulqa-smoke,validation,holyc,1,0,0.0,0,0.0,0
+dataset_split,truthfulqa-smoke,validation,llama,1,1,1.0,0,0.0,1

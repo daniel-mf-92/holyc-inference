@@ -1,6 +1,6 @@
 # Eval Compare Report
 
-Generated: 2026-04-28T20:01:15Z
+Generated: 2026-04-29T05:05:04Z
 Dataset: smoke-eval
 Split: validation
 Quantization: Q4_0
@@ -54,6 +54,13 @@ Status: pass
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | HolyC | 1/3 (0.3333) | 0.9990 | 0.9990 | 0.9990 | 0.9990 | 0.9990 | 0.0000 | 0 <= 0.1000 (0.0000) |
 | llama.cpp | 1/3 (0.3333) | 0.7185 | 0.7185 | 0.7185 | 0.7185 | 0.7185 | 0.0000 | 0 <= 0.1000 (0.0000) |
+
+## Score Ties
+
+| Engine | Score coverage | Top-score tied rows | Tie rate | Max tied choices |
+| --- | ---: | ---: | ---: | ---: |
+| HolyC | 1/3 (0.3333) | 0 | 0.0000 | 1 |
+| llama.cpp | 1/3 (0.3333) | 0 | 0.0000 | 1 |
 
 ## Dataset Breakdown
 

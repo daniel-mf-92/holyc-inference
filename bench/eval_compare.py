@@ -78,6 +78,8 @@ class EvalRow:
     llama_gold_rank: int | None
     holyc_gold_nll: float | None
     llama_gold_nll: float | None
+    holyc_top_score_tie_count: int | None
+    llama_top_score_tie_count: int | None
 
 
 @dataclass(frozen=True)
@@ -418,6 +420,13 @@ def prediction_margin(scores: list[float] | None, predicted_index: int) -> float
     return predicted_probability - runner_up
 
 
+def top_score_tie_count(scores: list[float] | None) -> int | None:
+    if scores is None:
+        return None
+    top_score = max(scores)
+    return sum(1 for score in scores if score == top_score)
+
+
 def gold_rank(scores: list[float] | None, answer_index: int) -> int | None:
     if scores is None:
         return None
@@ -525,6 +534,23 @@ def margin_metrics(
     }
 
 
+def tie_metrics(rows: list[EvalRow], engine: str) -> dict[str, Any]:
+    tie_counts = [
+        row.holyc_top_score_tie_count if engine == "holyc" else row.llama_top_score_tie_count
+        for row in rows
+    ]
+    scored_ties = [count for count in tie_counts if count is not None]
+    tied_count = sum(1 for count in scored_ties if count > 1)
+    return {
+        "max_top_score_tie_count": max(scored_ties) if scored_ties else 0,
+        "score_coverage": safe_div(len(scored_ties), len(rows)),
+        "scored_count": len(scored_ties),
+        "tied_count": tied_count,
+        "tie_rate": safe_div(tied_count, len(scored_ties)),
+        "total_count": len(rows),
+    }
+
+
 def calibration_metrics(
     gold: dict[str, GoldCase],
     predictions: dict[str, Prediction],
@@ -612,10 +638,12 @@ def dataset_breakdown(rows: list[EvalRow]) -> list[dict[str, Any]]:
                 "holyc_correct": holyc_correct,
                 "holyc_margin_metrics": margin_metrics(group_rows, "holyc"),
                 "holyc_nll_metrics": holyc_nll,
+                "holyc_tie_metrics": tie_metrics(group_rows, "holyc"),
                 "llama_accuracy": accuracy(llama_correct, total),
                 "llama_correct": llama_correct,
                 "llama_margin_metrics": margin_metrics(group_rows, "llama"),
                 "llama_nll_metrics": llama_nll,
+                "llama_tie_metrics": tie_metrics(group_rows, "llama"),
                 "mean_gold_nll_delta_holyc_minus_llama": holyc_nll["mean_gold_nll"]
                 - llama_nll["mean_gold_nll"],
                 "mcnemar_exact": exact_mcnemar_test(holyc_only_correct, llama_only_correct),
@@ -667,6 +695,8 @@ def compare(
                 llama_gold_rank=gold_rank(llama.scores, case.answer_index),
                 holyc_gold_nll=gold_nll(holyc.scores, case.answer_index),
                 llama_gold_nll=gold_nll(llama.scores, case.answer_index),
+                holyc_top_score_tie_count=top_score_tie_count(holyc.scores),
+                llama_top_score_tie_count=top_score_tie_count(llama.scores),
             )
         )
 
@@ -697,6 +727,7 @@ def compare(
         "holyc_nll_metrics": nll_metrics(rows, "holyc"),
         "holyc_per_answer_index": holyc_metrics["per_answer_index"],
         "holyc_rank_metrics": rank_metrics(rows, "holyc"),
+        "holyc_tie_metrics": tie_metrics(rows, "holyc"),
         "llama_accuracy": accuracy(llama_correct, total),
         "llama_calibration": llama_calibration,
         "llama_confusion_matrix": llama_metrics["confusion_matrix"],
@@ -706,6 +737,7 @@ def compare(
         "llama_nll_metrics": nll_metrics(rows, "llama"),
         "llama_per_answer_index": llama_metrics["per_answer_index"],
         "llama_rank_metrics": rank_metrics(rows, "llama"),
+        "llama_tie_metrics": tie_metrics(rows, "llama"),
         "mcnemar_exact": exact_mcnemar_test(holyc_only_correct, llama_only_correct),
         "paired_correctness": {
             "both_correct": both_correct,
@@ -834,6 +866,22 @@ def markdown_report(report: dict[str, Any]) -> str:
             f"<= {metrics['low_margin_threshold']:.4f} ({metrics['low_margin_rate']:.4f}) |"
         )
     lines.append("")
+    lines.extend(
+        [
+            "## Score Ties",
+            "",
+            "| Engine | Score coverage | Top-score tied rows | Tie rate | Max tied choices |",
+            "| --- | ---: | ---: | ---: | ---: |",
+        ]
+    )
+    for engine_label, key in (("HolyC", "holyc_tie_metrics"), ("llama.cpp", "llama_tie_metrics")):
+        metrics = summary[key]
+        lines.append(
+            f"| {engine_label} | {metrics['scored_count']}/{metrics['total_count']} "
+            f"({metrics['score_coverage']:.4f}) | {metrics['tied_count']} | "
+            f"{metrics['tie_rate']:.4f} | {metrics['max_top_score_tie_count']} |"
+        )
+    lines.append("")
     breakdown = summary.get("dataset_breakdown", [])
     if breakdown:
         lines.extend(
@@ -951,6 +999,7 @@ def find_regressions(
     min_holyc_nll_coverage: float | None = None,
     max_holyc_mean_nll: float | None = None,
     max_holyc_nll_delta: float | None = None,
+    max_holyc_score_tie_rate: float | None = None,
     scope: str = "overall",
     dataset: str = "",
     split: str = "",
@@ -1115,6 +1164,24 @@ def find_regressions(
                     split=split,
                 )
             )
+    holyc_ties = summary.get("holyc_tie_metrics", {})
+    if max_holyc_score_tie_rate is not None:
+        tie_rate = float(holyc_ties.get("tie_rate", 0.0))
+        if tie_rate > max_holyc_score_tie_rate:
+            regressions.append(
+                EvalRegression(
+                    metric="holyc_score_tie_rate",
+                    value=tie_rate,
+                    threshold=max_holyc_score_tie_rate,
+                    message=(
+                        f"{prefix}HolyC top-score tie rate {tie_rate:.4f} "
+                        f"is above maximum {max_holyc_score_tie_rate:.4f}"
+                    ),
+                    scope=scope,
+                    dataset=dataset,
+                    split=split,
+                )
+            )
     return regressions
 
 
@@ -1130,6 +1197,7 @@ def find_all_regressions(summary: dict[str, Any], args: argparse.Namespace) -> l
         min_holyc_nll_coverage=args.min_holyc_nll_coverage,
         max_holyc_mean_nll=args.max_holyc_mean_nll,
         max_holyc_nll_delta=args.max_holyc_nll_delta,
+        max_holyc_score_tie_rate=args.max_holyc_score_tie_rate,
     )
     if args.gate_dataset_breakdowns:
         for item in summary.get("dataset_breakdown", []):
@@ -1145,6 +1213,7 @@ def find_all_regressions(summary: dict[str, Any], args: argparse.Namespace) -> l
                     min_holyc_nll_coverage=args.min_holyc_nll_coverage,
                     max_holyc_mean_nll=args.max_holyc_mean_nll,
                     max_holyc_nll_delta=args.max_holyc_nll_delta,
+                    max_holyc_score_tie_rate=args.max_holyc_score_tie_rate,
                     scope="dataset_split",
                     dataset=item["dataset"],
                     split=item["split"],
@@ -1206,6 +1275,8 @@ def write_csv_report(path: Path, rows: list[EvalRow]) -> None:
                 "llama_gold_rank",
                 "holyc_gold_nll",
                 "llama_gold_nll",
+                "holyc_top_score_tie_count",
+                "llama_top_score_tie_count",
             ],
             lineterminator="\n",
         )
@@ -1378,6 +1449,49 @@ def write_nll_csv_report(path: Path, summary: dict[str, Any]) -> None:
             writer.writerow({field: row.get(field, "") for field in fields})
 
 
+def write_ties_csv_report(path: Path, summary: dict[str, Any]) -> None:
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        fields = [
+            "scope",
+            "dataset",
+            "split",
+            "engine",
+            "total_count",
+            "scored_count",
+            "score_coverage",
+            "tied_count",
+            "tie_rate",
+            "max_top_score_tie_count",
+        ]
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        rows: list[dict[str, Any]] = [
+            {"scope": "overall", "dataset": "", "split": "", "engine": "holyc", **summary["holyc_tie_metrics"]},
+            {"scope": "overall", "dataset": "", "split": "", "engine": "llama", **summary["llama_tie_metrics"]},
+        ]
+        for item in summary.get("dataset_breakdown", []):
+            rows.append(
+                {
+                    "scope": "dataset_split",
+                    "dataset": item.get("dataset", ""),
+                    "split": item.get("split", ""),
+                    "engine": "holyc",
+                    **item["holyc_tie_metrics"],
+                }
+            )
+            rows.append(
+                {
+                    "scope": "dataset_split",
+                    "dataset": item.get("dataset", ""),
+                    "split": item.get("split", ""),
+                    "engine": "llama",
+                    **item["llama_tie_metrics"],
+                }
+            )
+        for row in rows:
+            writer.writerow({field: row.get(field, "") for field in fields})
+
+
 def write_disagreements_csv_report(path: Path, rows: list[EvalRow]) -> None:
     with path.open("w", newline="", encoding="utf-8") as handle:
         fields = [
@@ -1397,6 +1511,8 @@ def write_disagreements_csv_report(path: Path, rows: list[EvalRow]) -> None:
             "llama_gold_rank",
             "holyc_gold_nll",
             "llama_gold_nll",
+            "holyc_top_score_tie_count",
+            "llama_top_score_tie_count",
         ]
         writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
@@ -1414,7 +1530,7 @@ def write_report(
     gold_path: Path,
     holyc_path: Path,
     llama_path: Path,
-) -> tuple[Path, Path, Path, Path, Path, Path, Path, Path, Path]:
+) -> tuple[Path, Path, Path, Path, Path, Path, Path, Path, Path, Path]:
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     regressions = find_all_regressions(summary, args)
@@ -1428,6 +1544,7 @@ def write_report(
         "max_accuracy_drop": args.max_accuracy_drop,
         "max_holyc_mean_nll": args.max_holyc_mean_nll,
         "max_holyc_nll_delta": args.max_holyc_nll_delta,
+        "max_holyc_score_tie_rate": args.max_holyc_score_tie_rate,
         "max_mcnemar_loss_p": args.max_mcnemar_loss_p,
         "min_holyc_margin_coverage": args.min_holyc_margin_coverage,
         "min_holyc_mean_margin": args.min_holyc_mean_margin,
@@ -1451,6 +1568,7 @@ def write_report(
     calibration_bins_csv_path = output_dir / f"{stem}_calibration_bins.csv"
     margin_csv_path = output_dir / f"{stem}_margins.csv"
     nll_csv_path = output_dir / f"{stem}_nll.csv"
+    ties_csv_path = output_dir / f"{stem}_score_ties.csv"
     disagreements_csv_path = output_dir / f"{stem}_disagreements.csv"
     junit_path = output_dir / f"{stem}_junit.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -1461,6 +1579,7 @@ def write_report(
     write_calibration_bins_csv_report(calibration_bins_csv_path, summary)
     write_margin_csv_report(margin_csv_path, summary)
     write_nll_csv_report(nll_csv_path, summary)
+    write_ties_csv_report(ties_csv_path, summary)
     write_disagreements_csv_report(disagreements_csv_path, rows)
     write_junit(regressions, junit_path)
     return (
@@ -1472,6 +1591,7 @@ def write_report(
         calibration_bins_csv_path,
         margin_csv_path,
         nll_csv_path,
+        ties_csv_path,
         disagreements_csv_path,
     )
 
@@ -1532,6 +1652,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum allowed HolyC mean gold NLL increase versus llama.cpp before CI gate failure",
     )
     parser.add_argument(
+        "--max-holyc-score-tie-rate",
+        type=float,
+        help="Maximum fraction of scored HolyC rows whose top score is tied across choices",
+    )
+    parser.add_argument(
         "--gate-dataset-breakdowns",
         action="store_true",
         help="Apply configured quality gates to each dataset/split breakdown as well as the aggregate",
@@ -1561,6 +1686,7 @@ def main(argv: list[str] | None = None) -> int:
         validate_probability_threshold(args.min_holyc_nll_coverage, "--min-holyc-nll-coverage")
         validate_nonnegative_threshold(args.max_holyc_mean_nll, "--max-holyc-mean-nll")
         validate_nonnegative_threshold(args.max_holyc_nll_delta, "--max-holyc-nll-delta")
+        validate_probability_threshold(args.max_holyc_score_tie_rate, "--max-holyc-score-tie-rate")
         gold = load_gold(args.gold, args.dataset, args.split)
         holyc_predictions = load_predictions(args.holyc, gold)
         llama_predictions = load_predictions(args.llama, gold)
@@ -1575,6 +1701,7 @@ def main(argv: list[str] | None = None) -> int:
             calibration_bins_csv_path,
             margin_csv_path,
             nll_csv_path,
+            ties_csv_path,
             disagreements_csv_path,
         ) = write_report(
             rows, summary, args, args.gold, args.holyc, args.llama
@@ -1591,6 +1718,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"wrote_calibration_bins_csv={calibration_bins_csv_path}")
     print(f"wrote_margin_csv={margin_csv_path}")
     print(f"wrote_nll_csv={nll_csv_path}")
+    print(f"wrote_score_ties_csv={ties_csv_path}")
     print(f"wrote_disagreements_csv={disagreements_csv_path}")
     print(f"holyc_accuracy={summary['holyc_accuracy']:.4f}")
     print(f"llama_accuracy={summary['llama_accuracy']:.4f}")
