@@ -282,6 +282,26 @@ def telemetry_status(
     return ("fail" if findings else "pass"), [f"{artifact_type}: {finding}" for finding in findings]
 
 
+def dry_run_telemetry_status(
+    prompts: int | None,
+    planned_measured_launches: int,
+    planned_total_launches: int,
+    launch_plan_count: int,
+) -> tuple[str, list[str]]:
+    findings: list[str] = []
+    if prompts is not None and prompts <= 0:
+        findings.append(f"non-positive prompt count: {prompts}")
+    if planned_measured_launches <= 0:
+        findings.append(f"non-positive planned measured launches: {planned_measured_launches}")
+    if planned_total_launches <= 0:
+        findings.append(f"non-positive planned total launches: {planned_total_launches}")
+    if launch_plan_count != planned_total_launches:
+        findings.append(
+            f"launch-plan length {launch_plan_count} does not match planned total launches {planned_total_launches}"
+        )
+    return ("fail" if findings else "pass"), [f"qemu_prompt_dry_run: {finding}" for finding in findings]
+
+
 def commit_status(artifact_type: str, commit_values: Iterable[Any]) -> tuple[str, str, list[str]]:
     commits = sorted({str(value) for value in commit_values if value})
     if not commits:
@@ -497,6 +517,99 @@ def summarize_qemu_report(
     )
 
 
+def summarize_dry_run_report(
+    path: Path,
+    report: dict[str, Any],
+    current_commit: str,
+    now: datetime,
+    max_artifact_age_seconds: int | None,
+) -> ArtifactSummary:
+    prompt_suite = report.get("prompt_suite") if isinstance(report.get("prompt_suite"), dict) else {}
+    environment = report.get("environment") if isinstance(report.get("environment"), dict) else {}
+    launch_plan = report.get("launch_plan") if isinstance(report.get("launch_plan"), list) else []
+    planned_warmups = parse_int(report.get("planned_warmup_launches")) or 0
+    planned_measured = parse_int(report.get("planned_measured_launches")) or 0
+    planned_total = parse_int(report.get("planned_total_launches"))
+    if planned_total is None:
+        planned_total = planned_warmups + planned_measured
+
+    command = row_command(report)
+    airgap_status, findings = command_status(command)
+    command_hash_state, command_sha256, command_hash_findings = command_hash_status(
+        "qemu_prompt_dry_run",
+        [report.get("command_sha256")],
+        [("dry_run", command)],
+    )
+    if command_hash_state == "fail":
+        findings.extend(command_hash_findings)
+
+    prompts = parse_int(prompt_suite.get("prompt_count"))
+    if prompts is None:
+        prompts = parse_int(report.get("prompt_count"))
+    telem_status, telem_findings = dry_run_telemetry_status(
+        prompts,
+        planned_measured,
+        planned_total,
+        len(launch_plan),
+    )
+    commit_state, commit, commit_findings = commit_status("qemu_prompt_dry_run", [report.get("commit")])
+    generated_at = str(report.get("generated_at", ""))
+    generated_age = artifact_age_seconds(generated_at, now)
+    fresh_state, fresh_findings = freshness_status(
+        "qemu_prompt_dry_run",
+        generated_at,
+        generated_age,
+        max_artifact_age_seconds,
+    )
+
+    return ArtifactSummary(
+        source=str(path),
+        artifact_type="qemu_prompt_dry_run",
+        status=str(report.get("status", "planned")),
+        generated_at=generated_at,
+        generated_age_seconds=generated_age,
+        profile=str(report.get("profile", "")),
+        model=str(report.get("model", "")),
+        quantization=str(report.get("quantization", "")),
+        prompt_suite_sha256=str(prompt_suite.get("suite_sha256", "")),
+        command_sha256=command_sha256,
+        environment_sha256=environment_hash(environment),
+        host_platform=environment_field(environment, "platform"),
+        host_machine=environment_field(environment, "machine"),
+        qemu_version=environment_field(environment, "qemu_version"),
+        qemu_bin=environment_field(environment, "qemu_bin"),
+        prompts=prompts,
+        total_tokens=None,
+        total_elapsed_us=None,
+        measured_runs=planned_measured,
+        warmup_runs=planned_warmups,
+        median_tok_per_s=None,
+        wall_tok_per_s_median=None,
+        ttft_us_p95=None,
+        host_overhead_pct_median=None,
+        host_child_cpu_us_median=None,
+        host_child_cpu_pct_median=None,
+        host_child_tok_per_cpu_s_median=None,
+        host_child_peak_rss_bytes_max=None,
+        us_per_token_median=None,
+        wall_us_per_token_median=None,
+        max_memory_bytes=None,
+        telemetry_status=telem_status,
+        telemetry_findings=telem_findings,
+        command_hash_status=command_hash_state,
+        command_hash_findings=command_hash_findings,
+        command_airgap_status=airgap_status,
+        command_findings=findings,
+        commit=commit,
+        current_commit=current_commit,
+        current_commit_match=current_commit_match(commit, current_commit),
+        commit_status=commit_state,
+        commit_findings=commit_findings,
+        freshness_status=fresh_state,
+        freshness_findings=fresh_findings,
+    )
+
+
 def summarize_matrix_report(
     path: Path,
     report: dict[str, Any],
@@ -604,6 +717,10 @@ def load_summaries(
         if isinstance(report.get("benchmarks"), list):
             summaries.append(
                 summarize_qemu_report(path, report, current_commit, effective_now, max_artifact_age_seconds)
+            )
+        elif report.get("status") == "planned" and isinstance(report.get("launch_plan"), list):
+            summaries.append(
+                summarize_dry_run_report(path, report, current_commit, effective_now, max_artifact_age_seconds)
             )
         elif isinstance(report.get("cells"), list):
             summaries.extend(
@@ -765,6 +882,8 @@ def comparable_key(summary: ArtifactSummary) -> str:
 def latest_comparable_artifacts(summaries: list[ArtifactSummary]) -> list[LatestComparableArtifact]:
     by_key: dict[str, list[ArtifactSummary]] = {}
     for summary in summaries:
+        if summary.median_tok_per_s is None:
+            continue
         by_key.setdefault(comparable_key(summary), []).append(summary)
 
     latest: list[LatestComparableArtifact] = []

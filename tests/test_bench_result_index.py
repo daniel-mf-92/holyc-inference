@@ -71,6 +71,95 @@ def test_indexes_qemu_prompt_report_with_airgap_status(tmp_path: Path) -> None:
     assert summary.max_memory_bytes == 4096
 
 
+def test_indexes_qemu_prompt_dry_run_launch_plan(tmp_path: Path) -> None:
+    command = [
+        "qemu-system-x86_64",
+        "-nic",
+        "none",
+        "-drive",
+        "file=TempleOS.img,format=raw,if=ide",
+    ]
+    report = tmp_path / "qemu_prompt_bench_dry_run_latest.json"
+    launch_plan = [
+        {
+            "launch_index": 1,
+            "phase": "warmup",
+            "prompt_index": 1,
+            "prompt_id": "smoke",
+            "prompt_sha256": "a" * 64,
+            "prompt_bytes": 5,
+            "iteration": 1,
+        },
+        {
+            "launch_index": 2,
+            "phase": "measured",
+            "prompt_index": 1,
+            "prompt_id": "smoke",
+            "prompt_sha256": "a" * 64,
+            "prompt_bytes": 5,
+            "iteration": 1,
+        },
+    ]
+    report.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-04-27T20:00:00Z",
+                "status": "planned",
+                "command": command,
+                "command_sha256": bench_result_index.command_hash(command),
+                "prompt_suite": {"suite_sha256": "b" * 64, "prompt_count": 1},
+                "launch_plan": launch_plan,
+                "planned_warmup_launches": 1,
+                "planned_measured_launches": 1,
+                "planned_total_launches": 2,
+                "environment": {"platform": "ci", "machine": "host", "qemu_bin": "qemu-system-x86_64"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summaries = bench_result_index.load_summaries([tmp_path])
+
+    assert len(summaries) == 1
+    summary = summaries[0]
+    assert summary.artifact_type == "qemu_prompt_dry_run"
+    assert summary.status == "planned"
+    assert summary.command_airgap_status == "pass"
+    assert summary.command_hash_status == "pass"
+    assert summary.telemetry_status == "pass"
+    assert summary.measured_runs == 1
+    assert summary.warmup_runs == 1
+    assert summary.median_tok_per_s is None
+    assert bench_result_index.latest_comparable_artifacts(summaries) == []
+    assert bench_result_index.index_status(summaries) == "pass"
+
+
+def test_dry_run_launch_plan_length_mismatch_fails_telemetry(tmp_path: Path) -> None:
+    report = tmp_path / "qemu_prompt_bench_dry_run_latest.json"
+    report.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-04-27T20:00:00Z",
+                "status": "planned",
+                "command": ["qemu-system-x86_64", "-nic", "none"],
+                "command_sha256": bench_result_index.command_hash(["qemu-system-x86_64", "-nic", "none"]),
+                "prompt_suite": {"suite_sha256": "c" * 64, "prompt_count": 1},
+                "launch_plan": [],
+                "planned_warmup_launches": 1,
+                "planned_measured_launches": 1,
+                "planned_total_launches": 2,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summaries = bench_result_index.load_summaries([tmp_path])
+
+    assert summaries[0].telemetry_status == "fail"
+    assert "launch-plan length 0 does not match planned total launches 2" in summaries[0].telemetry_findings[0]
+    assert bench_result_index.index_status(summaries) == "fail"
+
+
 def test_qemu_prompt_report_status_reflects_failed_runs(tmp_path: Path) -> None:
     report = tmp_path / "qemu_prompt_bench_latest.json"
     report.write_text(

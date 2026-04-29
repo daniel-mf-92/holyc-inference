@@ -596,17 +596,21 @@ python3 bench/bench_matrix.py \
   --dry-run
 ```
 
-`bench_result_index.py` scans existing QEMU prompt and matrix JSON reports,
-rolls their tok/s, wall-clock tok/s, TTFT, host-overhead, per-token latency,
-host child CPU efficiency/RSS, memory, prompt-suite, emitted-token, elapsed-time,
-and run-count metadata into a single
+`bench_result_index.py` scans existing QEMU prompt, QEMU prompt dry-run, and
+matrix JSON reports, rolls their tok/s, wall-clock tok/s, TTFT, host-overhead,
+per-token latency, host child CPU efficiency/RSS, memory, prompt-suite,
+emitted-token, elapsed-time, and run-count metadata into a single
 JSON/Markdown/CSV/JUnit XML index, and checks each recorded QEMU command for
-explicit `-nic none` air-gap compliance. It also reports prompt-suite drift when
-comparable profile/model/quantization artifacts carry different non-empty suite
-hashes, and command drift when comparable artifacts carry different
-`command_sha256` values. It also fingerprints host/QEMU environment metadata and
-reports environment drift when comparable artifacts use the same prompt suite
-and command hash but were produced under different host or QEMU identities.
+explicit `-nic none` air-gap compliance. Dry-run reports are indexed as planned
+launch artifacts: their command hash is recomputed, planned warmup/measured
+launch counts are checked against the launch plan, and they are excluded from
+latest comparable throughput rollups because they have no measured tok/s. It
+also reports prompt-suite drift when comparable profile/model/quantization
+artifacts carry different non-empty suite hashes, and command drift when
+comparable artifacts carry different `command_sha256` values. It also
+fingerprints host/QEMU environment metadata and reports environment drift when
+comparable artifacts use the same prompt suite and command hash but were
+produced under different host or QEMU identities.
 The JSON and Markdown reports also include a latest-per-comparable-key rollup,
 with the matching CSV at `bench_result_index_latest_comparable_latest.csv`, so
 dashboards can ingest only the newest artifact for each stable
