@@ -1474,6 +1474,24 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
     }
 
 
+def phase_summaries(warmups: list[BenchRun], runs: list[BenchRun]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for phase, phase_runs in (
+        ("warmup", warmups),
+        ("measured", runs),
+        ("all", warmups + runs),
+    ):
+        summary = suite_summary(phase_runs)
+        rows.append(
+            {
+                "phase": phase,
+                "launches": len(phase_runs),
+                **summary,
+            }
+        )
+    return rows
+
+
 def report_status(all_runs: list[BenchRun], findings: list[dict[str, Any]]) -> str:
     runs_ok = all(run.returncode == 0 and not run.timed_out for run in all_runs)
     return "pass" if runs_ok and not findings else "fail"
@@ -1607,6 +1625,25 @@ def markdown_report(report: dict[str, Any]) -> str:
             lines.append(
                 "| {scope} | {launch_index} | {prompt} | {iteration} | {metric} | {value} | {limit} |".format(
                     **{key: format_summary_value(value) for key, value in finding.items()}
+                )
+            )
+    phase_rows = report.get("phase_summaries") if isinstance(report.get("phase_summaries"), list) else []
+    if phase_rows:
+        lines.extend(
+            [
+                "",
+                "## Phase Summary",
+                "",
+                "| Phase | Launches | Prompts | OK | Failed | OK % | Timed out | Nonzero exit | Total tokens | Median tok/s | Median wall tok/s | Max memory bytes | Serial output bytes total |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for row in phase_rows:
+            lines.append(
+                "| {phase} | {launches} | {prompts} | {ok_runs} | {failed_runs} | {ok_run_pct} | "
+                "{timed_out_runs} | {nonzero_exit_runs} | {total_tokens} | {tok_per_s_median} | "
+                "{wall_tok_per_s_median} | {memory_bytes_max} | {serial_output_bytes_total} |".format(
+                    **{key: format_summary_value(value) for key, value in row.items()}
                 )
             )
     environment = report.get("environment") or {}
@@ -2077,6 +2114,7 @@ def write_report(
         "warmups": [asdict(run) for run in warmup_runs],
         "suite_summary": suite,
         "summaries": summaries,
+        "phase_summaries": phase_summaries(warmup_runs, runs),
         "variability_gates": {
             "max_suite_cv_pct": max_suite_cv_pct,
             "max_prompt_cv_pct": max_prompt_cv_pct,
@@ -2116,12 +2154,14 @@ def write_report(
     latest_md = output_dir / "qemu_prompt_bench_latest.md"
     latest_csv = output_dir / "qemu_prompt_bench_latest.csv"
     latest_summary_csv = output_dir / "qemu_prompt_bench_summary_latest.csv"
+    latest_phase_csv = output_dir / "qemu_prompt_bench_phases_latest.csv"
     latest_launch_csv = output_dir / "qemu_prompt_bench_launches_latest.csv"
     latest_junit = output_dir / "qemu_prompt_bench_junit_latest.xml"
     latest.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     latest_md.write_text(markdown_report(report), encoding="utf-8")
     write_csv_report(runs, latest_csv)
     write_summary_csv_report(report, latest_summary_csv)
+    write_phase_csv_report(report, latest_phase_csv)
     write_launch_csv_report(report, latest_launch_csv)
     write_junit_report(runs, warmup_runs, findings, telemetry, latest_junit)
     stamped = output_dir / f"qemu_prompt_bench_{report['generated_at'].replace(':', '').replace('-', '')}.json"
@@ -2260,6 +2300,57 @@ def write_summary_csv_report(report: dict[str, Any], path: Path) -> None:
         writer.writeheader()
         for row in rows:
             writer.writerow({field: row.get(field) for field in fields})
+
+
+def write_phase_csv_report(report: dict[str, Any], path: Path) -> None:
+    fields = [
+        "generated_at",
+        "phase",
+        "launches",
+        "prompts",
+        "runs",
+        "ok_runs",
+        "failed_runs",
+        "ok_run_pct",
+        "timed_out_runs",
+        "nonzero_exit_runs",
+        "measured_prompt_bytes_total",
+        "prompt_bytes_min",
+        "prompt_bytes_max",
+        "total_tokens",
+        "total_elapsed_us",
+        "tok_per_s_p05",
+        "tok_per_s_median",
+        "tok_per_s_p95",
+        "wall_tok_per_s_p05",
+        "wall_tok_per_s_median",
+        "wall_tok_per_s_p95",
+        "ttft_us_median",
+        "ttft_us_p95",
+        "host_overhead_pct_median",
+        "host_child_cpu_us_median",
+        "host_child_cpu_pct_median",
+        "host_child_tok_per_cpu_s_median",
+        "host_child_peak_rss_bytes_max",
+        "us_per_token_median",
+        "wall_us_per_token_median",
+        "memory_bytes_max",
+        "memory_bytes_per_token_median",
+        "memory_bytes_per_token_max",
+        "serial_output_bytes_total",
+        "serial_output_bytes_max",
+    ]
+    phase_rows = report.get("phase_summaries") if isinstance(report.get("phase_summaries"), list) else []
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for row in phase_rows:
+            writer.writerow(
+                {
+                    field: report.get("generated_at") if field == "generated_at" else row.get(field)
+                    for field in fields
+                }
+            )
 
 
 def write_launch_csv_report(report: dict[str, Any], path: Path) -> None:

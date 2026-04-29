@@ -1,9 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
 <testsuite name="holyc_qemu_prompt_bench" tests="6" failures="0" errors="0">
-  <testcase classname="qemu_prompt_bench.measured" name="ci-airgap-smoke:synthetic-smoke:Q4_0:1:smoke-short:1" />
-  <testcase classname="qemu_prompt_bench.measured" name="ci-airgap-smoke:synthetic-smoke:Q4_0:2:smoke-short:2" />
-  <testcase classname="qemu_prompt_bench.measured" name="ci-airgap-smoke:synthetic-smoke:Q4_0:3:smoke-short:3" />
-  <testcase classname="qemu_prompt_bench.measured" name="ci-airgap-smoke:synthetic-smoke:Q4_0:4:smoke-code:1" />
-  <testcase classname="qemu_prompt_bench.measured" name="ci-airgap-smoke:synthetic-smoke:Q4_0:5:smoke-code:2" />
-  <testcase classname="qemu_prompt_bench.measured" name="ci-airgap-smoke:synthetic-smoke:Q4_0:6:smoke-code:3" />
+  <testcase classname="qemu_prompt_bench.warmup" name="ci-airgap-smoke:synthetic-smoke:Q4_0:1:smoke-short:1" />
+  <testcase classname="qemu_prompt_bench.warmup" name="ci-airgap-smoke:synthetic-smoke:Q4_0:2:smoke-code:1" />
+  <testcase classname="qemu_prompt_bench.measured" name="ci-airgap-smoke:synthetic-smoke:Q4_0:3:smoke-short:1" />
+  <testcase classname="qemu_prompt_bench.measured" name="ci-airgap-smoke:synthetic-smoke:Q4_0:4:smoke-short:2" />
+  <testcase classname="qemu_prompt_bench.measured" name="ci-airgap-smoke:synthetic-smoke:Q4_0:5:smoke-code:1" />
+  <testcase classname="qemu_prompt_bench.measured" name="ci-airgap-smoke:synthetic-smoke:Q4_0:6:smoke-code:2" />
 </testsuite>

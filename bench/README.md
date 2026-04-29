@@ -496,9 +496,10 @@ times. Use `--max-launches N` to fail before booting QEMU when
 `--min-prompt-count N` to fail before booting QEMU when a benchmark suite has
 too few prompts for a comparable run. Reports
 include separate warmup records, raw measured per-run records, an overall suite
-summary, and per-prompt medians, OK/failed/timeout/nonzero-exit counts,
-min/max tok/s, P05/P95 tok/s, and P05-to-P95 spread percentages in JSON and
-Markdown. The suite summary includes measured prompt count, run count, total
+summary, per-phase warmup/measured/all summaries, and per-prompt medians,
+OK/failed/timeout/nonzero-exit counts, min/max tok/s, P05/P95 tok/s, and
+P05-to-P95 spread percentages in JSON and Markdown. The suite summary includes
+measured prompt count, run count, total
 prompt bytes launched, total tokens, total elapsed time,
 OK/failed/timeout/nonzero-exit counts, P05/median/P95 tok/s, P05/median/P95
 wall tok/s, tok/s standard deviation, coefficient of variation, P05-to-P95
@@ -524,7 +525,10 @@ prompt-suite SHA256 matching `prompt_audit.py`, plus
 upload, spreadsheets, and simple shell comparisons. It also writes
 `qemu_prompt_bench_summary_latest.csv` with one suite row plus one row per
 prompt aggregate so CI can publish compact latency, throughput, prompt-byte,
-and memory rollups without parsing JSON. JSON and Markdown reports also include
+and memory rollups without parsing JSON. `qemu_prompt_bench_phases_latest.csv`
+adds one row each for warmup, measured, and all launches so CI can compare
+launch health and token totals across phases without parsing raw run rows.
+JSON and Markdown reports also include
 host provenance for reproducibility: platform, machine, Python version, CPU
 count, QEMU binary/path, QEMU version when discoverable, and a stable SHA256
 fingerprint of the QEMU command line. Measured reports also include the same
@@ -606,6 +610,13 @@ below a host child-CPU or output-density floor, or report a missing/mismatched
 guest prompt hash or byte count.
 Telemetry gate failures are written as `telemetry_findings` in JSON/Markdown and as
 `benchmark_telemetry` failures in the JUnit report.
+
+The qemu prompt benchmark smoke uses the synthetic local QEMU-compatible
+fixture and does not boot a guest:
+
+```bash
+python3 bench/qemu_prompt_bench_ci_smoke.py
+```
 
 Example:
 
