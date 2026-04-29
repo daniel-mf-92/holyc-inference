@@ -128,6 +128,7 @@ def main() -> int:
         prompt_rank_csv_path = output_dir / "qemu_prompt_bench_prompt_rank_latest.csv"
         prompt_variability_csv_path = output_dir / "qemu_prompt_bench_prompt_variability_latest.csv"
         prompt_efficiency_csv_path = output_dir / "qemu_prompt_bench_prompt_efficiency_latest.csv"
+        prompt_serial_output_csv_path = output_dir / "qemu_prompt_bench_prompt_serial_output_latest.csv"
         launch_csv_path = output_dir / "qemu_prompt_bench_launches_latest.csv"
         launch_jsonl_path = output_dir / "qemu_prompt_bench_launches_latest.jsonl"
         junit_path = output_dir / "qemu_prompt_bench_junit_latest.xml"
@@ -292,6 +293,21 @@ def main() -> int:
             "missing_prompt_efficiency_wall_prompt_bytes_per_s",
         ):
             return rc
+        if rc := require(
+            len(report["prompt_serial_output_rankings"]) == 2,
+            "unexpected_prompt_serial_output_rank_count",
+        ):
+            return rc
+        if rc := require(
+            report["prompt_serial_output_rankings"][0]["serial_output_rank"] == 1,
+            "missing_first_prompt_serial_output_rank",
+        ):
+            return rc
+        if rc := require(
+            report["prompt_serial_output_rankings"][0]["serial_output_bytes_total"] is not None,
+            "missing_prompt_serial_output_bytes_total",
+        ):
+            return rc
 
         phases = {row["phase"]: row for row in report["phase_summaries"]}
         if rc := require(set(phases) == {"warmup", "measured", "all"}, "unexpected_phase_rows"):
@@ -418,6 +434,26 @@ def main() -> int:
             "missing_prompt_efficiency_csv_columns",
         ):
             return rc
+        prompt_serial_output_rows = list(csv.DictReader(prompt_serial_output_csv_path.open(encoding="utf-8", newline="")))
+        if rc := require(len(prompt_serial_output_rows) == 2, "unexpected_prompt_serial_output_csv_rows"):
+            return rc
+        if rc := require(
+            prompt_serial_output_rows[0]["serial_output_rank"] == "1",
+            "unexpected_prompt_serial_output_csv_rank",
+        ):
+            return rc
+        if rc := require(
+            {
+                "prompt_suite_sha256",
+                "command_sha256",
+                "serial_output_bytes_total",
+                "serial_output_bytes_max",
+                "serial_output_lines_total",
+                "serial_output_lines_max",
+            }.issubset(prompt_serial_output_rows[0].keys()),
+            "missing_prompt_serial_output_csv_columns",
+        ):
+            return rc
 
         launch_rows = list(csv.DictReader(launch_csv_path.open(encoding="utf-8", newline="")))
         if rc := require(len(launch_rows) == 6, "unexpected_launch_csv_rows"):
@@ -482,6 +518,11 @@ def main() -> int:
         if rc := require(
             "Prompt Efficiency" in markdown_path.read_text(encoding="utf-8"),
             "missing_prompt_efficiency_markdown",
+        ):
+            return rc
+        if rc := require(
+            "Prompt Serial Output Ranking" in markdown_path.read_text(encoding="utf-8"),
+            "missing_prompt_serial_output_rank_markdown",
         ):
             return rc
         if rc := require(
