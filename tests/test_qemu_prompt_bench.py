@@ -134,6 +134,9 @@ print("BENCH_RESULT: " + json.dumps({"tokens": 64, "elapsed_us": 250000, "tok_pe
     assert run.wall_us_per_token is not None
     assert run.wall_us_per_token > 0
     assert run.memory_bytes == 4194304
+    assert run.stdout_bytes == len(run.stdout_tail.encode("utf-8"))
+    assert run.stderr_bytes == 0
+    assert run.serial_output_bytes == run.stdout_bytes
     assert run.prompt == "smoke"
     assert run.prompt_bytes == 14
     assert run.profile == "secure-local"
@@ -290,6 +293,15 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
     assert report["benchmarks"][0]["us_per_token"] == 3125.0
     assert report["benchmarks"][0]["wall_us_per_token"] > 0
     assert report["benchmarks"][0]["memory_bytes"] == 8388608
+    assert report["benchmarks"][0]["stdout_bytes"] == len(
+        report["benchmarks"][0]["stdout_tail"].encode("utf-8")
+    )
+    assert report["benchmarks"][0]["stderr_bytes"] == 0
+    assert report["benchmarks"][0]["serial_output_bytes"] == report["benchmarks"][0]["stdout_bytes"]
+    assert report["suite_summary"]["serial_output_bytes_total"] == report["benchmarks"][0]["serial_output_bytes"]
+    assert report["suite_summary"]["serial_output_bytes_max"] == report["benchmarks"][0]["serial_output_bytes"]
+    assert report["summaries"][0]["serial_output_bytes_total"] == report["benchmarks"][0]["serial_output_bytes"]
+    assert report["summaries"][0]["serial_output_bytes_max"] == report["benchmarks"][0]["serial_output_bytes"]
     assert report["benchmarks"][0]["command"][1:3] == ["-nic", "none"]
     assert report["command_sha256"] == report["benchmarks"][0]["command_sha256"]
     assert report["command_sha256"] == qemu_prompt_bench.command_hash(report["benchmarks"][0]["command"])
@@ -305,9 +317,11 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
     assert "host_overhead_us,host_overhead_pct" in csv_report
     assert "wall_tok_per_s" in csv_report
     assert "us_per_token,wall_us_per_token" in csv_report
+    assert "stdout_bytes,stderr_bytes,serial_output_bytes" in csv_report
     assert "timed_out,command_sha256" in csv_report
     assert "qemu_prompt,default,,,prompt-1" in csv_report
     assert summary_csv_report.startswith("scope,prompt,prompt_bytes,prompts,runs,ok_runs")
+    assert "serial_output_bytes_total,serial_output_bytes_max" in summary_csv_report
     assert "suite,,20,1,1,1,0,0,0,,32," in summary_csv_report
     assert "prompt,prompt-1,20,,1,1,0,0,0,32,," in summary_csv_report
 
@@ -407,6 +421,8 @@ print(f"tokens={tokens} elapsed_us=100000 memory_bytes={memory_bytes}")
     assert "tok/s P05-P95 spread %" in markdown
     assert "Median wall tok/s" in markdown
     assert "Median us/token" in markdown
+    assert "Serial output bytes total" in markdown
+    assert "Prompt Serial Output" in markdown
     assert "| 2 | 6 | 6 | 0 | 0 | 0 | 33 | 180 | 600000 |" in markdown
     assert "| one | 5 | 3 | 3 | 0 | 0 | 0 | 20 | 100000 |" in markdown
     csv_report = (output_dir / "qemu_prompt_bench_latest.csv").read_text(encoding="utf-8")
@@ -717,6 +733,58 @@ print("tokens=12 elapsed_us=1")
     assert junit_root.attrib["failures"] == "2"
 
 
+def test_cli_serial_output_gate_fails_verbose_guest_output(tmp_path: Path) -> None:
+    fake_qemu = tmp_path / "fake-qemu.py"
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    output_dir = tmp_path / "results"
+    prompts.write_text('{"prompt_id":"one","prompt":"Verbose serial"}\n', encoding="utf-8")
+    fake_qemu.write_text(
+        """#!/usr/bin/env python3
+import sys
+print("tokens=12 elapsed_us=100000")
+print("verbose debug line", file=sys.stderr)
+""",
+        encoding="utf-8",
+    )
+    fake_qemu.chmod(0o755)
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--qemu-bin",
+            str(fake_qemu),
+            "--output-dir",
+            str(output_dir),
+            "--max-serial-output-bytes",
+            "8",
+        ]
+    )
+
+    assert status == 1
+    report = json.loads((output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8"))
+    junit_root = ET.parse(output_dir / "qemu_prompt_bench_junit_latest.xml").getroot()
+
+    assert report["status"] == "fail"
+    assert report["telemetry_gates"]["max_serial_output_bytes"] == 8
+    assert report["benchmarks"][0]["stderr_bytes"] == len("verbose debug line\n".encode("utf-8"))
+    assert report["benchmarks"][0]["serial_output_bytes"] > 8
+    assert report["telemetry_findings"] == [
+        {
+            "scope": "measured_run",
+            "prompt": "one",
+            "iteration": 1,
+            "metric": "serial_output_bytes",
+            "value": report["benchmarks"][0]["serial_output_bytes"],
+            "limit": 8,
+        }
+    ]
+    assert junit_root.attrib["failures"] == "1"
+
+
 def test_cli_junit_reports_failed_qemu_run(tmp_path: Path) -> None:
     fake_qemu = tmp_path / "fake-qemu.py"
     prompts = tmp_path / "prompts.jsonl"
@@ -772,6 +840,20 @@ def test_cli_rejects_negative_warmup(tmp_path: Path) -> None:
             str(prompts),
             "--dry-run",
             "--warmup",
+            "-1",
+        ]
+    )
+
+    assert status == 2
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--dry-run",
+            "--max-serial-output-bytes",
             "-1",
         ]
     )

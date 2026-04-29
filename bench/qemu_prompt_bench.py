@@ -123,6 +123,9 @@ class BenchRun:
     us_per_token: float | None
     wall_us_per_token: float | None
     memory_bytes: int | None
+    stdout_bytes: int
+    stderr_bytes: int
+    serial_output_bytes: int
     returncode: int
     timed_out: bool
     command: list[str]
@@ -176,6 +179,10 @@ def qemu_args_files_metadata(paths: Iterable[Path]) -> list[dict[str, Any]]:
 
 def prompt_bytes(prompt: str) -> int:
     return len(prompt.encode("utf-8"))
+
+
+def text_bytes(text: str) -> int:
+    return len(text.encode("utf-8"))
 
 
 def prompt_suite_hash_parts(payload: list[dict[str, Any]]) -> str:
@@ -727,6 +734,8 @@ def run_prompt(
     us_per_token = derived_us_per_token(tokens, elapsed_us)
     wall_us_per_token = derived_us_per_token(tokens, wall_elapsed_us)
     memory_bytes = extract_memory_bytes(payload)
+    stdout_bytes = text_bytes(stdout)
+    stderr_bytes = text_bytes(stderr)
 
     return BenchRun(
         benchmark="qemu_prompt",
@@ -758,6 +767,9 @@ def run_prompt(
         us_per_token=us_per_token,
         wall_us_per_token=wall_us_per_token,
         memory_bytes=memory_bytes,
+        stdout_bytes=stdout_bytes,
+        stderr_bytes=stderr_bytes,
+        serial_output_bytes=stdout_bytes + stderr_bytes,
         returncode=returncode,
         timed_out=timed_out,
         command=command,
@@ -811,6 +823,7 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
         ]
         ttft_values = [run.ttft_us for run in prompt_runs if run.ttft_us is not None]
         memory_values = [run.memory_bytes for run in prompt_runs if run.memory_bytes is not None]
+        serial_output_values = [run.serial_output_bytes for run in prompt_runs]
         ok_runs = [run for run in prompt_runs if run.returncode == 0 and not run.timed_out]
         timed_out_runs = [run for run in prompt_runs if run.timed_out]
         nonzero_exit_runs = [run for run in prompt_runs if run.returncode != 0]
@@ -880,6 +893,8 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
                 else None,
                 "wall_us_per_token_p95": percentile(wall_us_per_token_values, 95.0),
                 "memory_bytes_max": max(memory_values) if memory_values else None,
+                "serial_output_bytes_total": sum(serial_output_values),
+                "serial_output_bytes_max": max(serial_output_values) if serial_output_values else None,
             }
         )
     return summaries
@@ -1021,6 +1036,7 @@ def telemetry_findings(
     min_host_child_tok_per_cpu_s: float | None = None,
     require_host_child_rss: bool = False,
     max_host_child_rss_bytes: int | None = None,
+    max_serial_output_bytes: int | None = None,
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     for run in runs:
@@ -1113,6 +1129,15 @@ def telemetry_findings(
                     "limit": max_host_child_rss_bytes,
                 }
             )
+        if max_serial_output_bytes is not None and run.serial_output_bytes > max_serial_output_bytes:
+            findings.append(
+                {
+                    **base,
+                    "metric": "serial_output_bytes",
+                    "value": run.serial_output_bytes,
+                    "limit": max_serial_output_bytes,
+                }
+            )
     return findings
 
 
@@ -1140,6 +1165,7 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
     ]
     ttft_values = [run.ttft_us for run in runs if run.ttft_us is not None]
     memory_values = [run.memory_bytes for run in runs if run.memory_bytes is not None]
+    serial_output_values = [run.serial_output_bytes for run in runs]
     token_values = [run.tokens for run in runs if run.tokens is not None]
     prompts = sorted({run.prompt for run in runs})
     ok_runs = [run for run in runs if run.returncode == 0 and not run.timed_out]
@@ -1204,6 +1230,8 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
         "wall_us_per_token_p95": percentile(wall_us_per_token_values, 95.0),
         "elapsed_us_p95": percentile([float(value) for value in elapsed_values], 95.0),
         "memory_bytes_max": max(memory_values) if memory_values else None,
+        "serial_output_bytes_total": sum(serial_output_values),
+        "serial_output_bytes_max": max(serial_output_values) if serial_output_values else None,
     }
 
 
@@ -1266,6 +1294,12 @@ def markdown_report(report: dict[str, Any]) -> str:
                     **{key: format_summary_value(value) for key, value in suite.items()}
                 ),
                 "",
+                "| Serial output bytes total | Serial output bytes max |",
+                "| ---: | ---: |",
+                "| {serial_output_bytes_total} | {serial_output_bytes_max} |".format(
+                    **{key: format_summary_value(value) for key, value in suite.items()}
+                ),
+                "",
                 "## Prompt Summary",
                 "",
             ]
@@ -1281,6 +1315,21 @@ def markdown_report(report: dict[str, Any]) -> str:
                 "{host_overhead_us_median} | {host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | {host_child_tok_per_cpu_s_median} | {host_child_peak_rss_bytes_max} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_min} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_stdev} | {tok_per_s_cv_pct} | {tok_per_s_iqr_pct} | {tok_per_s_p05_p95_spread_pct} | "
                 "{tok_per_s_max} | {wall_tok_per_s_p05} | {wall_tok_per_s_median} | {wall_tok_per_s_p95} | {wall_tok_per_s_iqr_pct} | {wall_tok_per_s_p05_p95_spread_pct} | {prompt_bytes_per_s_median} | {wall_prompt_bytes_per_s_median} | {us_per_token_median} | {us_per_token_p95} | "
                 "{wall_us_per_token_median} | {wall_us_per_token_p95} | {memory_bytes_max} |".format(
+                    **{key: format_summary_value(value) for key, value in summary.items()}
+                )
+            )
+        lines.extend(
+            [
+                "",
+                "## Prompt Serial Output",
+                "",
+                "| Prompt | Serial output bytes total | Serial output bytes max |",
+                "| --- | ---: | ---: |",
+            ]
+        )
+        for summary in report["summaries"]:
+            lines.append(
+                "| {prompt} | {serial_output_bytes_total} | {serial_output_bytes_max} |".format(
                     **{key: format_summary_value(value) for key, value in summary.items()}
                 )
             )
@@ -1690,6 +1739,7 @@ def write_report(
     min_host_child_tok_per_cpu_s: float | None = None,
     require_host_child_rss: bool = False,
     max_host_child_rss_bytes: int | None = None,
+    max_serial_output_bytes: int | None = None,
     max_launches: int | None = None,
     environment: dict[str, Any] | None = None,
     image: dict[str, Any] | None = None,
@@ -1724,6 +1774,7 @@ def write_report(
         min_host_child_tok_per_cpu_s=min_host_child_tok_per_cpu_s,
         require_host_child_rss=require_host_child_rss,
         max_host_child_rss_bytes=max_host_child_rss_bytes,
+        max_serial_output_bytes=max_serial_output_bytes,
     )
     report = {
         "generated_at": iso_now(),
@@ -1762,6 +1813,7 @@ def write_report(
             "min_host_child_tok_per_cpu_s": min_host_child_tok_per_cpu_s,
             "require_host_child_rss": require_host_child_rss,
             "max_host_child_rss_bytes": max_host_child_rss_bytes,
+            "max_serial_output_bytes": max_serial_output_bytes,
         },
         "telemetry_findings": telemetry,
         "benchmarks": [asdict(run) for run in runs],
@@ -1812,6 +1864,9 @@ def write_csv_report(runs: list[BenchRun], path: Path) -> None:
         "us_per_token",
         "wall_us_per_token",
         "memory_bytes",
+        "stdout_bytes",
+        "stderr_bytes",
+        "serial_output_bytes",
         "returncode",
         "timed_out",
         "command_sha256",
@@ -1869,6 +1924,8 @@ def write_summary_csv_report(report: dict[str, Any], path: Path) -> None:
         "wall_us_per_token_median",
         "wall_us_per_token_p95",
         "memory_bytes_max",
+        "serial_output_bytes_total",
+        "serial_output_bytes_max",
     ]
     rows: list[dict[str, Any]] = []
     suite = report.get("suite_summary") or {}
@@ -1955,6 +2012,9 @@ def write_junit_report(
                 f"wall_prompt_bytes_per_s={format_summary_value(run.wall_prompt_bytes_per_s)}\n"
                 f"us_per_token={format_summary_value(run.us_per_token)}\n"
                 f"wall_us_per_token={format_summary_value(run.wall_us_per_token)}\n"
+                f"stdout_bytes={run.stdout_bytes}\n"
+                f"stderr_bytes={run.stderr_bytes}\n"
+                f"serial_output_bytes={run.serial_output_bytes}\n"
                 f"command_sha256={run.command_sha256}\n"
                 f"stdout_tail={run.stdout_tail}\n"
                 f"stderr_tail={run.stderr_tail}\n"
@@ -2122,6 +2182,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Fail if any measured run exceeds host-observed child peak RSS bytes",
     )
+    parser.add_argument(
+        "--max-serial-output-bytes",
+        type=int,
+        default=None,
+        help="Fail if any measured run emits more combined stdout/stderr serial bytes",
+    )
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--profile", default="default")
     parser.add_argument("--model", default="")
@@ -2185,6 +2251,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.max_host_child_rss_bytes is not None and args.max_host_child_rss_bytes < 0:
         print("error: --max-host-child-rss-bytes must be >= 0", file=sys.stderr)
+        return 2
+    if args.max_serial_output_bytes is not None and args.max_serial_output_bytes < 0:
+        print("error: --max-serial-output-bytes must be >= 0", file=sys.stderr)
         return 2
 
     try:
@@ -2261,6 +2330,7 @@ def main(argv: list[str] | None = None) -> int:
         min_host_child_tok_per_cpu_s=args.min_host_child_tok_per_cpu_s,
         require_host_child_rss=args.require_host_child_rss,
         max_host_child_rss_bytes=args.max_host_child_rss_bytes,
+        max_serial_output_bytes=args.max_serial_output_bytes,
         max_launches=args.max_launches,
         environment=host_environment(args.qemu_bin),
         image=image,

@@ -367,8 +367,10 @@ wall tok/s, tok/s standard deviation, coefficient of variation, P05-to-P95
 spread percentage, interquartile tok/s spread percentage, wall tok/s
 interquartile and P05-to-P95 spread percentages, and max memory.
 Per-run and per-prompt reports include UTF-8 prompt byte counts so
-benchmark changes can be separated from prompt-suite size drift. Optional
-first-token latency telemetry is
+benchmark changes can be separated from prompt-suite size drift. Per-run
+records also include stdout, stderr, and combined serial output byte counts;
+suite and prompt summaries roll those up so verbose guest logging can be gated
+separately from decode throughput. Optional first-token latency telemetry is
 normalized from `ttft_us`, `time_to_first_token_us`, `first_token_us`, and their
 `_ms` or `_s` variants into `ttft_us`; suite and per-prompt reports include
 median and P95 TTFT when present. The runner also writes a deterministic
@@ -430,10 +432,12 @@ Use `--require-tokens`, `--require-tok-per-s`, `--require-memory`,
 `--min-wall-tok-per-s`, `--max-memory-bytes`, `--max-ttft-us`,
 `--max-host-overhead-us`, `--max-host-overhead-pct`,
 `--min-host-child-tok-per-cpu-s`, `--require-host-child-rss`, and
-`--max-host-child-rss-bytes` to fail measured runs that omit required telemetry,
+`--max-host-child-rss-bytes`, and `--max-serial-output-bytes` to fail measured
+runs that omit required telemetry,
 produce too little work for a trustworthy throughput sample, exceed a
-host-observed latency, memory, RSS, or orchestration overhead budget, exceed a
-first-token latency budget, or fall below a host child-CPU efficiency floor.
+host-observed latency, memory, RSS, orchestration overhead, or serial verbosity
+budget, exceed a first-token latency budget, or fall below a host child-CPU
+efficiency floor.
 Telemetry gate failures are written as `telemetry_findings` in JSON/Markdown and as
 `benchmark_telemetry` failures in the JUnit report.
 
@@ -461,6 +465,7 @@ python3 bench/qemu_prompt_bench.py \
   --min-host-child-tok-per-cpu-s 20 \
   --require-host-child-rss \
   --max-host-child-rss-bytes 1073741824 \
+  --max-serial-output-bytes 65536 \
   --qemu-args-file bench/fixtures/local-qemu.args \
   --hash-image \
   -- -m 512M
