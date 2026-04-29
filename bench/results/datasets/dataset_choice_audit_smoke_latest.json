@@ -1,0 +1,30 @@
+{
+  "choice_count_histogram": {
+    "4": 3
+  },
+  "counts_by_dataset_split": {
+    "arc-smoke": {
+      "validation": 1
+    },
+    "hellaswag-smoke": {
+      "validation": 1
+    },
+    "truthfulqa-smoke": {
+      "validation": 1
+    }
+  },
+  "error_count": 0,
+  "findings": [],
+  "format": "hceval-choice-audit",
+  "generated_at": "2026-04-29T00:48:37Z",
+  "inputs": [
+    {
+      "path": "bench/datasets/samples/smoke_eval.jsonl",
+      "rows": 3,
+      "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+    }
+  ],
+  "record_count": 3,
+  "status": "pass",
+  "warning_count": 0
+}

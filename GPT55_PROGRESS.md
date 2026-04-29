@@ -185,3 +185,4 @@
 2026-04-29T00:16:45Z | Added HCEval choice-count telemetry to manifests/inspection with smoke validation and refreshed dataset artifacts.
 2026-04-29T00:24:01Z | Added latest comparable benchmark artifact rollups to bench_result_index with smoke coverage and refreshed index artifacts.
 2026-04-29T00:39:32Z | Added benchmark trend export dashboards with smoke coverage and refreshed trend artifacts.
+2026-04-29T00:49:14Z | Added offline dataset choice-quality audit with CSV/Markdown/JUnit outputs, smoke gate coverage, and latest sample artifacts.

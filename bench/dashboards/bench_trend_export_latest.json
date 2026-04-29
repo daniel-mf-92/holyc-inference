@@ -1,6 +1,6 @@
 {
   "findings": [],
-  "generated_at": "2026-04-29T00:40:20Z",
+  "generated_at": "2026-04-29T00:45:36Z",
   "latest": [
     {
       "key": "ci-airgap-smoke/synthetic-smoke/Q4_0/68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
@@ -124,6 +124,14 @@
     }
   ],
   "status": "pass",
+  "thresholds": {
+    "fail_on_airgap": true,
+    "fail_on_empty": true,
+    "fail_on_memory_growth_pct": 10.0,
+    "fail_on_telemetry": true,
+    "fail_on_tok_regression_pct": 5.0,
+    "fail_on_wall_tok_regression_pct": 5.0
+  },
   "trend_keys": 6,
   "trend_points": 85,
   "trends": {

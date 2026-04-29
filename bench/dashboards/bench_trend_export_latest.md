@@ -1,9 +1,11 @@
 # Benchmark Trend Export
 
-Generated: 2026-04-29T00:40:20Z
+Generated: 2026-04-29T00:45:36Z
 Status: pass
 Trend keys: 6
 Trend points: 85
+
+Thresholds: fail_on_empty=True, fail_on_airgap=True, fail_on_telemetry=True, fail_on_tok_regression_pct=5.000, fail_on_wall_tok_regression_pct=5.000, fail_on_memory_growth_pct=10.000
 
 | Key | Points | Latest commit | Status | Air-gap | Telemetry | Guest tok/s | Guest delta % | Wall tok/s | Wall delta % | Max memory bytes | Memory delta % | Source |
 | --- | ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |

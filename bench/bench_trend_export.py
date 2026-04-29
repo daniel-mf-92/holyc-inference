@@ -150,8 +150,12 @@ def build_report(
     fail_on_empty: bool,
     fail_on_airgap: bool,
     fail_on_telemetry: bool,
+    fail_on_tok_regression_pct: float | None,
+    fail_on_wall_tok_regression_pct: float | None,
+    fail_on_memory_growth_pct: float | None,
 ) -> dict[str, object]:
     all_points = [point for points in grouped.values() for point in points]
+    latest = latest_rows(grouped)
     findings: list[str] = []
     if not all_points:
         findings.append("no supported benchmark artifacts found")
@@ -164,14 +168,58 @@ def build_report(
         if telemetry_failures:
             findings.append(f"{len(telemetry_failures)} trend point(s) are missing telemetry")
 
-    status = "fail" if findings and (fail_on_empty or fail_on_airgap or fail_on_telemetry) else "pass"
+    if fail_on_tok_regression_pct is not None:
+        threshold = -abs(fail_on_tok_regression_pct)
+        for row in latest:
+            delta = row.get("median_tok_per_s_delta_pct")
+            if isinstance(delta, float) and delta < threshold:
+                findings.append(
+                    f"{row['key']} guest tok/s regressed {delta:.3f}% "
+                    f"(threshold {threshold:.3f}%)"
+                )
+    if fail_on_wall_tok_regression_pct is not None:
+        threshold = -abs(fail_on_wall_tok_regression_pct)
+        for row in latest:
+            delta = row.get("wall_tok_per_s_delta_pct")
+            if isinstance(delta, float) and delta < threshold:
+                findings.append(
+                    f"{row['key']} wall tok/s regressed {delta:.3f}% "
+                    f"(threshold {threshold:.3f}%)"
+                )
+    if fail_on_memory_growth_pct is not None:
+        threshold = abs(fail_on_memory_growth_pct)
+        for row in latest:
+            delta = row.get("max_memory_delta_pct")
+            if isinstance(delta, float) and delta > threshold:
+                findings.append(
+                    f"{row['key']} max memory grew {delta:.3f}% "
+                    f"(threshold {threshold:.3f}%)"
+                )
+
+    enabled_failure_gate = (
+        fail_on_empty
+        or fail_on_airgap
+        or fail_on_telemetry
+        or fail_on_tok_regression_pct is not None
+        or fail_on_wall_tok_regression_pct is not None
+        or fail_on_memory_growth_pct is not None
+    )
+    status = "fail" if findings and enabled_failure_gate else "pass"
     return {
         "generated_at": iso_now(),
         "status": status,
         "findings": findings,
+        "thresholds": {
+            "fail_on_empty": fail_on_empty,
+            "fail_on_airgap": fail_on_airgap,
+            "fail_on_telemetry": fail_on_telemetry,
+            "fail_on_tok_regression_pct": fail_on_tok_regression_pct,
+            "fail_on_wall_tok_regression_pct": fail_on_wall_tok_regression_pct,
+            "fail_on_memory_growth_pct": fail_on_memory_growth_pct,
+        },
         "trend_keys": len(grouped),
         "trend_points": len(all_points),
-        "latest": latest_rows(grouped),
+        "latest": latest,
         "trends": {
             key: [asdict(point) for point in points]
             for key, points in sorted(grouped.items())
@@ -199,6 +247,16 @@ def markdown_report(report: dict[str, object]) -> str:
         f"Trend points: {report['trend_points']}",
         "",
     ]
+    thresholds = report.get("thresholds")
+    if isinstance(thresholds, dict):
+        active_thresholds = [
+            f"{key}={format_value(value)}"
+            for key, value in thresholds.items()
+            if value not in (None, False, "")
+        ]
+        if active_thresholds:
+            lines.append("Thresholds: " + ", ".join(active_thresholds))
+            lines.append("")
     findings = report["findings"]
     assert isinstance(findings, list)
     if findings:
@@ -324,6 +382,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fail-on-empty", action="store_true")
     parser.add_argument("--fail-on-airgap", action="store_true")
     parser.add_argument("--fail-on-telemetry", action="store_true")
+    parser.add_argument(
+        "--fail-on-tok-regression-pct",
+        type=float,
+        help="Fail when latest guest tok/s falls more than this percent versus the previous point",
+    )
+    parser.add_argument(
+        "--fail-on-wall-tok-regression-pct",
+        type=float,
+        help="Fail when latest host wall-clock tok/s falls more than this percent versus the previous point",
+    )
+    parser.add_argument(
+        "--fail-on-memory-growth-pct",
+        type=float,
+        help="Fail when latest max memory grows more than this percent versus the previous point",
+    )
     return parser
 
 
@@ -332,6 +405,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.max_points_per_key is not None and args.max_points_per_key <= 0:
         print("error: --max-points-per-key must be positive", file=sys.stderr)
         return 2
+    for name in (
+        "fail_on_tok_regression_pct",
+        "fail_on_wall_tok_regression_pct",
+        "fail_on_memory_growth_pct",
+    ):
+        value = getattr(args, name)
+        if value is not None and value < 0:
+            option = "--" + name.replace("_", "-")
+            print(f"error: {option} must be non-negative", file=sys.stderr)
+            return 2
 
     inputs = args.input or [Path("bench/results")]
     summaries = bench_result_index.load_summaries(inputs)
@@ -342,6 +425,9 @@ def main(argv: list[str] | None = None) -> int:
         fail_on_empty=args.fail_on_empty,
         fail_on_airgap=args.fail_on_airgap,
         fail_on_telemetry=args.fail_on_telemetry,
+        fail_on_tok_regression_pct=args.fail_on_tok_regression_pct,
+        fail_on_wall_tok_regression_pct=args.fail_on_wall_tok_regression_pct,
+        fail_on_memory_growth_pct=args.fail_on_memory_growth_pct,
     )
     json_path = write_outputs(report, grouped, args.output_dir)
     print(json_path)

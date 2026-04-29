@@ -40,6 +40,27 @@ python3 bench/dataset_schema_audit.py \
   --fail-on-findings
 ```
 
+Run `bench/dataset_choice_audit.py` after schema validation when reviewing a
+local multiple-choice subset for option-quality issues. It flags duplicate
+choice text inside a row, choices that still carry label prefixes such as
+`A.`/`B)`, prompts that contain the correct choice text, and large choice-length
+skew:
+
+```bash
+python3 bench/dataset_choice_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_choice_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_choice_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_choice_audit_smoke_latest.csv \
+  --junit bench/results/datasets/dataset_choice_audit_smoke_latest_junit.xml \
+  --fail-on-duplicate-choices \
+  --fail-on-label-prefixes \
+  --fail-on-prompt-answer-leak \
+  --max-choice-length-ratio 100 \
+  --fail-on-length-skew \
+  --fail-on-findings
+```
+
 Use `bench/dataset_curate.py` to make a reproducible subset from locally staged
 source JSONL before packing. The curator normalizes rows through the packer, can
 filter by dataset or split, samples with a stable SHA-256 key, rejects duplicate

@@ -197,7 +197,9 @@ python3 bench/bench_artifact_manifest_ci_smoke.py
 dashboard trend files without launching QEMU. It groups comparable
 profile/model/quantization/prompt-suite points, records latest-vs-previous
 throughput and memory deltas, and writes JSON, Markdown, CSV, point-history CSV,
-and JUnit XML under `bench/dashboards/`.
+and JUnit XML under `bench/dashboards/`. Optional threshold gates fail CI when
+latest guest tok/s, host wall-clock tok/s, or max-memory trends regress beyond
+the configured percentage.
 
 ```bash
 python3 bench/bench_trend_export.py \
@@ -206,7 +208,10 @@ python3 bench/bench_trend_export.py \
   --max-points-per-key 25 \
   --fail-on-empty \
   --fail-on-airgap \
-  --fail-on-telemetry
+  --fail-on-telemetry \
+  --fail-on-tok-regression-pct 5 \
+  --fail-on-wall-tok-regression-pct 5 \
+  --fail-on-memory-growth-pct 10
 python3 bench/bench_trend_export_ci_smoke.py
 ```
 
