@@ -423,7 +423,9 @@ BENCH_RESULT: {"tokens": 128, "elapsed_us": 500000, "ttft_us": 42000, "tok_per_s
 Memory telemetry is optional. The runner normalizes `memory_bytes`,
 `max_rss_bytes`, `rss_bytes`, `peak_memory_bytes`, plus `_kib`, `_kb`, `_mib`,
 and `_mb` variants into `memory_bytes` so the perf regression dashboard can
-track peak memory alongside tok/s.
+track peak memory alongside tok/s. When token counts are present, reports also
+derive `memory_bytes_per_token` for each run and include median/max rollups in
+JSON, Markdown, summary CSV, and JUnit properties.
 
 Each measured run also records `wall_tok_per_s`, derived from host wall-clock
 elapsed time. Reports now include `host_overhead_us` and `host_overhead_pct`,
@@ -466,8 +468,8 @@ Use `--require-tokens`, `--require-tok-per-s`, `--require-memory`,
 `--max-host-overhead-us`, `--max-host-overhead-pct`,
 `--max-wall-timeout-pct`, `--min-host-child-tok-per-cpu-s`,
 `--min-tokens-per-prompt-byte`, `--require-host-child-rss`,
-`--max-host-child-rss-bytes`, and `--max-serial-output-bytes` to fail measured
-runs that omit required telemetry,
+`--max-host-child-rss-bytes`, `--max-memory-bytes-per-token`, and
+`--max-serial-output-bytes` to fail measured runs that omit required telemetry,
 produce too little work for a trustworthy throughput sample, exceed a
 host-observed latency, memory, RSS, orchestration overhead, or serial verbosity
 budget, exceed a first-token latency or timeout-budget threshold, or fall below
@@ -499,6 +501,7 @@ python3 bench/qemu_prompt_bench.py \
   --min-host-child-tok-per-cpu-s 20 \
   --require-host-child-rss \
   --max-host-child-rss-bytes 1073741824 \
+  --max-memory-bytes-per-token 16777216 \
   --max-serial-output-bytes 65536 \
   --qemu-args-file bench/fixtures/local-qemu.args \
   --hash-image \

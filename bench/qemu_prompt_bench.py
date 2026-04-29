@@ -128,6 +128,7 @@ class BenchRun:
     us_per_token: float | None
     wall_us_per_token: float | None
     memory_bytes: int | None
+    memory_bytes_per_token: float | None
     stdout_bytes: int
     stderr_bytes: int
     serial_output_bytes: int
@@ -509,6 +510,12 @@ def derived_tokens_per_prompt_byte(tokens: int | None, byte_count: int) -> float
     return tokens / byte_count
 
 
+def derived_memory_bytes_per_token(memory_bytes: int | None, tokens: int | None) -> float | None:
+    if memory_bytes is None or memory_bytes < 0 or tokens is None or tokens <= 0:
+        return None
+    return memory_bytes / tokens
+
+
 def host_overhead_pct(host_overhead_us: int, elapsed_us: int) -> float | None:
     if elapsed_us <= 0:
         return None
@@ -756,6 +763,7 @@ def run_prompt(
     us_per_token = derived_us_per_token(tokens, elapsed_us)
     wall_us_per_token = derived_us_per_token(tokens, wall_elapsed_us)
     memory_bytes = extract_memory_bytes(payload)
+    memory_bytes_per_token = derived_memory_bytes_per_token(memory_bytes, tokens)
     stdout_bytes = text_bytes(stdout)
     stderr_bytes = text_bytes(stderr)
 
@@ -794,6 +802,7 @@ def run_prompt(
         us_per_token=us_per_token,
         wall_us_per_token=wall_us_per_token,
         memory_bytes=memory_bytes,
+        memory_bytes_per_token=memory_bytes_per_token,
         stdout_bytes=stdout_bytes,
         stderr_bytes=stderr_bytes,
         serial_output_bytes=stdout_bytes + stderr_bytes,
@@ -855,6 +864,11 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
         ]
         ttft_values = [run.ttft_us for run in prompt_runs if run.ttft_us is not None]
         memory_values = [run.memory_bytes for run in prompt_runs if run.memory_bytes is not None]
+        memory_per_token_values = [
+            run.memory_bytes_per_token
+            for run in prompt_runs
+            if run.memory_bytes_per_token is not None
+        ]
         serial_output_values = [run.serial_output_bytes for run in prompt_runs]
         ok_runs = [run for run in prompt_runs if run.returncode == 0 and not run.timed_out]
         timed_out_runs = [run for run in prompt_runs if run.timed_out]
@@ -928,6 +942,12 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
                 else None,
                 "wall_us_per_token_p95": percentile(wall_us_per_token_values, 95.0),
                 "memory_bytes_max": max(memory_values) if memory_values else None,
+                "memory_bytes_per_token_median": statistics.median(memory_per_token_values)
+                if memory_per_token_values
+                else None,
+                "memory_bytes_per_token_max": max(memory_per_token_values)
+                if memory_per_token_values
+                else None,
                 "serial_output_bytes_total": sum(serial_output_values),
                 "serial_output_bytes_max": max(serial_output_values) if serial_output_values else None,
             }
@@ -1073,6 +1093,7 @@ def telemetry_findings(
     min_tokens_per_prompt_byte: float | None = None,
     require_host_child_rss: bool = False,
     max_host_child_rss_bytes: int | None = None,
+    max_memory_bytes_per_token: float | None = None,
     max_serial_output_bytes: int | None = None,
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
@@ -1190,6 +1211,18 @@ def telemetry_findings(
                     "limit": max_host_child_rss_bytes,
                 }
             )
+        if max_memory_bytes_per_token is not None and (
+            run.memory_bytes_per_token is None
+            or run.memory_bytes_per_token > max_memory_bytes_per_token
+        ):
+            findings.append(
+                {
+                    **base,
+                    "metric": "memory_bytes_per_token",
+                    "value": run.memory_bytes_per_token,
+                    "limit": max_memory_bytes_per_token,
+                }
+            )
         if max_serial_output_bytes is not None and run.serial_output_bytes > max_serial_output_bytes:
             findings.append(
                 {
@@ -1229,6 +1262,9 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
     ]
     ttft_values = [run.ttft_us for run in runs if run.ttft_us is not None]
     memory_values = [run.memory_bytes for run in runs if run.memory_bytes is not None]
+    memory_per_token_values = [
+        run.memory_bytes_per_token for run in runs if run.memory_bytes_per_token is not None
+    ]
     serial_output_values = [run.serial_output_bytes for run in runs]
     token_values = [run.tokens for run in runs if run.tokens is not None]
     prompts = sorted({run.prompt for run in runs})
@@ -1297,6 +1333,12 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
         "wall_us_per_token_p95": percentile(wall_us_per_token_values, 95.0),
         "elapsed_us_p95": percentile([float(value) for value in elapsed_values], 95.0),
         "memory_bytes_max": max(memory_values) if memory_values else None,
+        "memory_bytes_per_token_median": statistics.median(memory_per_token_values)
+        if memory_per_token_values
+        else None,
+        "memory_bytes_per_token_max": max(memory_per_token_values)
+        if memory_per_token_values
+        else None,
         "serial_output_bytes_total": sum(serial_output_values),
         "serial_output_bytes_max": max(serial_output_values) if serial_output_values else None,
     }
@@ -1347,12 +1389,12 @@ def markdown_report(report: dict[str, Any]) -> str:
             [
                 "## Suite Summary",
                 "",
-                "| Prompts | Runs | OK | Failed | OK % | Timed out | Nonzero exit | Measured prompt bytes | Total tokens | Total elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | P05 tok/s | Median tok/s | P95 tok/s | P05 wall tok/s | Median wall tok/s | P95 wall tok/s | Median prompt bytes/s | Median wall prompt bytes/s | Median tokens/prompt byte | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |",
-                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| Prompts | Runs | OK | Failed | OK % | Timed out | Nonzero exit | Measured prompt bytes | Total tokens | Total elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | P05 tok/s | Median tok/s | P95 tok/s | P05 wall tok/s | Median wall tok/s | P95 wall tok/s | Median prompt bytes/s | Median wall prompt bytes/s | Median tokens/prompt byte | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes | Median memory bytes/token | Max memory bytes/token |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
                 "| {prompts} | {runs} | {ok_runs} | {failed_runs} | {ok_run_pct} | {timed_out_runs} | {nonzero_exit_runs} | {measured_prompt_bytes_total} | {total_tokens} | {total_elapsed_us} | "
                 "{host_overhead_us_median} | {host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | {host_child_tok_per_cpu_s_median} | {host_child_peak_rss_bytes_max} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_p95} | "
                 "{wall_tok_per_s_p05} | {wall_tok_per_s_median} | {wall_tok_per_s_p95} | {prompt_bytes_per_s_median} | {wall_prompt_bytes_per_s_median} | {tokens_per_prompt_byte_median} | {us_per_token_median} | {us_per_token_p95} | "
-                "{wall_us_per_token_median} | {wall_us_per_token_p95} | {memory_bytes_max} |".format(
+                "{wall_us_per_token_median} | {wall_us_per_token_p95} | {memory_bytes_max} | {memory_bytes_per_token_median} | {memory_bytes_per_token_max} |".format(
                     **{key: format_summary_value(value) for key, value in suite.items()}
                 ),
                 "",
@@ -1374,15 +1416,15 @@ def markdown_report(report: dict[str, Any]) -> str:
         )
     if report["summaries"]:
         lines.append(
-            "| Prompt | Prompt bytes | Runs | OK | Failed | OK % | Timed out | Nonzero exit | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | Min tok/s | P05 tok/s | Median tok/s | tok/s stdev | tok/s CV % | tok/s IQR % | P05-P95 spread % | Max tok/s | P05 wall tok/s | Median wall tok/s | P95 wall tok/s | Wall tok/s IQR % | Wall P05-P95 spread % | Median prompt bytes/s | Median wall prompt bytes/s | Median tokens/prompt byte | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes |"
+            "| Prompt | Prompt bytes | Runs | OK | Failed | OK % | Timed out | Nonzero exit | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | Min tok/s | P05 tok/s | Median tok/s | tok/s stdev | tok/s CV % | tok/s IQR % | P05-P95 spread % | Max tok/s | P05 wall tok/s | Median wall tok/s | P95 wall tok/s | Wall tok/s IQR % | Wall P05-P95 spread % | Median prompt bytes/s | Median wall prompt bytes/s | Median tokens/prompt byte | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes | Median memory bytes/token | Max memory bytes/token |"
         )
-        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for summary in report["summaries"]:
             lines.append(
                 "| {prompt} | {prompt_bytes} | {runs} | {ok_runs} | {failed_runs} | {ok_run_pct} | {timed_out_runs} | {nonzero_exit_runs} | {tokens_median} | {elapsed_us_median} | "
                 "{host_overhead_us_median} | {host_overhead_pct_median} | {host_child_cpu_us_median} | {host_child_cpu_pct_median} | {host_child_tok_per_cpu_s_median} | {host_child_peak_rss_bytes_max} | {ttft_us_median} | {ttft_us_p95} | {tok_per_s_min} | {tok_per_s_p05} | {tok_per_s_median} | {tok_per_s_stdev} | {tok_per_s_cv_pct} | {tok_per_s_iqr_pct} | {tok_per_s_p05_p95_spread_pct} | "
                 "{tok_per_s_max} | {wall_tok_per_s_p05} | {wall_tok_per_s_median} | {wall_tok_per_s_p95} | {wall_tok_per_s_iqr_pct} | {wall_tok_per_s_p05_p95_spread_pct} | {prompt_bytes_per_s_median} | {wall_prompt_bytes_per_s_median} | {tokens_per_prompt_byte_median} | {us_per_token_median} | {us_per_token_p95} | "
-                "{wall_us_per_token_median} | {wall_us_per_token_p95} | {memory_bytes_max} |".format(
+                "{wall_us_per_token_median} | {wall_us_per_token_p95} | {memory_bytes_max} | {memory_bytes_per_token_median} | {memory_bytes_per_token_max} |".format(
                     **{key: format_summary_value(value) for key, value in summary.items()}
                 )
             )
@@ -1813,6 +1855,7 @@ def write_report(
     min_tokens_per_prompt_byte: float | None = None,
     require_host_child_rss: bool = False,
     max_host_child_rss_bytes: int | None = None,
+    max_memory_bytes_per_token: float | None = None,
     max_serial_output_bytes: int | None = None,
     max_launches: int | None = None,
     environment: dict[str, Any] | None = None,
@@ -1850,6 +1893,7 @@ def write_report(
         min_tokens_per_prompt_byte=min_tokens_per_prompt_byte,
         require_host_child_rss=require_host_child_rss,
         max_host_child_rss_bytes=max_host_child_rss_bytes,
+        max_memory_bytes_per_token=max_memory_bytes_per_token,
         max_serial_output_bytes=max_serial_output_bytes,
     )
     report = {
@@ -1893,6 +1937,7 @@ def write_report(
             "min_tokens_per_prompt_byte": min_tokens_per_prompt_byte,
             "require_host_child_rss": require_host_child_rss,
             "max_host_child_rss_bytes": max_host_child_rss_bytes,
+            "max_memory_bytes_per_token": max_memory_bytes_per_token,
             "max_serial_output_bytes": max_serial_output_bytes,
         },
         "telemetry_findings": telemetry,
@@ -1951,6 +1996,7 @@ def write_csv_report(runs: list[BenchRun], path: Path) -> None:
         "us_per_token",
         "wall_us_per_token",
         "memory_bytes",
+        "memory_bytes_per_token",
         "stdout_bytes",
         "stderr_bytes",
         "serial_output_bytes",
@@ -2012,6 +2058,8 @@ def write_summary_csv_report(report: dict[str, Any], path: Path) -> None:
         "wall_us_per_token_median",
         "wall_us_per_token_p95",
         "memory_bytes_max",
+        "memory_bytes_per_token_median",
+        "memory_bytes_per_token_max",
         "serial_output_bytes_total",
         "serial_output_bytes_max",
     ]
@@ -2151,6 +2199,7 @@ def write_junit_report(
                 f"wall_prompt_bytes_per_s={format_summary_value(run.wall_prompt_bytes_per_s)}\n"
                 f"us_per_token={format_summary_value(run.us_per_token)}\n"
                 f"wall_us_per_token={format_summary_value(run.wall_us_per_token)}\n"
+                f"memory_bytes_per_token={format_summary_value(run.memory_bytes_per_token)}\n"
                 f"stdout_bytes={run.stdout_bytes}\n"
                 f"stderr_bytes={run.stderr_bytes}\n"
                 f"serial_output_bytes={run.serial_output_bytes}\n"
@@ -2334,6 +2383,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail if any measured run exceeds host-observed child peak RSS bytes",
     )
     parser.add_argument(
+        "--max-memory-bytes-per-token",
+        type=float,
+        default=None,
+        help="Fail if any measured run exceeds guest-reported memory bytes per emitted token",
+    )
+    parser.add_argument(
         "--max-serial-output-bytes",
         type=int,
         default=None,
@@ -2408,6 +2463,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.max_host_child_rss_bytes is not None and args.max_host_child_rss_bytes < 0:
         print("error: --max-host-child-rss-bytes must be >= 0", file=sys.stderr)
+        return 2
+    if args.max_memory_bytes_per_token is not None and args.max_memory_bytes_per_token < 0:
+        print("error: --max-memory-bytes-per-token must be >= 0", file=sys.stderr)
         return 2
     if args.max_serial_output_bytes is not None and args.max_serial_output_bytes < 0:
         print("error: --max-serial-output-bytes must be >= 0", file=sys.stderr)
@@ -2499,6 +2557,7 @@ def main(argv: list[str] | None = None) -> int:
         min_tokens_per_prompt_byte=args.min_tokens_per_prompt_byte,
         require_host_child_rss=args.require_host_child_rss,
         max_host_child_rss_bytes=args.max_host_child_rss_bytes,
+        max_memory_bytes_per_token=args.max_memory_bytes_per_token,
         max_serial_output_bytes=args.max_serial_output_bytes,
         max_launches=args.max_launches,
         environment=host_environment(args.qemu_bin),
