@@ -1,6 +1,6 @@
 # Eval Input Audit
 
-Generated: 2026-04-28T22:17:22Z
+Generated: 2026-04-29T07:10:33Z
 Status: pass
 Dataset: smoke-eval
 Split: validation
@@ -36,6 +36,13 @@ Quantization: Q4_0
 | --- | ---: | ---: | ---: | ---: | --- |
 | holyc | 1/3 | 33.33 | 0 | 0.00 | {"4": 1} |
 | llama | 1/3 | 33.33 | 0 | 0.00 | {"4": 1} |
+
+## Input Hash Parity
+
+| Engine | Prompt matches | Prompt missing | Prompt mismatches | Choices matches | Choices missing | Choices mismatches | Input matches | Input missing | Input mismatches |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| holyc | 0 | 3 | 0 | 0 | 3 | 0 | 0 | 3 | 0 |
+| llama | 0 | 3 | 0 | 0 | 3 | 0 | 0 | 3 | 0 |
 
 ## Issues
 

@@ -968,8 +968,11 @@ answer distribution. Use `--max-majority-gold-answer-pct` to fail early when a
 gold file is too label-skewed for a useful paired comparison. It also records
 score-vector coverage and top-score ties; use `--min-score-coverage-pct` and
 `--max-top-score-tie-pct` to catch missing or ambiguous score vectors before
-running quality comparisons. The audit writes JSON, Markdown, CSV, and JUnit XML
-reports and exits non-zero when it finds errors:
+running quality comparisons. Prediction rows may also carry `prompt_sha256`,
+`choices_sha256`, and `input_sha256` either at top level or under `metadata`;
+`--require-input-hashes` fails the audit unless those hashes match the normalized
+gold prompt and choices used for comparison. The audit writes JSON, Markdown,
+CSV, and JUnit XML reports and exits non-zero when it finds errors:
 
 ```bash
 python3 bench/eval_input_audit.py \

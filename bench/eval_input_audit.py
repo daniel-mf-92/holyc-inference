@@ -3,9 +3,10 @@
 
 The audit validates local gold and prediction files before an apples-to-apples
 comparison run. It checks record-id coverage, duplicate rows, prediction ranges,
-optional dataset/split/model/quantization metadata, and writes JSON plus Markdown
-reports, CSV issue rows, and JUnit XML under bench/results. It is host-side only
-and never launches QEMU.
+optional dataset/split/model/quantization metadata, optional prompt/choice/input
+hash parity against gold rows, and writes JSON plus Markdown reports, CSV issue
+rows, and JUnit XML under bench/results. It is host-side only and never launches
+QEMU.
 """
 
 from __future__ import annotations
@@ -30,6 +31,9 @@ import eval_compare
 
 
 METADATA_KEYS = ("model", "quantization", "dataset", "split")
+PROMPT_HASH_KEYS = ("prompt_sha256", "prompt_hash", "gold_prompt_sha256")
+CHOICES_HASH_KEYS = ("choices_sha256", "choices_hash", "gold_choices_sha256")
+INPUT_HASH_KEYS = ("input_sha256", "gold_input_sha256", "prompt_choices_sha256")
 
 
 @dataclass(frozen=True)
@@ -53,6 +57,15 @@ class PredictionAudit:
     majority_prediction: str
     majority_prediction_count: int
     majority_prediction_pct: float | None
+    prompt_hash_matches: int
+    prompt_hash_mismatches: int
+    prompt_hash_missing: int
+    choices_hash_matches: int
+    choices_hash_mismatches: int
+    choices_hash_missing: int
+    input_hash_matches: int
+    input_hash_mismatches: int
+    input_hash_missing: int
     duplicate_ids: list[str]
     missing_ids: list[str]
     extra_ids: list[str]
@@ -69,6 +82,64 @@ def file_sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def text_sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def choices_sha256(choices: list[str]) -> str:
+    encoded = json.dumps(choices, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def input_sha256(gold: eval_compare.GoldCase) -> str:
+    encoded = json.dumps(
+        {
+            "prompt_sha256": text_sha256(gold.prompt),
+            "choices_sha256": choices_sha256(gold.choices),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def first_metadata_hash(row: dict[str, Any], keys: Iterable[str]) -> tuple[str | None, str | None]:
+    metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+    for key in keys:
+        value = row.get(key)
+        if value is None or str(value).strip() == "":
+            value = metadata.get(key)
+        if value is not None and str(value).strip() != "":
+            return key, str(value).strip()
+    return None, None
+
+
+def check_hash_value(
+    issues: list[Issue],
+    source_name: str,
+    row_label: str,
+    label: str,
+    found_key: str | None,
+    found_value: str | None,
+    expected_value: str,
+    require_hash: bool,
+) -> tuple[int, int, int]:
+    if found_value is None:
+        if require_hash:
+            append_issue(issues, "error", source_name, f"{row_label}: missing {label} hash metadata")
+        return 0, 0, 1
+    if found_value.lower() != expected_value.lower():
+        key_text = found_key or label
+        append_issue(
+            issues,
+            "error",
+            source_name,
+            f"{row_label}: {key_text} {found_value!r} does not match gold {label} hash {expected_value!r}",
+        )
+        return 0, 1, 0
+    return 1, 0, 0
 
 
 def sorted_counts(values: Iterable[int]) -> dict[str, int]:
@@ -132,6 +203,7 @@ def audit_predictions(
     max_majority_prediction_pct: float | None,
     min_score_coverage_pct: float | None,
     max_top_score_tie_pct: float | None,
+    require_input_hashes: bool,
     issues: list[Issue],
 ) -> PredictionAudit:
     rows = read_rows_with_issues(path, source_name, issues)
@@ -144,6 +216,15 @@ def audit_predictions(
     score_lengths: list[int] = []
     prediction_labels: list[str] = []
     metadata = collect_metadata(rows)
+    prompt_hash_matches = 0
+    prompt_hash_mismatches = 0
+    prompt_hash_missing = 0
+    choices_hash_matches = 0
+    choices_hash_mismatches = 0
+    choices_hash_missing = 0
+    input_hash_matches = 0
+    input_hash_mismatches = 0
+    input_hash_missing = 0
 
     for index, row in enumerate(rows):
         row_label = f"{path}:{index + 1}"
@@ -163,9 +244,10 @@ def audit_predictions(
             extra_ids.add(record_id)
             append_issue(issues, "error", source_name, f"prediction id {record_id!r} is not in gold")
             continue
+        gold_case = gold[record_id]
 
         try:
-            prediction = eval_compare.normalize_prediction(row, gold[record_id], path, index)
+            prediction = eval_compare.normalize_prediction(row, gold_case, path, index)
         except ValueError as exc:
             append_issue(issues, "error", source_name, str(exc))
             continue
@@ -194,6 +276,48 @@ def audit_predictions(
                 source_name,
                 f"{row_label}: split metadata {row_split!r} does not match expected {expected_split!r}",
             )
+        found_key, found_value = first_metadata_hash(row, PROMPT_HASH_KEYS)
+        matches, mismatches, missing = check_hash_value(
+            issues,
+            source_name,
+            row_label,
+            "prompt",
+            found_key,
+            found_value,
+            text_sha256(gold_case.prompt),
+            require_input_hashes,
+        )
+        prompt_hash_matches += matches
+        prompt_hash_mismatches += mismatches
+        prompt_hash_missing += missing
+        found_key, found_value = first_metadata_hash(row, CHOICES_HASH_KEYS)
+        matches, mismatches, missing = check_hash_value(
+            issues,
+            source_name,
+            row_label,
+            "choices",
+            found_key,
+            found_value,
+            choices_sha256(gold_case.choices),
+            require_input_hashes,
+        )
+        choices_hash_matches += matches
+        choices_hash_mismatches += mismatches
+        choices_hash_missing += missing
+        found_key, found_value = first_metadata_hash(row, INPUT_HASH_KEYS)
+        matches, mismatches, missing = check_hash_value(
+            issues,
+            source_name,
+            row_label,
+            "input",
+            found_key,
+            found_value,
+            input_sha256(gold_case),
+            require_input_hashes,
+        )
+        input_hash_matches += matches
+        input_hash_mismatches += mismatches
+        input_hash_missing += missing
 
     missing_ids = sorted(set(gold) - seen)
     for record_id in missing_ids:
@@ -263,6 +387,15 @@ def audit_predictions(
         majority_prediction=majority_prediction,
         majority_prediction_count=majority_prediction_count,
         majority_prediction_pct=majority_prediction_pct,
+        prompt_hash_matches=prompt_hash_matches,
+        prompt_hash_mismatches=prompt_hash_mismatches,
+        prompt_hash_missing=prompt_hash_missing,
+        choices_hash_matches=choices_hash_matches,
+        choices_hash_mismatches=choices_hash_mismatches,
+        choices_hash_missing=choices_hash_missing,
+        input_hash_matches=input_hash_matches,
+        input_hash_mismatches=input_hash_mismatches,
+        input_hash_missing=input_hash_missing,
         duplicate_ids=sorted(duplicate_ids),
         missing_ids=missing_ids,
         extra_ids=sorted(extra_ids),
@@ -355,6 +488,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         args.max_majority_prediction_pct,
         args.min_score_coverage_pct,
         args.max_top_score_tie_pct,
+        args.require_input_hashes,
         issues,
     )
     llama = audit_predictions(
@@ -368,6 +502,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         args.max_majority_prediction_pct,
         args.min_score_coverage_pct,
         args.max_top_score_tie_pct,
+        args.require_input_hashes,
         issues,
     )
     for key in ("model", "quantization"):
@@ -486,6 +621,23 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(
         [
             "",
+            "## Input Hash Parity",
+            "",
+            "| Engine | Prompt matches | Prompt missing | Prompt mismatches | Choices matches | Choices missing | Choices mismatches | Input matches | Input missing | Input mismatches |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
+    for name, audit in report["prediction_audits"].items():
+        lines.append(
+            f"| {name} | {audit['prompt_hash_matches']} | {audit['prompt_hash_missing']} | "
+            f"{audit['prompt_hash_mismatches']} | {audit['choices_hash_matches']} | "
+            f"{audit['choices_hash_missing']} | {audit['choices_hash_mismatches']} | "
+            f"{audit['input_hash_matches']} | {audit['input_hash_missing']} | "
+            f"{audit['input_hash_mismatches']} |"
+        )
+    lines.extend(
+        [
+            "",
             "## Issues",
             "",
         ]
@@ -584,6 +736,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-top-score-tie-pct",
         type=float,
         help="Fail when tied maximum scores exceed this percentage of scored prediction rows for either engine",
+    )
+    parser.add_argument(
+        "--require-input-hashes",
+        action="store_true",
+        help="Fail unless each valid prediction row carries matching prompt, choices, and combined input SHA256 metadata",
     )
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--output-stem", default="eval_input_audit_latest")

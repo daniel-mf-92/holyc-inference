@@ -49,6 +49,7 @@ class GoldCase:
     split: str
     answer_index: int
     choices: list[str]
+    prompt: str = ""
 
 
 @dataclass(frozen=True)
@@ -172,6 +173,7 @@ def load_gold(path: Path, dataset: str, split: str) -> dict[str, GoldCase]:
             split=record.split,
             answer_index=record.answer_index,
             choices=record.choices,
+            prompt=record.prompt,
         )
     return gold
 

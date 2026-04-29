@@ -48,6 +48,31 @@ def smoke_args(output_dir: Path, output_stem: str = "audit") -> list[str]:
     ]
 
 
+def write_hashed_predictions(path: Path, *, bad_prompt_hash_id: str = "") -> None:
+    gold = eval_input_audit.eval_compare.load_gold(
+        BENCH_PATH / "datasets" / "samples" / "smoke_eval.jsonl",
+        "smoke-eval",
+        "validation",
+    )
+    rows = []
+    for record_id, case in gold.items():
+        prompt_hash = eval_input_audit.text_sha256(case.prompt)
+        if record_id == bad_prompt_hash_id:
+            prompt_hash = "0" * 64
+        rows.append(
+            {
+                "id": record_id,
+                "prediction": 0,
+                "metadata": {
+                    "prompt_sha256": prompt_hash,
+                    "choices_sha256": eval_input_audit.choices_sha256(case.choices),
+                    "input_sha256": eval_input_audit.input_sha256(case),
+                },
+            }
+        )
+    path.write_text("\n".join(json.dumps(row, sort_keys=True) for row in rows) + "\n", encoding="utf-8")
+
+
 def test_smoke_eval_inputs_pass() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
@@ -72,6 +97,51 @@ def test_smoke_eval_inputs_pass() -> None:
         junit_root = ET.parse(tmp_path / "audit_junit.xml").getroot()
         assert junit_root.attrib["name"] == "holyc_eval_input_audit"
         assert junit_root.attrib["failures"] == "0"
+
+
+def test_required_input_hashes_pass_with_matching_metadata() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        holyc = tmp_path / "holyc_hashed.jsonl"
+        llama = tmp_path / "llama_hashed.jsonl"
+        write_hashed_predictions(holyc)
+        write_hashed_predictions(llama)
+
+        args = smoke_args(tmp_path, "hashes")
+        args[args.index(str(BENCH_PATH / "eval" / "samples" / "holyc_smoke_predictions.jsonl"))] = str(holyc)
+        args[args.index(str(BENCH_PATH / "eval" / "samples" / "llama_smoke_predictions.jsonl"))] = str(llama)
+        args.append("--require-input-hashes")
+        assert eval_input_audit.main(args) == 0
+
+        report = json.loads((tmp_path / "hashes.json").read_text(encoding="utf-8"))
+        for engine in ("holyc", "llama"):
+            audit = report["prediction_audits"][engine]
+            assert audit["prompt_hash_matches"] == 3
+            assert audit["choices_hash_matches"] == 3
+            assert audit["input_hash_matches"] == 3
+            assert audit["prompt_hash_missing"] == 0
+            assert audit["choices_hash_missing"] == 0
+            assert audit["input_hash_missing"] == 0
+        assert "## Input Hash Parity" in (tmp_path / "hashes.md").read_text(encoding="utf-8")
+
+
+def test_required_input_hashes_fail_on_missing_or_mismatch() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        holyc = tmp_path / "holyc_bad_hash.jsonl"
+        write_hashed_predictions(holyc, bad_prompt_hash_id="smoke-arc-1")
+
+        args = smoke_args(tmp_path, "bad_hashes")
+        args[args.index(str(BENCH_PATH / "eval" / "samples" / "holyc_smoke_predictions.jsonl"))] = str(holyc)
+        args.append("--require-input-hashes")
+        assert eval_input_audit.main(args) == 2
+
+        report = json.loads((tmp_path / "bad_hashes.json").read_text(encoding="utf-8"))
+        messages = [issue["message"] for issue in report["issues"]]
+        assert report["prediction_audits"]["holyc"]["prompt_hash_mismatches"] == 1
+        assert report["prediction_audits"]["llama"]["prompt_hash_missing"] == 3
+        assert any("prompt_sha256" in message and "does not match gold prompt hash" in message for message in messages)
+        assert any("missing prompt hash metadata" in message for message in messages)
 
 
 def test_missing_prediction_fails_with_structured_report() -> None:
@@ -179,6 +249,8 @@ def test_top_score_tie_gate_fails() -> None:
 
 if __name__ == "__main__":
     test_smoke_eval_inputs_pass()
+    test_required_input_hashes_pass_with_matching_metadata()
+    test_required_input_hashes_fail_on_missing_or_mismatch()
     test_missing_prediction_fails_with_structured_report()
     test_prediction_metadata_mismatch_fails()
     test_majority_prediction_gate_fails()

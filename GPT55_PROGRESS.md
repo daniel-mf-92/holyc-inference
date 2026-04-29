@@ -219,3 +219,4 @@
 2026-04-29T06:39:29Z | Added benchmark artifact manifest environment-drift CSV/JUnit reporting and opt-in stability gate.
 2026-04-29T06:47:12Z | Added benchmark trend recent-window stats with CSV/JSON dashboard output and smoke coverage.
 2026-04-29T06:54:05Z | Added qemu_prompt_bench guest prompt byte-count match telemetry/gating with smoke coverage and refreshed benchmark artifacts.
+2026-04-29T07:11:07Z | Added eval input prompt/choice/input hash parity telemetry and opt-in gating with smoke coverage.
