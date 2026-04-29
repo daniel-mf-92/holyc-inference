@@ -45,6 +45,27 @@ def main() -> int:
         "missing_launch_sequence_negative_finding",
     ):
         return rc
+    if rc := require(
+        qemu_prompt_bench.command_airgap_metadata(["qemu-system-x86_64", "-nic", "none"])["ok"] is True,
+        "explicit_nic_none_airgap_metadata_failed",
+    ):
+        return rc
+    missing_nic_metadata = qemu_prompt_bench.command_airgap_metadata(["qemu-system-x86_64", "-net", "none"])
+    if rc := require(missing_nic_metadata["ok"] is False, "missing_nic_none_airgap_metadata_passed"):
+        return rc
+    if rc := require(
+        "missing explicit `-nic none`" in missing_nic_metadata["violations"],
+        "missing_nic_none_airgap_violation_detail",
+    ):
+        return rc
+    nic_user_metadata = qemu_prompt_bench.command_airgap_metadata(["qemu-system-x86_64", "-nic", "user"])
+    if rc := require(nic_user_metadata["ok"] is False, "network_nic_airgap_metadata_passed"):
+        return rc
+    if rc := require(
+        "non-air-gapped `-nic user`" in nic_user_metadata["violations"],
+        "network_nic_airgap_violation_detail",
+    ):
+        return rc
 
     with tempfile.TemporaryDirectory(prefix="holyc-qemu-bench-ci-") as tmp:
         output_dir = Path(tmp) / "results"
@@ -122,6 +143,20 @@ def main() -> int:
         if rc := require(
             report["command_sha256"] == report["benchmarks"][0]["command_sha256"],
             "top_level_command_sha256_mismatch",
+        ):
+            return rc
+        if rc := require(report["command_airgap"]["ok"] is True, "command_airgap_not_ok"):
+            return rc
+        if rc := require(
+            report["command_airgap"]["explicit_nic_none"] is True,
+            "missing_command_airgap_nic_none",
+        ):
+            return rc
+        if rc := require(report["benchmarks"][0]["command_airgap_ok"] is True, "run_airgap_not_ok"):
+            return rc
+        if rc := require(
+            report["benchmarks"][0]["command_has_explicit_nic_none"] is True,
+            "run_missing_explicit_nic_none",
         ):
             return rc
         if rc := require(
@@ -238,10 +273,14 @@ def main() -> int:
             {
                 "expected_launch_sequence_sha256",
                 "observed_launch_sequence_sha256",
+                "command_airgap_ok",
+                "command_has_explicit_nic_none",
                 "serial_output_lines",
             }.issubset(launch_rows[0].keys()),
             "missing_launch_sequence_csv_columns",
         ):
+            return rc
+        if rc := require(launch_rows[0]["command_airgap_ok"] == "True", "launch_csv_airgap_not_ok"):
             return rc
         launch_jsonl_rows = [
             json.loads(line)
@@ -258,6 +297,11 @@ def main() -> int:
         if rc := require(
             launch_jsonl_rows[0]["launch_plan_sha256"] == report["launch_plan_sha256"],
             "launch_jsonl_plan_hash_mismatch",
+        ):
+            return rc
+        if rc := require(
+            launch_jsonl_rows[0]["command_airgap_ok"] is True,
+            "launch_jsonl_airgap_not_ok",
         ):
             return rc
         if rc := require(
@@ -300,8 +344,12 @@ def main() -> int:
             return rc
         if rc := require(dry_report["expected_launch_sequence_sha256"], "missing_dry_run_launch_sequence_hash"):
             return rc
+        if rc := require(dry_report["command_airgap"]["ok"] is True, "missing_dry_run_airgap_ok"):
+            return rc
         dry_csv_rows = list(csv.DictReader((dry_output_dir / "qemu_prompt_bench_dry_run_latest.csv").open(encoding="utf-8", newline="")))
         if rc := require(dry_csv_rows[0]["profile"] == "ci-airgap-smoke", "missing_dry_run_csv_profile"):
+            return rc
+        if rc := require(dry_csv_rows[0]["command_airgap_ok"] == "True", "dry_run_csv_airgap_not_ok"):
             return rc
         if rc := require(
             dry_csv_rows[0]["expected_launch_sequence_sha256"] == dry_report["expected_launch_sequence_sha256"],

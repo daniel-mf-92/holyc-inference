@@ -6,7 +6,7 @@
       <property name="profile" value="ci-airgap-smoke" />
       <property name="model" value="synthetic-smoke" />
       <property name="quantization" value="Q4_0" />
-      <property name="commit" value="2a6d550dfc92" />
+      <property name="commit" value="d3daa15c824c" />
       <property name="prompt_count" value="2" />
       <property name="planned_warmup_launches" value="2" />
       <property name="planned_measured_launches" value="4" />
@@ -16,6 +16,10 @@
       <property name="command_sha256" value="633b78c56d2f2d5c6739b10ca9b48d66a6bb83328887ac7aceabb4ab48fd1c96" />
       <property name="launch_plan_sha256" value="1984f18af8d221fea7e13bfa2403bd87662cb633f728095187b698a10b4f99c5" />
       <property name="expected_launch_sequence_sha256" value="b2700d55880665cd3be86418a939e5ca949f7df4e2ecc60705a1b3909c9f1f0d" />
+      <property name="command_airgap_ok" value="True" />
+      <property name="command_airgap_explicit_nic_none" value="True" />
+      <property name="command_airgap_legacy_net_none" value="False" />
+      <property name="command_airgap_violations" value="" />
       <property name="image_path" value="/tmp/TempleOS.synthetic.img" />
       <property name="image_exists" value="False" />
       <property name="image_size_bytes" value="-" />

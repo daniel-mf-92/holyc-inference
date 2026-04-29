@@ -537,8 +537,11 @@ launch health and token totals across phases without parsing raw run rows.
 JSON and Markdown reports also include
 host provenance for reproducibility: platform, machine, Python version, CPU
 count, QEMU binary/path, QEMU version when discoverable, and a stable SHA256
-fingerprint of the QEMU command line. Measured reports also include the same
-deterministic launch plan and launch-plan SHA256 used by dry-runs, and write
+fingerprint of the QEMU command line. Dry-run, measured, per-run, launch CSV,
+and launch JSONL artifacts also record command-level air-gap evidence:
+whether the command includes explicit `-nic none`, whether legacy `-net none`
+is present, and any detected network-device violations. Measured reports also
+include the same deterministic launch plan and launch-plan SHA256 used by dry-runs, and write
 `qemu_prompt_bench_launches_latest.csv` with one row per warmup or measured
 launch so CI can audit actual launch order against the reviewed plan. They also
 write `qemu_prompt_bench_launches_latest.jsonl` with the same ordered launch

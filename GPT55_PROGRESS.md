@@ -263,3 +263,4 @@
 2026-04-29T18:50:29Z | Added benchmark artifact manifest freshness-failure CSV export with stale-artifact smoke coverage and refreshed manifest artifacts.
 2026-04-29T18:57:20Z | Added QEMU prompt benchmark launch-level JSONL export with smoke coverage and refreshed synthetic results.
 2026-04-29T19:10:38Z | Added elapsed and wall-elapsed duration regression gates to perf dashboards with smoke coverage and refreshed artifacts.
+2026-04-29T19:37:00Z | Added QEMU prompt benchmark command-level air-gap evidence across JSON/CSV/Markdown/JUnit artifacts.

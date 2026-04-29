@@ -146,6 +146,10 @@ class BenchRun:
     failure_reason: str | None
     command: list[str]
     command_sha256: str
+    command_airgap_ok: bool
+    command_has_explicit_nic_none: bool
+    command_has_legacy_net_none: bool
+    command_airgap_violations: tuple[str, ...]
     stdout_tail: str
     stderr_tail: str
 
@@ -443,6 +447,72 @@ def parse_expected_tokens(value: Any) -> int | None:
 def is_network_device_arg(value: str) -> bool:
     lowered = value.lower()
     return any(marker in lowered for marker in NETWORK_DEVICE_MARKERS)
+
+
+def has_explicit_nic_none(args: list[str]) -> bool:
+    for index, arg in enumerate(args):
+        if arg == "-nic" and index + 1 < len(args) and args[index + 1] == "none":
+            return True
+        if arg == "-nic=none":
+            return True
+    return False
+
+
+def has_legacy_net_none(args: list[str]) -> bool:
+    for index, arg in enumerate(args):
+        if arg == "-net" and index + 1 < len(args) and args[index + 1] == "none":
+            return True
+        if arg == "-net=none":
+            return True
+    return False
+
+
+def command_airgap_violations(args: list[str]) -> list[str]:
+    violations: list[str] = []
+    if not has_explicit_nic_none(args):
+        violations.append("missing explicit `-nic none`")
+
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        next_arg = args[index + 1] if index + 1 < len(args) else ""
+
+        if arg == "-nic":
+            if next_arg != "none":
+                violations.append(f"non-air-gapped `-nic {next_arg}`")
+            index += 2
+            continue
+        if arg.startswith("-nic=") and arg != "-nic=none":
+            violations.append(f"non-air-gapped `{arg}`")
+
+        if arg == "-net":
+            if next_arg != "none":
+                violations.append(f"networking `-net {next_arg}`")
+            index += 2
+            continue
+        if arg.startswith("-net=") and arg != "-net=none":
+            violations.append(f"networking `{arg}`")
+
+        if arg == "-netdev" or arg.startswith("-netdev"):
+            violations.append(f"network backend `{arg}`")
+        if arg == "-device" and is_network_device_arg(next_arg):
+            violations.append(f"network device `{next_arg}`")
+        if arg.startswith("-device=") and is_network_device_arg(arg):
+            violations.append(f"network device `{arg}`")
+
+        index += 1
+
+    return violations
+
+
+def command_airgap_metadata(args: list[str]) -> dict[str, Any]:
+    violations = command_airgap_violations(args)
+    return {
+        "ok": not violations,
+        "explicit_nic_none": has_explicit_nic_none(args),
+        "legacy_net_none": has_legacy_net_none(args),
+        "violations": violations,
+    }
 
 
 def reject_network_args(args: list[str]) -> None:
@@ -983,6 +1053,10 @@ def run_prompt(
         failure_reason=failure_reason(returncode, timed_out),
         command=command,
         command_sha256=command_hash(command),
+        command_airgap_ok=not command_airgap_violations(command),
+        command_has_explicit_nic_none=has_explicit_nic_none(command),
+        command_has_legacy_net_none=has_legacy_net_none(command),
+        command_airgap_violations=tuple(command_airgap_violations(command)),
         stdout_tail=tail_text(stdout),
         stderr_tail=tail_text(stderr),
     )
@@ -1622,6 +1696,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Status: {report['status']}",
         f"Prompt suite: {report.get('prompt_suite', {}).get('suite_sha256', '-')}",
         f"Command SHA256: {report.get('command_sha256', '-')}",
+        f"Command air-gap OK: {format_summary_value((report.get('command_airgap') or {}).get('ok'))}",
         f"Launch plan SHA256: {report.get('launch_plan_sha256', '-')}",
         f"Expected launch sequence SHA256: {report.get('expected_launch_sequence_sha256', '-')}",
         f"Observed launch sequence SHA256: {report.get('observed_launch_sequence_sha256', '-')}",
@@ -1840,6 +1915,7 @@ def markdown_dry_run_report(report: dict[str, Any]) -> str:
         f"Commit: {format_summary_value(report.get('commit'))}",
         f"Prompt suite: {prompt_suite.get('suite_sha256', '-')}",
         f"Command SHA256: {report.get('command_sha256', '-')}",
+        f"Command air-gap OK: {format_summary_value((report.get('command_airgap') or {}).get('ok'))}",
         f"Launch plan SHA256: {report.get('launch_plan_sha256', '-')}",
         f"Expected launch sequence SHA256: {report.get('expected_launch_sequence_sha256', '-')}",
         f"Prompt count: {report['prompt_count']}",
@@ -1966,6 +2042,7 @@ def dry_run_payload(
         "status": "planned",
         "command": command,
         "command_sha256": command_hash(command),
+        "command_airgap": command_airgap_metadata(command),
         "profile": profile,
         "model": model,
         "quantization": quantization,
@@ -2045,6 +2122,10 @@ def write_dry_run_csv_report(report: dict[str, Any], path: Path) -> None:
         "quantization",
         "commit",
         "command_sha256",
+        "command_airgap_ok",
+        "command_has_explicit_nic_none",
+        "command_has_legacy_net_none",
+        "command_airgap_violations",
         "launch_plan_sha256",
         "expected_launch_sequence_sha256",
         "prompt_count",
@@ -2076,6 +2157,10 @@ def write_dry_run_csv_report(report: dict[str, Any], path: Path) -> None:
         "quantization": report.get("quantization"),
         "commit": report.get("commit"),
         "command_sha256": report.get("command_sha256"),
+        "command_airgap_ok": (report.get("command_airgap") or {}).get("ok"),
+        "command_has_explicit_nic_none": (report.get("command_airgap") or {}).get("explicit_nic_none"),
+        "command_has_legacy_net_none": (report.get("command_airgap") or {}).get("legacy_net_none"),
+        "command_airgap_violations": ";".join((report.get("command_airgap") or {}).get("violations") or []),
         "launch_plan_sha256": report.get("launch_plan_sha256"),
         "expected_launch_sequence_sha256": report.get("expected_launch_sequence_sha256"),
         "prompt_count": report.get("prompt_count"),
@@ -2109,6 +2194,9 @@ def write_dry_run_launch_csv_report(report: dict[str, Any], path: Path) -> None:
     fields = [
         "generated_at",
         "command_sha256",
+        "command_airgap_ok",
+        "command_has_explicit_nic_none",
+        "command_has_legacy_net_none",
         "launch_plan_sha256",
         "launch_index",
         "phase",
@@ -2128,6 +2216,9 @@ def write_dry_run_launch_csv_report(report: dict[str, Any], path: Path) -> None:
                 {
                     "generated_at": report.get("generated_at"),
                     "command_sha256": report.get("command_sha256"),
+                    "command_airgap_ok": (report.get("command_airgap") or {}).get("ok"),
+                    "command_has_explicit_nic_none": (report.get("command_airgap") or {}).get("explicit_nic_none"),
+                    "command_has_legacy_net_none": (report.get("command_airgap") or {}).get("legacy_net_none"),
                     "launch_plan_sha256": report.get("launch_plan_sha256"),
                     "launch_index": row.get("launch_index"),
                     "phase": row.get("phase"),
@@ -2185,6 +2276,21 @@ def write_dry_run_junit_report(report: dict[str, Any], path: Path) -> None:
             "property",
             {"name": name, "value": format_summary_value(report.get(name))},
         )
+    command_airgap = report.get("command_airgap") or {}
+    for name in ("ok", "explicit_nic_none", "legacy_net_none"):
+        ET.SubElement(
+            properties,
+            "property",
+            {"name": f"command_airgap_{name}", "value": format_summary_value(command_airgap.get(name))},
+        )
+    ET.SubElement(
+        properties,
+        "property",
+        {
+            "name": "command_airgap_violations",
+            "value": ";".join(command_airgap.get("violations") or []),
+        },
+    )
     for name in ("path", "exists", "size_bytes", "sha256"):
         ET.SubElement(
             properties,
@@ -2303,6 +2409,7 @@ def write_report(
         "image": image or {},
         "qemu_args_files": qemu_args_files or [],
         "command_sha256": command_hash(all_runs[0].command) if all_runs else command_hash([]),
+        "command_airgap": command_airgap_metadata(all_runs[0].command) if all_runs else command_airgap_metadata([]),
         "profile": all_runs[0].profile if all_runs else "",
         "model": all_runs[0].model if all_runs else "",
         "quantization": all_runs[0].quantization if all_runs else "",
@@ -2424,6 +2531,10 @@ def write_csv_report(runs: list[BenchRun], path: Path) -> None:
         "exit_class",
         "failure_reason",
         "command_sha256",
+        "command_airgap_ok",
+        "command_has_explicit_nic_none",
+        "command_has_legacy_net_none",
+        "command_airgap_violations",
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
@@ -2577,6 +2688,10 @@ def write_launch_csv_report(report: dict[str, Any], path: Path) -> None:
     fields = [
         "generated_at",
         "command_sha256",
+        "command_airgap_ok",
+        "command_has_explicit_nic_none",
+        "command_has_legacy_net_none",
+        "command_airgap_violations",
         "launch_plan_sha256",
         "expected_launch_sequence_sha256",
         "observed_launch_sequence_sha256",
@@ -2624,6 +2739,10 @@ def write_launch_csv_report(report: dict[str, Any], path: Path) -> None:
                 not in {
                     "generated_at",
                     "command_sha256",
+                    "command_airgap_ok",
+                    "command_has_explicit_nic_none",
+                    "command_has_legacy_net_none",
+                    "command_airgap_violations",
                     "launch_plan_sha256",
                     "expected_launch_sequence_sha256",
                     "observed_launch_sequence_sha256",
@@ -2633,6 +2752,10 @@ def write_launch_csv_report(report: dict[str, Any], path: Path) -> None:
                 {
                     "generated_at": report.get("generated_at"),
                     "command_sha256": report.get("command_sha256"),
+                    "command_airgap_ok": report.get("command_airgap", {}).get("ok"),
+                    "command_has_explicit_nic_none": report.get("command_airgap", {}).get("explicit_nic_none"),
+                    "command_has_legacy_net_none": report.get("command_airgap", {}).get("legacy_net_none"),
+                    "command_airgap_violations": ";".join(report.get("command_airgap", {}).get("violations") or []),
                     "launch_plan_sha256": report.get("launch_plan_sha256"),
                     "expected_launch_sequence_sha256": report.get("expected_launch_sequence_sha256"),
                     "observed_launch_sequence_sha256": report.get("observed_launch_sequence_sha256"),
@@ -2655,6 +2778,10 @@ def write_launch_jsonl_report(report: dict[str, Any], path: Path) -> None:
         "generated_at": report.get("generated_at"),
         "status": report.get("status"),
         "command_sha256": report.get("command_sha256"),
+        "command_airgap_ok": report.get("command_airgap", {}).get("ok"),
+        "command_has_explicit_nic_none": report.get("command_airgap", {}).get("explicit_nic_none"),
+        "command_has_legacy_net_none": report.get("command_airgap", {}).get("legacy_net_none"),
+        "command_airgap_violations": report.get("command_airgap", {}).get("violations") or [],
         "launch_plan_sha256": report.get("launch_plan_sha256"),
         "expected_launch_sequence_sha256": report.get("expected_launch_sequence_sha256"),
         "observed_launch_sequence_sha256": report.get("observed_launch_sequence_sha256"),
