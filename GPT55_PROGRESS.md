@@ -199,3 +199,4 @@
 2026-04-29T02:32:32Z | Added qemu_source_audit args-file reference following for JSON/YAML benchmark configs with smoke coverage and refreshed source audit artifacts.
 2026-04-29T02:49:52Z | Added qemu_prompt_bench tokens-per-prompt-byte telemetry/gate with smoke coverage and refreshed benchmark artifacts.
 2026-04-29T02:56:58Z | Added build_compare serial output byte delta telemetry and optional growth gating with refreshed comparison artifacts.
+2026-04-29T03:14:00Z | Added build_compare CI smoke gate for synthetic pass, command-drift, and OK-run coverage paths with refreshed comparison artifacts.

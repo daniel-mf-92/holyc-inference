@@ -825,6 +825,14 @@ rejects comparable build pairs whose launch command fingerprints differ, with
 details written to `build_compare_command_drift_latest.csv` and the JUnit
 report.
 
+`build_compare_ci_smoke.py` is a stdlib-only CI gate for the build comparison
+dashboard. It creates synthetic local benchmark reports, checks the pass path,
+and verifies command-drift and OK-run coverage gates without launching QEMU:
+
+```bash
+python3 bench/build_compare_ci_smoke.py
+```
+
 Example:
 
 ```bash
