@@ -60,6 +60,7 @@ def main() -> int:
             "--fail-on-duplicate-choices",
             "--fail-on-label-prefixes",
             "--fail-on-prompt-answer-leak",
+            "--fail-on-prompt-choice-leak",
             "--max-choice-length-ratio",
             "100",
             "--fail-on-length-skew",
@@ -133,6 +134,18 @@ def main() -> int:
                     ),
                     json.dumps(
                         {
+                            "id": "distractor-leak",
+                            "dataset": "choice-smoke",
+                            "split": "validation",
+                            "prompt": "The sentence mentions Venus but asks for the innermost planet.",
+                            "choices": ["Mercury", "Venus", "Earth", "Mars"],
+                            "answer_index": 0,
+                            "provenance": "synthetic bad distractor leak",
+                        },
+                        sort_keys=True,
+                    ),
+                    json.dumps(
+                        {
                             "id": "length-skew",
                             "dataset": "choice-smoke",
                             "split": "validation",
@@ -164,8 +177,11 @@ def main() -> int:
             "--fail-on-duplicate-choices",
             "--fail-on-label-prefixes",
             "--fail-on-prompt-answer-leak",
+            "--fail-on-prompt-choice-leak",
             "--min-answer-leak-chars",
             "8",
+            "--min-choice-leak-chars",
+            "5",
             "--max-choice-length-ratio",
             "8",
             "--fail-on-length-skew",
@@ -187,6 +203,7 @@ def main() -> int:
             "duplicate_choice_text",
             "choice_label_prefix",
             "prompt_contains_correct_choice",
+            "prompt_contains_choice_text",
             "choice_length_skew",
         }:
             if rc := require(expected in kinds, f"missing_{expected}"):

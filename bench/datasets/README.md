@@ -43,8 +43,8 @@ python3 bench/dataset_schema_audit.py \
 Run `bench/dataset_choice_audit.py` after schema validation when reviewing a
 local multiple-choice subset for option-quality issues. It flags duplicate
 choice text inside a row, choices that still carry label prefixes such as
-`A.`/`B)`, prompts that contain the correct choice text, and large choice-length
-skew:
+`A.`/`B)`, prompts that contain the correct choice text or any candidate choice
+text, and large choice-length skew:
 
 ```bash
 python3 bench/dataset_choice_audit.py \
@@ -56,6 +56,7 @@ python3 bench/dataset_choice_audit.py \
   --fail-on-duplicate-choices \
   --fail-on-label-prefixes \
   --fail-on-prompt-answer-leak \
+  --fail-on-prompt-choice-leak \
   --max-choice-length-ratio 100 \
   --fail-on-length-skew \
   --fail-on-findings

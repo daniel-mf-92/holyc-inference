@@ -158,6 +158,7 @@
 2026-04-28T19:05:57Z | Added build_compare QEMU command hash drift gate with CSV/JUnit/Markdown coverage.
 2026-04-28T19:12:07Z | Added eval dataset schema answer-skew telemetry/gates with smoke coverage and refreshed schema artifacts.
 2026-04-28T19:18:48Z | Added HellaSwag ctx_a/ctx_b prompt normalization for offline eval dataset packing with smoke coverage.
+2026-04-29T01:45:48Z | Added eval dataset choice-audit gate for prompts that leak any candidate choice text with smoke coverage.
 2026-04-28T19:27:43Z | Added eval_compare score-margin telemetry, CSV output, optional HolyC margin gates, and refreshed smoke artifacts.
 2026-04-28T19:36:30Z | Added expanded benchmark artifact manifest telemetry fields with refreshed manifest artifacts.
 2026-04-28T19:49:43Z | Added HCEval record span telemetry to pack manifests and inspection reports with refreshed smoke dataset artifacts.

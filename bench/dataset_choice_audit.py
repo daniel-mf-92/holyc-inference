@@ -170,9 +170,11 @@ def audit_records(
     fail_on_duplicate_choices: bool,
     fail_on_label_prefixes: bool,
     fail_on_prompt_answer_leak: bool,
+    fail_on_prompt_choice_leak: bool,
     fail_on_length_skew: bool,
     max_choice_length_ratio: float | None,
     min_answer_leak_chars: int,
+    min_choice_leak_chars: int,
     findings: list[ChoiceFinding],
 ) -> None:
     for loaded in records:
@@ -215,6 +217,22 @@ def audit_records(
                 "error" if fail_on_prompt_answer_leak else "warning",
                 "prompt_contains_correct_choice",
                 f"correct choice text appears in normalized prompt ({len(correct_choice)} chars)",
+            )
+
+        leaked_choices = [
+            {"choice_index": index, "is_answer": index == record.answer_index, "chars": len(choice_key)}
+            for index, choice in enumerate(record.choices)
+            if (choice_key := stable_text_key(choice))
+            and len(choice_key) >= min_choice_leak_chars
+            and choice_key in prompt
+        ]
+        if leaked_choices:
+            add_finding(
+                findings,
+                loaded,
+                "error" if fail_on_prompt_choice_leak else "warning",
+                "prompt_contains_choice_text",
+                json.dumps(leaked_choices, ensure_ascii=False, sort_keys=True),
             )
 
         ratio = choice_length_ratio(record.choices)
@@ -371,6 +389,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fail when the normalized prompt contains the correct choice text",
     )
+    parser.add_argument(
+        "--fail-on-prompt-choice-leak",
+        action="store_true",
+        help="Fail when the normalized prompt contains any candidate choice text",
+    )
     parser.add_argument("--fail-on-length-skew", action="store_true", help="Fail when --max-choice-length-ratio is exceeded")
     parser.add_argument(
         "--max-choice-length-ratio",
@@ -382,6 +405,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=12,
         help="Minimum normalized correct-choice chars before prompt leak detection runs",
+    )
+    parser.add_argument(
+        "--min-choice-leak-chars",
+        type=int,
+        default=12,
+        help="Minimum normalized choice chars before any-choice prompt leak detection runs",
     )
     parser.add_argument("--fail-on-findings", action="store_true", help="Exit nonzero when errors are present")
     return parser
@@ -395,6 +424,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.min_answer_leak_chars < 1:
         print("error: --min-answer-leak-chars must be at least 1", file=sys.stderr)
         return 2
+    if args.min_choice_leak_chars < 1:
+        print("error: --min-choice-leak-chars must be at least 1", file=sys.stderr)
+        return 2
 
     records, inputs, findings = load_records(args.input, args.default_dataset, args.default_split)
     audit_records(
@@ -402,9 +434,11 @@ def main(argv: list[str] | None = None) -> int:
         args.fail_on_duplicate_choices,
         args.fail_on_label_prefixes,
         args.fail_on_prompt_answer_leak,
+        args.fail_on_prompt_choice_leak,
         args.fail_on_length_skew,
         args.max_choice_length_ratio,
         args.min_answer_leak_chars,
+        args.min_choice_leak_chars,
         findings,
     )
     report = build_report(inputs, records, findings)
