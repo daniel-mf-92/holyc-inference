@@ -859,6 +859,7 @@ def detect_regressions(
     p05_tok_threshold_pct: float | None = None,
     p05_wall_tok_threshold_pct: float | None = None,
     token_drop_threshold_pct: float | None = None,
+    min_token_drop_threshold_pct: float | None = None,
     us_per_token_threshold_pct: float | None = None,
     wall_us_per_token_threshold_pct: float | None = None,
     baseline_commit: str | None = None,
@@ -1110,6 +1111,30 @@ def detect_regressions(
                         candidate_value=candidate.median_tokens,
                         delta_pct=delta_pct,
                         threshold_pct=token_drop_threshold_pct,
+                    )
+                )
+
+        if (
+            min_token_drop_threshold_pct is not None
+            and baseline.min_tokens
+            and candidate.min_tokens is not None
+        ):
+            delta_pct = (
+                (baseline.min_tokens - candidate.min_tokens)
+                * 100.0
+                / baseline.min_tokens
+            )
+            if delta_pct > min_token_drop_threshold_pct:
+                regressions.append(
+                    Regression(
+                        key=key,
+                        metric="min_tokens",
+                        baseline_commit=baseline.commit,
+                        candidate_commit=candidate.commit,
+                        baseline_value=float(baseline.min_tokens),
+                        candidate_value=float(candidate.min_tokens),
+                        delta_pct=delta_pct,
+                        threshold_pct=min_token_drop_threshold_pct,
                     )
                 )
 
@@ -1426,7 +1451,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Host overhead regressions: {len([row for row in report['regressions'] if row['metric'] == 'host_overhead_pct'])}",
         f"Host child RSS regressions: {len([row for row in report['regressions'] if row['metric'] == 'host_child_peak_rss_bytes'])}",
         f"Host child tok/CPU-s regressions: {len([row for row in report['regressions'] if row['metric'] == 'host_child_tok_per_cpu_s'])}",
-        f"Token-count regressions: {len([row for row in report['regressions'] if row['metric'] == 'tokens'])}",
+        f"Token-count regressions: {len([row for row in report['regressions'] if row['metric'] in {'tokens', 'min_tokens'}])}",
         f"Sample violations: {len(report['sample_violations'])}",
         f"Variability violations: {len(report['variability_violations'])}",
         f"Wall variability violations: {len(report['wall_variability_violations'])}",
@@ -2253,6 +2278,7 @@ def build_report(
     p05_tok_threshold_pct: float | None = None,
     p05_wall_tok_threshold_pct: float | None = None,
     token_drop_threshold_pct: float | None = None,
+    min_token_drop_threshold_pct: float | None = None,
     us_per_token_threshold_pct: float | None = None,
     wall_us_per_token_threshold_pct: float | None = None,
     min_commits_per_key: int = 1,
@@ -2282,6 +2308,7 @@ def build_report(
         p05_tok_threshold_pct=p05_tok_threshold_pct,
         p05_wall_tok_threshold_pct=p05_wall_tok_threshold_pct,
         token_drop_threshold_pct=token_drop_threshold_pct,
+        min_token_drop_threshold_pct=min_token_drop_threshold_pct,
         us_per_token_threshold_pct=us_per_token_threshold_pct,
         wall_us_per_token_threshold_pct=wall_us_per_token_threshold_pct,
         baseline_commit=baseline_commit,
@@ -2343,6 +2370,7 @@ def build_report(
             "p05_tok_regression_pct": p05_tok_threshold_pct,
             "p05_wall_tok_regression_pct": p05_wall_tok_threshold_pct,
             "token_drop_regression_pct": token_drop_threshold_pct,
+            "min_token_drop_regression_pct": min_token_drop_threshold_pct,
             "us_per_token_regression_pct": us_per_token_threshold_pct,
             "wall_us_per_token_regression_pct": wall_us_per_token_threshold_pct,
             "min_records_per_point": min_records_per_point,
@@ -2445,6 +2473,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--token-drop-regression-pct",
         type=float,
         help="Fail when median emitted token count drops by more than this percent",
+    )
+    parser.add_argument(
+        "--min-token-drop-regression-pct",
+        type=float,
+        help="Fail when minimum emitted token count drops by more than this percent",
     )
     parser.add_argument(
         "--us-per-token-regression-pct",
@@ -2564,6 +2597,7 @@ def main(argv: list[str] | None = None) -> int:
         p05_tok_threshold_pct=args.p05_tok_regression_pct,
         p05_wall_tok_threshold_pct=args.p05_wall_tok_regression_pct,
         token_drop_threshold_pct=args.token_drop_regression_pct,
+        min_token_drop_threshold_pct=args.min_token_drop_regression_pct,
         us_per_token_threshold_pct=args.us_per_token_regression_pct,
         wall_us_per_token_threshold_pct=args.wall_us_per_token_regression_pct,
         min_commits_per_key=args.min_commits_per_key,

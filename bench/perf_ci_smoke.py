@@ -443,6 +443,100 @@ def main() -> int:
             print("p05_wall_tok_regression_not_rejected=true", file=sys.stderr)
             return 1
 
+        min_token_drop_fixture = tmp_path / "min_token_drop_regression.jsonl"
+        min_token_drop_fixture.write_text(
+            "\n".join(
+                [
+                    json.dumps(
+                        {
+                            "timestamp": "2026-04-27T15:00:00Z",
+                            "commit": "token-base",
+                            "benchmark": "qemu_prompt",
+                            "profile": "ci-airgap-smoke",
+                            "model": "synthetic-smoke",
+                            "quantization": "Q4_0",
+                            "prompt": "ci-token",
+                            "tok_per_s": 100.0,
+                            "tokens": 100,
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "timestamp": "2026-04-27T15:01:00Z",
+                            "commit": "token-base",
+                            "benchmark": "qemu_prompt",
+                            "profile": "ci-airgap-smoke",
+                            "model": "synthetic-smoke",
+                            "quantization": "Q4_0",
+                            "prompt": "ci-token",
+                            "tok_per_s": 100.0,
+                            "tokens": 100,
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "timestamp": "2026-04-27T15:05:00Z",
+                            "commit": "token-head",
+                            "benchmark": "qemu_prompt",
+                            "profile": "ci-airgap-smoke",
+                            "model": "synthetic-smoke",
+                            "quantization": "Q4_0",
+                            "prompt": "ci-token",
+                            "tok_per_s": 100.0,
+                            "tokens": 100,
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "timestamp": "2026-04-27T15:06:00Z",
+                            "commit": "token-head",
+                            "benchmark": "qemu_prompt",
+                            "profile": "ci-airgap-smoke",
+                            "model": "synthetic-smoke",
+                            "quantization": "Q4_0",
+                            "prompt": "ci-token",
+                            "tok_per_s": 100.0,
+                            "tokens": 50,
+                        }
+                    ),
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        min_token_drop_command = [
+            sys.executable,
+            str(ROOT / "bench" / "perf_regression.py"),
+            "--input",
+            str(min_token_drop_fixture),
+            "--output-dir",
+            str(tmp_path / "min_token_drop_dashboard"),
+            "--min-token-drop-regression-pct",
+            "40",
+            "--fail-on-regression",
+        ]
+        completed = subprocess.run(
+            min_token_drop_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("min_token_drop_regression_not_rejected=true", file=sys.stderr)
+            return 1
+        min_token_drop_report = json.loads(
+            (tmp_path / "min_token_drop_dashboard" / "perf_regression_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        if not any(
+            regression.get("metric") == "min_tokens"
+            for regression in min_token_drop_report["regressions"]
+        ):
+            print("missing_min_token_drop_regression=true", file=sys.stderr)
+            return 1
+
         wall_variability_fixture = tmp_path / "wall_variability.jsonl"
         wall_variability_fixture.write_text(
             "\n".join(

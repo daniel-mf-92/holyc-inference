@@ -718,6 +718,7 @@ python3 bench/perf_regression.py \
   --us-per-token-regression-pct 7.5 \
   --wall-us-per-token-regression-pct 7.5 \
   --token-drop-regression-pct 5 \
+  --min-token-drop-regression-pct 25 \
   --p95-ttft-regression-pct 15 \
   --host-overhead-regression-pct 25 \
   --host-child-peak-rss-regression-pct 10 \
@@ -763,7 +764,9 @@ child peak RSS growth separately from guest-reported memory.
 child process CPU efficiency when host child CPU telemetry is available.
 `--token-drop-regression-pct`
 optionally gates drops in median emitted token count so faster runs cannot pass
-only because they generated less output. `--require-tok-per-s`,
+only because they generated less output. `--min-token-drop-regression-pct`
+applies the same check to the minimum emitted token count so one truncated
+prompt cannot hide behind a healthy median. `--require-tok-per-s`,
 `--require-wall-tok-per-s`, `--require-us-per-token`,
 `--require-wall-us-per-token`, `--require-tokens`, `--require-ttft-us`,
 `--require-host-overhead-pct`, `--require-memory`, and
@@ -969,6 +972,7 @@ python3 bench/perf_regression.py \
   --us-per-token-regression-pct 7.5 \
   --wall-us-per-token-regression-pct 7.5 \
   --token-drop-regression-pct 5 \
+  --min-token-drop-regression-pct 25 \
   --ttft-regression-pct 15 \
   --p95-ttft-regression-pct 15 \
   --host-overhead-regression-pct 25 \
