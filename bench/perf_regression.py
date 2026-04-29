@@ -234,9 +234,15 @@ class ComparisonRow:
     median_us_per_token_baseline: float | None
     median_us_per_token_candidate: float | None
     median_us_per_token_delta_pct: float | None
+    p95_us_per_token_baseline: float | None
+    p95_us_per_token_candidate: float | None
+    p95_us_per_token_delta_pct: float | None
     median_wall_us_per_token_baseline: float | None
     median_wall_us_per_token_candidate: float | None
     median_wall_us_per_token_delta_pct: float | None
+    p95_wall_us_per_token_baseline: float | None
+    p95_wall_us_per_token_candidate: float | None
+    p95_wall_us_per_token_delta_pct: float | None
     max_memory_bytes_baseline: int | None
     max_memory_bytes_candidate: int | None
     max_memory_bytes_delta_pct: float | None
@@ -991,10 +997,20 @@ def comparison_rows(
                 median_us_per_token_delta_pct=growth_delta_pct(
                     baseline.median_us_per_token, candidate.median_us_per_token
                 ),
+                p95_us_per_token_baseline=baseline.p95_us_per_token,
+                p95_us_per_token_candidate=candidate.p95_us_per_token,
+                p95_us_per_token_delta_pct=growth_delta_pct(
+                    baseline.p95_us_per_token, candidate.p95_us_per_token
+                ),
                 median_wall_us_per_token_baseline=baseline.median_wall_us_per_token,
                 median_wall_us_per_token_candidate=candidate.median_wall_us_per_token,
                 median_wall_us_per_token_delta_pct=growth_delta_pct(
                     baseline.median_wall_us_per_token, candidate.median_wall_us_per_token
+                ),
+                p95_wall_us_per_token_baseline=baseline.p95_wall_us_per_token,
+                p95_wall_us_per_token_candidate=candidate.p95_wall_us_per_token,
+                p95_wall_us_per_token_delta_pct=growth_delta_pct(
+                    baseline.p95_wall_us_per_token, candidate.p95_wall_us_per_token
                 ),
                 max_memory_bytes_baseline=baseline.max_memory_bytes,
                 max_memory_bytes_candidate=candidate.max_memory_bytes,
@@ -1126,7 +1142,9 @@ def detect_regressions(
     serial_output_threshold_pct: float | None = None,
     serial_output_per_token_threshold_pct: float | None = None,
     us_per_token_threshold_pct: float | None = None,
+    p95_us_per_token_threshold_pct: float | None = None,
     wall_us_per_token_threshold_pct: float | None = None,
+    p95_wall_us_per_token_threshold_pct: float | None = None,
     baseline_commit: str | None = None,
     candidate_commit: str | None = None,
 ) -> list[Regression]:
@@ -1258,6 +1276,30 @@ def detect_regressions(
                 )
 
         if (
+            p95_us_per_token_threshold_pct is not None
+            and baseline.p95_us_per_token
+            and candidate.p95_us_per_token is not None
+        ):
+            delta_pct = (
+                (candidate.p95_us_per_token - baseline.p95_us_per_token)
+                * 100.0
+                / baseline.p95_us_per_token
+            )
+            if delta_pct > p95_us_per_token_threshold_pct:
+                regressions.append(
+                    Regression(
+                        key=key,
+                        metric="us_per_token_p95",
+                        baseline_commit=baseline.commit,
+                        candidate_commit=candidate.commit,
+                        baseline_value=baseline.p95_us_per_token,
+                        candidate_value=candidate.p95_us_per_token,
+                        delta_pct=delta_pct,
+                        threshold_pct=p95_us_per_token_threshold_pct,
+                    )
+                )
+
+        if (
             wall_us_per_token_threshold_pct is not None
             and baseline.median_wall_us_per_token
             and candidate.median_wall_us_per_token is not None
@@ -1278,6 +1320,30 @@ def detect_regressions(
                         candidate_value=candidate.median_wall_us_per_token,
                         delta_pct=delta_pct,
                         threshold_pct=wall_us_per_token_threshold_pct,
+                    )
+                )
+
+        if (
+            p95_wall_us_per_token_threshold_pct is not None
+            and baseline.p95_wall_us_per_token
+            and candidate.p95_wall_us_per_token is not None
+        ):
+            delta_pct = (
+                (candidate.p95_wall_us_per_token - baseline.p95_wall_us_per_token)
+                * 100.0
+                / baseline.p95_wall_us_per_token
+            )
+            if delta_pct > p95_wall_us_per_token_threshold_pct:
+                regressions.append(
+                    Regression(
+                        key=key,
+                        metric="wall_us_per_token_p95",
+                        baseline_commit=baseline.commit,
+                        candidate_commit=candidate.commit,
+                        baseline_value=baseline.p95_wall_us_per_token,
+                        candidate_value=candidate.p95_wall_us_per_token,
+                        delta_pct=delta_pct,
+                        threshold_pct=p95_wall_us_per_token_threshold_pct,
                     )
                 )
 
@@ -1924,7 +1990,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Regressions: {len(report['regressions'])}",
         f"P05 throughput regressions: {len([row for row in report['regressions'] if row['metric'] == 'tok_per_s_p05'])}",
         f"P05 wall throughput regressions: {len([row for row in report['regressions'] if row['metric'] == 'wall_tok_per_s_p05'])}",
-        f"Token latency regressions: {len([row for row in report['regressions'] if row['metric'] in {'us_per_token', 'wall_us_per_token'}])}",
+        f"Token latency regressions: {len([row for row in report['regressions'] if row['metric'] in {'us_per_token', 'us_per_token_p95', 'wall_us_per_token', 'wall_us_per_token_p95'}])}",
         f"P95 TTFT regressions: {len([row for row in report['regressions'] if row['metric'] == 'ttft_us_p95'])}",
         f"Host overhead regressions: {len([row for row in report['regressions'] if row['metric'] == 'host_overhead_pct'])}",
         f"Host child RSS regressions: {len([row for row in report['regressions'] if row['metric'] == 'host_child_peak_rss_bytes'])}",
@@ -2074,16 +2140,18 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(["", "## Comparisons", ""])
     if report["comparisons"]:
         lines.append(
-            "| Key | Baseline | Candidate | Median tok/s Delta | P05 tok/s Delta | Wall tok/s Delta | P05 wall tok/s Delta | us/token Delta | Wall us/token Delta | Memory Delta | Memory/token Delta | Host RSS Delta | Host CPU Delta | P95 Host CPU Delta | Host CPU % Delta | Host tok/CPU-s Delta | Token Drop | Serial Output Delta | Serial Output/token Delta | Median TTFT Delta | P95 TTFT Delta | Host Overhead Delta |"
+            "| Key | Baseline | Candidate | Median tok/s Delta | P05 tok/s Delta | Wall tok/s Delta | P05 wall tok/s Delta | us/token Delta | P95 us/token Delta | Wall us/token Delta | P95 wall us/token Delta | Memory Delta | Memory/token Delta | Host RSS Delta | Host CPU Delta | P95 Host CPU Delta | Host CPU % Delta | Host tok/CPU-s Delta | Token Drop | Serial Output Delta | Serial Output/token Delta | Median TTFT Delta | P95 TTFT Delta | Host Overhead Delta |"
         )
-        lines.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         for comparison in report["comparisons"]:
             median_tps_delta = comparison["median_tok_per_s_delta_pct"]
             p05_tps_delta = comparison["p05_tok_per_s_delta_pct"]
             wall_tps_delta = comparison["median_wall_tok_per_s_delta_pct"]
             p05_wall_tps_delta = comparison["p05_wall_tok_per_s_delta_pct"]
             us_per_token_delta = comparison["median_us_per_token_delta_pct"]
+            p95_us_per_token_delta = comparison["p95_us_per_token_delta_pct"]
             wall_us_per_token_delta = comparison["median_wall_us_per_token_delta_pct"]
+            p95_wall_us_per_token_delta = comparison["p95_wall_us_per_token_delta_pct"]
             memory_delta = comparison["max_memory_bytes_delta_pct"]
             memory_per_token_delta = comparison["median_memory_bytes_per_token_delta_pct"]
             host_rss_delta = comparison["max_host_child_peak_rss_bytes_delta_pct"]
@@ -2106,9 +2174,19 @@ def markdown_report(report: dict[str, Any]) -> str:
             us_per_token_cell = (
                 f"{us_per_token_delta:.2f}%" if us_per_token_delta is not None else "-"
             )
+            p95_us_per_token_cell = (
+                f"{p95_us_per_token_delta:.2f}%"
+                if p95_us_per_token_delta is not None
+                else "-"
+            )
             wall_us_per_token_cell = (
                 f"{wall_us_per_token_delta:.2f}%"
                 if wall_us_per_token_delta is not None
+                else "-"
+            )
+            p95_wall_us_per_token_cell = (
+                f"{p95_wall_us_per_token_delta:.2f}%"
+                if p95_wall_us_per_token_delta is not None
                 else "-"
             )
             memory_cell = f"{memory_delta:.2f}%" if memory_delta is not None else "-"
@@ -2142,7 +2220,8 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"| {comparison['key']} | {comparison['baseline_commit']} | "
                 f"{comparison['candidate_commit']} | {median_tps_cell} | {p05_tps_cell} | "
                 f"{wall_tps_cell} | {p05_wall_tps_cell} | "
-                f"{us_per_token_cell} | {wall_us_per_token_cell} | "
+                f"{us_per_token_cell} | {p95_us_per_token_cell} | "
+                f"{wall_us_per_token_cell} | {p95_wall_us_per_token_cell} | "
                 f"{memory_cell} | {memory_per_token_cell} | {host_rss_cell} | {host_cpu_cell} | {p95_host_cpu_cell} | "
                 f"{host_cpu_pct_cell} | {host_tok_cpu_cell} | {token_cell} | "
                 f"{serial_cell} | {serial_per_token_cell} | {ttft_cell} | "
@@ -2810,9 +2889,15 @@ def write_dashboard_outputs(report: dict[str, Any], output_dir: Path) -> None:
             "median_us_per_token_baseline",
             "median_us_per_token_candidate",
             "median_us_per_token_delta_pct",
+            "p95_us_per_token_baseline",
+            "p95_us_per_token_candidate",
+            "p95_us_per_token_delta_pct",
             "median_wall_us_per_token_baseline",
             "median_wall_us_per_token_candidate",
             "median_wall_us_per_token_delta_pct",
+            "p95_wall_us_per_token_baseline",
+            "p95_wall_us_per_token_candidate",
+            "p95_wall_us_per_token_delta_pct",
             "max_memory_bytes_baseline",
             "max_memory_bytes_candidate",
             "max_memory_bytes_delta_pct",
@@ -2964,7 +3049,9 @@ def build_report(
     serial_output_threshold_pct: float | None = None,
     serial_output_per_token_threshold_pct: float | None = None,
     us_per_token_threshold_pct: float | None = None,
+    p95_us_per_token_threshold_pct: float | None = None,
     wall_us_per_token_threshold_pct: float | None = None,
+    p95_wall_us_per_token_threshold_pct: float | None = None,
     min_commits_per_key: int = 1,
     require_tok_per_s: bool = False,
     require_wall_tok_per_s: bool = False,
@@ -3010,7 +3097,9 @@ def build_report(
         serial_output_threshold_pct=serial_output_threshold_pct,
         serial_output_per_token_threshold_pct=serial_output_per_token_threshold_pct,
         us_per_token_threshold_pct=us_per_token_threshold_pct,
+        p95_us_per_token_threshold_pct=p95_us_per_token_threshold_pct,
         wall_us_per_token_threshold_pct=wall_us_per_token_threshold_pct,
+        p95_wall_us_per_token_threshold_pct=p95_wall_us_per_token_threshold_pct,
         baseline_commit=baseline_commit,
         candidate_commit=candidate_commit,
     )
@@ -3092,7 +3181,9 @@ def build_report(
             "serial_output_regression_pct": serial_output_threshold_pct,
             "serial_output_per_token_regression_pct": serial_output_per_token_threshold_pct,
             "us_per_token_regression_pct": us_per_token_threshold_pct,
+            "p95_us_per_token_regression_pct": p95_us_per_token_threshold_pct,
             "wall_us_per_token_regression_pct": wall_us_per_token_threshold_pct,
+            "p95_wall_us_per_token_regression_pct": p95_wall_us_per_token_threshold_pct,
             "min_records_per_point": min_records_per_point,
             "max_tok_cv_pct": max_tok_cv_pct,
             "max_wall_tok_cv_pct": max_wall_tok_cv_pct,
@@ -3248,9 +3339,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail when median guest microseconds/token increases by more than this percent",
     )
     parser.add_argument(
+        "--p95-us-per-token-regression-pct",
+        type=float,
+        help="Fail when P95 guest microseconds/token increases by more than this percent",
+    )
+    parser.add_argument(
         "--wall-us-per-token-regression-pct",
         type=float,
         help="Fail when median host wall-clock microseconds/token increases by more than this percent",
+    )
+    parser.add_argument(
+        "--p95-wall-us-per-token-regression-pct",
+        type=float,
+        help="Fail when P95 host wall-clock microseconds/token increases by more than this percent",
     )
     parser.add_argument("--baseline-commit", help="Commit SHA/name to use as the comparison baseline")
     parser.add_argument("--candidate-commit", help="Commit SHA/name to compare against the baseline")
@@ -3418,7 +3519,9 @@ def main(argv: list[str] | None = None) -> int:
         serial_output_threshold_pct=args.serial_output_regression_pct,
         serial_output_per_token_threshold_pct=args.serial_output_per_token_regression_pct,
         us_per_token_threshold_pct=args.us_per_token_regression_pct,
+        p95_us_per_token_threshold_pct=args.p95_us_per_token_regression_pct,
         wall_us_per_token_threshold_pct=args.wall_us_per_token_regression_pct,
+        p95_wall_us_per_token_threshold_pct=args.p95_wall_us_per_token_regression_pct,
         min_commits_per_key=args.min_commits_per_key,
         require_tok_per_s=args.require_tok_per_s,
         require_wall_tok_per_s=args.require_wall_tok_per_s,

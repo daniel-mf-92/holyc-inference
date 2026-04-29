@@ -230,3 +230,4 @@
 2026-04-29T09:00:43Z | Added benchmark trend command/launch-plan/environment drift reporting and opt-in gates with smoke coverage.
 2026-04-29T09:10:20Z | Added benchmark result index dry-run coverage JUnit failures with smoke coverage and refreshed index artifacts.
 2026-04-29T09:17:57Z | Added benchmark trend absolute latest tok/s floor gates with smoke coverage and refreshed dashboard artifacts.
+2026-04-29T09:28:06Z | Added perf regression P95 guest/wall token-latency gates with smoke coverage and refreshed dashboards.

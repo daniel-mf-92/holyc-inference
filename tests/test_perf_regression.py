@@ -150,6 +150,89 @@ def test_detects_optional_serial_output_per_token_regressions(tmp_path: Path) ->
     assert report["telemetry_coverage_violations"] == []
 
 
+def test_detects_optional_p95_token_latency_regressions(tmp_path: Path) -> None:
+    result = tmp_path / "perf.jsonl"
+    write_jsonl(
+        result,
+        [
+            {
+                "timestamp": "2026-04-27T10:00:00Z",
+                "commit": "base",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "us_per_token": 100.0,
+                "wall_us_per_token": 200.0,
+            },
+            {
+                "timestamp": "2026-04-27T10:01:00Z",
+                "commit": "base",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "us_per_token": 110.0,
+                "wall_us_per_token": 210.0,
+            },
+            {
+                "timestamp": "2026-04-27T10:02:00Z",
+                "commit": "base",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "us_per_token": 120.0,
+                "wall_us_per_token": 220.0,
+            },
+            {
+                "timestamp": "2026-04-27T11:00:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "us_per_token": 100.0,
+                "wall_us_per_token": 200.0,
+            },
+            {
+                "timestamp": "2026-04-27T11:01:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "us_per_token": 110.0,
+                "wall_us_per_token": 210.0,
+            },
+            {
+                "timestamp": "2026-04-27T11:02:00Z",
+                "commit": "head",
+                "benchmark": "decode",
+                "profile": "secure-local",
+                "quantization": "Q4_0",
+                "us_per_token": 180.0,
+                "wall_us_per_token": 360.0,
+            },
+        ],
+    )
+
+    records = perf_regression.load_records([result])
+    report = perf_regression.build_report(
+        records,
+        100.0,
+        100.0,
+        p95_us_per_token_threshold_pct=20.0,
+        p95_wall_us_per_token_threshold_pct=20.0,
+    )
+
+    assert report["status"] == "fail"
+    assert report["thresholds"]["p95_us_per_token_regression_pct"] == 20.0
+    assert report["thresholds"]["p95_wall_us_per_token_regression_pct"] == 20.0
+    assert [regression["metric"] for regression in report["regressions"]] == [
+        "us_per_token_p95",
+        "wall_us_per_token_p95",
+    ]
+    assert report["comparisons"][0]["p95_us_per_token_delta_pct"] > 20.0
+    assert report["comparisons"][0]["p95_wall_us_per_token_delta_pct"] > 20.0
+    assert "Token latency regressions: 2" in perf_regression.markdown_report(report)
+
+
 def test_detects_optional_wall_tok_per_s_regressions(tmp_path: Path) -> None:
     result = tmp_path / "perf.jsonl"
     write_jsonl(
@@ -594,9 +677,15 @@ def test_report_includes_baseline_candidate_comparison_rows() -> None:
             "median_us_per_token_baseline": None,
             "median_us_per_token_candidate": None,
             "median_us_per_token_delta_pct": None,
+            "p95_us_per_token_baseline": None,
+            "p95_us_per_token_candidate": None,
+            "p95_us_per_token_delta_pct": None,
             "median_wall_us_per_token_baseline": None,
             "median_wall_us_per_token_candidate": None,
             "median_wall_us_per_token_delta_pct": None,
+            "p95_wall_us_per_token_baseline": None,
+            "p95_wall_us_per_token_candidate": None,
+            "p95_wall_us_per_token_delta_pct": None,
             "max_memory_bytes_baseline": 1000,
             "max_memory_bytes_candidate": 1100,
             "max_memory_bytes_delta_pct": 10.0,

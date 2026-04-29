@@ -1132,7 +1132,7 @@ python3 bench/perf_regression.py --input bench/results --output-dir bench/dashbo
 ```
 
 CI can fail on median throughput, low-tail guest or host wall-clock throughput,
-guest/wall microseconds per token, emitted-token drops, median or P95
+median or P95 guest/wall microseconds per token, emitted-token drops, median or P95
 first-token latency, QEMU host overhead, guest memory, or host child peak RSS
 or tok/CPU-second regressions with:
 
@@ -1144,7 +1144,9 @@ python3 bench/perf_regression.py \
   --wall-tok-regression-pct 7.5 \
   --p05-wall-tok-regression-pct 7.5 \
   --us-per-token-regression-pct 7.5 \
+  --p95-us-per-token-regression-pct 7.5 \
   --wall-us-per-token-regression-pct 7.5 \
+  --p95-wall-us-per-token-regression-pct 7.5 \
   --token-drop-regression-pct 5 \
   --min-token-drop-regression-pct 25 \
   --serial-output-regression-pct 25 \
