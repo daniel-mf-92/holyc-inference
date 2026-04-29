@@ -253,7 +253,8 @@ gates fail CI when latest guest tok/s, host wall-clock tok/s, or max-memory
 trends regress beyond the configured percentage, or when a comparable trend key
 has too little retained history for a regression decision. Use `--window-points`
 to tune the per-key recent-window rows written to
-`bench_trend_export_windows_latest.csv`.
+`bench_trend_export_windows_latest.csv`; window gates compare the first retained
+point in that recent window against the latest point.
 
 ```bash
 python3 bench/bench_trend_export.py \
@@ -267,7 +268,10 @@ python3 bench/bench_trend_export.py \
   --min-points-per-key 2 \
   --fail-on-tok-regression-pct 5 \
   --fail-on-wall-tok-regression-pct 5 \
-  --fail-on-memory-growth-pct 10
+  --fail-on-memory-growth-pct 10 \
+  --fail-on-window-tok-regression-pct 5 \
+  --fail-on-window-wall-tok-regression-pct 5 \
+  --fail-on-window-memory-growth-pct 10
 python3 bench/bench_trend_export_ci_smoke.py
 ```
 

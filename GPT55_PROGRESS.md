@@ -221,3 +221,5 @@
 2026-04-29T06:54:05Z | Added qemu_prompt_bench guest prompt byte-count match telemetry/gating with smoke coverage and refreshed benchmark artifacts.
 2026-04-29T07:11:07Z | Added eval input prompt/choice/input hash parity telemetry and opt-in gating with smoke coverage.
 2026-04-29T07:20:48Z | Added HCEval normalized JSONL export with prompt/choice/input hashes and dataset smoke coverage.
+2026-04-29T07:33:16Z | Added benchmark trend recent-window regression gates with smoke coverage and refreshed dashboard artifacts.
+2026-04-29T07:39:49Z | Added offline eval dataset fingerprint manifests with prompt/choice/input hashes and smoke coverage.

@@ -64,6 +64,11 @@ def main() -> int:
         provenance_md = datasets_dir / "dataset_provenance_audit_latest.md"
         provenance_csv = datasets_dir / "dataset_provenance_audit_latest.csv"
         provenance_junit = datasets_dir / "dataset_provenance_audit_junit_latest.xml"
+        fingerprint_json = datasets_dir / "dataset_fingerprint_smoke_latest.json"
+        fingerprint_jsonl = datasets_dir / "dataset_fingerprint_smoke_latest.jsonl"
+        fingerprint_csv = datasets_dir / "dataset_fingerprint_smoke_latest.csv"
+        fingerprint_md = datasets_dir / "dataset_fingerprint_smoke_latest.md"
+        fingerprint_junit = datasets_dir / "dataset_fingerprint_smoke_latest_junit.xml"
 
         sample_lines = SAMPLE.read_text(encoding="utf-8").splitlines()
         curated_source.parent.mkdir(parents=True, exist_ok=True)
@@ -145,6 +150,66 @@ def main() -> int:
         if rc := require(schema_root.attrib.get("name") == "holyc_dataset_schema_audit", "missing_schema_junit"):
             return rc
         if rc := require(schema_root.attrib.get("failures") == "0", "unexpected_schema_junit_failures"):
+            return rc
+
+        fingerprint_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_fingerprint.py"),
+            "--input",
+            str(SAMPLE),
+            "--output",
+            str(fingerprint_json),
+            "--jsonl",
+            str(fingerprint_jsonl),
+            "--csv",
+            str(fingerprint_csv),
+            "--markdown",
+            str(fingerprint_md),
+            "--junit",
+            str(fingerprint_junit),
+            "--fail-on-duplicate-ids",
+            "--fail-on-conflicting-input-answers",
+            "--fail-on-findings",
+        ]
+        completed = run_command(fingerprint_command)
+        if completed.returncode != 0:
+            return completed.returncode
+
+        fingerprint_report = json.loads(fingerprint_json.read_text(encoding="utf-8"))
+        if rc := require(fingerprint_report["status"] == "pass", "unexpected_fingerprint_status"):
+            return rc
+        if rc := require(fingerprint_report["record_count"] == 3, "unexpected_fingerprint_record_count"):
+            return rc
+        if rc := require(
+            fingerprint_report["choice_count_histogram"] == {"4": 3},
+            "unexpected_fingerprint_choice_histogram",
+        ):
+            return rc
+        if rc := require(
+            all(
+                len(row["prompt_sha256"]) == 64
+                and len(row["choices_sha256"]) == 64
+                and len(row["input_sha256"]) == 64
+                for row in fingerprint_report["fingerprints"]
+            ),
+            "missing_fingerprint_hashes",
+        ):
+            return rc
+        if rc := require(
+            "Eval Dataset Fingerprints" in fingerprint_md.read_text(encoding="utf-8"),
+            "missing_fingerprint_markdown",
+        ):
+            return rc
+        fingerprint_root = ET.parse(fingerprint_junit).getroot()
+        if rc := require(
+            fingerprint_root.attrib.get("name") == "holyc_dataset_fingerprint",
+            "missing_fingerprint_junit",
+        ):
+            return rc
+        if rc := require(
+            fingerprint_root.attrib.get("failures") == "0",
+            "unexpected_fingerprint_junit_failures",
+        ):
             return rc
 
         curate_command = [

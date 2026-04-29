@@ -138,6 +138,12 @@ def main() -> int:
             "10",
             "--fail-on-memory-growth-pct",
             "10",
+            "--fail-on-window-tok-regression-pct",
+            "10",
+            "--fail-on-window-wall-tok-regression-pct",
+            "10",
+            "--fail-on-window-memory-growth-pct",
+            "10",
             "--window-points",
             "2",
         ]
@@ -193,6 +199,9 @@ def main() -> int:
             return 1
         if thresholds["window_points"] != 2:
             print("missing_window_points_threshold=true", file=sys.stderr)
+            return 1
+        if thresholds["fail_on_window_tok_regression_pct"] != 10.0:
+            print("missing_window_tok_threshold=true", file=sys.stderr)
             return 1
         markdown = (output_dir / "bench_trend_export_latest.md").read_text(encoding="utf-8")
         if "Benchmark Trend Export" not in markdown:
@@ -336,6 +345,70 @@ def main() -> int:
         sparse_findings = "\n".join(sparse_report["findings"])
         if "below minimum 2" not in sparse_findings:
             print("missing_sparse_history_finding=true", file=sys.stderr)
+            return 1
+
+        window_regression_dir = tmp_path / "window_regression_results"
+        window_regression_dir.mkdir()
+        write_report(
+            window_regression_dir / "qemu_prompt_bench_base.json",
+            commit="window-base",
+            generated_at="2026-04-27T13:00:00Z",
+            tok_per_s=100.0,
+            memory=64_000_000,
+        )
+        write_report(
+            window_regression_dir / "qemu_prompt_bench_mid.json",
+            commit="window-mid",
+            generated_at="2026-04-27T13:05:00Z",
+            tok_per_s=99.0,
+            memory=65_000_000,
+        )
+        write_report(
+            window_regression_dir / "qemu_prompt_bench_head.json",
+            commit="window-head",
+            generated_at="2026-04-27T13:10:00Z",
+            tok_per_s=94.0,
+            memory=72_000_000,
+        )
+        window_regression_completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "bench" / "bench_trend_export.py"),
+                "--input",
+                str(window_regression_dir),
+                "--output-dir",
+                str(tmp_path / "window_regression_dashboards"),
+                "--window-points",
+                "3",
+                "--fail-on-window-tok-regression-pct",
+                "5",
+                "--fail-on-window-wall-tok-regression-pct",
+                "5",
+                "--fail-on-window-memory-growth-pct",
+                "10",
+            ],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if window_regression_completed.returncode == 0:
+            print("window_trend_regression_not_rejected=true", file=sys.stderr)
+            return 1
+        window_regression_report = json.loads(
+            (tmp_path / "window_regression_dashboards" / "bench_trend_export_latest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        window_findings = "\n".join(window_regression_report["findings"])
+        if "recent-window guest tok/s regressed" not in window_findings:
+            print("missing_window_guest_tok_regression_finding=true", file=sys.stderr)
+            return 1
+        if "recent-window wall tok/s regressed" not in window_findings:
+            print("missing_window_wall_tok_regression_finding=true", file=sys.stderr)
+            return 1
+        if "recent-window max memory grew" not in window_findings:
+            print("missing_window_memory_growth_finding=true", file=sys.stderr)
             return 1
 
     return 0

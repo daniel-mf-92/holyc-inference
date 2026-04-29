@@ -64,6 +64,24 @@ python3 bench/dataset_choice_audit.py \
   --fail-on-findings
 ```
 
+Run `bench/dataset_fingerprint.py` when a curated JSONL needs stable prompt,
+choice, and prompt+choice input hashes before packing or before collecting
+HolyC/llama.cpp predictions. The hashes match the metadata expected by
+`bench/eval_input_audit.py`:
+
+```bash
+python3 bench/dataset_fingerprint.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_fingerprint_smoke_latest.json \
+  --jsonl bench/results/datasets/dataset_fingerprint_smoke_latest.jsonl \
+  --csv bench/results/datasets/dataset_fingerprint_smoke_latest.csv \
+  --markdown bench/results/datasets/dataset_fingerprint_smoke_latest.md \
+  --junit bench/results/datasets/dataset_fingerprint_smoke_latest_junit.xml \
+  --fail-on-duplicate-ids \
+  --fail-on-conflicting-input-answers \
+  --fail-on-findings
+```
+
 Use `bench/dataset_curate.py` to make a reproducible subset from locally staged
 source JSONL before packing. The curator normalizes rows through the packer, can
 filter by dataset or split, samples with a stable SHA-256 key, rejects duplicate

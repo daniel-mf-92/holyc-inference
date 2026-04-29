@@ -230,6 +230,9 @@ def build_report(
     fail_on_tok_regression_pct: float | None,
     fail_on_wall_tok_regression_pct: float | None,
     fail_on_memory_growth_pct: float | None,
+    fail_on_window_tok_regression_pct: float | None,
+    fail_on_window_wall_tok_regression_pct: float | None,
+    fail_on_window_memory_growth_pct: float | None,
 ) -> dict[str, object]:
     all_points = [point for points in grouped.values() for point in points]
     latest = latest_rows(grouped)
@@ -279,6 +282,33 @@ def build_report(
                     f"{row['key']} max memory grew {delta:.3f}% "
                     f"(threshold {threshold:.3f}%)"
                 )
+    if fail_on_window_tok_regression_pct is not None:
+        threshold = -abs(fail_on_window_tok_regression_pct)
+        for row in windows:
+            delta = row.get("guest_tok_per_s_delta_pct")
+            if isinstance(delta, float) and delta < threshold:
+                findings.append(
+                    f"{row['key']} recent-window guest tok/s regressed {delta:.3f}% "
+                    f"(threshold {threshold:.3f}%)"
+                )
+    if fail_on_window_wall_tok_regression_pct is not None:
+        threshold = -abs(fail_on_window_wall_tok_regression_pct)
+        for row in windows:
+            delta = row.get("wall_tok_per_s_delta_pct")
+            if isinstance(delta, float) and delta < threshold:
+                findings.append(
+                    f"{row['key']} recent-window wall tok/s regressed {delta:.3f}% "
+                    f"(threshold {threshold:.3f}%)"
+                )
+    if fail_on_window_memory_growth_pct is not None:
+        threshold = abs(fail_on_window_memory_growth_pct)
+        for row in windows:
+            delta = row.get("max_memory_delta_pct")
+            if isinstance(delta, float) and delta > threshold:
+                findings.append(
+                    f"{row['key']} recent-window max memory grew {delta:.3f}% "
+                    f"(threshold {threshold:.3f}%)"
+                )
 
     enabled_failure_gate = (
         fail_on_empty
@@ -288,6 +318,9 @@ def build_report(
         or fail_on_tok_regression_pct is not None
         or fail_on_wall_tok_regression_pct is not None
         or fail_on_memory_growth_pct is not None
+        or fail_on_window_tok_regression_pct is not None
+        or fail_on_window_wall_tok_regression_pct is not None
+        or fail_on_window_memory_growth_pct is not None
     )
     status = "fail" if findings and enabled_failure_gate else "pass"
     return {
@@ -302,6 +335,9 @@ def build_report(
             "fail_on_tok_regression_pct": fail_on_tok_regression_pct,
             "fail_on_wall_tok_regression_pct": fail_on_wall_tok_regression_pct,
             "fail_on_memory_growth_pct": fail_on_memory_growth_pct,
+            "fail_on_window_tok_regression_pct": fail_on_window_tok_regression_pct,
+            "fail_on_window_wall_tok_regression_pct": fail_on_window_wall_tok_regression_pct,
+            "fail_on_window_memory_growth_pct": fail_on_window_memory_growth_pct,
             "window_points": window_points,
         },
         "trend_keys": len(grouped),
@@ -534,6 +570,21 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         help="Fail when latest max memory grows more than this percent versus the previous point",
     )
+    parser.add_argument(
+        "--fail-on-window-tok-regression-pct",
+        type=float,
+        help="Fail when recent-window guest tok/s falls more than this percent from window start to latest point",
+    )
+    parser.add_argument(
+        "--fail-on-window-wall-tok-regression-pct",
+        type=float,
+        help="Fail when recent-window host wall-clock tok/s falls more than this percent from window start to latest point",
+    )
+    parser.add_argument(
+        "--fail-on-window-memory-growth-pct",
+        type=float,
+        help="Fail when recent-window max memory grows more than this percent from window start to latest point",
+    )
     return parser
 
 
@@ -552,6 +603,9 @@ def main(argv: list[str] | None = None) -> int:
         "fail_on_tok_regression_pct",
         "fail_on_wall_tok_regression_pct",
         "fail_on_memory_growth_pct",
+        "fail_on_window_tok_regression_pct",
+        "fail_on_window_wall_tok_regression_pct",
+        "fail_on_window_memory_growth_pct",
     ):
         value = getattr(args, name)
         if value is not None and value < 0:
@@ -573,6 +627,9 @@ def main(argv: list[str] | None = None) -> int:
         fail_on_tok_regression_pct=args.fail_on_tok_regression_pct,
         fail_on_wall_tok_regression_pct=args.fail_on_wall_tok_regression_pct,
         fail_on_memory_growth_pct=args.fail_on_memory_growth_pct,
+        fail_on_window_tok_regression_pct=args.fail_on_window_tok_regression_pct,
+        fail_on_window_wall_tok_regression_pct=args.fail_on_window_wall_tok_regression_pct,
+        fail_on_window_memory_growth_pct=args.fail_on_window_memory_growth_pct,
     )
     json_path = write_outputs(report, grouped, args.output_dir)
     print(json_path)
