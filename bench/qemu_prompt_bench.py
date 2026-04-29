@@ -98,6 +98,8 @@ class BenchRun:
     profile: str
     model: str
     quantization: str
+    phase: str
+    launch_index: int
     prompt: str
     prompt_sha256: str
     prompt_bytes: int
@@ -220,12 +222,13 @@ def dry_run_launch_plan(cases: list[PromptCase], *, warmup: int, repeat: int) ->
     plan: list[dict[str, Any]] = []
     launch_index = 1
     for phase, iterations in (("warmup", warmup), ("measured", repeat)):
-        for case in cases:
+        for prompt_index, case in enumerate(cases, 1):
             for iteration in range(1, iterations + 1):
                 plan.append(
                     {
                         "launch_index": launch_index,
                         "phase": phase,
+                        "prompt_index": prompt_index,
                         "prompt_id": case.prompt_id,
                         "prompt_sha256": prompt_hash(case.prompt),
                         "prompt_bytes": prompt_bytes(case.prompt),
@@ -700,6 +703,9 @@ def run_prompt(
     prompt_case: PromptCase,
     timeout: float,
     metadata: dict[str, str],
+    *,
+    phase: str,
+    launch_index: int,
     iteration: int = 1,
 ) -> BenchRun:
     started = time.monotonic_ns()
@@ -750,6 +756,8 @@ def run_prompt(
         profile=metadata["profile"],
         model=metadata["model"],
         quantization=metadata["quantization"],
+        phase=phase,
+        launch_index=launch_index,
         prompt=prompt_case.prompt_id,
         prompt_sha256=prompt_hash(prompt_case.prompt),
         prompt_bytes=prompt_byte_count,
@@ -1060,6 +1068,7 @@ def telemetry_findings(
     for run in runs:
         base = {
             "scope": "measured_run",
+            "launch_index": run.launch_index,
             "prompt": run.prompt,
             "iteration": run.iteration,
         }
@@ -1286,6 +1295,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Status: {report['status']}",
         f"Prompt suite: {report.get('prompt_suite', {}).get('suite_sha256', '-')}",
         f"Command SHA256: {report.get('command_sha256', '-')}",
+        f"Launch plan SHA256: {report.get('launch_plan_sha256', '-')}",
         f"Launch budget: {format_summary_value(report.get('max_launches'))}",
         f"Total launches: {format_summary_value(report.get('planned_total_launches'))}",
         f"Warmup runs: {len(report['warmups'])}",
@@ -1394,13 +1404,13 @@ def markdown_report(report: dict[str, Any]) -> str:
                 "",
                 "## Telemetry Gate Findings",
                 "",
-                "| Scope | Prompt | Iteration | Metric | Value | Limit |",
-                "| --- | --- | ---: | --- | ---: | --- |",
+                "| Scope | Launch | Prompt | Iteration | Metric | Value | Limit |",
+                "| --- | ---: | --- | ---: | --- | ---: | --- |",
             ]
         )
         for finding in report["telemetry_findings"]:
             lines.append(
-                "| {scope} | {prompt} | {iteration} | {metric} | {value} | {limit} |".format(
+                "| {scope} | {launch_index} | {prompt} | {iteration} | {metric} | {value} | {limit} |".format(
                     **{key: format_summary_value(value) for key, value in finding.items()}
                 )
             )
@@ -1491,15 +1501,16 @@ def markdown_dry_run_report(report: dict[str, Any]) -> str:
                 "",
                 "## Launch Plan",
                 "",
-                "| Launch | Phase | Prompt | Iteration | Prompt bytes | Prompt SHA256 |",
-                "| ---: | --- | --- | ---: | ---: | --- |",
+                "| Launch | Phase | Prompt index | Prompt | Iteration | Prompt bytes | Prompt SHA256 |",
+                "| ---: | --- | ---: | --- | ---: | ---: | --- |",
             ]
         )
         for row in launch_plan:
             lines.append(
-                "| {launch_index} | {phase} | {prompt_id} | {iteration} | {prompt_bytes} | {prompt_sha256} |".format(
+                "| {launch_index} | {phase} | {prompt_index} | {prompt_id} | {iteration} | {prompt_bytes} | {prompt_sha256} |".format(
                     launch_index=format_summary_value(row.get("launch_index")),
                     phase=format_summary_value(row.get("phase")),
+                    prompt_index=format_summary_value(row.get("prompt_index")),
                     prompt_id=format_summary_value(row.get("prompt_id")),
                     iteration=format_summary_value(row.get("iteration")),
                     prompt_bytes=format_summary_value(row.get("prompt_bytes")),
@@ -1670,6 +1681,7 @@ def write_dry_run_launch_csv_report(report: dict[str, Any], path: Path) -> None:
         "launch_plan_sha256",
         "launch_index",
         "phase",
+        "prompt_index",
         "prompt_id",
         "prompt_sha256",
         "prompt_bytes",
@@ -1687,6 +1699,7 @@ def write_dry_run_launch_csv_report(report: dict[str, Any], path: Path) -> None:
                     "launch_plan_sha256": report.get("launch_plan_sha256"),
                     "launch_index": row.get("launch_index"),
                     "phase": row.get("phase"),
+                    "prompt_index": row.get("prompt_index"),
                     "prompt_id": row.get("prompt_id"),
                     "prompt_sha256": row.get("prompt_sha256"),
                     "prompt_bytes": row.get("prompt_bytes"),
@@ -1756,6 +1769,7 @@ def write_report(
     output_dir: Path,
     *,
     prompt_suite: dict[str, Any] | None = None,
+    launch_plan: list[dict[str, Any]] | None = None,
     warmups: list[BenchRun] | None = None,
     max_suite_cv_pct: float | None = None,
     max_prompt_cv_pct: float | None = None,
@@ -1818,6 +1832,8 @@ def write_report(
         "generated_at": iso_now(),
         "status": report_status(all_runs, findings + telemetry),
         "prompt_suite": prompt_suite or {},
+        "launch_plan_sha256": launch_plan_hash(launch_plan or []),
+        "launch_plan": launch_plan or [],
         "environment": environment or {},
         "image": image or {},
         "qemu_args_files": qemu_args_files or [],
@@ -1861,11 +1877,13 @@ def write_report(
     latest_md = output_dir / "qemu_prompt_bench_latest.md"
     latest_csv = output_dir / "qemu_prompt_bench_latest.csv"
     latest_summary_csv = output_dir / "qemu_prompt_bench_summary_latest.csv"
+    latest_launch_csv = output_dir / "qemu_prompt_bench_launches_latest.csv"
     latest_junit = output_dir / "qemu_prompt_bench_junit_latest.xml"
     latest.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     latest_md.write_text(markdown_report(report), encoding="utf-8")
     write_csv_report(runs, latest_csv)
     write_summary_csv_report(report, latest_summary_csv)
+    write_launch_csv_report(report, latest_launch_csv)
     write_junit_report(runs, warmup_runs, findings, telemetry, latest_junit)
     stamped = output_dir / f"qemu_prompt_bench_{report['generated_at'].replace(':', '').replace('-', '')}.json"
     stamped.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -1883,6 +1901,8 @@ def write_csv_report(runs: list[BenchRun], path: Path) -> None:
         "prompt",
         "prompt_sha256",
         "prompt_bytes",
+        "phase",
+        "launch_index",
         "iteration",
         "tokens",
         "elapsed_us",
@@ -1990,6 +2010,52 @@ def write_summary_csv_report(report: dict[str, Any], path: Path) -> None:
             writer.writerow({field: row.get(field) for field in fields})
 
 
+def write_launch_csv_report(report: dict[str, Any], path: Path) -> None:
+    fields = [
+        "generated_at",
+        "command_sha256",
+        "launch_plan_sha256",
+        "launch_index",
+        "phase",
+        "prompt",
+        "prompt_sha256",
+        "prompt_bytes",
+        "iteration",
+        "returncode",
+        "timed_out",
+        "tokens",
+        "elapsed_us",
+        "wall_elapsed_us",
+        "tok_per_s",
+        "wall_tok_per_s",
+        "memory_bytes",
+        "serial_output_bytes",
+    ]
+    rows = []
+    for key in ("warmups", "benchmarks"):
+        values = report.get(key)
+        if isinstance(values, list):
+            rows.extend(row for row in values if isinstance(row, dict))
+
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for row in sorted(rows, key=lambda item: int(item.get("launch_index") or 0)):
+            run_values = {
+                field: row.get(field)
+                for field in fields
+                if field not in {"generated_at", "command_sha256", "launch_plan_sha256"}
+            }
+            writer.writerow(
+                {
+                    "generated_at": report.get("generated_at"),
+                    "command_sha256": report.get("command_sha256"),
+                    "launch_plan_sha256": report.get("launch_plan_sha256"),
+                    **run_values,
+                }
+            )
+
+
 def write_junit_report(
     runs: list[BenchRun],
     warmups: list[BenchRun],
@@ -2016,7 +2082,7 @@ def write_junit_report(
             "testcase",
             {
                 "classname": f"qemu_prompt_bench.{phase}",
-                "name": f"{run.profile}:{run.model}:{run.quantization}:{run.prompt}:{run.iteration}",
+                "name": f"{run.profile}:{run.model}:{run.quantization}:{run.launch_index}:{run.prompt}:{run.iteration}",
             },
         )
         if run.returncode != 0 or run.timed_out:
@@ -2031,6 +2097,7 @@ def write_junit_report(
             )
             failure.text = (
                 f"phase={phase}\n"
+                f"launch_index={run.launch_index}\n"
                 f"prompt={run.prompt}\n"
                 f"iteration={run.iteration}\n"
                 f"returncode={run.returncode}\n"
@@ -2347,20 +2414,30 @@ def main(argv: list[str] | None = None) -> int:
         "quantization": args.quantization,
         "commit": git_commit(root),
     }
-    warmups = [
-        run_prompt(command, prompt_case, args.timeout, metadata, iteration=iteration)
-        for prompt_case in prompts
-        for iteration in range(1, args.warmup + 1)
-    ]
-    runs = [
-        run_prompt(command, prompt_case, args.timeout, metadata, iteration=iteration)
-        for prompt_case in prompts
-        for iteration in range(1, args.repeat + 1)
-    ]
+    launch_plan = dry_run_launch_plan(prompts, warmup=args.warmup, repeat=args.repeat)
+    warmups: list[BenchRun] = []
+    runs: list[BenchRun] = []
+    for planned in launch_plan:
+        prompt_index = int(planned["prompt_index"]) - 1
+        phase = str(planned["phase"])
+        run = run_prompt(
+            command,
+            prompts[prompt_index],
+            args.timeout,
+            metadata,
+            phase=phase,
+            launch_index=int(planned["launch_index"]),
+            iteration=int(planned["iteration"]),
+        )
+        if phase == "warmup":
+            warmups.append(run)
+        else:
+            runs.append(run)
     output = write_report(
         runs,
         args.output_dir,
         prompt_suite=prompt_suite_metadata(args.prompts, prompts),
+        launch_plan=launch_plan,
         warmups=warmups,
         max_suite_cv_pct=args.max_suite_cv_pct,
         max_prompt_cv_pct=args.max_prompt_cv_pct,

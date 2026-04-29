@@ -1171,6 +1171,26 @@ def main() -> int:
         )
         suite_summary = bench_report["suite_summary"]
         telemetry_gates = bench_report["telemetry_gates"]
+        if not bench_report.get("launch_plan_sha256"):
+            print("missing_measured_launch_plan_hash=true", file=sys.stderr)
+            return 1
+        if len(bench_report.get("launch_plan") or []) != 6:
+            print("measured_launch_plan_count_mismatch=true", file=sys.stderr)
+            return 1
+        expected_launch_indexes = list(range(1, 7))
+        actual_launch_indexes = [
+            row.get("launch_index")
+            for row in bench_report["warmups"] + bench_report["benchmarks"]
+        ]
+        if actual_launch_indexes != expected_launch_indexes:
+            print("measured_launch_order_mismatch=true", file=sys.stderr)
+            return 1
+        measured_launch_csv = (bench_output_dir / "qemu_prompt_bench_launches_latest.csv").read_text(
+            encoding="utf-8"
+        )
+        if "launch_plan_sha256" not in measured_launch_csv or "measured" not in measured_launch_csv:
+            print("missing_measured_launch_csv_fields=true", file=sys.stderr)
+            return 1
         if telemetry_gates.get("min_wall_tok_per_s") != 1.0:
             print("missing_min_wall_tok_gate=true", file=sys.stderr)
             return 1
