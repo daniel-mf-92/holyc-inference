@@ -272,7 +272,7 @@ profile/model/quantization/prompt-suite/command/launch-plan keys span multiple
 environment fingerprints. `bench_artifact_manifest_ci_smoke.py` is a
 stdlib-only CI gate for this path; it builds synthetic QEMU benchmark reports,
 verifies the latest/history JSON, Markdown, CSV, and JUnit outputs, and checks
-that a NIC-enabled QEMU command is rejected:
+that stale artifacts and a NIC-enabled QEMU command are rejected:
 
 ```bash
 python3 bench/bench_artifact_manifest_ci_smoke.py
@@ -890,8 +890,9 @@ records SHA256 and byte size for each benchmark JSON, retains compact history,
 selects the newest artifact for each profile/model/quantization/prompt-suite
 key, preserves prompt count, wall-clock throughput, TTFT, host overhead,
 host child CPU/RSS, emitted-token totals, elapsed guest time, and guest/wall
-per-token latency telemetry, writes both
-latest-key, full-history, and missing dry-run coverage CSV exports, keeps the same recorded-command
+per-token latency telemetry, writes
+latest-key, full-history, missing dry-run coverage, environment drift, and
+freshness-failure CSV exports, keeps the same recorded-command
 air-gap, command SHA256, and commit
 metadata checks while preserving environment fingerprints, and writes
 `bench_artifact_manifest_junit_latest.xml` so CI can

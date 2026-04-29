@@ -260,3 +260,4 @@
 2026-04-29T18:12:07Z | Added signed quant-payload coverage telemetry and negative/positive entry gates to host-side quant audit.
 2026-04-29T18:25:17Z | Added qemu prompt benchmark serial-output line telemetry and gating with smoke coverage and refreshed artifacts.
 2026-04-29T18:38:39Z | Added build benchmark host/QEMU environment drift detection with CSV/JUnit smoke coverage.
+2026-04-29T18:50:29Z | Added benchmark artifact manifest freshness-failure CSV export with stale-artifact smoke coverage and refreshed manifest artifacts.

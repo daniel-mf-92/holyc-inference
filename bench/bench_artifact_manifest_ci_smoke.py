@@ -198,6 +198,7 @@ def main() -> int:
         sample_coverage_csv_path = safe_output_dir / "bench_artifact_manifest_sample_coverage_latest.csv"
         dry_run_coverage_csv_path = safe_output_dir / "bench_artifact_manifest_dry_run_coverage_latest.csv"
         environment_drift_csv_path = safe_output_dir / "bench_artifact_manifest_environment_drift_latest.csv"
+        freshness_failures_csv_path = safe_output_dir / "bench_artifact_manifest_freshness_failures_latest.csv"
         junit_path = safe_output_dir / "bench_artifact_manifest_junit_latest.xml"
         report = json.loads(report_path.read_text(encoding="utf-8"))
         if report["status"] != "pass":
@@ -260,6 +261,12 @@ def main() -> int:
             not in environment_drift_csv_path.read_text(encoding="utf-8")
         ):
             print("missing_manifest_environment_drift_csv=true", file=sys.stderr)
+            return 1
+        if (
+            "key,source,artifact_type,generated_at,generated_age_seconds,freshness_status,freshness_findings"
+            not in freshness_failures_csv_path.read_text(encoding="utf-8")
+        ):
+            print("missing_manifest_freshness_failures_csv=true", file=sys.stderr)
             return 1
         junit_root = ET.parse(junit_path).getroot()
         if junit_root.attrib.get("name") != "holyc_bench_artifact_manifest":
@@ -442,6 +449,26 @@ def main() -> int:
         findings = "\n".join(unsafe_artifact.get("command_hash_findings", []))
         if findings:
             print("unsafe_artifact_command_hash_unexpected_fail=true", file=sys.stderr)
+            return 1
+
+        stale_report = tmp_path / "qemu_prompt_bench_stale.json"
+        write_qemu_report(stale_report, safe_command, generated_at="2000-01-01T00:00:00Z")
+        stale_output_dir = tmp_path / "stale_manifest"
+        completed = run_manifest(
+            stale_report,
+            stale_output_dir,
+            "--max-artifact-age-hours",
+            "1",
+            "--fail-on-stale-artifact",
+        )
+        if completed.returncode == 0:
+            print("stale_manifest_not_rejected=true", file=sys.stderr)
+            return 1
+        stale_csv = (
+            stale_output_dir / "bench_artifact_manifest_freshness_failures_latest.csv"
+        ).read_text(encoding="utf-8")
+        if "qemu_prompt_bench_stale.json" not in stale_csv or "freshness_status" not in stale_csv:
+            print("missing_stale_manifest_freshness_failure_csv_row=true", file=sys.stderr)
             return 1
 
     return 0

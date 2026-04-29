@@ -582,6 +582,37 @@ def write_environment_drift_csv(findings: list[bench_result_index.EnvironmentDri
             )
 
 
+def write_freshness_failures_csv(artifacts: list[ManifestArtifact], path: Path) -> None:
+    fields = [
+        "key",
+        "source",
+        "artifact_type",
+        "generated_at",
+        "generated_age_seconds",
+        "freshness_status",
+        "freshness_findings",
+    ]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for artifact in artifacts:
+            if artifact.freshness_status != "fail":
+                continue
+            writer.writerow(
+                {
+                    "key": artifact.key,
+                    "source": artifact.source,
+                    "artifact_type": artifact.artifact_type,
+                    "generated_at": artifact.generated_at,
+                    "generated_age_seconds": artifact.generated_age_seconds,
+                    "freshness_status": artifact.freshness_status,
+                    "freshness_findings": json.dumps(
+                        artifact.freshness_findings, separators=(",", ":")
+                    ),
+                }
+            )
+
+
 def junit_report(report: dict[str, object]) -> str:
     history = [row for row in report["history"] if isinstance(row, dict)]
     failed_artifacts = [row for row in history if row.get("status") == "fail"]
@@ -848,6 +879,7 @@ def write_manifest(
     sample_coverage_csv_path = output_dir / "bench_artifact_manifest_sample_coverage_latest.csv"
     dry_run_coverage_csv_path = output_dir / "bench_artifact_manifest_dry_run_coverage_latest.csv"
     environment_drift_csv_path = output_dir / "bench_artifact_manifest_environment_drift_latest.csv"
+    freshness_failures_csv_path = output_dir / "bench_artifact_manifest_freshness_failures_latest.csv"
     junit_path = output_dir / "bench_artifact_manifest_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
@@ -857,6 +889,7 @@ def write_manifest(
     write_sample_coverage_csv(sample_violations, sample_coverage_csv_path)
     write_dry_run_coverage_csv(dry_run_coverage_violations, dry_run_coverage_csv_path)
     write_environment_drift_csv(environment_drift_findings, environment_drift_csv_path)
+    write_freshness_failures_csv(history, freshness_failures_csv_path)
     junit_path.write_text(junit_report(report), encoding="utf-8")
     return (
         json_path,
