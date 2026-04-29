@@ -206,6 +206,25 @@ def byte_stats(records: list[InspectRecord]) -> dict[str, int]:
     return dataset_pack.byte_stats(pack_records)
 
 
+def choice_count_histogram(records: list[InspectRecord]) -> dict[str, int]:
+    histogram: dict[str, int] = {}
+    for record in records:
+        key = str(len(record.choices))
+        histogram[key] = histogram.get(key, 0) + 1
+    return dict(sorted(histogram.items(), key=lambda item: int(item[0])))
+
+
+def choice_count_stats(records: list[InspectRecord]) -> dict[str, float | int]:
+    choice_counts = [len(record.choices) for record in records]
+    total_choices = sum(choice_counts)
+    return {
+        "avg_choices_per_record": total_choices / len(choice_counts) if choice_counts else 0.0,
+        "max_choices_per_record": max(choice_counts, default=0),
+        "min_choices_per_record": min(choice_counts, default=0),
+        "total_choices": total_choices,
+    }
+
+
 def binary_layout(dataset: HCEvalDataset) -> dict[str, int]:
     body_bytes = sum(record.length for record in dataset.records)
     choice_count = sum(len(record.choices) for record in dataset.records)
@@ -284,6 +303,13 @@ def validate_dataset(
             findings.append("manifest split does not match metadata")
         if "byte_stats" in manifest and manifest.get("byte_stats") != byte_stats(records):
             findings.append("manifest byte_stats does not match parsed records")
+        if (
+            "choice_count_histogram" in manifest
+            and manifest.get("choice_count_histogram") != choice_count_histogram(records)
+        ):
+            findings.append("manifest choice_count_histogram does not match parsed records")
+        if "choice_count_stats" in manifest and manifest.get("choice_count_stats") != choice_count_stats(records):
+            findings.append("manifest choice_count_stats does not match parsed records")
         if "binary_layout" in manifest and manifest.get("binary_layout") != binary_layout(dataset):
             findings.append("manifest binary_layout does not match parsed binary")
         if "record_spans" in manifest and manifest.get("record_spans") != record_spans(records):
@@ -310,6 +336,8 @@ def build_report(path: Path, dataset: HCEvalDataset, findings: list[str]) -> dic
         "answer_histogram": answer_histogram(dataset.records),
         "binary_layout": binary_layout(dataset),
         "byte_stats": byte_stats(dataset.records),
+        "choice_count_histogram": choice_count_histogram(dataset.records),
+        "choice_count_stats": choice_count_stats(dataset.records),
         "dataset": dataset.metadata.get("dataset", ""),
         "findings": findings,
         "format": dataset.metadata.get("format", ""),
@@ -354,6 +382,14 @@ def markdown_report(report: dict[str, Any]) -> str:
             f"- Max record payload bytes: {report['byte_stats']['max_record_payload_bytes']}",
             f"- Total prompt bytes: {report['byte_stats']['total_prompt_bytes']}",
             f"- Total choice bytes: {report['byte_stats']['total_choice_bytes']}",
+            "",
+            "## Choice Counts",
+            "",
+            f"- Histogram: `{json.dumps(report['choice_count_histogram'], sort_keys=True)}`",
+            f"- Min choices per record: {report['choice_count_stats']['min_choices_per_record']}",
+            f"- Max choices per record: {report['choice_count_stats']['max_choices_per_record']}",
+            f"- Average choices per record: {report['choice_count_stats']['avg_choices_per_record']:.2f}",
+            f"- Total choices: {report['choice_count_stats']['total_choices']}",
             "",
             "## Binary Layout",
             "",

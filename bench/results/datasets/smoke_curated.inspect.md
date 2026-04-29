@@ -1,6 +1,6 @@
 # HCEval Dataset Inspection
 
-Generated: 2026-04-29T00:06:26Z
+Generated: 2026-04-29T00:13:37Z
 Status: pass
 Dataset: smoke-eval
 Split: validation
@@ -18,6 +18,14 @@ No findings.
 - Total prompt bytes: 182
 - Total choice bytes: 327
 
+## Choice Counts
+
+- Histogram: `{"4": 3}`
+- Min choices per record: 4
+- Max choices per record: 4
+- Average choices per record: 4.00
+- Total choices: 12
+
 ## Binary Layout
 
 - Fixed header bytes: 52
@@ -32,6 +40,6 @@ No findings.
 
 | ID | Choices | Answer | Provenance |
 | --- | ---: | ---: | --- |
-| smoke-arc-1 | 4 | 0 | synthetic ARC-shaped smoke row |
-| smoke-hellaswag-1 | 4 | 0 | synthetic HellaSwag-shaped smoke row |
-| smoke-truthfulqa-1 | 4 | 0 | synthetic TruthfulQA-shaped smoke row |
+| arc-smoke-1 | 4 | 0 | synthetic ARC-shaped smoke row |
+| hellaswag-smoke-2 | 4 | 0 | synthetic HellaSwag-shaped smoke row |
+| truthfulqa-smoke-3 | 4 | 0 | synthetic TruthfulQA-shaped smoke row |

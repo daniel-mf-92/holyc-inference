@@ -242,6 +242,25 @@ def byte_stats(records: list[EvalRecord]) -> dict[str, int]:
     }
 
 
+def choice_count_histogram(records: list[EvalRecord]) -> dict[str, int]:
+    histogram: dict[str, int] = {}
+    for record in records:
+        key = str(len(record.choices))
+        histogram[key] = histogram.get(key, 0) + 1
+    return dict(sorted(histogram.items(), key=lambda item: int(item[0])))
+
+
+def choice_count_stats(records: list[EvalRecord]) -> dict[str, float | int]:
+    choice_counts = [len(record.choices) for record in records]
+    total_choices = sum(choice_counts)
+    return {
+        "avg_choices_per_record": total_choices / len(choice_counts) if choice_counts else 0.0,
+        "max_choices_per_record": max(choice_counts, default=0),
+        "min_choices_per_record": min(choice_counts, default=0),
+        "total_choices": total_choices,
+    }
+
+
 def binary_layout(records: list[EvalRecord], dataset: str, split: str) -> dict[str, int]:
     packed_metadata = metadata_bytes(dataset, split, len(records))
     record_lengths = [len(record_bytes(record)) for record in records]
@@ -349,6 +368,8 @@ def write_outputs(records: list[EvalRecord], output: Path, manifest_path: Path, 
         "binary_layout": binary_layout(records, dataset, split),
         "binary_sha256": hashlib.sha256(payload).hexdigest(),
         "byte_stats": byte_stats(records),
+        "choice_count_histogram": choice_count_histogram(records),
+        "choice_count_stats": choice_count_stats(records),
         "dataset": dataset,
         "format": "hceval-mc",
         "magic": MAGIC.decode("ascii"),

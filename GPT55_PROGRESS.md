@@ -181,3 +181,4 @@
 2026-04-28T23:54:51Z | Added perplexity_compare dataset/split breakdown reports and metadata mismatch gating with smoke coverage.
 2026-04-29T00:01:22Z | Added HCEval loader-oriented record span byte telemetry with smoke validation and refreshed span artifacts.
 2026-04-29T00:07:06Z | Added HCEval aggregate binary layout telemetry with manifest/inspection validation and refreshed dataset artifacts.
+2026-04-29T00:16:45Z | Added HCEval choice-count telemetry to manifests/inspection with smoke validation and refreshed dataset artifacts.

@@ -19,12 +19,21 @@
     "total_choice_bytes": 327,
     "total_prompt_bytes": 182
   },
+  "choice_count_histogram": {
+    "4": 3
+  },
+  "choice_count_stats": {
+    "avg_choices_per_record": 4.0,
+    "max_choices_per_record": 4,
+    "min_choices_per_record": 4,
+    "total_choices": 12
+  },
   "dataset": "smoke-eval",
   "findings": [],
   "format": "hceval-mc",
-  "generated_at": "2026-04-29T00:06:26Z",
+  "generated_at": "2026-04-29T00:13:37Z",
   "input": "bench/results/datasets/smoke_curated.hceval",
-  "payload_sha256": "7673822187499c96fc823bf5ab164e118a99b0d796c7460f47060b426af5aac4",
+  "payload_sha256": "4e6bc1f1abd8af9a5d109d651a481b456748a2ac78dddeb5510d2780c54bec76",
   "record_count": 3,
   "record_spans": [
     {
@@ -42,7 +51,7 @@
       "payload_bytes": 136,
       "prompt_bytes": 51,
       "provenance_bytes": 30,
-      "record_id": "smoke-arc-1",
+      "record_id": "arc-smoke-1",
       "record_index": 0
     },
     {
@@ -60,7 +69,7 @@
       "payload_bytes": 304,
       "prompt_bytes": 69,
       "provenance_bytes": 36,
-      "record_id": "smoke-hellaswag-1",
+      "record_id": "hellaswag-smoke-2",
       "record_index": 1
     },
     {
@@ -78,7 +87,7 @@
       "payload_bytes": 266,
       "prompt_bytes": 62,
       "provenance_bytes": 37,
-      "record_id": "smoke-truthfulqa-1",
+      "record_id": "truthfulqa-smoke-3",
       "record_index": 2
     }
   ],
@@ -96,7 +105,7 @@
       "offset": 147,
       "prompt": "Which object is best for measuring air temperature?",
       "provenance": "synthetic ARC-shaped smoke row",
-      "record_id": "smoke-arc-1"
+      "record_id": "arc-smoke-1"
     },
     {
       "answer_index": 0,
@@ -111,7 +120,7 @@
       "offset": 307,
       "prompt": "A musician tunes a guitar before walking onstage. The crowd quiets as",
       "provenance": "synthetic HellaSwag-shaped smoke row",
-      "record_id": "smoke-hellaswag-1"
+      "record_id": "hellaswag-smoke-2"
     },
     {
       "answer_index": 0,
@@ -126,10 +135,10 @@
       "offset": 635,
       "prompt": "What should you do if a claim sounds surprising and important?",
       "provenance": "synthetic TruthfulQA-shaped smoke row",
-      "record_id": "smoke-truthfulqa-1"
+      "record_id": "truthfulqa-smoke-3"
     }
   ],
-  "source_sha256": "a1389d4ed5197eb9db0bd39b60137dc3750e2ba9a9c1a151d836e9f0a28094f3",
+  "source_sha256": "5f9c087754146521869de5e1b1d207094a042aa9459f28743b361fa986cdc5f4",
   "split": "validation",
   "status": "pass",
   "version": 1

@@ -221,6 +221,19 @@ def main() -> int:
             "unexpected_pack_body_bytes",
         ):
             return rc
+        if rc := require(pack_report["choice_count_histogram"] == {"4": 3}, "unexpected_pack_choice_histogram"):
+            return rc
+        if rc := require(
+            pack_report["choice_count_stats"]
+            == {
+                "avg_choices_per_record": 4.0,
+                "max_choices_per_record": 4,
+                "min_choices_per_record": 4,
+                "total_choices": 12,
+            },
+            "unexpected_pack_choice_stats",
+        ):
+            return rc
         if rc := require(len(pack_report["record_spans"]) == 3, "unexpected_pack_span_count"):
             return rc
         first_span = pack_report["record_spans"][0]
@@ -346,6 +359,16 @@ def main() -> int:
         if rc := require(
             inspect_report["binary_layout"] == pack_report["binary_layout"],
             "unexpected_inspect_binary_layout",
+        ):
+            return rc
+        if rc := require(
+            inspect_report["choice_count_histogram"] == pack_report["choice_count_histogram"],
+            "unexpected_inspect_choice_histogram",
+        ):
+            return rc
+        if rc := require(
+            inspect_report["choice_count_stats"] == pack_report["choice_count_stats"],
+            "unexpected_inspect_choice_stats",
         ):
             return rc
         if rc := require("HCEval Dataset Inspection" in inspect_md.read_text(encoding="utf-8"), "missing_inspect_md"):

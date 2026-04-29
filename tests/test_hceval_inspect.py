@@ -67,6 +67,13 @@ def test_cli_writes_json_and_markdown() -> None:
         assert report["record_spans"][0]["record_id"] == "smoke-hellaswag-1"
         assert report["record_spans"][-1]["offset"] + report["record_spans"][-1]["length"] == input_path.stat().st_size
         assert report["byte_stats"]["max_prompt_bytes"] > 0
+        assert report["choice_count_histogram"] == {"4": 3}
+        assert report["choice_count_stats"] == {
+            "avg_choices_per_record": 4.0,
+            "max_choices_per_record": 4,
+            "min_choices_per_record": 4,
+            "total_choices": 12,
+        }
         assert "HCEval Dataset Inspection" in markdown.read_text(encoding="utf-8")
 
 

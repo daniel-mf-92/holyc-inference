@@ -1,6 +1,6 @@
 # HCEval Dataset Inspection
 
-Generated: 2026-04-29T00:06:46Z
+Generated: 2026-04-29T00:13:37Z
 Status: pass
 Dataset: smoke-eval
 Split: validation
@@ -17,6 +17,14 @@ No findings.
 - Max record payload bytes: 304
 - Total prompt bytes: 182
 - Total choice bytes: 327
+
+## Choice Counts
+
+- Histogram: `{"4": 3}`
+- Min choices per record: 4
+- Max choices per record: 4
+- Average choices per record: 4.00
+- Total choices: 12
 
 ## Binary Layout
 
