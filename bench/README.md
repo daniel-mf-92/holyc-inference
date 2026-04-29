@@ -691,6 +691,10 @@ generation-volume changes are visible next to tok/s, RSS, and latency rollups.
 compact row per cell for CI dashboards that only need pass/fail counts,
 throughput ranges, prompt-byte and token totals, latency, RSS, and variability
 findings.
+Use `expect_cells` in the matrix JSON, or `--expect-cells` on the CLI, to fail
+the matrix when the expanded profile/model/quantization cell count changes
+unexpectedly. The gate also works with `--dry-run`, so CI can catch accidental
+matrix coverage loss before launching QEMU.
 Use `max_suite_cv_pct`, `max_prompt_cv_pct`, `max_suite_iqr_pct`, and
 `max_prompt_iqr_pct` in the matrix JSON, or the matching CLI flags, to pass
 tok/s variability gates through to every cell. A cell that fails a variability
@@ -703,7 +707,8 @@ Example:
 python3 bench/bench_matrix.py \
   --matrix bench/fixtures/bench_matrix_smoke.json \
   --output-dir bench/results \
-  --max-prompt-cv-pct 5
+  --max-prompt-cv-pct 5 \
+  --expect-cells 2
 ```
 
 Validate the expanded matrix without launching QEMU:

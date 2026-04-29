@@ -1,5 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
-<testsuite name="holyc_bench_matrix" tests="2" failures="0" errors="0">
+<testsuite name="holyc_bench_matrix" tests="3" failures="0" errors="0">
+  <testcase classname="bench_matrix.coverage" name="matrix_coverage" />
   <testcase classname="bench_matrix.cell" name="ci-airgap-smoke:synthetic-smoke:Q4_0" />
   <testcase classname="bench_matrix.cell" name="ci-airgap-smoke:synthetic-smoke:Q8_0" />
 </testsuite>

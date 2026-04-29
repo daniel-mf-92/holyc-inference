@@ -85,6 +85,14 @@ class MatrixCellResult:
     variability_findings: int
 
 
+@dataclass(frozen=True)
+class MatrixCoverageFinding:
+    metric: str
+    observed: int
+    expected: int
+    message: str
+
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -410,6 +418,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"Status: {report['status']}",
         f"Matrix: {report['matrix_name']}",
         f"Cells: {len(report['cells'])}",
+        f"Coverage gates: expect cells = {format_gate(report['coverage_gates'].get('expect_cells'))}",
         "Variability gates: suite CV <= {suite}, prompt CV <= {prompt}, suite IQR <= {suite_iqr}, prompt IQR <= {prompt_iqr}".format(
             suite=format_gate(report["variability_gates"].get("max_suite_cv_pct")),
             prompt=format_gate(report["variability_gates"].get("max_prompt_cv_pct")),
@@ -417,9 +426,22 @@ def markdown_report(report: dict[str, Any]) -> str:
             prompt_iqr=format_gate(report["variability_gates"].get("max_prompt_iqr_pct")),
         ),
         "",
-        "## Cells",
-        "",
     ]
+    if report["coverage_findings"]:
+        lines.extend(
+            [
+                "## Coverage Findings",
+                "",
+                "| Metric | Observed | Expected | Message |",
+                "| --- | ---: | ---: | --- |",
+            ]
+        )
+        for finding in report["coverage_findings"]:
+            lines.append(
+                f"| {finding['metric']} | {finding['observed']} | {finding['expected']} | {finding['message']} |"
+            )
+        lines.append("")
+    lines.extend(["## Cells", ""])
     if report["cells"]:
         lines.append(
             "| Profile | Model | Quantization | Commit | Status | Prompts | Prompt bytes | Prompt byte range | Total tokens | Total elapsed us | Prompt suite | Command SHA256 | Launch plan SHA256 | Runs | Warmups | Guest tok/s | Wall tok/s | P95 TTFT us | Host overhead % | Host child CPU us | Host child CPU % | Host child tok/CPU s | Max host child RSS bytes | Guest us/token | Wall us/token | Max memory bytes | Variability findings |"
@@ -484,15 +506,21 @@ def write_matrix_report(
     max_prompt_cv_pct: float | None,
     max_suite_iqr_pct: float | None,
     max_prompt_iqr_pct: float | None,
+    expect_cells: int | None,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
+    coverage_findings = matrix_coverage_findings(cells, expect_cells)
     report = {
         "generated_at": iso_now(),
-        "status": "planned" if dry_run else ("pass" if all(cell.status == "pass" for cell in cells) else "fail"),
+        "status": matrix_status(cells, dry_run=dry_run, coverage_findings=coverage_findings),
         "matrix_name": matrix_name,
         "matrix_file": str(matrix_file),
         "matrix_dir": str(matrix_dir),
         "dry_run": dry_run,
+        "coverage_gates": {
+            "expect_cells": expect_cells,
+        },
+        "coverage_findings": [asdict(finding) for finding in coverage_findings],
         "variability_gates": {
             "max_suite_cv_pct": max_suite_cv_pct,
             "max_prompt_cv_pct": max_prompt_cv_pct,
@@ -510,8 +538,38 @@ def write_matrix_report(
     md_path.write_text(markdown_report(report), encoding="utf-8")
     write_matrix_csv(cells, csv_path)
     write_matrix_summary_csv(cells, summary_csv_path)
-    write_matrix_junit(cells, junit_path)
+    write_matrix_junit(cells, coverage_findings, junit_path)
     return json_path
+
+
+def matrix_coverage_findings(
+    cells: list[MatrixCellResult],
+    expect_cells: int | None,
+) -> list[MatrixCoverageFinding]:
+    findings: list[MatrixCoverageFinding] = []
+    if expect_cells is not None and len(cells) != expect_cells:
+        findings.append(
+            MatrixCoverageFinding(
+                metric="cells",
+                observed=len(cells),
+                expected=expect_cells,
+                message=f"expanded matrix cells {len(cells)} != expected {expect_cells}",
+            )
+        )
+    return findings
+
+
+def matrix_status(
+    cells: list[MatrixCellResult],
+    *,
+    dry_run: bool,
+    coverage_findings: list[MatrixCoverageFinding],
+) -> str:
+    if coverage_findings:
+        return "fail"
+    if dry_run:
+        return "planned"
+    return "pass" if all(cell.status == "pass" for cell in cells) else "fail"
 
 
 def write_matrix_csv(cells: list[MatrixCellResult], path: Path) -> None:
@@ -717,17 +775,42 @@ def write_matrix_summary_csv(cells: list[MatrixCellResult], path: Path) -> None:
             writer.writerow({field: row.get(field) for field in fields})
 
 
-def write_matrix_junit(cells: list[MatrixCellResult], path: Path) -> None:
-    failures = sum(1 for cell in cells if cell.status == "fail")
+def write_matrix_junit(
+    cells: list[MatrixCellResult],
+    coverage_findings: list[MatrixCoverageFinding],
+    path: Path,
+) -> None:
+    failures = sum(1 for cell in cells if cell.status == "fail") + len(coverage_findings)
     suite = ET.Element(
         "testsuite",
         {
             "name": "holyc_bench_matrix",
-            "tests": str(len(cells)),
+            "tests": str(len(cells) + 1),
             "failures": str(failures),
             "errors": "0",
         },
     )
+    coverage_case = ET.SubElement(
+        suite,
+        "testcase",
+        {
+            "classname": "bench_matrix.coverage",
+            "name": "matrix_coverage",
+        },
+    )
+    if coverage_findings:
+        failure = ET.SubElement(
+            coverage_case,
+            "failure",
+            {
+                "type": "benchmark_matrix_coverage_failure",
+                "message": f"coverage_findings={len(coverage_findings)}",
+            },
+        )
+        failure.text = "\n".join(
+            f"{finding.metric}: observed={finding.observed} expected={finding.expected} message={finding.message}"
+            for finding in coverage_findings
+        )
     for cell in cells:
         case = ET.SubElement(
             suite,
@@ -811,6 +894,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--dry-run", action="store_true", help="Validate and write planned commands without launching")
+    parser.add_argument("--expect-cells", type=int, help="Fail unless the expanded matrix has exactly this many cells")
     return parser
 
 
@@ -870,6 +954,14 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("--max-suite-iqr-pct must be >= 0")
         if max_prompt_iqr_pct is not None and max_prompt_iqr_pct < 0:
             raise ValueError("--max-prompt-iqr-pct must be >= 0")
+        expect_cells = (
+            args.expect_cells
+            if args.expect_cells is not None
+            else payload.get("expect_cells")
+        )
+        expect_cells = int(expect_cells) if expect_cells is not None else None
+        if expect_cells is not None and expect_cells < 0:
+            raise ValueError("--expect-cells must be >= 0")
 
         matrix_base_dir = args.matrix.resolve().parent
         global_qemu_args = matrix_qemu_args(payload, "matrix", matrix_base_dir)
@@ -905,12 +997,14 @@ def main(argv: list[str] | None = None) -> int:
             max_prompt_cv_pct=max_prompt_cv_pct,
             max_suite_iqr_pct=max_suite_iqr_pct,
             max_prompt_iqr_pct=max_prompt_iqr_pct,
+            expect_cells=expect_cells,
         )
     except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    status = "planned" if args.dry_run else ("pass" if all(cell.status == "pass" for cell in results) else "fail")
+    coverage_findings = matrix_coverage_findings(results, expect_cells)
+    status = matrix_status(results, dry_run=args.dry_run, coverage_findings=coverage_findings)
     print(f"wrote_json={output}")
     print(f"status={status}")
     print(f"cells={len(results)}")

@@ -1566,6 +1566,8 @@ print("BENCH_RESULT: " + json.dumps({
             str(matrix_output_dir),
             "--max-suite-cv-pct",
             "0.1",
+            "--expect-cells",
+            "2",
         ]
         completed = subprocess.run(
             matrix_command,
@@ -1591,6 +1593,12 @@ print("BENCH_RESULT: " + json.dumps({
         if matrix_report["variability_gates"].get("max_prompt_cv_pct") != 0.1:
             print("missing_matrix_prompt_cv_gate=true", file=sys.stderr)
             return 1
+        if matrix_report["coverage_gates"].get("expect_cells") != 2:
+            print("missing_matrix_expect_cells_gate=true", file=sys.stderr)
+            return 1
+        if matrix_report["coverage_findings"]:
+            print("unexpected_matrix_coverage_findings=true", file=sys.stderr)
+            return 1
         if not matrix_report["cells"] or any(
             "variability_findings" not in cell for cell in matrix_report["cells"]
         ):
@@ -1603,6 +1611,15 @@ print("BENCH_RESULT: " + json.dumps({
             encoding="utf-8"
         ):
             print("missing_matrix_variability_markdown=true", file=sys.stderr)
+            return 1
+        if "Coverage gates" not in (matrix_output_dir / "bench_matrix_latest.md").read_text(
+            encoding="utf-8"
+        ):
+            print("missing_matrix_coverage_markdown=true", file=sys.stderr)
+            return 1
+        matrix_junit_root = ET.parse(matrix_output_dir / "bench_matrix_junit_latest.xml").getroot()
+        if matrix_junit_root.attrib.get("failures") != "0":
+            print("unexpected_matrix_junit_failures=true", file=sys.stderr)
             return 1
         if "variability_findings" not in (
             matrix_output_dir / "bench_matrix_latest.csv"
@@ -1688,6 +1705,38 @@ print("BENCH_RESULT: " + json.dumps({
             encoding="utf-8"
         ):
             print("missing_matrix_prompt_size_markdown=true", file=sys.stderr)
+            return 1
+
+        bad_matrix_output_dir = tmp_path / "bench_matrix_bad_coverage"
+        bad_matrix_command = [
+            sys.executable,
+            str(ROOT / "bench" / "bench_matrix.py"),
+            "--matrix",
+            str(ROOT / "bench" / "fixtures" / "bench_matrix_smoke.json"),
+            "--output-dir",
+            str(bad_matrix_output_dir),
+            "--dry-run",
+            "--expect-cells",
+            "3",
+        ]
+        completed = subprocess.run(
+            bad_matrix_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("matrix_expect_cells_gate_did_not_fail=true", file=sys.stderr)
+            return 1
+        bad_matrix_report = json.loads(
+            (bad_matrix_output_dir / "bench_matrix_latest.json").read_text(encoding="utf-8")
+        )
+        if bad_matrix_report["status"] != "fail":
+            print("bad_matrix_coverage_status_not_fail=true", file=sys.stderr)
+            return 1
+        if not bad_matrix_report["coverage_findings"]:
+            print("missing_bad_matrix_coverage_findings=true", file=sys.stderr)
             return 1
 
         result_index_output_dir = tmp_path / "bench_result_index"

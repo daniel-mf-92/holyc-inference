@@ -6,6 +6,7 @@
   "qemu_args": ["-m", "256M"],
   "repeat": 2,
   "warmup": 1,
+  "expect_cells": 2,
   "max_prompt_cv_pct": 0.1,
   "profiles": [
     {
