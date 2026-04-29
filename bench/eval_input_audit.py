@@ -3,10 +3,10 @@
 
 The audit validates local gold and prediction files before an apples-to-apples
 comparison run. It checks record-id coverage, duplicate rows, prediction ranges,
-optional dataset/split/model/quantization metadata, optional prompt/choice/input
-hash parity against gold rows, and writes JSON plus Markdown reports, CSV issue
-rows, and JUnit XML under bench/results. It is host-side only and never launches
-QEMU.
+gold choice-count bounds, optional dataset/split/model/quantization metadata,
+optional prompt/choice/input hash parity against gold rows, and writes JSON plus
+Markdown reports, CSV issue rows, and JUnit XML under bench/results. It is
+host-side only and never launches QEMU.
 """
 
 from __future__ import annotations
@@ -439,7 +439,14 @@ def cross_check_metadata(
         )
 
 
-def audit_gold(path: Path, dataset: str, split: str, issues: list[Issue]) -> dict[str, eval_compare.GoldCase]:
+def audit_gold(
+    path: Path,
+    dataset: str,
+    split: str,
+    min_choices: int | None,
+    max_choices: int | None,
+    issues: list[Issue],
+) -> dict[str, eval_compare.GoldCase]:
     try:
         gold = eval_compare.load_gold(path, dataset, split)
     except (OSError, ValueError) as exc:
@@ -449,6 +456,23 @@ def audit_gold(path: Path, dataset: str, split: str, issues: list[Issue]) -> dic
     if not gold:
         append_issue(issues, "error", "gold", "gold dataset contains no records")
 
+    for record_id, case in sorted(gold.items()):
+        choice_count = len(case.choices)
+        if min_choices is not None and choice_count < min_choices:
+            append_issue(
+                issues,
+                "error",
+                "gold",
+                f"gold id {record_id!r} has {choice_count} choices, below --min-choices {min_choices}",
+            )
+        if max_choices is not None and choice_count > max_choices:
+            append_issue(
+                issues,
+                "error",
+                "gold",
+                f"gold id {record_id!r} has {choice_count} choices, above --max-choices {max_choices}",
+            )
+
     splits = sorted({case.split for case in gold.values()})
     if len(splits) > 1:
         append_issue(issues, "warning", "gold", f"gold rows contain multiple split values: {', '.join(splits)}")
@@ -457,7 +481,7 @@ def audit_gold(path: Path, dataset: str, split: str, issues: list[Issue]) -> dic
 
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     issues: list[Issue] = []
-    gold = audit_gold(args.gold, args.dataset, args.split, issues)
+    gold = audit_gold(args.gold, args.dataset, args.split, args.min_choices, args.max_choices, issues)
     answer_histogram = sorted_counts(case.answer_index for case in gold.values())
     choice_count_histogram = sorted_counts(len(case.choices) for case in gold.values())
     majority_gold_answer, majority_gold_answer_count, majority_gold_answer_pct = majority_label(answer_histogram)
@@ -529,6 +553,10 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "majority_answer_count": majority_gold_answer_count,
             "majority_answer_pct": majority_gold_answer_pct,
         },
+        "gold_choice_gates": {
+            "min_choices": args.min_choices,
+            "max_choices": args.max_choices,
+        },
         "gold_record_count": len(gold),
         "issues": [asdict(issue) for issue in issues],
         "model": args.model,
@@ -582,6 +610,13 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"| {json.dumps(gold_distribution['answer_histogram'], sort_keys=True)} | "
         f"{json.dumps(gold_distribution['choice_count_histogram'], sort_keys=True)} | "
         f"{gold_distribution['majority_answer'] or '-'} | {majority_pct_text} |"
+    )
+    choice_gates = report["gold_choice_gates"]
+    lines.extend(
+        [
+            "",
+            f"Choice gates: min={choice_gates['min_choices'] or '-'}, max={choice_gates['max_choices'] or '-'}",
+        ]
     )
     lines.extend(
         [
@@ -728,6 +763,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail when one gold answer index covers more than this percentage of gold rows",
     )
     parser.add_argument(
+        "--min-choices",
+        type=int,
+        help="Fail when any normalized gold row has fewer than this many choices",
+    )
+    parser.add_argument(
+        "--max-choices",
+        type=int,
+        help="Fail when any normalized gold row has more than this many choices",
+    )
+    parser.add_argument(
         "--min-score-coverage-pct",
         type=float,
         help="Fail when either engine has score vectors for less than this percentage of valid rows",
@@ -754,6 +799,15 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.max_majority_prediction_pct is not None and not 0.0 <= args.max_majority_prediction_pct <= 100.0:
         print("error: --max-majority-prediction-pct must be between 0 and 100", file=sys.stderr)
+        return 2
+    if args.min_choices is not None and args.min_choices < 1:
+        print("error: --min-choices must be at least 1", file=sys.stderr)
+        return 2
+    if args.max_choices is not None and args.max_choices < 1:
+        print("error: --max-choices must be at least 1", file=sys.stderr)
+        return 2
+    if args.min_choices is not None and args.max_choices is not None and args.min_choices > args.max_choices:
+        print("error: --min-choices cannot be greater than --max-choices", file=sys.stderr)
         return 2
     if args.min_score_coverage_pct is not None and not 0.0 <= args.min_score_coverage_pct <= 100.0:
         print("error: --min-score-coverage-pct must be between 0 and 100", file=sys.stderr)

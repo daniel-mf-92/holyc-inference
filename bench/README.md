@@ -1056,7 +1056,9 @@ Before comparing, `eval_input_audit.py` can gate apples-to-apples inputs. It
 checks gold/prediction record coverage, duplicates, invalid prediction indexes,
 dataset/split metadata, optional model/quantization metadata drift, and gold
 answer distribution. Use `--max-majority-gold-answer-pct` to fail early when a
-gold file is too label-skewed for a useful paired comparison. It also records
+gold file is too label-skewed for a useful paired comparison. Use
+`--min-choices` and `--max-choices` to enforce homogeneous normalized
+multiple-choice rows before prediction files are scored. It also records
 score-vector coverage and top-score ties; use `--min-score-coverage-pct` and
 `--max-top-score-tie-pct` to catch missing or ambiguous score vectors before
 running quality comparisons. Prediction rows may also carry `prompt_sha256`,
@@ -1075,6 +1077,8 @@ python3 bench/eval_input_audit.py \
   --model synthetic-smoke \
   --quantization Q4_0 \
   --max-majority-gold-answer-pct 100 \
+  --min-choices 4 \
+  --max-choices 4 \
   --output-stem eval_input_audit_smoke_latest
 ```
 

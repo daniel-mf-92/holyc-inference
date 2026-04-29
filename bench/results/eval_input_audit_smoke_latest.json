@@ -20,7 +20,11 @@
       "sha256": "22a31f8ffa48784acd9645bf802ac0f3e0260d45e703a34c926a3331e643dfa1"
     }
   },
-  "generated_at": "2026-04-29T07:10:33Z",
+  "generated_at": "2026-04-29T11:02:55Z",
+  "gold_choice_gates": {
+    "max_choices": 4,
+    "min_choices": 4
+  },
   "gold_distribution": {
     "answer_histogram": {
       "0": 3

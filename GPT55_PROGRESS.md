@@ -237,3 +237,4 @@
 2026-04-29T10:33:43Z | Added qemu prompt benchmark exit classification telemetry for nonzero/timeout failures with smoke coverage and refreshed artifacts.
 2026-04-29T10:48:43Z | Added prompt audit pinned suite hash drift gate with smoke coverage and refreshed prompt audit artifacts.
 2026-04-29T10:55:54Z | Added perplexity_compare minimum record/token coverage gates with CI smoke coverage and refreshed smoke reports.
+2026-04-29T11:03:07Z | Added eval input audit choice-count gates with CI smoke coverage and refreshed smoke reports.

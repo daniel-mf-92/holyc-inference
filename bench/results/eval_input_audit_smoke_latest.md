@@ -1,6 +1,6 @@
 # Eval Input Audit
 
-Generated: 2026-04-29T07:10:33Z
+Generated: 2026-04-29T11:02:55Z
 Status: pass
 Dataset: smoke-eval
 Split: validation
@@ -22,6 +22,8 @@ Quantization: Q4_0
 | Answer histogram | Choice counts | Majority | Majority % |
 | --- | --- | --- | ---: |
 | {"0": 3} | {"4": 3} | 0 | 100.00 |
+
+Choice gates: min=4, max=4
 
 ## Prediction Distribution
 
