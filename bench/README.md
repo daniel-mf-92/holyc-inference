@@ -402,7 +402,10 @@ CSV, Markdown, and JSON reports surface the maximum sampled RSS separately from
 guest-reported `memory_bytes`. The same artifacts also include derived
 `us_per_token` and `wall_us_per_token` latency metrics, plus median/P95 latency
 rollups, so dashboards can compare either throughput or per-token decode cost
-without reprocessing raw elapsed times.
+without reprocessing raw elapsed times. Suite and prompt summaries include
+`ok_run_pct` next to OK, failed, timeout, and nonzero-exit counts, making
+partially successful benchmark sweeps visible in JSON, Markdown, and summary
+CSV artifacts.
 
 Use `--max-suite-cv-pct`, `--max-prompt-cv-pct`, `--max-suite-iqr-pct`, and
 `--max-prompt-iqr-pct` to fail noisy benchmark runs when measured tok/s

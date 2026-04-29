@@ -1064,6 +1064,9 @@ def main() -> int:
         if suite_summary.get("failed_runs") != 0:
             print("unexpected_suite_failed_runs=true", file=sys.stderr)
             return 1
+        if suite_summary.get("ok_run_pct") != 100.0:
+            print("unexpected_suite_ok_run_pct=true", file=sys.stderr)
+            return 1
         if suite_summary.get("timed_out_runs") != 0:
             print("unexpected_suite_timed_out_runs=true", file=sys.stderr)
             return 1
@@ -1106,6 +1109,7 @@ def main() -> int:
             return 1
         if not all(
             row.get("failed_runs") == 0
+            and row.get("ok_run_pct") == 100.0
             and row.get("timed_out_runs") == 0
             and row.get("nonzero_exit_runs") == 0
             for row in bench_report["summaries"]
