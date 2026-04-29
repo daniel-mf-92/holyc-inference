@@ -542,6 +542,9 @@ prompt aggregate so CI can publish compact latency, throughput, prompt-byte,
 and memory rollups without parsing JSON. `qemu_prompt_bench_phases_latest.csv`
 adds one row each for warmup, measured, and all launches so CI can compare
 launch health and token totals across phases without parsing raw run rows.
+Measured reports also write `qemu_prompt_bench_prompt_rank_latest.csv` for
+slowest-prompt triage and `qemu_prompt_bench_prompt_variability_latest.csv`
+for prompts with the highest wall tok/s IQR or P05-to-P95 spread.
 JSON and Markdown reports also include
 host provenance for reproducibility: platform, machine, Python version, CPU
 count, QEMU binary/path, QEMU version when discoverable, and a stable SHA256
