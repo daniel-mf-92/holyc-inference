@@ -117,6 +117,46 @@ def test_block_audit_checks_expected_shape(tmp_path: Path) -> None:
     assert "expected 33 elements exceeds block capacity 32" in audit.findings
 
 
+def test_q4_block_audit_counts_nonzero_tail_padding(tmp_path: Path) -> None:
+    block_file = tmp_path / "q4.bin"
+    packed = bytes([0x88] * 15 + [0xF8])
+    block_file.write_bytes(half_bits(1.0) + packed)
+
+    audit = quant_audit.audit_q4_0_blocks(
+        block_file,
+        allow_inf_nan_scale=False,
+        expect_elements=31,
+        fail_nonzero_padding_quants=True,
+    )
+
+    assert audit.padding_element_count == 1
+    assert audit.padding_nonzero_count == 1
+    assert (
+        "block 0: 1 nonzero padding quant entries after expected element count 31"
+        in audit.findings
+    )
+
+
+def test_q8_block_audit_counts_nonzero_tail_padding(tmp_path: Path) -> None:
+    block_file = tmp_path / "q8.bin"
+    payload = bytes([0] * 30 + [0, 5])
+    block_file.write_bytes(half_bits(1.0) + payload)
+
+    audit = quant_audit.audit_q8_0_blocks(
+        block_file,
+        allow_inf_nan_scale=False,
+        expect_elements=30,
+        fail_nonzero_padding_quants=True,
+    )
+
+    assert audit.padding_element_count == 2
+    assert audit.padding_nonzero_count == 1
+    assert (
+        "block 0: 1 nonzero padding quant entries after expected element count 30"
+        in audit.findings
+    )
+
+
 def test_block_audit_checks_q16_scale_limit(tmp_path: Path) -> None:
     block_file = tmp_path / "q8.bin"
     block_file.write_bytes(half_bits(2.0) + bytes([0] * 32))
@@ -313,6 +353,7 @@ def test_cli_fails_on_q16_scale_limit(tmp_path: Path) -> None:
     assert '"worst_block_saturation_count": 0' in report
     markdown_text = markdown.read_text(encoding="utf-8")
     assert "Scale Q16 min/max/absmax/zero/overlimit" in markdown_text
+    assert "Padding elements/nonzero" in markdown_text
     assert "Zero-scale nonzero blocks/entries" in markdown_text
     assert "Used values" in markdown_text
     assert "Min block used values" in markdown_text
@@ -324,6 +365,34 @@ def test_cli_fails_on_q16_scale_limit(tmp_path: Path) -> None:
     failure = junit_root.find("./testcase/failure")
     assert failure is not None
     assert "|scale_q16| 65536 exceeds limit 32768" in (failure.text or "")
+
+
+def test_cli_fails_on_nonzero_padding_quants(tmp_path: Path) -> None:
+    source = tmp_path / "ok.HC"
+    q8_file = tmp_path / "q8.bin"
+    output = tmp_path / "report.json"
+    source.write_text("I64 Good(U16 d_fp16) { return d_fp16; }\n", encoding="utf-8")
+    q8_file.write_bytes(half_bits(1.0) + bytes([0] * 31 + [1]))
+
+    status = quant_audit.main(
+        [
+            "--source-root",
+            str(source),
+            "--q8-block-file",
+            str(q8_file),
+            "--expect-elements",
+            "31",
+            "--fail-nonzero-padding-quants",
+            "--output",
+            str(output),
+        ]
+    )
+
+    report = output.read_text(encoding="utf-8")
+    assert status == 1
+    assert '"padding_element_count": 1' in report
+    assert '"padding_nonzero_count": 1' in report
+    assert "nonzero padding quant entries" in report
 
 
 def test_cli_audits_mixed_q4_and_q8_block_files(tmp_path: Path) -> None:

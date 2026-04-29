@@ -58,6 +58,8 @@ class BlockAudit:
     bytes_read: int
     block_count: int
     element_capacity: int
+    padding_element_count: int
+    padding_nonzero_count: int
     scale_zero_count: int
     scale_subnormal_count: int
     scale_normal_count: int
@@ -297,6 +299,16 @@ def check_expected_shape(
         findings.append(f"expected {expect_elements} elements exceeds block capacity {capacity}")
 
 
+def is_padding_element(
+    block_index: int,
+    element_index: int,
+    expect_elements: int | None,
+) -> bool:
+    if expect_elements is None:
+        return False
+    return block_index * BLOCK_ELEMENTS + element_index >= expect_elements
+
+
 def empty_histogram(min_value: int, max_value: int) -> dict[str, int]:
     return {str(value): 0 for value in range(min_value, max_value + 1)}
 
@@ -380,6 +392,7 @@ def audit_q4_0_blocks(
     fail_zero_scale_nonzero_blocks: bool = False,
     fail_zero_scales: bool = False,
     fail_subnormal_scales: bool = False,
+    fail_nonzero_padding_quants: bool = False,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -392,6 +405,8 @@ def audit_q4_0_blocks(
     quant_min = math.inf
     quant_max = -math.inf
     quant_zero_count = 0
+    padding_element_count = 0
+    padding_nonzero_count = 0
     zero_scale_nonzero_quant_block_count = 0
     zero_scale_nonzero_quant_entry_count = 0
     quant_histogram = empty_histogram(-8, 7)
@@ -440,7 +455,9 @@ def audit_q4_0_blocks(
 
         packed = data[offset + 2 : offset + 2 + Q4_0_PACKED_BYTES]
         block_nonzero_quant_count = 0
+        block_padding_nonzero_count = 0
         block_histogram = {value: 0 for value in range(-8, 8)}
+        element_index = 0
         for byte in packed:
             for nibble in (byte & 0x0F, (byte >> 4) & 0x0F):
                 signed = nibble - 8
@@ -452,6 +469,24 @@ def audit_q4_0_blocks(
                     quant_zero_count += 1
                 else:
                     block_nonzero_quant_count += 1
+                if is_padding_element(block_index, element_index, expect_elements):
+                    padding_element_count += 1
+                    if signed != 0:
+                        padding_nonzero_count += 1
+                        block_padding_nonzero_count += 1
+                element_index += 1
+
+        if block_padding_nonzero_count and fail_nonzero_padding_quants:
+            findings.append(
+                (
+                    "block {block}: {count} nonzero padding quant entries after "
+                    "expected element count {expected}"
+                ).format(
+                    block=block_index,
+                    count=block_padding_nonzero_count,
+                    expected=expect_elements,
+                )
+            )
 
         block_used_values, block_saturation_count, block_saturation_pct = (
             check_block_quant_distribution(
@@ -505,6 +540,8 @@ def audit_q4_0_blocks(
         bytes_read=len(data),
         block_count=block_count,
         element_capacity=block_count * BLOCK_ELEMENTS,
+        padding_element_count=padding_element_count,
+        padding_nonzero_count=padding_nonzero_count,
         scale_zero_count=counts["zero"],
         scale_subnormal_count=counts["subnormal"],
         scale_normal_count=counts["normal"],
@@ -546,6 +583,7 @@ def audit_q8_0_blocks(
     fail_zero_scale_nonzero_blocks: bool = False,
     fail_zero_scales: bool = False,
     fail_subnormal_scales: bool = False,
+    fail_nonzero_padding_quants: bool = False,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -558,6 +596,8 @@ def audit_q8_0_blocks(
     quant_min = math.inf
     quant_max = -math.inf
     quant_zero_count = 0
+    padding_element_count = 0
+    padding_nonzero_count = 0
     zero_scale_nonzero_quant_block_count = 0
     zero_scale_nonzero_quant_entry_count = 0
     quant_histogram = empty_histogram(-128, 127)
@@ -606,8 +646,9 @@ def audit_q8_0_blocks(
 
         qs = data[offset + 2 : offset + 2 + Q8_0_PACKED_BYTES]
         block_nonzero_quant_count = 0
+        block_padding_nonzero_count = 0
         block_histogram = {value: 0 for value in range(-128, 128)}
-        for value in struct.unpack("<32b", qs):
+        for element_index, value in enumerate(struct.unpack("<32b", qs)):
             quant_min = min(quant_min, value)
             quant_max = max(quant_max, value)
             quant_histogram[str(value)] += 1
@@ -616,6 +657,23 @@ def audit_q8_0_blocks(
                 quant_zero_count += 1
             else:
                 block_nonzero_quant_count += 1
+            if is_padding_element(block_index, element_index, expect_elements):
+                padding_element_count += 1
+                if value != 0:
+                    padding_nonzero_count += 1
+                    block_padding_nonzero_count += 1
+
+        if block_padding_nonzero_count and fail_nonzero_padding_quants:
+            findings.append(
+                (
+                    "block {block}: {count} nonzero padding quant entries after "
+                    "expected element count {expected}"
+                ).format(
+                    block=block_index,
+                    count=block_padding_nonzero_count,
+                    expected=expect_elements,
+                )
+            )
 
         block_used_values, block_saturation_count, block_saturation_pct = (
             check_block_quant_distribution(
@@ -669,6 +727,8 @@ def audit_q8_0_blocks(
         bytes_read=len(data),
         block_count=block_count,
         element_capacity=block_count * BLOCK_ELEMENTS,
+        padding_element_count=padding_element_count,
+        padding_nonzero_count=padding_nonzero_count,
         scale_zero_count=counts["zero"],
         scale_subnormal_count=counts["subnormal"],
         scale_normal_count=counts["normal"],
@@ -711,6 +771,7 @@ def audit_blocks(
     fail_zero_scale_nonzero_blocks: bool = False,
     fail_zero_scales: bool = False,
     fail_subnormal_scales: bool = False,
+    fail_nonzero_padding_quants: bool = False,
 ) -> BlockAudit:
     if quant_format == "q4_0":
         return audit_q4_0_blocks(
@@ -726,6 +787,7 @@ def audit_blocks(
             fail_zero_scale_nonzero_blocks,
             fail_zero_scales,
             fail_subnormal_scales,
+            fail_nonzero_padding_quants,
         )
     if quant_format == "q8_0":
         return audit_q8_0_blocks(
@@ -741,6 +803,7 @@ def audit_blocks(
             fail_zero_scale_nonzero_blocks,
             fail_zero_scales,
             fail_subnormal_scales,
+            fail_nonzero_padding_quants,
         )
     raise ValueError(f"unsupported quant format: {quant_format}")
 
@@ -771,9 +834,9 @@ def markdown_report(report: dict) -> str:
         lines.extend(
             [
                 "| Format | Path | Blocks | Capacity | Scale zero/subnormal/normal/inf_nan "
-                "| Scale Q16 min/max/absmax/zero/overlimit | Zero-scale nonzero blocks/entries | Quant min/max | Used values | Zero/nonzero quants "
+                "| Padding elements/nonzero | Scale Q16 min/max/absmax/zero/overlimit | Zero-scale nonzero blocks/entries | Quant min/max | Used values | Zero/nonzero quants "
                 "| Saturated quants | Min block used values | Worst block saturation | Findings |",
-                "| --- | --- | ---: | ---: | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| --- | --- | ---: | ---: | --- | ---: | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
         for audit in block_audits:
@@ -796,7 +859,8 @@ def markdown_report(report: dict) -> str:
             lines.append(
                 (
                     "| {format} | `{path}` | {block_count} | {element_capacity} | "
-                    "{scales} | {scale_q16} | {zero_scale_nonzero_quant_block_count}/{zero_scale_nonzero_quant_entry_count} | "
+                    "{scales} | {padding_element_count}/{padding_nonzero_count} | "
+                    "{scale_q16} | {zero_scale_nonzero_quant_block_count}/{zero_scale_nonzero_quant_entry_count} | "
                     "{quant_min}/{quant_max} | {quant_used_value_count} | "
                     "{quant_zero_count}/{quant_nonzero_count} | {quant_saturation_count} ({quant_saturation_pct:.3f}%) | "
                     "{min_block_used_quant_values} @ {min_block_used_quant_values_index} | "
@@ -808,6 +872,8 @@ def markdown_report(report: dict) -> str:
                     block_count=audit["block_count"],
                     element_capacity=audit["element_capacity"],
                     scales=scale_counts,
+                    padding_element_count=audit["padding_element_count"],
+                    padding_nonzero_count=audit["padding_nonzero_count"],
                     scale_q16=scale_q16,
                     zero_scale_nonzero_quant_block_count=audit[
                         "zero_scale_nonzero_quant_block_count"
@@ -1054,6 +1120,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fail any raw block whose fp16 scale field is subnormal",
     )
+    parser.add_argument(
+        "--fail-nonzero-padding-quants",
+        action="store_true",
+        help="Fail tail padding elements with nonzero quant payload values when --expect-elements is set",
+    )
     parser.add_argument("--allow-inf-nan-scale", action="store_true", help="Do not fail on fp16 inf/nan scales")
     parser.add_argument("--output", type=Path, help="Write JSON report to this path")
     parser.add_argument("--markdown", type=Path, help="Write Markdown report to this path")
@@ -1086,6 +1157,7 @@ def main(argv: list[str] | None = None) -> int:
             args.fail_zero_scale_nonzero_blocks,
             args.fail_zero_scales,
             args.fail_subnormal_scales,
+            args.fail_nonzero_padding_quants,
         )
         for path, quant_format in block_specs
     ]
