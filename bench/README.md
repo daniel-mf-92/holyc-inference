@@ -520,8 +520,8 @@ with a host-side match flag, giving CI a cheap independent check that the guest
 consumed the same input length. Suite, phase, and prompt summaries include
 guest prompt hash/byte record, match, and mismatch counts so prompt-integrity
 coverage is visible without scanning every launch row. Per-run records also
-include stdout, stderr, and combined serial output byte counts. Suite and
-prompt summaries roll those up so verbose guest logging can be gated
+include stdout/stderr byte counts plus combined serial byte and line counts.
+Suite, phase, and prompt summaries roll those up so verbose guest logging can be gated
 separately from decode throughput. Optional first-token latency telemetry is
 normalized from `ttft_us`, `time_to_first_token_us`, `first_token_us`, and their
 `_ms` or `_s` variants into `ttft_us`; suite and per-prompt reports include
@@ -610,7 +610,8 @@ Use `--require-tokens`, `--require-tok-per-s`, `--require-memory`,
 `--max-wall-timeout-pct`, `--min-host-child-tok-per-cpu-s`,
 `--min-tokens-per-prompt-byte`, `--require-host-child-rss`,
 `--max-host-child-rss-bytes`, `--max-memory-bytes-per-token`,
-`--max-serial-output-bytes`, `--require-guest-prompt-sha256-match`, and
+`--max-serial-output-bytes`, `--max-serial-output-lines`,
+`--require-guest-prompt-sha256-match`, and
 `--require-guest-prompt-bytes-match` to fail measured runs or suites that omit required
 telemetry, produce too little work for a trustworthy throughput sample, exceed
 a host-observed latency, memory, RSS, orchestration overhead, or serial
@@ -655,6 +656,7 @@ python3 bench/qemu_prompt_bench.py \
   --max-host-child-rss-bytes 1073741824 \
   --max-memory-bytes-per-token 16777216 \
   --max-serial-output-bytes 65536 \
+  --max-serial-output-lines 256 \
   --require-guest-prompt-sha256-match \
   --require-guest-prompt-bytes-match \
   --qemu-args-file bench/fixtures/local-qemu.args \

@@ -139,6 +139,7 @@ class BenchRun:
     stdout_bytes: int
     stderr_bytes: int
     serial_output_bytes: int
+    serial_output_lines: int
     returncode: int
     timed_out: bool
     exit_class: str
@@ -198,6 +199,10 @@ def prompt_bytes(prompt: str) -> int:
 
 def text_bytes(text: str) -> int:
     return len(text.encode("utf-8"))
+
+
+def text_lines(text: str) -> int:
+    return len(text.splitlines())
 
 
 def prompt_suite_hash_parts(payload: list[dict[str, Any]]) -> str:
@@ -971,6 +976,7 @@ def run_prompt(
         stdout_bytes=stdout_bytes,
         stderr_bytes=stderr_bytes,
         serial_output_bytes=stdout_bytes + stderr_bytes,
+        serial_output_lines=text_lines(stdout) + text_lines(stderr),
         returncode=returncode,
         timed_out=timed_out,
         exit_class=classify_exit(returncode, timed_out),
@@ -1037,6 +1043,7 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
             if run.memory_bytes_per_token is not None
         ]
         serial_output_values = [run.serial_output_bytes for run in prompt_runs]
+        serial_output_line_values = [run.serial_output_lines for run in prompt_runs]
         ok_runs = [run for run in prompt_runs if run.returncode == 0 and not run.timed_out]
         timed_out_runs = [run for run in prompt_runs if run.timed_out]
         nonzero_exit_runs = [run for run in prompt_runs if run.returncode != 0]
@@ -1117,6 +1124,10 @@ def summarize_runs(runs: list[BenchRun]) -> list[dict[str, Any]]:
                 else None,
                 "serial_output_bytes_total": sum(serial_output_values),
                 "serial_output_bytes_max": max(serial_output_values) if serial_output_values else None,
+                "serial_output_lines_total": sum(serial_output_line_values),
+                "serial_output_lines_max": max(serial_output_line_values)
+                if serial_output_line_values
+                else None,
                 **prompt_integrity_summary(prompt_runs),
             }
         )
@@ -1265,6 +1276,7 @@ def telemetry_findings(
     max_host_child_rss_bytes: int | None = None,
     max_memory_bytes_per_token: float | None = None,
     max_serial_output_bytes: int | None = None,
+    max_serial_output_lines: int | None = None,
     require_guest_prompt_sha256_match: bool = False,
     require_guest_prompt_bytes_match: bool = False,
     require_expected_tokens_match: bool = False,
@@ -1432,6 +1444,15 @@ def telemetry_findings(
                     "limit": max_serial_output_bytes,
                 }
             )
+        if max_serial_output_lines is not None and run.serial_output_lines > max_serial_output_lines:
+            findings.append(
+                {
+                    **base,
+                    "metric": "serial_output_lines",
+                    "value": run.serial_output_lines,
+                    "limit": max_serial_output_lines,
+                }
+            )
         if require_guest_prompt_sha256_match and run.guest_prompt_sha256_match is not True:
             findings.append(
                 {
@@ -1484,6 +1505,7 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
         run.memory_bytes_per_token for run in runs if run.memory_bytes_per_token is not None
     ]
     serial_output_values = [run.serial_output_bytes for run in runs]
+    serial_output_line_values = [run.serial_output_lines for run in runs]
     token_values = [run.tokens for run in runs if run.tokens is not None]
     prompts = sorted({run.prompt for run in runs})
     ok_runs = [run for run in runs if run.returncode == 0 and not run.timed_out]
@@ -1559,6 +1581,10 @@ def suite_summary(runs: list[BenchRun]) -> dict[str, Any]:
         else None,
         "serial_output_bytes_total": sum(serial_output_values),
         "serial_output_bytes_max": max(serial_output_values) if serial_output_values else None,
+        "serial_output_lines_total": sum(serial_output_line_values),
+        "serial_output_lines_max": max(serial_output_line_values)
+        if serial_output_line_values
+        else None,
         **prompt_integrity_summary(runs),
     }
 
@@ -1644,9 +1670,9 @@ def markdown_report(report: dict[str, Any]) -> str:
                     **{key: format_summary_value(value) for key, value in suite.items()}
                 ),
                 "",
-                "| Serial output bytes total | Serial output bytes max |",
-                "| ---: | ---: |",
-                "| {serial_output_bytes_total} | {serial_output_bytes_max} |".format(
+                "| Serial output bytes total | Serial output bytes max | Serial output lines total | Serial output lines max |",
+                "| ---: | ---: | ---: | ---: |",
+                "| {serial_output_bytes_total} | {serial_output_bytes_max} | {serial_output_lines_total} | {serial_output_lines_max} |".format(
                     **{key: format_summary_value(value) for key, value in suite.items()}
                 ),
                 "",
@@ -1679,13 +1705,13 @@ def markdown_report(report: dict[str, Any]) -> str:
                 "",
                 "## Prompt Serial Output",
                 "",
-                "| Prompt | Serial output bytes total | Serial output bytes max |",
-                "| --- | ---: | ---: |",
+                "| Prompt | Serial output bytes total | Serial output bytes max | Serial output lines total | Serial output lines max |",
+                "| --- | ---: | ---: | ---: | ---: |",
             ]
         )
         for summary in report["summaries"]:
             lines.append(
-                "| {prompt} | {serial_output_bytes_total} | {serial_output_bytes_max} |".format(
+                "| {prompt} | {serial_output_bytes_total} | {serial_output_bytes_max} | {serial_output_lines_total} | {serial_output_lines_max} |".format(
                     **{key: format_summary_value(value) for key, value in summary.items()}
                 )
             )
@@ -1763,15 +1789,15 @@ def markdown_report(report: dict[str, Any]) -> str:
                 "",
                 "## Phase Summary",
                 "",
-                "| Phase | Launches | Prompts | OK | Failed | OK % | Timed out | Nonzero exit | Total tokens | Median tok/s | Median wall tok/s | Max memory bytes | Serial output bytes total |",
-                "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| Phase | Launches | Prompts | OK | Failed | OK % | Timed out | Nonzero exit | Total tokens | Median tok/s | Median wall tok/s | Max memory bytes | Serial output bytes total | Serial output lines total |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
         for row in phase_rows:
             lines.append(
                 "| {phase} | {launches} | {prompts} | {ok_runs} | {failed_runs} | {ok_run_pct} | "
                 "{timed_out_runs} | {nonzero_exit_runs} | {total_tokens} | {tok_per_s_median} | "
-                "{wall_tok_per_s_median} | {memory_bytes_max} | {serial_output_bytes_total} |".format(
+                "{wall_tok_per_s_median} | {memory_bytes_max} | {serial_output_bytes_total} | {serial_output_lines_total} |".format(
                     **{key: format_summary_value(value) for key, value in row.items()}
                 )
             )
@@ -2207,6 +2233,7 @@ def write_report(
     max_host_child_rss_bytes: int | None = None,
     max_memory_bytes_per_token: float | None = None,
     max_serial_output_bytes: int | None = None,
+    max_serial_output_lines: int | None = None,
     require_guest_prompt_sha256_match: bool = False,
     require_guest_prompt_bytes_match: bool = False,
     require_expected_tokens_match: bool = False,
@@ -2255,6 +2282,7 @@ def write_report(
         max_host_child_rss_bytes=max_host_child_rss_bytes,
         max_memory_bytes_per_token=max_memory_bytes_per_token,
         max_serial_output_bytes=max_serial_output_bytes,
+        max_serial_output_lines=max_serial_output_lines,
         require_guest_prompt_sha256_match=require_guest_prompt_sha256_match,
         require_guest_prompt_bytes_match=require_guest_prompt_bytes_match,
         require_expected_tokens_match=require_expected_tokens_match,
@@ -2315,6 +2343,7 @@ def write_report(
             "max_host_child_rss_bytes": max_host_child_rss_bytes,
             "max_memory_bytes_per_token": max_memory_bytes_per_token,
             "max_serial_output_bytes": max_serial_output_bytes,
+            "max_serial_output_lines": max_serial_output_lines,
             "require_guest_prompt_sha256_match": require_guest_prompt_sha256_match,
             "require_guest_prompt_bytes_match": require_guest_prompt_bytes_match,
             "require_expected_tokens_match": require_expected_tokens_match,
@@ -2388,6 +2417,7 @@ def write_csv_report(runs: list[BenchRun], path: Path) -> None:
         "stdout_bytes",
         "stderr_bytes",
         "serial_output_bytes",
+        "serial_output_lines",
         "returncode",
         "timed_out",
         "exit_class",
@@ -2452,6 +2482,8 @@ def write_summary_csv_report(report: dict[str, Any], path: Path) -> None:
         "memory_bytes_per_token_max",
         "serial_output_bytes_total",
         "serial_output_bytes_max",
+        "serial_output_lines_total",
+        "serial_output_lines_max",
         "guest_prompt_sha256_records",
         "guest_prompt_sha256_matches",
         "guest_prompt_sha256_mismatches",
@@ -2518,6 +2550,8 @@ def write_phase_csv_report(report: dict[str, Any], path: Path) -> None:
         "memory_bytes_per_token_max",
         "serial_output_bytes_total",
         "serial_output_bytes_max",
+        "serial_output_lines_total",
+        "serial_output_lines_max",
         "guest_prompt_sha256_records",
         "guest_prompt_sha256_matches",
         "guest_prompt_sha256_mismatches",
@@ -2570,6 +2604,7 @@ def write_launch_csv_report(report: dict[str, Any], path: Path) -> None:
         "wall_tok_per_s",
         "memory_bytes",
         "serial_output_bytes",
+        "serial_output_lines",
     ]
     rows = []
     for key in ("warmups", "benchmarks"):
@@ -2697,6 +2732,7 @@ def write_junit_report(
                 f"stdout_bytes={run.stdout_bytes}\n"
                 f"stderr_bytes={run.stderr_bytes}\n"
                 f"serial_output_bytes={run.serial_output_bytes}\n"
+                f"serial_output_lines={run.serial_output_lines}\n"
                 f"command_sha256={run.command_sha256}\n"
                 f"stdout_tail={run.stdout_tail}\n"
                 f"stderr_tail={run.stderr_tail}\n"
@@ -2925,6 +2961,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail if any measured run emits more combined stdout/stderr serial bytes",
     )
     parser.add_argument(
+        "--max-serial-output-lines",
+        type=int,
+        default=None,
+        help="Fail if any measured run emits more combined stdout/stderr serial lines",
+    )
+    parser.add_argument(
         "--require-guest-prompt-sha256-match",
         action="store_true",
         help="Fail if guest-reported prompt SHA-256 is missing or differs from the host prompt",
@@ -3020,6 +3062,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.max_serial_output_bytes is not None and args.max_serial_output_bytes < 0:
         print("error: --max-serial-output-bytes must be >= 0", file=sys.stderr)
+        return 2
+    if args.max_serial_output_lines is not None and args.max_serial_output_lines < 0:
+        print("error: --max-serial-output-lines must be >= 0", file=sys.stderr)
         return 2
 
     try:
@@ -3117,6 +3162,7 @@ def main(argv: list[str] | None = None) -> int:
         max_host_child_rss_bytes=args.max_host_child_rss_bytes,
         max_memory_bytes_per_token=args.max_memory_bytes_per_token,
         max_serial_output_bytes=args.max_serial_output_bytes,
+        max_serial_output_lines=args.max_serial_output_lines,
         require_guest_prompt_sha256_match=args.require_guest_prompt_sha256_match,
         require_guest_prompt_bytes_match=args.require_guest_prompt_bytes_match,
         require_expected_tokens_match=args.require_expected_tokens_match,

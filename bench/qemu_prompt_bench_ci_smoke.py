@@ -82,6 +82,8 @@ def main() -> int:
             "6",
             "--min-prompt-count",
             "2",
+            "--max-serial-output-lines",
+            "1",
             "--qemu-arg=-m",
             "--qemu-arg=256M",
         ]
@@ -160,6 +162,16 @@ def main() -> int:
             "unexpected_suite_guest_prompt_bytes_matches",
         ):
             return rc
+        if rc := require(
+            report["suite_summary"]["serial_output_lines_total"] == 4,
+            "unexpected_suite_serial_output_lines",
+        ):
+            return rc
+        if rc := require(
+            report["telemetry_gates"]["max_serial_output_lines"] == 1,
+            "missing_serial_output_line_gate",
+        ):
+            return rc
 
         phases = {row["phase"]: row for row in report["phase_summaries"]}
         if rc := require(set(phases) == {"warmup", "measured", "all"}, "unexpected_phase_rows"):
@@ -171,6 +183,11 @@ def main() -> int:
         if rc := require(phases["measured"]["launches"] == 4, "unexpected_measured_phase_launches"):
             return rc
         if rc := require(phases["measured"]["total_tokens"] == 160, "unexpected_measured_phase_tokens"):
+            return rc
+        if rc := require(
+            phases["measured"]["serial_output_lines_total"] == 4,
+            "unexpected_measured_phase_serial_output_lines",
+        ):
             return rc
         if rc := require(
             phases["measured"]["guest_prompt_sha256_mismatches"] == 0,
@@ -191,9 +208,14 @@ def main() -> int:
         if rc := require(len(phase_rows) == 3, "unexpected_phase_csv_rows"):
             return rc
         if rc := require(
-            {"phase", "launches", "total_tokens", "tok_per_s_median", "serial_output_bytes_total"}.issubset(
-                phase_rows[0].keys()
-            ),
+            {
+                "phase",
+                "launches",
+                "total_tokens",
+                "tok_per_s_median",
+                "serial_output_bytes_total",
+                "serial_output_lines_total",
+            }.issubset(phase_rows[0].keys()),
             "missing_phase_csv_columns",
         ):
             return rc
@@ -215,6 +237,7 @@ def main() -> int:
             {
                 "expected_launch_sequence_sha256",
                 "observed_launch_sequence_sha256",
+                "serial_output_lines",
             }.issubset(launch_rows[0].keys()),
             "missing_launch_sequence_csv_columns",
         ):
