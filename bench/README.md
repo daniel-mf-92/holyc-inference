@@ -507,6 +507,12 @@ launch so CI can audit actual launch order against the reviewed plan. They also
 record input artifact metadata for the disk image path and any
 `--qemu-args-file` sources; pass `--hash-image` when the disk image digest
 should be recorded alongside size and mtime.
+JSON and JSONL prompt rows can declare `expected_tokens` or
+`expected_generated_tokens` to pin intended decode length for comparable
+throughput runs. Use `--require-expected-tokens-match` when CI should fail any
+measured run whose emitted token count differs from the prompt-declared count.
+Expected-token metadata is reported separately and does not alter the prompt
+suite hash, which remains tied to prompt IDs and prompt text.
 
 Prompt files can be JSON, JSONL, or plain text split with `---`. Guest output may
 include a JSON line such as:

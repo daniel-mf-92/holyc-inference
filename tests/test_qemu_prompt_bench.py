@@ -88,7 +88,10 @@ def test_qemu_args_file_parsing_and_air_gap_validation(tmp_path: Path) -> None:
 def test_load_prompt_cases_json_and_text(tmp_path: Path) -> None:
     prompt_json = tmp_path / "prompts.json"
     prompt_text = tmp_path / "prompts.txt"
-    prompt_json.write_text(json.dumps({"prompts": [{"id": "arc-1", "prompt": "Question?"}]}), encoding="utf-8")
+    prompt_json.write_text(
+        json.dumps({"prompts": [{"id": "arc-1", "prompt": "Question?", "expected_tokens": 4}]}),
+        encoding="utf-8",
+    )
     prompt_text.write_text("first\n---\nsecond\n", encoding="utf-8")
 
     json_cases = qemu_prompt_bench.load_prompt_cases(prompt_json)
@@ -96,6 +99,7 @@ def test_load_prompt_cases_json_and_text(tmp_path: Path) -> None:
 
     assert json_cases[0].prompt_id == "arc-1"
     assert json_cases[0].prompt == "Question?"
+    assert json_cases[0].expected_tokens == 4
     assert [case.prompt for case in text_cases] == ["first", "second"]
 
 
@@ -930,6 +934,112 @@ print(f"tokens=12 elapsed_us=100000 prompt_sha256={hashlib.sha256(prompt.encode(
     assert report["status"] == "pass"
     assert report["benchmarks"][0]["guest_prompt_sha256"] == report["benchmarks"][0]["prompt_sha256"]
     assert report["benchmarks"][0]["guest_prompt_sha256_match"] is True
+    assert report["telemetry_findings"] == []
+
+
+def test_cli_expected_tokens_gate_fails_mismatched_decode_length(tmp_path: Path) -> None:
+    fake_qemu = tmp_path / "fake-qemu.py"
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    output_dir = tmp_path / "results"
+    prompts.write_text(
+        '{"prompt_id":"short","prompt":"Short decode","expected_tokens":12}\n'
+        '{"prompt_id":"long","prompt":"Long decode","expected_tokens":24}\n',
+        encoding="utf-8",
+    )
+    fake_qemu.write_text(
+        """#!/usr/bin/env python3
+import os
+prompt_id = os.environ["HOLYC_BENCH_PROMPT_ID"]
+tokens = 24 if prompt_id == "long" else 8
+print(f"tokens={tokens} elapsed_us=100000")
+""",
+        encoding="utf-8",
+    )
+    fake_qemu.chmod(0o755)
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--qemu-bin",
+            str(fake_qemu),
+            "--output-dir",
+            str(output_dir),
+            "--require-expected-tokens-match",
+        ]
+    )
+
+    assert status == 1
+    report = json.loads((output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8"))
+    markdown = (output_dir / "qemu_prompt_bench_latest.md").read_text(encoding="utf-8")
+    csv_report = (output_dir / "qemu_prompt_bench_latest.csv").read_text(encoding="utf-8")
+    launch_csv = (output_dir / "qemu_prompt_bench_launches_latest.csv").read_text(encoding="utf-8")
+    junit_root = ET.parse(output_dir / "qemu_prompt_bench_junit_latest.xml").getroot()
+
+    assert report["status"] == "fail"
+    assert report["prompt_suite"]["expected_token_prompts"] == 2
+    assert report["prompt_suite"]["expected_tokens_total"] == 36
+    assert report["telemetry_gates"]["require_expected_tokens_match"] is True
+    assert [run["expected_tokens_match"] for run in report["benchmarks"]] == [False, True]
+    assert report["telemetry_findings"] == [
+        {
+            "scope": "measured_run",
+            "launch_index": 1,
+            "prompt": "short",
+            "iteration": 1,
+            "metric": "expected_tokens_match",
+            "value": 8,
+            "limit": 12,
+        }
+    ]
+    assert "expected_tokens_match" in markdown
+    assert "expected_tokens,expected_tokens_match" in csv_report
+    assert "expected_tokens" in launch_csv
+    assert junit_root.attrib["failures"] == "1"
+
+
+def test_cli_expected_tokens_gate_ignores_undeclared_prompt_counts(tmp_path: Path) -> None:
+    fake_qemu = tmp_path / "fake-qemu.py"
+    prompts = tmp_path / "prompts.jsonl"
+    image = tmp_path / "temple.img"
+    output_dir = tmp_path / "results"
+    prompts.write_text(
+        '{"prompt_id":"declared","prompt":"Declared decode","expected_tokens":7}\n'
+        '{"prompt_id":"undeclared","prompt":"Free decode"}\n',
+        encoding="utf-8",
+    )
+    fake_qemu.write_text(
+        """#!/usr/bin/env python3
+import os
+prompt_id = os.environ["HOLYC_BENCH_PROMPT_ID"]
+tokens = 123 if prompt_id == "undeclared" else 7
+print(f"tokens={tokens} elapsed_us=100000")
+""",
+        encoding="utf-8",
+    )
+    fake_qemu.chmod(0o755)
+
+    status = qemu_prompt_bench.main(
+        [
+            "--image",
+            str(image),
+            "--prompts",
+            str(prompts),
+            "--qemu-bin",
+            str(fake_qemu),
+            "--output-dir",
+            str(output_dir),
+            "--require-expected-tokens-match",
+        ]
+    )
+
+    assert status == 0
+    report = json.loads((output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8"))
+    assert report["status"] == "pass"
+    assert [run["expected_tokens_match"] for run in report["benchmarks"]] == [True, None]
     assert report["telemetry_findings"] == []
 
 

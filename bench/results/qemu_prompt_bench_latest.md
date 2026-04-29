@@ -1,14 +1,14 @@
 # QEMU Prompt Benchmark
 
-Generated: 2026-04-29T10:33:12Z
+Generated: 2026-04-29T11:32:34Z
 Status: pass
 Prompt suite: 68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a
 Command SHA256: e415146c052b9f0baa23706ffde97548f2374f6601337823b4d810c39bed48e7
-Launch plan SHA256: 7bf1257265af0839c236008631b4062821e27fef1c51977fd318fdf878f2db14
+Launch plan SHA256: 1b8f97385b6c789b6df66f05e476b20f6766421b6e861be746735d67cc9513da
 Launch budget: -
-Total launches: 2
+Total launches: 6
 Warmup runs: 0
-Runs: 2
+Runs: 6
 
 ## Inputs
 
@@ -20,29 +20,29 @@ Runs: 2
 
 | Prompts | Runs | OK | Failed | OK % | Timed out | Nonzero exit | Measured prompt bytes | Total tokens | Total elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | P05 tok/s | Median tok/s | P95 tok/s | P05 wall tok/s | Median wall tok/s | P95 wall tok/s | Median prompt bytes/s | Median wall prompt bytes/s | Median tokens/prompt byte | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes | Median memory bytes/token | Max memory bytes/token |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 2 | 2 | 2 | 0 | 100.000 | 0 | 0 | 120 | 80 | 500000 | 712134.000 | 375.546 | 61777.500 | 39.767 | 697.041 | 17547264 | 12000.000 | 12360.000 | 160.000 | 160.000 | 160.000 | 52.587 | 370.865 | 689.142 | 240.833 | 549.019 | 0.665 | 6250.000 | 6250.000 | 29721.625 | 55228.862 | 67207168 | 1749674.667 | 2099200.000 |
+| 2 | 6 | 6 | 0 | 100.000 | 0 | 0 | 360 | 240 | 1500000 | 124314.500 | 55.782 | 73266.000 | 24.577 | 489.590 | 18137088 | 12000.000 | 12400.000 | 160.000 | 160.000 | 160.000 | 58.974 | 106.741 | 289.541 | 240.833 | 160.127 | 0.665 | 6250.000 | 6250.000 | 9736.406 | 16962.344 | 67207168 | 1749674.667 | 2099200.000 |
 
 | tok/s stdev | tok/s CV % | tok/s IQR % | tok/s P05-P95 spread % | Wall tok/s IQR % | Wall tok/s P05-P95 spread % |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 0.000 | 0.000 | 0.000 | 0.000 | 95.356 | 171.641 |
+| 0.000 | 0.000 | 0.000 | 0.000 | 123.082 | 216.006 |
 
 | Serial output bytes total | Serial output bytes max |
 | ---: | ---: |
-| 430 | 215 |
+| 1290 | 215 |
 
 ## Prompt Summary
 
 | Prompt | Prompt bytes | Runs | OK | Failed | OK % | Timed out | Nonzero exit | Median tokens | Median elapsed us | Median host overhead us | Median host overhead % | Median host child CPU us | Median host child CPU % | Median host child tok/CPU-s | Max host child RSS bytes | Median TTFT us | P95 TTFT us | Min tok/s | P05 tok/s | Median tok/s | tok/s stdev | tok/s CV % | tok/s IQR % | P05-P95 spread % | Max tok/s | P05 wall tok/s | Median wall tok/s | P95 wall tok/s | Wall tok/s IQR % | Wall P05-P95 spread % | Median prompt bytes/s | Median wall prompt bytes/s | Median tokens/prompt byte | Median us/token | P95 us/token | Median wall us/token | P95 wall us/token | Max memory bytes | Median memory bytes/token | Max memory bytes/token |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| smoke-code | 71 | 1 | 1 | 0 | 100.000 | 0 | 0 | 48 | 300000 | -233748 | -77.916 | 50073 | 75.580 | 958.600 | 573440 | 12400 | 12400.000 | 160.000 | 160.000 | 160.000 | - | - | 0.000 | 0.000 | 160.000 | 724.506 | 724.506 | 724.506 | 0.000 | 0.000 | 236.667 | 1071.666 | 0.676 | 6250.000 | 6250.000 | 1380.250 | 1380.250 | 67207168 | 1400149.333 | 1400149.333 |
-| smoke-short | 49 | 1 | 1 | 0 | 100.000 | 0 | 0 | 32 | 200000 | 1658016 | 829.008 | 73482 | 3.955 | 435.481 | 17547264 | 11600 | 11600.000 | 160.000 | 160.000 | 160.000 | - | - | 0.000 | 0.000 | 160.000 | 17.223 | 17.223 | 17.223 | 0.000 | 0.000 | 245.000 | 26.372 | 0.653 | 6250.000 | 6250.000 | 58063.000 | 58063.000 | 67174400 | 2099200.000 | 2099200.000 |
+| smoke-code | 71 | 3 | 3 | 0 | 100.000 | 0 | 0 | 48 | 300000 | -83972 | -27.991 | 72942 | 31.551 | 658.057 | 14204928 | 12400 | 12400.000 | 160.000 | 160.000 | 160.000 | 0.000 | 0.000 | 0.000 | 0.000 | 160.000 | 136.961 | 222.193 | 303.010 | 41.518 | 74.732 | 236.667 | 328.661 | 0.676 | 6250.000 | 6250.000 | 4500.583 | 7509.377 | 67207168 | 1400149.333 | 1400149.333 |
+| smoke-short | 49 | 3 | 3 | 0 | 100.000 | 0 | 0 | 32 | 200000 | 325842 | 162.921 | 73590 | 13.418 | 434.842 | 18137088 | 11600 | 11600.000 | 160.000 | 160.000 | 160.000 | 0.000 | 0.000 | 0.000 | 0.000 | 160.000 | 58.597 | 60.855 | 83.477 | 22.713 | 40.884 | 245.000 | 93.184 | 0.653 | 6250.000 | 6250.000 | 16432.562 | 17068.300 | 67174400 | 2099200.000 | 2099200.000 |
 
 ## Prompt Serial Output
 
 | Prompt | Serial output bytes total | Serial output bytes max |
 | --- | ---: | ---: |
-| smoke-code | 215 | 215 |
-| smoke-short | 215 | 215 |
+| smoke-code | 645 | 215 |
+| smoke-short | 645 | 215 |
 
 ## Environment
 

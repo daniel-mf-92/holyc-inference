@@ -1270,6 +1270,7 @@ def main() -> int:
             "--max-memory-bytes-per-token",
             "3000000",
             "--require-guest-prompt-bytes-match",
+            "--require-expected-tokens-match",
             "--output-dir",
             str(bench_output_dir),
         ]
@@ -1324,6 +1325,9 @@ def main() -> int:
             return 1
         if telemetry_gates.get("require_guest_prompt_bytes_match") is not True:
             print("missing_guest_prompt_bytes_gate=true", file=sys.stderr)
+            return 1
+        if telemetry_gates.get("require_expected_tokens_match") is not True:
+            print("missing_expected_tokens_gate=true", file=sys.stderr)
             return 1
         if telemetry_gates.get("min_tokens_per_prompt_byte") != 0.5:
             print("missing_min_tokens_per_prompt_byte_gate=true", file=sys.stderr)
@@ -1434,6 +1438,13 @@ def main() -> int:
             for row in bench_report["benchmarks"]
         ):
             print("missing_run_guest_prompt_bytes_match=true", file=sys.stderr)
+            return 1
+        if not all(
+            row.get("tokens") == row.get("expected_tokens")
+            and row.get("expected_tokens_match") is True
+            for row in bench_report["benchmarks"]
+        ):
+            print("missing_run_expected_tokens_match=true", file=sys.stderr)
             return 1
         if not all(
             row.get("exit_class") == "ok" and row.get("failure_reason") is None

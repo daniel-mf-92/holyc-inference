@@ -238,3 +238,4 @@
 2026-04-29T10:48:43Z | Added prompt audit pinned suite hash drift gate with smoke coverage and refreshed prompt audit artifacts.
 2026-04-29T10:55:54Z | Added perplexity_compare minimum record/token coverage gates with CI smoke coverage and refreshed smoke reports.
 2026-04-29T11:03:07Z | Added eval input audit choice-count gates with CI smoke coverage and refreshed smoke reports.
+2026-04-29T11:38:15Z | Added qemu prompt benchmark expected-token telemetry and declared decode-length gates with smoke coverage.

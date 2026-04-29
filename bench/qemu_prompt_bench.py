@@ -90,6 +90,7 @@ except OSError:
 class PromptCase:
     prompt_id: str
     prompt: str
+    expected_tokens: int | None = None
 
 
 @dataclass(frozen=True)
@@ -111,6 +112,8 @@ class BenchRun:
     commit: str
     timestamp: str
     tokens: int | None
+    expected_tokens: int | None
+    expected_tokens_match: bool | None
     elapsed_us: int
     wall_elapsed_us: int
     timeout_seconds: float
@@ -224,6 +227,8 @@ def prompt_suite_metadata(source: Path, cases: list[PromptCase]) -> dict[str, An
         "prompt_bytes_total": sum(byte_counts),
         "prompt_bytes_min": min(byte_counts) if byte_counts else None,
         "prompt_bytes_max": max(byte_counts) if byte_counts else None,
+        "expected_token_prompts": sum(1 for case in cases if case.expected_tokens is not None),
+        "expected_tokens_total": sum(case.expected_tokens or 0 for case in cases),
     }
 
 
@@ -241,6 +246,7 @@ def dry_run_launch_plan(cases: list[PromptCase], *, warmup: int, repeat: int) ->
                         "prompt_id": case.prompt_id,
                         "prompt_sha256": prompt_hash(case.prompt),
                         "prompt_bytes": prompt_bytes(case.prompt),
+                        "expected_tokens": case.expected_tokens,
                         "iteration": iteration,
                     }
                 )
@@ -339,7 +345,20 @@ def prompt_case_from_row(row: Any, index: int) -> PromptCase:
     if not isinstance(prompt, str) or not prompt:
         raise ValueError(f"prompt row {index + 1} is missing non-empty prompt text")
     prompt_id = str(row.get("id") or row.get("prompt_id") or f"prompt-{index + 1}")
-    return PromptCase(prompt_id=prompt_id, prompt=prompt)
+    expected_tokens = parse_expected_tokens(row.get("expected_tokens", row.get("expected_generated_tokens")))
+    return PromptCase(prompt_id=prompt_id, prompt=prompt, expected_tokens=expected_tokens)
+
+
+def parse_expected_tokens(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        raise ValueError("expected_tokens must be a non-negative integer")
+    if parsed < 0:
+        raise ValueError("expected_tokens must be a non-negative integer")
+    return parsed
 
 
 def is_network_device_arg(value: str) -> bool:
@@ -836,6 +855,10 @@ def run_prompt(
         commit=metadata["commit"],
         timestamp=iso_now(),
         tokens=tokens,
+        expected_tokens=prompt_case.expected_tokens,
+        expected_tokens_match=None
+        if prompt_case.expected_tokens is None or tokens is None
+        else tokens == prompt_case.expected_tokens,
         elapsed_us=elapsed_us,
         wall_elapsed_us=wall_elapsed_us,
         timeout_seconds=timeout,
@@ -1156,6 +1179,7 @@ def telemetry_findings(
     max_serial_output_bytes: int | None = None,
     require_guest_prompt_sha256_match: bool = False,
     require_guest_prompt_bytes_match: bool = False,
+    require_expected_tokens_match: bool = False,
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     if min_total_tokens is not None:
@@ -1183,6 +1207,19 @@ def telemetry_findings(
             findings.append({**base, "metric": "tokens", "value": None, "limit": "present"})
         if min_tokens is not None and (run.tokens is None or run.tokens < min_tokens):
             findings.append({**base, "metric": "tokens", "value": run.tokens, "limit": min_tokens})
+        if (
+            require_expected_tokens_match
+            and run.expected_tokens is not None
+            and run.expected_tokens_match is not True
+        ):
+            findings.append(
+                {
+                    **base,
+                    "metric": "expected_tokens_match",
+                    "value": run.tokens,
+                    "limit": run.expected_tokens,
+                }
+            )
         if require_tok_per_s and run.tok_per_s is None:
             findings.append({**base, "metric": "tok_per_s", "value": None, "limit": "present"})
         if min_tok_per_s is not None and (run.tok_per_s is None or run.tok_per_s < min_tok_per_s):
@@ -1789,6 +1826,8 @@ def write_dry_run_csv_report(report: dict[str, Any], path: Path) -> None:
         "prompt_bytes_total",
         "prompt_bytes_min",
         "prompt_bytes_max",
+        "expected_token_prompts",
+        "expected_tokens_total",
         "warmup",
         "repeat",
         "planned_warmup_launches",
@@ -1812,6 +1851,8 @@ def write_dry_run_csv_report(report: dict[str, Any], path: Path) -> None:
         "prompt_bytes_total": prompt_suite.get("prompt_bytes_total"),
         "prompt_bytes_min": prompt_suite.get("prompt_bytes_min"),
         "prompt_bytes_max": prompt_suite.get("prompt_bytes_max"),
+        "expected_token_prompts": prompt_suite.get("expected_token_prompts"),
+        "expected_tokens_total": prompt_suite.get("expected_tokens_total"),
         "warmup": report.get("warmup"),
         "repeat": report.get("repeat"),
         "planned_warmup_launches": report.get("planned_warmup_launches"),
@@ -1842,6 +1883,7 @@ def write_dry_run_launch_csv_report(report: dict[str, Any], path: Path) -> None:
         "prompt_id",
         "prompt_sha256",
         "prompt_bytes",
+        "expected_tokens",
         "iteration",
     ]
     launch_plan = report.get("launch_plan") if isinstance(report.get("launch_plan"), list) else []
@@ -1860,6 +1902,7 @@ def write_dry_run_launch_csv_report(report: dict[str, Any], path: Path) -> None:
                     "prompt_id": row.get("prompt_id"),
                     "prompt_sha256": row.get("prompt_sha256"),
                     "prompt_bytes": row.get("prompt_bytes"),
+                    "expected_tokens": row.get("expected_tokens"),
                     "iteration": row.get("iteration"),
                 }
             )
@@ -1953,6 +1996,7 @@ def write_report(
     max_serial_output_bytes: int | None = None,
     require_guest_prompt_sha256_match: bool = False,
     require_guest_prompt_bytes_match: bool = False,
+    require_expected_tokens_match: bool = False,
     max_launches: int | None = None,
     environment: dict[str, Any] | None = None,
     image: dict[str, Any] | None = None,
@@ -1995,6 +2039,7 @@ def write_report(
         max_serial_output_bytes=max_serial_output_bytes,
         require_guest_prompt_sha256_match=require_guest_prompt_sha256_match,
         require_guest_prompt_bytes_match=require_guest_prompt_bytes_match,
+        require_expected_tokens_match=require_expected_tokens_match,
     )
     report = {
         "generated_at": iso_now(),
@@ -2042,6 +2087,7 @@ def write_report(
             "max_serial_output_bytes": max_serial_output_bytes,
             "require_guest_prompt_sha256_match": require_guest_prompt_sha256_match,
             "require_guest_prompt_bytes_match": require_guest_prompt_bytes_match,
+            "require_expected_tokens_match": require_expected_tokens_match,
         },
         "telemetry_findings": telemetry,
         "benchmarks": [asdict(run) for run in runs],
@@ -2082,6 +2128,8 @@ def write_csv_report(runs: list[BenchRun], path: Path) -> None:
         "launch_index",
         "iteration",
         "tokens",
+        "expected_tokens",
+        "expected_tokens_match",
         "elapsed_us",
         "wall_elapsed_us",
         "timeout_seconds",
@@ -2214,6 +2262,8 @@ def write_launch_csv_report(report: dict[str, Any], path: Path) -> None:
         "exit_class",
         "failure_reason",
         "tokens",
+        "expected_tokens",
+        "expected_tokens_match",
         "elapsed_us",
         "wall_elapsed_us",
         "timeout_seconds",
@@ -2300,6 +2350,8 @@ def write_junit_report(
                 f"exit_class={run.exit_class}\n"
                 f"failure_reason={format_summary_value(run.failure_reason)}\n"
                 f"tokens={format_summary_value(run.tokens)}\n"
+                f"expected_tokens={format_summary_value(run.expected_tokens)}\n"
+                f"expected_tokens_match={format_summary_value(run.expected_tokens_match)}\n"
                 f"elapsed_us={run.elapsed_us}\n"
                 f"wall_elapsed_us={run.wall_elapsed_us}\n"
                 f"timeout_seconds={format_summary_value(run.timeout_seconds)}\n"
@@ -2534,6 +2586,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fail if guest-reported prompt byte count is missing or differs from the host prompt",
     )
+    parser.add_argument(
+        "--require-expected-tokens-match",
+        action="store_true",
+        help="Fail if a prompt declares expected_tokens and the measured run emits a different token count",
+    )
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--profile", default="default")
     parser.add_argument("--model", default="")
@@ -2705,6 +2762,7 @@ def main(argv: list[str] | None = None) -> int:
         max_serial_output_bytes=args.max_serial_output_bytes,
         require_guest_prompt_sha256_match=args.require_guest_prompt_sha256_match,
         require_guest_prompt_bytes_match=args.require_guest_prompt_bytes_match,
+        require_expected_tokens_match=args.require_expected_tokens_match,
         max_launches=args.max_launches,
         environment=host_environment(args.qemu_bin),
         image=image,
