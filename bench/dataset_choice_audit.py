@@ -2,9 +2,9 @@
 """Audit local multiple-choice eval rows for choice-text quality issues.
 
 The audit is offline-only. It normalizes the same JSONL row shapes accepted by
-dataset_pack.py, then flags duplicate options, answer text leaked in prompts,
-choice label prefixes, and large within-record choice length skew before rows
-are curated or packed into HCEval binaries.
+dataset_pack.py, then flags duplicate options, overlapping options, answer text
+leaked in prompts, choice label prefixes, and large within-record choice length
+skew before rows are curated or packed into HCEval binaries.
 """
 
 from __future__ import annotations
@@ -165,14 +165,37 @@ def choice_length_ratio(choices: list[str]) -> float | None:
     return max(byte_lengths) / shortest
 
 
+def choice_overlap_pairs(choices: list[str], min_overlap_chars: int) -> list[dict[str, Any]]:
+    keyed = [(index, stable_text_key(choice)) for index, choice in enumerate(choices)]
+    pairs: list[dict[str, Any]] = []
+    for left_pos, (left_index, left_key) in enumerate(keyed):
+        if len(left_key) < min_overlap_chars:
+            continue
+        for right_index, right_key in keyed[left_pos + 1 :]:
+            if len(right_key) < min_overlap_chars or left_key == right_key:
+                continue
+            shorter, longer = (left_key, right_key) if len(left_key) <= len(right_key) else (right_key, left_key)
+            if shorter in longer:
+                pairs.append(
+                    {
+                        "choice_indexes": [left_index, right_index],
+                        "shorter_chars": len(shorter),
+                        "longer_chars": len(longer),
+                    }
+                )
+    return pairs
+
+
 def audit_records(
     records: list[LoadedRecord],
     fail_on_duplicate_choices: bool,
+    fail_on_choice_overlap: bool,
     fail_on_label_prefixes: bool,
     fail_on_prompt_answer_leak: bool,
     fail_on_prompt_choice_leak: bool,
     fail_on_length_skew: bool,
     max_choice_length_ratio: float | None,
+    min_choice_overlap_chars: int,
     min_answer_leak_chars: int,
     min_choice_leak_chars: int,
     findings: list[ChoiceFinding],
@@ -192,6 +215,16 @@ def audit_records(
                 "error" if fail_on_duplicate_choices else "warning",
                 "duplicate_choice_text",
                 "; ".join(details),
+            )
+
+        overlaps = choice_overlap_pairs(record.choices, min_choice_overlap_chars)
+        if overlaps:
+            add_finding(
+                findings,
+                loaded,
+                "error" if fail_on_choice_overlap else "warning",
+                "choice_text_overlap",
+                json.dumps(overlaps, ensure_ascii=False, sort_keys=True),
             )
 
         prefixed = [
@@ -383,6 +416,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--default-dataset", default="eval", help="Dataset name for rows missing dataset")
     parser.add_argument("--default-split", default="validation", help="Split name for rows missing split")
     parser.add_argument("--fail-on-duplicate-choices", action="store_true", help="Fail on duplicate options in a row")
+    parser.add_argument(
+        "--fail-on-choice-overlap",
+        action="store_true",
+        help="Fail when one normalized choice text contains another choice text in the same row",
+    )
     parser.add_argument("--fail-on-label-prefixes", action="store_true", help="Fail when choices include A./B./1) prefixes")
     parser.add_argument(
         "--fail-on-prompt-answer-leak",
@@ -399,6 +437,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-choice-length-ratio",
         type=float,
         help="Warn/fail when longest choice bytes divided by shortest choice bytes exceeds this ratio",
+    )
+    parser.add_argument(
+        "--min-choice-overlap-chars",
+        type=int,
+        default=8,
+        help="Minimum normalized choice chars before same-row choice overlap detection runs",
     )
     parser.add_argument(
         "--min-answer-leak-chars",
@@ -421,6 +465,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.max_choice_length_ratio is not None and args.max_choice_length_ratio < 1.0:
         print("error: --max-choice-length-ratio must be at least 1.0", file=sys.stderr)
         return 2
+    if args.min_choice_overlap_chars < 1:
+        print("error: --min-choice-overlap-chars must be at least 1", file=sys.stderr)
+        return 2
     if args.min_answer_leak_chars < 1:
         print("error: --min-answer-leak-chars must be at least 1", file=sys.stderr)
         return 2
@@ -432,11 +479,13 @@ def main(argv: list[str] | None = None) -> int:
     audit_records(
         records,
         args.fail_on_duplicate_choices,
+        args.fail_on_choice_overlap,
         args.fail_on_label_prefixes,
         args.fail_on_prompt_answer_leak,
         args.fail_on_prompt_choice_leak,
         args.fail_on_length_skew,
         args.max_choice_length_ratio,
+        args.min_choice_overlap_chars,
         args.min_answer_leak_chars,
         args.min_choice_leak_chars,
         findings,

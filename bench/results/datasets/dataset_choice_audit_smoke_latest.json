@@ -16,7 +16,7 @@
   "error_count": 0,
   "findings": [],
   "format": "hceval-choice-audit",
-  "generated_at": "2026-04-29T01:45:37Z",
+  "generated_at": "2026-04-29T05:50:28Z",
   "inputs": [
     {
       "path": "bench/datasets/samples/smoke_eval.jsonl",

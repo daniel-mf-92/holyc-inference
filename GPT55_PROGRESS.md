@@ -211,3 +211,4 @@
 2026-04-29T05:05:54Z | Added eval_compare top-score tie telemetry/gating with smoke coverage and refreshed eval artifacts.
 2026-04-29T05:17:55Z | Added perf regression host/QEMU environment metadata coverage gates with CSV/JUnit smoke coverage and refreshed dashboards.
 2026-04-29T05:42:44Z | Added perf regression memory-per-token telemetry/gating with smoke coverage and refreshed dashboards.
+2026-04-29T05:51:40Z | Added dataset choice-overlap audit gating with smoke coverage and refreshed choice audit artifacts.

@@ -58,6 +58,7 @@ def main() -> int:
             "--junit",
             str(pass_junit),
             "--fail-on-duplicate-choices",
+            "--fail-on-choice-overlap",
             "--fail-on-label-prefixes",
             "--fail-on-prompt-answer-leak",
             "--fail-on-prompt-choice-leak",
@@ -105,6 +106,18 @@ def main() -> int:
                             "choices": ["Paris", "Paris", "Berlin", "Rome"],
                             "answer_index": 0,
                             "provenance": "synthetic bad duplicate choice",
+                        },
+                        sort_keys=True,
+                    ),
+                    json.dumps(
+                        {
+                            "id": "choice-overlap",
+                            "dataset": "choice-smoke",
+                            "split": "validation",
+                            "prompt": "Choose the process named by the teacher.",
+                            "choices": ["evaporation", "water evaporation", "condensation", "sublimation"],
+                            "answer_index": 0,
+                            "provenance": "synthetic bad choice overlap",
                         },
                         sort_keys=True,
                     ),
@@ -175,6 +188,7 @@ def main() -> int:
             "--output",
             str(bad_output),
             "--fail-on-duplicate-choices",
+            "--fail-on-choice-overlap",
             "--fail-on-label-prefixes",
             "--fail-on-prompt-answer-leak",
             "--fail-on-prompt-choice-leak",
@@ -201,6 +215,7 @@ def main() -> int:
         kinds = {finding["kind"] for finding in bad_report["findings"]}
         for expected in {
             "duplicate_choice_text",
+            "choice_text_overlap",
             "choice_label_prefix",
             "prompt_contains_correct_choice",
             "prompt_contains_choice_text",
