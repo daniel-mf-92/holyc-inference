@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import subprocess
 import sys
@@ -26,6 +27,7 @@ def main() -> int:
         tmp_path = Path(tmp)
         selected = tmp_path / "selected.jsonl"
         manifest = tmp_path / "manifest.json"
+        selected_csv = tmp_path / "selected.csv"
         command = [
             sys.executable,
             str(ROOT / "bench" / "dataset_select.py"),
@@ -35,6 +37,8 @@ def main() -> int:
             str(selected),
             "--manifest",
             str(manifest),
+            "--csv",
+            str(selected_csv),
             "--max-records-per-slice",
             "1",
             "--balance-answer",
@@ -48,6 +52,7 @@ def main() -> int:
 
         report = json.loads(manifest.read_text(encoding="utf-8"))
         selected_rows = [json.loads(line) for line in selected.read_text(encoding="utf-8").splitlines()]
+        csv_rows = list(csv.DictReader(selected_csv.open(encoding="utf-8", newline="")))
         if rc := require(report["status"] == "pass", "unexpected_dataset_select_status"):
             return rc
         if rc := require(report["candidate_count"] == 3, "unexpected_candidate_count"):
@@ -61,6 +66,13 @@ def main() -> int:
         if rc := require(len(selected_rows) == 3, "bad_selected_jsonl"):
             return rc
         if rc := require(all("record_id" in row and "answer_index" in row for row in selected_rows), "bad_selected_rows"):
+            return rc
+        if rc := require(len(csv_rows) == 3, "bad_selected_csv"):
+            return rc
+        if rc := require(
+            all(len(row["payload_sha256"]) == 64 and len(row["rank_sha256"]) == 64 for row in csv_rows),
+            "bad_selected_csv_hashes",
+        ):
             return rc
 
     print("dataset_select_ci_smoke=pass")

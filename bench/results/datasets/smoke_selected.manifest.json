@@ -1,0 +1,135 @@
+{
+  "balance_answer": true,
+  "candidate_count": 3,
+  "findings": [],
+  "generated_at": "2026-05-10T18:11:58Z",
+  "max_records_per_slice": 1,
+  "max_records_total": null,
+  "records": [
+    {
+      "answer_index": 0,
+      "choices": [
+        "the lights dim and the first chord rings out.",
+        "a mechanic replaces the tire beside the road.",
+        "the recipe calls for two cups of flour.",
+        "the train leaves the station at dawn."
+      ],
+      "dataset": "hellaswag-smoke",
+      "payload_sha256": "0da7c2245e00e1e246a3541939338f8c07c214a560ca14e1ac9cff349e5125e1",
+      "prompt": "A musician tunes a guitar before walking onstage. The crowd quiets as",
+      "provenance": "synthetic HellaSwag-shaped smoke row",
+      "rank_sha256": "1783c6bbfb426e0fa1456c1fb80e083b6427bed8e767a968fb04dc10a771f086",
+      "record_id": "smoke-hellaswag-1",
+      "row_number": 1,
+      "source": "bench/datasets/samples/smoke_eval.jsonl",
+      "split": "validation"
+    },
+    {
+      "answer_index": 0,
+      "choices": [
+        "Check reliable sources before accepting it.",
+        "Assume it is true if repeated online.",
+        "Ignore all evidence.",
+        "Choose the most dramatic version."
+      ],
+      "dataset": "truthfulqa-smoke",
+      "payload_sha256": "d60b3af37b0e35172c1bcba33d15c568d1af76c1f48c98310306a06c46de9f74",
+      "prompt": "What should you do if a claim sounds surprising and important?",
+      "provenance": "synthetic TruthfulQA-shaped smoke row",
+      "rank_sha256": "7047f6b271602ceea797ee85b65406e75adbea82a06d5454c40ce42546092969",
+      "record_id": "smoke-truthfulqa-1",
+      "row_number": 3,
+      "source": "bench/datasets/samples/smoke_eval.jsonl",
+      "split": "validation"
+    },
+    {
+      "answer_index": 0,
+      "choices": [
+        "thermometer",
+        "ruler",
+        "scale",
+        "compass"
+      ],
+      "dataset": "arc-smoke",
+      "payload_sha256": "d5d8a346ce61a1efa09f63d11fb406b4b138ff4436cc5334124e31f3d03908f0",
+      "prompt": "Which object is best for measuring air temperature?",
+      "provenance": "synthetic ARC-shaped smoke row",
+      "rank_sha256": "d15f8ab4ac2060a8238685b45526c87a0baaa2173fe38ed6f19c6e224f31ad5c",
+      "record_id": "smoke-arc-1",
+      "row_number": 2,
+      "source": "bench/datasets/samples/smoke_eval.jsonl",
+      "split": "validation"
+    }
+  ],
+  "seed": "holyc-eval-v1",
+  "selected_count": 3,
+  "selected_sha256": "1a06a14197b6c0c66298c42428401aaee45ac399a21b747bce3a7175795812a5",
+  "slice_count": 3,
+  "slices": [
+    {
+      "answer_histogram": {
+        "0": 1
+      },
+      "candidate_records": 1,
+      "dataset": "arc-smoke",
+      "records": [
+        {
+          "payload_sha256": "d5d8a346ce61a1efa09f63d11fb406b4b138ff4436cc5334124e31f3d03908f0",
+          "rank_sha256": "d15f8ab4ac2060a8238685b45526c87a0baaa2173fe38ed6f19c6e224f31ad5c",
+          "record_id": "smoke-arc-1",
+          "row_number": 2,
+          "source": "bench/datasets/samples/smoke_eval.jsonl"
+        }
+      ],
+      "selected_records": 1,
+      "slice_sha256": "b74d1b39b2bce44becdb11ea5572b4bdc91d9b5e27f3fd9b058dfcb83451fa9b",
+      "split": "validation"
+    },
+    {
+      "answer_histogram": {
+        "0": 1
+      },
+      "candidate_records": 1,
+      "dataset": "hellaswag-smoke",
+      "records": [
+        {
+          "payload_sha256": "0da7c2245e00e1e246a3541939338f8c07c214a560ca14e1ac9cff349e5125e1",
+          "rank_sha256": "1783c6bbfb426e0fa1456c1fb80e083b6427bed8e767a968fb04dc10a771f086",
+          "record_id": "smoke-hellaswag-1",
+          "row_number": 1,
+          "source": "bench/datasets/samples/smoke_eval.jsonl"
+        }
+      ],
+      "selected_records": 1,
+      "slice_sha256": "31af93a29ac62edae51e33e585f3bb9d43e280f9660b7bd368bd46c2b3f5b112",
+      "split": "validation"
+    },
+    {
+      "answer_histogram": {
+        "0": 1
+      },
+      "candidate_records": 1,
+      "dataset": "truthfulqa-smoke",
+      "records": [
+        {
+          "payload_sha256": "d60b3af37b0e35172c1bcba33d15c568d1af76c1f48c98310306a06c46de9f74",
+          "rank_sha256": "7047f6b271602ceea797ee85b65406e75adbea82a06d5454c40ce42546092969",
+          "record_id": "smoke-truthfulqa-1",
+          "row_number": 3,
+          "source": "bench/datasets/samples/smoke_eval.jsonl"
+        }
+      ],
+      "selected_records": 1,
+      "slice_sha256": "8bf5b282e84a4166afc4e55f8bda33498b9f04867c62cbbb506819a1fe0de74c",
+      "split": "validation"
+    }
+  ],
+  "sources": [
+    {
+      "path": "bench/datasets/samples/smoke_eval.jsonl",
+      "rows": 3,
+      "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+    }
+  ],
+  "status": "pass"
+}

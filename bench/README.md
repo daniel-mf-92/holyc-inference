@@ -1615,6 +1615,22 @@ dataset/split/prompt/choices/answer rows before caps and sampling. If duplicate
 within-split prompt/choices payloads disagree on the answer index, curation
 fails instead of silently choosing one label.
 
+`dataset_select.py` is the smaller deterministic selector for already-staged
+JSONL rows. It can now write a selected-record CSV sidecar for quick review of
+record IDs, answer indexes, byte budgets, source rows, payload hashes, and
+stable rank hashes:
+
+```bash
+python3 bench/dataset_select.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/smoke_selected.jsonl \
+  --manifest bench/results/datasets/smoke_selected.manifest.json \
+  --csv bench/results/datasets/smoke_selected.csv \
+  --max-records-per-slice 1 \
+  --balance-answer \
+  --fail-on-findings
+```
+
 `dataset_manifest_audit.py` validates curated JSONL provenance manifests before
 publishing packed eval artifacts. It checks local source and output digests,
 derives actual curated row counts plus dataset/split coverage from JSONL, and

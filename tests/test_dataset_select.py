@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import sys
 import tempfile
@@ -35,6 +36,7 @@ def test_select_balances_answer_buckets_per_slice(tmp_path: Path) -> None:
     source = tmp_path / "eval.jsonl"
     selected = tmp_path / "selected.jsonl"
     manifest = tmp_path / "manifest.json"
+    selected_csv = tmp_path / "selected.csv"
     write_jsonl(
         source,
         [
@@ -55,6 +57,8 @@ def test_select_balances_answer_buckets_per_slice(tmp_path: Path) -> None:
             str(selected),
             "--manifest",
             str(manifest),
+            "--csv",
+            str(selected_csv),
             "--max-records-per-slice",
             "4",
             "--balance-answer",
@@ -64,12 +68,16 @@ def test_select_balances_answer_buckets_per_slice(tmp_path: Path) -> None:
 
     report = json.loads(manifest.read_text(encoding="utf-8"))
     selected_rows = [json.loads(line) for line in selected.read_text(encoding="utf-8").splitlines()]
+    selected_csv_rows = list(csv.DictReader(selected_csv.open(encoding="utf-8", newline="")))
     assert status == 0
     assert report["status"] == "pass"
     assert report["selected_count"] == 4
     assert report["slices"][0]["answer_histogram"] == {"0": 2, "1": 2}
     assert len(selected_rows) == 4
     assert all("source" not in item for item in selected_rows)
+    assert len(selected_csv_rows) == 4
+    assert {row["record_id"] for row in selected_csv_rows} == {row["record_id"] for row in selected_rows}
+    assert all(len(row["payload_sha256"]) == 64 and len(row["rank_sha256"]) == 64 for row in selected_csv_rows)
 
 
 def test_select_keeps_slices_separate_and_caps_total(tmp_path: Path) -> None:

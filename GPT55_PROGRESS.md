@@ -533,3 +533,4 @@
 2026-05-10T17:51:55Z | Added QEMU phase summary consistency audit with smoke coverage and refreshed latest reports.
 2026-05-10T17:58:27Z | Extended QEMU artifact secret audit to catch Authorization and Cookie header leaks with smoke coverage and refreshed reports.
 2026-05-10T18:04:46Z | Hardened QEMU command fingerprint audit to verify stored row air-gap metadata with smoke coverage and refreshed latest reports.
+2026-05-10T18:12:17Z | Added dataset_select selected-record CSV sidecars with smoke coverage, docs, and refreshed sample selection artifacts.

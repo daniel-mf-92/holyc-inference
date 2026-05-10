@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import csv
 import hashlib
 import json
 import sys
@@ -249,11 +250,49 @@ def write_manifest(path: Path, manifest: dict[str, Any]) -> None:
     path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def write_selected_csv(path: Path, selected: list[CandidateRecord]) -> None:
+    fieldnames = [
+        "dataset",
+        "split",
+        "record_id",
+        "answer_index",
+        "choice_count",
+        "prompt_bytes",
+        "choices_bytes",
+        "source",
+        "row_number",
+        "payload_sha256",
+        "rank_sha256",
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
+        writer.writeheader()
+        for candidate in selected:
+            record = candidate.record
+            writer.writerow(
+                {
+                    "dataset": record.dataset,
+                    "split": record.split,
+                    "record_id": record.record_id,
+                    "answer_index": record.answer_index,
+                    "choice_count": len(record.choices),
+                    "prompt_bytes": len(record.prompt.encode("utf-8")),
+                    "choices_bytes": sum(len(choice.encode("utf-8")) for choice in record.choices),
+                    "source": candidate.source,
+                    "row_number": candidate.row_number,
+                    "payload_sha256": candidate.payload_sha256,
+                    "rank_sha256": candidate.rank_sha256,
+                }
+            )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", action="append", type=Path, required=True, help="Input JSONL file; repeatable")
     parser.add_argument("--output", type=Path, required=True, help="Normalized selected JSONL output")
     parser.add_argument("--manifest", type=Path, required=True, help="Selection manifest JSON output")
+    parser.add_argument("--csv", type=Path, help="Optional selected-record CSV sidecar")
     parser.add_argument("--default-dataset", default="eval")
     parser.add_argument("--default-split", default="validation")
     parser.add_argument("--seed", default="holyc-eval-v1", help="Stable selection seed")
@@ -290,8 +329,12 @@ def main(argv: list[str] | None = None) -> int:
     manifest = build_manifest(candidates, selected, sources, findings, args)
     write_selected_jsonl(args.output, selected)
     write_manifest(args.manifest, manifest)
+    if args.csv:
+        write_selected_csv(args.csv, selected)
     print(f"wrote_selected={args.output}")
     print(f"wrote_manifest={args.manifest}")
+    if args.csv:
+        print(f"wrote_csv={args.csv}")
     return 1 if args.fail_on_findings and manifest["status"] == "fail" else 0
 
 
