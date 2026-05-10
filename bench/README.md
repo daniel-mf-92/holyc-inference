@@ -836,6 +836,36 @@ smoke gate builds temporary passing and failing benchmark artifacts:
 python3 bench/qemu_timeout_margin_audit_ci_smoke.py
 ```
 
+## QEMU Runtime Budget Audit
+
+`qemu_runtime_budget_audit.py` checks saved QEMU prompt benchmark artifacts for
+wall-clock budget drift before perf dashboards consume them. It reports total,
+measured, and warmup wall seconds by profile/model/quantization group, gates
+aggregate and per-group wall-time budgets, and can cap warmup wall time either
+as absolute seconds or as a percentage of total benchmark wall time. It is
+host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_runtime_budget_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_runtime_budget_audit_latest \
+  --min-rows 4 \
+  --max-total-wall-seconds 600 \
+  --max-warmup-wall-pct 25 \
+  --max-group-warmup-wall-pct 25 \
+  --fail-on-failures
+```
+
+The tool writes JSON, Markdown, CSV rows, CSV findings, and JUnit outputs. Its
+smoke gate builds temporary passing and failing benchmark artifacts:
+
+```bash
+python3 bench/qemu_runtime_budget_audit_ci_smoke.py
+```
+
 ## QEMU Timeout Recommendations
 
 `qemu_timeout_recommend.py` reads saved QEMU prompt benchmark artifacts and

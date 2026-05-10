@@ -1,6 +1,6 @@
 {
   "findings": [],
-  "generated_at": "2026-05-10T20:27:07Z",
+  "generated_at": "2026-05-10T20:33:52Z",
   "groups": [
     {
       "failed_rows": 0,
@@ -20,6 +20,7 @@
       "total_wall_seconds": 2.427611,
       "warmup_rows": 0,
       "warmup_wall_elapsed_us": 0,
+      "warmup_wall_pct": 0.0,
       "warmup_wall_seconds": 0.0
     }
   ],
@@ -33,6 +34,7 @@
     "rows": 4,
     "total_wall_seconds": 2.427611,
     "warmup_rows": 0,
+    "warmup_wall_pct": 0.0,
     "warmup_wall_seconds": 0.0
   }
 }

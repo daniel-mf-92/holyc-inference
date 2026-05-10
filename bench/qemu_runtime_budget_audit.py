@@ -41,6 +41,7 @@ class RuntimeRow:
     total_wall_seconds: float
     measured_wall_seconds: float
     warmup_wall_seconds: float
+    warmup_wall_pct: float | None
     max_row_wall_seconds: float
 
 
@@ -226,6 +227,7 @@ def summarize_group(key: tuple[str, str, str, str], rows: list[dict[str, Any]]) 
         total_wall_seconds=total_wall_elapsed_us / 1_000_000.0,
         measured_wall_seconds=measured_wall_elapsed_us / 1_000_000.0,
         warmup_wall_seconds=warmup_wall_elapsed_us / 1_000_000.0,
+        warmup_wall_pct=(warmup_wall_elapsed_us * 100.0 / total_wall_elapsed_us) if total_wall_elapsed_us > 0 else None,
         max_row_wall_seconds=max_row_wall_elapsed_us / 1_000_000.0,
     )
 
@@ -293,6 +295,21 @@ def evaluate(rows: list[RuntimeRow], args: argparse.Namespace) -> list[Finding]:
                 "aggregate warmup wall time exceeds CI budget",
             )
         )
+    if args.max_warmup_wall_pct is not None and total_wall_seconds > 0:
+        warmup_wall_pct = warmup_wall_seconds * 100.0 / total_wall_seconds
+        if warmup_wall_pct > args.max_warmup_wall_pct:
+            findings.append(
+                Finding(
+                    "",
+                    "all",
+                    "error",
+                    "max_warmup_wall_pct",
+                    "warmup_wall_pct",
+                    warmup_wall_pct,
+                    args.max_warmup_wall_pct,
+                    "aggregate warmup wall time share exceeds CI budget",
+                )
+            )
 
     for row in rows:
         add_limit_finding(
@@ -313,6 +330,23 @@ def evaluate(rows: list[RuntimeRow], args: argparse.Namespace) -> list[Finding]:
             limit=args.max_group_measured_wall_seconds,
             detail=f"{row.group} measured wall time exceeds per-group budget",
         )
+        if (
+            args.max_group_warmup_wall_pct is not None
+            and row.warmup_wall_pct is not None
+            and row.warmup_wall_pct > args.max_group_warmup_wall_pct
+        ):
+            findings.append(
+                Finding(
+                    row.source,
+                    row.group,
+                    "error",
+                    "max_group_warmup_wall_pct",
+                    "warmup_wall_pct",
+                    row.warmup_wall_pct,
+                    args.max_group_warmup_wall_pct,
+                    f"{row.group} warmup wall time share exceeds per-group budget",
+                )
+            )
         add_limit_finding(
             findings,
             row,
@@ -355,7 +389,7 @@ def write_csv(path: Path, rows: list[RuntimeRow]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fields = list(RuntimeRow.__dataclass_fields__)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
         for row in rows:
             writer.writerow(asdict(row))
@@ -365,7 +399,7 @@ def write_findings_csv(path: Path, findings: list[Finding]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fields = list(Finding.__dataclass_fields__)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
         for finding in findings:
             writer.writerow(asdict(finding))
@@ -381,17 +415,20 @@ def write_markdown(path: Path, report: dict[str, Any]) -> None:
         f"- Total wall seconds: {report['summary']['total_wall_seconds']:.6f}",
         f"- Measured wall seconds: {report['summary']['measured_wall_seconds']:.6f}",
         f"- Warmup wall seconds: {report['summary']['warmup_wall_seconds']:.6f}",
+        f"- Warmup wall pct: {format_optional_float(report['summary']['warmup_wall_pct'])}",
         f"- Findings: {len(report['findings'])}",
         "",
         "## Groups",
         "",
-        "| Group | Rows | Measured | Warmup | Failed | Missing wall | Total s | Measured s | Warmup s | Max row s |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Group | Rows | Measured | Warmup | Failed | Missing wall | Total s | Measured s | Warmup s | Warmup % | Max row s |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for row in report["groups"]:
         lines.append(
             "| {group} | {total_rows} | {measured_rows} | {warmup_rows} | {failed_rows} | {missing_wall_elapsed_rows} | "
-            "{total_wall_seconds:.6f} | {measured_wall_seconds:.6f} | {warmup_wall_seconds:.6f} | {max_row_wall_seconds:.6f} |".format(**row)
+            "{total_wall_seconds:.6f} | {measured_wall_seconds:.6f} | {warmup_wall_seconds:.6f} | {warmup_wall_pct} | {max_row_wall_seconds:.6f} |".format(
+                **{**row, "warmup_wall_pct": format_optional_float(row.get("warmup_wall_pct"))}
+            )
         )
     if report["findings"]:
         lines.extend(["", "## Findings", "", "| Severity | Kind | Group | Metric | Value | Limit | Detail |", "| --- | --- | --- | --- | ---: | ---: | --- |"])
@@ -415,6 +452,12 @@ def write_junit(path: Path, report: dict[str, Any]) -> None:
     ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
 
 
+def format_optional_float(value: Any) -> str:
+    if isinstance(value, (int, float)) and math.isfinite(value):
+        return f"{float(value):.6f}"
+    return ""
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("inputs", nargs="+", type=Path, help="Benchmark JSON/JSONL/CSV files or directories to audit")
@@ -425,8 +468,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-total-wall-seconds", type=float)
     parser.add_argument("--max-measured-wall-seconds", type=float)
     parser.add_argument("--max-warmup-wall-seconds", type=float)
+    parser.add_argument("--max-warmup-wall-pct", type=float, help="Fail when aggregate warmup wall time exceeds this percent of total wall time")
     parser.add_argument("--max-group-wall-seconds", type=float)
     parser.add_argument("--max-group-measured-wall-seconds", type=float)
+    parser.add_argument("--max-group-warmup-wall-pct", type=float, help="Fail when any profile/model/quantization group spends this percent of wall time in warmup")
     parser.add_argument("--max-row-wall-seconds", type=float)
     parser.add_argument("--allow-missing-wall-elapsed-us", dest="require_wall_elapsed_us", action="store_false")
     parser.add_argument("--fail-on-failures", action="store_true", help="Fail when rows record timeout, non-ok exit_class, or nonzero returncode")
@@ -440,6 +485,8 @@ def main(argv: list[str] | None = None) -> int:
     grouped = load_grouped_rows(args.inputs, patterns)
     rows = [summarize_group(key, grouped[key]) for key in sorted(grouped)]
     findings = evaluate(rows, args)
+    total_wall_seconds = sum(row.total_wall_seconds for row in rows)
+    warmup_wall_seconds = sum(row.warmup_wall_seconds for row in rows)
     report = {
         "generated_at": iso_now(),
         "status": "fail" if findings else "pass",
@@ -450,9 +497,10 @@ def main(argv: list[str] | None = None) -> int:
             "warmup_rows": sum(row.warmup_rows for row in rows),
             "failed_rows": sum(row.failed_rows for row in rows),
             "missing_wall_elapsed_rows": sum(row.missing_wall_elapsed_rows for row in rows),
-            "total_wall_seconds": sum(row.total_wall_seconds for row in rows),
+            "total_wall_seconds": total_wall_seconds,
             "measured_wall_seconds": sum(row.measured_wall_seconds for row in rows),
-            "warmup_wall_seconds": sum(row.warmup_wall_seconds for row in rows),
+            "warmup_wall_seconds": warmup_wall_seconds,
+            "warmup_wall_pct": (warmup_wall_seconds * 100.0 / total_wall_seconds) if total_wall_seconds > 0 else None,
         },
         "groups": [asdict(row) for row in rows],
         "findings": [asdict(finding) for finding in findings],

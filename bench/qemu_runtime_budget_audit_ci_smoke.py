@@ -85,8 +85,12 @@ def main() -> int:
             "0.25",
             "--max-warmup-wall-seconds",
             "0.05",
+            "--max-warmup-wall-pct",
+            "20",
             "--max-group-wall-seconds",
             "0.30",
+            "--max-group-warmup-wall-pct",
+            "20",
             "--max-row-wall-seconds",
             "0.13",
             "--fail-on-failures",
@@ -99,6 +103,10 @@ def main() -> int:
         if rc := require(report["status"] == "pass", "runtime_budget_pass_status_not_pass"):
             return rc
         if rc := require(report["summary"]["measured_wall_seconds"] == 0.22, "runtime_budget_measured_seconds_wrong"):
+            return rc
+        if rc := require(15.0 < report["summary"]["warmup_wall_pct"] < 16.0, "runtime_budget_warmup_pct_wrong"):
+            return rc
+        if rc := require(15.0 < report["groups"][0]["warmup_wall_pct"] < 16.0, "runtime_budget_group_warmup_pct_wrong"):
             return rc
         if rc := require((pass_dir / "qemu_runtime_budget_audit_latest.csv").exists(), "missing_runtime_budget_csv"):
             return rc
@@ -119,8 +127,12 @@ def main() -> int:
             "0.90",
             "--max-warmup-wall-seconds",
             "0.10",
+            "--max-warmup-wall-pct",
+            "25",
             "--max-group-wall-seconds",
             "1.00",
+            "--max-group-warmup-wall-pct",
+            "25",
             "--max-row-wall-seconds",
             "0.80",
             "--fail-on-failures",
@@ -129,7 +141,14 @@ def main() -> int:
             return rc
         fail_report = json.loads((fail_dir / "qemu_runtime_budget_audit_latest.json").read_text(encoding="utf-8"))
         kinds = {finding["kind"] for finding in fail_report["findings"]}
-        expected = {"max_group_wall_seconds", "max_warmup_wall_seconds", "missing_wall_elapsed_us", "failed_rows"}
+        expected = {
+            "max_group_wall_seconds",
+            "max_warmup_wall_seconds",
+            "max_warmup_wall_pct",
+            "max_group_warmup_wall_pct",
+            "missing_wall_elapsed_us",
+            "failed_rows",
+        }
         if rc := require(expected <= kinds, "runtime_budget_findings_missing"):
             return rc
 

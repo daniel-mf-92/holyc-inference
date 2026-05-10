@@ -553,3 +553,4 @@
 2026-05-10T20:12:58Z | Added direct HCEval inspector smoke gate with manifest-mismatch rejection and refreshed inspection artifacts.
 2026-05-10T20:19:53Z | Added grouped QEMU host-overhead rollups with smoke coverage and refreshed latest audit artifacts.
 2026-05-10T20:27:16Z | Added QEMU runtime budget audit with smoke coverage and refreshed latest runtime budget artifacts.
+2026-05-10T20:33:06Z | Added QEMU runtime budget warmup wall-share gates with smoke coverage, docs, and refreshed latest artifacts.
