@@ -1,0 +1,32 @@
+{
+  "benchmarks": [
+    {
+      "command": [
+        "qemu-system-x86_64",
+        "-nic",
+        "none",
+        "-serial",
+        "stdio",
+        "-display",
+        "none",
+        "-drive",
+        "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide"
+      ],
+      "launch_index": 1,
+      "phase": "measured",
+      "prompt": "smoke-short"
+    }
+  ],
+  "command": [
+    "qemu-system-x86_64",
+    "-nic",
+    "none",
+    "-serial",
+    "stdio",
+    "-display",
+    "none",
+    "-drive",
+    "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide"
+  ],
+  "warmups": []
+}

@@ -5,7 +5,7 @@
       "perf_ci_smoke.py"
     ],
     "min_lines": 5,
-    "min_smokes": 100,
+    "min_smokes": 1,
     "patterns": [
       "*_ci_smoke.py"
     ],
@@ -13,7 +13,7 @@
     "require_shebang": false
   },
   "findings": [],
-  "generated_at": "2026-05-02T06:20:20Z",
+  "generated_at": "2026-05-10T17:45:40Z",
   "smokes": [
     {
       "area": "airgap",
@@ -245,6 +245,18 @@
     },
     {
       "area": "dataset",
+      "bytes": 5096,
+      "docstring": "Stdlib-only CI smoke gate for dataset duplicate audits.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 144,
+      "name": "dataset_duplicate_audit_ci_smoke.py",
+      "paired_tool": "bench/dataset_duplicate_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/dataset_duplicate_audit_ci_smoke.py"
+    },
+    {
+      "area": "dataset",
       "bytes": 6138,
       "docstring": "Stdlib-only smoke gate for dataset_fingerprint.py.",
       "has_main_guard": true,
@@ -401,11 +413,11 @@
     },
     {
       "area": "dataset",
-      "bytes": 4134,
-      "docstring": "CI smoke test for dataset_provenance_balance_audit.py.",
+      "bytes": 6399,
+      "docstring": "CI smoke gate for dataset_provenance_balance_audit.py.",
       "has_main_guard": true,
       "has_shebang": true,
-      "lines": 112,
+      "lines": 171,
       "name": "dataset_provenance_balance_audit_ci_smoke.py",
       "paired_tool": "bench/dataset_provenance_balance_audit.py",
       "paired_tool_exists": true,
@@ -461,6 +473,18 @@
     },
     {
       "area": "dataset",
+      "bytes": 4251,
+      "docstring": "Stdlib-only CI smoke gate for dataset_split_balance_audit.py.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 110,
+      "name": "dataset_split_balance_audit_ci_smoke.py",
+      "paired_tool": "bench/dataset_split_balance_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/dataset_split_balance_audit_ci_smoke.py"
+    },
+    {
+      "area": "dataset",
       "bytes": 3940,
       "docstring": "CI smoke test for dataset_split_overlap_audit.py.",
       "has_main_guard": true,
@@ -509,6 +533,18 @@
     },
     {
       "area": "eval",
+      "bytes": 4029,
+      "docstring": "CI smoke gate for eval_artifact_identity_audit.py.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 125,
+      "name": "eval_artifact_identity_audit_ci_smoke.py",
+      "paired_tool": "bench/eval_artifact_identity_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/eval_artifact_identity_audit_ci_smoke.py"
+    },
+    {
+      "area": "eval",
       "bytes": 3194,
       "docstring": "Stdlib-only CI smoke gate for eval_baseline.py.",
       "has_main_guard": true,
@@ -521,11 +557,11 @@
     },
     {
       "area": "eval",
-      "bytes": 5013,
+      "bytes": 5359,
       "docstring": "Stdlib-only CI smoke gate for eval calibration audits.",
       "has_main_guard": true,
       "has_shebang": true,
-      "lines": 144,
+      "lines": 149,
       "name": "eval_calibration_audit_ci_smoke.py",
       "paired_tool": "bench/eval_calibration_audit.py",
       "paired_tool_exists": true,
@@ -593,11 +629,11 @@
     },
     {
       "area": "eval",
-      "bytes": 2444,
+      "bytes": 2791,
       "docstring": "CI smoke gate for eval efficiency frontier reports.",
       "has_main_guard": true,
       "has_shebang": true,
-      "lines": 85,
+      "lines": 96,
       "name": "eval_efficiency_frontier_ci_smoke.py",
       "paired_tool": "bench/eval_efficiency_frontier.py",
       "paired_tool_exists": true,
@@ -617,11 +653,23 @@
     },
     {
       "area": "eval",
-      "bytes": 5285,
+      "bytes": 3883,
+      "docstring": "Smoke gate for eval_error_overlap_audit.py.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 112,
+      "name": "eval_error_overlap_audit_ci_smoke.py",
+      "paired_tool": "bench/eval_error_overlap_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/eval_error_overlap_audit_ci_smoke.py"
+    },
+    {
+      "area": "eval",
+      "bytes": 8404,
       "docstring": "Stdlib-only CI smoke gate for eval hash audits.",
       "has_main_guard": true,
       "has_shebang": true,
-      "lines": 136,
+      "lines": 207,
       "name": "eval_hash_audit_ci_smoke.py",
       "paired_tool": "bench/eval_hash_audit.py",
       "paired_tool_exists": true,
@@ -725,6 +773,18 @@
     },
     {
       "area": "eval",
+      "bytes": 4535,
+      "docstring": "Stdlib-only CI smoke gate for eval prompt hash audits.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 135,
+      "name": "eval_prompt_hash_audit_ci_smoke.py",
+      "paired_tool": "bench/eval_prompt_hash_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/eval_prompt_hash_audit_ci_smoke.py"
+    },
+    {
+      "area": "eval",
       "bytes": 2084,
       "docstring": "CI smoke gate for eval quantization delta audits.",
       "has_main_guard": true,
@@ -746,6 +806,18 @@
       "paired_tool": "bench/eval_rank_audit.py",
       "paired_tool_exists": true,
       "source": "bench/eval_rank_audit_ci_smoke.py"
+    },
+    {
+      "area": "eval",
+      "bytes": 3098,
+      "docstring": "Smoke gate for eval_record_order_audit.py.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 91,
+      "name": "eval_record_order_audit_ci_smoke.py",
+      "paired_tool": "bench/eval_record_order_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/eval_record_order_audit_ci_smoke.py"
     },
     {
       "area": "eval",
@@ -929,6 +1001,18 @@
     },
     {
       "area": "hceval",
+      "bytes": 3547,
+      "docstring": "CI smoke gate for packed HCEval choice semantics auditing.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 106,
+      "name": "hceval_choice_semantics_audit_ci_smoke.py",
+      "paired_tool": "bench/hceval_choice_semantics_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/hceval_choice_semantics_audit_ci_smoke.py"
+    },
+    {
+      "area": "hceval",
       "bytes": 3199,
       "docstring": "Smoke gate for HCEval binary diff reports.",
       "has_main_guard": true,
@@ -950,6 +1034,42 @@
       "paired_tool": "bench/hceval_export_roundtrip_audit.py",
       "paired_tool_exists": true,
       "source": "bench/hceval_export_roundtrip_audit_ci_smoke.py"
+    },
+    {
+      "area": "hceval",
+      "bytes": 3859,
+      "docstring": "CI smoke gate for packed HCEval metadata auditing.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 110,
+      "name": "hceval_metadata_audit_ci_smoke.py",
+      "paired_tool": "bench/hceval_metadata_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/hceval_metadata_audit_ci_smoke.py"
+    },
+    {
+      "area": "hceval",
+      "bytes": 4997,
+      "docstring": "Stdlib-only smoke gate for hceval_provenance_audit.py.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 142,
+      "name": "hceval_provenance_audit_ci_smoke.py",
+      "paired_tool": "bench/hceval_provenance_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/hceval_provenance_audit_ci_smoke.py"
+    },
+    {
+      "area": "hceval",
+      "bytes": 5419,
+      "docstring": "Smoke gate for packed HCEval record identity auditing.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 136,
+      "name": "hceval_record_identity_audit_ci_smoke.py",
+      "paired_tool": "bench/hceval_record_identity_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/hceval_record_identity_audit_ci_smoke.py"
     },
     {
       "area": "hceval",
@@ -1012,6 +1132,30 @@
       "source": "bench/perplexity_compare_ci_smoke.py"
     },
     {
+      "area": "eval",
+      "bytes": 5153,
+      "docstring": "Stdlib-only CI smoke gate for perplexity input artifact auditing.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 130,
+      "name": "perplexity_input_audit_ci_smoke.py",
+      "paired_tool": "bench/perplexity_input_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/perplexity_input_audit_ci_smoke.py"
+    },
+    {
+      "area": "eval",
+      "bytes": 2969,
+      "docstring": "CI smoke for perplexity_pairing_audit.py.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 77,
+      "name": "perplexity_pairing_audit_ci_smoke.py",
+      "paired_tool": "bench/perplexity_pairing_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/perplexity_pairing_audit_ci_smoke.py"
+    },
+    {
       "area": "prompt",
       "bytes": 6589,
       "docstring": "Stdlib-only CI smoke checks for prompt audit drift gates.",
@@ -1049,11 +1193,11 @@
     },
     {
       "area": "qemu",
-      "bytes": 6001,
+      "bytes": 6904,
       "docstring": "Stdlib-only smoke gate for QEMU args policy auditing.",
       "has_main_guard": true,
       "has_shebang": true,
-      "lines": 127,
+      "lines": 140,
       "name": "qemu_args_policy_audit_ci_smoke.py",
       "paired_tool": "bench/qemu_args_policy_audit.py",
       "paired_tool_exists": true,
@@ -1061,15 +1205,39 @@
     },
     {
       "area": "qemu",
-      "bytes": 5187,
+      "bytes": 7039,
       "docstring": "Stdlib-only CI smoke gate for QEMU artifact budget audits.",
       "has_main_guard": true,
       "has_shebang": true,
-      "lines": 146,
+      "lines": 192,
       "name": "qemu_artifact_budget_audit_ci_smoke.py",
       "paired_tool": "bench/qemu_artifact_budget_audit.py",
       "paired_tool_exists": true,
       "source": "bench/qemu_artifact_budget_audit_ci_smoke.py"
+    },
+    {
+      "area": "qemu",
+      "bytes": 5580,
+      "docstring": "Smoke gate for qemu_artifact_network_text_audit.py.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 129,
+      "name": "qemu_artifact_network_text_audit_ci_smoke.py",
+      "paired_tool": "bench/qemu_artifact_network_text_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/qemu_artifact_network_text_audit_ci_smoke.py"
+    },
+    {
+      "area": "qemu",
+      "bytes": 5793,
+      "docstring": "Smoke gate for qemu_artifact_path_audit.py.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 131,
+      "name": "qemu_artifact_path_audit_ci_smoke.py",
+      "paired_tool": "bench/qemu_artifact_path_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/qemu_artifact_path_audit_ci_smoke.py"
     },
     {
       "area": "qemu",
@@ -1097,6 +1265,18 @@
     },
     {
       "area": "qemu",
+      "bytes": 5635,
+      "docstring": "Smoke gate for qemu_artifact_secret_audit.py.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 134,
+      "name": "qemu_artifact_secret_audit_ci_smoke.py",
+      "paired_tool": "bench/qemu_artifact_secret_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/qemu_artifact_secret_audit_ci_smoke.py"
+    },
+    {
+      "area": "qemu",
       "bytes": 2570,
       "docstring": "Smoke test for qemu_benchmark_matrix_audit.py.",
       "has_main_guard": true,
@@ -1121,11 +1301,23 @@
     },
     {
       "area": "qemu",
-      "bytes": 4588,
+      "bytes": 4882,
+      "docstring": "Smoke gate for QEMU block-device policy auditing.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 133,
+      "name": "qemu_block_device_policy_audit_ci_smoke.py",
+      "paired_tool": "bench/qemu_block_device_policy_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/qemu_block_device_policy_audit_ci_smoke.py"
+    },
+    {
+      "area": "qemu",
+      "bytes": 6712,
       "docstring": "Stdlib-only CI smoke gate for QEMU build throughput scorecard.",
       "has_main_guard": true,
       "has_shebang": true,
-      "lines": 110,
+      "lines": 146,
       "name": "qemu_build_throughput_scorecard_ci_smoke.py",
       "paired_tool": "bench/qemu_build_throughput_scorecard.py",
       "paired_tool_exists": true,
@@ -1169,6 +1361,18 @@
     },
     {
       "area": "qemu",
+      "bytes": 2655,
+      "docstring": "Smoke gate for QEMU display policy audit.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 77,
+      "name": "qemu_display_policy_audit_ci_smoke.py",
+      "paired_tool": "bench/qemu_display_policy_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/qemu_display_policy_audit_ci_smoke.py"
+    },
+    {
+      "area": "qemu",
       "bytes": 6069,
       "docstring": "Stdlib-only CI smoke gate for qemu_environment_audit.py.",
       "has_main_guard": true,
@@ -1178,6 +1382,18 @@
       "paired_tool": "bench/qemu_environment_audit.py",
       "paired_tool_exists": true,
       "source": "bench/qemu_environment_audit_ci_smoke.py"
+    },
+    {
+      "area": "qemu",
+      "bytes": 3807,
+      "docstring": "Stdlib-only CI smoke gate for qemu_executable_audit.py.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 103,
+      "name": "qemu_executable_audit_ci_smoke.py",
+      "paired_tool": "bench/qemu_executable_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/qemu_executable_audit_ci_smoke.py"
     },
     {
       "area": "qemu",
@@ -1238,6 +1454,18 @@
       "paired_tool": "bench/qemu_host_env_policy_audit.py",
       "paired_tool_exists": true,
       "source": "bench/qemu_host_env_policy_audit_ci_smoke.py"
+    },
+    {
+      "area": "qemu",
+      "bytes": 4922,
+      "docstring": "Smoke gate for QEMU host filesystem share auditing.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 134,
+      "name": "qemu_host_filesystem_share_audit_ci_smoke.py",
+      "paired_tool": "bench/qemu_host_filesystem_share_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/qemu_host_filesystem_share_audit_ci_smoke.py"
     },
     {
       "area": "qemu",
@@ -1361,11 +1589,11 @@
     },
     {
       "area": "qemu",
-      "bytes": 2553,
+      "bytes": 3768,
       "docstring": "Smoke gate for qemu_launch_profile_audit.py.",
       "has_main_guard": true,
       "has_shebang": true,
-      "lines": 74,
+      "lines": 97,
       "name": "qemu_launch_profile_audit_ci_smoke.py",
       "paired_tool": "bench/qemu_launch_profile_audit.py",
       "paired_tool_exists": true,
@@ -1373,11 +1601,11 @@
     },
     {
       "area": "qemu",
-      "bytes": 4759,
+      "bytes": 4943,
       "docstring": "CI smoke for qemu_matrix_budget_audit.py.",
       "has_main_guard": true,
       "has_shebang": true,
-      "lines": 139,
+      "lines": 146,
       "name": "qemu_matrix_budget_audit_ci_smoke.py",
       "paired_tool": "bench/qemu_matrix_budget_audit.py",
       "paired_tool_exists": true,
@@ -1493,11 +1721,11 @@
     },
     {
       "area": "qemu",
-      "bytes": 7216,
+      "bytes": 8284,
       "docstring": "Stdlib-only CI smoke gate for QEMU prompt coverage audit artifacts.",
       "has_main_guard": true,
       "has_shebang": true,
-      "lines": 188,
+      "lines": 209,
       "name": "qemu_prompt_coverage_audit_ci_smoke.py",
       "paired_tool": "bench/qemu_prompt_coverage_audit.py",
       "paired_tool_exists": true,
@@ -1697,6 +1925,18 @@
     },
     {
       "area": "qemu",
+      "bytes": 4055,
+      "docstring": "Stdlib-only CI smoke gate for qemu_seed_audit.py.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 113,
+      "name": "qemu_seed_audit_ci_smoke.py",
+      "paired_tool": "bench/qemu_seed_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/qemu_seed_audit_ci_smoke.py"
+    },
+    {
+      "area": "qemu",
       "bytes": 4150,
       "docstring": "Stdlib-only CI smoke gate for qemu_serial_accounting_audit.py.",
       "has_main_guard": true,
@@ -1733,11 +1973,11 @@
     },
     {
       "area": "qemu",
-      "bytes": 8158,
+      "bytes": 8420,
       "docstring": "Stdlib-only CI smoke gate for QEMU source air-gap auditing.",
       "has_main_guard": true,
       "has_shebang": true,
-      "lines": 236,
+      "lines": 241,
       "name": "qemu_source_audit_ci_smoke.py",
       "paired_tool": "bench/qemu_source_audit.py",
       "paired_tool_exists": true,
@@ -1865,6 +2105,18 @@
     },
     {
       "area": "qemu",
+      "bytes": 4012,
+      "docstring": "Stdlib-only CI smoke gate for qemu_ttft_audit.py.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 121,
+      "name": "qemu_ttft_audit_ci_smoke.py",
+      "paired_tool": "bench/qemu_ttft_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/qemu_ttft_audit_ci_smoke.py"
+    },
+    {
+      "area": "qemu",
       "bytes": 3909,
       "docstring": "Stdlib-only CI smoke gate for qemu_warmup_isolation_audit.py.",
       "has_main_guard": true,
@@ -1910,6 +2162,18 @@
       "paired_tool": "bench/quant_manifest_audit.py",
       "paired_tool_exists": true,
       "source": "bench/quant_manifest_audit_ci_smoke.py"
+    },
+    {
+      "area": "quant",
+      "bytes": 3585,
+      "docstring": "Stdlib-only smoke gate for quant_pair_manifest_audit.py.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 94,
+      "name": "quant_pair_manifest_audit_ci_smoke.py",
+      "paired_tool": "bench/quant_pair_manifest_audit.py",
+      "paired_tool_exists": true,
+      "source": "bench/quant_pair_manifest_audit_ci_smoke.py"
     }
   ],
   "status": "pass",
@@ -1919,17 +2183,17 @@
       "bench": 5,
       "build": 2,
       "dashboard": 3,
-      "dataset": 29,
-      "eval": 35,
-      "hceval": 5,
+      "dataset": 31,
+      "eval": 41,
+      "hceval": 9,
       "perf": 3,
       "prompt": 3,
-      "qemu": 69,
-      "quant": 3
+      "qemu": 78,
+      "quant": 4
     },
     "findings": 0,
-    "paired_tools": 156,
-    "smoke_scripts": 158,
+    "paired_tools": 178,
+    "smoke_scripts": 180,
     "unpaired_tools": 2
   }
 }

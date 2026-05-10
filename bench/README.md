@@ -218,6 +218,24 @@ python3 bench/qemu_quant_pairing_audit.py bench/results/bench_matrix_20260428T20
   --require-success
 ```
 
+`qemu_host_filesystem_share_audit.py` checks saved QEMU benchmark artifacts for
+forbidden host filesystem passthrough flags such as `-virtfs`, `-fsdev`,
+virtio/9p filesystem devices, and SMB host-share markers. It reads artifacts
+only and does not launch QEMU.
+
+```bash
+python3 bench/qemu_host_filesystem_share_audit.py bench/results \
+  --output-dir bench/results \
+  --output-stem qemu_host_filesystem_share_audit_latest
+```
+
+Its smoke gate covers a clean air-gapped command and rejected host filesystem
+sharing flags:
+
+```bash
+python3 bench/qemu_host_filesystem_share_audit_ci_smoke.py
+```
+
 Its smoke gate covers passing pairs, missing quantization pairs, failed pair
 members, and the older `returncode=0` success fallback:
 

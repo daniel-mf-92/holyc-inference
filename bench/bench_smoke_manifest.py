@@ -179,7 +179,7 @@ def write_json(path: Path, report: dict[str, object]) -> None:
 def write_csv(path: Path, records: list[SmokeRecord]) -> None:
     fieldnames = list(SmokeRecord.__dataclass_fields__)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for record in records:
             writer.writerow(asdict(record))
@@ -188,7 +188,7 @@ def write_csv(path: Path, records: list[SmokeRecord]) -> None:
 def write_findings_csv(path: Path, findings: list[Finding]) -> None:
     fieldnames = list(Finding.__dataclass_fields__)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for finding in findings:
             writer.writerow(asdict(finding))
