@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="quant_manifest_padding_audit" tests="2" failures="0"><testcase name="fixture.q4_full" classname="quant_manifest_padding_audit" /><testcase name="fixture.q8_full" classname="quant_manifest_padding_audit" /></testsuite>

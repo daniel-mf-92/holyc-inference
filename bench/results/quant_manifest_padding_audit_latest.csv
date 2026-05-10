@@ -1,0 +1,3 @@
+manifest,entry,path,format,elements,blocks,actual_blocks,element_capacity,padding_element_count,padding_nonzero_count,status
+bench/fixtures/quant_manifest_padding_audit/pass.json,fixture.q4_full,/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/fixtures/quant_manifest_padding_audit/q4_full.bin,q4_0,32,1,1,32,0,0,pass
+bench/fixtures/quant_manifest_padding_audit/pass.json,fixture.q8_full,/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/fixtures/quant_manifest_padding_audit/q8_full.bin,q8_0,32,1,1,32,0,0,pass

@@ -3862,8 +3862,9 @@ python3 bench/qemu_artifact_secret_audit_ci_smoke.py
 
 `qemu_artifact_network_text_audit.py` scans saved QEMU benchmark artifacts for
 network URL, QEMU endpoint, IP:port, and network-keyword text in retained
-commands, stdio tails, failure reasons, and metadata. Endpoint matches fail;
-standalone network keywords are warnings unless `--fail-on-keywords` is set:
+commands, stdio tails, failure reasons, metadata, and retained CSV/Markdown/XML
+sidecars. Endpoint matches fail; standalone network keywords are warnings unless
+`--fail-on-keywords` is set:
 
 ```bash
 python3 bench/qemu_artifact_network_text_audit.py bench/results \
@@ -3871,8 +3872,8 @@ python3 bench/qemu_artifact_network_text_audit.py bench/results \
   --output-stem qemu_artifact_network_text_audit_latest
 ```
 
-Its smoke gate exercises clean artifacts, keyword-only warnings, and endpoint
-failure paths:
+Its smoke gate exercises clean artifacts, clean text sidecars, keyword-only
+warnings, JSON endpoint failures, and text-sidecar endpoint failures:
 
 ```bash
 python3 bench/qemu_artifact_network_text_audit_ci_smoke.py

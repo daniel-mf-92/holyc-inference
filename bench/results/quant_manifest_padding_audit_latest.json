@@ -1,0 +1,41 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-10T18:58:19Z",
+  "records": [
+    {
+      "actual_blocks": 1,
+      "blocks": 1,
+      "element_capacity": 32,
+      "elements": 32,
+      "entry": "fixture.q4_full",
+      "format": "q4_0",
+      "manifest": "bench/fixtures/quant_manifest_padding_audit/pass.json",
+      "padding_element_count": 0,
+      "padding_nonzero_count": 0,
+      "path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/fixtures/quant_manifest_padding_audit/q4_full.bin",
+      "status": "pass"
+    },
+    {
+      "actual_blocks": 1,
+      "blocks": 1,
+      "element_capacity": 32,
+      "elements": 32,
+      "entry": "fixture.q8_full",
+      "format": "q8_0",
+      "manifest": "bench/fixtures/quant_manifest_padding_audit/pass.json",
+      "padding_element_count": 0,
+      "padding_nonzero_count": 0,
+      "path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/fixtures/quant_manifest_padding_audit/q8_full.bin",
+      "status": "pass"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "entries": 2,
+    "findings": 0,
+    "nonzero_padding_elements": 0,
+    "padding_elements": 0,
+    "status": "pass"
+  },
+  "tool": "quant_manifest_padding_audit"
+}

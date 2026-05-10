@@ -4,7 +4,9 @@
 This host-side tool reads existing benchmark artifacts only. It never launches
 QEMU and never touches the TempleOS guest. It scans captured commands, stdio
 tails, failure reasons, and metadata for URL-like or endpoint-like network text
-that would indicate air-gap drift in retained benchmark artifacts.
+that would indicate air-gap drift in retained benchmark artifacts. It can also
+scan retained CSV, Markdown, and XML sidecars so endpoint text cannot bypass the
+JSON artifact gate.
 """
 
 from __future__ import annotations
@@ -21,6 +23,14 @@ from typing import Any, Iterable
 
 
 DEFAULT_PATTERNS = ("qemu_prompt_bench*.json", "qemu_benchmark_matrix*.json")
+DEFAULT_TEXT_PATTERNS = (
+    "qemu_prompt_bench*.csv",
+    "qemu_prompt_bench*.md",
+    "qemu_prompt_bench*.xml",
+    "qemu_benchmark_matrix*.csv",
+    "qemu_benchmark_matrix*.md",
+    "qemu_benchmark_matrix*.xml",
+)
 ROW_KEYS = ("benchmarks", "results", "runs", "rows", "cells", "warmups")
 NETWORK_SCHEME_RE = re.compile(r"\b(?:https?|ftp|ssh|sftp|ws|wss|tcp|udp|tls)://[^\s'\"<>]+", re.IGNORECASE)
 QEMU_ENDPOINT_RE = re.compile(r"\b(?:tcp|udp|unix|telnet|websocket):[^\s'\"<>]+", re.IGNORECASE)
@@ -37,6 +47,7 @@ NETWORK_KEYWORD_RE = re.compile(
 class NetworkTextRecord:
     source: str
     row: int
+    artifact_kind: str
     text_fields_checked: int
     endpoint_findings: int
     keyword_findings: int
@@ -66,7 +77,20 @@ def iter_input_files(paths: Iterable[Path], patterns: list[str]) -> Iterable[Pat
                     if child.is_file() and child not in seen:
                         seen.add(child)
                         yield child
-        elif path.is_file():
+        elif path.is_file() and path.suffix.lower() == ".json":
+            yield path
+
+
+def iter_text_sidecars(paths: Iterable[Path], patterns: list[str]) -> Iterable[Path]:
+    for path in paths:
+        if path.is_dir():
+            seen: set[Path] = set()
+            for pattern in patterns:
+                for child in sorted(path.rglob(pattern)):
+                    if child.is_file() and child not in seen:
+                        seen.add(child)
+                        yield child
+        elif path.is_file() and path.suffix.lower() != ".json":
             yield path
 
 
@@ -160,7 +184,9 @@ def scan_text(source: Path, row_number: int, json_path: str, text: str, fail_on_
     return findings
 
 
-def audit_row(source: Path, row_number: int, row: dict[str, Any], args: argparse.Namespace) -> tuple[NetworkTextRecord, list[Finding]]:
+def audit_row(
+    source: Path, row_number: int, row: dict[str, Any], args: argparse.Namespace
+) -> tuple[NetworkTextRecord, list[Finding]]:
     checked = 0
     findings: list[Finding] = []
     for json_path, text in iter_text_fields(row):
@@ -168,7 +194,20 @@ def audit_row(source: Path, row_number: int, row: dict[str, Any], args: argparse
         findings.extend(scan_text(source, row_number, json_path, text, args.fail_on_keywords))
     endpoint_findings = sum(1 for finding in findings if finding.kind != "network_keyword")
     keyword_findings = sum(1 for finding in findings if finding.kind == "network_keyword")
-    return NetworkTextRecord(str(source), row_number, checked, endpoint_findings, keyword_findings), findings
+    return NetworkTextRecord(str(source), row_number, "json", checked, endpoint_findings, keyword_findings), findings
+
+
+def audit_text_sidecar(source: Path, args: argparse.Namespace) -> tuple[NetworkTextRecord, list[Finding]]:
+    try:
+        text = source.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        finding = Finding(str(source), 0, "error", "load_error", "$", "", str(exc))
+        return NetworkTextRecord(str(source), 0, "text_sidecar", 0, 0, 0), [finding]
+
+    findings = scan_text(source, 0, "$", text, args.fail_on_keywords)
+    endpoint_findings = sum(1 for finding in findings if finding.kind != "network_keyword")
+    keyword_findings = sum(1 for finding in findings if finding.kind == "network_keyword")
+    return NetworkTextRecord(str(source), 0, "text_sidecar", 1, endpoint_findings, keyword_findings), findings
 
 
 def audit(paths: Iterable[Path], args: argparse.Namespace) -> tuple[list[NetworkTextRecord], list[Finding]]:
@@ -186,6 +225,12 @@ def audit(paths: Iterable[Path], args: argparse.Namespace) -> tuple[list[Network
             record, row_findings = audit_row(path, row_number, row, args)
             records.append(record)
             findings.extend(row_findings)
+    if args.scan_text_sidecars:
+        for path in iter_text_sidecars(paths, args.text_pattern):
+            seen_files += 1
+            record, sidecar_findings = audit_text_sidecar(path, args)
+            records.append(record)
+            findings.extend(sidecar_findings)
 
     if seen_files < args.min_artifacts:
         findings.append(Finding("-", 0, "error", "min_artifacts", "$", "", f"found {seen_files}, expected at least {args.min_artifacts}"))
@@ -204,6 +249,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str]) -> 
 def summary(records: list[NetworkTextRecord], findings: list[Finding]) -> dict[str, Any]:
     return {
         "rows": len(records),
+        "json_rows": sum(1 for record in records if record.artifact_kind == "json"),
+        "text_sidecars": sum(1 for record in records if record.artifact_kind == "text_sidecar"),
         "text_fields_checked": sum(record.text_fields_checked for record in records),
         "endpoint_findings": sum(record.endpoint_findings for record in records),
         "keyword_findings": sum(record.keyword_findings for record in records),
@@ -234,6 +281,8 @@ def write_outputs(records: list[NetworkTextRecord], findings: list[Finding], arg
         "",
         f"Status: {status}",
         f"Rows: {report['rows']}",
+        f"JSON rows: {report['json_rows']}",
+        f"Text sidecars: {report['text_sidecars']}",
         f"Text fields checked: {report['text_fields_checked']}",
         f"Endpoint findings: {report['endpoint_findings']}",
         f"Keyword findings: {report['keyword_findings']}",
@@ -264,11 +313,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("inputs", nargs="+", type=Path, help="QEMU benchmark JSON files or directories")
     parser.add_argument("--pattern", action="append", default=list(DEFAULT_PATTERNS), help="glob pattern when an input is a directory")
+    parser.add_argument("--text-pattern", action="append", default=list(DEFAULT_TEXT_PATTERNS), help="text sidecar glob pattern when an input is a directory")
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--output-stem", default="qemu_artifact_network_text_audit_latest")
     parser.add_argument("--min-artifacts", type=int, default=1)
     parser.add_argument("--min-rows", type=int, default=1)
+    parser.add_argument("--no-text-sidecars", dest="scan_text_sidecars", action="store_false", help="scan JSON artifacts only")
     parser.add_argument("--fail-on-keywords", action="store_true", help="promote standalone network keyword matches from warnings to errors")
+    parser.set_defaults(scan_text_sidecars=True)
     return parser
 
 

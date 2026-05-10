@@ -58,8 +58,12 @@ def main() -> int:
 
         safe = root / "qemu_prompt_bench_safe.json"
         write_artifact(safe, base_row())
+        (root / "qemu_prompt_bench_safe.md").write_text(
+            "# QEMU Prompt Bench\n\nCommand: `qemu-system-x86_64 -nic none -serial stdio`\n",
+            encoding="utf-8",
+        )
         safe_out = root / "safe_out"
-        completed = run_audit(safe, safe_out, fail_on_keywords=True)
+        completed = run_audit(root, safe_out, fail_on_keywords=True)
         if completed.returncode != 0:
             sys.stdout.write(completed.stdout)
             sys.stderr.write(completed.stderr)
@@ -69,6 +73,8 @@ def main() -> int:
         checks = [
             require(safe_report["status"] == "pass", "safe_network_text_audit_not_pass=true"),
             require(safe_report["findings"] == [], "safe_network_text_audit_has_findings=true"),
+            require(safe_report["summary"]["json_rows"] == 1, "safe_network_text_audit_json_row_count_drift=true"),
+            require(safe_report["summary"]["text_sidecars"] == 1, "safe_network_text_audit_sidecar_count_drift=true"),
             require(safe_junit.attrib.get("failures") == "0", "safe_network_text_audit_junit_failures=true"),
             require((safe_out / "qemu_artifact_network_text_audit_smoke_findings.csv").exists(), "safe_network_text_audit_missing_findings_csv=true"),
         ]
@@ -90,6 +96,32 @@ def main() -> int:
             require(warning_report["status"] == "pass", "warning_network_text_audit_not_pass=true"),
             require(warning_report["findings"][0]["severity"] == "warning", "warning_network_text_audit_missing_warning=true"),
             require(warning_report["findings"][0]["kind"] == "network_keyword", "warning_network_text_audit_wrong_kind=true"),
+        ]
+        if not all(checks):
+            return 1
+
+        unsafe_sidecar = root / "qemu_prompt_bench_unsafe_sidecar.json"
+        write_artifact(unsafe_sidecar, base_row())
+        (root / "qemu_prompt_bench_unsafe_sidecar.csv").write_text(
+            "field,value\nstderr_tail,opened tcp://127.0.0.1:2222 for serial capture\n",
+            encoding="utf-8",
+        )
+        unsafe_sidecar_out = root / "unsafe_sidecar_out"
+        sidecar_failed = run_audit(root, unsafe_sidecar_out)
+        if sidecar_failed.returncode == 0:
+            print("unsafe_sidecar_network_text_audit_not_rejected=true", file=sys.stderr)
+            return 1
+        unsafe_sidecar_report = json.loads(
+            (unsafe_sidecar_out / "qemu_artifact_network_text_audit_smoke.json").read_text(encoding="utf-8")
+        )
+        sidecar_errors = [finding for finding in unsafe_sidecar_report["findings"] if finding["severity"] == "error"]
+        checks = [
+            require(unsafe_sidecar_report["status"] == "fail", "unsafe_sidecar_network_text_audit_not_fail=true"),
+            require(any(finding["kind"] == "network_url" for finding in sidecar_errors), "unsafe_sidecar_network_text_audit_missing_url=true"),
+            require(
+                any(finding["source"].endswith("qemu_prompt_bench_unsafe_sidecar.csv") for finding in sidecar_errors),
+                "unsafe_sidecar_network_text_audit_missing_sidecar_source=true",
+            ),
         ]
         if not all(checks):
             return 1

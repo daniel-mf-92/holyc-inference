@@ -1,0 +1,19 @@
+{
+  "artifacts": [
+    {
+      "blocks": 1,
+      "elements": 32,
+      "format": "q4_0",
+      "name": "fixture.q4_full",
+      "path": "q4_full.bin"
+    },
+    {
+      "blocks": 1,
+      "elements": 32,
+      "format": "q8_0",
+      "name": "fixture.q8_full",
+      "path": "q8_full.bin"
+    }
+  ],
+  "model": "padding-fixture"
+}
