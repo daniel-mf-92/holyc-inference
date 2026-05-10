@@ -1343,9 +1343,12 @@ python3 bench/qemu_launch_profile_audit_ci_smoke.py
 
 `qemu_command_fingerprint_audit.py` checks saved QEMU benchmark artifacts for
 recomputable command SHA256s, explicit `-nic none`, legacy `-net none` drift,
-and row-vs-top-level command hash consistency. It is host-side only and does
-not launch QEMU. Use `--require-single-command-hash` when a benchmark artifact
-must prove all measured and warmup rows used exactly the same launch command.
+row-vs-top-level command hash consistency, and stale row-level air-gap metadata.
+It is host-side only and does not launch QEMU. Use
+`--require-single-command-hash` when a benchmark artifact must prove all
+measured and warmup rows used exactly the same launch command. Use
+`--require-row-airgap-metadata` when every row must carry recomputable
+`command_airgap_*` metadata.
 
 Example:
 
@@ -1354,12 +1357,14 @@ python3 bench/qemu_command_fingerprint_audit.py bench/results \
   --output-dir bench/results \
   --output-stem qemu_command_fingerprint_audit_latest \
   --require-top-command \
-  --require-single-command-hash
+  --require-single-command-hash \
+  --require-row-airgap-metadata
 ```
 
 The tool writes JSON, Markdown, CSV row records, CSV findings, and JUnit
 outputs. Its smoke gate exercises passing hashes plus hash drift, air-gap
-violations, row-command drift, and multi-command rejection:
+violations, stale air-gap metadata, row-command drift, and multi-command
+rejection:
 
 ```bash
 python3 bench/qemu_command_fingerprint_audit_ci_smoke.py

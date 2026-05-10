@@ -120,6 +120,16 @@ def command_list(value: Any) -> list[str] | None:
     return value
 
 
+def optional_bool(value: Any) -> bool | None:
+    return value if isinstance(value, bool) else None
+
+
+def optional_string_list(value: Any) -> list[str] | None:
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        return None
+    return value
+
+
 def data_rows(payload: dict[str, Any], findings: list[Finding], path: Path) -> list[tuple[str, dict[str, Any]]]:
     rows: list[tuple[str, dict[str, Any]]] = []
     for list_name in ("warmups", "benchmarks"):
@@ -185,6 +195,67 @@ def audit_command(
     return computed_hash, airgap
 
 
+def audit_stored_airgap_metadata(
+    path: Path,
+    row_number: int,
+    row: dict[str, Any],
+    airgap: dict[str, Any],
+    findings: list[Finding],
+    require_metadata: bool,
+) -> None:
+    expected_fields = {
+        "command_airgap_ok": airgap["ok"],
+        "command_has_explicit_nic_none": airgap["explicit_nic_none"],
+        "command_has_legacy_net_none": airgap["legacy_net_none"],
+    }
+    for field, expected in expected_fields.items():
+        stored = optional_bool(row.get(field))
+        if stored is None:
+            if require_metadata:
+                findings.append(
+                    Finding(str(path), row_number, "error", f"missing_{field}", field, "row must carry computed command air-gap metadata")
+                )
+            continue
+        if stored != expected:
+            findings.append(
+                Finding(
+                    str(path),
+                    row_number,
+                    "error",
+                    f"{field}_mismatch",
+                    field,
+                    f"stored {stored} does not match computed {expected}",
+                )
+            )
+
+    stored_violations = optional_string_list(row.get("command_airgap_violations"))
+    expected_violations = list(airgap["violations"])
+    if stored_violations is None:
+        if require_metadata:
+            findings.append(
+                Finding(
+                    str(path),
+                    row_number,
+                    "error",
+                    "missing_command_airgap_violations",
+                    "command_airgap_violations",
+                    "row must carry computed command air-gap violations",
+                )
+            )
+        return
+    if stored_violations != expected_violations:
+        findings.append(
+            Finding(
+                str(path),
+                row_number,
+                "error",
+                "command_airgap_violations_mismatch",
+                "command_airgap_violations",
+                f"stored {stored_violations!r} does not match computed {expected_violations!r}",
+            )
+        )
+
+
 def audit_artifact(path: Path, args: argparse.Namespace) -> tuple[ArtifactRecord, list[CommandRow], list[Finding]]:
     payload, error = load_json_object(path)
     if payload is None:
@@ -212,6 +283,7 @@ def audit_artifact(path: Path, args: argparse.Namespace) -> tuple[ArtifactRecord
             continue
         stored_hash = text(row.get("command_sha256"))
         computed_hash, airgap = audit_command(path, row_number, "command_sha256", command, stored_hash, findings)
+        audit_stored_airgap_metadata(path, row_number, row, airgap, findings, args.require_row_airgap_metadata)
         effective_hash = stored_hash or computed_hash
         if top_hash and effective_hash != top_hash and not args.allow_row_command_drift:
             findings.append(
@@ -358,6 +430,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--allow-row-command-drift", action="store_true")
     parser.add_argument("--require-single-command-hash", action="store_true")
     parser.add_argument("--require-top-command", action="store_true")
+    parser.add_argument("--require-row-airgap-metadata", action="store_true")
     return parser
 
 

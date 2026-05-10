@@ -24,6 +24,16 @@ def require(condition: bool, message: str) -> int:
     return 0
 
 
+def airgap_fields(command: list[str]) -> dict[str, object]:
+    metadata = qemu_prompt_bench.command_airgap_metadata(command)
+    return {
+        "command_airgap_ok": metadata["ok"],
+        "command_has_explicit_nic_none": metadata["explicit_nic_none"],
+        "command_has_legacy_net_none": metadata["legacy_net_none"],
+        "command_airgap_violations": metadata["violations"],
+    }
+
+
 def row(command: list[str], **overrides: object) -> dict[str, object]:
     value: dict[str, object] = {
         "prompt": "smoke-short",
@@ -35,6 +45,7 @@ def row(command: list[str], **overrides: object) -> dict[str, object]:
         "launch_index": 1,
         "command": command,
         "command_sha256": qemu_prompt_bench.command_hash(command),
+        **airgap_fields(command),
     }
     value.update(overrides)
     return value
@@ -52,6 +63,7 @@ def run_audit(input_path: Path, output_dir: Path) -> subprocess.CompletedProcess
             "qemu_command_fingerprint_audit_latest",
             "--require-top-command",
             "--require-single-command-hash",
+            "--require-row-airgap-metadata",
         ],
         cwd=ROOT,
         stdout=subprocess.PIPE,
@@ -105,6 +117,7 @@ def main() -> int:
                     "command_sha256": qemu_prompt_bench.command_hash(command),
                     "benchmarks": [
                         row(command, prompt="bad-hash", command_sha256="bad"),
+                        row(command, prompt="stale-airgap", launch_index=3, command_airgap_ok=False),
                         row(bad_command, prompt="networked", launch_index=2),
                     ],
                 }
@@ -118,7 +131,14 @@ def main() -> int:
         fail_report = json.loads((fail_dir / "qemu_command_fingerprint_audit_latest.json").read_text(encoding="utf-8"))
         kinds = {finding["kind"] for finding in fail_report["findings"]}
         if rc := require(
-            {"command_sha256_mismatch", "command_airgap_violation", "row_command_hash_drift", "multiple_row_command_hashes"} <= kinds,
+            {
+                "command_sha256_mismatch",
+                "command_airgap_violation",
+                "command_airgap_ok_mismatch",
+                "row_command_hash_drift",
+                "multiple_row_command_hashes",
+            }
+            <= kinds,
             "command_fingerprint_findings_not_reported",
         ):
             return rc
