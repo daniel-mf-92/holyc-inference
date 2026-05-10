@@ -6,6 +6,6 @@ Status: **pass**
 | ---: | ---: | ---: | ---: |
 | 1 | 4 | 0 | 30 |
 
-| Benchmark | Profile | Model | Quantization | Samples | P95 wall s | Current timeout s | Recommended timeout s |
-| --- | --- | --- | --- | ---: | ---: | ---: | ---: |
-| qemu_prompt | ci-airgap-smoke | synthetic-smoke | Q4_0 | 4 | 0.687427 | 5 | 30 |
+| Benchmark | Profile | Model | Quantization | Samples | P95 wall s | Current timeout s | Current headroom % | Recommended timeout s |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
+| qemu_prompt | ci-airgap-smoke | synthetic-smoke | Q4_0 | 4 | 0.687427 | 5 | 85.9577 | 30 |

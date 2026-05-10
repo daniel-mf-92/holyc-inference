@@ -70,6 +70,31 @@ def main() -> int:
         payload = json.loads((output_dir / "qemu_timeout_recommend_smoke.json").read_text(encoding="utf-8"))
         assert payload["status"] == "pass"
         assert payload["recommendations"][0]["recommended_timeout_s"] == 41
+        assert payload["recommendations"][0]["current_timeout_headroom_pct"] == 80.0
+
+        fail_dir = Path(tmp) / "fail"
+        failed = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                str(artifact),
+                "--output-dir",
+                str(fail_dir),
+                "--output-stem",
+                "qemu_timeout_recommend_headroom_fail",
+                "--min-samples",
+                "2",
+                "--require-timeout-telemetry",
+                "--min-current-timeout-headroom-pct",
+                "90",
+            ],
+            text=True,
+            capture_output=True,
+        )
+        assert failed.returncode == 1, failed.stdout + failed.stderr
+        fail_payload = json.loads((fail_dir / "qemu_timeout_recommend_headroom_fail.json").read_text(encoding="utf-8"))
+        kinds = {finding["kind"] for finding in fail_payload["findings"]}
+        assert "current_timeout_headroom_low" in kinds
 
     RESULTS.mkdir(parents=True, exist_ok=True)
     latest_artifact = RESULTS / "qemu_prompt_bench_latest.json"

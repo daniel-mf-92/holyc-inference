@@ -218,6 +218,7 @@
 2026-04-29T05:17:55Z | Added perf regression host/QEMU environment metadata coverage gates with CSV/JUnit smoke coverage and refreshed dashboards.
 2026-04-29T05:42:44Z | Added perf regression memory-per-token telemetry/gating with smoke coverage and refreshed dashboards.
 2026-04-29T05:51:40Z | Added dataset choice-overlap audit gating with smoke coverage and refreshed choice audit artifacts.
+2026-05-10T19:26:59Z | Added QEMU timeout recommender current-headroom gating with smoke rejection coverage and refreshed reports.
 2026-04-29T06:01:22Z | Added qemu_prompt_bench guest memory-per-token telemetry/gating with smoke coverage and refreshed benchmark artifacts.
 2026-04-29T06:10:02Z | Added qemu_prompt_bench suite-level total-token gating with smoke coverage and README documentation.
 2026-04-29T06:21:23Z | Added benchmark artifact manifest dry-run coverage gate with smoke coverage and refreshed manifest artifacts.

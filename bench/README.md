@@ -851,12 +851,14 @@ python3 bench/qemu_timeout_recommend.py \
   --output-dir bench/results \
   --output-stem qemu_timeout_recommend_latest \
   --min-samples 2 \
-  --require-timeout-telemetry
+  --require-timeout-telemetry \
+  --min-current-timeout-headroom-pct 50
 ```
 
 The tool writes JSON, Markdown, CSV rows, CSV findings, and JUnit outputs. Its
-smoke gate builds a temporary passing benchmark artifact and refreshes latest
-recommendation sidecars when a local latest QEMU benchmark result exists:
+smoke gate builds temporary passing and low-headroom benchmark artifacts and
+refreshes latest recommendation sidecars when a local latest QEMU benchmark
+result exists:
 
 ```bash
 python3 bench/qemu_timeout_recommend_ci_smoke.py

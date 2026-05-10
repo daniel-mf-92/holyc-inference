@@ -1,6 +1,6 @@
 {
   "findings": [],
-  "generated_at": "2026-05-02T04:02:00Z",
+  "generated_at": "2026-05-10T19:28:21Z",
   "recommendations": [
     {
       "benchmark": "qemu_prompt",
@@ -24,6 +24,7 @@
   "settings": {
     "additive_seconds": 5.0,
     "fail_if_current_below_recommended": false,
+    "min_current_timeout_headroom_pct": null,
     "min_samples": 1,
     "min_timeout_seconds": 30.0,
     "p95_multiplier": 3.0,

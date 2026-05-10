@@ -261,6 +261,25 @@ def build_report(samples: list[TimeoutSample], args: argparse.Namespace, finding
                     f"current {recommendation.current_timeout_s:g}s below recommended {recommendation.recommended_timeout_s}s",
                 )
             )
+        if (
+            args.min_current_timeout_headroom_pct is not None
+            and recommendation.current_timeout_headroom_pct is not None
+            and recommendation.current_timeout_headroom_pct < args.min_current_timeout_headroom_pct
+        ):
+            findings.append(
+                Finding(
+                    "error",
+                    recommendation.benchmark,
+                    recommendation.profile,
+                    recommendation.model,
+                    recommendation.quantization,
+                    "current_timeout_headroom_low",
+                    (
+                        f"current timeout headroom {recommendation.current_timeout_headroom_pct:.3f}% "
+                        f"below minimum {args.min_current_timeout_headroom_pct:.3f}%"
+                    ),
+                )
+            )
 
     if args.require_rows and not recommendations:
         findings.append(Finding("error", "", "", "", "", "missing_groups", "no timeout recommendation groups found"))
@@ -277,6 +296,7 @@ def build_report(samples: list[TimeoutSample], args: argparse.Namespace, finding
             "additive_seconds": args.additive_seconds,
             "require_timeout_telemetry": args.require_timeout_telemetry,
             "fail_if_current_below_recommended": args.fail_if_current_below_recommended,
+            "min_current_timeout_headroom_pct": args.min_current_timeout_headroom_pct,
         },
         "summary": {
             "groups": len(recommendations),
@@ -313,12 +333,12 @@ def write_markdown(path: Path, report: dict[str, Any]) -> None:
             max_timeout=report["summary"]["max_recommended_timeout_s"] or "",
         ),
         "",
-        "| Benchmark | Profile | Model | Quantization | Samples | P95 wall s | Current timeout s | Recommended timeout s |",
-        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: |",
+        "| Benchmark | Profile | Model | Quantization | Samples | P95 wall s | Current timeout s | Current headroom % | Recommended timeout s |",
+        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |",
     ]
     for row in report["recommendations"]:
         lines.append(
-            "| {benchmark} | {profile} | {model} | {quantization} | {samples} | {p95:.6g} | {current} | {recommended} |".format(
+            "| {benchmark} | {profile} | {model} | {quantization} | {samples} | {p95:.6g} | {current} | {headroom} | {recommended} |".format(
                 benchmark=row["benchmark"],
                 profile=row["profile"],
                 model=row["model"],
@@ -326,6 +346,11 @@ def write_markdown(path: Path, report: dict[str, Any]) -> None:
                 samples=row["samples"],
                 p95=row["p95_wall_s"],
                 current="" if row["current_timeout_s"] is None else f"{row['current_timeout_s']:.6g}",
+                headroom=(
+                    ""
+                    if row["current_timeout_headroom_pct"] is None
+                    else f"{row['current_timeout_headroom_pct']:.6g}"
+                ),
                 recommended=row["recommended_timeout_s"],
             )
         )
@@ -403,6 +428,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--additive-seconds", type=float, default=5.0)
     parser.add_argument("--require-timeout-telemetry", action="store_true")
     parser.add_argument("--fail-if-current-below-recommended", action="store_true")
+    parser.add_argument(
+        "--min-current-timeout-headroom-pct",
+        type=float,
+        help="Fail groups whose recorded timeout leaves less than this percent headroom above max wall time",
+    )
     parser.add_argument("--no-require-rows", action="store_false", dest="require_rows")
     parser.set_defaults(require_success=True, require_rows=True)
     return parser
@@ -430,6 +460,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--p95-multiplier must be positive")
     if args.additive_seconds < 0:
         parser.error("--additive-seconds must be non-negative")
+    if args.min_current_timeout_headroom_pct is not None and args.min_current_timeout_headroom_pct < 0:
+        parser.error("--min-current-timeout-headroom-pct must be non-negative")
     report = audit(args.paths, args)
     write_outputs(report, args.output_dir, args.output_stem)
     return 0 if report["status"] == "pass" else 1
