@@ -1,0 +1,3 @@
+key,tensor,model,source,formats,q4_0_blocks,q8_0_blocks,q4_0_bytes,q8_0_bytes,element_counts,pair_byte_ratio,status
+output|smoke-llm,output,smoke-llm,,"q4_0,q8_0",1,1,18,34,32,1.888889,pass
+tok_embeddings|smoke-llm,tok_embeddings,smoke-llm,,"q4_0,q8_0",2,2,36,68,64,1.888889,pass

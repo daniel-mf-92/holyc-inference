@@ -1,0 +1,5 @@
+key,tensor,model,source,format,blocks,expected_blocks,bytes,expected_bytes,elements,element_capacity,padding_elements,status
+tok_embeddings|smoke-llm,tok_embeddings,smoke-llm,,q4_0,2,2,36,36,64,64,0,pass
+tok_embeddings|smoke-llm,tok_embeddings,smoke-llm,,q8_0,2,2,68,68,64,64,0,pass
+output|smoke-llm,output,smoke-llm,,q4_0,1,1,18,18,32,32,0,pass
+output|smoke-llm,output,smoke-llm,,q8_0,1,1,34,34,32,32,0,pass

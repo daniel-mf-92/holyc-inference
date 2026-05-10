@@ -1,0 +1,115 @@
+{
+  "entries": [
+    {
+      "blocks": 2,
+      "bytes": 36,
+      "element_capacity": 64,
+      "elements": 64,
+      "expected_blocks": 2,
+      "expected_bytes": 36,
+      "format": "q4_0",
+      "key": "tok_embeddings|smoke-llm",
+      "model": "smoke-llm",
+      "padding_elements": 0,
+      "source": "",
+      "status": "pass",
+      "tensor": "tok_embeddings"
+    },
+    {
+      "blocks": 2,
+      "bytes": 68,
+      "element_capacity": 64,
+      "elements": 64,
+      "expected_blocks": 2,
+      "expected_bytes": 68,
+      "format": "q8_0",
+      "key": "tok_embeddings|smoke-llm",
+      "model": "smoke-llm",
+      "padding_elements": 0,
+      "source": "",
+      "status": "pass",
+      "tensor": "tok_embeddings"
+    },
+    {
+      "blocks": 1,
+      "bytes": 18,
+      "element_capacity": 32,
+      "elements": 32,
+      "expected_blocks": 1,
+      "expected_bytes": 18,
+      "format": "q4_0",
+      "key": "output|smoke-llm",
+      "model": "smoke-llm",
+      "padding_elements": 0,
+      "source": "",
+      "status": "pass",
+      "tensor": "output"
+    },
+    {
+      "blocks": 1,
+      "bytes": 34,
+      "element_capacity": 32,
+      "elements": 32,
+      "expected_blocks": 1,
+      "expected_bytes": 34,
+      "format": "q8_0",
+      "key": "output|smoke-llm",
+      "model": "smoke-llm",
+      "padding_elements": 0,
+      "source": "",
+      "status": "pass",
+      "tensor": "output"
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-10T18:27:31Z",
+  "key_fields": [
+    "tensor",
+    "model"
+  ],
+  "manifest": "bench/fixtures/quant_pair_size_audit/pass.json",
+  "pairs": [
+    {
+      "element_counts": "32",
+      "formats": "q4_0,q8_0",
+      "key": "output|smoke-llm",
+      "model": "smoke-llm",
+      "pair_byte_ratio": 1.888889,
+      "q4_0_blocks": 1,
+      "q4_0_bytes": 18,
+      "q8_0_blocks": 1,
+      "q8_0_bytes": 34,
+      "source": "",
+      "status": "pass",
+      "tensor": "output"
+    },
+    {
+      "element_counts": "64",
+      "formats": "q4_0,q8_0",
+      "key": "tok_embeddings|smoke-llm",
+      "model": "smoke-llm",
+      "pair_byte_ratio": 1.888889,
+      "q4_0_blocks": 2,
+      "q4_0_bytes": 36,
+      "q8_0_blocks": 2,
+      "q8_0_bytes": 68,
+      "source": "",
+      "status": "pass",
+      "tensor": "tok_embeddings"
+    }
+  ],
+  "required_formats": [
+    "q4_0",
+    "q8_0"
+  ],
+  "status": "pass",
+  "summary": {
+    "complete_pairs": 2,
+    "entries": 4,
+    "findings": 0,
+    "pair_keys": 2,
+    "q4_0_bytes_total": 54,
+    "q8_0_bytes_total": 102
+  },
+  "tool": "quant_pair_size_audit"
+}
