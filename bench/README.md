@@ -542,6 +542,34 @@ drift:
 python3 bench/eval_identity_audit_ci_smoke.py
 ```
 
+## Eval Error Overlap Audit
+
+`eval_error_overlap_audit.py` checks local HolyC and llama.cpp prediction
+streams against the same gold set, then reports shared misses, engine-unique
+misses, and error-set Jaccard overlap. This helps separate broad dataset
+difficulty from engine-specific regressions before interpreting eval deltas.
+
+```bash
+python3 bench/eval_error_overlap_audit.py \
+  --gold bench/datasets/samples/smoke_eval.jsonl \
+  --holyc bench/eval/samples/holyc_smoke_predictions.jsonl \
+  --llama bench/eval/samples/llama_smoke_predictions.jsonl \
+  --dataset smoke-eval \
+  --split validation \
+  --min-paired-records 3 \
+  --min-error-jaccard 0.25 \
+  --max-holyc-unique-error-excess 1 \
+  --output-dir bench/results \
+  --output-stem eval_error_overlap_audit_smoke_latest
+```
+
+The smoke gate exercises shared/unique error accounting plus a failing Jaccard
+gate:
+
+```bash
+python3 bench/eval_error_overlap_audit_ci_smoke.py
+```
+
 ## Eval Top-k Overlap Audit
 
 `eval_topk_overlap_audit.py` checks scored HolyC and llama.cpp multiple-choice

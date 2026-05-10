@@ -1,0 +1,66 @@
+{
+  "findings": [],
+  "format": "eval-error-overlap-audit",
+  "gates": {
+    "max_holyc_unique_error_excess": 1,
+    "min_error_jaccard": 0.25,
+    "min_paired_records": 3
+  },
+  "generated_at": "2026-05-10T14:44:38Z",
+  "inputs": {
+    "gold": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl",
+    "holyc": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/holyc-eval-error-overlap-2zlp4keo/holyc.jsonl",
+    "llama": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/holyc-eval-error-overlap-2zlp4keo/llama.jsonl"
+  },
+  "rows": [
+    {
+      "answer_index": 0,
+      "dataset": "hellaswag-smoke",
+      "error_class": "both_correct",
+      "holyc_correct": true,
+      "holyc_prediction": 0,
+      "llama_correct": true,
+      "llama_prediction": 0,
+      "record_id": "smoke-hellaswag-1",
+      "split": "validation"
+    },
+    {
+      "answer_index": 0,
+      "dataset": "arc-smoke",
+      "error_class": "shared_error",
+      "holyc_correct": false,
+      "holyc_prediction": 1,
+      "llama_correct": false,
+      "llama_prediction": 2,
+      "record_id": "smoke-arc-1",
+      "split": "validation"
+    },
+    {
+      "answer_index": 0,
+      "dataset": "truthfulqa-smoke",
+      "error_class": "holyc_unique_error",
+      "holyc_correct": false,
+      "holyc_prediction": 1,
+      "llama_correct": true,
+      "llama_prediction": 0,
+      "record_id": "smoke-truthfulqa-1",
+      "split": "validation"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "error_jaccard": 0.5,
+    "error_union": 2,
+    "findings": 0,
+    "gold_records": 3,
+    "holyc_errors": 2,
+    "holyc_unique_errors": 1,
+    "llama_errors": 1,
+    "llama_unique_errors": 0,
+    "paired_records": 3,
+    "shared_error_pct_of_holyc_errors": 50.0,
+    "shared_error_pct_of_llama_errors": 100.0,
+    "shared_errors": 1,
+    "unique_error_delta_holyc_minus_llama": 1
+  }
+}
