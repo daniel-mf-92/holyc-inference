@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="qemu_artifact_path_audit" tests="877" failures="0"><testcase name="host_path_policy" /></testsuite>
