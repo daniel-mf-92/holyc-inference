@@ -1,0 +1,13 @@
+source,field,rows,present,missing,distinct_values,values
+holyc,model,3,3,0,1,smoke-model
+holyc,model_sha256,3,3,0,1,9f4b79a6f9c8d58d13ef5f8bb6c24739021d09fc6d1f3d3f07380f6c31f0c05a
+holyc,tokenizer_sha256,3,3,0,1,ec1c742f6b98c5c6cc938acdf58edb7e3aef3a7423dfbe24f2a5d820f4f4d2bb
+holyc,quantization,3,3,0,1,Q4_0
+holyc,quantization_sha256,3,0,3,0,
+holyc,prompt_template_sha256,3,3,0,1,44a1c57bd64dc8801d3a615559f6eb5420dfaa900d227dd7747a46c86d3f9c3e
+llama.cpp,model,3,3,0,1,smoke-model
+llama.cpp,model_sha256,3,3,0,1,9f4b79a6f9c8d58d13ef5f8bb6c24739021d09fc6d1f3d3f07380f6c31f0c05a
+llama.cpp,tokenizer_sha256,3,3,0,1,ec1c742f6b98c5c6cc938acdf58edb7e3aef3a7423dfbe24f2a5d820f4f4d2bb
+llama.cpp,quantization,3,3,0,1,Q4_0
+llama.cpp,quantization_sha256,3,0,3,0,
+llama.cpp,prompt_template_sha256,3,3,0,1,44a1c57bd64dc8801d3a615559f6eb5420dfaa900d227dd7747a46c86d3f9c3e

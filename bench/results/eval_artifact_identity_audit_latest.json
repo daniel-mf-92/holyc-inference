@@ -1,0 +1,158 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-10T16:00:25Z",
+  "identity": [
+    {
+      "distinct_values": 1,
+      "field": "model",
+      "missing": 0,
+      "present": 3,
+      "rows": 3,
+      "source": "holyc",
+      "values": "smoke-model"
+    },
+    {
+      "distinct_values": 1,
+      "field": "model_sha256",
+      "missing": 0,
+      "present": 3,
+      "rows": 3,
+      "source": "holyc",
+      "values": "9f4b79a6f9c8d58d13ef5f8bb6c24739021d09fc6d1f3d3f07380f6c31f0c05a"
+    },
+    {
+      "distinct_values": 1,
+      "field": "tokenizer_sha256",
+      "missing": 0,
+      "present": 3,
+      "rows": 3,
+      "source": "holyc",
+      "values": "ec1c742f6b98c5c6cc938acdf58edb7e3aef3a7423dfbe24f2a5d820f4f4d2bb"
+    },
+    {
+      "distinct_values": 1,
+      "field": "quantization",
+      "missing": 0,
+      "present": 3,
+      "rows": 3,
+      "source": "holyc",
+      "values": "Q4_0"
+    },
+    {
+      "distinct_values": 0,
+      "field": "quantization_sha256",
+      "missing": 3,
+      "present": 0,
+      "rows": 3,
+      "source": "holyc",
+      "values": ""
+    },
+    {
+      "distinct_values": 1,
+      "field": "prompt_template_sha256",
+      "missing": 0,
+      "present": 3,
+      "rows": 3,
+      "source": "holyc",
+      "values": "44a1c57bd64dc8801d3a615559f6eb5420dfaa900d227dd7747a46c86d3f9c3e"
+    },
+    {
+      "distinct_values": 1,
+      "field": "model",
+      "missing": 0,
+      "present": 3,
+      "rows": 3,
+      "source": "llama.cpp",
+      "values": "smoke-model"
+    },
+    {
+      "distinct_values": 1,
+      "field": "model_sha256",
+      "missing": 0,
+      "present": 3,
+      "rows": 3,
+      "source": "llama.cpp",
+      "values": "9f4b79a6f9c8d58d13ef5f8bb6c24739021d09fc6d1f3d3f07380f6c31f0c05a"
+    },
+    {
+      "distinct_values": 1,
+      "field": "tokenizer_sha256",
+      "missing": 0,
+      "present": 3,
+      "rows": 3,
+      "source": "llama.cpp",
+      "values": "ec1c742f6b98c5c6cc938acdf58edb7e3aef3a7423dfbe24f2a5d820f4f4d2bb"
+    },
+    {
+      "distinct_values": 1,
+      "field": "quantization",
+      "missing": 0,
+      "present": 3,
+      "rows": 3,
+      "source": "llama.cpp",
+      "values": "Q4_0"
+    },
+    {
+      "distinct_values": 0,
+      "field": "quantization_sha256",
+      "missing": 3,
+      "present": 0,
+      "rows": 3,
+      "source": "llama.cpp",
+      "values": ""
+    },
+    {
+      "distinct_values": 1,
+      "field": "prompt_template_sha256",
+      "missing": 0,
+      "present": 3,
+      "rows": 3,
+      "source": "llama.cpp",
+      "values": "44a1c57bd64dc8801d3a615559f6eb5420dfaa900d227dd7747a46c86d3f9c3e"
+    }
+  ],
+  "inputs": {
+    "holyc": "bench/eval/samples/holyc_smoke_identity_predictions.jsonl",
+    "llama": "bench/eval/samples/llama_smoke_identity_predictions.jsonl"
+  },
+  "pairs": [
+    {
+      "compared_fields": 5,
+      "holyc_row": 2,
+      "llama_row": 2,
+      "mismatched_fields": 0,
+      "missing_required_fields": 0,
+      "record_id": "smoke-arc-1"
+    },
+    {
+      "compared_fields": 5,
+      "holyc_row": 1,
+      "llama_row": 1,
+      "mismatched_fields": 0,
+      "missing_required_fields": 0,
+      "record_id": "smoke-hellaswag-1"
+    },
+    {
+      "compared_fields": 5,
+      "holyc_row": 3,
+      "llama_row": 3,
+      "mismatched_fields": 0,
+      "missing_required_fields": 0,
+      "record_id": "smoke-truthfulqa-1"
+    }
+  ],
+  "required_fields": [
+    "model_sha256",
+    "quantization",
+    "tokenizer_sha256"
+  ],
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "holyc_records": 3,
+    "identity_fields": 6,
+    "llama_records": 3,
+    "paired_records": 3
+  },
+  "tool": "eval_artifact_identity_audit"
+}

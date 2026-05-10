@@ -542,6 +542,29 @@ drift:
 python3 bench/eval_identity_audit_ci_smoke.py
 ```
 
+## Eval Artifact Identity Audit
+
+`eval_artifact_identity_audit.py` is a stricter paired-row identity gate for
+HolyC-vs-llama prediction streams. It accepts common hash aliases such as
+`weights_sha256`/`gguf_sha256`, requires stable model/tokenizer/quantization
+metadata by default, and fails when paired records disagree.
+
+```bash
+python3 bench/eval_artifact_identity_audit.py \
+  --holyc bench/eval/samples/holyc_smoke_identity_predictions.jsonl \
+  --llama bench/eval/samples/llama_smoke_identity_predictions.jsonl \
+  --output-dir bench/results \
+  --output-stem eval_artifact_identity_audit_latest \
+  --fail-on-findings
+```
+
+The smoke gate covers a passing paired stream, model-hash mismatch, and missing
+tokenizer-hash metadata:
+
+```bash
+python3 bench/eval_artifact_identity_audit_ci_smoke.py
+```
+
 ## Eval Error Overlap Audit
 
 `eval_error_overlap_audit.py` checks local HolyC and llama.cpp prediction
