@@ -34,9 +34,11 @@ class ThroughputRow:
     total_tokens: int
     mean_tok_per_s: float
     median_tok_per_s: float
+    weighted_tok_per_s: float | None
     min_tok_per_s: float
     max_tok_per_s: float
     mean_wall_tok_per_s: float | None
+    weighted_wall_tok_per_s: float | None
     total_elapsed_us: int
     total_wall_elapsed_us: int
 
@@ -191,6 +193,12 @@ def summarize_group(rows: list[dict[str, Any]], key: tuple[str, str, str, str], 
 
     if not tok_rates:
         return None, findings
+    weighted_tok_per_s = None
+    if total_tokens > 0 and total_elapsed_us > 0:
+        weighted_tok_per_s = total_tokens * 1_000_000.0 / total_elapsed_us
+    weighted_wall_tok_per_s = None
+    if total_tokens > 0 and total_wall_elapsed_us > 0:
+        weighted_wall_tok_per_s = total_tokens * 1_000_000.0 / total_wall_elapsed_us
     return (
         ThroughputRow(
             build=build,
@@ -202,9 +210,11 @@ def summarize_group(rows: list[dict[str, Any]], key: tuple[str, str, str, str], 
             total_tokens=total_tokens,
             mean_tok_per_s=statistics.fmean(tok_rates),
             median_tok_per_s=statistics.median(tok_rates),
+            weighted_tok_per_s=weighted_tok_per_s,
             min_tok_per_s=min(tok_rates),
             max_tok_per_s=max(tok_rates),
             mean_wall_tok_per_s=statistics.fmean(wall_rates) if wall_rates else None,
+            weighted_wall_tok_per_s=weighted_wall_tok_per_s,
             total_elapsed_us=total_elapsed_us,
             total_wall_elapsed_us=total_wall_elapsed_us,
         ),
@@ -271,7 +281,7 @@ def build_scorecard(paths: list[Path], patterns: list[str], min_rows: int) -> di
 
 def write_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str]) -> None:
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
@@ -286,14 +296,17 @@ def write_markdown(path: Path, payload: dict[str, Any]) -> None:
         f"- Measured rows: {payload['summary']['measured_rows']}",
         f"- Total tokens: {payload['summary']['total_tokens']}",
         "",
-        "| Build | Profile | Model | Quantization | Rows | Mean tok/s | Median tok/s | Mean wall tok/s |",
-        "|---|---|---|---|---:|---:|---:|---:|",
+        "| Build | Profile | Model | Quantization | Rows | Mean tok/s | Weighted tok/s | Median tok/s | Mean wall tok/s | Weighted wall tok/s |",
+        "|---|---|---|---|---:|---:|---:|---:|---:|---:|",
     ]
     for row in payload["rows"]:
         wall = "-" if row["mean_wall_tok_per_s"] is None else f"{row['mean_wall_tok_per_s']:.6f}"
+        weighted = "-" if row["weighted_tok_per_s"] is None else f"{row['weighted_tok_per_s']:.6f}"
+        weighted_wall = "-" if row["weighted_wall_tok_per_s"] is None else f"{row['weighted_wall_tok_per_s']:.6f}"
         lines.append(
             f"| {row['build']} | {row['profile']} | {row['model']} | {row['quantization']} | "
-            f"{row['measured_rows']} | {row['mean_tok_per_s']:.6f} | {row['median_tok_per_s']:.6f} | {wall} |"
+            f"{row['measured_rows']} | {row['mean_tok_per_s']:.6f} | {weighted} | "
+            f"{row['median_tok_per_s']:.6f} | {wall} | {weighted_wall} |"
         )
     if payload["findings"]:
         lines.extend(["", "## Findings", ""])
@@ -345,9 +358,11 @@ def write_outputs(payload: dict[str, Any], output_dir: Path, output_stem: str) -
             "total_tokens",
             "mean_tok_per_s",
             "median_tok_per_s",
+            "weighted_tok_per_s",
             "min_tok_per_s",
             "max_tok_per_s",
             "mean_wall_tok_per_s",
+            "weighted_wall_tok_per_s",
             "total_elapsed_us",
             "total_wall_elapsed_us",
         ],

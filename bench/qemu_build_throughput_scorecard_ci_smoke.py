@@ -46,6 +46,20 @@ def main() -> int:
                             "wall_tok_per_s": 80.0,
                         },
                         {
+                            "build": "base",
+                            "profile": "ci-airgap-smoke",
+                            "model": "synthetic-smoke",
+                            "quantization": "Q4_0",
+                            "phase": "measured",
+                            "exit_class": "ok",
+                            "timed_out": False,
+                            "tokens": 8,
+                            "elapsed_us": 100000,
+                            "wall_elapsed_us": 200000,
+                            "tok_per_s": 80.0,
+                            "wall_tok_per_s": 40.0,
+                        },
+                        {
                             "build": "candidate",
                             "profile": "ci-airgap-smoke",
                             "model": "synthetic-smoke",
@@ -86,6 +100,14 @@ def main() -> int:
             return rc
         rows = list(csv.DictReader((output_dir / "qemu_build_throughput_scorecard_latest.csv").open(encoding="utf-8")))
         if rc := require(rows[0]["build"] == "base", "unexpected_first_scorecard_build"):
+            return rc
+        if rc := require(rows[0]["measured_rows"] == "2", "unexpected_base_scorecard_rows"):
+            return rc
+        if rc := require(rows[0]["mean_tok_per_s"] == "120.0", "unexpected_base_mean_rate"):
+            return rc
+        if rc := require(rows[0]["weighted_tok_per_s"] == "133.33333333333334", "unexpected_base_weighted_rate"):
+            return rc
+        if rc := require(rows[0]["weighted_wall_tok_per_s"] == "66.66666666666667", "unexpected_base_weighted_wall_rate"):
             return rc
         if rc := require(rows[1]["mean_tok_per_s"] == "200.0", "unexpected_candidate_scorecard_rate"):
             return rc

@@ -1,6 +1,6 @@
 {
   "findings": [],
-  "generated_at": "2026-05-01T22:13:12Z",
+  "generated_at": "2026-05-10T15:05:32Z",
   "inputs": [
     "bench/results/qemu_prompt_bench_latest.json"
   ],
@@ -9,7 +9,7 @@
       "build": "a70776642a09",
       "max_tok_per_s": 160.0,
       "mean_tok_per_s": 160.0,
-      "mean_wall_tok_per_s": 73.29859352528511,
+      "mean_wall_tok_per_s": 67.03793046211261,
       "measured_rows": 4,
       "median_tok_per_s": 160.0,
       "min_tok_per_s": 160.0,
@@ -19,7 +19,9 @@
       "source_count": 1,
       "total_elapsed_us": 1000000,
       "total_tokens": 160,
-      "total_wall_elapsed_us": 2164878
+      "total_wall_elapsed_us": 2427611,
+      "weighted_tok_per_s": 160.0,
+      "weighted_wall_tok_per_s": 65.90841778192635
     }
   ],
   "status": "pass",
