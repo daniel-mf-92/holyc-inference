@@ -9,12 +9,10 @@
     "none",
     "-drive",
     "file=/tmp/templeos.img,format=raw,if=ide",
-    "-nic",
-    "none",
     "-serial",
     "stdio"
   ],
-  "command_sha256": "72742a3c184093a30f9923158e9d8f9f87376e61ba1ff2368bef36920abe9755",
+  "command_sha256": "b5ca5d105cd5336d4c23e308abb0ac38a4b490500965a7da85451960d54b324c",
   "environment": {
     "cpu_count": 10,
     "machine": "arm64",
