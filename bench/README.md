@@ -2872,8 +2872,9 @@ or operator runbooks. It also checks JSON `qemu_args`/`qemu_extra_args`/
 them, and `.args` files for network-enabling options such as `-netdev`,
 non-`none` `-nic`, legacy `-net none`, and virtual NIC devices. Fragment audits
 do not require `-nic none` because the launcher injects it; they reject options
-that re-enable networking or drift back to legacy network-disabling flags. Raw
-QEMU examples must keep `-nic none` explicit:
+that re-enable networking, drift back to legacy network-disabling flags, or
+point QEMU at URL-backed disks, kernels, initrds, or block devices. Raw QEMU
+examples must keep `-nic none` explicit:
 
 ```bash
 qemu-system-x86_64 \

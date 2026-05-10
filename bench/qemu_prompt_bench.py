@@ -77,6 +77,30 @@ SOCKET_ENDPOINT_MARKERS = (
     "unix:",
     "websocket",
 )
+REMOTE_RESOURCE_MARKERS = (
+    "file.driver=ftp",
+    "file.driver=http",
+    "file.driver=https",
+    "file.driver=iscsi",
+    "file.driver=nbd",
+    "file.driver=sftp",
+    "file.driver=ssh",
+    "ftp://",
+    "ftps://",
+    "gluster://",
+    "http://",
+    "https://",
+    "iscsi:",
+    "nbd:",
+    "rbd:",
+    "sftp://",
+    "ssh://",
+    "tftp://",
+    "url=ftp://",
+    "url=http://",
+    "url=https://",
+    "vxhs://",
+)
 SOCKET_TRANSPORT_OPTIONS = {"-chardev", "-gdb", "-incoming", "-monitor", "-qmp", "-qmp-pretty", "-serial", "-vnc"}
 USER_NET_SERVICE_OPTIONS = {"-bootp", "-redir", "-smb", "-tftp"}
 REMOTE_DISPLAY_MARKERS = ("spice", "vnc")
@@ -494,6 +518,11 @@ def is_socket_endpoint_arg(value: str) -> bool:
     return any(marker in lowered for marker in SOCKET_ENDPOINT_MARKERS)
 
 
+def is_remote_resource_arg(value: str) -> bool:
+    lowered = value.lower()
+    return any(marker in lowered for marker in REMOTE_RESOURCE_MARKERS)
+
+
 def is_remote_display_arg(value: str) -> bool:
     lowered = value.lower()
     return any(marker in lowered for marker in REMOTE_DISPLAY_MARKERS)
@@ -560,6 +589,13 @@ def command_airgap_violations(args: list[str]) -> list[str]:
             violations.append(f"tls option `{arg} {next_arg}`")
         if previous_arg not in TLS_VALUE_OPTIONS and is_tls_arg(arg):
             violations.append(f"tls option `{arg}`")
+        if is_remote_resource_arg(arg):
+            violations.append(f"remote resource `{arg}`")
+        if (
+            option in {"-blockdev", "-cdrom", "-drive", "-hda", "-hdb", "-hdc", "-hdd", "-initrd", "-kernel"}
+            and is_remote_resource_arg(next_arg)
+        ):
+            violations.append(f"remote resource `{arg} {next_arg}`")
 
         if arg.startswith("@") and len(arg) > 1:
             violations.append(f"nested qemu args include `{arg}`")
@@ -654,6 +690,13 @@ def reject_network_args(args: list[str]) -> None:
             raise ValueError(f"TLS is not allowed for air-gapped benchmark runs: {arg} {next_arg}")
         if previous_arg not in TLS_VALUE_OPTIONS and is_tls_arg(arg):
             raise ValueError(f"TLS is not allowed for air-gapped benchmark runs: {arg}")
+        if is_remote_resource_arg(arg):
+            raise ValueError(f"remote QEMU resources are not allowed for air-gapped benchmark runs: {arg}")
+        if (
+            option in {"-blockdev", "-cdrom", "-drive", "-hda", "-hdb", "-hdc", "-hdd", "-initrd", "-kernel"}
+            and is_remote_resource_arg(next_arg)
+        ):
+            raise ValueError(f"remote QEMU resources are not allowed for air-gapped benchmark runs: {arg} {next_arg}")
 
         if arg.startswith("@") and len(arg) > 1:
             raise ValueError(f"QEMU response files are not allowed for air-gapped benchmark runs: {arg}")

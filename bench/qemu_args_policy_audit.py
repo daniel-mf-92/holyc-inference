@@ -64,6 +64,30 @@ SOCKET_ENDPOINT_MARKERS = (
     "unix:",
     "websocket",
 )
+REMOTE_RESOURCE_MARKERS = (
+    "file.driver=ftp",
+    "file.driver=http",
+    "file.driver=https",
+    "file.driver=iscsi",
+    "file.driver=nbd",
+    "file.driver=sftp",
+    "file.driver=ssh",
+    "ftp://",
+    "ftps://",
+    "gluster://",
+    "http://",
+    "https://",
+    "iscsi:",
+    "nbd:",
+    "rbd:",
+    "sftp://",
+    "ssh://",
+    "tftp://",
+    "url=ftp://",
+    "url=http://",
+    "url=https://",
+    "vxhs://",
+)
 SOCKET_TRANSPORT_OPTIONS = {"-chardev", "-gdb", "-incoming", "-monitor", "-qmp", "-qmp-pretty", "-serial", "-vnc"}
 USER_NET_SERVICE_OPTIONS = {"-bootp", "-redir", "-smb", "-tftp"}
 REMOTE_DISPLAY_MARKERS = ("spice", "vnc")
@@ -124,6 +148,11 @@ def is_network_device_arg(value: str) -> bool:
 def is_socket_endpoint_arg(value: str) -> bool:
     lowered = value.lower()
     return any(marker in lowered for marker in SOCKET_ENDPOINT_MARKERS)
+
+
+def is_remote_resource_arg(value: str) -> bool:
+    lowered = value.lower()
+    return any(marker in lowered for marker in REMOTE_RESOURCE_MARKERS)
 
 
 def is_remote_display_arg(value: str) -> bool:
@@ -241,6 +270,29 @@ def audit_args(path: Path, args: list[str]) -> list[Finding]:
             )
         if previous_arg not in TLS_VALUE_OPTIONS and is_tls_arg(arg):
             findings.append(Finding(str(path), "tls option", index, arg, f"`{arg}` violates the no-TLS air-gap policy"))
+        if is_remote_resource_arg(arg):
+            findings.append(
+                Finding(
+                    str(path),
+                    "remote resource",
+                    index,
+                    arg,
+                    f"`{arg}` can make QEMU open a network-backed resource and violates the air-gap policy",
+                )
+            )
+        if (
+            option in {"-blockdev", "-cdrom", "-drive", "-hda", "-hdb", "-hdc", "-hdd", "-initrd", "-kernel"}
+            and is_remote_resource_arg(next_arg)
+        ):
+            findings.append(
+                Finding(
+                    str(path),
+                    "remote resource",
+                    index,
+                    arg,
+                    f"`{arg} {next_arg}` can make QEMU open a network-backed resource and violates the air-gap policy",
+                )
+            )
 
         if arg.startswith("@") and len(arg) > 1:
             findings.append(

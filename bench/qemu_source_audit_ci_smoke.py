@@ -104,6 +104,7 @@ def write_unsafe_sources(path: Path) -> None:
                 "-chardev socket,id=mon,path=/tmp/qmp.sock",
                 "-display vnc=127.0.0.1:1",
                 "-object tls-creds-x509,id=tls0,endpoint=server,dir=/tmp/tls",
+                "-drive file=https://example.invalid/TempleOS.img",
                 "",
             ]
         ),
@@ -221,6 +222,10 @@ def main() -> int:
             require("socket endpoint `-chardev socket" in reasons, "unsafe_source_audit_missing_socket=true"),
             require("remote display socket `-display vnc" in reasons, "unsafe_source_audit_missing_remote_display=true"),
             require("tls option `-object tls-creds" in reasons, "unsafe_source_audit_missing_tls=true"),
+            require(
+                "remote resource `file=https://example.invalid/TempleOS.img`" in reasons,
+                "unsafe_source_audit_missing_remote_resource=true",
+            ),
             require(
                 int(unsafe_junit.attrib.get("failures", "0")) >= 4,
                 "unsafe_source_audit_junit_missing_failures=true",

@@ -160,6 +160,13 @@ def fragment_violations(args: list[str]) -> list[str]:
             violations.append(f"tls option `{arg} {next_arg}`")
         if previous_arg not in qemu_prompt_bench.TLS_VALUE_OPTIONS and qemu_prompt_bench.is_tls_arg(arg):
             violations.append(f"tls option `{arg}`")
+        if qemu_prompt_bench.is_remote_resource_arg(arg):
+            violations.append(f"remote resource `{arg}`")
+        if (
+            arg in {"-blockdev", "-cdrom", "-drive", "-hda", "-hdb", "-hdc", "-hdd", "-initrd", "-kernel"}
+            and qemu_prompt_bench.is_remote_resource_arg(next_arg)
+        ):
+            violations.append(f"remote resource `{arg} {next_arg}`")
 
         if arg.startswith("@") and len(arg) > 1:
             violations.append(f"nested qemu args include `{arg}`")

@@ -96,6 +96,14 @@ def main() -> int:
             "-object tls-creds-x509,id=tls0,endpoint=server,dir=/tmp/tls\n",
             encoding="utf-8",
         )
+        (unsafe_dir / "remote_disk.args").write_text(
+            "-drive file=https://example.invalid/disk.img\n",
+            encoding="utf-8",
+        )
+        (unsafe_dir / "remote_blockdev.json").write_text(
+            json.dumps(["-blockdev", "driver=https,url=https://example.invalid/model.bin,node-name=n0"]) + "\n",
+            encoding="utf-8",
+        )
         (unsafe_dir / "duplicate_nic.args").write_text("-nic none -nic=none\n", encoding="utf-8")
         unsafe_out = tmp_path / "unsafe_out"
         completed = run_audit(unsafe_dir, unsafe_out)
@@ -117,6 +125,7 @@ def main() -> int:
             require("socket endpoint" in reasons, "unsafe_args_policy_missing_socket_endpoint=true"),
             require("remote display socket" in reasons, "unsafe_args_policy_missing_remote_display=true"),
             require("tls option" in reasons, "unsafe_args_policy_missing_tls_option=true"),
+            require("remote resource" in reasons, "unsafe_args_policy_missing_remote_resource=true"),
             require("fragment includes -nic none" in reasons, "unsafe_args_policy_missing_fragment_nic=true"),
             require("duplicate -nic none" in reasons, "unsafe_args_policy_missing_duplicate_nic=true"),
             require(int(unsafe_junit.attrib.get("failures", "0")) >= 12, "unsafe_args_policy_junit_failures=true"),
