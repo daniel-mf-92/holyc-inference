@@ -30,6 +30,11 @@ SHARE_DEVICE_MARKERS = (
     "9p-device",
 )
 SHARE_VALUE_MARKERS = (
+    "driver=vvfat",
+    "fat:ro:",
+    "fat:rw:",
+    "file.driver=vvfat",
+    "file=fat:",
     "mount_tag=",
     "security_model=",
     "multidevs=",

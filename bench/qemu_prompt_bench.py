@@ -112,12 +112,26 @@ HOST_FILESYSTEM_SHARE_DEVICE_MARKERS = (
     "virtio-fs",
 )
 HOST_FILESYSTEM_SHARE_MARKERS = (
+    "driver=vvfat",
+    "fat:ro:",
+    "fat:rw:",
+    "file.driver=vvfat",
+    "file=fat:",
     "mount_tag=",
     "multidevs=",
     "security_model=",
     "smb=",
     "smbserver=",
 )
+HOST_FILESYSTEM_SHARE_VALUE_OPTIONS = {
+    "-blockdev",
+    "-cdrom",
+    "-drive",
+    "-hda",
+    "-hdb",
+    "-hdc",
+    "-hdd",
+}
 REMOTE_DISPLAY_MARKERS = ("spice", "vnc")
 TLS_OPTION_MARKERS = ("tls-creds", "tlsauthz", "tls-cipher-suites")
 TLS_VALUE_OPTIONS = {
@@ -663,6 +677,8 @@ def command_airgap_violations(args: list[str]) -> list[str]:
             continue
         if any(option.startswith(f"{share_option}=") for share_option in HOST_FILESYSTEM_SHARE_OPTIONS):
             violations.append(f"host filesystem share `{arg}`")
+        if option in HOST_FILESYSTEM_SHARE_VALUE_OPTIONS and is_host_filesystem_share_marker_arg(next_arg):
+            violations.append(f"host filesystem share marker `{arg} {next_arg}`")
         if option == "-device" and is_network_device_arg(next_arg):
             violations.append(f"network device `{next_arg}`")
         if option.startswith("-device=") and is_network_device_arg(option):
@@ -775,6 +791,8 @@ def reject_network_args(args: list[str]) -> None:
             raise ValueError(f"host filesystem sharing is not allowed for air-gapped benchmark runs: {arg} {next_arg}")
         if any(option.startswith(f"{share_option}=") for share_option in HOST_FILESYSTEM_SHARE_OPTIONS):
             raise ValueError(f"host filesystem sharing is not allowed for air-gapped benchmark runs: {arg}")
+        if option in HOST_FILESYSTEM_SHARE_VALUE_OPTIONS and is_host_filesystem_share_marker_arg(next_arg):
+            raise ValueError(f"host filesystem sharing marker is not allowed: {arg} {next_arg}")
         if option == "-device" and is_network_device_arg(next_arg):
             raise ValueError(f"network device is not allowed: {next_arg}")
         if option.startswith("-device=") and is_network_device_arg(option):

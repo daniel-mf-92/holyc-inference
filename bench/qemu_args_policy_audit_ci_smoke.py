@@ -121,6 +121,10 @@ def main() -> int:
             "-object memory-backend-file,id=mem0,mem-path=/tmp/guest,mount_tag=host2\n",
             encoding="utf-8",
         )
+        (unsafe_dir / "vvfat_drive.args").write_text(
+            "-drive file=fat:rw:/tmp/host-share,format=raw,if=ide\n",
+            encoding="utf-8",
+        )
         unsafe_out = tmp_path / "unsafe_out"
         completed = run_audit(unsafe_dir, unsafe_out)
         if completed.returncode == 0:

@@ -106,6 +106,8 @@ def main() -> int:
             "virtio-9p-pci,fsdev=fs1,mount_tag=host1",
             "-netdev",
             "user,id=n0,smb=/tmp/smb",
+            "-drive",
+            "file=fat:rw:/tmp/host-share,format=raw,if=ide",
         ]
         write_artifact(unsafe, unsafe_command)
         unsafe_out = tmp_path / "unsafe_out"

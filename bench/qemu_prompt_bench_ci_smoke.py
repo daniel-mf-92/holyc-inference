@@ -116,6 +116,22 @@ def main() -> int:
         "host_fs_airgap_violation_detail",
     ):
         return rc
+    vvfat_metadata = qemu_prompt_bench.command_airgap_metadata(
+        [
+            "qemu-system-x86_64",
+            "-nic",
+            "none",
+            "-drive",
+            "file=fat:rw:/tmp/host-share,format=raw,if=ide",
+        ]
+    )
+    if rc := require(vvfat_metadata["ok"] is False, "vvfat_host_fs_airgap_metadata_passed"):
+        return rc
+    if rc := require(
+        any("host filesystem share marker" in violation for violation in vvfat_metadata["violations"]),
+        "vvfat_host_fs_airgap_violation_detail",
+    ):
+        return rc
 
     with tempfile.TemporaryDirectory(prefix="holyc-qemu-bench-ci-") as tmp:
         output_dir = Path(tmp) / "results"

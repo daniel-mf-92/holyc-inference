@@ -210,6 +210,17 @@ def fragment_violations(args: list[str]) -> list[str]:
             arg.startswith(f"{option}=") for option in qemu_prompt_bench.USER_NET_SERVICE_OPTIONS
         ):
             violations.append(f"user-mode network service `{arg}`")
+        if arg in qemu_prompt_bench.HOST_FILESYSTEM_SHARE_OPTIONS:
+            violations.append(f"host filesystem share `{arg} {next_arg}`")
+            index += 2
+            continue
+        if any(arg.startswith(f"{option}=") for option in qemu_prompt_bench.HOST_FILESYSTEM_SHARE_OPTIONS):
+            violations.append(f"host filesystem share `{arg}`")
+        if (
+            arg in qemu_prompt_bench.HOST_FILESYSTEM_SHARE_VALUE_OPTIONS
+            and qemu_prompt_bench.is_host_filesystem_share_marker_arg(next_arg)
+        ):
+            violations.append(f"host filesystem share marker `{arg} {next_arg}`")
         if arg == "-device" and airgap_audit.is_network_device_arg(next_arg):
             violations.append(f"network device `{next_arg}`")
         if arg.startswith("-device=") and airgap_audit.is_network_device_arg(arg):

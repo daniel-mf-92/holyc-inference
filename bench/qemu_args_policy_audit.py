@@ -99,12 +99,26 @@ HOST_FILESYSTEM_SHARE_DEVICE_MARKERS = (
     "virtio-fs",
 )
 HOST_FILESYSTEM_SHARE_MARKERS = (
+    "driver=vvfat",
+    "fat:ro:",
+    "fat:rw:",
+    "file.driver=vvfat",
+    "file=fat:",
     "mount_tag=",
     "multidevs=",
     "security_model=",
     "smb=",
     "smbserver=",
 )
+HOST_FILESYSTEM_SHARE_VALUE_OPTIONS = {
+    "-blockdev",
+    "-cdrom",
+    "-drive",
+    "-hda",
+    "-hdb",
+    "-hdc",
+    "-hdd",
+}
 REMOTE_DISPLAY_MARKERS = ("spice", "vnc")
 TLS_OPTION_MARKERS = ("tls-creds", "tlsauthz", "tls-cipher-suites")
 TLS_VALUE_OPTIONS = {
@@ -398,6 +412,16 @@ def audit_args(path: Path, args: list[str]) -> list[Finding]:
                     index,
                     arg,
                     f"`{arg}` is forbidden because it shares host filesystem paths with the guest",
+                )
+            )
+        if option in HOST_FILESYSTEM_SHARE_VALUE_OPTIONS and is_host_filesystem_share_marker_arg(next_arg):
+            findings.append(
+                Finding(
+                    str(path),
+                    "host filesystem share marker",
+                    index,
+                    arg,
+                    f"`{arg} {next_arg}` contains a filesystem sharing marker and violates guest isolation policy",
                 )
             )
         if option == "-device" and is_network_device_arg(next_arg):
