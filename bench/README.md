@@ -1204,7 +1204,8 @@ python3 bench/qemu_launch_integrity_audit_ci_smoke.py
 `qemu_artifact_budget_audit.py` checks saved QEMU benchmark artifacts for
 bounded file sizes, captured serial output, stdout/stderr tails, and failure
 reason payloads before dashboards consume them. It is host-side only and does
-not launch QEMU.
+not launch QEMU. It also verifies stdout/stderr byte counters are consistent
+with retained tails so diagnostics are not silently dropped or overstated.
 
 Example:
 

@@ -528,3 +528,4 @@
 2026-05-10T17:04:03Z | Extended QEMU artifact secret audit to scan text sidecars, added smoke coverage, and refreshed latest results.
 2026-05-10T17:13:15Z | Made eval hash warnings visible but nonblocking by default, added warning-mode smoke coverage, and refreshed latest results.
 2026-05-10T17:28:38Z | Hardened host-side QEMU air-gap audits to reject URL-backed remote disks/kernels/block devices and refreshed args-policy results.
+2026-05-10T17:37:50Z | Extended QEMU artifact budget audit with stdout/stderr tail-retention consistency checks, smoke coverage, and refreshed latest results.

@@ -7,7 +7,6 @@ import json
 import subprocess
 import sys
 import tempfile
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -29,7 +28,15 @@ def require(condition: bool, message: str) -> int:
     return 0
 
 
-def write_artifact(path: Path, *, serial_bytes: int, stdout_tail: str = "", stderr_tail: str = "") -> None:
+def write_artifact(
+    path: Path,
+    *,
+    serial_bytes: int,
+    stdout_bytes: int | None = None,
+    stderr_bytes: int | None = None,
+    stdout_tail: str = "",
+    stderr_tail: str = "",
+) -> None:
     path.write_text(
         json.dumps(
             {
@@ -40,6 +47,8 @@ def write_artifact(path: Path, *, serial_bytes: int, stdout_tail: str = "", stde
                         "phase": "measured",
                         "exit_class": "ok",
                         "serial_output_bytes": serial_bytes,
+                        "stdout_bytes": len(stdout_tail.encode("utf-8")) if stdout_bytes is None else stdout_bytes,
+                        "stderr_bytes": len(stderr_tail.encode("utf-8")) if stderr_bytes is None else stderr_bytes,
                         "stdout_tail": stdout_tail,
                         "stderr_tail": stderr_tail,
                         "failure_reason": "",
@@ -58,7 +67,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="holyc-qemu-artifact-budget-ci-") as tmp:
         tmp_path = Path(tmp)
         passing = tmp_path / "qemu_prompt_bench_20260429T230149Z.json"
-        write_artifact(passing, serial_bytes=256, stdout_tail="ok", stderr_tail="")
+        write_artifact(passing, serial_bytes=256, stdout_bytes=256, stdout_tail="ok", stderr_tail="")
         output_dir = tmp_path / "out"
         completed = run_command(
             [
@@ -97,10 +106,12 @@ def main() -> int:
             "missing_csv",
         ):
             return rc
-        junit = ET.parse(output_dir / "qemu_artifact_budget_audit_smoke_junit.xml").getroot()
-        if rc := require(junit.attrib.get("name") == "holyc_qemu_artifact_budget_audit", "missing_junit"):
+        if rc := require(report["artifacts"][0]["stdout_tail_retained_rows"] == 1, "missing_tail_retention_count"):
             return rc
-        if rc := require(junit.attrib.get("failures") == "0", "unexpected_junit_failure"):
+        junit_text = (output_dir / "qemu_artifact_budget_audit_smoke_junit.xml").read_text(encoding="utf-8")
+        if rc := require('name="holyc_qemu_artifact_budget_audit"' in junit_text, "missing_junit"):
+            return rc
+        if rc := require('failures="0"' in junit_text, "unexpected_junit_failure"):
             return rc
 
         failing_dir = tmp_path / "failing"
@@ -108,6 +119,8 @@ def main() -> int:
         write_artifact(
             failing_dir / "qemu_prompt_bench_20260429T230149Z.json",
             serial_bytes=2048,
+            stdout_bytes=2048,
+            stderr_bytes=5,
             stdout_tail="x" * 80,
             stderr_tail="",
         )
@@ -136,6 +149,39 @@ def main() -> int:
         if rc := require("serial_output_budget_exceeded" in kinds, "missing_serial_budget_finding"):
             return rc
         if rc := require("stdout_tail_budget_exceeded" in kinds, "missing_stdout_tail_finding"):
+            return rc
+        if rc := require("stderr_tail_missing" in kinds, "missing_stderr_tail_finding"):
+            return rc
+
+        impossible_dir = tmp_path / "impossible"
+        impossible_dir.mkdir()
+        write_artifact(
+            impossible_dir / "qemu_prompt_bench_20260429T230149Z.json",
+            serial_bytes=8,
+            stdout_bytes=2,
+            stdout_tail="too-long",
+        )
+        impossible = run_command(
+            [
+                sys.executable,
+                str(ROOT / "bench" / "qemu_artifact_budget_audit.py"),
+                str(impossible_dir),
+                "--output-dir",
+                str(output_dir),
+                "--output-stem",
+                "qemu_artifact_budget_audit_impossible",
+                "--max-file-bytes",
+                "4096",
+            ],
+            expected_failure=True,
+        )
+        if rc := require(impossible.returncode == 1, "expected_impossible_tail_failure"):
+            return rc
+        impossible_report = json.loads(
+            (output_dir / "qemu_artifact_budget_audit_impossible.json").read_text(encoding="utf-8")
+        )
+        impossible_kinds = {finding["kind"] for finding in impossible_report["findings"]}
+        if rc := require("stdout_tail_exceeds_stream" in impossible_kinds, "missing_tail_exceeds_stream_finding"):
             return rc
 
     print("qemu_artifact_budget_audit_ci_smoke=ok")

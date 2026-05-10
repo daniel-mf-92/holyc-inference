@@ -30,9 +30,13 @@ class ArtifactRecord:
     size_bytes: int
     row_count: int
     max_serial_output_bytes: int | None
+    max_stdout_bytes: int | None
+    max_stderr_bytes: int | None
     max_stdout_tail_bytes: int
     max_stderr_tail_bytes: int
     max_failure_reason_bytes: int
+    stdout_tail_retained_rows: int
+    stderr_tail_retained_rows: int
 
 
 @dataclass(frozen=True)
@@ -160,12 +164,16 @@ def audit_file(path: Path, args: argparse.Namespace) -> tuple[ArtifactRecord, li
         rows = load_rows(path)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         findings.append(BudgetFinding(str(path), 0, "error", "load_error", "rows", 0, 0, str(exc)))
-        return ArtifactRecord(str(path), "fail", path.suffix.lower(), size_bytes, 0, None, 0, 0, 0), findings
+        return ArtifactRecord(str(path), "fail", path.suffix.lower(), size_bytes, 0, None, None, None, 0, 0, 0, 0, 0), findings
 
     max_serial: int | None = None
+    max_stdout: int | None = None
+    max_stderr: int | None = None
     max_stdout_tail = 0
     max_stderr_tail = 0
     max_failure_reason = 0
+    stdout_tail_retained_rows = 0
+    stderr_tail_retained_rows = 0
     for index, row in enumerate(rows, 1):
         serial_bytes = finite_int(row.get("serial_output_bytes"))
         if serial_bytes is not None:
@@ -181,9 +189,71 @@ def audit_file(path: Path, args: argparse.Namespace) -> tuple[ArtifactRecord, li
                 "captured serial output exceeds configured byte budget",
             )
 
+        stdout_bytes = finite_int(row.get("stdout_bytes"))
+        stderr_bytes = finite_int(row.get("stderr_bytes"))
         stdout_tail_bytes = text_bytes(row.get("stdout_tail"))
         stderr_tail_bytes = text_bytes(row.get("stderr_tail"))
         failure_reason_bytes = text_bytes(row.get("failure_reason"))
+        if stdout_bytes is not None:
+            max_stdout = stdout_bytes if max_stdout is None else max(max_stdout, stdout_bytes)
+            if stdout_bytes > 0 and stdout_tail_bytes == 0:
+                findings.append(
+                    BudgetFinding(
+                        str(path),
+                        index,
+                        "error",
+                        "stdout_tail_missing",
+                        "stdout_tail_bytes",
+                        stdout_tail_bytes,
+                        min(stdout_bytes, args.max_stdout_tail_bytes),
+                        "stdout bytes were captured but stdout_tail is empty",
+                    )
+                )
+            if stdout_tail_bytes > stdout_bytes:
+                findings.append(
+                    BudgetFinding(
+                        str(path),
+                        index,
+                        "error",
+                        "stdout_tail_exceeds_stream",
+                        "stdout_tail_bytes",
+                        stdout_tail_bytes,
+                        stdout_bytes,
+                        "stdout_tail cannot be larger than captured stdout_bytes",
+                    )
+                )
+            if stdout_tail_bytes > 0:
+                stdout_tail_retained_rows += 1
+        if stderr_bytes is not None:
+            max_stderr = stderr_bytes if max_stderr is None else max(max_stderr, stderr_bytes)
+            if stderr_bytes > 0 and stderr_tail_bytes == 0:
+                findings.append(
+                    BudgetFinding(
+                        str(path),
+                        index,
+                        "error",
+                        "stderr_tail_missing",
+                        "stderr_tail_bytes",
+                        stderr_tail_bytes,
+                        min(stderr_bytes, args.max_stderr_tail_bytes),
+                        "stderr bytes were captured but stderr_tail is empty",
+                    )
+                )
+            if stderr_tail_bytes > stderr_bytes:
+                findings.append(
+                    BudgetFinding(
+                        str(path),
+                        index,
+                        "error",
+                        "stderr_tail_exceeds_stream",
+                        "stderr_tail_bytes",
+                        stderr_tail_bytes,
+                        stderr_bytes,
+                        "stderr_tail cannot be larger than captured stderr_bytes",
+                    )
+                )
+            if stderr_tail_bytes > 0:
+                stderr_tail_retained_rows += 1
         max_stdout_tail = max(max_stdout_tail, stdout_tail_bytes)
         max_stderr_tail = max(max_stderr_tail, stderr_tail_bytes)
         max_failure_reason = max(max_failure_reason, failure_reason_bytes)
@@ -226,9 +296,13 @@ def audit_file(path: Path, args: argparse.Namespace) -> tuple[ArtifactRecord, li
             size_bytes=size_bytes,
             row_count=len(rows),
             max_serial_output_bytes=max_serial,
+            max_stdout_bytes=max_stdout,
+            max_stderr_bytes=max_stderr,
             max_stdout_tail_bytes=max_stdout_tail,
             max_stderr_tail_bytes=max_stderr_tail,
             max_failure_reason_bytes=max_failure_reason,
+            stdout_tail_retained_rows=stdout_tail_retained_rows,
+            stderr_tail_retained_rows=stderr_tail_retained_rows,
         ),
         findings,
     )
@@ -281,12 +355,12 @@ def write_markdown(path: Path, report: dict[str, Any]) -> None:
         f"- Total size bytes: {summary['total_size_bytes']}",
         f"- Findings: {summary['findings']}",
         "",
-        "| Artifact | Status | Size bytes | Rows | Max serial bytes | Max stdout tail bytes | Max stderr tail bytes |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| Artifact | Status | Size bytes | Rows | Max serial bytes | Max stdout bytes | Max stderr bytes | Max stdout tail bytes | Max stderr tail bytes |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for record in report["artifacts"]:
         lines.append(
-            "| {source} | {status} | {size_bytes} | {row_count} | {max_serial_output_bytes} | {max_stdout_tail_bytes} | {max_stderr_tail_bytes} |".format(
+            "| {source} | {status} | {size_bytes} | {row_count} | {max_serial_output_bytes} | {max_stdout_bytes} | {max_stderr_bytes} | {max_stdout_tail_bytes} | {max_stderr_tail_bytes} |".format(
                 **record
             )
         )

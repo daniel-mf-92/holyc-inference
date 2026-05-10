@@ -3,23 +3,27 @@
     {
       "max_failure_reason_bytes": 0,
       "max_serial_output_bytes": 215,
+      "max_stderr_bytes": 0,
       "max_stderr_tail_bytes": 0,
+      "max_stdout_bytes": 215,
       "max_stdout_tail_bytes": 215,
       "row_count": 4,
-      "size_bytes": 41776,
+      "size_bytes": 41827,
       "source": "bench/results/qemu_prompt_bench_latest.json",
       "status": "pass",
+      "stderr_tail_retained_rows": 0,
+      "stdout_tail_retained_rows": 4,
       "suffix": ".json"
     }
   ],
   "findings": [],
-  "generated_at": "2026-04-30T13:27:01Z",
+  "generated_at": "2026-05-10T17:39:18Z",
   "status": "pass",
   "summary": {
     "artifacts": 1,
     "failed_artifacts": 0,
     "findings": 0,
     "rows": 4,
-    "total_size_bytes": 41776
+    "total_size_bytes": 41827
   }
 }
