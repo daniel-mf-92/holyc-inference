@@ -1,0 +1,2 @@
+source,status,profile,model,quantization,warmup_rows,measured_rows,stored_phase_summaries,expected_phase_summaries,checked_fields,mismatched_fields,error
+bench/results/qemu_prompt_bench_latest.json,pass,ci-airgap-smoke,synthetic-smoke,Q4_0,2,4,3,3,192,0,
