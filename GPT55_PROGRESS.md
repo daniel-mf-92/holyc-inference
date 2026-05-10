@@ -540,3 +540,4 @@
 2026-05-10T18:40:07Z | Added focused dataset_pack CI smoke coverage for sample HCEval packing, inspection parity, and rejection paths.
 2026-05-10T18:50:37Z | Hardened QEMU prompt benchmark air-gap validation to reject host filesystem passthrough args with smoke/unit coverage and refreshed audits.
 2026-05-10T18:58:26Z | Added quant manifest padding audit for Q4_0/Q8_0 tail payload zeroing with smoke coverage and refreshed reports.
+2026-05-10T19:03:04Z | Added eval quant-delta duplicate-report gate with smoke coverage and refreshed latest artifacts.

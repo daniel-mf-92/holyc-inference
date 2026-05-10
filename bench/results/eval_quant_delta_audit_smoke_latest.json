@@ -5,7 +5,7 @@
       "candidate_quantization": "Q4_0",
       "candidate_records": 4,
       "candidate_regressions": 0,
-      "candidate_source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpbsoxwgh5/q4.json",
+      "candidate_source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpy7bvizyg/safe/q4.json",
       "candidate_status": "pass",
       "dataset": "smoke-eval",
       "holyc_accuracy_drop": 0.020000000000000018,
@@ -14,13 +14,13 @@
       "reference_quantization": "Q8_0",
       "reference_records": 4,
       "reference_regressions": 0,
-      "reference_source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpbsoxwgh5/q8.json",
+      "reference_source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpy7bvizyg/safe/q8.json",
       "reference_status": "pass",
       "split": "validation"
     }
   ],
   "findings": [],
-  "generated_at": "2026-05-02T04:00:41Z",
+  "generated_at": "2026-05-10T19:03:52Z",
   "pairs": [
     "Q4_0:Q8_0"
   ],
@@ -35,7 +35,7 @@
       "quantization": "Q4_0",
       "records": 4,
       "regressions": 0,
-      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpbsoxwgh5/q4.json",
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpy7bvizyg/safe/q4.json",
       "split": "validation",
       "status": "pass"
     },
@@ -49,7 +49,7 @@
       "quantization": "Q8_0",
       "records": 4,
       "regressions": 0,
-      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpbsoxwgh5/q8.json",
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpy7bvizyg/safe/q8.json",
       "split": "validation",
       "status": "pass"
     }

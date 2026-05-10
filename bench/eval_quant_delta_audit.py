@@ -161,11 +161,38 @@ def indexed_reports(reports: Iterable[EvalReport]) -> dict[tuple[str, str, str, 
     return index
 
 
+def duplicate_report_findings(reports: Iterable[EvalReport]) -> list[Finding]:
+    sources_by_key: dict[tuple[str, str, str, str], list[str]] = {}
+    for report in reports:
+        key = (report.dataset, report.split, report.model, report.quantization)
+        if all(key):
+            sources_by_key.setdefault(key, []).append(report.source)
+
+    findings: list[Finding] = []
+    for (dataset, split, model, quantization), sources in sorted(sources_by_key.items()):
+        if len(sources) <= 1:
+            continue
+        findings.append(
+            Finding(
+                "duplicate_report",
+                dataset,
+                split,
+                model,
+                quantization,
+                "",
+                len(sources),
+                1,
+                f"{len(sources)} eval reports found for {dataset}/{split}/{model}/{quantization}: {', '.join(sources)}",
+            )
+        )
+    return findings
+
+
 def build_comparisons(reports: list[EvalReport], pairs: list[tuple[str, str]]) -> tuple[list[Comparison], list[Finding]]:
     index = indexed_reports(reports)
     groups = sorted({(report.dataset, report.split, report.model) for report in reports if report.dataset and report.split and report.model})
     comparisons: list[Comparison] = []
-    findings: list[Finding] = []
+    findings = duplicate_report_findings(reports)
     for dataset, split, model in groups:
         for candidate_quantization, reference_quantization in pairs:
             candidate = index.get((dataset, split, model, candidate_quantization))
@@ -260,7 +287,7 @@ def evaluate(comparisons: list[Comparison], reports: list[EvalReport], pair_find
 def write_csv(path: Path, rows: Iterable[Any], fieldnames: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for row in rows:
             writer.writerow(asdict(row))
