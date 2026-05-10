@@ -1913,7 +1913,8 @@ python3 bench/hceval_metadata_audit.py \
 `hceval_budget_audit.py` scans existing `.hceval` artifacts and gates suite-level
 binary layout budgets without unpacking data through QEMU. It can require
 companion manifests, enforce minimum/maximum record counts, and cap binary,
-metadata, body, prompt, choice, and per-record payload bytes across a directory:
+metadata, body, record-header, choice-length-prefix, aggregate prompt/choice/
+provenance arena, and per-record payload bytes across a directory:
 
 ```bash
 python3 bench/hceval_budget_audit.py bench/results/datasets \
@@ -1922,6 +1923,11 @@ python3 bench/hceval_budget_audit.py bench/results/datasets \
   --require-manifest \
   --max-binary-bytes 1048576 \
   --max-metadata-bytes 4096 \
+  --max-record-header-bytes 65536 \
+  --max-choice-length-prefix-bytes 65536 \
+  --max-total-prompt-bytes 262144 \
+  --max-total-choice-bytes 262144 \
+  --max-total-provenance-bytes 65536 \
   --max-record-payload-bytes 8192
 ```
 

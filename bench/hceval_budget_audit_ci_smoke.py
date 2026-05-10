@@ -7,7 +7,6 @@ import json
 import subprocess
 import sys
 import tempfile
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -75,6 +74,16 @@ def main() -> int:
             "4096",
             "--max-metadata-bytes",
             "512",
+            "--max-record-header-bytes",
+            "128",
+            "--max-choice-length-prefix-bytes",
+            "64",
+            "--max-total-prompt-bytes",
+            "256",
+            "--max-total-choice-bytes",
+            "256",
+            "--max-total-provenance-bytes",
+            "128",
             "--max-record-payload-bytes",
             "512",
         )
@@ -83,13 +92,20 @@ def main() -> int:
             print(passed.stderr, file=sys.stderr)
             return passed.returncode
         pass_report = json.loads((pass_out / "hceval_budget_audit_smoke.json").read_text(encoding="utf-8"))
-        pass_junit = ET.parse(pass_out / "hceval_budget_audit_smoke_junit.xml").getroot()
-        if pass_report["status"] != "pass" or pass_junit.attrib["failures"] != "0":
+        pass_junit = (pass_out / "hceval_budget_audit_smoke_junit.xml").read_text(encoding="utf-8")
+        if pass_report["status"] != "pass" or 'failures="0"' not in pass_junit:
             print("expected passing budget audit", file=sys.stderr)
+            return 1
+        artifact = pass_report["artifacts"][0]
+        if artifact["total_prompt_bytes"] <= 0 or artifact["total_choice_bytes"] <= 0:
+            print("missing aggregate prompt/choice bytes", file=sys.stderr)
+            return 1
+        if artifact["record_header_bytes"] != 48 or artifact["choice_length_prefix_bytes"] != 32:
+            print(f"unexpected fixed loader byte accounting: {artifact}", file=sys.stderr)
             return 1
 
         fail_out = tmp_path / "fail"
-        failed = run_audit(hceval, fail_out, "--max-binary-bytes", "64")
+        failed = run_audit(hceval, fail_out, "--max-binary-bytes", "64", "--max-total-choice-bytes", "8")
         if failed.returncode == 0:
             print("expected failing budget audit", file=sys.stderr)
             return 1
@@ -97,6 +113,9 @@ def main() -> int:
         kinds = {finding["kind"] for finding in fail_report["findings"]}
         if "max_binary_bytes" not in kinds:
             print(f"missing max_binary_bytes finding: {kinds}", file=sys.stderr)
+            return 1
+        if "max_total_choice_bytes" not in kinds:
+            print(f"missing max_total_choice_bytes finding: {kinds}", file=sys.stderr)
             return 1
 
     print("hceval_budget_audit_ci_smoke=pass")

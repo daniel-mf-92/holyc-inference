@@ -37,6 +37,11 @@ class BudgetRecord:
     binary_bytes: int
     metadata_bytes: int
     body_bytes: int
+    record_header_bytes: int
+    choice_length_prefix_bytes: int
+    total_prompt_bytes: int
+    total_choice_bytes: int
+    total_provenance_bytes: int
     max_prompt_bytes: int
     max_choice_bytes: int
     max_record_payload_bytes: int
@@ -149,7 +154,27 @@ def audit_artifact(path: Path, args: argparse.Namespace) -> tuple[BudgetRecord, 
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         finding = Finding(str(path), "error", "load_error", "input", "", "", str(exc))
         return (
-            BudgetRecord(str(path), "fail", "", "", 0, 0, 0, 0, 0, 0, 0, str(manifest_arg or ""), 1, str(exc)),
+            BudgetRecord(
+                str(path),
+                "fail",
+                "",
+                "",
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                str(manifest_arg or ""),
+                1,
+                str(exc),
+            ),
             [finding],
         )
 
@@ -163,6 +188,52 @@ def audit_artifact(path: Path, args: argparse.Namespace) -> tuple[BudgetRecord, 
     add_limit_finding(findings, path, "max_binary_bytes", "binary_bytes", layout["binary_bytes"], args.max_binary_bytes, "max")
     add_limit_finding(findings, path, "max_metadata_bytes", "metadata_bytes", layout["metadata_bytes"], args.max_metadata_bytes, "max")
     add_limit_finding(findings, path, "max_body_bytes", "body_bytes", layout["body_bytes"], args.max_body_bytes, "max")
+    add_limit_finding(
+        findings,
+        path,
+        "max_record_header_bytes",
+        "record_header_bytes",
+        layout["record_header_bytes"],
+        args.max_record_header_bytes,
+        "max",
+    )
+    add_limit_finding(
+        findings,
+        path,
+        "max_choice_length_prefix_bytes",
+        "choice_length_prefix_bytes",
+        layout["choice_length_prefix_bytes"],
+        args.max_choice_length_prefix_bytes,
+        "max",
+    )
+    add_limit_finding(
+        findings,
+        path,
+        "max_total_prompt_bytes",
+        "total_prompt_bytes",
+        stats["total_prompt_bytes"],
+        args.max_total_prompt_bytes,
+        "max",
+    )
+    add_limit_finding(
+        findings,
+        path,
+        "max_total_choice_bytes",
+        "total_choice_bytes",
+        stats["total_choice_bytes"],
+        args.max_total_choice_bytes,
+        "max",
+    )
+    total_provenance_bytes = sum(len(record.provenance.encode("utf-8")) for record in dataset.records)
+    add_limit_finding(
+        findings,
+        path,
+        "max_total_provenance_bytes",
+        "total_provenance_bytes",
+        total_provenance_bytes,
+        args.max_total_provenance_bytes,
+        "max",
+    )
 
     return (
         BudgetRecord(
@@ -174,6 +245,11 @@ def audit_artifact(path: Path, args: argparse.Namespace) -> tuple[BudgetRecord, 
             binary_bytes=int(layout["binary_bytes"]),
             metadata_bytes=int(layout["metadata_bytes"]),
             body_bytes=int(layout["body_bytes"]),
+            record_header_bytes=int(layout["record_header_bytes"]),
+            choice_length_prefix_bytes=int(layout["choice_length_prefix_bytes"]),
+            total_prompt_bytes=int(stats["total_prompt_bytes"]),
+            total_choice_bytes=int(stats["total_choice_bytes"]),
+            total_provenance_bytes=total_provenance_bytes,
             max_prompt_bytes=int(stats["max_prompt_bytes"]),
             max_choice_bytes=int(stats["max_choice_bytes"]),
             max_record_payload_bytes=int(stats["max_record_payload_bytes"]),
@@ -217,7 +293,13 @@ def build_report(records: list[BudgetRecord], findings: list[Finding]) -> dict[s
             "failing_artifacts": sum(1 for record in records if record.status == "fail"),
             "total_records": sum(record.record_count for record in records),
             "total_binary_bytes": sum(record.binary_bytes for record in records),
+            "total_prompt_bytes": sum(record.total_prompt_bytes for record in records),
+            "total_choice_bytes": sum(record.total_choice_bytes for record in records),
+            "total_provenance_bytes": sum(record.total_provenance_bytes for record in records),
             "max_binary_bytes": max((record.binary_bytes for record in records), default=0),
+            "max_total_prompt_bytes": max((record.total_prompt_bytes for record in records), default=0),
+            "max_total_choice_bytes": max((record.total_choice_bytes for record in records), default=0),
+            "max_total_provenance_bytes": max((record.total_provenance_bytes for record in records), default=0),
             "max_record_payload_bytes": max((record.max_record_payload_bytes for record in records), default=0),
             "findings": len(findings),
         },
@@ -240,6 +322,9 @@ def write_markdown(path: Path, report: dict[str, Any]) -> None:
         f"Artifacts: {summary['artifacts']}",
         f"Total records: {summary['total_records']}",
         f"Total binary bytes: {summary['total_binary_bytes']}",
+        f"Total prompt bytes: {summary['total_prompt_bytes']}",
+        f"Total choice bytes: {summary['total_choice_bytes']}",
+        f"Total provenance bytes: {summary['total_provenance_bytes']}",
         f"Findings: {summary['findings']}",
         "",
     ]
@@ -328,6 +413,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-binary-bytes", type=int)
     parser.add_argument("--max-metadata-bytes", type=int)
     parser.add_argument("--max-body-bytes", type=int)
+    parser.add_argument("--max-record-header-bytes", type=int)
+    parser.add_argument("--max-choice-length-prefix-bytes", type=int)
+    parser.add_argument("--max-total-prompt-bytes", type=int)
+    parser.add_argument("--max-total-choice-bytes", type=int)
+    parser.add_argument("--max-total-provenance-bytes", type=int)
     parser.add_argument("--max-prompt-bytes", type=int)
     parser.add_argument("--max-choice-bytes", type=int)
     parser.add_argument("--max-record-payload-bytes", type=int)

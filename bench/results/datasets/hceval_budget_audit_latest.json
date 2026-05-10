@@ -3,6 +3,7 @@
     {
       "binary_bytes": 343,
       "body_bytes": 196,
+      "choice_length_prefix_bytes": 32,
       "dataset": "smoke-eval",
       "error": "",
       "finding_count": 0,
@@ -12,13 +13,18 @@
       "max_record_payload_bytes": 74,
       "metadata_bytes": 95,
       "record_count": 2,
+      "record_header_bytes": 48,
       "source": "bench/results/datasets/hceval_diff_smoke_candidate.hceval",
       "split": "validation",
-      "status": "pass"
+      "status": "pass",
+      "total_choice_bytes": 31,
+      "total_prompt_bytes": 41,
+      "total_provenance_bytes": 30
     },
     {
       "binary_bytes": 343,
       "body_bytes": 196,
+      "choice_length_prefix_bytes": 32,
       "dataset": "smoke-eval",
       "error": "",
       "finding_count": 0,
@@ -28,13 +34,18 @@
       "max_record_payload_bytes": 74,
       "metadata_bytes": 95,
       "record_count": 2,
+      "record_header_bytes": 48,
       "source": "bench/results/datasets/hceval_diff_smoke_reference.hceval",
       "split": "validation",
-      "status": "pass"
+      "status": "pass",
+      "total_choice_bytes": 31,
+      "total_prompt_bytes": 41,
+      "total_provenance_bytes": 30
     },
     {
       "binary_bytes": 925,
       "body_bytes": 778,
+      "choice_length_prefix_bytes": 48,
       "dataset": "smoke-eval",
       "error": "",
       "finding_count": 0,
@@ -44,13 +55,18 @@
       "max_record_payload_bytes": 304,
       "metadata_bytes": 95,
       "record_count": 3,
+      "record_header_bytes": 72,
       "source": "bench/results/datasets/smoke_curated.hceval",
       "split": "validation",
-      "status": "pass"
+      "status": "pass",
+      "total_choice_bytes": 327,
+      "total_prompt_bytes": 182,
+      "total_provenance_bytes": 103
     },
     {
       "binary_bytes": 925,
       "body_bytes": 778,
+      "choice_length_prefix_bytes": 48,
       "dataset": "smoke-eval",
       "error": "",
       "finding_count": 0,
@@ -60,13 +76,17 @@
       "max_record_payload_bytes": 304,
       "metadata_bytes": 95,
       "record_count": 3,
+      "record_header_bytes": 72,
       "source": "bench/results/datasets/smoke_eval.hceval",
       "split": "validation",
-      "status": "pass"
+      "status": "pass",
+      "total_choice_bytes": 327,
+      "total_prompt_bytes": 182,
+      "total_provenance_bytes": 103
     }
   ],
   "findings": [],
-  "generated_at": "2026-05-02T02:43:40Z",
+  "generated_at": "2026-05-10T19:43:40Z",
   "status": "pass",
   "summary": {
     "artifacts": 4,
@@ -74,8 +94,14 @@
     "findings": 0,
     "max_binary_bytes": 925,
     "max_record_payload_bytes": 304,
+    "max_total_choice_bytes": 327,
+    "max_total_prompt_bytes": 182,
+    "max_total_provenance_bytes": 103,
     "passing_artifacts": 4,
     "total_binary_bytes": 2536,
+    "total_choice_bytes": 716,
+    "total_prompt_bytes": 446,
+    "total_provenance_bytes": 266,
     "total_records": 10
   }
 }
