@@ -81,7 +81,11 @@ def test_scorecard_summarizes_measured_rows(tmp_path: Path) -> None:
     assert row["total_tokens"] == 30
     assert row["mean_tok_per_s"] == 150.0
     assert row["median_tok_per_s"] == 150.0
+    assert row["stdev_tok_per_s"] == 50.0
+    assert row["cv_tok_per_s"] == 50.0 / 150.0
     assert row["mean_wall_tok_per_s"] == 65.0
+    assert row["stdev_wall_tok_per_s"] == 15.0
+    assert row["cv_wall_tok_per_s"] == 15.0 / 65.0
 
 
 def test_scorecard_reports_min_row_failures(tmp_path: Path) -> None:
@@ -91,6 +95,21 @@ def test_scorecard_reports_min_row_failures(tmp_path: Path) -> None:
 
     assert payload["status"] == "fail"
     assert {finding["kind"] for finding in payload["findings"]} == {"min_rows"}
+
+
+def test_scorecard_reports_stability_gate_failures(tmp_path: Path) -> None:
+    artifact = write_artifact(tmp_path)
+
+    payload = qemu_build_throughput_scorecard.build_scorecard(
+        [artifact],
+        ["*.json"],
+        min_rows=1,
+        max_cv=0.1,
+        max_wall_cv=0.1,
+    )
+
+    assert payload["status"] == "fail"
+    assert {finding["kind"] for finding in payload["findings"]} == {"max_cv", "max_wall_cv"}
 
 
 def test_cli_writes_scorecard_artifacts(tmp_path: Path) -> None:
@@ -104,6 +123,8 @@ def test_cli_writes_scorecard_artifacts(tmp_path: Path) -> None:
     assert payload["summary"]["total_tokens"] == 30
     rows = list(csv.DictReader((output_dir / "scorecard.csv").open(encoding="utf-8")))
     assert rows[0]["mean_tok_per_s"] == "150.0"
+    assert rows[0]["stdev_tok_per_s"] == "50.0"
+    assert rows[0]["cv_wall_tok_per_s"] == str(15.0 / 65.0)
     findings = list(csv.DictReader((output_dir / "scorecard_findings.csv").open(encoding="utf-8")))
     assert findings == []
     assert "QEMU Build Throughput Scorecard" in (output_dir / "scorecard.md").read_text(encoding="utf-8")
@@ -117,6 +138,8 @@ def main() -> int:
         test_scorecard_summarizes_measured_rows(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:
         test_scorecard_reports_min_row_failures(Path(tmp))
+    with tempfile.TemporaryDirectory() as tmp:
+        test_scorecard_reports_stability_gate_failures(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:
         test_cli_writes_scorecard_artifacts(Path(tmp))
     return 0

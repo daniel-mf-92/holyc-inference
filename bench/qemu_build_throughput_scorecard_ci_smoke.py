@@ -105,7 +105,13 @@ def main() -> int:
             return rc
         if rc := require(rows[0]["mean_tok_per_s"] == "120.0", "unexpected_base_mean_rate"):
             return rc
+        if rc := require(rows[0]["stdev_tok_per_s"] == "40.0", "unexpected_base_stdev_rate"):
+            return rc
+        if rc := require(rows[0]["cv_tok_per_s"] == "0.3333333333333333", "unexpected_base_cv_rate"):
+            return rc
         if rc := require(rows[0]["weighted_tok_per_s"] == "133.33333333333334", "unexpected_base_weighted_rate"):
+            return rc
+        if rc := require(rows[0]["cv_wall_tok_per_s"] == "0.3333333333333333", "unexpected_base_wall_cv_rate"):
             return rc
         if rc := require(rows[0]["weighted_wall_tok_per_s"] == "66.66666666666667", "unexpected_base_weighted_wall_rate"):
             return rc
@@ -124,6 +130,14 @@ def main() -> int:
         bad_payload = json.loads((output_dir / "qemu_build_throughput_scorecard_latest.json").read_text(encoding="utf-8"))
         bad_kinds = {finding["kind"] for finding in bad_payload["findings"]}
         if rc := require("min_rows" in bad_kinds, "missing_scorecard_min_rows_finding"):
+            return rc
+
+        unstable_completed = subprocess.run(command + ["--max-cv", "0.1"], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if rc := require(unstable_completed.returncode == 1, "expected_scorecard_cv_failure"):
+            return rc
+        unstable_payload = json.loads((output_dir / "qemu_build_throughput_scorecard_latest.json").read_text(encoding="utf-8"))
+        unstable_kinds = {finding["kind"] for finding in unstable_payload["findings"]}
+        if rc := require("max_cv" in unstable_kinds, "missing_scorecard_cv_finding"):
             return rc
     return 0
 

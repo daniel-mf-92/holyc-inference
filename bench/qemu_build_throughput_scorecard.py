@@ -34,10 +34,14 @@ class ThroughputRow:
     total_tokens: int
     mean_tok_per_s: float
     median_tok_per_s: float
+    stdev_tok_per_s: float
+    cv_tok_per_s: float
     weighted_tok_per_s: float | None
     min_tok_per_s: float
     max_tok_per_s: float
     mean_wall_tok_per_s: float | None
+    stdev_wall_tok_per_s: float | None
+    cv_wall_tok_per_s: float | None
     weighted_wall_tok_per_s: float | None
     total_elapsed_us: int
     total_wall_elapsed_us: int
@@ -193,6 +197,16 @@ def summarize_group(rows: list[dict[str, Any]], key: tuple[str, str, str, str], 
 
     if not tok_rates:
         return None, findings
+    mean_tok_per_s = statistics.fmean(tok_rates)
+    stdev_tok_per_s = statistics.pstdev(tok_rates) if len(tok_rates) > 1 else 0.0
+    cv_tok_per_s = stdev_tok_per_s / mean_tok_per_s if mean_tok_per_s > 0 else 0.0
+    mean_wall_tok_per_s = statistics.fmean(wall_rates) if wall_rates else None
+    stdev_wall_tok_per_s = statistics.pstdev(wall_rates) if len(wall_rates) > 1 else (0.0 if wall_rates else None)
+    cv_wall_tok_per_s = (
+        stdev_wall_tok_per_s / mean_wall_tok_per_s
+        if stdev_wall_tok_per_s is not None and mean_wall_tok_per_s is not None and mean_wall_tok_per_s > 0
+        else (0.0 if wall_rates else None)
+    )
     weighted_tok_per_s = None
     if total_tokens > 0 and total_elapsed_us > 0:
         weighted_tok_per_s = total_tokens * 1_000_000.0 / total_elapsed_us
@@ -208,12 +222,16 @@ def summarize_group(rows: list[dict[str, Any]], key: tuple[str, str, str, str], 
             source_count=len(sources),
             measured_rows=len(tok_rates),
             total_tokens=total_tokens,
-            mean_tok_per_s=statistics.fmean(tok_rates),
+            mean_tok_per_s=mean_tok_per_s,
             median_tok_per_s=statistics.median(tok_rates),
+            stdev_tok_per_s=stdev_tok_per_s,
+            cv_tok_per_s=cv_tok_per_s,
             weighted_tok_per_s=weighted_tok_per_s,
             min_tok_per_s=min(tok_rates),
             max_tok_per_s=max(tok_rates),
-            mean_wall_tok_per_s=statistics.fmean(wall_rates) if wall_rates else None,
+            mean_wall_tok_per_s=mean_wall_tok_per_s,
+            stdev_wall_tok_per_s=stdev_wall_tok_per_s,
+            cv_wall_tok_per_s=cv_wall_tok_per_s,
             weighted_wall_tok_per_s=weighted_wall_tok_per_s,
             total_elapsed_us=total_elapsed_us,
             total_wall_elapsed_us=total_wall_elapsed_us,
@@ -222,7 +240,14 @@ def summarize_group(rows: list[dict[str, Any]], key: tuple[str, str, str, str], 
     )
 
 
-def build_scorecard(paths: list[Path], patterns: list[str], min_rows: int) -> dict[str, Any]:
+def build_scorecard(
+    paths: list[Path],
+    patterns: list[str],
+    min_rows: int,
+    *,
+    max_cv: float | None = None,
+    max_wall_cv: float | None = None,
+) -> dict[str, Any]:
     groups: dict[tuple[str, str, str, str], list[dict[str, Any]]] = {}
     group_sources: dict[tuple[str, str, str, str], set[str]] = {}
     input_files = list(iter_input_files(paths, patterns))
@@ -256,6 +281,30 @@ def build_scorecard(paths: list[Path], patterns: list[str], min_rows: int) -> di
                     summary.model,
                     summary.quantization,
                     f"{summary.measured_rows} measured rows below required {min_rows}",
+                )
+            )
+        if max_cv is not None and summary.cv_tok_per_s > max_cv:
+            findings.append(
+                ThroughputFinding(
+                    "error",
+                    "max_cv",
+                    summary.build,
+                    summary.profile,
+                    summary.model,
+                    summary.quantization,
+                    f"tok/s coefficient of variation {summary.cv_tok_per_s:.6g} exceeds limit {max_cv:.6g}",
+                )
+            )
+        if max_wall_cv is not None and summary.cv_wall_tok_per_s is not None and summary.cv_wall_tok_per_s > max_wall_cv:
+            findings.append(
+                ThroughputFinding(
+                    "error",
+                    "max_wall_cv",
+                    summary.build,
+                    summary.profile,
+                    summary.model,
+                    summary.quantization,
+                    f"wall tok/s coefficient of variation {summary.cv_wall_tok_per_s:.6g} exceeds limit {max_wall_cv:.6g}",
                 )
             )
         rows.append(summary)
@@ -296,17 +345,18 @@ def write_markdown(path: Path, payload: dict[str, Any]) -> None:
         f"- Measured rows: {payload['summary']['measured_rows']}",
         f"- Total tokens: {payload['summary']['total_tokens']}",
         "",
-        "| Build | Profile | Model | Quantization | Rows | Mean tok/s | Weighted tok/s | Median tok/s | Mean wall tok/s | Weighted wall tok/s |",
-        "|---|---|---|---|---:|---:|---:|---:|---:|---:|",
+        "| Build | Profile | Model | Quantization | Rows | Mean tok/s | CV | Weighted tok/s | Median tok/s | Mean wall tok/s | Wall CV | Weighted wall tok/s |",
+        "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in payload["rows"]:
         wall = "-" if row["mean_wall_tok_per_s"] is None else f"{row['mean_wall_tok_per_s']:.6f}"
+        wall_cv = "-" if row["cv_wall_tok_per_s"] is None else f"{row['cv_wall_tok_per_s']:.6f}"
         weighted = "-" if row["weighted_tok_per_s"] is None else f"{row['weighted_tok_per_s']:.6f}"
         weighted_wall = "-" if row["weighted_wall_tok_per_s"] is None else f"{row['weighted_wall_tok_per_s']:.6f}"
         lines.append(
             f"| {row['build']} | {row['profile']} | {row['model']} | {row['quantization']} | "
-            f"{row['measured_rows']} | {row['mean_tok_per_s']:.6f} | {weighted} | "
-            f"{row['median_tok_per_s']:.6f} | {wall} | {weighted_wall} |"
+            f"{row['measured_rows']} | {row['mean_tok_per_s']:.6f} | {row['cv_tok_per_s']:.6f} | {weighted} | "
+            f"{row['median_tok_per_s']:.6f} | {wall} | {wall_cv} | {weighted_wall} |"
         )
     if payload["findings"]:
         lines.extend(["", "## Findings", ""])
@@ -358,10 +408,14 @@ def write_outputs(payload: dict[str, Any], output_dir: Path, output_stem: str) -
             "total_tokens",
             "mean_tok_per_s",
             "median_tok_per_s",
+            "stdev_tok_per_s",
+            "cv_tok_per_s",
             "weighted_tok_per_s",
             "min_tok_per_s",
             "max_tok_per_s",
             "mean_wall_tok_per_s",
+            "stdev_wall_tok_per_s",
+            "cv_wall_tok_per_s",
             "weighted_wall_tok_per_s",
             "total_elapsed_us",
             "total_wall_elapsed_us",
@@ -381,6 +435,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("inputs", nargs="+", type=Path, help="Benchmark JSON/CSV/JSONL files or directories")
     parser.add_argument("--pattern", action="append", dest="patterns", help="Glob to use when an input is a directory")
     parser.add_argument("--min-rows", type=int, default=1, help="Minimum measured rows required per build group")
+    parser.add_argument("--max-cv", type=float, help="Maximum allowed tok/s coefficient of variation per build group")
+    parser.add_argument("--max-wall-cv", type=float, help="Maximum allowed wall tok/s coefficient of variation per build group")
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--output-stem", default="qemu_build_throughput_scorecard_latest")
     return parser.parse_args(argv)
@@ -390,7 +446,17 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if args.min_rows < 1:
         raise SystemExit("--min-rows must be at least 1")
-    payload = build_scorecard(args.inputs, args.patterns or list(DEFAULT_PATTERNS), args.min_rows)
+    if args.max_cv is not None and args.max_cv < 0:
+        raise SystemExit("--max-cv must be non-negative")
+    if args.max_wall_cv is not None and args.max_wall_cv < 0:
+        raise SystemExit("--max-wall-cv must be non-negative")
+    payload = build_scorecard(
+        args.inputs,
+        args.patterns or list(DEFAULT_PATTERNS),
+        args.min_rows,
+        max_cv=args.max_cv,
+        max_wall_cv=args.max_wall_cv,
+    )
     write_outputs(payload, args.output_dir, args.output_stem)
     return 0 if payload["status"] == "pass" else 1
 

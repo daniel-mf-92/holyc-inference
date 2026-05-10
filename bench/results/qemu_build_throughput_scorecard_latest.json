@@ -1,12 +1,14 @@
 {
   "findings": [],
-  "generated_at": "2026-05-10T15:05:32Z",
+  "generated_at": "2026-05-10T16:41:31Z",
   "inputs": [
     "bench/results/qemu_prompt_bench_latest.json"
   ],
   "rows": [
     {
       "build": "a70776642a09",
+      "cv_tok_per_s": 0.0,
+      "cv_wall_tok_per_s": 0.24999498522257058,
       "max_tok_per_s": 160.0,
       "mean_tok_per_s": 160.0,
       "mean_wall_tok_per_s": 67.03793046211261,
@@ -17,6 +19,8 @@
       "profile": "ci-airgap-smoke",
       "quantization": "Q4_0",
       "source_count": 1,
+      "stdev_tok_per_s": 0.0,
+      "stdev_wall_tok_per_s": 16.759146435227557,
       "total_elapsed_us": 1000000,
       "total_tokens": 160,
       "total_wall_elapsed_us": 2427611,

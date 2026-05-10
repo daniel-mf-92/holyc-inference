@@ -1,2 +1,2 @@
-build,profile,model,quantization,source_count,measured_rows,total_tokens,mean_tok_per_s,median_tok_per_s,weighted_tok_per_s,min_tok_per_s,max_tok_per_s,mean_wall_tok_per_s,weighted_wall_tok_per_s,total_elapsed_us,total_wall_elapsed_us
-a70776642a09,ci-airgap-smoke,synthetic-smoke,Q4_0,1,4,160,160.0,160.0,160.0,160.0,160.0,67.03793046211261,65.90841778192635,1000000,2427611
+build,profile,model,quantization,source_count,measured_rows,total_tokens,mean_tok_per_s,median_tok_per_s,stdev_tok_per_s,cv_tok_per_s,weighted_tok_per_s,min_tok_per_s,max_tok_per_s,mean_wall_tok_per_s,stdev_wall_tok_per_s,cv_wall_tok_per_s,weighted_wall_tok_per_s,total_elapsed_us,total_wall_elapsed_us
+a70776642a09,ci-airgap-smoke,synthetic-smoke,Q4_0,1,4,160,160.0,160.0,0.0,0.0,160.0,160.0,160.0,67.03793046211261,16.759146435227557,0.24999498522257058,65.90841778192635,1000000,2427611
