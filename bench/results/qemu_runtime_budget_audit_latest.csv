@@ -1,0 +1,2 @@
+source,group,profile,model,quantization,total_rows,measured_rows,warmup_rows,timeout_rows,failed_rows,missing_wall_elapsed_rows,total_wall_elapsed_us,measured_wall_elapsed_us,warmup_wall_elapsed_us,total_wall_seconds,measured_wall_seconds,warmup_wall_seconds,max_row_wall_seconds
+bench/results/qemu_prompt_bench_latest.json,ci-airgap-smoke/synthetic-smoke/Q4_0,ci-airgap-smoke,synthetic-smoke,Q4_0,4,4,0,0,0,0,2427611,2427611,0,2.427611,2.427611,0.0,0.702117

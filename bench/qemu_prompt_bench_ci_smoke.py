@@ -730,6 +730,40 @@ def main() -> int:
             "dry_run_csv_launch_sequence_hash_mismatch",
         ):
             return rc
+        dry_launch_jsonl_rows = [
+            json.loads(line)
+            for line in (dry_output_dir / "qemu_prompt_bench_dry_run_launches_latest.jsonl")
+            .read_text(encoding="utf-8")
+            .splitlines()
+            if line.strip()
+        ]
+        if rc := require(len(dry_launch_jsonl_rows) == 6, "unexpected_dry_run_launch_jsonl_rows"):
+            return rc
+        if rc := require(
+            {row["phase"] for row in dry_launch_jsonl_rows} == {"warmup", "measured"},
+            "unexpected_dry_run_launch_jsonl_phases",
+        ):
+            return rc
+        if rc := require(
+            dry_launch_jsonl_rows[0]["command_airgap_ok"] is True,
+            "dry_run_launch_jsonl_airgap_not_ok",
+        ):
+            return rc
+        if rc := require(
+            dry_launch_jsonl_rows[0]["command"] == dry_report["command"],
+            "dry_run_launch_jsonl_command_mismatch",
+        ):
+            return rc
+        if rc := require(
+            dry_launch_jsonl_rows[0]["launch_plan_sha256"] == dry_report["launch_plan_sha256"],
+            "dry_run_launch_jsonl_plan_hash_mismatch",
+        ):
+            return rc
+        if rc := require(
+            dry_launch_jsonl_rows[0]["prompt_suite_sha256"] == dry_report["prompt_suite"]["suite_sha256"],
+            "dry_run_launch_jsonl_prompt_suite_hash_mismatch",
+        ):
+            return rc
         dry_junit_root = ET.parse(dry_output_dir / "qemu_prompt_bench_dry_run_junit_latest.xml").getroot()
         dry_properties = {
             item.attrib.get("name"): item.attrib.get("value")

@@ -2919,7 +2919,8 @@ python3 bench/qemu_prompt_bench.py \
 
 Dry-runs also write `qemu_prompt_bench_dry_run_latest.json`, Markdown, CSV, and
 JUnit XML artifacts under the selected output directory, plus
-`qemu_prompt_bench_dry_run_launches_latest.csv` with one row per planned launch.
+`qemu_prompt_bench_dry_run_launches_latest.csv` and
+`qemu_prompt_bench_dry_run_launches_latest.jsonl` with one row per planned launch.
 These artifacts record the exact `-nic none` command, the command SHA256
 fingerprint, prompt-suite hash, launch-plan SHA256, planned launch sequence
 SHA256, warmup count, repeat count, configured launch budget, prompt-count

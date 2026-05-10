@@ -1,0 +1,38 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-10T20:27:07Z",
+  "groups": [
+    {
+      "failed_rows": 0,
+      "group": "ci-airgap-smoke/synthetic-smoke/Q4_0",
+      "max_row_wall_seconds": 0.702117,
+      "measured_rows": 4,
+      "measured_wall_elapsed_us": 2427611,
+      "measured_wall_seconds": 2.427611,
+      "missing_wall_elapsed_rows": 0,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "timeout_rows": 0,
+      "total_rows": 4,
+      "total_wall_elapsed_us": 2427611,
+      "total_wall_seconds": 2.427611,
+      "warmup_rows": 0,
+      "warmup_wall_elapsed_us": 0,
+      "warmup_wall_seconds": 0.0
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "failed_rows": 0,
+    "groups": 1,
+    "measured_rows": 4,
+    "measured_wall_seconds": 2.427611,
+    "missing_wall_elapsed_rows": 0,
+    "rows": 4,
+    "total_wall_seconds": 2.427611,
+    "warmup_rows": 0,
+    "warmup_wall_seconds": 0.0
+  }
+}

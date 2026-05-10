@@ -2710,11 +2710,13 @@ def write_dry_run_report(report: dict[str, Any], output_dir: Path) -> Path:
     latest_md = output_dir / "qemu_prompt_bench_dry_run_latest.md"
     latest_csv = output_dir / "qemu_prompt_bench_dry_run_latest.csv"
     latest_launch_csv = output_dir / "qemu_prompt_bench_dry_run_launches_latest.csv"
+    latest_launch_jsonl = output_dir / "qemu_prompt_bench_dry_run_launches_latest.jsonl"
     latest_junit = output_dir / "qemu_prompt_bench_dry_run_junit_latest.xml"
     latest.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     latest_md.write_text(markdown_dry_run_report(report), encoding="utf-8")
     write_dry_run_csv_report(report, latest_csv)
     write_dry_run_launch_csv_report(report, latest_launch_csv)
+    write_dry_run_launch_jsonl_report(report, latest_launch_jsonl)
     write_dry_run_junit_report(report, latest_junit)
     stamped = output_dir / f"qemu_prompt_bench_dry_run_{report['generated_at'].replace(':', '').replace('-', '')}.json"
     stamped.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -2841,6 +2843,44 @@ def write_dry_run_launch_csv_report(report: dict[str, Any], path: Path) -> None:
                     "expected_tokens": row.get("expected_tokens"),
                     "iteration": row.get("iteration"),
                 }
+            )
+
+
+def write_dry_run_launch_jsonl_report(report: dict[str, Any], path: Path) -> None:
+    launch_plan = report.get("launch_plan") if isinstance(report.get("launch_plan"), list) else []
+    prompt_suite = report.get("prompt_suite") or {}
+    command_airgap = report.get("command_airgap") or {}
+    top_level_fields = {
+        "generated_at": report.get("generated_at"),
+        "status": report.get("status"),
+        "command": report.get("command") or [],
+        "command_sha256": report.get("command_sha256"),
+        "command_airgap_ok": command_airgap.get("ok"),
+        "command_has_explicit_nic_none": command_airgap.get("explicit_nic_none"),
+        "command_has_legacy_net_none": command_airgap.get("legacy_net_none"),
+        "command_airgap_violations": command_airgap.get("violations") or [],
+        "launch_plan_sha256": report.get("launch_plan_sha256"),
+        "expected_launch_sequence_sha256": report.get("expected_launch_sequence_sha256"),
+        "prompt_suite_sha256": prompt_suite.get("suite_sha256"),
+        "profile": report.get("profile"),
+        "model": report.get("model"),
+        "quantization": report.get("quantization"),
+        "commit": report.get("commit"),
+    }
+    with path.open("w", encoding="utf-8") as handle:
+        for row in launch_plan:
+            if not isinstance(row, dict):
+                continue
+            handle.write(
+                json.dumps(
+                    {
+                        **top_level_fields,
+                        **row,
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                + "\n"
             )
 
 
