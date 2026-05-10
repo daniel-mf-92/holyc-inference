@@ -1222,6 +1222,25 @@ artifacts:
 python3 bench/qemu_image_reference_audit_ci_smoke.py
 ```
 
+`qemu_block_device_policy_audit.py` checks saved QEMU benchmark command
+telemetry for canonical local raw IDE image drives. It rejects remote block
+transports, `-blockdev` graphs, non-raw/non-IDE drive options, and extra legacy
+disk media options:
+
+```bash
+python3 bench/qemu_block_device_policy_audit.py bench/results \
+  --output-dir bench/results \
+  --output-stem qemu_block_device_policy_audit_latest
+```
+
+The tool writes JSON, Markdown, CSV artifact rows, CSV findings, and JUnit
+outputs. Its smoke gate builds temporary passing and failing benchmark
+artifacts:
+
+```bash
+python3 bench/qemu_block_device_policy_audit_ci_smoke.py
+```
+
 ## QEMU Launch Profile Audit
 
 `qemu_launch_profile_audit.py` checks saved QEMU benchmark artifacts for drift
