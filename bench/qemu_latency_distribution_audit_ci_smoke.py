@@ -77,7 +77,7 @@ def main() -> int:
         passing = root / "qemu_prompt_bench_pass.json"
         passing.write_text(json.dumps(artifact()), encoding="utf-8")
         pass_dir = root / "pass"
-        completed = run_audit(passing, pass_dir, ["--max-p95-wall-us-per-token", "1200"])
+        completed = run_audit(passing, pass_dir, ["--max-p95-wall-us-per-token", "1200", "--min-p05-wall-tok-per-s", "900"])
         if completed.returncode != 0:
             sys.stdout.write(completed.stdout)
             sys.stderr.write(completed.stderr)
@@ -99,12 +99,12 @@ def main() -> int:
         failing = root / "qemu_prompt_bench_fail.json"
         failing.write_text(json.dumps(artifact(slow=True, missing=True)), encoding="utf-8")
         fail_dir = root / "fail"
-        failed = run_audit(failing, fail_dir, ["--max-p95-wall-us-per-token", "1200"])
+        failed = run_audit(failing, fail_dir, ["--max-p95-wall-us-per-token", "1200", "--min-p05-wall-tok-per-s", "900"])
         if rc := require(failed.returncode == 1, "latency_audit_slow_or_missing_metric_not_rejected"):
             return rc
         fail_report = json.loads((fail_dir / "qemu_latency_distribution_audit_latest.json").read_text(encoding="utf-8"))
         kinds = {finding["kind"] for finding in fail_report["findings"]}
-        if rc := require({"missing_metric", "max_p95_wall_us_per_token"} <= kinds, "latency_audit_findings_not_reported"):
+        if rc := require({"missing_metric", "max_p95_wall_us_per_token", "min_p05_wall_tok_per_s"} <= kinds, "latency_audit_findings_not_reported"):
             return rc
 
     return 0

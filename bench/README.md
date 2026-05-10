@@ -955,8 +955,8 @@ python3 bench/qemu_ttft_audit_ci_smoke.py
 `qemu_latency_distribution_audit.py` checks saved QEMU benchmark artifacts for
 latency distribution telemetry before perf dashboards consume them. It groups
 measured OK rows by profile, model, quantization, and prompt, then reports p50
-and p95 wall latency, TTFT, wall us/token, and wall tok/s. It is host-side only
-and does not launch QEMU.
+and p95 wall latency, TTFT, wall us/token, median wall tok/s, and low-tail p05
+wall tok/s. It is host-side only and does not launch QEMU.
 
 Example:
 
@@ -968,7 +968,8 @@ python3 bench/qemu_latency_distribution_audit.py \
   --min-rows 4 \
   --min-samples-per-group 2 \
   --max-p95-wall-us-per-token 10000 \
-  --min-p50-wall-tok-per-s 100
+  --min-p50-wall-tok-per-s 100 \
+  --min-p05-wall-tok-per-s 80
 ```
 
 The tool writes JSON, Markdown, CSV group rows, CSV sample rows, CSV findings,

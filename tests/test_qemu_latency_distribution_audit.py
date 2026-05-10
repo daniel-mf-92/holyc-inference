@@ -66,17 +66,18 @@ def test_audit_accepts_latency_samples_and_groups(tmp_path: Path) -> None:
 def test_audit_flags_missing_metric_drift_and_slo_failure(tmp_path: Path) -> None:
     artifact = tmp_path / "qemu_prompt_bench_latest.json"
     row = artifact_row(wall_us_per_token=1.0, wall_tok_per_s="")
-    write_artifact(artifact, [row])
-    args = parse_args([str(artifact), "--max-p95-wall-us-per-token", "0.5"])
+    slow_tail = artifact_row(prompt="smoke-short", wall_tok_per_s=1.0)
+    write_artifact(artifact, [row, slow_tail])
+    args = parse_args([str(artifact), "--max-p95-wall-us-per-token", "0.5", "--min-p05-wall-tok-per-s", "2000"])
     args.pattern = ["qemu_prompt_bench*.json"]
     args.require_metric = ["wall_elapsed_us", "wall_us_per_token", "wall_tok_per_s"]
 
     samples, groups, findings = qemu_latency_distribution_audit.audit([artifact], args)
 
-    assert len(samples) == 1
+    assert len(samples) == 2
     assert len(groups) == 1
     kinds = {finding.kind for finding in findings}
-    assert {"missing_metric", "wall_us_per_token_drift", "max_p95_wall_us_per_token"} <= kinds
+    assert {"missing_metric", "wall_us_per_token_drift", "max_p95_wall_us_per_token", "min_p05_wall_tok_per_s"} <= kinds
 
 
 def test_cli_writes_json_markdown_csv_samples_and_junit(tmp_path: Path) -> None:
@@ -103,6 +104,7 @@ def test_cli_writes_json_markdown_csv_samples_and_junit(tmp_path: Path) -> None:
     assert "No latency distribution findings." in (output_dir / "latency.md").read_text(encoding="utf-8")
     rows = list(csv.DictReader((output_dir / "latency.csv").open(encoding="utf-8")))
     assert rows[0]["prompt"] == "smoke-short"
+    assert rows[0]["wall_tok_per_s_p05"] == "1000.0"
     sample_rows = list(csv.DictReader((output_dir / "latency_samples.csv").open(encoding="utf-8")))
     assert sample_rows[0]["wall_elapsed_us"] == "32000.0"
     finding_rows = list(csv.DictReader((output_dir / "latency_findings.csv").open(encoding="utf-8")))

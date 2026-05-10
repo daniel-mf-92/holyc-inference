@@ -344,6 +344,18 @@ def audit(paths: Iterable[Path], args: argparse.Namespace) -> tuple[list[Latency
                     f"{group.wall_tok_per_s_p50:.6f} < {args.min_p50_wall_tok_per_s:.6f}",
                 )
             )
+        if args.min_p05_wall_tok_per_s is not None and group.wall_tok_per_s_p05 is not None and group.wall_tok_per_s_p05 < args.min_p05_wall_tok_per_s:
+            findings.append(
+                Finding(
+                    "-",
+                    0,
+                    "error",
+                    "min_p05_wall_tok_per_s",
+                    label,
+                    "wall_tok_per_s_p05",
+                    f"{group.wall_tok_per_s_p05:.6f} < {args.min_p05_wall_tok_per_s:.6f}",
+                )
+            )
 
     return samples, groups, findings
 
@@ -389,13 +401,14 @@ def write_markdown(path: Path, samples: list[LatencySample], groups: list[Latenc
         "",
         "## Groups",
         "",
-        "| Profile | Model | Quantization | Prompt | Samples | Wall tok/s p50 | Wall us/token p95 | TTFT us p95 |",
-        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: |",
+        "| Profile | Model | Quantization | Prompt | Samples | Wall tok/s p50 | Wall tok/s p05 | Wall us/token p95 | TTFT us p95 |",
+        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |",
     ]
     for group in groups:
         lines.append(
             f"| {group.profile} | {group.model} | {group.quantization} | {group.prompt} | {group.samples} | "
-            f"{format_number(group.wall_tok_per_s_p50)} | {format_number(group.wall_us_per_token_p95)} | {format_number(group.ttft_us_p95)} |"
+            f"{format_number(group.wall_tok_per_s_p50)} | {format_number(group.wall_tok_per_s_p05)} | "
+            f"{format_number(group.wall_us_per_token_p95)} | {format_number(group.ttft_us_p95)} |"
         )
     lines.extend(["", "## Findings", ""])
     if findings:
@@ -413,7 +426,7 @@ def format_number(value: float | None) -> str:
 
 def write_csv(path: Path, groups: list[LatencyGroup]) -> None:
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(LatencyGroup.__dataclass_fields__))
+        writer = csv.DictWriter(handle, fieldnames=list(LatencyGroup.__dataclass_fields__), lineterminator="\n")
         writer.writeheader()
         for group in groups:
             writer.writerow(asdict(group))
@@ -421,7 +434,7 @@ def write_csv(path: Path, groups: list[LatencyGroup]) -> None:
 
 def write_samples_csv(path: Path, samples: list[LatencySample]) -> None:
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(LatencySample.__dataclass_fields__))
+        writer = csv.DictWriter(handle, fieldnames=list(LatencySample.__dataclass_fields__), lineterminator="\n")
         writer.writeheader()
         for sample in samples:
             writer.writerow(asdict(sample))
@@ -429,7 +442,7 @@ def write_samples_csv(path: Path, samples: list[LatencySample]) -> None:
 
 def write_findings_csv(path: Path, findings: list[Finding]) -> None:
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(Finding.__dataclass_fields__))
+        writer = csv.DictWriter(handle, fieldnames=list(Finding.__dataclass_fields__), lineterminator="\n")
         writer.writeheader()
         for finding in findings:
             writer.writerow(asdict(finding))
@@ -465,6 +478,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-p95-ttft-us", type=float)
     parser.add_argument("--max-p95-wall-us-per-token", type=float)
     parser.add_argument("--min-p50-wall-tok-per-s", type=float)
+    parser.add_argument("--min-p05-wall-tok-per-s", type=float)
     parser.add_argument("--all-phases", dest="measured_only", action="store_false", help="Include warmup rows")
     parser.add_argument("--all-exit-classes", dest="ok_only", action="store_false", help="Include non-ok rows")
     parser.set_defaults(measured_only=True, ok_only=True)

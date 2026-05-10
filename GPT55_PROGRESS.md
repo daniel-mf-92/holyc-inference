@@ -556,3 +556,4 @@
 2026-05-10T20:27:16Z | Added QEMU runtime budget audit with smoke coverage and refreshed latest runtime budget artifacts.
 2026-05-10T20:33:06Z | Added QEMU runtime budget warmup wall-share gates with smoke coverage, docs, and refreshed latest artifacts.
 2026-05-10T20:55:55Z | Extended QEMU token accounting audit with prompt byte/s gates, smoke coverage, and refreshed latest reports.
+2026-05-10T21:03:46Z | Added QEMU latency distribution p05 wall tok/s tail-throughput gate with smoke coverage and refreshed latest reports.
