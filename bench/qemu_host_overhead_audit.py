@@ -52,6 +52,23 @@ class Finding:
     detail: str
 
 
+@dataclass(frozen=True)
+class OverheadGroup:
+    profile: str
+    model: str
+    quantization: str
+    prompt: str
+    phase: str
+    rows: int
+    ok_rows: int
+    negative_host_overhead_rows: int
+    min_host_overhead_pct: float | None
+    max_host_overhead_pct: float | None
+    median_host_overhead_pct: float | None
+    p95_host_overhead_pct: float | None
+    avg_host_overhead_pct: float | None
+
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -177,6 +194,38 @@ def row_label(row: OverheadRow) -> str:
     return f"{row.profile}/{row.model}/{row.quantization}/{row.prompt}/{row.phase}/{row.iteration or '-'}"
 
 
+def group_key(row: OverheadRow) -> tuple[str, str, str, str, str]:
+    return (row.profile, row.model, row.quantization, row.prompt, row.phase)
+
+
+def build_groups(rows: list[OverheadRow]) -> list[OverheadGroup]:
+    grouped: dict[tuple[str, str, str, str, str], list[OverheadRow]] = {}
+    for row in rows:
+        grouped.setdefault(group_key(row), []).append(row)
+
+    summaries: list[OverheadGroup] = []
+    for key, group_rows in sorted(grouped.items()):
+        values = sorted(row.host_overhead_pct for row in group_rows if row.host_overhead_pct is not None)
+        summaries.append(
+            OverheadGroup(
+                profile=key[0],
+                model=key[1],
+                quantization=key[2],
+                prompt=key[3],
+                phase=key[4],
+                rows=len(group_rows),
+                ok_rows=sum(1 for row in group_rows if row.exit_class == "ok"),
+                negative_host_overhead_rows=sum(1 for row in group_rows if row.host_overhead_us is not None and row.host_overhead_us < 0),
+                min_host_overhead_pct=min(values, default=None),
+                max_host_overhead_pct=max(values, default=None),
+                median_host_overhead_pct=statistics.median(values) if values else None,
+                p95_host_overhead_pct=percentile(values, 95),
+                avg_host_overhead_pct=sum(values) / len(values) if values else None,
+            )
+        )
+    return summaries
+
+
 def audit(paths: Iterable[Path], args: argparse.Namespace) -> tuple[list[OverheadRow], list[Finding]]:
     rows: list[OverheadRow] = []
     findings: list[Finding] = []
@@ -221,12 +270,15 @@ def audit(paths: Iterable[Path], args: argparse.Namespace) -> tuple[list[Overhea
 def write_json(path: Path, rows: list[OverheadRow], findings: list[Finding]) -> None:
     overhead_values = [row.host_overhead_pct for row in rows if row.host_overhead_pct is not None]
     sorted_overheads = sorted(overhead_values)
+    groups = build_groups(rows)
     payload = {
         "generated_at": iso_now(),
         "status": "pass" if not findings else "fail",
         "summary": {
             "rows": len(rows),
             "ok_rows": sum(1 for row in rows if row.exit_class == "ok"),
+            "groups": len(groups),
+            "negative_host_overhead_rows": sum(1 for row in rows if row.host_overhead_us is not None and row.host_overhead_us < 0),
             "findings": len(findings),
             "max_host_overhead_pct": max(overhead_values, default=None),
             "median_host_overhead_pct": statistics.median(sorted_overheads) if sorted_overheads else None,
@@ -234,6 +286,7 @@ def write_json(path: Path, rows: list[OverheadRow], findings: list[Finding]) -> 
             "avg_host_overhead_pct": sum(overhead_values) / len(overhead_values) if overhead_values else None,
         },
         "rows": [asdict(row) for row in rows],
+        "groups": [asdict(group) for group in groups],
         "findings": [asdict(finding) for finding in findings],
     }
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -255,6 +308,7 @@ def percentile(sorted_values: list[float], pct: float) -> float | None:
 
 def write_markdown(path: Path, rows: list[OverheadRow], findings: list[Finding]) -> None:
     overhead_values = sorted(row.host_overhead_pct for row in rows if row.host_overhead_pct is not None)
+    groups = build_groups(rows)
     max_pct = max(overhead_values, default=None)
     median_pct = statistics.median(overhead_values) if overhead_values else None
     p95_pct = percentile(overhead_values, 95)
@@ -264,6 +318,8 @@ def write_markdown(path: Path, rows: list[OverheadRow], findings: list[Finding])
         f"Generated: {iso_now()}",
         f"Status: {'pass' if not findings else 'fail'}",
         f"Rows: {len(rows)}",
+        f"Groups: {len(groups)}",
+        f"Negative host overhead rows: {sum(1 for row in rows if row.host_overhead_us is not None and row.host_overhead_us < 0)}",
         f"Findings: {len(findings)}",
         f"Max host overhead %: {max_pct if max_pct is not None else '-'}",
         f"Median host overhead %: {median_pct if median_pct is not None else '-'}",
@@ -281,7 +337,7 @@ def write_markdown(path: Path, rows: list[OverheadRow], findings: list[Finding])
 def write_csv(path: Path, rows: list[OverheadRow]) -> None:
     fieldnames = list(asdict(rows[0]).keys()) if rows else list(OverheadRow.__dataclass_fields__.keys())
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for row in rows:
             writer.writerow(asdict(row))
@@ -290,10 +346,19 @@ def write_csv(path: Path, rows: list[OverheadRow]) -> None:
 def write_findings_csv(path: Path, findings: list[Finding]) -> None:
     fieldnames = list(Finding.__dataclass_fields__.keys())
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for finding in findings:
             writer.writerow(asdict(finding))
+
+
+def write_group_csv(path: Path, rows: list[OverheadRow]) -> None:
+    fieldnames = list(OverheadGroup.__dataclass_fields__.keys())
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
+        writer.writeheader()
+        for group in build_groups(rows):
+            writer.writerow(asdict(group))
 
 
 def write_junit(path: Path, findings: list[Finding]) -> None:
@@ -328,6 +393,7 @@ def main(argv: list[str] | None = None) -> int:
     write_json(args.output_dir / f"{stem}.json", rows, findings)
     write_markdown(args.output_dir / f"{stem}.md", rows, findings)
     write_csv(args.output_dir / f"{stem}.csv", rows)
+    write_group_csv(args.output_dir / f"{stem}_groups.csv", rows)
     write_findings_csv(args.output_dir / f"{stem}_findings.csv", findings)
     write_junit(args.output_dir / f"{stem}_junit.xml", findings)
     return 1 if findings else 0

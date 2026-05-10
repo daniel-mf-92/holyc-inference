@@ -79,9 +79,18 @@ def main() -> int:
             return rc
         if rc := require(report["summary"]["max_host_overhead_pct"] == 25.0, "missing_host_overhead_summary"):
             return rc
+        if rc := require(report["summary"]["groups"] == 1, "missing_host_overhead_group_summary"):
+            return rc
+        if rc := require(report["groups"][0]["negative_host_overhead_rows"] == 0, "unexpected_negative_host_overhead_group_rows"):
+            return rc
         if rc := require(report["summary"]["median_host_overhead_pct"] == 25.0, "missing_host_overhead_median"):
             return rc
         if rc := require(report["summary"]["p95_host_overhead_pct"] == 25.0, "missing_host_overhead_p95"):
+            return rc
+        groups_csv = (pass_dir / "qemu_host_overhead_audit_latest_groups.csv").read_text(encoding="utf-8")
+        if rc := require("profile,model,quantization,prompt,phase,rows,ok_rows,negative_host_overhead_rows" in groups_csv, "missing_host_overhead_group_csv"):
+            return rc
+        if rc := require("ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,measured,1,1,0" in groups_csv, "missing_host_overhead_group_row"):
             return rc
         if rc := require(
             "No host overhead findings." in (pass_dir / "qemu_host_overhead_audit_latest.md").read_text(encoding="utf-8"),
@@ -139,6 +148,11 @@ def main() -> int:
         if rc := require(allowed.returncode == 0, "negative_host_overhead_not_allowed_by_default"):
             sys.stdout.write(allowed.stdout)
             sys.stderr.write(allowed.stderr)
+            return rc
+        allowed_report = json.loads((allowed_dir / "qemu_host_overhead_audit_latest.json").read_text(encoding="utf-8"))
+        if rc := require(allowed_report["summary"]["negative_host_overhead_rows"] == 1, "missing_negative_host_overhead_summary"):
+            return rc
+        if rc := require(allowed_report["groups"][0]["negative_host_overhead_rows"] == 1, "missing_negative_host_overhead_group_summary"):
             return rc
 
     return 0

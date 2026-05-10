@@ -1,0 +1,5 @@
+profile,model,quantization,prompt,phase,rows,ok_rows,negative_host_overhead_rows,min_host_overhead_pct,max_host_overhead_pct,median_host_overhead_pct,p95_host_overhead_pct,avg_host_overhead_pct
+ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,measured,2,2,0,84.203,101.39466666666667,92.79883333333333,100.53508333333333,92.79883333333333
+ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,warmup,1,1,0,113.726,113.726,113.726,113.726,113.726
+ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,measured,2,2,0,184.3505,251.0585,217.7045,247.7231,217.7045
+ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,warmup,1,1,0,154.7215,154.7215,154.7215,154.7215,154.7215

@@ -1,14 +1,76 @@
 {
   "findings": [],
-  "generated_at": "2026-05-01T13:43:46Z",
+  "generated_at": "2026-05-10T20:20:26Z",
+  "groups": [
+    {
+      "avg_host_overhead_pct": 92.79883333333333,
+      "max_host_overhead_pct": 101.39466666666667,
+      "median_host_overhead_pct": 92.79883333333333,
+      "min_host_overhead_pct": 84.203,
+      "model": "synthetic-smoke",
+      "negative_host_overhead_rows": 0,
+      "ok_rows": 2,
+      "p95_host_overhead_pct": 100.53508333333333,
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "rows": 2
+    },
+    {
+      "avg_host_overhead_pct": 113.726,
+      "max_host_overhead_pct": 113.726,
+      "median_host_overhead_pct": 113.726,
+      "min_host_overhead_pct": 113.726,
+      "model": "synthetic-smoke",
+      "negative_host_overhead_rows": 0,
+      "ok_rows": 1,
+      "p95_host_overhead_pct": 113.726,
+      "phase": "warmup",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "rows": 1
+    },
+    {
+      "avg_host_overhead_pct": 217.7045,
+      "max_host_overhead_pct": 251.0585,
+      "median_host_overhead_pct": 217.7045,
+      "min_host_overhead_pct": 184.3505,
+      "model": "synthetic-smoke",
+      "negative_host_overhead_rows": 0,
+      "ok_rows": 2,
+      "p95_host_overhead_pct": 247.7231,
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "rows": 2
+    },
+    {
+      "avg_host_overhead_pct": 154.7215,
+      "max_host_overhead_pct": 154.7215,
+      "median_host_overhead_pct": 154.7215,
+      "min_host_overhead_pct": 154.7215,
+      "model": "synthetic-smoke",
+      "negative_host_overhead_rows": 0,
+      "ok_rows": 1,
+      "p95_host_overhead_pct": 154.7215,
+      "phase": "warmup",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "rows": 1
+    }
+  ],
   "rows": [
     {
       "elapsed_us": 200000.0,
       "exit_class": "ok",
-      "expected_host_overhead_pct": -23.258,
-      "expected_host_overhead_us": -46516.0,
-      "host_overhead_pct": -23.258,
-      "host_overhead_us": -46516.0,
+      "expected_host_overhead_pct": 154.7215,
+      "expected_host_overhead_us": 309443.0,
+      "host_overhead_pct": 154.7215,
+      "host_overhead_us": 309443.0,
       "iteration": 1,
       "model": "synthetic-smoke",
       "phase": "warmup",
@@ -17,15 +79,15 @@
       "quantization": "Q4_0",
       "row": 1,
       "source": "bench/results/qemu_prompt_bench_latest.json",
-      "wall_elapsed_us": 153484.0
+      "wall_elapsed_us": 509443.0
     },
     {
       "elapsed_us": 300000.0,
       "exit_class": "ok",
-      "expected_host_overhead_pct": -50.521,
-      "expected_host_overhead_us": -151563.0,
-      "host_overhead_pct": -50.521,
-      "host_overhead_us": -151563.0,
+      "expected_host_overhead_pct": 113.726,
+      "expected_host_overhead_us": 341178.0,
+      "host_overhead_pct": 113.726,
+      "host_overhead_us": 341178.0,
       "iteration": 1,
       "model": "synthetic-smoke",
       "phase": "warmup",
@@ -34,15 +96,15 @@
       "quantization": "Q4_0",
       "row": 2,
       "source": "bench/results/qemu_prompt_bench_latest.json",
-      "wall_elapsed_us": 148437.0
+      "wall_elapsed_us": 641178.0
     },
     {
       "elapsed_us": 200000.0,
       "exit_class": "ok",
-      "expected_host_overhead_pct": 18.3125,
-      "expected_host_overhead_us": 36625.0,
-      "host_overhead_pct": 18.3125,
-      "host_overhead_us": 36625.0,
+      "expected_host_overhead_pct": 251.0585,
+      "expected_host_overhead_us": 502117.0,
+      "host_overhead_pct": 251.0585,
+      "host_overhead_us": 502117.0,
       "iteration": 1,
       "model": "synthetic-smoke",
       "phase": "measured",
@@ -51,15 +113,15 @@
       "quantization": "Q4_0",
       "row": 3,
       "source": "bench/results/qemu_prompt_bench_latest.json",
-      "wall_elapsed_us": 236625.0
+      "wall_elapsed_us": 702117.0
     },
     {
       "elapsed_us": 200000.0,
       "exit_class": "ok",
-      "expected_host_overhead_pct": 57.0265,
-      "expected_host_overhead_us": 114053.0,
-      "host_overhead_pct": 57.0265,
-      "host_overhead_us": 114053.0,
+      "expected_host_overhead_pct": 184.3505,
+      "expected_host_overhead_us": 368701.0,
+      "host_overhead_pct": 184.3505,
+      "host_overhead_us": 368701.0,
       "iteration": 2,
       "model": "synthetic-smoke",
       "phase": "measured",
@@ -68,15 +130,15 @@
       "quantization": "Q4_0",
       "row": 4,
       "source": "bench/results/qemu_prompt_bench_latest.json",
-      "wall_elapsed_us": 314053.0
+      "wall_elapsed_us": 568701.0
     },
     {
       "elapsed_us": 300000.0,
       "exit_class": "ok",
-      "expected_host_overhead_pct": -56.75366666666667,
-      "expected_host_overhead_us": -170261.0,
-      "host_overhead_pct": -56.75366666666667,
-      "host_overhead_us": -170261.0,
+      "expected_host_overhead_pct": 84.203,
+      "expected_host_overhead_us": 252609.0,
+      "host_overhead_pct": 84.203,
+      "host_overhead_us": 252609.0,
       "iteration": 1,
       "model": "synthetic-smoke",
       "phase": "measured",
@@ -85,15 +147,15 @@
       "quantization": "Q4_0",
       "row": 5,
       "source": "bench/results/qemu_prompt_bench_latest.json",
-      "wall_elapsed_us": 129739.0
+      "wall_elapsed_us": 552609.0
     },
     {
       "elapsed_us": 300000.0,
       "exit_class": "ok",
-      "expected_host_overhead_pct": -45.18866666666667,
-      "expected_host_overhead_us": -135566.0,
-      "host_overhead_pct": -45.18866666666667,
-      "host_overhead_us": -135566.0,
+      "expected_host_overhead_pct": 101.39466666666667,
+      "expected_host_overhead_us": 304184.0,
+      "host_overhead_pct": 101.39466666666667,
+      "host_overhead_us": 304184.0,
       "iteration": 2,
       "model": "synthetic-smoke",
       "phase": "measured",
@@ -102,17 +164,19 @@
       "quantization": "Q4_0",
       "row": 6,
       "source": "bench/results/qemu_prompt_bench_latest.json",
-      "wall_elapsed_us": 164434.0
+      "wall_elapsed_us": 604184.0
     }
   ],
   "status": "pass",
   "summary": {
-    "avg_host_overhead_pct": -16.73038888888889,
+    "avg_host_overhead_pct": 148.2423611111111,
     "findings": 0,
-    "max_host_overhead_pct": 57.0265,
-    "median_host_overhead_pct": -34.223333333333336,
+    "groups": 4,
+    "max_host_overhead_pct": 251.0585,
+    "median_host_overhead_pct": 134.22375,
+    "negative_host_overhead_rows": 0,
     "ok_rows": 6,
-    "p95_host_overhead_pct": 47.348,
+    "p95_host_overhead_pct": 234.38150000000002,
     "rows": 6
   }
 }

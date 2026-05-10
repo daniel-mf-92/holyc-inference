@@ -551,3 +551,4 @@
 2026-05-10T19:58:14Z | Added balanced accuracy to eval compare summaries, breakdowns, docs, tests, and refreshed smoke artifacts.
 2026-05-10T20:07:16Z | Added eval perf scorecard quality-adjusted throughput and tok/s-per-MiB gates with smoke coverage and refreshed reports.
 2026-05-10T20:12:58Z | Added direct HCEval inspector smoke gate with manifest-mismatch rejection and refreshed inspection artifacts.
+2026-05-10T20:19:53Z | Added grouped QEMU host-overhead rollups with smoke coverage and refreshed latest audit artifacts.

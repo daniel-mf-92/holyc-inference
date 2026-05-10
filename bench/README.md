@@ -870,8 +870,9 @@ python3 bench/qemu_timeout_recommend_ci_smoke.py
 host-side timing overhead accounting before perf dashboards consume them. It
 verifies `host_overhead_us` and `host_overhead_pct` match wall elapsed time
 minus guest-reported elapsed time, reports max/median/p95 overhead percentages,
-and provides an optional negative-overhead gate for non-synthetic runs. It is
-host-side only and does not launch QEMU.
+emits grouped rollups by profile/model/quantization/prompt/phase, and provides
+an optional negative-overhead gate for non-synthetic runs. It is host-side only
+and does not launch QEMU.
 
 Example:
 
@@ -884,8 +885,9 @@ python3 bench/qemu_host_overhead_audit.py \
   --max-ok-host-overhead-pct 50
 ```
 
-The tool writes JSON, Markdown, CSV rows, CSV findings, and JUnit outputs. Its
-smoke gate builds temporary passing and failing benchmark artifacts:
+The tool writes JSON, Markdown, CSV rows, CSV group rollups, CSV findings, and
+JUnit outputs. Its smoke gate builds temporary passing and failing benchmark
+artifacts:
 
 ```bash
 python3 bench/qemu_host_overhead_audit_ci_smoke.py
