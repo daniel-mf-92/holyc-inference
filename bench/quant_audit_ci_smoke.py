@@ -57,7 +57,9 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="holyc-quant-audit-ci-") as tmp:
         tmp_path = Path(tmp)
         source_root = tmp_path / "src" / "quant"
+        extra_source_root = tmp_path / "src" / "math"
         write_clean_source(source_root)
+        write_clean_source(extra_source_root)
 
         q4_path = tmp_path / "q4_good.bin"
         q8_path = tmp_path / "q8_good.bin"
@@ -73,6 +75,8 @@ def main() -> int:
             str(ROOT / "bench" / "quant_audit.py"),
             "--source-root",
             str(source_root),
+            "--extra-source-root",
+            str(extra_source_root),
             "--q4-block-file",
             str(q4_path),
             "--q8-block-file",
@@ -122,6 +126,10 @@ def main() -> int:
 
         report = json.loads(pass_json.read_text(encoding="utf-8"))
         if rc := require(report["status"] == "pass", "unexpected_pass_status"):
+            return rc
+        if rc := require(report["source_audit"]["files_scanned"] == 2, "unexpected_source_scan_count"):
+            return rc
+        if rc := require(len(report["source_roots"]) == 2, "unexpected_source_root_count"):
             return rc
         if rc := require(len(report["block_audits"]) == 2, "unexpected_block_audit_count"):
             return rc
@@ -181,6 +189,8 @@ def main() -> int:
         if rc := require("Quant sign -/+ delta" in pass_md.read_text(encoding="utf-8"), "missing_markdown_quant_sign"):
             return rc
         if rc := require("Scale sign +/-" in pass_md.read_text(encoding="utf-8"), "missing_markdown_scale_sign"):
+            return rc
+        if rc := require("Source roots scanned" in pass_md.read_text(encoding="utf-8"), "missing_markdown_source_roots"):
             return rc
         if rc := require("Duplicate blocks" in pass_md.read_text(encoding="utf-8"), "missing_markdown_duplicate_blocks"):
             return rc

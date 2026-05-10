@@ -542,3 +542,4 @@
 2026-05-10T18:58:26Z | Added quant manifest padding audit for Q4_0/Q8_0 tail payload zeroing with smoke coverage and refreshed reports.
 2026-05-10T19:03:04Z | Added eval quant-delta duplicate-report gate with smoke coverage and refreshed latest artifacts.
 2026-05-10T19:10:58Z | Added perf_regression CI smoke coverage for pass, regression-fail, and environment metadata coverage gates.
+2026-05-10T19:21:33Z | Extended quant_audit source float-leak scan to support multiple HolyC roots and refreshed quant/math audit artifacts.

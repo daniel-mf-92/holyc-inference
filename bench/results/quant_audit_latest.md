@@ -1,9 +1,10 @@
 # Quantization Audit
 
 Status: pass
-Generated: 2026-04-30T00:14:24+00:00
+Generated: 2026-05-10T19:21:25+00:00
 Source root: `src/quant`
-HolyC files scanned: 8
+Source roots scanned: `src/quant, src/math`
+HolyC files scanned: 14
 Source findings: 0
 
 ## Block Audits

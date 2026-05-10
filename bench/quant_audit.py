@@ -219,6 +219,24 @@ def audit_sources(root: Path) -> SourceAudit:
     return SourceAudit(files_scanned=files_scanned, findings=findings)
 
 
+def audit_source_roots(roots: Iterable[Path]) -> SourceAudit:
+    findings: list[SourceFinding] = []
+    files_scanned = 0
+    seen: set[Path] = set()
+
+    for root in roots:
+        for path in iter_holyc_files(root):
+            resolved = path.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            audit = audit_sources(path)
+            files_scanned += audit.files_scanned
+            findings.extend(audit.findings)
+
+    return SourceAudit(files_scanned=files_scanned, findings=findings)
+
+
 def fp16_class(bits: int) -> str:
     exponent = (bits >> 10) & 0x1F
     fraction = bits & 0x03FF
@@ -1421,6 +1439,7 @@ def markdown_report(report: dict) -> str:
         f"Status: {report['status']}",
         f"Generated: {report['generated_at']}",
         f"Source root: `{report['source_root']}`",
+        f"Source roots scanned: `{', '.join(report.get('source_roots') or [report['source_root']])}`",
         f"HolyC files scanned: {source['files_scanned']}",
         f"Source findings: {len(source['findings'])}",
         "",
@@ -1691,6 +1710,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="HolyC file or directory to scan",
     )
     parser.add_argument(
+        "--extra-source-root",
+        type=Path,
+        action="append",
+        default=[],
+        help="Additional HolyC file or directory to include in the float-runtime source scan",
+    )
+    parser.add_argument(
         "--block-file",
         type=Path,
         action="append",
@@ -1848,7 +1874,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
-    source_audit = audit_sources(args.source_root)
+    source_roots = [args.source_root, *args.extra_source_root]
+    source_audit = audit_source_roots(source_roots)
     block_specs = (
         [(path, args.format) for path in args.block_file]
         + [(path, "q4_0") for path in args.q4_block_file]
@@ -1890,6 +1917,7 @@ def main(argv: list[str] | None = None) -> int:
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source_root": str(args.source_root),
+        "source_roots": [str(root) for root in source_roots],
         "source_audit": {
             "files_scanned": source_audit.files_scanned,
             "findings": [asdict(finding) for finding in source_audit.findings],

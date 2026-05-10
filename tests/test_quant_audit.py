@@ -57,6 +57,21 @@ F64 BadScale()
     assert kinds == {"float-token", "float-literal"}
 
 
+def test_source_root_audit_deduplicates_extra_roots(tmp_path: Path) -> None:
+    quant_root = tmp_path / "quant"
+    math_root = tmp_path / "math"
+    quant_root.mkdir()
+    math_root.mkdir()
+    (quant_root / "Q4.HC").write_text("I64 QuantScale(I64 x) { return x << 16; }\n", encoding="utf-8")
+    (math_root / "Bad.HC").write_text("F64 BadScale() { return 1.25; }\n", encoding="utf-8")
+
+    audit = quant_audit.audit_source_roots([quant_root, math_root, quant_root])
+
+    assert audit.files_scanned == 2
+    assert {finding.path for finding in audit.findings} == {str(math_root / "Bad.HC")}
+    assert {finding.kind for finding in audit.findings} == {"float-token", "float-literal"}
+
+
 def test_q4_0_block_audit_reports_signed_nibble_range(tmp_path: Path) -> None:
     block_file = tmp_path / "q4.bin"
     packed = bytes([0x0F] + [0x88] * 15)
@@ -391,6 +406,7 @@ def test_cli_writes_pass_report(tmp_path: Path) -> None:
     assert status == 0
     text = output.read_text(encoding="utf-8")
     assert '"status": "pass"' in text
+    assert '"source_roots": [' in text
     assert "Quantization Audit" in markdown.read_text(encoding="utf-8")
 
 
@@ -453,8 +469,8 @@ def test_cli_fails_on_q16_scale_limit(tmp_path: Path) -> None:
     assert "block," in csv_report.read_text(encoding="utf-8")
     junit_root = ET.parse(junit).getroot()
     assert junit_root.attrib["name"] == "holyc_quant_audit"
-    assert junit_root.attrib["tests"] == "2"
-    assert junit_root.attrib["failures"] == "1"
+    assert junit_root.attrib["tests"] == "3"
+    assert junit_root.attrib["failures"] == "2"
     failure = junit_root.find("./testcase/failure")
     assert failure is not None
     assert "|scale_q16| 65536 exceeds limit 32768" in (failure.text or "")
