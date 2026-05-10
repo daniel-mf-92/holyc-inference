@@ -90,6 +90,21 @@ REMOTE_RESOURCE_MARKERS = (
 )
 SOCKET_TRANSPORT_OPTIONS = {"-chardev", "-gdb", "-incoming", "-monitor", "-qmp", "-qmp-pretty", "-serial", "-vnc"}
 USER_NET_SERVICE_OPTIONS = {"-bootp", "-redir", "-smb", "-tftp"}
+HOST_FILESYSTEM_SHARE_OPTIONS = {"-virtfs", "-fsdev"}
+HOST_FILESYSTEM_SHARE_DEVICE_MARKERS = (
+    "9p-device",
+    "9p-pci",
+    "vhost-user-fs",
+    "virtio-9p",
+    "virtio-fs",
+)
+HOST_FILESYSTEM_SHARE_MARKERS = (
+    "mount_tag=",
+    "multidevs=",
+    "security_model=",
+    "smb=",
+    "smbserver=",
+)
 REMOTE_DISPLAY_MARKERS = ("spice", "vnc")
 TLS_OPTION_MARKERS = ("tls-creds", "tlsauthz", "tls-cipher-suites")
 TLS_VALUE_OPTIONS = {
@@ -163,6 +178,16 @@ def is_remote_display_arg(value: str) -> bool:
 def is_tls_arg(value: str) -> bool:
     lowered = value.lower()
     return any(marker in lowered for marker in TLS_OPTION_MARKERS)
+
+
+def is_host_filesystem_share_device_arg(value: str) -> bool:
+    lowered = value.lower()
+    return any(marker in lowered for marker in HOST_FILESYSTEM_SHARE_DEVICE_MARKERS)
+
+
+def is_host_filesystem_share_marker_arg(value: str) -> bool:
+    lowered = value.lower()
+    return any(marker in lowered for marker in HOST_FILESYSTEM_SHARE_MARKERS)
 
 
 def canonical_qemu_option(arg: str) -> str:
@@ -360,10 +385,57 @@ def audit_args(path: Path, args: list[str]) -> list[Finding]:
                     f"`{arg}` is forbidden because it configures QEMU user-mode networking services",
                 )
             )
+        if option in HOST_FILESYSTEM_SHARE_OPTIONS:
+            detail = f"`{arg} {next_arg}` is forbidden because it shares host filesystem paths with the guest"
+            findings.append(Finding(str(path), "host filesystem share", index, arg, detail))
+            index += 2
+            continue
+        if any(option.startswith(f"{share_option}=") for share_option in HOST_FILESYSTEM_SHARE_OPTIONS):
+            findings.append(
+                Finding(
+                    str(path),
+                    "host filesystem share",
+                    index,
+                    arg,
+                    f"`{arg}` is forbidden because it shares host filesystem paths with the guest",
+                )
+            )
         if option == "-device" and is_network_device_arg(next_arg):
             findings.append(Finding(str(path), "network device", index, arg, f"`{next_arg}` is a network device"))
         if option.startswith("-device=") and is_network_device_arg(option):
             findings.append(Finding(str(path), "network device", index, arg, f"`{arg}` is a network device"))
+        if option == "-device" and is_host_filesystem_share_device_arg(next_arg):
+            findings.append(
+                Finding(
+                    str(path),
+                    "host filesystem share device",
+                    index,
+                    arg,
+                    f"`{next_arg}` is a filesystem sharing device and violates guest isolation policy",
+                )
+            )
+        if option.startswith("-device=") and is_host_filesystem_share_device_arg(option):
+            findings.append(
+                Finding(
+                    str(path),
+                    "host filesystem share device",
+                    index,
+                    arg,
+                    f"`{arg}` is a filesystem sharing device and violates guest isolation policy",
+                )
+            )
+        if is_host_filesystem_share_marker_arg(arg) and not (
+            option in USER_NET_SERVICE_OPTIONS or any(option.startswith(f"{service}=") for service in USER_NET_SERVICE_OPTIONS)
+        ):
+            findings.append(
+                Finding(
+                    str(path),
+                    "host filesystem share marker",
+                    index,
+                    arg,
+                    f"`{arg}` contains a filesystem sharing marker and violates guest isolation policy",
+                )
+            )
         if option == "-vnc" and next_arg != "none":
             findings.append(Finding(str(path), "socket endpoint", index, arg, f"`-vnc {next_arg}` opens a remote display socket"))
             index += 2

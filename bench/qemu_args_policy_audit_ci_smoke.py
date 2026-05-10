@@ -105,6 +105,22 @@ def main() -> int:
             encoding="utf-8",
         )
         (unsafe_dir / "duplicate_nic.args").write_text("-nic none -nic=none\n", encoding="utf-8")
+        (unsafe_dir / "virtfs.args").write_text(
+            "-virtfs local,path=/tmp/share,mount_tag=host0,security_model=none\n",
+            encoding="utf-8",
+        )
+        (unsafe_dir / "fsdev.json").write_text(
+            json.dumps(["-fsdev", "local,id=fs1,path=/tmp/fsdev,security_model=mapped-xattr"]) + "\n",
+            encoding="utf-8",
+        )
+        (unsafe_dir / "fs_device.json").write_text(
+            json.dumps(["-device", "virtio-9p-pci,fsdev=fs1,mount_tag=host1"]) + "\n",
+            encoding="utf-8",
+        )
+        (unsafe_dir / "fs_marker.args").write_text(
+            "-object memory-backend-file,id=mem0,mem-path=/tmp/guest,mount_tag=host2\n",
+            encoding="utf-8",
+        )
         unsafe_out = tmp_path / "unsafe_out"
         completed = run_audit(unsafe_dir, unsafe_out)
         if completed.returncode == 0:
@@ -128,7 +144,10 @@ def main() -> int:
             require("remote resource" in reasons, "unsafe_args_policy_missing_remote_resource=true"),
             require("fragment includes -nic none" in reasons, "unsafe_args_policy_missing_fragment_nic=true"),
             require("duplicate -nic none" in reasons, "unsafe_args_policy_missing_duplicate_nic=true"),
-            require(int(unsafe_junit.attrib.get("failures", "0")) >= 12, "unsafe_args_policy_junit_failures=true"),
+            require("host filesystem share" in reasons, "unsafe_args_policy_missing_host_fs_share=true"),
+            require("host filesystem share device" in reasons, "unsafe_args_policy_missing_host_fs_share_device=true"),
+            require("host filesystem share marker" in reasons, "unsafe_args_policy_missing_host_fs_share_marker=true"),
+            require(int(unsafe_junit.attrib.get("failures", "0")) >= 16, "unsafe_args_policy_junit_failures=true"),
         ]
         if not all(checks):
             return 1
