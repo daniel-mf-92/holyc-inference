@@ -102,6 +102,11 @@ def main() -> int:
             return rc
         if rc := require((tmp_path / "calibration_pass.csv").read_text(encoding="utf-8").startswith("severity,"), "missing_csv_header"):
             return rc
+        summary_csv = (tmp_path / "calibration_pass_summaries.csv").read_text(encoding="utf-8")
+        if rc := require(summary_csv.startswith("source,engine,"), "missing_summary_csv_header"):
+            return rc
+        if rc := require("holyc" in summary_csv and "llama" in summary_csv, "missing_summary_csv_engines"):
+            return rc
         junit = ET.parse(tmp_path / "calibration_pass_junit.xml").getroot()
         if rc := require(junit.attrib.get("name") == "holyc_eval_calibration_audit", "missing_junit_suite"):
             return rc

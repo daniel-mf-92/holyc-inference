@@ -254,6 +254,16 @@ def write_csv(path: Path, findings: list[Finding]) -> None:
             writer.writerow(asdict(finding))
 
 
+def write_summary_csv(path: Path, summaries: list[EngineSummary]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fields = list(EngineSummary.__dataclass_fields__)
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        for summary in summaries:
+            writer.writerow(asdict(summary))
+
+
 def write_junit(path: Path, payload: dict[str, Any]) -> None:
     suite = ET.Element(
         "testsuite",
@@ -355,15 +365,18 @@ def main(argv: list[str] | None = None) -> int:
     json_path = output_dir / f"{stem}.json"
     markdown_path = output_dir / f"{stem}.md"
     csv_path = output_dir / f"{stem}.csv"
+    summary_csv_path = output_dir / f"{stem}_summaries.csv"
     junit_path = output_dir / f"{stem}_junit.xml"
     write_json(json_path, report)
     write_markdown(markdown_path, report)
     write_csv(csv_path, findings)
+    write_summary_csv(summary_csv_path, summaries)
     write_junit(junit_path, report)
 
     print(f"wrote_json={json_path}")
     print(f"wrote_markdown={markdown_path}")
     print(f"wrote_csv={csv_path}")
+    print(f"wrote_summary_csv={summary_csv_path}")
     print(f"wrote_junit={junit_path}")
     return 2 if findings and args.fail_on_findings else 0
 

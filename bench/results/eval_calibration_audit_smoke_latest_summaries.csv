@@ -1,0 +1,3 @@
+source,engine,dataset,split,model,quantization,scored_count,total_count,score_coverage,accuracy_when_scored,mean_confidence,ece,brier_score
+bench/results/eval_compare_smoke_latest.json,holyc,smoke-eval,validation,synthetic-smoke,Q4_0,1,3,0.3333333333333333,1.0,0.9993030936950774,0.0006969063049225843,6.644734737210628e-07
+bench/results/eval_compare_smoke_latest.json,llama,smoke-eval,validation,synthetic-smoke,Q4_0,1,3,0.3333333333333333,1.0,0.8309526605439513,0.16904733945604866,0.04316679346247537

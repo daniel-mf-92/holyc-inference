@@ -78,6 +78,8 @@ def test_calibration_audit_passes_clean_report() -> None:
         assert payload["engine_summary_count"] == 2
         assert payload["engine_summaries"][0]["engine"] == "holyc"
         assert payload["findings"] == []
+        assert "score_coverage" in (tmp_path / "audit_summaries.csv").read_text(encoding="utf-8")
+        assert "holyc" in (tmp_path / "audit_summaries.csv").read_text(encoding="utf-8")
         assert "No calibration gate findings" in (tmp_path / "audit.md").read_text(encoding="utf-8")
         junit = ET.parse(tmp_path / "audit_junit.xml").getroot()
         assert junit.attrib["name"] == "holyc_eval_calibration_audit"
