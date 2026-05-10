@@ -103,6 +103,21 @@ REMOTE_RESOURCE_MARKERS = (
 )
 SOCKET_TRANSPORT_OPTIONS = {"-chardev", "-gdb", "-incoming", "-monitor", "-qmp", "-qmp-pretty", "-serial", "-vnc"}
 USER_NET_SERVICE_OPTIONS = {"-bootp", "-redir", "-smb", "-tftp"}
+HOST_FILESYSTEM_SHARE_OPTIONS = {"-virtfs", "-fsdev"}
+HOST_FILESYSTEM_SHARE_DEVICE_MARKERS = (
+    "9p-device",
+    "9p-pci",
+    "vhost-user-fs",
+    "virtio-9p",
+    "virtio-fs",
+)
+HOST_FILESYSTEM_SHARE_MARKERS = (
+    "mount_tag=",
+    "multidevs=",
+    "security_model=",
+    "smb=",
+    "smbserver=",
+)
 REMOTE_DISPLAY_MARKERS = ("spice", "vnc")
 TLS_OPTION_MARKERS = ("tls-creds", "tlsauthz", "tls-cipher-suites")
 TLS_VALUE_OPTIONS = {
@@ -533,6 +548,16 @@ def is_tls_arg(value: str) -> bool:
     return any(marker in lowered for marker in TLS_OPTION_MARKERS)
 
 
+def is_host_filesystem_share_device_arg(value: str) -> bool:
+    lowered = value.lower()
+    return any(marker in lowered for marker in HOST_FILESYSTEM_SHARE_DEVICE_MARKERS)
+
+
+def is_host_filesystem_share_marker_arg(value: str) -> bool:
+    lowered = value.lower()
+    return any(marker in lowered for marker in HOST_FILESYSTEM_SHARE_MARKERS)
+
+
 def canonical_qemu_option(arg: str) -> str:
     if arg.startswith("--") and len(arg) > 2:
         return "-" + arg[2:]
@@ -632,10 +657,24 @@ def command_airgap_violations(args: list[str]) -> list[str]:
             violations.append(f"network backend `{arg}`")
         if option in USER_NET_SERVICE_OPTIONS or any(option.startswith(f"{service}=") for service in USER_NET_SERVICE_OPTIONS):
             violations.append(f"user-mode network service `{arg}`")
+        if option in HOST_FILESYSTEM_SHARE_OPTIONS:
+            violations.append(f"host filesystem share `{arg} {next_arg}`")
+            index += 2
+            continue
+        if any(option.startswith(f"{share_option}=") for share_option in HOST_FILESYSTEM_SHARE_OPTIONS):
+            violations.append(f"host filesystem share `{arg}`")
         if option == "-device" and is_network_device_arg(next_arg):
             violations.append(f"network device `{next_arg}`")
         if option.startswith("-device=") and is_network_device_arg(option):
             violations.append(f"network device `{arg}`")
+        if option == "-device" and is_host_filesystem_share_device_arg(next_arg):
+            violations.append(f"host filesystem share device `{next_arg}`")
+        if option.startswith("-device=") and is_host_filesystem_share_device_arg(option):
+            violations.append(f"host filesystem share device `{arg}`")
+        if is_host_filesystem_share_marker_arg(arg) and not (
+            option in USER_NET_SERVICE_OPTIONS or any(option.startswith(f"{service}=") for service in USER_NET_SERVICE_OPTIONS)
+        ):
+            violations.append(f"host filesystem share marker `{arg}`")
         if option == "-vnc" and next_arg != "none":
             violations.append(f"remote display socket `-vnc {next_arg}`")
             index += 2
@@ -732,10 +771,22 @@ def reject_network_args(args: list[str]) -> None:
             raise ValueError("-netdev is not allowed for air-gapped benchmark runs")
         if option in USER_NET_SERVICE_OPTIONS or any(option.startswith(f"{service}=") for service in USER_NET_SERVICE_OPTIONS):
             raise ValueError(f"user-mode network service is not allowed: {arg}")
+        if option in HOST_FILESYSTEM_SHARE_OPTIONS:
+            raise ValueError(f"host filesystem sharing is not allowed for air-gapped benchmark runs: {arg} {next_arg}")
+        if any(option.startswith(f"{share_option}=") for share_option in HOST_FILESYSTEM_SHARE_OPTIONS):
+            raise ValueError(f"host filesystem sharing is not allowed for air-gapped benchmark runs: {arg}")
         if option == "-device" and is_network_device_arg(next_arg):
             raise ValueError(f"network device is not allowed: {next_arg}")
         if option.startswith("-device=") and is_network_device_arg(option):
             raise ValueError(f"network device is not allowed: {arg}")
+        if option == "-device" and is_host_filesystem_share_device_arg(next_arg):
+            raise ValueError(f"host filesystem sharing device is not allowed: {next_arg}")
+        if option.startswith("-device=") and is_host_filesystem_share_device_arg(option):
+            raise ValueError(f"host filesystem sharing device is not allowed: {arg}")
+        if is_host_filesystem_share_marker_arg(arg) and not (
+            option in USER_NET_SERVICE_OPTIONS or any(option.startswith(f"{service}=") for service in USER_NET_SERVICE_OPTIONS)
+        ):
+            raise ValueError(f"host filesystem sharing marker is not allowed: {arg}")
         if option == "-vnc" and next_arg != "none":
             raise ValueError(f"remote display socket is not allowed: -vnc {next_arg}")
         if option.startswith("-vnc=") and option != "-vnc=none":

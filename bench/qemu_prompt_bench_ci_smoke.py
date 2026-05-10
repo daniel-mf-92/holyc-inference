@@ -100,6 +100,22 @@ def main() -> int:
         "readconfig_airgap_violation_detail",
     ):
         return rc
+    host_fs_metadata = qemu_prompt_bench.command_airgap_metadata(
+        [
+            "qemu-system-x86_64",
+            "-nic",
+            "none",
+            "-virtfs",
+            "local,path=/tmp/share,mount_tag=host0,security_model=none",
+        ]
+    )
+    if rc := require(host_fs_metadata["ok"] is False, "host_fs_airgap_metadata_passed"):
+        return rc
+    if rc := require(
+        any("host filesystem share" in violation for violation in host_fs_metadata["violations"]),
+        "host_fs_airgap_violation_detail",
+    ):
+        return rc
 
     with tempfile.TemporaryDirectory(prefix="holyc-qemu-bench-ci-") as tmp:
         output_dir = Path(tmp) / "results"

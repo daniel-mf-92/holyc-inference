@@ -170,6 +170,39 @@ def test_user_mode_network_services_are_rejected_for_air_gap(tmp_path: Path) -> 
             raise AssertionError(f"expected user-mode network service rejection for {extra_args}")
 
 
+def test_host_filesystem_shares_are_rejected_for_air_gap(tmp_path: Path) -> None:
+    image = tmp_path / "temple.img"
+
+    metadata = qemu_prompt_bench.command_airgap_metadata(
+        [
+            "qemu-system-x86_64",
+            "-nic",
+            "none",
+            "-virtfs",
+            "local,path=/tmp/share,mount_tag=host0,security_model=none",
+        ]
+    )
+
+    assert metadata["ok"] is False
+    assert any("host filesystem share" in violation for violation in metadata["violations"])
+
+    for extra_args in (
+        ["-virtfs", "local,path=/tmp/share,mount_tag=host0,security_model=none"],
+        ["-virtfs=local,path=/tmp/share,mount_tag=host0,security_model=none"],
+        ["-fsdev", "local,id=fs1,path=/tmp/fsdev,security_model=mapped-xattr"],
+        ["--fsdev=local,id=fs1,path=/tmp/fsdev,security_model=mapped-xattr"],
+        ["-device", "virtio-9p-pci,fsdev=fs1,mount_tag=host1"],
+        ["-device=virtio-fs-pci,fsdev=fs1"],
+        ["mount_tag=host1"],
+    ):
+        try:
+            qemu_prompt_bench.build_command("qemu-system-x86_64", image, extra_args)
+        except ValueError as exc:
+            assert "host filesystem sharing" in str(exc)
+        else:
+            raise AssertionError(f"expected host filesystem sharing rejection for {extra_args}")
+
+
 def test_tls_options_are_rejected_for_air_gap(tmp_path: Path) -> None:
     image = tmp_path / "temple.img"
 

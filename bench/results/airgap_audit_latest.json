@@ -1,6 +1,6 @@
 {
   "findings": [],
-  "generated_at": "2026-04-30T04:24:13Z",
+  "generated_at": "2026-05-10T18:50:05Z",
   "inputs": [
     "bench/results/qemu_prompt_bench_latest.json"
   ],
