@@ -101,6 +101,21 @@ python3 bench/dataset_text_audit.py \
   --fail-on-findings
 ```
 
+Run `bench/dataset_stats_report.py` when a staged subset needs byte percentile
+and answer-position telemetry without failing on text-quality findings. It emits
+an `all:all` suite rollup plus per-dataset/split scope rows and per-record CSV
+sidecars:
+
+```bash
+python3 bench/dataset_stats_report.py \
+  bench/datasets/samples/smoke_eval.jsonl \
+  --output-dir bench/results/datasets \
+  --output-stem dataset_stats_report_smoke_latest \
+  --min-records 3 \
+  --max-prompt-p95-bytes 4096 \
+  --max-choice-p95-bytes 1024
+```
+
 Run `bench/dataset_provenance_balance_audit.py` before packing promoted subsets
 that combine multiple staged local sources. It checks non-empty provenance,
 required source coverage, minimum source cardinality, and dominant provenance

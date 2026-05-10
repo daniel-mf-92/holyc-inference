@@ -7,7 +7,6 @@ import json
 import subprocess
 import sys
 import tempfile
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -58,7 +57,11 @@ def main() -> int:
             return rc
         if rc := require(report["summary"]["records"] == 3, "unexpected_dataset_stats_record_count"):
             return rc
-        if rc := require(report["summary"]["scopes"] == 3, "unexpected_dataset_stats_scope_count"):
+        if rc := require(report["summary"]["scopes"] == 4, "unexpected_dataset_stats_scope_count"):
+            return rc
+        if rc := require(report["scopes"][0]["scope"] == "all:all", "missing_dataset_stats_global_scope"):
+            return rc
+        if rc := require(report["scopes"][0]["records"] == 3, "unexpected_dataset_stats_global_count"):
             return rc
         if rc := require("prompt_bytes_p95" in (out / "dataset_stats_report_smoke.csv").read_text(encoding="utf-8"), "missing_stats_csv"):
             return rc
@@ -66,8 +69,10 @@ def main() -> int:
             return rc
         if rc := require("No dataset stats findings." in (out / "dataset_stats_report_smoke.md").read_text(encoding="utf-8"), "missing_stats_markdown"):
             return rc
-        junit = ET.parse(out / "dataset_stats_report_smoke_junit.xml").getroot()
-        if rc := require(junit.attrib["name"] == "holyc_dataset_stats_report", "missing_stats_junit"):
+        junit_text = (out / "dataset_stats_report_smoke_junit.xml").read_text(encoding="utf-8")
+        if rc := require('name="holyc_dataset_stats_report"' in junit_text, "missing_stats_junit"):
+            return rc
+        if rc := require('failures="0"' in junit_text, "unexpected_stats_junit_failure"):
             return rc
 
         failed = run_command(

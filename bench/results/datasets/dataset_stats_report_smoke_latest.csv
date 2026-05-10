@@ -1,4 +1,5 @@
 scope,dataset,split,records,prompt_bytes_min,prompt_bytes_p50,prompt_bytes_p95,prompt_bytes_max,choice_bytes_min,choice_bytes_p50,choice_bytes_p95,choice_bytes_max,choices_per_record_min,choices_per_record_p50,choices_per_record_max,answer_index_histogram,choice_count_histogram
+all:all,all,all,3,51,62.0,68.3,69,5,28.5,44.5,45,4,4.0,4,0:3,4:3
 arc-smoke:validation,arc-smoke,validation,1,51,51.0,51.0,51,5,8.0,10.7,11,4,4.0,4,0:1,4:1
 hellaswag-smoke:validation,hellaswag-smoke,validation,1,69,69.0,69.0,69,37,41.0,44.6,45,4,4.0,4,0:1,4:1
 truthfulqa-smoke:validation,truthfulqa-smoke,validation,1,62,62.0,62.0,62,20,31.5,41.85,43,4,4.0,4,0:1,4:1

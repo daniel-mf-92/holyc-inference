@@ -175,6 +175,15 @@ def scope_key(row: RecordStats) -> str:
     return f"{row.dataset}:{row.split}"
 
 
+def group_scope_rows(rows: list[RecordStats]) -> dict[str, list[RecordStats]]:
+    grouped: dict[str, list[RecordStats]] = {}
+    if rows:
+        grouped["all:all"] = list(rows)
+    for row in rows:
+        grouped.setdefault(scope_key(row), []).append(row)
+    return grouped
+
+
 def build_scope_stats(scope: str, rows: list[RecordStats]) -> ScopeStats:
     prompt_bytes = [row.prompt_bytes for row in rows]
     choice_bytes = [size for row in rows for size in (row.choice_bytes_min, row.choice_bytes_max)]
@@ -345,9 +354,7 @@ def main(argv: list[str] | None = None) -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     loaded, inputs, findings = load_records(args.inputs, args.default_dataset, args.default_split)
     rows = [record_stats(record) for record in loaded]
-    grouped: dict[str, list[RecordStats]] = {}
-    for row in rows:
-        grouped.setdefault(scope_key(row), []).append(row)
+    grouped = group_scope_rows(rows)
     scopes = [build_scope_stats(scope, grouped[scope]) for scope in sorted(grouped)]
 
     if len(rows) < args.min_records:
