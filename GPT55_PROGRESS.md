@@ -158,6 +158,7 @@
 2026-04-28T18:27:23Z | Added eval dataset provenance contribution counts/skew gate with smoke coverage and refreshed dataset artifacts.
 2026-04-28T18:33:49Z | Added eval_compare paired McNemar loss gating with smoke artifact refresh and coverage.
 2026-04-28T18:50:28Z | Added eval dataset schema audit gate with smoke reports and dataset CI coverage.
+2026-05-10T20:50:50Z | Added QEMU prompt benchmark summary CSV parity audit with smoke coverage and refreshed latest reports.
 2026-05-10T15:04:30Z | Added weighted guest/wall tok/s metrics to the QEMU build throughput scorecard with smoke coverage and refreshed reports.
 2026-05-10T16:12:30Z | Tightened QEMU args-file audit to reject embedded `-nic none` fragments with smoke coverage and refreshed reports.
 2026-04-28T19:05:57Z | Added build_compare QEMU command hash drift gate with CSV/JUnit/Markdown coverage.
@@ -554,3 +555,4 @@
 2026-05-10T20:19:53Z | Added grouped QEMU host-overhead rollups with smoke coverage and refreshed latest audit artifacts.
 2026-05-10T20:27:16Z | Added QEMU runtime budget audit with smoke coverage and refreshed latest runtime budget artifacts.
 2026-05-10T20:33:06Z | Added QEMU runtime budget warmup wall-share gates with smoke coverage, docs, and refreshed latest artifacts.
+2026-05-10T20:55:55Z | Extended QEMU token accounting audit with prompt byte/s gates, smoke coverage, and refreshed latest reports.

@@ -42,6 +42,8 @@ def row(**overrides: object) -> dict[str, object]:
         "host_overhead_pct": 2_000 * 100.0 / 30_000,
         "tok_per_s": 32 * 1_000_000.0 / 30_000,
         "wall_tok_per_s": 32 * 1_000_000.0 / 32_000,
+        "prompt_bytes_per_s": 16 * 1_000_000.0 / 30_000,
+        "wall_prompt_bytes_per_s": 16 * 1_000_000.0 / 32_000,
         "us_per_token": 30_000 / 32,
         "wall_us_per_token": 32_000 / 32,
         "tokens_per_prompt_byte": 2.0,
@@ -90,7 +92,7 @@ def main() -> int:
         report = json.loads(report_path.read_text(encoding="utf-8"))
         if rc := require(report["status"] == "pass", "unexpected_token_accounting_pass_status"):
             return rc
-        if rc := require(report["summary"]["checks"] >= 10, "missing_token_accounting_checks"):
+        if rc := require(report["summary"]["checks"] >= 12, "missing_token_accounting_checks"):
             return rc
         if rc := require(
             "No token accounting findings." in (pass_dir / "qemu_token_accounting_audit_latest.md").read_text(encoding="utf-8"),
@@ -114,6 +116,8 @@ def main() -> int:
                             host_overhead_us=1.0,
                             host_overhead_pct=1.0,
                             wall_timeout_pct=1.0,
+                            prompt_bytes_per_s=1.0,
+                            wall_prompt_bytes_per_s=1.0,
                             memory_bytes_per_token=1.0,
                         )
                     ]
@@ -133,7 +137,10 @@ def main() -> int:
         ):
             return rc
         metrics = {finding["metric"] for finding in fail_report["findings"]}
-        if rc := require({"host_overhead_us", "host_overhead_pct", "wall_timeout_pct"} <= metrics, "host_overhead_findings_not_reported"):
+        if rc := require(
+            {"host_overhead_us", "host_overhead_pct", "wall_timeout_pct", "prompt_bytes_per_s", "wall_prompt_bytes_per_s"} <= metrics,
+            "host_overhead_findings_not_reported",
+        ):
             return rc
 
         recorded_mismatch = root / "qemu_prompt_bench_recorded_mismatch.json"

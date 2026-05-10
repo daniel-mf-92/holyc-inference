@@ -983,8 +983,8 @@ python3 bench/qemu_latency_distribution_audit_ci_smoke.py
 
 `qemu_token_accounting_audit.py` checks saved QEMU benchmark artifacts for
 token-derived metric consistency before benchmark dashboards consume them. It
-verifies tok/s, us/token, prompt-byte ratios, memory/token ratios, and optional
-expected-token contracts from measured OK rows. With
+verifies tok/s, us/token, prompt byte/s, prompt-byte ratios, memory/token
+ratios, and optional expected-token contracts from measured OK rows. With
 `--require-expected-tokens-match`, the audit fails both stale match flags and
 honestly recorded token-count mismatches. It is host-side only and does not
 launch QEMU.
@@ -2897,6 +2897,28 @@ summary consistency pass path plus stale suite/prompt summary failure paths:
 
 ```bash
 python3 bench/qemu_summary_consistency_audit_ci_smoke.py
+```
+
+`qemu_summary_parity_audit.py` checks each prompt benchmark JSON artifact
+against its `qemu_prompt_bench_summary_latest.csv` sidecar. It verifies that the
+CSV has exactly one suite row, one row per JSON prompt summary, and matching
+aggregate values within a small numeric tolerance. It is host-side only and does
+not launch QEMU.
+
+```bash
+python3 bench/qemu_summary_parity_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_summary_parity_audit_latest \
+  --min-artifacts 1 \
+  --min-rows 3
+```
+
+The smoke gate builds a synthetic air-gapped benchmark artifact and checks the
+summary CSV parity pass path plus a stale suite total failure path:
+
+```bash
+python3 bench/qemu_summary_parity_audit_ci_smoke.py
 ```
 
 Example:

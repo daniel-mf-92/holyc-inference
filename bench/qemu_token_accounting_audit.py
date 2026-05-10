@@ -45,6 +45,8 @@ class AccountingRow:
     host_overhead_pct: float | None
     tok_per_s: float | None
     wall_tok_per_s: float | None
+    prompt_bytes_per_s: float | None
+    wall_prompt_bytes_per_s: float | None
     us_per_token: float | None
     wall_us_per_token: float | None
     tokens_per_prompt_byte: float | None
@@ -233,6 +235,8 @@ def accounting_row(source: Path, row_number: int, row: dict[str, Any], args: arg
     host_overhead_pct = finite_float(row.get("host_overhead_pct"))
     tok_per_s = finite_float(row.get("tok_per_s"))
     wall_tok_per_s = finite_float(row.get("wall_tok_per_s"))
+    prompt_bytes_per_s = finite_float(row.get("prompt_bytes_per_s"))
+    wall_prompt_bytes_per_s = finite_float(row.get("wall_prompt_bytes_per_s"))
     us_per_token = finite_float(row.get("us_per_token"))
     wall_us_per_token = finite_float(row.get("wall_us_per_token"))
     tokens_per_prompt_byte = finite_float(row.get("tokens_per_prompt_byte"))
@@ -335,6 +339,34 @@ def accounting_row(source: Path, row_number: int, row: dict[str, Any], args: arg
         findings,
         source=source,
         row_number=row_number,
+        metric="prompt_bytes_per_s",
+        stored=prompt_bytes_per_s,
+        expected=(
+            prompt_bytes * 1_000_000.0 / elapsed_us
+            if prompt_bytes is not None and prompt_bytes > 0 and elapsed_us is not None and elapsed_us > 0
+            else None
+        ),
+        relative_tolerance=args.relative_tolerance,
+        absolute_tolerance=args.absolute_tolerance,
+    )
+    checks += check_metric(
+        findings,
+        source=source,
+        row_number=row_number,
+        metric="wall_prompt_bytes_per_s",
+        stored=wall_prompt_bytes_per_s,
+        expected=(
+            prompt_bytes * 1_000_000.0 / wall_elapsed_us
+            if prompt_bytes is not None and prompt_bytes > 0 and wall_elapsed_us is not None and wall_elapsed_us > 0
+            else None
+        ),
+        relative_tolerance=args.relative_tolerance,
+        absolute_tolerance=args.absolute_tolerance,
+    )
+    checks += check_metric(
+        findings,
+        source=source,
+        row_number=row_number,
         metric="tokens_per_prompt_byte",
         stored=tokens_per_prompt_byte,
         expected=(usable_tokens / prompt_bytes if usable_tokens and prompt_bytes and prompt_bytes > 0 else None),
@@ -414,6 +446,8 @@ def accounting_row(source: Path, row_number: int, row: dict[str, Any], args: arg
         host_overhead_pct=host_overhead_pct,
         tok_per_s=tok_per_s,
         wall_tok_per_s=wall_tok_per_s,
+        prompt_bytes_per_s=prompt_bytes_per_s,
+        wall_prompt_bytes_per_s=wall_prompt_bytes_per_s,
         us_per_token=us_per_token,
         wall_us_per_token=wall_us_per_token,
         tokens_per_prompt_byte=tokens_per_prompt_byte,

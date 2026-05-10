@@ -1,0 +1,28 @@
+{
+  "artifacts": [
+    {
+      "compared_values": 170,
+      "csv_path": "bench/results/qemu_prompt_bench_summary_latest.csv",
+      "error": "",
+      "findings": 0,
+      "json_prompts": 2,
+      "prompt_rows": 2,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "status": "pass",
+      "suite_rows": 1
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-10T20:50:22Z",
+  "status": "pass",
+  "summary": {
+    "artifacts": 1,
+    "compared_values": 170,
+    "failed_artifacts": 0,
+    "findings": 0,
+    "json_prompts": 2,
+    "passed_artifacts": 1,
+    "prompt_rows": 2,
+    "suite_rows": 1
+  }
+}

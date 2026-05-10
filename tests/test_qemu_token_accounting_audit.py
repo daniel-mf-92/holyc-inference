@@ -38,6 +38,8 @@ def artifact_row(**overrides: object) -> dict[str, object]:
         "host_overhead_pct": 2_000 * 100.0 / 30_000,
         "tok_per_s": 32 * 1_000_000.0 / 30_000,
         "wall_tok_per_s": 32 * 1_000_000.0 / 32_000,
+        "prompt_bytes_per_s": 16 * 1_000_000.0 / 30_000,
+        "wall_prompt_bytes_per_s": 16 * 1_000_000.0 / 32_000,
         "us_per_token": 30_000 / 32,
         "wall_us_per_token": 32_000 / 32,
         "tokens_per_prompt_byte": 2.0,
@@ -83,6 +85,8 @@ def test_audit_flags_metric_and_expected_token_drift(tmp_path: Path) -> None:
                 host_overhead_us=1.0,
                 host_overhead_pct=1.0,
                 wall_timeout_pct=1.0,
+                prompt_bytes_per_s=1.0,
+                wall_prompt_bytes_per_s=1.0,
             )
         ],
     )
@@ -95,7 +99,7 @@ def test_audit_flags_metric_and_expected_token_drift(tmp_path: Path) -> None:
     kinds = {finding.kind for finding in findings}
     assert {"metric_drift", "expected_tokens_match_drift"} <= kinds
     metrics = {finding.metric for finding in findings}
-    assert {"host_overhead_us", "host_overhead_pct", "wall_timeout_pct"} <= metrics
+    assert {"host_overhead_us", "host_overhead_pct", "wall_timeout_pct", "prompt_bytes_per_s", "wall_prompt_bytes_per_s"} <= metrics
 
 
 def test_audit_rejects_recorded_expected_token_mismatch(tmp_path: Path) -> None:
@@ -123,6 +127,8 @@ def test_audit_accepts_negative_host_overhead_when_guest_timer_exceeds_wall(tmp_
                 wall_timeout_pct=3.0,
                 tok_per_s=32 * 1_000_000.0 / 40_000,
                 wall_tok_per_s=32 * 1_000_000.0 / 30_000,
+                prompt_bytes_per_s=16 * 1_000_000.0 / 40_000,
+                wall_prompt_bytes_per_s=16 * 1_000_000.0 / 30_000,
                 us_per_token=40_000 / 32,
                 wall_us_per_token=30_000 / 32,
             )
