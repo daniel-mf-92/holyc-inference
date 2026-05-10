@@ -373,6 +373,14 @@ inspection report also emits parsed `binary_layout`, `record_spans`, and
 `record_fingerprints`, can write spans as CSV for offset diffs, and checks them
 against the manifest when present.
 
+Run the focused packer smoke gate when changing the packer or binary inspector.
+It rebuilds the committed sample `.hceval`, validates the manifest through
+`hceval_inspect.py`, and checks schema and byte-budget rejection paths:
+
+```bash
+python3 bench/dataset_pack_ci_smoke.py
+```
+
 ## Artifact Index
 
 Summarize curated JSONL manifests, packed binary manifests, and inspection

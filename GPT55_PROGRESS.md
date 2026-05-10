@@ -537,3 +537,4 @@
 2026-05-10T18:20:12Z | Hardened QEMU args-fragment policy against host filesystem sharing with smoke coverage and refreshed audit results.
 2026-05-10T18:27:36Z | Added quant pair size-equation audit for Q4_0/Q8_0 block/byte/element invariants with smoke coverage and refreshed reports.
 2026-05-10T18:31:59Z | Added eval workload estimate CI smoke coverage for pass/fail budget paths and refreshed latest reports.
+2026-05-10T18:40:07Z | Added focused dataset_pack CI smoke coverage for sample HCEval packing, inspection parity, and rejection paths.
