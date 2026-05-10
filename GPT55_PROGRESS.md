@@ -521,3 +521,4 @@
 2026-05-10T15:40:26Z | Hardened QEMU artifact secret audit for authorization/cookie-style fields with stdlib test coverage and refreshed latest result.
 2026-05-10T15:48:38Z | Added QEMU artifact network-text audit for URL/IP endpoint air-gap drift with smoke coverage and latest result sidecars.
 2026-05-10T16:00:48Z | Added paired eval artifact identity audit for HolyC/llama model-tokenizer-quant metadata parity with smoke coverage and latest result sidecars.
+2026-05-10T16:26:45Z | Added quant pair manifest audit for Q4_0/Q8_0 tensor coverage with smoke coverage and latest result sidecars.

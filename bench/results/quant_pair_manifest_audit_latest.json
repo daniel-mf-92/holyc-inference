@@ -1,0 +1,51 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-10T16:26:20Z",
+  "key_fields": [
+    "tensor",
+    "model"
+  ],
+  "manifest": "bench/fixtures/quant_pair_manifest_audit/pass.json",
+  "pairs": [
+    {
+      "artifact_count": 2,
+      "block_counts": "1",
+      "byte_counts": "18,34",
+      "element_counts": "32",
+      "formats": "q4_0,q8_0",
+      "key": "output|smoke-llm",
+      "model": "smoke-llm",
+      "q4_0_count": 1,
+      "q8_0_count": 1,
+      "source": "",
+      "status": "pass",
+      "tensor": "output"
+    },
+    {
+      "artifact_count": 2,
+      "block_counts": "2",
+      "byte_counts": "36,68",
+      "element_counts": "64",
+      "formats": "q4_0,q8_0",
+      "key": "tok_embeddings|smoke-llm",
+      "model": "smoke-llm",
+      "q4_0_count": 1,
+      "q8_0_count": 1,
+      "source": "",
+      "status": "pass",
+      "tensor": "tok_embeddings"
+    }
+  ],
+  "required_formats": [
+    "q4_0",
+    "q8_0"
+  ],
+  "status": "pass",
+  "summary": {
+    "artifact_count": 4,
+    "complete_pairs": 2,
+    "findings": 0,
+    "pair_keys": 2
+  },
+  "tool": "quant_pair_manifest_audit"
+}
