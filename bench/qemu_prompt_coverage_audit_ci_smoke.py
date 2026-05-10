@@ -139,6 +139,27 @@ def main() -> int:
         if rc := require(junit_root.attrib.get("failures") == "0", "unexpected_junit_failures"):
             return rc
 
+        warmup_dir = tmp_path / "coverage-warmups"
+        warmup_command = coverage_command.copy()
+        warmup_command[warmup_command.index("--output-dir") + 1] = str(warmup_dir)
+        warmup_command[warmup_command.index("--min-runs-per-prompt") + 1] = "3"
+        warmup_command.append("--include-warmups")
+        completed = run(warmup_command, cwd=ROOT)
+        if completed.returncode != 0:
+            sys.stdout.write(completed.stdout)
+            sys.stderr.write(completed.stderr)
+            return completed.returncode
+        warmup_report = json.loads((warmup_dir / "coverage.json").read_text(encoding="utf-8"))
+        if rc := require(warmup_report["status"] == "pass", "unexpected_warmup_coverage_status"):
+            return rc
+        if rc := require(warmup_report["summary"]["successful_runs"] == 6, "warmups_not_counted"):
+            return rc
+        if rc := require(
+            all(row["successful_runs"] == 3 for row in warmup_report["prompt_rows"]),
+            "unexpected_warmup_prompt_run_count",
+        ):
+            return rc
+
         fail_dir = tmp_path / "fail"
         fail_command = coverage_command.copy()
         fail_command[fail_command.index("--output-dir") + 1] = str(fail_dir)

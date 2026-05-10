@@ -524,3 +524,4 @@
 2026-05-10T16:26:45Z | Added quant pair manifest audit for Q4_0/Q8_0 tensor coverage with smoke coverage and latest result sidecars.
 2026-05-10T16:33:08Z | Hardened dataset provenance-balance CI smoke coverage with artifact assertions and failing threshold gates.
 2026-05-10T16:40:44Z | Added QEMU build throughput scorecard CV stability telemetry and optional variability gates with smoke coverage and refreshed results.
+2026-05-10T16:53:24Z | Fixed QEMU prompt coverage auditing to count top-level warmup rows when requested, with smoke coverage and refreshed artifacts.

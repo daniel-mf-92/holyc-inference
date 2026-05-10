@@ -161,10 +161,19 @@ def load_expected_prompts(path: Path, payload: dict[str, Any]) -> tuple[list[Exp
 
 
 def measured_benchmarks(payload: dict[str, Any], *, include_warmups: bool) -> list[dict[str, Any]]:
+    selected = []
+    if include_warmups:
+        warmups = payload.get("warmups")
+        if isinstance(warmups, list):
+            for row in warmups:
+                if isinstance(row, dict):
+                    merged = dict(row)
+                    merged.setdefault("phase", "warmup")
+                    selected.append(merged)
+
     rows = payload.get("benchmarks")
     if not isinstance(rows, list):
-        return []
-    selected = []
+        return selected
     for row in rows:
         if not isinstance(row, dict):
             continue

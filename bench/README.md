@@ -2707,7 +2707,9 @@ python3 bench/qemu_prompt_bench_ci_smoke.py
 and verifies that every prompt declared in `prompt_suite.source` was measured,
 that the recorded prompt-suite SHA256 still matches the suite file, and that
 each expected prompt has a minimum number of successful measured runs. It is
-host-side only and does not launch QEMU.
+host-side only and does not launch QEMU. Use `--include-warmups` when coverage
+must include the benchmark runner's top-level `warmups` rows in addition to
+measured `benchmarks` rows.
 
 ```bash
 python3 bench/qemu_prompt_coverage_audit.py \
@@ -2723,8 +2725,8 @@ python3 bench/qemu_prompt_coverage_audit.py \
 ```
 
 The smoke gate builds a synthetic air-gapped benchmark artifact and checks the
-coverage audit pass path, minimum-run failure path, and empty-input failure
-path:
+coverage audit pass path, top-level warmup inclusion, minimum-run failure path,
+and empty-input failure path:
 
 ```bash
 python3 bench/qemu_prompt_coverage_audit_ci_smoke.py

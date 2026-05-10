@@ -45,7 +45,14 @@ def bench_row(case: qemu_prompt_bench.PromptCase, *, exit_class: str = "ok") -> 
     }
 
 
-def write_artifact(path: Path, suite: Path, cases: list[qemu_prompt_bench.PromptCase], rows: list[dict[str, object]]) -> None:
+def write_artifact(
+    path: Path,
+    suite: Path,
+    cases: list[qemu_prompt_bench.PromptCase],
+    rows: list[dict[str, object]],
+    *,
+    warmups: list[dict[str, object]] | None = None,
+) -> None:
     path.write_text(
         json.dumps(
             {
@@ -57,6 +64,7 @@ def write_artifact(path: Path, suite: Path, cases: list[qemu_prompt_bench.Prompt
                     "prompt_count": len(cases),
                     "suite_sha256": qemu_prompt_bench.prompt_suite_hash(cases),
                 },
+                "warmups": warmups or [],
                 "benchmarks": rows,
             },
             indent=2,
@@ -100,6 +108,34 @@ def test_audit_flags_missing_and_failed_prompt_runs(tmp_path: Path) -> None:
     assert coverage.status == "fail"
     assert coverage.missing_prompts == 1
     assert {finding.kind for finding in findings} == {"failed_runs", "min_runs_per_prompt", "missing_prompt"}
+
+
+def test_include_warmups_counts_top_level_warmup_rows(tmp_path: Path) -> None:
+    suite = tmp_path / "prompts.jsonl"
+    cases = write_prompt_suite(suite)
+    artifact = tmp_path / "qemu_prompt_bench_latest.json"
+    warmups = [bench_row(cases[0]), bench_row(cases[1])]
+    for row in warmups:
+        row["phase"] = "warmup"
+    write_artifact(artifact, suite, cases, [], warmups=warmups)
+    args = qemu_prompt_coverage_audit.build_parser().parse_args(
+        [
+            str(artifact),
+            "--include-warmups",
+            "--require-suite-file",
+            "--require-success",
+            "--min-runs-per-prompt",
+            "1",
+        ]
+    )
+
+    coverage, prompt_rows, findings = qemu_prompt_coverage_audit.audit_artifact(artifact, args)
+
+    assert findings == []
+    assert coverage.status == "pass"
+    assert coverage.measured_runs == 2
+    assert coverage.successful_runs == 2
+    assert {row.prompt for row in prompt_rows if row.measured_runs == 1} == {"alpha", "beta"}
 
 
 def test_cli_writes_json_markdown_csv_and_junit(tmp_path: Path) -> None:
@@ -165,6 +201,10 @@ def main() -> int:
         path = Path(tmp) / "fail"
         path.mkdir()
         test_audit_flags_missing_and_failed_prompt_runs(path)
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "warmups"
+        path.mkdir()
+        test_include_warmups_counts_top_level_warmup_rows(path)
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "cli"
         path.mkdir()

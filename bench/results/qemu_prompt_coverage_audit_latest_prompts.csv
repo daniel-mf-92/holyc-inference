@@ -1,3 +1,3 @@
 source,prompt,prompt_sha256,expected,measured_runs,successful_runs,failed_runs,min_tokens,max_tokens,expected_tokens,expected_tokens_mismatches,guest_sha_mismatches,guest_bytes_mismatches
-bench/results/qemu_prompt_bench_latest.json,smoke-code,587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091,True,2,2,0,48,48,48,0,0,0
-bench/results/qemu_prompt_bench_latest.json,smoke-short,8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4,True,2,2,0,32,32,32,0,0,0
+bench/results/qemu_prompt_bench_latest.json,smoke-code,587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091,True,3,3,0,48,48,48,0,0,0
+bench/results/qemu_prompt_bench_latest.json,smoke-short,8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4,True,3,3,0,32,32,32,0,0,0
