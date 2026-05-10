@@ -1894,6 +1894,13 @@ python3 bench/hceval_inspect.py \
   --max-choice-bytes 1024
 ```
 
+Its smoke gate covers passing inspection artifacts plus a failing manifest hash
+mismatch:
+
+```bash
+python3 bench/hceval_inspect_ci_smoke.py
+```
+
 `hceval_metadata_audit.py` checks packed `.hceval` metadata without launching
 QEMU. It verifies the canonical compact metadata bytes produced by
 `dataset_pack.py`, expected metadata keys, non-empty dataset/split fields,
