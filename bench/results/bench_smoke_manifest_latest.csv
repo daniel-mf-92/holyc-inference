@@ -7,6 +7,7 @@ bench/bench_smoke_manifest_ci_smoke.py,bench_smoke_manifest_ci_smoke.py,bench,be
 bench/bench_trend_export_ci_smoke.py,bench_trend_export_ci_smoke.py,bench,bench/bench_trend_export.py,True,29268,741,True,True,Stdlib-only CI smoke gate for benchmark trend exports.
 bench/build_compare_ci_smoke.py,build_compare_ci_smoke.py,build,bench/build_compare.py,True,18421,499,True,True,Stdlib-only CI smoke gate for host-side build benchmark comparisons.
 bench/build_pair_manifest_audit_ci_smoke.py,build_pair_manifest_audit_ci_smoke.py,build,bench/build_pair_manifest_audit.py,True,782,34,True,True,Smoke gate for build_pair_manifest_audit.py.
+bench/build_pair_select_ci_smoke.py,build_pair_select_ci_smoke.py,build,bench/build_pair_select.py,True,4864,127,True,True,Smoke gate for build_pair_select.py.
 bench/dashboard_digest_ci_smoke.py,dashboard_digest_ci_smoke.py,dashboard,bench/dashboard_digest.py,True,1945,56,True,True,Smoke test for dashboard digest artifact generation.
 bench/dashboard_freshness_audit_ci_smoke.py,dashboard_freshness_audit_ci_smoke.py,dashboard,bench/dashboard_freshness_audit.py,True,2686,73,True,True,Smoke test for dashboard freshness audit artifact generation.
 bench/dashboard_sidecar_audit_ci_smoke.py,dashboard_sidecar_audit_ci_smoke.py,dashboard,bench/dashboard_sidecar_audit.py,True,1988,49,True,True,Smoke test for dashboard sidecar audit artifact generation.
@@ -40,7 +41,7 @@ bench/dataset_select_ci_smoke.py,dataset_select_ci_smoke.py,dataset,bench/datase
 bench/dataset_slice_manifest_ci_smoke.py,dataset_slice_manifest_ci_smoke.py,dataset,bench/dataset_slice_manifest.py,True,4579,122,True,True,Stdlib-only smoke gate for dataset_slice_manifest.py.
 bench/dataset_split_balance_audit_ci_smoke.py,dataset_split_balance_audit_ci_smoke.py,dataset,bench/dataset_split_balance_audit.py,True,4251,110,True,True,Stdlib-only CI smoke gate for dataset_split_balance_audit.py.
 bench/dataset_split_overlap_audit_ci_smoke.py,dataset_split_overlap_audit_ci_smoke.py,dataset,bench/dataset_split_overlap_audit.py,True,3940,111,True,True,CI smoke test for dataset_split_overlap_audit.py.
-bench/dataset_stats_report_ci_smoke.py,dataset_stats_report_ci_smoke.py,dataset,bench/dataset_stats_report.py,True,3829,101,True,True,Stdlib-only CI smoke gate for dataset_stats_report.py.
+bench/dataset_stats_report_ci_smoke.py,dataset_stats_report_ci_smoke.py,dataset,bench/dataset_stats_report.py,True,4173,106,True,True,Stdlib-only CI smoke gate for dataset_stats_report.py.
 bench/dataset_text_audit_ci_smoke.py,dataset_text_audit_ci_smoke.py,dataset,bench/dataset_text_audit.py,True,3884,115,True,True,CI smoke test for dataset_text_audit.py.
 bench/eval_artifact_drift_audit_ci_smoke.py,eval_artifact_drift_audit_ci_smoke.py,eval,bench/eval_artifact_drift_audit.py,True,2424,83,True,True,CI smoke gate for eval artifact drift auditing.
 bench/eval_artifact_identity_audit_ci_smoke.py,eval_artifact_identity_audit_ci_smoke.py,eval,bench/eval_artifact_identity_audit.py,True,4029,125,True,True,CI smoke gate for eval_artifact_identity_audit.py.
@@ -81,7 +82,7 @@ bench/eval_suite_summary_ci_smoke.py,eval_suite_summary_ci_smoke.py,eval,bench/e
 bench/eval_tie_audit_ci_smoke.py,eval_tie_audit_ci_smoke.py,eval,bench/eval_tie_audit.py,True,1904,72,True,True,CI smoke runner for eval_tie_audit.
 bench/eval_topk_overlap_audit_ci_smoke.py,eval_topk_overlap_audit_ci_smoke.py,eval,bench/eval_topk_overlap_audit.py,True,3321,102,True,True,CI smoke coverage for eval_topk_overlap_audit.py.
 bench/eval_workload_estimate_ci_smoke.py,eval_workload_estimate_ci_smoke.py,eval,bench/eval_workload_estimate.py,True,5194,138,True,True,Stdlib-only smoke gate for offline eval workload estimates.
-bench/hceval_budget_audit_ci_smoke.py,hceval_budget_audit_ci_smoke.py,hceval,bench/hceval_budget_audit.py,True,3432,107,True,True,Smoke gate for HCEval binary budget audit.
+bench/hceval_budget_audit_ci_smoke.py,hceval_budget_audit_ci_smoke.py,hceval,bench/hceval_budget_audit.py,True,4342,126,True,True,Smoke gate for HCEval binary budget audit.
 bench/hceval_bundle_audit_ci_smoke.py,hceval_bundle_audit_ci_smoke.py,hceval,bench/hceval_bundle_audit.py,True,1048,39,True,True,CI smoke entry point for the host-side HCEval bundle audit.
 bench/hceval_choice_semantics_audit_ci_smoke.py,hceval_choice_semantics_audit_ci_smoke.py,hceval,bench/hceval_choice_semantics_audit.py,True,3547,106,True,True,CI smoke gate for packed HCEval choice semantics auditing.
 bench/hceval_diff_ci_smoke.py,hceval_diff_ci_smoke.py,hceval,bench/hceval_diff.py,True,3199,96,True,True,Smoke gate for HCEval binary diff reports.
@@ -156,7 +157,7 @@ bench/qemu_prompt_sidecar_audit_ci_smoke.py,qemu_prompt_sidecar_audit_ci_smoke.p
 bench/qemu_prompt_source_audit_ci_smoke.py,qemu_prompt_source_audit_ci_smoke.py,qemu,bench/qemu_prompt_source_audit.py,True,4569,124,True,True,Stdlib-only CI smoke gate for qemu_prompt_source_audit.py.
 bench/qemu_quant_coverage_audit_ci_smoke.py,qemu_quant_coverage_audit_ci_smoke.py,qemu,bench/qemu_quant_coverage_audit.py,True,5617,152,True,True,Stdlib-only CI smoke gate for qemu_quant_coverage_audit.py.
 bench/qemu_quant_pairing_audit_ci_smoke.py,qemu_quant_pairing_audit_ci_smoke.py,qemu,bench/qemu_quant_pairing_audit.py,True,3525,101,True,True,Stdlib-only smoke gate for qemu_quant_pairing_audit.py.
-bench/qemu_replay_manifest_audit_ci_smoke.py,qemu_replay_manifest_audit_ci_smoke.py,qemu,bench/qemu_replay_manifest_audit.py,True,3045,81,True,True,CI smoke gate for qemu_replay_manifest_audit.py.
+bench/qemu_replay_manifest_audit_ci_smoke.py,qemu_replay_manifest_audit_ci_smoke.py,qemu,bench/qemu_replay_manifest_audit.py,True,4215,107,True,True,CI smoke gate for qemu_replay_manifest_audit.py.
 bench/qemu_replay_manifest_ci_smoke.py,qemu_replay_manifest_ci_smoke.py,qemu,bench/qemu_replay_manifest.py,True,3393,89,True,True,CI smoke gate for qemu_replay_manifest.py.
 bench/qemu_resource_coverage_audit_ci_smoke.py,qemu_resource_coverage_audit_ci_smoke.py,qemu,bench/qemu_resource_coverage_audit.py,True,3730,106,True,True,Stdlib-only CI smoke gate for qemu_resource_coverage_audit.py.
 bench/qemu_result_freshness_audit_ci_smoke.py,qemu_result_freshness_audit_ci_smoke.py,qemu,bench/qemu_result_freshness_audit.py,True,2491,90,True,True,CI smoke for qemu_result_freshness_audit.
@@ -172,14 +173,14 @@ bench/qemu_stdio_hygiene_audit_ci_smoke.py,qemu_stdio_hygiene_audit_ci_smoke.py,
 bench/qemu_summary_consistency_audit_ci_smoke.py,qemu_summary_consistency_audit_ci_smoke.py,qemu,bench/qemu_summary_consistency_audit.py,True,5709,151,True,True,Stdlib-only CI smoke gate for QEMU summary consistency audits.
 bench/qemu_throughput_stability_audit_ci_smoke.py,qemu_throughput_stability_audit_ci_smoke.py,qemu,bench/qemu_throughput_stability_audit.py,True,4312,108,True,True,Stdlib-only CI smoke gate for qemu_throughput_stability_audit.py.
 bench/qemu_timeout_margin_audit_ci_smoke.py,qemu_timeout_margin_audit_ci_smoke.py,qemu,bench/qemu_timeout_margin_audit.py,True,4195,120,True,True,Stdlib-only CI smoke gate for qemu_timeout_margin_audit.py.
-bench/qemu_timeout_recommend_ci_smoke.py,qemu_timeout_recommend_ci_smoke.py,qemu,bench/qemu_timeout_recommend.py,True,2883,95,True,True,Smoke gate for QEMU timeout recommendation reporting.
+bench/qemu_timeout_recommend_ci_smoke.py,qemu_timeout_recommend_ci_smoke.py,qemu,bench/qemu_timeout_recommend.py,True,3874,120,True,True,Smoke gate for QEMU timeout recommendation reporting.
 bench/qemu_timestamp_audit_ci_smoke.py,qemu_timestamp_audit_ci_smoke.py,qemu,bench/qemu_timestamp_audit.py,True,5980,164,True,True,Stdlib-only CI smoke gate for QEMU timestamp audits.
 bench/qemu_timing_consistency_audit_ci_smoke.py,qemu_timing_consistency_audit_ci_smoke.py,qemu,bench/qemu_timing_consistency_audit.py,True,3556,108,True,True,Smoke gate for qemu_timing_consistency_audit.py.
 bench/qemu_token_accounting_audit_ci_smoke.py,qemu_token_accounting_audit_ci_smoke.py,qemu,bench/qemu_token_accounting_audit.py,True,5919,157,True,True,Stdlib-only CI smoke gate for qemu_token_accounting_audit.py.
 bench/qemu_token_latency_audit_ci_smoke.py,qemu_token_latency_audit_ci_smoke.py,qemu,bench/qemu_token_latency_audit.py,True,627,29,True,True,CI smoke entry point for QEMU token latency audits.
 bench/qemu_ttft_audit_ci_smoke.py,qemu_ttft_audit_ci_smoke.py,qemu,bench/qemu_ttft_audit.py,True,4012,121,True,True,Stdlib-only CI smoke gate for qemu_ttft_audit.py.
 bench/qemu_warmup_isolation_audit_ci_smoke.py,qemu_warmup_isolation_audit_ci_smoke.py,qemu,bench/qemu_warmup_isolation_audit.py,True,3909,108,True,True,Stdlib-only CI smoke gate for qemu_warmup_isolation_audit.py.
-bench/quant_audit_ci_smoke.py,quant_audit_ci_smoke.py,quant,bench/quant_audit.py,True,20268,514,True,True,Stdlib-only smoke gate for quant_audit.py raw block checks.
+bench/quant_audit_ci_smoke.py,quant_audit_ci_smoke.py,quant,bench/quant_audit.py,True,20823,524,True,True,Stdlib-only smoke gate for quant_audit.py raw block checks.
 bench/quant_block_compare_ci_smoke.py,quant_block_compare_ci_smoke.py,quant,bench/quant_block_compare.py,True,3432,110,True,True,Smoke gate for quant_block_compare.py.
 bench/quant_manifest_audit_ci_smoke.py,quant_manifest_audit_ci_smoke.py,quant,bench/quant_manifest_audit.py,True,3879,118,True,True,Smoke gate for quant_manifest_audit.py.
 bench/quant_manifest_padding_audit_ci_smoke.py,quant_manifest_padding_audit_ci_smoke.py,quant,bench/quant_manifest_padding_audit.py,True,5462,139,True,True,Stdlib-only smoke gate for quant manifest padding audit.

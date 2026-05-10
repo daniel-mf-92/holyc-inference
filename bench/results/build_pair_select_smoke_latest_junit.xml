@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="holyc_build_pair_select" tests="1" failures="0"><testcase name="ci-airgap-smoke/synthetic-smoke/Q4_0/suite/command/launch/env" classname="build_pair_select" /></testsuite>

@@ -1,9 +1,9 @@
 # Bench Smoke Manifest
 
-Generated: 2026-05-10T19:11:26Z
+Generated: 2026-05-10T19:49:14Z
 Status: pass
-Smoke scripts: 186
-Paired tools: 184
+Smoke scripts: 187
+Paired tools: 185
 Unpaired tools: 2
 Findings: 0
 
@@ -11,7 +11,7 @@ Findings: 0
 
 - airgap: 1
 - bench: 5
-- build: 2
+- build: 3
 - dashboard: 3
 - dataset: 32
 - eval: 42

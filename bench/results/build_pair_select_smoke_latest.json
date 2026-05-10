@@ -1,0 +1,46 @@
+{
+  "artifact_count": 3,
+  "eligible_pair_count": 1,
+  "findings": [
+    {
+      "detail": "skipped artifact_type='qemu_prompt_dry_run'",
+      "key": "ci-airgap-smoke/synthetic-smoke/Q4_0/suite/command/launch/env",
+      "kind": "skipped_type",
+      "severity": "info"
+    }
+  ],
+  "generated_at": "2026-05-10T19:49:06Z",
+  "input_count": 1,
+  "min_measured_runs": 4,
+  "pairs": [
+    {
+      "baseline_build": "base-20260501-basecommit",
+      "baseline_commit": "basecommit",
+      "baseline_generated_at": "2026-05-01T00:00:00Z",
+      "baseline_max_memory_bytes": 4096,
+      "baseline_measured_runs": 4,
+      "baseline_median_tok_per_s": 100.0,
+      "baseline_source": "bench/results/base.json",
+      "baseline_wall_tok_per_s_median": 80.0,
+      "build_compare_args": [
+        "--input",
+        "base-20260501-basecommit=bench/results/base.json",
+        "--input",
+        "head-20260502-headcommit=bench/results/head.json"
+      ],
+      "candidate_build": "head-20260502-headcommit",
+      "candidate_commit": "headcommit",
+      "candidate_generated_at": "2026-05-02T00:00:00Z",
+      "candidate_max_memory_bytes": 4096,
+      "candidate_measured_runs": 4,
+      "candidate_median_tok_per_s": 125.0,
+      "candidate_source": "bench/results/head.json",
+      "candidate_wall_tok_per_s_median": 100.0,
+      "key": "ci-airgap-smoke/synthetic-smoke/Q4_0/suite/command/launch/env",
+      "max_memory_delta_pct": 0.0,
+      "median_tok_per_s_delta_pct": 25.0,
+      "wall_tok_per_s_delta_pct": 25.0
+    }
+  ],
+  "status": "pass"
+}

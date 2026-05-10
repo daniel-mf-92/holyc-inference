@@ -13,7 +13,7 @@
     "require_shebang": false
   },
   "findings": [],
-  "generated_at": "2026-05-10T19:11:26Z",
+  "generated_at": "2026-05-10T19:49:14Z",
   "smokes": [
     {
       "area": "airgap",
@@ -110,6 +110,18 @@
       "paired_tool": "bench/build_pair_manifest_audit.py",
       "paired_tool_exists": true,
       "source": "bench/build_pair_manifest_audit_ci_smoke.py"
+    },
+    {
+      "area": "build",
+      "bytes": 4864,
+      "docstring": "Smoke gate for build_pair_select.py.",
+      "has_main_guard": true,
+      "has_shebang": true,
+      "lines": 127,
+      "name": "build_pair_select_ci_smoke.py",
+      "paired_tool": "bench/build_pair_select.py",
+      "paired_tool_exists": true,
+      "source": "bench/build_pair_select_ci_smoke.py"
     },
     {
       "area": "dashboard",
@@ -509,11 +521,11 @@
     },
     {
       "area": "dataset",
-      "bytes": 3829,
+      "bytes": 4173,
       "docstring": "Stdlib-only CI smoke gate for dataset_stats_report.py.",
       "has_main_guard": true,
       "has_shebang": true,
-      "lines": 101,
+      "lines": 106,
       "name": "dataset_stats_report_ci_smoke.py",
       "paired_tool": "bench/dataset_stats_report.py",
       "paired_tool_exists": true,
@@ -1001,11 +1013,11 @@
     },
     {
       "area": "hceval",
-      "bytes": 3432,
+      "bytes": 4342,
       "docstring": "Smoke gate for HCEval binary budget audit.",
       "has_main_guard": true,
       "has_shebang": true,
-      "lines": 107,
+      "lines": 126,
       "name": "hceval_budget_audit_ci_smoke.py",
       "paired_tool": "bench/hceval_budget_audit.py",
       "paired_tool_exists": true,
@@ -1901,11 +1913,11 @@
     },
     {
       "area": "qemu",
-      "bytes": 3045,
+      "bytes": 4215,
       "docstring": "CI smoke gate for qemu_replay_manifest_audit.py.",
       "has_main_guard": true,
       "has_shebang": true,
-      "lines": 81,
+      "lines": 107,
       "name": "qemu_replay_manifest_audit_ci_smoke.py",
       "paired_tool": "bench/qemu_replay_manifest_audit.py",
       "paired_tool_exists": true,
@@ -2093,11 +2105,11 @@
     },
     {
       "area": "qemu",
-      "bytes": 2883,
+      "bytes": 3874,
       "docstring": "Smoke gate for QEMU timeout recommendation reporting.",
       "has_main_guard": true,
       "has_shebang": true,
-      "lines": 95,
+      "lines": 120,
       "name": "qemu_timeout_recommend_ci_smoke.py",
       "paired_tool": "bench/qemu_timeout_recommend.py",
       "paired_tool_exists": true,
@@ -2177,11 +2189,11 @@
     },
     {
       "area": "quant",
-      "bytes": 20268,
+      "bytes": 20823,
       "docstring": "Stdlib-only smoke gate for quant_audit.py raw block checks.",
       "has_main_guard": true,
       "has_shebang": true,
-      "lines": 514,
+      "lines": 524,
       "name": "quant_audit_ci_smoke.py",
       "paired_tool": "bench/quant_audit.py",
       "paired_tool_exists": true,
@@ -2253,7 +2265,7 @@
     "areas": {
       "airgap": 1,
       "bench": 5,
-      "build": 2,
+      "build": 3,
       "dashboard": 3,
       "dataset": 32,
       "eval": 42,
@@ -2264,8 +2276,8 @@
       "quant": 6
     },
     "findings": 0,
-    "paired_tools": 184,
-    "smoke_scripts": 186,
+    "paired_tools": 185,
+    "smoke_scripts": 187,
     "unpaired_tools": 2
   }
 }

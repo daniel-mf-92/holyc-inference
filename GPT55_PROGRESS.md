@@ -547,3 +547,4 @@
 2026-05-10T19:33:12Z | Added dataset stats all-scope rollups with smoke coverage, docs, and refreshed sample reports.
 2026-05-10T19:38:23Z | Tightened QEMU replay manifest audit for provenance/qemu_bin parity with smoke coverage and refreshed reports.
 2026-05-10T19:43:47Z | Extended HCEval budget audit with aggregate prompt/choice/provenance and loader-overhead byte gates, smoke coverage, and refreshed reports.
+2026-05-10T19:49:29Z | Added build-pair selector CI smoke coverage with refreshed smoke manifest and benchmark result artifacts.
