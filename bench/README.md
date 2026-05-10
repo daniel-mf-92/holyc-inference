@@ -2930,13 +2930,15 @@ python3 bench/qemu_matrix_budget_audit.py \
   --output-stem qemu_matrix_budget_audit_latest \
   --max-launches 64 \
   --max-launches-per-build 16 \
+  --max-expected-tokens 8192 \
   --max-prompt-bytes-per-build 65536 \
   --require-expected-tokens \
   --require-airgap
 ```
 
 The smoke gate covers passing budget reports plus launch-budget and
-expected-token failures:
+global expected-token budget, launch-budget, and expected-token coverage
+failures:
 
 ```bash
 python3 bench/qemu_matrix_budget_audit_ci_smoke.py

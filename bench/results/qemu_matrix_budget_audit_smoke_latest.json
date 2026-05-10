@@ -1,5 +1,6 @@
 {
   "config": {
+    "max_expected_tokens": 48,
     "max_expected_tokens_per_build": null,
     "max_launches": 6,
     "max_launches_per_build": 3,
@@ -10,7 +11,7 @@
     "require_expected_tokens": true
   },
   "findings": [],
-  "generated_at": "2026-05-02T04:01:33Z",
+  "generated_at": "2026-05-10T13:42:42Z",
   "rows": [
     {
       "build": "baseline",
@@ -23,7 +24,7 @@
       "profile": "ci-smoke",
       "prompt_bytes_total": 54,
       "quantization": "Q4_0",
-      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmphb6m84rr/qemu_benchmark_matrix_ok.json",
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp45zy5an2/qemu_benchmark_matrix_ok.json",
       "warmup_launches": 1
     },
     {
@@ -37,7 +38,7 @@
       "profile": "ci-smoke",
       "prompt_bytes_total": 54,
       "quantization": "Q4_0",
-      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmphb6m84rr/qemu_benchmark_matrix_ok.json",
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp45zy5an2/qemu_benchmark_matrix_ok.json",
       "warmup_launches": 1
     }
   ],

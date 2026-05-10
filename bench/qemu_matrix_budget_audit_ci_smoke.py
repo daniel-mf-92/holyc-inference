@@ -98,6 +98,8 @@ def main() -> int:
                 "3",
                 "--max-prompt-bytes-per-build",
                 "60",
+                "--max-expected-tokens",
+                "48",
                 "--require-expected-tokens",
                 "--require-airgap",
             ]
@@ -123,6 +125,8 @@ def main() -> int:
                 "budget",
                 "--max-launches-per-build",
                 "2",
+                "--max-expected-tokens",
+                "39",
                 "--require-expected-tokens",
             ]
         )
@@ -130,7 +134,10 @@ def main() -> int:
             return rc
         failed_payload = json.loads((root / "failed" / "budget.json").read_text(encoding="utf-8"))
         kinds = {finding["kind"] for finding in failed_payload["findings"]}
-        if rc := require({"max_launches_per_build", "missing_expected_tokens"}.issubset(kinds), "missing_budget_findings"):
+        if rc := require(
+            {"max_launches_per_build", "max_expected_tokens", "missing_expected_tokens"}.issubset(kinds),
+            "missing_budget_findings",
+        ):
             return rc
     return 0
 

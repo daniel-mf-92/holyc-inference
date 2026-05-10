@@ -233,6 +233,20 @@ def evaluate(rows: list[BudgetRow], args: argparse.Namespace) -> list[BudgetFind
                 f"{total_prompt_bytes} planned prompt bytes exceed global limit {args.max_prompt_bytes}",
             )
         )
+    total_expected_tokens = sum(row.expected_tokens_total for row in rows)
+    if args.max_expected_tokens is not None and total_expected_tokens > args.max_expected_tokens:
+        findings.append(
+            BudgetFinding(
+                "",
+                "",
+                "error",
+                "max_expected_tokens",
+                "expected_tokens_total",
+                total_expected_tokens,
+                args.max_expected_tokens,
+                f"{total_expected_tokens} planned expected tokens exceed global limit {args.max_expected_tokens}",
+            )
+        )
     return findings
 
 
@@ -261,6 +275,7 @@ def build_report(paths: list[Path], args: argparse.Namespace) -> dict[str, Any]:
             "max_launches_per_build": args.max_launches_per_build,
             "max_prompt_bytes": args.max_prompt_bytes,
             "max_prompt_bytes_per_build": args.max_prompt_bytes_per_build,
+            "max_expected_tokens": args.max_expected_tokens,
             "max_expected_tokens_per_build": args.max_expected_tokens_per_build,
             "require_expected_tokens": args.require_expected_tokens,
             "require_airgap": args.require_airgap,
@@ -277,7 +292,7 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
 def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
     fieldnames = list(BudgetRow.__dataclass_fields__)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
@@ -286,7 +301,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 def write_findings_csv(path: Path, findings: list[dict[str, Any]]) -> None:
     fieldnames = list(BudgetFinding.__dataclass_fields__)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for finding in findings:
             writer.writerow(finding)
@@ -361,6 +376,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-launches-per-build", type=int)
     parser.add_argument("--max-prompt-bytes", type=int)
     parser.add_argument("--max-prompt-bytes-per-build", type=int)
+    parser.add_argument("--max-expected-tokens", type=int)
     parser.add_argument("--max-expected-tokens-per-build", type=int)
     parser.add_argument("--require-expected-tokens", action="store_true")
     parser.add_argument("--require-airgap", action="store_true")
