@@ -59,10 +59,13 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="holyc-qemu-artifact-secret-") as tmp:
         root = Path(tmp)
 
-        safe = root / "qemu_prompt_bench_safe.json"
+        safe_dir = root / "safe_artifacts"
+        safe_dir.mkdir()
+        safe = safe_dir / "qemu_prompt_bench_safe.json"
         write_artifact(safe, base_row())
+        (safe_dir / "qemu_prompt_bench_safe.md").write_text("# Safe sidecar\nNo credential material here.\n", encoding="utf-8")
         safe_out = root / "safe_out"
-        completed = run_audit(safe, safe_out)
+        completed = run_audit(safe_dir, safe_out)
         if completed.returncode != 0:
             sys.stdout.write(completed.stdout)
             sys.stderr.write(completed.stderr)
@@ -71,7 +74,7 @@ def main() -> int:
         safe_junit = ET.parse(safe_out / "qemu_artifact_secret_audit_smoke_junit.xml").getroot()
         checks = [
             require(safe_report["status"] == "pass", "safe_secret_audit_not_pass=true"),
-            require(safe_report["summary"]["rows"] == 1, "safe_secret_audit_missing_row=true"),
+            require(safe_report["summary"]["rows"] == 2, "safe_secret_audit_missing_sidecar_row=true"),
             require(safe_report["findings"] == [], "safe_secret_audit_has_findings=true"),
             require(safe_junit.attrib.get("failures") == "0", "safe_secret_audit_junit_failures=true"),
             require((safe_out / "qemu_artifact_secret_audit_smoke_findings.csv").exists(), "safe_secret_audit_missing_findings_csv=true"),
@@ -79,7 +82,9 @@ def main() -> int:
         if not all(checks):
             return 1
 
-        unsafe = root / "qemu_prompt_bench_unsafe.json"
+        unsafe_dir = root / "unsafe_artifacts"
+        unsafe_dir.mkdir()
+        unsafe = unsafe_dir / "qemu_prompt_bench_unsafe.json"
         unsafe_row = base_row()
         unsafe_row.update(
             {
@@ -93,8 +98,12 @@ def main() -> int:
             }
         )
         write_artifact(unsafe, unsafe_row)
+        (unsafe_dir / "qemu_prompt_bench_unsafe.md").write_text(
+            "# Unsafe sidecar\nstdout tail repeated sk-proj-abcdefghijklmnopqrstuvwxyz123456\n",
+            encoding="utf-8",
+        )
         unsafe_out = root / "unsafe_out"
-        failed = run_audit(unsafe, unsafe_out)
+        failed = run_audit(unsafe_dir, unsafe_out)
         if failed.returncode == 0:
             print("unsafe_secret_audit_not_rejected=true", file=sys.stderr)
             return 1
@@ -109,6 +118,10 @@ def main() -> int:
             require("huggingface_token" in kinds, "unsafe_secret_audit_missing_huggingface=true"),
             require("url_embedded_credentials" in kinds, "unsafe_secret_audit_missing_url_creds=true"),
             require("sensitive_field_populated" in kinds, "unsafe_secret_audit_missing_sensitive_field=true"),
+            require(
+                any(finding["source"].endswith("qemu_prompt_bench_unsafe.md") for finding in unsafe_report["findings"]),
+                "unsafe_secret_audit_missing_sidecar_finding=true",
+            ),
             require(int(unsafe_junit.attrib.get("failures", "0")) >= 1, "unsafe_secret_audit_junit_failures=true"),
         ]
         if not all(checks):

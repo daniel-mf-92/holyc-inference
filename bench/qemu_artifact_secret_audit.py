@@ -22,6 +22,14 @@ from urllib.parse import urlsplit
 
 
 DEFAULT_PATTERNS = ("qemu_prompt_bench*.json", "qemu_benchmark_matrix*.json")
+DEFAULT_TEXT_PATTERNS = (
+    "qemu_prompt_bench*.csv",
+    "qemu_prompt_bench*.md",
+    "qemu_prompt_bench*.xml",
+    "qemu_benchmark_matrix*.csv",
+    "qemu_benchmark_matrix*.md",
+    "qemu_benchmark_matrix*.xml",
+)
 ROW_KEYS = ("benchmarks", "results", "runs", "rows", "cells", "warmups")
 SENSITIVE_KEY_RE = re.compile(
     r"(?:^|[_\-.])("
@@ -78,7 +86,20 @@ def iter_input_files(paths: Iterable[Path], patterns: list[str]) -> Iterable[Pat
                     if child.is_file() and child not in seen:
                         seen.add(child)
                         yield child
-        elif path.is_file():
+        elif path.is_file() and path.suffix.lower() == ".json":
+            yield path
+
+
+def iter_text_sidecars(paths: Iterable[Path], patterns: list[str]) -> Iterable[Path]:
+    for path in paths:
+        if path.is_dir():
+            seen: set[Path] = set()
+            for pattern in patterns:
+                for child in sorted(path.rglob(pattern)):
+                    if child.is_file() and child not in seen:
+                        seen.add(child)
+                        yield child
+        elif path.is_file() and path.suffix.lower() != ".json":
             yield path
 
 
@@ -213,7 +234,8 @@ def audit(paths: Iterable[Path], args: argparse.Namespace) -> tuple[list[SecretR
     records: list[SecretRecord] = []
     findings: list[Finding] = []
     seen_files = 0
-    for path in iter_input_files(paths, args.pattern):
+    input_paths = list(paths)
+    for path in iter_input_files(input_paths, args.pattern):
         seen_files += 1
         try:
             rows = flatten_rows(load_json(path))
@@ -223,6 +245,21 @@ def audit(paths: Iterable[Path], args: argparse.Namespace) -> tuple[list[SecretR
         for row_number, row in enumerate(rows, 1):
             record, row_findings = audit_row(path, row_number, row)
             records.append(record)
+            findings.extend(row_findings)
+
+    if args.scan_text_sidecars:
+        for path in iter_text_sidecars(input_paths, args.text_pattern):
+            seen_files += 1
+            try:
+                text = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError as exc:
+                findings.append(Finding(str(path), 0, "error", "decode_error", "$text", str(exc), ""))
+                continue
+            except OSError as exc:
+                findings.append(Finding(str(path), 0, "error", "read_error", "$text", str(exc), ""))
+                continue
+            row_findings = scan_text(path, 1, "$text", text)
+            records.append(SecretRecord(str(path), 1, 1, 0, len(row_findings)))
             findings.extend(row_findings)
 
     if seen_files < args.min_artifacts:
@@ -236,7 +273,7 @@ def audit(paths: Iterable[Path], args: argparse.Namespace) -> tuple[list[SecretR
 
 def write_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str]) -> None:
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -300,12 +337,25 @@ def write_outputs(records: list[SecretRecord], findings: list[Finding], args: ar
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("inputs", nargs="+", type=Path, help="QEMU benchmark JSON files or directories")
+    parser.add_argument("inputs", nargs="+", type=Path, help="QEMU benchmark artifact files or directories")
     parser.add_argument("--pattern", action="append", default=list(DEFAULT_PATTERNS), help="glob pattern when an input is a directory")
+    parser.add_argument(
+        "--text-pattern",
+        action="append",
+        default=list(DEFAULT_TEXT_PATTERNS),
+        help="text sidecar glob pattern when an input is a directory",
+    )
+    parser.add_argument(
+        "--no-text-sidecars",
+        action="store_false",
+        dest="scan_text_sidecars",
+        help="scan only JSON benchmark artifacts",
+    )
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--output-stem", default="qemu_artifact_secret_audit_latest")
     parser.add_argument("--min-artifacts", type=int, default=1)
     parser.add_argument("--min-rows", type=int, default=1)
+    parser.set_defaults(scan_text_sidecars=True)
     return parser
 
 

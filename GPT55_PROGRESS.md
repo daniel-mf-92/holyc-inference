@@ -525,3 +525,4 @@
 2026-05-10T16:33:08Z | Hardened dataset provenance-balance CI smoke coverage with artifact assertions and failing threshold gates.
 2026-05-10T16:40:44Z | Added QEMU build throughput scorecard CV stability telemetry and optional variability gates with smoke coverage and refreshed results.
 2026-05-10T16:53:24Z | Fixed QEMU prompt coverage auditing to count top-level warmup rows when requested, with smoke coverage and refreshed artifacts.
+2026-05-10T17:04:03Z | Extended QEMU artifact secret audit to scan text sidecars, added smoke coverage, and refreshed latest results.
