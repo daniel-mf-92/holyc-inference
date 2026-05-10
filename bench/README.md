@@ -3786,6 +3786,24 @@ OpenAI/GitHub token, credential-bearing URL, and sensitive-field failure paths:
 python3 bench/qemu_artifact_secret_audit_ci_smoke.py
 ```
 
+`qemu_artifact_network_text_audit.py` scans saved QEMU benchmark artifacts for
+network URL, QEMU endpoint, IP:port, and network-keyword text in retained
+commands, stdio tails, failure reasons, and metadata. Endpoint matches fail;
+standalone network keywords are warnings unless `--fail-on-keywords` is set:
+
+```bash
+python3 bench/qemu_artifact_network_text_audit.py bench/results \
+  --output-dir bench/results \
+  --output-stem qemu_artifact_network_text_audit_latest
+```
+
+Its smoke gate exercises clean artifacts, keyword-only warnings, and endpoint
+failure paths:
+
+```bash
+python3 bench/qemu_artifact_network_text_audit_ci_smoke.py
+```
+
 `airgap_audit.py` scans benchmark artifacts, including benchmark-matrix cells,
 for recorded QEMU commands and fails if any QEMU-like command is missing
 `-nic none` or includes networking flags/devices. It writes JSON, and can also
