@@ -1,0 +1,57 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-10T20:06:51Z",
+  "perf_summaries": [
+    {
+      "airgap_violations": 0,
+      "max_memory_bytes": 67207168,
+      "median_tok_per_s": 160.0,
+      "median_wall_tok_per_s": 67.85729030124463,
+      "min_tok_per_s": 160.0,
+      "min_wall_tok_per_s": 45.57644950912739,
+      "model": "synthetic-smoke",
+      "ok_runs": 4,
+      "profile": "ci-airgap-smoke",
+      "prompt_count": 2,
+      "quantization": "Q4_0",
+      "run_count": 4,
+      "source": "bench/results/qemu_prompt_bench_latest.json"
+    }
+  ],
+  "scorecard": [
+    {
+      "agreement": 1.0,
+      "airgap_violations": 0,
+      "dataset": "smoke-eval",
+      "eval_source": "bench/results/eval_compare_smoke_latest.json",
+      "holyc_accuracy": 1.0,
+      "llama_accuracy": 1.0,
+      "max_memory_bytes": 67207168,
+      "median_tok_per_s": 160.0,
+      "median_tok_per_s_per_mib": 2.4963432471964895,
+      "median_wall_tok_per_s": 67.85729030124463,
+      "median_wall_tok_per_s_per_mib": 1.0587193026035242,
+      "min_tok_per_s": 160.0,
+      "min_wall_tok_per_s": 45.57644950912739,
+      "model": "synthetic-smoke",
+      "ok_runs": 4,
+      "perf_source": "bench/results/qemu_prompt_bench_latest.json",
+      "prompt_count": 2,
+      "quality_adjusted_min_tok_per_s": 160.0,
+      "quality_adjusted_min_wall_tok_per_s": 45.57644950912739,
+      "quantization": "Q4_0",
+      "records": 3,
+      "regressions": 0,
+      "split": "validation",
+      "status": "pass"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "eval_reports": 1,
+    "findings": 0,
+    "perf_summaries": 1,
+    "records": 3,
+    "scorecard_rows": 1
+  }
+}

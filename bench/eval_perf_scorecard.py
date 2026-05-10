@@ -73,6 +73,10 @@ class ScorecardRow:
     median_tok_per_s: float | None
     min_wall_tok_per_s: float | None
     median_wall_tok_per_s: float | None
+    quality_adjusted_min_tok_per_s: float | None
+    quality_adjusted_min_wall_tok_per_s: float | None
+    median_tok_per_s_per_mib: float | None
+    median_wall_tok_per_s_per_mib: float | None
     max_memory_bytes: int | None
     airgap_violations: int
 
@@ -265,10 +269,27 @@ def pick_perf(summary: list[PerfSummary], model: str, quantization: str) -> Perf
     return sorted(matches, key=lambda item: (item.ok_runs, item.prompt_count, item.median_tok_per_s or 0.0), reverse=True)[0]
 
 
+def quality_adjusted(accuracy: float | None, speed: float | None) -> float | None:
+    if accuracy is None or speed is None:
+        return None
+    return accuracy * speed
+
+
+def per_mib(speed: float | None, memory_bytes: int | None) -> float | None:
+    if speed is None or memory_bytes is None or memory_bytes <= 0:
+        return None
+    return speed / (memory_bytes / 1048576.0)
+
+
 def build_scorecard(eval_reports: list[EvalReport], perf_summaries: list[PerfSummary]) -> list[ScorecardRow]:
     rows: list[ScorecardRow] = []
     for report in eval_reports:
         perf = pick_perf(perf_summaries, report.model, report.quantization)
+        min_tok_per_s = perf.min_tok_per_s if perf else None
+        median_tok_per_s = perf.median_tok_per_s if perf else None
+        min_wall_tok_per_s = perf.min_wall_tok_per_s if perf else None
+        median_wall_tok_per_s = perf.median_wall_tok_per_s if perf else None
+        max_memory_bytes = perf.max_memory_bytes if perf else None
         rows.append(
             ScorecardRow(
                 model=report.model,
@@ -285,11 +306,15 @@ def build_scorecard(eval_reports: list[EvalReport], perf_summaries: list[PerfSum
                 regressions=report.regressions,
                 prompt_count=perf.prompt_count if perf else 0,
                 ok_runs=perf.ok_runs if perf else 0,
-                min_tok_per_s=perf.min_tok_per_s if perf else None,
-                median_tok_per_s=perf.median_tok_per_s if perf else None,
-                min_wall_tok_per_s=perf.min_wall_tok_per_s if perf else None,
-                median_wall_tok_per_s=perf.median_wall_tok_per_s if perf else None,
-                max_memory_bytes=perf.max_memory_bytes if perf else None,
+                min_tok_per_s=min_tok_per_s,
+                median_tok_per_s=median_tok_per_s,
+                min_wall_tok_per_s=min_wall_tok_per_s,
+                median_wall_tok_per_s=median_wall_tok_per_s,
+                quality_adjusted_min_tok_per_s=quality_adjusted(report.holyc_accuracy, min_tok_per_s),
+                quality_adjusted_min_wall_tok_per_s=quality_adjusted(report.holyc_accuracy, min_wall_tok_per_s),
+                median_tok_per_s_per_mib=per_mib(median_tok_per_s, max_memory_bytes),
+                median_wall_tok_per_s_per_mib=per_mib(median_wall_tok_per_s, max_memory_bytes),
+                max_memory_bytes=max_memory_bytes,
                 airgap_violations=perf.airgap_violations if perf else 0,
             )
         )
@@ -333,6 +358,57 @@ def evaluate(rows: list[ScorecardRow], eval_reports: list[EvalReport], args: arg
             row.min_wall_tok_per_s is None or row.min_wall_tok_per_s < args.min_wall_tok_per_s
         ):
             findings.append(Finding("min_wall_tok_per_s", *identity, row.min_wall_tok_per_s, args.min_wall_tok_per_s, "wall tok/s below gate"))
+        if args.min_quality_adjusted_tok_per_s is not None and (
+            row.quality_adjusted_min_tok_per_s is None
+            or row.quality_adjusted_min_tok_per_s < args.min_quality_adjusted_tok_per_s
+        ):
+            findings.append(
+                Finding(
+                    "min_quality_adjusted_tok_per_s",
+                    *identity,
+                    row.quality_adjusted_min_tok_per_s,
+                    args.min_quality_adjusted_tok_per_s,
+                    "quality-adjusted guest tok/s below gate",
+                )
+            )
+        if args.min_quality_adjusted_wall_tok_per_s is not None and (
+            row.quality_adjusted_min_wall_tok_per_s is None
+            or row.quality_adjusted_min_wall_tok_per_s < args.min_quality_adjusted_wall_tok_per_s
+        ):
+            findings.append(
+                Finding(
+                    "min_quality_adjusted_wall_tok_per_s",
+                    *identity,
+                    row.quality_adjusted_min_wall_tok_per_s,
+                    args.min_quality_adjusted_wall_tok_per_s,
+                    "quality-adjusted wall tok/s below gate",
+                )
+            )
+        if args.min_median_tok_per_s_per_mib is not None and (
+            row.median_tok_per_s_per_mib is None or row.median_tok_per_s_per_mib < args.min_median_tok_per_s_per_mib
+        ):
+            findings.append(
+                Finding(
+                    "min_median_tok_per_s_per_mib",
+                    *identity,
+                    row.median_tok_per_s_per_mib,
+                    args.min_median_tok_per_s_per_mib,
+                    "guest tok/s per MiB below gate",
+                )
+            )
+        if args.min_median_wall_tok_per_s_per_mib is not None and (
+            row.median_wall_tok_per_s_per_mib is None
+            or row.median_wall_tok_per_s_per_mib < args.min_median_wall_tok_per_s_per_mib
+        ):
+            findings.append(
+                Finding(
+                    "min_median_wall_tok_per_s_per_mib",
+                    *identity,
+                    row.median_wall_tok_per_s_per_mib,
+                    args.min_median_wall_tok_per_s_per_mib,
+                    "wall tok/s per MiB below gate",
+                )
+            )
         if args.max_memory_bytes is not None and (row.max_memory_bytes is None or row.max_memory_bytes > args.max_memory_bytes):
             findings.append(Finding("max_memory_bytes", *identity, row.max_memory_bytes, args.max_memory_bytes, "memory above gate"))
         if row.airgap_violations:
@@ -345,7 +421,7 @@ def write_csv(path: Path, rows: list[Any]) -> None:
     dictionaries = [asdict(row) for row in rows]
     fieldnames = list(dictionaries[0]) if dictionaries else []
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         writer.writerows(dictionaries)
 
@@ -360,12 +436,12 @@ def write_markdown(path: Path, payload: dict[str, Any]) -> None:
         f"- Scorecard rows: {payload['summary']['scorecard_rows']}",
         f"- Findings: {payload['summary']['findings']}",
         "",
-        "| model | quantization | dataset | records | accuracy | agreement | min tok/s | min wall tok/s | ok runs |",
-        "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| model | quantization | dataset | records | accuracy | agreement | min tok/s | QA min tok/s | tok/s/MiB | ok runs |",
+        "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for row in payload["scorecard"]:
         lines.append(
-            "| {model} | {quantization} | {dataset}/{split} | {records} | {holyc_accuracy} | {agreement} | {min_tok_per_s} | {min_wall_tok_per_s} | {ok_runs} |".format(
+            "| {model} | {quantization} | {dataset}/{split} | {records} | {holyc_accuracy} | {agreement} | {min_tok_per_s} | {quality_adjusted_min_tok_per_s} | {median_tok_per_s_per_mib} | {ok_runs} |".format(
                 **{key: ("" if value is None else value) for key, value in row.items()}
             )
         )
@@ -406,6 +482,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--min-prompts", type=int)
     parser.add_argument("--min-tok-per-s", type=float)
     parser.add_argument("--min-wall-tok-per-s", type=float)
+    parser.add_argument("--min-quality-adjusted-tok-per-s", type=float)
+    parser.add_argument("--min-quality-adjusted-wall-tok-per-s", type=float)
+    parser.add_argument("--min-median-tok-per-s-per-mib", type=float)
+    parser.add_argument("--min-median-wall-tok-per-s-per-mib", type=float)
     parser.add_argument("--max-memory-bytes", type=int)
     parser.add_argument("--require-perf-match", action="store_true")
     parser.add_argument("--fail-on-failed-eval", action="store_true")

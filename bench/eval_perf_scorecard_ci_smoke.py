@@ -100,10 +100,24 @@ def main() -> int:
                 "100",
                 "--min-wall-tok-per-s",
                 "100",
+                "--min-quality-adjusted-tok-per-s",
+                "100",
+                "--min-quality-adjusted-wall-tok-per-s",
+                "100",
+                "--min-median-tok-per-s-per-mib",
+                "1",
+                "--min-median-wall-tok-per-s-per-mib",
+                "1",
                 "--max-memory-bytes",
                 "80000000",
             ]
         )
+        report = json.loads(Path("bench/results/eval_perf_scorecard_smoke_latest.json").read_text(encoding="utf-8"))
+        row = report["scorecard"][0]
+        assert row["quality_adjusted_min_tok_per_s"] == 150.0
+        assert row["quality_adjusted_min_wall_tok_per_s"] == 115.0
+        assert row["median_tok_per_s_per_mib"] > 2.0
+        assert row["median_wall_tok_per_s_per_mib"] > 1.0
     return status
 
 

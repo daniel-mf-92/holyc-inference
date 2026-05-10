@@ -549,3 +549,4 @@
 2026-05-10T19:43:47Z | Extended HCEval budget audit with aggregate prompt/choice/provenance and loader-overhead byte gates, smoke coverage, and refreshed reports.
 2026-05-10T19:49:29Z | Added build-pair selector CI smoke coverage with refreshed smoke manifest and benchmark result artifacts.
 2026-05-10T19:58:14Z | Added balanced accuracy to eval compare summaries, breakdowns, docs, tests, and refreshed smoke artifacts.
+2026-05-10T20:07:16Z | Added eval perf scorecard quality-adjusted throughput and tok/s-per-MiB gates with smoke coverage and refreshed reports.

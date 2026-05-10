@@ -3289,6 +3289,25 @@ python3 bench/bench_artifact_manifest.py \
   --fail-on-command-hash-metadata
 ```
 
+## Eval Perf Scorecard
+
+`eval_perf_scorecard.py` joins saved eval comparison reports with saved QEMU
+prompt benchmark artifacts by model and quantization. It emits raw throughput,
+quality-adjusted throughput (`holyc_accuracy * min tok/s`), and throughput per
+MiB so perf CI can gate quality/speed regressions without launching QEMU.
+
+```bash
+python3 bench/eval_perf_scorecard.py \
+  --eval bench/results/eval_compare_latest.json \
+  --bench bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem eval_perf_scorecard_latest \
+  --require-perf-match \
+  --fail-on-regressions \
+  --min-quality-adjusted-wall-tok-per-s 50 \
+  --min-median-wall-tok-per-s-per-mib 0.5
+```
+
 ## Eval Efficiency Frontier
 
 `eval_efficiency_frontier.py` reads saved eval perf scorecards and marks

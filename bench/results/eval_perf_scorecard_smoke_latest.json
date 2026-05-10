@@ -1,6 +1,6 @@
 {
   "findings": [],
-  "generated_at": "2026-05-02T04:00:41Z",
+  "generated_at": "2026-05-10T20:06:59Z",
   "perf_summaries": [
     {
       "airgap_violations": 0,
@@ -15,7 +15,7 @@
       "prompt_count": 2,
       "quantization": "Q4_0",
       "run_count": 2,
-      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp2t_2g109/qemu_prompt_bench_smoke.json"
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp3mt6ihm9/qemu_prompt_bench_smoke.json"
     }
   ],
   "scorecard": [
@@ -23,18 +23,22 @@
       "agreement": 1.0,
       "airgap_violations": 0,
       "dataset": "smoke-eval",
-      "eval_source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp2t_2g109/eval_compare_smoke.json",
+      "eval_source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp3mt6ihm9/eval_compare_smoke.json",
       "holyc_accuracy": 1.0,
       "llama_accuracy": 1.0,
       "max_memory_bytes": 67174400,
       "median_tok_per_s": 155.0,
+      "median_tok_per_s_per_mib": 2.419512195121951,
       "median_wall_tok_per_s": 117.5,
+      "median_wall_tok_per_s_per_mib": 1.8341463414634147,
       "min_tok_per_s": 150.0,
       "min_wall_tok_per_s": 115.0,
       "model": "synthetic-smoke",
       "ok_runs": 2,
-      "perf_source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp2t_2g109/qemu_prompt_bench_smoke.json",
+      "perf_source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp3mt6ihm9/qemu_prompt_bench_smoke.json",
       "prompt_count": 2,
+      "quality_adjusted_min_tok_per_s": 150.0,
+      "quality_adjusted_min_wall_tok_per_s": 115.0,
       "quantization": "Q4_0",
       "records": 3,
       "regressions": 0,
