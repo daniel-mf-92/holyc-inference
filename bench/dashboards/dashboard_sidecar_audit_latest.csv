@@ -1,0 +1,5 @@
+source,json_valid,csv_path,csv_present,markdown_path,markdown_present,junit_path,junit_present,status,error
+bench/dashboards/bench_trend_export_latest.json,True,bench/dashboards/bench_trend_export_latest.csv,True,bench/dashboards/bench_trend_export_latest.md,True,bench/dashboards/bench_trend_export_junit_latest.xml,True,pass,
+bench/dashboards/dashboard_digest_latest.json,True,bench/dashboards/dashboard_digest_latest.csv,True,bench/dashboards/dashboard_digest_latest.md,True,bench/dashboards/dashboard_digest_latest_junit.xml,True,pass,
+bench/dashboards/perf_regression_latest.json,True,bench/dashboards/perf_regression_commit_coverage_violations_latest.csv,True,bench/dashboards/perf_regression_latest.md,True,bench/dashboards/perf_regression_junit_latest.xml,True,pass,
+bench/dashboards/perf_slo_audit_latest.json,True,bench/dashboards/perf_slo_audit_latest.csv,True,bench/dashboards/perf_slo_audit_latest.md,True,bench/dashboards/perf_slo_audit_latest_junit.xml,True,pass,

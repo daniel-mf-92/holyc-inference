@@ -52,6 +52,9 @@ class PredictionAudit:
     score_coverage_pct: float | None
     top_score_ties: int
     top_score_tie_pct: float | None
+    low_top_score_margins: int
+    low_top_score_margin_pct: float | None
+    min_top_score_margin: float | None
     score_length_histogram: dict[str, int]
     prediction_histogram: dict[str, int]
     majority_prediction: str
@@ -70,6 +73,7 @@ class PredictionAudit:
     missing_ids: list[str]
     extra_ids: list[str]
     metadata: dict[str, list[str]]
+    records: list[dict[str, Any]]
 
 
 def iso_now() -> str:
@@ -142,6 +146,14 @@ def check_hash_value(
     return 1, 0, 0
 
 
+def hash_status(found_value: str | None, expected_value: str) -> str:
+    if found_value is None:
+        return "missing"
+    if found_value.lower() != expected_value.lower():
+        return "mismatch"
+    return "match"
+
+
 def sorted_counts(values: Iterable[int]) -> dict[str, int]:
     counter = collections.Counter(values)
     return {str(key): counter[key] for key in sorted(counter)}
@@ -203,6 +215,7 @@ def audit_predictions(
     max_majority_prediction_pct: float | None,
     min_score_coverage_pct: float | None,
     max_top_score_tie_pct: float | None,
+    min_top_score_margin: float | None,
     require_input_hashes: bool,
     issues: list[Issue],
 ) -> PredictionAudit:
@@ -213,9 +226,12 @@ def audit_predictions(
     valid_predictions = 0
     scored_predictions = 0
     top_score_ties = 0
+    low_top_score_margins = 0
     score_lengths: list[int] = []
+    top_score_margins: list[float] = []
     prediction_labels: list[str] = []
     metadata = collect_metadata(rows)
+    records: list[dict[str, Any]] = []
     prompt_hash_matches = 0
     prompt_hash_mismatches = 0
     prompt_hash_missing = 0
@@ -228,36 +244,87 @@ def audit_predictions(
 
     for index, row in enumerate(rows):
         row_label = f"{path}:{index + 1}"
+        record_telemetry: dict[str, Any] = {
+            "source": source_name,
+            "row_number": index + 1,
+            "record_id": "",
+            "valid": False,
+            "answer_index": "",
+            "predicted_index": "",
+            "correct": "",
+            "has_scores": False,
+            "score_count": 0,
+            "top_score_tie_count": "",
+            "top_score_margin": "",
+            "prompt_hash_status": "not_checked",
+            "choices_hash_status": "not_checked",
+            "input_hash_status": "not_checked",
+            "issue": "",
+        }
         try:
             record_id = eval_compare.case_id(row, row_label)
         except ValueError as exc:
             append_issue(issues, "error", source_name, str(exc))
+            record_telemetry["issue"] = str(exc)
+            records.append(record_telemetry)
             continue
+        record_telemetry["record_id"] = record_id
 
         if record_id in seen:
             duplicate_ids.add(record_id)
-            append_issue(issues, "error", source_name, f"duplicate prediction id {record_id!r}")
+            message = f"duplicate prediction id {record_id!r}"
+            append_issue(issues, "error", source_name, message)
+            record_telemetry["issue"] = message
+            records.append(record_telemetry)
             continue
         seen.add(record_id)
 
         if record_id not in gold:
             extra_ids.add(record_id)
-            append_issue(issues, "error", source_name, f"prediction id {record_id!r} is not in gold")
+            message = f"prediction id {record_id!r} is not in gold"
+            append_issue(issues, "error", source_name, message)
+            record_telemetry["issue"] = message
+            records.append(record_telemetry)
             continue
         gold_case = gold[record_id]
+        record_telemetry["answer_index"] = gold_case.answer_index
 
         try:
             prediction = eval_compare.normalize_prediction(row, gold_case, path, index)
         except ValueError as exc:
             append_issue(issues, "error", source_name, str(exc))
+            record_telemetry["issue"] = str(exc)
+            records.append(record_telemetry)
             continue
         valid_predictions += 1
+        record_telemetry["valid"] = True
+        record_telemetry["predicted_index"] = prediction.predicted_index
+        record_telemetry["correct"] = prediction.predicted_index == gold_case.answer_index
         if prediction.scores is not None:
             scored_predictions += 1
             score_lengths.append(len(prediction.scores))
+            record_telemetry["has_scores"] = True
+            record_telemetry["score_count"] = len(prediction.scores)
             top_score = max(prediction.scores)
-            if sum(1 for score in prediction.scores if score == top_score) > 1:
+            top_score_tie_count = sum(1 for score in prediction.scores if score == top_score)
+            record_telemetry["top_score_tie_count"] = top_score_tie_count
+            if top_score_tie_count > 1:
                 top_score_ties += 1
+            sorted_scores = sorted(prediction.scores, reverse=True)
+            top_score_margin = sorted_scores[0] - sorted_scores[1] if len(sorted_scores) > 1 else 0.0
+            top_score_margins.append(top_score_margin)
+            record_telemetry["top_score_margin"] = top_score_margin
+            if min_top_score_margin is not None and top_score_margin < min_top_score_margin:
+                low_top_score_margins += 1
+                append_issue(
+                    issues,
+                    "error",
+                    source_name,
+                    (
+                        f"{row_label}: top score margin {top_score_margin:.6g} is below "
+                        f"--min-top-score-margin {min_top_score_margin:.6g}"
+                    ),
+                )
         prediction_labels.append(str(prediction.predicted_index))
 
         row_dataset = metadata_value(row, "dataset")
@@ -277,6 +344,7 @@ def audit_predictions(
                 f"{row_label}: split metadata {row_split!r} does not match expected {expected_split!r}",
             )
         found_key, found_value = first_metadata_hash(row, PROMPT_HASH_KEYS)
+        record_telemetry["prompt_hash_status"] = hash_status(found_value, text_sha256(gold_case.prompt))
         matches, mismatches, missing = check_hash_value(
             issues,
             source_name,
@@ -291,6 +359,7 @@ def audit_predictions(
         prompt_hash_mismatches += mismatches
         prompt_hash_missing += missing
         found_key, found_value = first_metadata_hash(row, CHOICES_HASH_KEYS)
+        record_telemetry["choices_hash_status"] = hash_status(found_value, choices_sha256(gold_case.choices))
         matches, mismatches, missing = check_hash_value(
             issues,
             source_name,
@@ -305,6 +374,7 @@ def audit_predictions(
         choices_hash_mismatches += mismatches
         choices_hash_missing += missing
         found_key, found_value = first_metadata_hash(row, INPUT_HASH_KEYS)
+        record_telemetry["input_hash_status"] = hash_status(found_value, input_sha256(gold_case))
         matches, mismatches, missing = check_hash_value(
             issues,
             source_name,
@@ -318,6 +388,7 @@ def audit_predictions(
         input_hash_matches += matches
         input_hash_mismatches += mismatches
         input_hash_missing += missing
+        records.append(record_telemetry)
 
     missing_ids = sorted(set(gold) - seen)
     for record_id in missing_ids:
@@ -345,6 +416,10 @@ def audit_predictions(
         )
     score_coverage_pct = (scored_predictions / valid_predictions * 100.0) if valid_predictions else None
     top_score_tie_pct = (top_score_ties / scored_predictions * 100.0) if scored_predictions else None
+    low_top_score_margin_pct = (
+        (low_top_score_margins / scored_predictions * 100.0) if scored_predictions else None
+    )
+    observed_min_top_score_margin = min(top_score_margins) if top_score_margins else None
     if (
         min_score_coverage_pct is not None
         and score_coverage_pct is not None
@@ -382,6 +457,9 @@ def audit_predictions(
         score_coverage_pct=score_coverage_pct,
         top_score_ties=top_score_ties,
         top_score_tie_pct=top_score_tie_pct,
+        low_top_score_margins=low_top_score_margins,
+        low_top_score_margin_pct=low_top_score_margin_pct,
+        min_top_score_margin=observed_min_top_score_margin,
         score_length_histogram=sorted_counts(score_lengths),
         prediction_histogram=prediction_histogram,
         majority_prediction=majority_prediction,
@@ -400,6 +478,7 @@ def audit_predictions(
         missing_ids=missing_ids,
         extra_ids=sorted(extra_ids),
         metadata=metadata,
+        records=records,
     )
 
 
@@ -512,6 +591,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         args.max_majority_prediction_pct,
         args.min_score_coverage_pct,
         args.max_top_score_tie_pct,
+        args.min_top_score_margin,
         args.require_input_hashes,
         issues,
     )
@@ -526,6 +606,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         args.max_majority_prediction_pct,
         args.min_score_coverage_pct,
         args.max_top_score_tie_pct,
+        args.min_top_score_margin,
         args.require_input_hashes,
         issues,
     )
@@ -656,6 +737,23 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(
         [
             "",
+            "## Score Margins",
+            "",
+            "| Engine | Min margin | Low margins | Low margin % |",
+            "| --- | ---: | ---: | ---: |",
+        ]
+    )
+    for name, audit in report["prediction_audits"].items():
+        min_margin = audit["min_top_score_margin"]
+        min_margin_text = "-" if min_margin is None else f"{min_margin:.6g}"
+        low_pct = audit["low_top_score_margin_pct"]
+        low_pct_text = "-" if low_pct is None else f"{low_pct:.2f}"
+        lines.append(
+            f"| {name} | {min_margin_text} | {audit['low_top_score_margins']} | {low_pct_text} |"
+        )
+    lines.extend(
+        [
+            "",
             "## Input Hash Parity",
             "",
             "| Engine | Prompt matches | Prompt missing | Prompt mismatches | Choices matches | Choices missing | Choices mismatches | Input matches | Input missing | Input mismatches |",
@@ -696,6 +794,32 @@ def write_csv(report: dict[str, Any], path: Path) -> None:
             writer.writerow({field: issue[field] for field in fields})
 
 
+def write_record_csv(report: dict[str, Any], path: Path) -> None:
+    fields = [
+        "source",
+        "row_number",
+        "record_id",
+        "valid",
+        "answer_index",
+        "predicted_index",
+        "correct",
+        "has_scores",
+        "score_count",
+        "top_score_tie_count",
+        "top_score_margin",
+        "prompt_hash_status",
+        "choices_hash_status",
+        "input_hash_status",
+        "issue",
+    ]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for audit in report["prediction_audits"].values():
+            for row in audit["records"]:
+                writer.writerow({field: row.get(field, "") for field in fields})
+
+
 def write_junit(report: dict[str, Any], path: Path) -> None:
     errors = [issue for issue in report["issues"] if issue["severity"] == "error"]
     warnings = [issue for issue in report["issues"] if issue["severity"] == "warning"]
@@ -730,7 +854,12 @@ def write_junit(report: dict[str, Any], path: Path) -> None:
         handle.write(b"\n")
 
 
-def write_report(report: dict[str, Any], output_dir: Path, output_stem: str) -> tuple[Path, Path, Path, Path]:
+def write_report(
+    report: dict[str, Any],
+    output_dir: Path,
+    output_stem: str,
+    record_csv: Path | None = None,
+) -> tuple[Path, Path, Path, Path, Path | None]:
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / f"{output_stem}.json"
     md_path = output_dir / f"{output_stem}.md"
@@ -740,7 +869,10 @@ def write_report(report: dict[str, Any], output_dir: Path, output_stem: str) -> 
     md_path.write_text(markdown_report(report), encoding="utf-8")
     write_csv(report, csv_path)
     write_junit(report, junit_path)
-    return json_path, md_path, csv_path, junit_path
+    if record_csv is not None:
+        record_csv.parent.mkdir(parents=True, exist_ok=True)
+        write_record_csv(report, record_csv)
+    return json_path, md_path, csv_path, junit_path, record_csv
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -783,12 +915,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail when tied maximum scores exceed this percentage of scored prediction rows for either engine",
     )
     parser.add_argument(
+        "--min-top-score-margin",
+        type=float,
+        help="Fail when any scored prediction row has top-score minus second-score margin below this value",
+    )
+    parser.add_argument(
         "--require-input-hashes",
         action="store_true",
         help="Fail unless each valid prediction row carries matching prompt, choices, and combined input SHA256 metadata",
     )
     parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
     parser.add_argument("--output-stem", default="eval_input_audit_latest")
+    parser.add_argument("--record-csv", type=Path, help="Optional per-engine prediction telemetry CSV path")
     return parser
 
 
@@ -815,12 +953,22 @@ def main(argv: list[str] | None = None) -> int:
     if args.max_top_score_tie_pct is not None and not 0.0 <= args.max_top_score_tie_pct <= 100.0:
         print("error: --max-top-score-tie-pct must be between 0 and 100", file=sys.stderr)
         return 2
+    if args.min_top_score_margin is not None and args.min_top_score_margin < 0.0:
+        print("error: --min-top-score-margin must be non-negative", file=sys.stderr)
+        return 2
     report = build_report(args)
-    json_path, md_path, csv_path, junit_path = write_report(report, args.output_dir, args.output_stem)
+    json_path, md_path, csv_path, junit_path, record_csv_path = write_report(
+        report,
+        args.output_dir,
+        args.output_stem,
+        args.record_csv,
+    )
     print(f"wrote_json={json_path}")
     print(f"wrote_markdown={md_path}")
     print(f"wrote_csv={csv_path}")
     print(f"wrote_junit={junit_path}")
+    if record_csv_path is not None:
+        print(f"wrote_record_csv={record_csv_path}")
     print(f"status={report['status']}")
     print(f"errors={report['summary']['errors']}")
     print(f"warnings={report['summary']['warnings']}")

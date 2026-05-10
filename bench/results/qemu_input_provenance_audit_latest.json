@@ -1,0 +1,27 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-01T08:50:43Z",
+  "records": [
+    {
+      "findings": 0,
+      "image_exists_recorded": false,
+      "image_live_checked": false,
+      "image_path": "/tmp/TempleOS.synthetic.img",
+      "prompt_count": 2,
+      "prompt_live_checked": true,
+      "prompt_source": "bench/prompts/smoke.jsonl",
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "qemu_args_files": 0,
+      "qemu_args_live_checked": 0,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "artifacts": 1,
+    "findings": 0,
+    "prompt_live_checked": 1,
+    "qemu_args_live_checked": 0
+  }
+}

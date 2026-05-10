@@ -1,0 +1,3 @@
+source,row,key,profile,model,quantization,phase,prompt,iteration,commit,exit_class,seed,seed_source
+/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/holyc-qemu-seed-audit-nblq346j/qemu_prompt_bench_pass.json,1,ci-airgap-smoke|synthetic-smoke|Q4_0|smoke-short|1|abc1234,ci-airgap-smoke,synthetic-smoke,Q4_0,measured,smoke-short,1,abc1234,ok,42,seed
+/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/holyc-qemu-seed-audit-nblq346j/qemu_prompt_bench_pass.json,2,ci-airgap-smoke|synthetic-smoke|Q4_0|smoke-code|2|abc1234,ci-airgap-smoke,synthetic-smoke,Q4_0,measured,smoke-code,2,abc1234,ok,99,rng_seed

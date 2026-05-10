@@ -1,0 +1,3 @@
+path,exists,size_bytes,sha256,format,arg_count,command_like,explicit_nic_none,nic_none_count,legacy_net_none,violation_count
+bench/fixtures/qemu_args_policy/safe.args,True,29,c58aae648dd7ff82ca391e35d858653a2d132cf41dc31859628a0802fd69191a,shell-fragment,6,False,False,0,False,0
+bench/fixtures/qemu_args_policy/safe.json,True,22,9dd5beeb43de0162e7b69f2aa5d6ce2f4f7d44ec12f4d7b44d721ba6c90556a8,json-array,2,False,False,0,False,0

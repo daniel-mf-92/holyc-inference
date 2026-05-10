@@ -1,0 +1,46 @@
+{
+  "artifacts": [
+    {
+      "command_airgap_ok": true,
+      "command_sha256": "633b78c56d2f2d5c6739b10ca9b48d66a6bb83328887ac7aceabb4ab48fd1c96",
+      "commit": "a70776642a09",
+      "cpu_count": 10,
+      "machine": "arm64",
+      "model": "synthetic-smoke",
+      "platform": "macOS-26.2-arm64-arm-64bit-Mach-O",
+      "profile": "ci-airgap-smoke",
+      "python": "3.14.3",
+      "qemu_bin": "bench/fixtures/qemu_synthetic_bench.py",
+      "qemu_path": "bench/fixtures/qemu_synthetic_bench.py",
+      "qemu_version": "",
+      "quantization": "Q4_0",
+      "row_command_airgap_mismatches": 0,
+      "row_command_hash_mismatches": 0,
+      "row_commit_mismatches": 0,
+      "row_missing_command_provenance": 0,
+      "rows": 4,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-01T20:38:22Z",
+  "status": "pass",
+  "summary": {
+    "artifacts": 1,
+    "artifacts_with_airgap_ok": 1,
+    "commits": [
+      "a70776642a09"
+    ],
+    "environment_signatures": 1,
+    "findings": 0,
+    "row_command_airgap_mismatches": 0,
+    "row_command_hash_mismatches": 0,
+    "row_commit_mismatches": 0,
+    "row_missing_command_provenance": 0,
+    "statuses": [
+      "pass"
+    ],
+    "total_rows": 4
+  }
+}

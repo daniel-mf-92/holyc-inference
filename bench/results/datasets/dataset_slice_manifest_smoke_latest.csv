@@ -1,0 +1,4 @@
+dataset,split,record_count,choice_count_histogram,answer_histogram,prompt_bytes,choices_bytes,slice_sha256
+arc-smoke,validation,1,"{""4"": 1}","{""0"": 1}",51,28,cb95c4da75fa49bb44b5bd8f3477eb473f895c66664ff1aab18ec8b6efaa3daa
+hellaswag-smoke,validation,1,"{""4"": 1}","{""0"": 1}",69,166,5fa0a59d93ed8a31b5bca334573312673391368e3a662da9e545027d73ae68d4
+truthfulqa-smoke,validation,1,"{""4"": 1}","{""0"": 1}",62,133,3312b40fe424a611149f84d18316d924a10459a89a25a484bc9fd30e92ad23e4

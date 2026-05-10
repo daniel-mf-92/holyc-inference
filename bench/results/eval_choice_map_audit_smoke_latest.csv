@@ -1,0 +1,7 @@
+source,record_id,dataset,split,raw_format,raw_prediction,normalized_index,answer_index,choice_count,valid,correct,has_scores
+holyc,smoke-hellaswag-1,hellaswag-smoke,validation,index,0,0,0,4,True,True,False
+holyc,smoke-arc-1,arc-smoke,validation,scores_only,,0,0,4,True,True,True
+holyc,smoke-truthfulqa-1,truthfulqa-smoke,validation,alpha,A,0,0,4,True,True,False
+llama.cpp,smoke-hellaswag-1,hellaswag-smoke,validation,index,0,0,0,4,True,True,False
+llama.cpp,smoke-arc-1,arc-smoke,validation,alpha,A,0,0,4,True,True,False
+llama.cpp,smoke-truthfulqa-1,truthfulqa-smoke,validation,scores_only,,0,0,4,True,True,True

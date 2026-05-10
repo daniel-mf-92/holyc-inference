@@ -1,0 +1,25 @@
+{
+  "artifacts": [
+    {
+      "max_failure_reason_bytes": 0,
+      "max_serial_output_bytes": 215,
+      "max_stderr_tail_bytes": 0,
+      "max_stdout_tail_bytes": 215,
+      "row_count": 4,
+      "size_bytes": 41776,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "status": "pass",
+      "suffix": ".json"
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-04-30T13:27:01Z",
+  "status": "pass",
+  "summary": {
+    "artifacts": 1,
+    "failed_artifacts": 0,
+    "findings": 0,
+    "rows": 4,
+    "total_size_bytes": 41776
+  }
+}

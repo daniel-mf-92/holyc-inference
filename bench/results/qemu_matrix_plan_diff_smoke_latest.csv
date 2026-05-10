@@ -1,0 +1,2 @@
+build,profile,model,quantization,baseline_present,candidate_present,baseline_command_sha256,candidate_command_sha256,baseline_launch_plan_sha256,candidate_launch_plan_sha256,baseline_launch_count,candidate_launch_count,delta_launch_count,status
+base,smoke,toy,Q8_0,True,True,cmd-a,cmd-a,plan-2,plan-2,2,2,0,pass

@@ -1,0 +1,124 @@
+{
+  "dataset_split_counts": {
+    "arc-smoke": {
+      "validation": 1
+    },
+    "hellaswag-smoke": {
+      "validation": 1
+    },
+    "truthfulqa-smoke": {
+      "validation": 1
+    }
+  },
+  "distribution": [
+    {
+      "dataset": "",
+      "pct_of_scope": 33.33333333333333,
+      "provenance": "synthetic ARC-shaped smoke row",
+      "records": 1,
+      "scope": "provenance",
+      "split": ""
+    },
+    {
+      "dataset": "",
+      "pct_of_scope": 33.33333333333333,
+      "provenance": "synthetic HellaSwag-shaped smoke row",
+      "records": 1,
+      "scope": "provenance",
+      "split": ""
+    },
+    {
+      "dataset": "",
+      "pct_of_scope": 33.33333333333333,
+      "provenance": "synthetic TruthfulQA-shaped smoke row",
+      "records": 1,
+      "scope": "provenance",
+      "split": ""
+    },
+    {
+      "dataset": "arc-smoke",
+      "pct_of_scope": 100.0,
+      "provenance": "synthetic ARC-shaped smoke row",
+      "records": 1,
+      "scope": "dataset_split_provenance",
+      "split": "validation"
+    },
+    {
+      "dataset": "hellaswag-smoke",
+      "pct_of_scope": 100.0,
+      "provenance": "synthetic HellaSwag-shaped smoke row",
+      "records": 1,
+      "scope": "dataset_split_provenance",
+      "split": "validation"
+    },
+    {
+      "dataset": "truthfulqa-smoke",
+      "pct_of_scope": 100.0,
+      "provenance": "synthetic TruthfulQA-shaped smoke row",
+      "records": 1,
+      "scope": "dataset_split_provenance",
+      "split": "validation"
+    }
+  ],
+  "error_count": 0,
+  "findings": [],
+  "format": "hceval-dataset-provenance-balance-audit",
+  "generated_at": "2026-05-02T04:00:20Z",
+  "inputs": [
+    {
+      "path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl",
+      "rows": 3,
+      "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+    }
+  ],
+  "provenance_counts": {
+    "synthetic ARC-shaped smoke row": 1,
+    "synthetic HellaSwag-shaped smoke row": 1,
+    "synthetic TruthfulQA-shaped smoke row": 1
+  },
+  "provenance_source_count": 3,
+  "record_count": 3,
+  "record_telemetry": [
+    {
+      "answer_index": 0,
+      "choice_count": 4,
+      "dataset": "hellaswag-smoke",
+      "dataset_split": "hellaswag-smoke:validation",
+      "normalized_payload_sha256": "639fd2031909b1c29ef7d570a1e02f1146d05a7daf7e020078f5520f25c103ca",
+      "provenance": "synthetic HellaSwag-shaped smoke row",
+      "provenance_bucket": "synthetic HellaSwag-shaped smoke row",
+      "record_id": "smoke-hellaswag-1",
+      "row_number": 1,
+      "source": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl",
+      "split": "validation"
+    },
+    {
+      "answer_index": 0,
+      "choice_count": 4,
+      "dataset": "arc-smoke",
+      "dataset_split": "arc-smoke:validation",
+      "normalized_payload_sha256": "2be7ae6d905249cd97df4d67a67d7b760152c2edb251bbc72aa1d10bc41573c7",
+      "provenance": "synthetic ARC-shaped smoke row",
+      "provenance_bucket": "synthetic ARC-shaped smoke row",
+      "record_id": "smoke-arc-1",
+      "row_number": 2,
+      "source": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl",
+      "split": "validation"
+    },
+    {
+      "answer_index": 0,
+      "choice_count": 4,
+      "dataset": "truthfulqa-smoke",
+      "dataset_split": "truthfulqa-smoke:validation",
+      "normalized_payload_sha256": "9bfbeecf4488e55c96a8ada5467bc5083734d6ed6ad94f75ef3bbc14ec21f02a",
+      "provenance": "synthetic TruthfulQA-shaped smoke row",
+      "provenance_bucket": "synthetic TruthfulQA-shaped smoke row",
+      "record_id": "smoke-truthfulqa-1",
+      "row_number": 3,
+      "source": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl",
+      "split": "validation"
+    }
+  ],
+  "status": "pass",
+  "warning_count": 0
+}

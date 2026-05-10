@@ -1,0 +1,2 @@
+source,profile,model,quantization,phase,rows,ok_rows,failed_rows,timeout_rows,nonzero_exit_rows,launch_error_rows,failure_pct,timeout_pct,nonzero_exit_pct,launch_error_pct
+bench/results/qemu_prompt_bench_latest.json,ci-airgap-smoke,synthetic-smoke,Q4_0,measured,4,4,0,0,0,0,0.0,0.0,0.0,0.0

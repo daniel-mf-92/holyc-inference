@@ -1,0 +1,3 @@
+source,row,key,profile,model,quantization,prompt,commit,seed,phase,exit_class,tokens,output_sha256,output_source
+bench/fixtures/qemu_output_determinism_audit/pass.json,1,ci-airgap-smoke|synthetic-smoke|Q4_0|short|abc123|0,ci-airgap-smoke,synthetic-smoke,Q4_0,short,abc123,0,measured,ok,8,b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9,output:derived
+bench/fixtures/qemu_output_determinism_audit/pass.json,2,ci-airgap-smoke|synthetic-smoke|Q4_0|short|abc123|0,ci-airgap-smoke,synthetic-smoke,Q4_0,short,abc123,0,measured,ok,8,b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9,output:derived

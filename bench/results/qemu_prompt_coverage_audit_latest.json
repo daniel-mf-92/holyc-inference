@@ -1,0 +1,68 @@
+{
+  "artifacts": [
+    {
+      "error": "",
+      "expected_prompts": 2,
+      "failed_runs": 0,
+      "measured_prompts": 2,
+      "measured_runs": 4,
+      "min_successful_runs_per_expected_prompt": 2,
+      "missing_prompts": 0,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt_suite_file_exists": true,
+      "prompt_suite_file_sha256_matches": true,
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "prompt_suite_source": "bench/prompts/smoke.jsonl",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "status": "pass",
+      "successful_runs": 4,
+      "unexpected_prompts": 0
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-04-30T09:05:07Z",
+  "prompt_rows": [
+    {
+      "expected": true,
+      "expected_tokens": 48,
+      "expected_tokens_mismatches": 0,
+      "failed_runs": 0,
+      "guest_bytes_mismatches": 0,
+      "guest_sha_mismatches": 0,
+      "max_tokens": 48,
+      "measured_runs": 2,
+      "min_tokens": 48,
+      "prompt": "smoke-code",
+      "prompt_sha256": "587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "successful_runs": 2
+    },
+    {
+      "expected": true,
+      "expected_tokens": 32,
+      "expected_tokens_mismatches": 0,
+      "failed_runs": 0,
+      "guest_bytes_mismatches": 0,
+      "guest_sha_mismatches": 0,
+      "max_tokens": 32,
+      "measured_runs": 2,
+      "min_tokens": 32,
+      "prompt": "smoke-short",
+      "prompt_sha256": "8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "successful_runs": 2
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "artifacts": 1,
+    "expected_prompts": 2,
+    "failed_runs": 0,
+    "findings": 0,
+    "measured_prompts": 2,
+    "measured_runs": 4,
+    "successful_runs": 4
+  }
+}

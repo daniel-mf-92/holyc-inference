@@ -1,0 +1,4 @@
+dataset,split,gold_records,holyc_records,llama_records,holyc_coverage_pct,llama_coverage_pct,paired_records,paired_coverage_pct,missing_holyc_records,missing_llama_records
+arc-smoke,validation,1,1,1,100.0,100.0,1,100.0,0,0
+hellaswag-smoke,validation,1,1,1,100.0,100.0,1,100.0,0,0
+truthfulqa-smoke,validation,1,1,1,100.0,100.0,1,100.0,0,0

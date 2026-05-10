@@ -1,0 +1,5 @@
+source,row,profile,model,quantization,prompt,phase,exit_class,prompt_bytes,guest_prompt_bytes,expected_tokens,tokens,expected_tokens_match,prompt_bytes_over_budget,tokens_over_budget
+bench/results/qemu_prompt_bench_latest.json,1,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,measured,ok,49,49,32,32,True,,
+bench/results/qemu_prompt_bench_latest.json,2,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,measured,ok,49,49,32,32,True,,
+bench/results/qemu_prompt_bench_latest.json,3,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,measured,ok,71,71,48,48,True,,
+bench/results/qemu_prompt_bench_latest.json,4,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,measured,ok,71,71,48,48,True,,

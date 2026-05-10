@@ -35,6 +35,16 @@ def make_summary(source: Path, **overrides: object) -> bench_result_index.Artifa
         "qemu_version": "synthetic",
         "qemu_bin": "qemu-system-x86_64",
         "prompts": 2,
+        "expected_token_prompts": 2,
+        "expected_tokens_total": 64,
+        "expected_tokens_matches": 2,
+        "expected_tokens_mismatches": 0,
+        "measured_prompt_bytes_total": 32,
+        "prompt_bytes_min": 16,
+        "prompt_bytes_max": 16,
+        "prompt_bytes_per_s_median": 64.0,
+        "wall_prompt_bytes_per_s_median": None,
+        "tokens_per_prompt_byte_median": 2.0,
         "total_tokens": 64,
         "total_elapsed_us": 500000,
         "measured_runs": 2,
@@ -147,7 +157,7 @@ def test_manifest_status_and_junit_fail_on_inconsistent_commit_metadata(tmp_path
 
     root = ET.parse(tmp_path / "bench_artifact_manifest_junit_latest.xml").getroot()
     assert root.attrib["name"] == "holyc_bench_artifact_manifest"
-    assert root.attrib["tests"] == "11"
+    assert root.attrib["tests"] == "12"
     assert root.attrib["failures"] == "1"
     failure = root.find("./testcase[@name='commit_metadata']/failure")
     assert failure is not None
@@ -208,6 +218,50 @@ def test_manifest_history_csv_keeps_superseded_artifacts(tmp_path: Path) -> None
 
     assert [row["source"] for row in latest_rows] == [str(newer_source)]
     assert [row["source"] for row in history_rows] == [str(older_source), str(newer_source)]
+
+
+def test_manifest_timestamp_collision_gate_reports_ambiguous_latest_artifacts(tmp_path: Path) -> None:
+    source_a = tmp_path / "qemu_prompt_bench_a.json"
+    source_b = tmp_path / "qemu_prompt_bench_b.json"
+    source_a.write_text('{"status":"pass","source":"a"}\n', encoding="utf-8")
+    source_b.write_text('{"status":"pass","source":"b"}\n', encoding="utf-8")
+
+    output_path, status, _history, _history_coverage, _sample_coverage, collisions, *_ = (
+        bench_artifact_manifest.write_manifest(
+            [
+                make_summary(source_a, generated_at="2026-04-28T02:50:00Z"),
+                make_summary(source_b, generated_at="2026-04-28T02:50:00Z"),
+            ],
+            tmp_path,
+            require_unique_timestamps=True,
+        )
+    )
+
+    assert status == "fail"
+    assert len(collisions) == 1
+    assert collisions[0].key == "ci-airgap-smoke/synthetic-smoke/Q4_0/" + "a" * 64
+    assert collisions[0].generated_at == "2026-04-28T02:50:00Z"
+    assert collisions[0].sources == sorted([str(source_a), str(source_b)])
+    assert len(collisions[0].sha256s) == 2
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["require_unique_timestamps"] is True
+    assert len(payload["timestamp_collisions"]) == 1
+
+    markdown = (tmp_path / "bench_artifact_manifest_latest.md").read_text(encoding="utf-8")
+    assert "Timestamp Collisions" in markdown
+
+    rows = list(
+        csv.DictReader((tmp_path / "bench_artifact_manifest_timestamp_collisions_latest.csv").open(encoding="utf-8"))
+    )
+    assert rows[0]["source_count"] == "2"
+    assert rows[0]["sha256_count"] == "2"
+
+    root = ET.parse(tmp_path / "bench_artifact_manifest_junit_latest.xml").getroot()
+    assert root.attrib["failures"] == "1"
+    failure = root.find("./testcase[@name='timestamp_uniqueness']/failure")
+    assert failure is not None
+    assert failure.attrib["type"] == "benchmark_manifest_timestamp_collision"
 
 
 def test_manifest_stale_commit_gate_is_opt_in(tmp_path: Path) -> None:

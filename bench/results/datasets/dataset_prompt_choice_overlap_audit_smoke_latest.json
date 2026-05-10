@@ -1,0 +1,31 @@
+{
+  "answer_overlap_record_count": 0,
+  "answer_overlap_record_pct": 0.0,
+  "counts_by_dataset_split": {
+    "arc-smoke": {
+      "validation": 1
+    },
+    "hellaswag-smoke": {
+      "validation": 1
+    },
+    "truthfulqa-smoke": {
+      "validation": 1
+    }
+  },
+  "error_count": 0,
+  "findings": [],
+  "generated_at": "2026-05-02T04:00:14Z",
+  "input_files": [
+    {
+      "path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl",
+      "rows": 3,
+      "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+    }
+  ],
+  "min_choice_chars": 4,
+  "overlap_record_count": 0,
+  "overlap_record_pct": 0.0,
+  "record_count": 3,
+  "status": "pass",
+  "warning_count": 0
+}

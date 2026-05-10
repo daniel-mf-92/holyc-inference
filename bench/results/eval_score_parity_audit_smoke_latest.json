@@ -1,0 +1,94 @@
+{
+  "dataset": "smoke-eval",
+  "files": {
+    "gold": {
+      "path": "bench/datasets/samples/smoke_eval.jsonl",
+      "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+    },
+    "holyc": {
+      "path": "bench/eval/samples/holyc_smoke_scored_predictions.jsonl",
+      "sha256": "d76c1fbf2f701d6950807795e95d61ee3e4ce8a94e3d6fb89225a664cd65e798"
+    },
+    "llama": {
+      "path": "bench/eval/samples/llama_smoke_scored_predictions.jsonl",
+      "sha256": "7552a0152ad3c76afd7096b0b37b52d175c5d9fbfd84c55438ddc05fff083def"
+    }
+  },
+  "findings": [],
+  "generated_at": "2026-05-01T06:21:52Z",
+  "gold_record_count": 3,
+  "pairs": [
+    {
+      "both_scored": true,
+      "choice_count": 4,
+      "holyc_has_scores": true,
+      "holyc_predicted_index": 0,
+      "holyc_present": true,
+      "holyc_score_count": 4,
+      "holyc_top_score_index": 0,
+      "holyc_top_score_tie_count": 1,
+      "llama_has_scores": true,
+      "llama_predicted_index": 0,
+      "llama_present": true,
+      "llama_score_count": 4,
+      "llama_top_score_index": 0,
+      "llama_top_score_tie_count": 1,
+      "record_id": "smoke-arc-1",
+      "score_shape_match": true
+    },
+    {
+      "both_scored": true,
+      "choice_count": 4,
+      "holyc_has_scores": true,
+      "holyc_predicted_index": 0,
+      "holyc_present": true,
+      "holyc_score_count": 4,
+      "holyc_top_score_index": 0,
+      "holyc_top_score_tie_count": 1,
+      "llama_has_scores": true,
+      "llama_predicted_index": 0,
+      "llama_present": true,
+      "llama_score_count": 4,
+      "llama_top_score_index": 0,
+      "llama_top_score_tie_count": 1,
+      "record_id": "smoke-hellaswag-1",
+      "score_shape_match": true
+    },
+    {
+      "both_scored": true,
+      "choice_count": 4,
+      "holyc_has_scores": true,
+      "holyc_predicted_index": 0,
+      "holyc_present": true,
+      "holyc_score_count": 4,
+      "holyc_top_score_index": 0,
+      "holyc_top_score_tie_count": 1,
+      "llama_has_scores": true,
+      "llama_predicted_index": 0,
+      "llama_present": true,
+      "llama_score_count": 4,
+      "llama_top_score_index": 0,
+      "llama_top_score_tie_count": 1,
+      "record_id": "smoke-truthfulqa-1",
+      "score_shape_match": true
+    }
+  ],
+  "split": "validation",
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "holyc_rows": 3,
+    "holyc_scored_rows": 3,
+    "holyc_top_score_tie_pct": 0.0,
+    "holyc_top_score_tie_rows": 0,
+    "llama_rows": 3,
+    "llama_scored_rows": 3,
+    "llama_top_score_tie_pct": 0.0,
+    "llama_top_score_tie_rows": 0,
+    "paired_rows": 3,
+    "paired_scored_rows": 3,
+    "score_parity_pct": 100.0,
+    "score_shape_match_pct": 100.0,
+    "score_shape_match_rows": 3
+  }
+}

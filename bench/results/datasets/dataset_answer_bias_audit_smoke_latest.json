@@ -1,0 +1,110 @@
+{
+  "counts_by_dataset_split": {
+    "arc-smoke": {
+      "validation": 1
+    },
+    "hellaswag-smoke": {
+      "validation": 1
+    },
+    "truthfulqa-smoke": {
+      "validation": 1
+    }
+  },
+  "dataset_split_summaries": {
+    "arc-smoke:validation": {
+      "answer_longest_or_tied_pct": 100.0,
+      "answer_shortest_or_tied_pct": 0.0,
+      "mean_answer_to_distractor_ratio": 1.9411764705882353,
+      "position_histogram": {
+        "longest": 1
+      },
+      "record_count": 1
+    },
+    "hellaswag-smoke:validation": {
+      "answer_longest_or_tied_pct": 100.0,
+      "answer_shortest_or_tied_pct": 0.0,
+      "mean_answer_to_distractor_ratio": 1.1157024793388428,
+      "position_histogram": {
+        "tied_longest": 1
+      },
+      "record_count": 1
+    },
+    "truthfulqa-smoke:validation": {
+      "answer_longest_or_tied_pct": 100.0,
+      "answer_shortest_or_tied_pct": 0.0,
+      "mean_answer_to_distractor_ratio": 1.4333333333333333,
+      "position_histogram": {
+        "longest": 1
+      },
+      "record_count": 1
+    }
+  },
+  "error_count": 0,
+  "findings": [],
+  "format": "hceval-answer-bias-audit",
+  "generated_at": "2026-04-30T00:29:52Z",
+  "inputs": [
+    {
+      "path": "bench/datasets/samples/smoke_eval.jsonl",
+      "rows": 3,
+      "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+    }
+  ],
+  "record_count": 3,
+  "record_telemetry": [
+    {
+      "answer_bytes": 45,
+      "answer_index": 0,
+      "answer_length_position": "tied_longest",
+      "answer_to_distractor_mean_ratio": 1.1157024793388428,
+      "choice_count": 4,
+      "dataset": "hellaswag-smoke",
+      "max_choice_bytes": 45,
+      "mean_distractor_bytes": 40.333333333333336,
+      "min_choice_bytes": 37,
+      "record_id": "smoke-hellaswag-1",
+      "source": "bench/datasets/samples/smoke_eval.jsonl:1",
+      "split": "validation"
+    },
+    {
+      "answer_bytes": 11,
+      "answer_index": 0,
+      "answer_length_position": "longest",
+      "answer_to_distractor_mean_ratio": 1.9411764705882353,
+      "choice_count": 4,
+      "dataset": "arc-smoke",
+      "max_choice_bytes": 11,
+      "mean_distractor_bytes": 5.666666666666667,
+      "min_choice_bytes": 5,
+      "record_id": "smoke-arc-1",
+      "source": "bench/datasets/samples/smoke_eval.jsonl:2",
+      "split": "validation"
+    },
+    {
+      "answer_bytes": 43,
+      "answer_index": 0,
+      "answer_length_position": "longest",
+      "answer_to_distractor_mean_ratio": 1.4333333333333333,
+      "choice_count": 4,
+      "dataset": "truthfulqa-smoke",
+      "max_choice_bytes": 43,
+      "mean_distractor_bytes": 30.0,
+      "min_choice_bytes": 20,
+      "record_id": "smoke-truthfulqa-1",
+      "source": "bench/datasets/samples/smoke_eval.jsonl:3",
+      "split": "validation"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "answer_longest_or_tied_pct": 100.0,
+    "answer_shortest_or_tied_pct": 0.0,
+    "mean_answer_to_distractor_ratio": 1.4967374277534704,
+    "position_histogram": {
+      "longest": 2,
+      "tied_longest": 1
+    },
+    "record_count": 3
+  },
+  "warning_count": 0
+}

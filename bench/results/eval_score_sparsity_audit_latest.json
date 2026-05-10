@@ -1,0 +1,129 @@
+{
+  "config": {
+    "max_zero_score_pct": 75.0,
+    "min_nonzero_scores_per_record": 2,
+    "min_records": 3,
+    "min_unique_scores_per_record": 2,
+    "zero_epsilon": 0.0
+  },
+  "findings": [],
+  "generated_at": "2026-05-02T04:43:26Z",
+  "inputs": {
+    "holyc": "bench/eval/samples/holyc_smoke_scored_predictions.jsonl",
+    "holyc_sha256": "d76c1fbf2f701d6950807795e95d61ee3e4ce8a94e3d6fb89225a664cd65e798",
+    "llama": "bench/eval/samples/llama_smoke_scored_predictions.jsonl",
+    "llama_sha256": "7552a0152ad3c76afd7096b0b37b52d175c5d9fbfd84c55438ddc05fff083def"
+  },
+  "records": [
+    {
+      "engine": "holyc",
+      "finite": true,
+      "finite_score_count": 4,
+      "nonzero_score_count": 4,
+      "record_id": "smoke-hellaswag-1",
+      "score_count": 4,
+      "source": "bench/eval/samples/holyc_smoke_scored_predictions.jsonl",
+      "unique_score_count": 4,
+      "zero_score_count": 0,
+      "zero_score_pct": 0.0
+    },
+    {
+      "engine": "holyc",
+      "finite": true,
+      "finite_score_count": 4,
+      "nonzero_score_count": 3,
+      "record_id": "smoke-arc-1",
+      "score_count": 4,
+      "source": "bench/eval/samples/holyc_smoke_scored_predictions.jsonl",
+      "unique_score_count": 4,
+      "zero_score_count": 1,
+      "zero_score_pct": 25.0
+    },
+    {
+      "engine": "holyc",
+      "finite": true,
+      "finite_score_count": 4,
+      "nonzero_score_count": 3,
+      "record_id": "smoke-truthfulqa-1",
+      "score_count": 4,
+      "source": "bench/eval/samples/holyc_smoke_scored_predictions.jsonl",
+      "unique_score_count": 4,
+      "zero_score_count": 1,
+      "zero_score_pct": 25.0
+    },
+    {
+      "engine": "llama",
+      "finite": true,
+      "finite_score_count": 4,
+      "nonzero_score_count": 4,
+      "record_id": "smoke-hellaswag-1",
+      "score_count": 4,
+      "source": "bench/eval/samples/llama_smoke_scored_predictions.jsonl",
+      "unique_score_count": 4,
+      "zero_score_count": 0,
+      "zero_score_pct": 0.0
+    },
+    {
+      "engine": "llama",
+      "finite": true,
+      "finite_score_count": 4,
+      "nonzero_score_count": 3,
+      "record_id": "smoke-arc-1",
+      "score_count": 4,
+      "source": "bench/eval/samples/llama_smoke_scored_predictions.jsonl",
+      "unique_score_count": 4,
+      "zero_score_count": 1,
+      "zero_score_pct": 25.0
+    },
+    {
+      "engine": "llama",
+      "finite": true,
+      "finite_score_count": 4,
+      "nonzero_score_count": 3,
+      "record_id": "smoke-truthfulqa-1",
+      "score_count": 4,
+      "source": "bench/eval/samples/llama_smoke_scored_predictions.jsonl",
+      "unique_score_count": 4,
+      "zero_score_count": 1,
+      "zero_score_pct": 25.0
+    }
+  ],
+  "status": "pass",
+  "summaries": [
+    {
+      "engine": "holyc",
+      "invalid_record_count": 0,
+      "mean_nonzero_scores_per_record": 3.3333333333333335,
+      "mean_unique_scores_per_record": 4.0,
+      "min_nonzero_scores_per_record": 3,
+      "min_unique_scores_per_record": 4,
+      "record_count": 3,
+      "scored_record_count": 3,
+      "source": "bench/eval/samples/holyc_smoke_scored_predictions.jsonl",
+      "total_nonzero_score_count": 10,
+      "total_score_count": 12,
+      "total_zero_score_count": 2,
+      "zero_score_pct": 16.666666666666664
+    },
+    {
+      "engine": "llama",
+      "invalid_record_count": 0,
+      "mean_nonzero_scores_per_record": 3.3333333333333335,
+      "mean_unique_scores_per_record": 4.0,
+      "min_nonzero_scores_per_record": 3,
+      "min_unique_scores_per_record": 4,
+      "record_count": 3,
+      "scored_record_count": 3,
+      "source": "bench/eval/samples/llama_smoke_scored_predictions.jsonl",
+      "total_nonzero_score_count": 10,
+      "total_score_count": 12,
+      "total_zero_score_count": 2,
+      "zero_score_pct": 16.666666666666664
+    }
+  ],
+  "summary": {
+    "findings": 0,
+    "records": 6,
+    "summaries": 2
+  }
+}

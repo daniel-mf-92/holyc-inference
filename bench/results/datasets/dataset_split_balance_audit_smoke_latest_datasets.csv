@@ -1,0 +1,4 @@
+dataset,records,split_count,splits,largest_split_pct,smallest_split_pct
+arc-smoke,1,1,validation,100.0,100.0
+hellaswag-smoke,1,1,validation,100.0,100.0
+truthfulqa-smoke,1,1,validation,100.0,100.0

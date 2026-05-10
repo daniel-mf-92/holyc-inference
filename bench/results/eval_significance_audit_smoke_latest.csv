@@ -1,0 +1,5 @@
+source,scope,dataset,split,record_count,holyc_accuracy,llama_accuracy,accuracy_delta_holyc_minus_llama,holyc_only_correct,llama_only_correct,discordant_count,p_value,method,significant_holyc_loss
+bench/results/eval_compare_smoke_latest.json,overall,smoke-eval,validation,3,1.0,1.0,0.0,0,0,0,1.0,exact_binomial_two_sided,False
+bench/results/eval_compare_smoke_latest.json,dataset_split,arc-smoke,validation,1,1.0,1.0,0.0,0,0,0,1.0,exact_binomial_two_sided,False
+bench/results/eval_compare_smoke_latest.json,dataset_split,hellaswag-smoke,validation,1,1.0,1.0,0.0,0,0,0,1.0,exact_binomial_two_sided,False
+bench/results/eval_compare_smoke_latest.json,dataset_split,truthfulqa-smoke,validation,1,1.0,1.0,0.0,0,0,0,1.0,exact_binomial_two_sided,False

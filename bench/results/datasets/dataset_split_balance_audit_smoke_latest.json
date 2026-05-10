@@ -1,0 +1,68 @@
+{
+  "datasets": [
+    {
+      "dataset": "arc-smoke",
+      "largest_split_pct": 100.0,
+      "records": 1,
+      "smallest_split_pct": 100.0,
+      "split_count": 1,
+      "splits": "validation"
+    },
+    {
+      "dataset": "hellaswag-smoke",
+      "largest_split_pct": 100.0,
+      "records": 1,
+      "smallest_split_pct": 100.0,
+      "split_count": 1,
+      "splits": "validation"
+    },
+    {
+      "dataset": "truthfulqa-smoke",
+      "largest_split_pct": 100.0,
+      "records": 1,
+      "smallest_split_pct": 100.0,
+      "split_count": 1,
+      "splits": "validation"
+    }
+  ],
+  "findings": [],
+  "format": "hceval-dataset-split-balance-audit",
+  "generated_at": "2026-05-02T07:27:13Z",
+  "inputs": [
+    {
+      "path": "bench/datasets/samples/smoke_eval.jsonl",
+      "rows": 3,
+      "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+    }
+  ],
+  "splits": [
+    {
+      "dataset": "arc-smoke",
+      "pct_of_dataset": 100.0,
+      "pct_of_total": 33.333333,
+      "records": 1,
+      "split": "validation"
+    },
+    {
+      "dataset": "hellaswag-smoke",
+      "pct_of_dataset": 100.0,
+      "pct_of_total": 33.333333,
+      "records": 1,
+      "split": "validation"
+    },
+    {
+      "dataset": "truthfulqa-smoke",
+      "pct_of_dataset": 100.0,
+      "pct_of_total": 33.333333,
+      "records": 1,
+      "split": "validation"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "dataset_splits": 3,
+    "datasets": 3,
+    "findings": 0,
+    "records": 3
+  }
+}

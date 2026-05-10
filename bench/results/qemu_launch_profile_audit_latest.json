@@ -1,0 +1,85 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-02T07:04:55Z",
+  "records": [
+    {
+      "accelerator": "",
+      "cpu": "",
+      "executable": "qemu_synthetic_bench.py",
+      "json_path": "$.command",
+      "machine": "",
+      "memory": "256M",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "violation_count": 0
+    },
+    {
+      "accelerator": "",
+      "cpu": "",
+      "executable": "qemu_synthetic_bench.py",
+      "json_path": "$.warmups[0].command",
+      "machine": "",
+      "memory": "256M",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "violation_count": 0
+    },
+    {
+      "accelerator": "",
+      "cpu": "",
+      "executable": "qemu_synthetic_bench.py",
+      "json_path": "$.warmups[1].command",
+      "machine": "",
+      "memory": "256M",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "violation_count": 0
+    },
+    {
+      "accelerator": "",
+      "cpu": "",
+      "executable": "qemu_synthetic_bench.py",
+      "json_path": "$.benchmarks[0].command",
+      "machine": "",
+      "memory": "256M",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "violation_count": 0
+    },
+    {
+      "accelerator": "",
+      "cpu": "",
+      "executable": "qemu_synthetic_bench.py",
+      "json_path": "$.benchmarks[1].command",
+      "machine": "",
+      "memory": "256M",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "violation_count": 0
+    },
+    {
+      "accelerator": "",
+      "cpu": "",
+      "executable": "qemu_synthetic_bench.py",
+      "json_path": "$.benchmarks[2].command",
+      "machine": "",
+      "memory": "256M",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "violation_count": 0
+    },
+    {
+      "accelerator": "",
+      "cpu": "",
+      "executable": "qemu_synthetic_bench.py",
+      "json_path": "$.benchmarks[3].command",
+      "machine": "",
+      "memory": "256M",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "violation_count": 0
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "artifacts": 1,
+    "commands": 7,
+    "commands_with_violations": 0,
+    "findings": 0,
+    "status": "pass"
+  },
+  "tool": "qemu_launch_profile_audit"
+}

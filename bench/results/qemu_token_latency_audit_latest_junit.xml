@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="holyc_qemu_token_latency_audit" tests="1" failures="0" errors="0"><testcase name="token_latency" /></testsuite>

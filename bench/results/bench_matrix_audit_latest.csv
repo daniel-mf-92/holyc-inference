@@ -1,0 +1,3 @@
+row_type,matrix,status,scope,message,slug,profile,model,quantization,command_airgap_ok,command_sha256
+cell,bench/fixtures/bench_matrix_smoke.json,pass,,,ci-airgap-smoke_synthetic-smoke_Q4_0,ci-airgap-smoke,synthetic-smoke,Q4_0,True,b9be9bb048be4bf27f179ec73019754dd945d4c113f0a28a4ca266b00b458b85
+cell,bench/fixtures/bench_matrix_smoke.json,pass,,,ci-airgap-smoke_synthetic-smoke_Q8_0,ci-airgap-smoke,synthetic-smoke,Q8_0,True,b9be9bb048be4bf27f179ec73019754dd945d4c113f0a28a4ca266b00b458b85

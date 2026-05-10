@@ -1,0 +1,2 @@
+source,status,command_rows,qemu_system_rows,exact_one_nic_none_rows,airgap_ok_rows,findings,error
+bench/results/qemu_prompt_bench_latest.json,pass,7,0,7,7,0,

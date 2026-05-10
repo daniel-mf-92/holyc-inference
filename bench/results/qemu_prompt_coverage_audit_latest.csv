@@ -1,0 +1,2 @@
+source,status,profile,model,quantization,prompt_suite_source,prompt_suite_sha256,prompt_suite_file_exists,prompt_suite_file_sha256_matches,expected_prompts,measured_prompts,missing_prompts,unexpected_prompts,measured_runs,successful_runs,failed_runs,min_successful_runs_per_expected_prompt,error
+bench/results/qemu_prompt_bench_latest.json,pass,ci-airgap-smoke,synthetic-smoke,Q4_0,bench/prompts/smoke.jsonl,68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a,True,True,2,2,0,0,4,4,0,2,

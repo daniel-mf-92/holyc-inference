@@ -1,0 +1,2 @@
+source,status,commit,profile,model,quantization,qemu_bin,qemu_path,qemu_version,platform,machine,python,cpu_count,command_sha256,command_airgap_ok,rows,row_missing_command_provenance,row_commit_mismatches,row_command_hash_mismatches,row_command_airgap_mismatches
+bench/results/qemu_prompt_bench_latest.json,pass,a70776642a09,ci-airgap-smoke,synthetic-smoke,Q4_0,bench/fixtures/qemu_synthetic_bench.py,bench/fixtures/qemu_synthetic_bench.py,,macOS-26.2-arm64-arm-64bit-Mach-O,arm64,3.14.3,10,633b78c56d2f2d5c6739b10ca9b48d66a6bb83328887ac7aceabb4ab48fd1c96,True,4,0,0,0,0

@@ -1,0 +1,4 @@
+input,record_id,choice_count,unique_normalized_choices,duplicate_choice_indexes,prompt_overlap_choice_indexes,answer_index,answer_alias_count,status
+bench/results/datasets/smoke_eval.hceval,smoke-hellaswag-1,4,4,,,0,1,pass
+bench/results/datasets/smoke_eval.hceval,smoke-arc-1,4,4,,,0,1,pass
+bench/results/datasets/smoke_eval.hceval,smoke-truthfulqa-1,4,4,,,0,1,pass

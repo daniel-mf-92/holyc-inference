@@ -1,0 +1,7 @@
+source,row,list_name,profile,model,quantization,prompt,phase,returncode,timed_out,exit_class,computed_exit_class,failure_reason,computed_failure_reason,tokens,elapsed_us,status
+bench/results/qemu_prompt_bench_latest.json,1,warmups,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,warmup,0,False,ok,ok,,,32,200000,pass
+bench/results/qemu_prompt_bench_latest.json,2,warmups,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,warmup,0,False,ok,ok,,,48,300000,pass
+bench/results/qemu_prompt_bench_latest.json,3,benchmarks,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,measured,0,False,ok,ok,,,32,200000,pass
+bench/results/qemu_prompt_bench_latest.json,4,benchmarks,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,measured,0,False,ok,ok,,,32,200000,pass
+bench/results/qemu_prompt_bench_latest.json,5,benchmarks,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,measured,0,False,ok,ok,,,48,300000,pass
+bench/results/qemu_prompt_bench_latest.json,6,benchmarks,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,measured,0,False,ok,ok,,,48,300000,pass

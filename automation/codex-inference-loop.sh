@@ -6,7 +6,7 @@ PROMPT_FILE="${PROMPT_FILE:-$REPO_DIR/LOOP_PROMPT.md}"
 LOG_DIR="${LOG_DIR:-$REPO_DIR/automation/logs}"
 SLEEP_SECONDS="${SLEEP_SECONDS:-60}"
 BRANCH_NAME="${BRANCH_NAME:-main}"
-CODEX_MODEL="${CODEX_MODEL:-gpt-5.3-codex}"
+CODEX_MODEL="${CODEX_MODEL:-gpt-5.5}"
 CODEX_TIMEOUT_SECONDS="${CODEX_TIMEOUT_SECONDS:-1200}"
 CODEX_KILL_AFTER_SECONDS="${CODEX_KILL_AFTER_SECONDS:-30}"
 CODEX_MAX_RETRIES="${CODEX_MAX_RETRIES:-10}"
@@ -22,19 +22,19 @@ LAST_ITERATION_FILE="${LAST_ITERATION_FILE:-$LOG_DIR/last-iteration.txt}"
 AIRGAP_GUARD_SCRIPT="${AIRGAP_GUARD_SCRIPT:-/usr/bin/true}"
 CREDENTIALS_FILE="${CREDENTIALS_FILE:-$HOME/.mcp-credentials.env}"
 CODEX_USE_CO_WRAPPER="${CODEX_USE_CO_WRAPPER:-0}"
-CODEX_CO_WRAPPER="${CODEX_CO_WRAPPER:-$HOME/bin/co}"
+CODEX_CO_WRAPPER="${CODEX_CO_WRAPPER:-$HOME/bin/gpt55}"
 LB_ENDPOINT_FILES="${LB_ENDPOINT_FILES:-}"
-LB_STATE_FILE="${LB_STATE_FILE:-$HOME/.co-codex53-lb-state-inference}"
+LB_STATE_FILE="${LB_STATE_FILE:-$HOME/.co-gpt55-lb-state-holyc-gpt55-bench}"
 CODEX_FORCE_SKIP_GIT_CHECK="${CODEX_FORCE_SKIP_GIT_CHECK:-1}"
 CODEX_PYTHON_SAFEPATH="${CODEX_PYTHON_SAFEPATH:-1}"
 NO_NETWORK_GUARD=$'Hard safety requirement: keep TempleOS guest fully air-gapped at all times.\n- Do not add or enable networking stack, NIC drivers, sockets, TCP/IP, UDP, TLS, DHCP, DNS, HTTP, or similar networking features.\n- Do not execute WS8 networking tasks; record them as out-of-scope due to air-gap policy.\n- Any QEMU or VM command must explicitly disable networking (use `-nic none`; legacy fallback: `-net none`).'
 HOLYC_ONLY_GUARD=$'Hard language requirement: core TempleOS modernization is HolyC-only.\n- For core subsystems, do not introduce C/C++/Rust/Go/Python/JS/TS implementation code.\n- Non-HolyC is allowed only for host-side automation/tooling around the repo.\n- Reject tasks requiring network-dependent package ecosystems or remote runtime services.'
 
 DEFAULT_LB_ENDPOINT_FILES=(
-  "$HOME/.codex/codex53-endpoints.json"
-  "$HOME/.codex/codex53-2-endpoints.json"
-  "$HOME/.codex/codex53-3-endpoints.json"
-  "$HOME/.codex/codex53-4-endpoints.json"
+  "$HOME/.codex/gpt55-endpoints.json"
+  "$HOME/.codex/gpt55-2-endpoints.json"
+  "$HOME/.codex/gpt55-3-endpoints.json"
+  "$HOME/.codex/gpt55-4-endpoints.json"
 )
 
 LB_SELECTED_NAME=""
@@ -106,7 +106,7 @@ select_lb_endpoint() {
       jq -r '
         if type=="array" then .[] else . end
         | select(type=="object" and (.name|type=="string") and (.base_url|type=="string") and (.api_key|type=="string"))
-        | [.name, .base_url, .api_key, ((.model // "gpt-53-codex")|tostring)]
+        | [.name, .base_url, .api_key, ((.model // "gpt-55")|tostring)]
         | @tsv
       ' "$endpoint_file" 2>/dev/null || true
     )
@@ -133,7 +133,7 @@ select_lb_endpoint() {
     names+=("$name")
     bases+=("$base")
     keys+=("$key")
-    models+=("${model:-gpt-53-codex}")
+    models+=("${model:-gpt-55}")
     counts+=("$count")
 
     (( count < min_count )) && min_count="$count"
@@ -273,6 +273,9 @@ run_codex_with_watchdog() {
       exec
       --json
       --model "$LB_SELECTED_MODEL"
+      -c "model_provider=\"azure\""
+      -c "model_providers.azure.name=\"azure\""
+      -c "model_providers.azure.env_key=\"AZURE_OPENAI_API_KEY\""
       -c "model_providers.azure.base_url=$LB_SELECTED_BASE_URL"
       -c "model_providers.azure.wire_api=responses"
       -c "model_providers.azure.timeout=7200"

@@ -1,0 +1,2 @@
+bucket,min_prompt_bytes,max_prompt_bytes,record_count,holyc_correct,llama_correct,both_correct,holyc_only_correct,llama_only_correct,both_wrong,agreement_count,holyc_accuracy,llama_accuracy,agreement,holyc_accuracy_delta_vs_llama
+0-128,0,128,3,3,3,3,0,0,0,3,1.0,1.0,1.0,0.0

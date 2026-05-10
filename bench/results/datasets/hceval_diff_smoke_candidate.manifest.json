@@ -1,0 +1,133 @@
+{
+  "answer_histogram": {
+    "0": 1,
+    "1": 1
+  },
+  "binary_layout": {
+    "binary_bytes": 343,
+    "body_bytes": 196,
+    "choice_length_prefix_bytes": 32,
+    "fixed_header_bytes": 52,
+    "metadata_bytes": 95,
+    "record_count": 2,
+    "record_header_bytes": 48,
+    "record_payload_bytes": 148
+  },
+  "binary_sha256": "f4116c292a38f32da8ac87f1ad3f3229484a2c7e0f28f8d8a4206f7e02b6394b",
+  "byte_stats": {
+    "max_choice_bytes": 5,
+    "max_prompt_bytes": 21,
+    "max_record_payload_bytes": 74,
+    "total_choice_bytes": 31,
+    "total_prompt_bytes": 41
+  },
+  "choice_count_histogram": {
+    "4": 2
+  },
+  "choice_count_stats": {
+    "avg_choices_per_record": 4.0,
+    "max_choices_per_record": 4,
+    "min_choices_per_record": 4,
+    "total_choices": 8
+  },
+  "dataset": "smoke-eval",
+  "format": "hceval-mc",
+  "magic": "HCEVAL1\u0000",
+  "output": "bench/results/datasets/hceval_diff_smoke_candidate.hceval",
+  "record_count": 2,
+  "record_fingerprints": [
+    {
+      "answer_index": 0,
+      "answer_payload_sha256": "41dc8f1a227137490788cef6b3d7ecf5ca0c70cb37005c44aee632e1ba20abd7",
+      "choice_count": 4,
+      "choices_sha256": "076396e922cbd41b057ade4bc23d24d603a50dcc78b6e7a99dbe6fbb87c93278",
+      "full_payload_sha256": "ed8f04b9432915ae17f4b3654f4a3da62c3c4673e164824b389aae7d7a87fb16",
+      "input_sha256": "1e781112e8d03710e5b1b45293f32aaeca082399e6be02d3f77b8e0e9f52de31",
+      "prompt_sha256": "ad8aedbd433ab4f234166afcf3cdd81b7f78fbbedf482c24245a31d7d006822d",
+      "record_id": "smoke-1",
+      "record_index": 0
+    },
+    {
+      "answer_index": 1,
+      "answer_payload_sha256": "e9b94297d9bf06e98eba0b9a3260b06bcdf6ef92bb472bcee28ca81043efdfde",
+      "choice_count": 4,
+      "choices_sha256": "b0d88536e007a87bba09f2d4e20cf892b9e24ccde8ba067a58076c9a66233509",
+      "full_payload_sha256": "7eaf3e50e98b44a5678efbd56b4475840d1436526ca285e65a92b649197c8265",
+      "input_sha256": "6c8f9e55af8647f22f1c34084815017964f868c2f98b0ea86b3b40998712e42b",
+      "prompt_sha256": "c44d75d2b8414ba40e58750913c1ac50305d8cd2c9a6b91be8db7b394aaa9c13",
+      "record_id": "smoke-2",
+      "record_index": 1
+    }
+  ],
+  "record_spans": [
+    {
+      "answer_index": 0,
+      "choice_bytes": [
+        3,
+        4,
+        5,
+        4
+      ],
+      "choice_bytes_total": 16,
+      "choice_count": 4,
+      "length": 98,
+      "offset": 147,
+      "payload_bytes": 74,
+      "prompt_bytes": 20,
+      "provenance_bytes": 15,
+      "record_id": "smoke-1",
+      "record_index": 0
+    },
+    {
+      "answer_index": 1,
+      "choice_bytes": [
+        3,
+        3,
+        5,
+        4
+      ],
+      "choice_bytes_total": 15,
+      "choice_count": 4,
+      "length": 98,
+      "offset": 245,
+      "payload_bytes": 74,
+      "prompt_bytes": 21,
+      "provenance_bytes": 15,
+      "record_id": "smoke-2",
+      "record_index": 1
+    }
+  ],
+  "records": [
+    {
+      "answer_index": 0,
+      "choices": [
+        "red",
+        "blue",
+        "green",
+        "gray"
+      ],
+      "dataset": "smoke-eval",
+      "prompt": "Pick the warm color.",
+      "provenance": "synthetic smoke",
+      "record_id": "smoke-1",
+      "split": "validation"
+    },
+    {
+      "answer_index": 1,
+      "choices": [
+        "one",
+        "two",
+        "three",
+        "five"
+      ],
+      "dataset": "smoke-eval",
+      "prompt": "Pick the even number.",
+      "provenance": "synthetic smoke",
+      "record_id": "smoke-2",
+      "split": "validation"
+    }
+  ],
+  "source_sha256": "6abc06bc3f93d581056d8bda0ce661c752eb832c3fd023a518a58469e8e318a8",
+  "split": "validation",
+  "version": 1
+}

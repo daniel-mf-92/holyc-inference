@@ -1,0 +1,2 @@
+source,status,expected_status,rows,ok_rows,failed_rows,timed_out_rows,nonzero_exit_rows,telemetry_findings,variability_findings,command_airgap_ok,suite_runs,suite_ok_runs,suite_failed_runs,suite_timed_out_runs,suite_nonzero_exit_runs
+bench/fixtures/qemu_status_audit/pass.json,pass,pass,2,2,0,0,0,0,0,True,2,2,0,0,0

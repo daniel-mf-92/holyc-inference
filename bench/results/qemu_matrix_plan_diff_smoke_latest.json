@@ -1,0 +1,66 @@
+{
+  "baseline": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmphdk15ctx/baseline.json",
+  "build_diffs": [
+    {
+      "baseline_command_sha256": "cmd-a",
+      "baseline_launch_count": 2,
+      "baseline_launch_plan_sha256": "plan-2",
+      "baseline_present": true,
+      "build": "base",
+      "candidate_command_sha256": "cmd-a",
+      "candidate_launch_count": 2,
+      "candidate_launch_plan_sha256": "plan-2",
+      "candidate_present": true,
+      "delta_launch_count": 0,
+      "model": "toy",
+      "profile": "smoke",
+      "quantization": "Q8_0",
+      "status": "pass"
+    }
+  ],
+  "candidate": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmphdk15ctx/candidate_pass.json",
+  "findings": [],
+  "generated_at": "2026-05-02T04:10:50Z",
+  "launch_diffs": [
+    {
+      "baseline_count": 1,
+      "build": "base",
+      "candidate_count": 1,
+      "delta": 0,
+      "iteration": 0,
+      "model": "toy",
+      "phase": "measured",
+      "profile": "smoke",
+      "prompt_id": "alpha",
+      "prompt_sha256": "prompt-a",
+      "quantization": "Q8_0",
+      "status": "pass"
+    },
+    {
+      "baseline_count": 1,
+      "build": "base",
+      "candidate_count": 1,
+      "delta": 0,
+      "iteration": 1,
+      "model": "toy",
+      "phase": "measured",
+      "profile": "smoke",
+      "prompt_id": "alpha",
+      "prompt_sha256": "prompt-a",
+      "quantization": "Q8_0",
+      "status": "pass"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "baseline_builds": 1,
+    "baseline_launch_keys": 2,
+    "build_diff_rows": 1,
+    "candidate_builds": 1,
+    "candidate_launch_keys": 2,
+    "changed_build_rows": 0,
+    "changed_launch_rows": 0,
+    "findings": 0,
+    "launch_diff_rows": 2
+  }
+}

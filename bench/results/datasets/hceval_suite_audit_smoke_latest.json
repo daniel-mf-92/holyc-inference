@@ -1,0 +1,33 @@
+{
+  "dataset_counts": {
+    "suite-smoke": 1
+  },
+  "error_count": 0,
+  "findings": [],
+  "format": "hceval-suite-audit",
+  "generated_at": "2026-05-02T04:00:57Z",
+  "input_count": 1,
+  "inputs": [
+    "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/hceval-suite-audit-vmedwq42/suite.hceval"
+  ],
+  "record_count": 1,
+  "rows": [
+    {
+      "binary_bytes": 268,
+      "dataset": "suite-smoke",
+      "findings": [],
+      "input": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/hceval-suite-audit-vmedwq42/suite.hceval",
+      "manifest": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/hceval-suite-audit-vmedwq42/suite.hceval.manifest.json",
+      "max_choice_bytes": 8,
+      "max_prompt_bytes": 27,
+      "max_record_payload_bytes": 96,
+      "payload_sha256": "b9f424f552614a9586ad2722ae63c446a2c9e5ecae279a70d94054548ba928ec",
+      "record_count": 1,
+      "source_sha256": "11c207216eda1c94bb7a45822c8cc9baf62919f3a421fd22ab89c3f17acc7639",
+      "split": "validation",
+      "status": "pass"
+    }
+  ],
+  "status": "pass",
+  "total_binary_bytes": 268
+}

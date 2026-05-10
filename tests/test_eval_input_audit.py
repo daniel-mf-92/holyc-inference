@@ -91,12 +91,44 @@ def test_smoke_eval_inputs_pass() -> None:
         assert abs(report["prediction_audits"]["holyc"]["score_coverage_pct"] - (100.0 / 3.0)) < 0.001
         assert report["prediction_audits"]["holyc"]["top_score_ties"] == 0
         assert report["prediction_audits"]["holyc"]["top_score_tie_pct"] == 0.0
+        assert report["prediction_audits"]["holyc"]["min_top_score_margin"] == 8.0
+        assert report["prediction_audits"]["holyc"]["low_top_score_margins"] == 0
+        assert report["prediction_audits"]["holyc"]["low_top_score_margin_pct"] == 0.0
         assert report["prediction_audits"]["holyc"]["score_length_histogram"] == {"4": 1}
+        assert len(report["prediction_audits"]["holyc"]["records"]) == 3
+        scored_record = next(row for row in report["prediction_audits"]["holyc"]["records"] if row["has_scores"])
+        assert scored_record["source"] == "holyc"
+        assert scored_record["record_id"] == "smoke-arc-1"
+        assert scored_record["valid"] is True
+        assert scored_record["correct"] is True
+        assert scored_record["score_count"] == 4
         assert (tmp_path / "audit.md").exists()
         assert list(csv.DictReader((tmp_path / "audit.csv").open(newline="", encoding="utf-8"))) == []
         junit_root = ET.parse(tmp_path / "audit_junit.xml").getroot()
         assert junit_root.attrib["name"] == "holyc_eval_input_audit"
         assert junit_root.attrib["failures"] == "0"
+
+
+def test_record_csv_writes_per_engine_prediction_telemetry() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        record_csv = tmp_path / "records.csv"
+        args = smoke_args(tmp_path)
+        args.extend(["--record-csv", str(record_csv)])
+
+        assert eval_input_audit.main(args) == 0
+
+        rows = list(csv.DictReader(record_csv.open(newline="", encoding="utf-8")))
+        assert len(rows) == 6
+        assert {row["source"] for row in rows} == {"holyc", "llama.cpp"}
+        scored_holyc = next(row for row in rows if row["source"] == "holyc" and row["has_scores"] == "True")
+        assert scored_holyc["record_id"] == "smoke-arc-1"
+        assert scored_holyc["valid"] == "True"
+        assert scored_holyc["correct"] == "True"
+        assert scored_holyc["score_count"] == "4"
+        assert scored_holyc["top_score_tie_count"] == "1"
+        assert scored_holyc["top_score_margin"] == "8.0"
+        assert scored_holyc["prompt_hash_status"] == "missing"
 
 
 def test_required_input_hashes_pass_with_matching_metadata() -> None:
@@ -247,8 +279,39 @@ def test_top_score_tie_gate_fails() -> None:
         assert any("top score ties cover 50.00% of scored predictions" in message for message in messages)
 
 
+def test_top_score_margin_gate_fails() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        holyc = tmp_path / "holyc_low_margin_scores.jsonl"
+        holyc.write_text(
+            "\n".join(
+                [
+                    '{"id":"smoke-hellaswag-1","scores":[4.0,3.95,1.0,0.0]}',
+                    '{"id":"smoke-arc-1","scores":[9.0,1.0,0.5,0.25]}',
+                    '{"id":"smoke-truthfulqa-1","prediction":"A"}',
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        args = smoke_args(tmp_path, "score_margin")
+        args[args.index(str(BENCH_PATH / "eval" / "samples" / "holyc_smoke_predictions.jsonl"))] = str(holyc)
+        args.extend(["--min-top-score-margin", "0.1"])
+        assert eval_input_audit.main(args) == 2
+
+        report = json.loads((tmp_path / "score_margin.json").read_text(encoding="utf-8"))
+        messages = [issue["message"] for issue in report["issues"]]
+        assert report["prediction_audits"]["holyc"]["scored_predictions"] == 2
+        assert report["prediction_audits"]["holyc"]["low_top_score_margins"] == 1
+        assert report["prediction_audits"]["holyc"]["low_top_score_margin_pct"] == 50.0
+        assert abs(report["prediction_audits"]["holyc"]["min_top_score_margin"] - 0.05) < 0.000001
+        assert any("top score margin 0.05 is below --min-top-score-margin 0.1" in message for message in messages)
+
+
 if __name__ == "__main__":
     test_smoke_eval_inputs_pass()
+    test_record_csv_writes_per_engine_prediction_telemetry()
     test_required_input_hashes_pass_with_matching_metadata()
     test_required_input_hashes_fail_on_missing_or_mismatch()
     test_missing_prediction_fails_with_structured_report()
@@ -256,4 +319,5 @@ if __name__ == "__main__":
     test_majority_prediction_gate_fails()
     test_score_coverage_gate_fails()
     test_top_score_tie_gate_fails()
+    test_top_score_margin_gate_fails()
     print("eval_input_audit_tests=ok")

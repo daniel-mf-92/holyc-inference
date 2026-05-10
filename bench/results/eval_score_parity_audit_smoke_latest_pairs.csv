@@ -1,0 +1,4 @@
+record_id,choice_count,holyc_present,llama_present,holyc_has_scores,llama_has_scores,holyc_score_count,llama_score_count,holyc_predicted_index,llama_predicted_index,holyc_top_score_index,llama_top_score_index,holyc_top_score_tie_count,llama_top_score_tie_count,score_shape_match,both_scored
+smoke-arc-1,4,True,True,True,True,4,4,0,0,0,0,1,1,True,True
+smoke-hellaswag-1,4,True,True,True,True,4,4,0,0,0,0,1,1,True,True
+smoke-truthfulqa-1,4,True,True,True,True,4,4,0,0,0,0,1,1,True,True

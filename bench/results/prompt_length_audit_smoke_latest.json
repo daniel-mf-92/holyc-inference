@@ -1,0 +1,93 @@
+{
+  "buckets": [
+    {
+      "max_bytes": 128,
+      "min_bytes": 0,
+      "name": "short"
+    },
+    {
+      "max_bytes": 512,
+      "min_bytes": 129,
+      "name": "medium"
+    },
+    {
+      "max_bytes": null,
+      "min_bytes": 513,
+      "name": "long"
+    }
+  ],
+  "findings": [],
+  "gates": {
+    "fail_on_duplicate_prompts": false,
+    "min_bucket_prompts": {
+      "long": 1,
+      "medium": 1,
+      "short": 1
+    },
+    "min_sources": 1,
+    "min_total_prompts": 3
+  },
+  "prompts": [
+    {
+      "bucket": "short",
+      "expected_tokens": 4,
+      "prompt_bytes": 12,
+      "prompt_id": "short",
+      "prompt_sha256": "b8e8b8a25cadcb8ecd893653ecaa9ec217c766de897529b93e308e057a8d1990",
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp2m5tixid/prompts.jsonl"
+    },
+    {
+      "bucket": "medium",
+      "expected_tokens": 16,
+      "prompt_bytes": 180,
+      "prompt_id": "medium",
+      "prompt_sha256": "b086c61a9d00d5586eb88e327dfe87ecf5f8ff2a561ddfaea159e675f146f8ab",
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp2m5tixid/prompts.jsonl"
+    },
+    {
+      "bucket": "long",
+      "expected_tokens": 32,
+      "prompt_bytes": 640,
+      "prompt_id": "long",
+      "prompt_sha256": "d59ecdb8886779fc64e9ef4c45260f03a3081dd49f1e39da7a41ccfb46089320",
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp2m5tixid/prompts.jsonl"
+    }
+  ],
+  "sources": [
+    {
+      "bucket_counts": {
+        "long": 1,
+        "medium": 1,
+        "short": 1,
+        "unbucketed": 0
+      },
+      "duplicate_prompt_sha256": 0,
+      "error": "",
+      "prompt_bytes_avg": 277.3333333333333,
+      "prompt_bytes_max": 640,
+      "prompt_bytes_min": 12,
+      "prompt_bytes_total": 832,
+      "prompts": 3,
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp2m5tixid/prompts.jsonl",
+      "status": "pass",
+      "suite_sha256": "7312e9c1797b2fd02084b3f19f49336cf36dee72bd54373673fb4b7cf7061159"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "bucket_counts": {
+      "long": 1,
+      "medium": 1,
+      "short": 1,
+      "unbucketed": 0
+    },
+    "findings": 0,
+    "prompt_bytes_max": 640,
+    "prompt_bytes_min": 12,
+    "prompt_bytes_total": 832,
+    "prompts": 3,
+    "sources": 1
+  },
+  "timestamp": "2026-05-02T04:01:20Z",
+  "tool": "prompt_length_audit"
+}

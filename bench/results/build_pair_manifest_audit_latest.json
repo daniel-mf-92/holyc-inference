@@ -1,0 +1,27 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-02T03:59:34Z",
+  "pairs": [
+    {
+      "baseline_commit": "basecommit",
+      "baseline_generated_at": "2026-04-30T00:00:00Z",
+      "baseline_measured_runs": 4,
+      "baseline_source": "bench/results/base.json",
+      "build_compare_args": "--input base-20260430-basecommit=bench/results/base.json --input head-20260501-headcommit=bench/results/head.json",
+      "candidate_commit": "headcommit",
+      "candidate_generated_at": "2026-05-01T00:00:00Z",
+      "candidate_measured_runs": 4,
+      "candidate_source": "bench/results/head.json",
+      "key": "ci/tiny/Q4_0/suite/command/launch/env",
+      "row": 1,
+      "source": "bench/fixtures/build_pair_manifest_audit/pass.json"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "inputs": 1,
+    "pairs": 1
+  },
+  "tool": "build_pair_manifest_audit"
+}

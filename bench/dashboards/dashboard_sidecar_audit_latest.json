@@ -1,0 +1,61 @@
+{
+  "dashboards": [
+    {
+      "csv_path": "bench/dashboards/bench_trend_export_latest.csv",
+      "csv_present": true,
+      "error": "",
+      "json_valid": true,
+      "junit_path": "bench/dashboards/bench_trend_export_junit_latest.xml",
+      "junit_present": true,
+      "markdown_path": "bench/dashboards/bench_trend_export_latest.md",
+      "markdown_present": true,
+      "source": "bench/dashboards/bench_trend_export_latest.json",
+      "status": "pass"
+    },
+    {
+      "csv_path": "bench/dashboards/dashboard_digest_latest.csv",
+      "csv_present": true,
+      "error": "",
+      "json_valid": true,
+      "junit_path": "bench/dashboards/dashboard_digest_latest_junit.xml",
+      "junit_present": true,
+      "markdown_path": "bench/dashboards/dashboard_digest_latest.md",
+      "markdown_present": true,
+      "source": "bench/dashboards/dashboard_digest_latest.json",
+      "status": "pass"
+    },
+    {
+      "csv_path": "bench/dashboards/perf_regression_commit_coverage_violations_latest.csv",
+      "csv_present": true,
+      "error": "",
+      "json_valid": true,
+      "junit_path": "bench/dashboards/perf_regression_junit_latest.xml",
+      "junit_present": true,
+      "markdown_path": "bench/dashboards/perf_regression_latest.md",
+      "markdown_present": true,
+      "source": "bench/dashboards/perf_regression_latest.json",
+      "status": "pass"
+    },
+    {
+      "csv_path": "bench/dashboards/perf_slo_audit_latest.csv",
+      "csv_present": true,
+      "error": "",
+      "json_valid": true,
+      "junit_path": "bench/dashboards/perf_slo_audit_latest_junit.xml",
+      "junit_present": true,
+      "markdown_path": "bench/dashboards/perf_slo_audit_latest.md",
+      "markdown_present": true,
+      "source": "bench/dashboards/perf_slo_audit_latest.json",
+      "status": "pass"
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-04-30T06:45:59Z",
+  "status": "pass",
+  "summary": {
+    "dashboards": 4,
+    "findings": 0,
+    "invalid_json": 0,
+    "missing_sidecar_dashboards": 0
+  }
+}

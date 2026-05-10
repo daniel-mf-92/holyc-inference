@@ -1,0 +1,4 @@
+source,dataset,split,record_id,choice_count,answer_index,overlap_count,answer_overlaps_prompt,overlap_choice_indexes
+/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl:1,hellaswag-smoke,validation,smoke-hellaswag-1,4,0,0,False,
+/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl:2,arc-smoke,validation,smoke-arc-1,4,0,0,False,
+/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl:3,truthfulqa-smoke,validation,smoke-truthfulqa-1,4,0,0,False,

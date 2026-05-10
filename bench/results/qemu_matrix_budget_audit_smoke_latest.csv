@@ -1,0 +1,3 @@
+source,build,profile,model,quantization,launches,warmup_launches,measured_launches,prompt_bytes_total,expected_tokens_total,missing_expected_tokens,command_airgap_ok
+/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmphb6m84rr/qemu_benchmark_matrix_ok.json,baseline,ci-smoke,synthetic,Q4_0,3,1,2,54,24,0,True
+/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmphb6m84rr/qemu_benchmark_matrix_ok.json,candidate,ci-smoke,synthetic,Q4_0,3,1,2,54,24,0,True

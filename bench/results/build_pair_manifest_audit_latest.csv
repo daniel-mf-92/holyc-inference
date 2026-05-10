@@ -1,0 +1,2 @@
+source,row,key,baseline_source,candidate_source,baseline_commit,candidate_commit,baseline_generated_at,candidate_generated_at,baseline_measured_runs,candidate_measured_runs,build_compare_args
+bench/fixtures/build_pair_manifest_audit/pass.json,1,ci/tiny/Q4_0/suite/command/launch/env,bench/results/base.json,bench/results/head.json,basecommit,headcommit,2026-04-30T00:00:00Z,2026-05-01T00:00:00Z,4,4,--input base-20260430-basecommit=bench/results/base.json --input head-20260501-headcommit=bench/results/head.json

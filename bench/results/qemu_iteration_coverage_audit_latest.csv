@@ -1,0 +1,5 @@
+source,list_name,phase,prompt,rows,ok_rows,min_iteration,max_iteration,missing_iterations,duplicate_iterations
+bench/results/qemu_prompt_bench_latest.json,benchmarks,measured,smoke-code,2,2,1,2,,
+bench/results/qemu_prompt_bench_latest.json,benchmarks,measured,smoke-short,2,2,1,2,,
+bench/results/qemu_prompt_bench_latest.json,warmups,warmup,smoke-code,1,1,1,1,,
+bench/results/qemu_prompt_bench_latest.json,warmups,warmup,smoke-short,1,1,1,1,,

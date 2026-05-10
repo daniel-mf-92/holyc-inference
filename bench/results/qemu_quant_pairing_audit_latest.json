@@ -1,0 +1,73 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-02T01:25:59Z",
+  "pairs": [
+    {
+      "commit": "5025377e127c",
+      "iteration": "1",
+      "missing_quantizations": "",
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "present_quantizations": "Q4_0,Q8_0",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "required_quantizations": "Q4_0,Q8_0",
+      "rows": 4,
+      "sources": "bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T200733Z.json;bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json;bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T200733Z.json;bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "successful_rows": 4
+    },
+    {
+      "commit": "5025377e127c",
+      "iteration": "2",
+      "missing_quantizations": "",
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "present_quantizations": "Q4_0,Q8_0",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "required_quantizations": "Q4_0,Q8_0",
+      "rows": 4,
+      "sources": "bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T200733Z.json;bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json;bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T200733Z.json;bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "successful_rows": 4
+    },
+    {
+      "commit": "5025377e127c",
+      "iteration": "1",
+      "missing_quantizations": "",
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "present_quantizations": "Q4_0,Q8_0",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "required_quantizations": "Q4_0,Q8_0",
+      "rows": 4,
+      "sources": "bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T200733Z.json;bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json;bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T200733Z.json;bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "successful_rows": 4
+    },
+    {
+      "commit": "5025377e127c",
+      "iteration": "2",
+      "missing_quantizations": "",
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "present_quantizations": "Q4_0,Q8_0",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "required_quantizations": "Q4_0,Q8_0",
+      "rows": 4,
+      "sources": "bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T200733Z.json;bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json;bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T200733Z.json;bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "successful_rows": 4
+    }
+  ],
+  "required_quantizations": [
+    "Q4_0",
+    "Q8_0"
+  ],
+  "status": "pass",
+  "summary": {
+    "complete_pairs": 4,
+    "findings": 0,
+    "pair_keys": 4,
+    "rows": 16
+  }
+}

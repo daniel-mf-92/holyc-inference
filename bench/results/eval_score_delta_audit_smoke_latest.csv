@@ -1,0 +1,4 @@
+record_id,dataset,split,choice_count,holyc_top_index,llama_top_index,top_index_match,max_abs_delta,mean_abs_delta,top_score_abs_delta,gold_score_abs_delta
+smoke-arc-1,arc-smoke,validation,4,0,0,True,0.09999999999999964,0.02499999999999991,0.09999999999999964,0.09999999999999964
+smoke-hellaswag-1,hellaswag-smoke,validation,4,0,0,True,0.20000000000000018,0.11250000000000006,0.20000000000000018,0.20000000000000018
+smoke-truthfulqa-1,truthfulqa-smoke,validation,4,0,0,True,0.20000000000000018,0.050000000000000044,0.20000000000000018,0.20000000000000018

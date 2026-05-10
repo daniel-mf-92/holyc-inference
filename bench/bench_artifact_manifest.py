@@ -96,6 +96,14 @@ class ManifestSampleViolation:
     required: int
 
 
+@dataclass(frozen=True)
+class ManifestTimestampCollision:
+    key: str
+    generated_at: str
+    sources: list[str]
+    sha256s: list[str]
+
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -260,9 +268,29 @@ def sample_coverage_violations(
                         metric="total_tokens",
                         observed=total_tokens,
                         required=min_total_tokens,
-                    )
                 )
+            )
     return violations
+
+
+def timestamp_collisions(artifacts: Iterable[ManifestArtifact]) -> list[ManifestTimestampCollision]:
+    by_timestamp: dict[tuple[str, str], list[ManifestArtifact]] = {}
+    for artifact in artifacts:
+        by_timestamp.setdefault((artifact.key, artifact.generated_at), []).append(artifact)
+
+    collisions: list[ManifestTimestampCollision] = []
+    for (key, generated_at), grouped in sorted(by_timestamp.items()):
+        if len(grouped) <= 1:
+            continue
+        collisions.append(
+            ManifestTimestampCollision(
+                key=key,
+                generated_at=generated_at,
+                sources=sorted(artifact.source for artifact in grouped),
+                sha256s=sorted({artifact.sha256 for artifact in grouped}),
+            )
+        )
+    return collisions
 
 
 def has_airgap_failures(artifacts: Iterable[ManifestArtifact]) -> bool:
@@ -297,6 +325,10 @@ def has_sample_coverage_violations(violations: Iterable[ManifestSampleViolation]
     return any(True for _ in violations)
 
 
+def has_timestamp_collisions(violations: Iterable[ManifestTimestampCollision]) -> bool:
+    return any(True for _ in violations)
+
+
 def has_dry_run_coverage_violations(
     violations: Iterable[bench_result_index.DryRunCoverageViolation],
 ) -> bool:
@@ -327,6 +359,7 @@ def markdown_report(report: dict[str, object]) -> str:
         f"History artifacts: {report['history_artifacts']}",
         f"Dry-run coverage violations: {len(report.get('dry_run_coverage_violations', []))}",
         f"Sample coverage violations: {len(report.get('sample_coverage_violations', []))}",
+        f"Timestamp collisions: {len(report.get('timestamp_collisions', []))}",
         f"Environment drift: {len(report.get('environment_drift', []))}",
         "",
     ]
@@ -426,6 +459,30 @@ def markdown_report(report: dict[str, object]) -> str:
             )
     elif report.get("min_measured_runs") is not None or report.get("min_total_tokens") is not None:
         lines.extend(["", "Sample coverage requirements satisfied."])
+
+    timestamp_collision_rows = report.get("timestamp_collisions", [])
+    if timestamp_collision_rows:
+        lines.extend(
+            [
+                "",
+                "## Timestamp Collisions",
+                "",
+                "| Key | Generated at | Sources | SHA256s |",
+                "| --- | --- | ---: | ---: |",
+            ]
+        )
+        for violation in timestamp_collision_rows:
+            assert isinstance(violation, dict)
+            lines.append(
+                "| {key} | {generated_at} | {sources} | {sha256s} |".format(
+                    key=violation["key"],
+                    generated_at=violation["generated_at"],
+                    sources=len(violation["sources"]),
+                    sha256s=len(violation["sha256s"]),
+                )
+            )
+    elif report.get("require_unique_timestamps"):
+        lines.extend(["", "Timestamp uniqueness requirements satisfied."])
 
     environment_drift = report.get("environment_drift", [])
     if environment_drift:
@@ -543,6 +600,24 @@ def write_sample_coverage_csv(violations: list[ManifestSampleViolation], path: P
             writer.writerow(asdict(violation))
 
 
+def write_timestamp_collision_csv(violations: list[ManifestTimestampCollision], path: Path) -> None:
+    fields = ["key", "generated_at", "source_count", "sources", "sha256_count", "sha256s"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for violation in violations:
+            writer.writerow(
+                {
+                    "key": violation.key,
+                    "generated_at": violation.generated_at,
+                    "source_count": len(violation.sources),
+                    "sources": json.dumps(violation.sources, separators=(",", ":")),
+                    "sha256_count": len(violation.sha256s),
+                    "sha256s": json.dumps(violation.sha256s, separators=(",", ":")),
+                }
+            )
+
+
 def write_dry_run_coverage_csv(
     violations: list[bench_result_index.DryRunCoverageViolation],
     path: Path,
@@ -627,6 +702,11 @@ def junit_report(report: dict[str, object]) -> str:
     sample_coverage_failures = [
         row for row in report.get("sample_coverage_violations", []) if isinstance(row, dict)
     ]
+    timestamp_collision_failures = (
+        [row for row in report.get("timestamp_collisions", []) if isinstance(row, dict)]
+        if report.get("require_unique_timestamps")
+        else []
+    )
     dry_run_coverage_failures = (
         [row for row in report.get("dry_run_coverage_violations", []) if isinstance(row, dict)]
         if report.get("require_dry_run_coverage")
@@ -647,6 +727,7 @@ def junit_report(report: dict[str, object]) -> str:
         + int(bool(freshness_failures))
         + int(bool(history_coverage_failures))
         + int(bool(sample_coverage_failures))
+        + int(bool(timestamp_collision_failures))
         + int(bool(dry_run_coverage_failures))
         + int(bool(environment_drift_failures))
         + int(missing_latest)
@@ -656,7 +737,7 @@ def junit_report(report: dict[str, object]) -> str:
         "testsuite",
         {
             "name": "holyc_bench_artifact_manifest",
-            "tests": "11",
+            "tests": "12",
             "failures": str(failures),
         },
     )
@@ -787,6 +868,21 @@ def junit_report(report: dict[str, object]) -> str:
             for row in sample_coverage_failures
         )
 
+    timestamp_collision_case = ET.SubElement(suite, "testcase", {"name": "timestamp_uniqueness"})
+    if timestamp_collision_failures:
+        failure = ET.SubElement(
+            timestamp_collision_case,
+            "failure",
+            {
+                "type": "benchmark_manifest_timestamp_collision",
+                "message": f"{len(timestamp_collision_failures)} benchmark key/timestamp collision(s)",
+            },
+        )
+        failure.text = "\n".join(
+            f"{row.get('key', '')}: {row.get('generated_at', '')}"
+            for row in timestamp_collision_failures
+        )
+
     dry_run_coverage_case = ET.SubElement(suite, "testcase", {"name": "dry_run_coverage"})
     if dry_run_coverage_failures:
         failure = ET.SubElement(
@@ -825,12 +921,14 @@ def write_manifest(
     min_total_tokens: int | None = None,
     require_dry_run_coverage: bool = False,
     require_environment_stability: bool = False,
+    require_unique_timestamps: bool = False,
 ) -> tuple[
     Path,
     str,
     list[ManifestArtifact],
     list[ManifestCoverageViolation],
     list[ManifestSampleViolation],
+    list[ManifestTimestampCollision],
     list[bench_result_index.DryRunCoverageViolation],
     list[bench_result_index.EnvironmentDrift],
 ]:
@@ -842,12 +940,14 @@ def write_manifest(
     latest = latest_artifacts(history)
     coverage_violations = history_coverage_violations(history, min_history_per_key)
     sample_violations = sample_coverage_violations(history, min_measured_runs, min_total_tokens)
+    timestamp_collision_findings = timestamp_collisions(history)
     dry_run_coverage_violations = bench_result_index.dry_run_coverage_violations(summaries)
     environment_drift_findings = bench_result_index.environment_drift(summaries)
     status = (
         "fail"
         if coverage_violations
         or sample_violations
+        or (require_unique_timestamps and timestamp_collision_findings)
         or (require_dry_run_coverage and dry_run_coverage_violations)
         or (require_environment_stability and environment_drift_findings)
         else manifest_status(history)
@@ -861,10 +961,12 @@ def write_manifest(
         "min_total_tokens": min_total_tokens,
         "require_dry_run_coverage": require_dry_run_coverage,
         "require_environment_stability": require_environment_stability,
+        "require_unique_timestamps": require_unique_timestamps,
         "latest_artifacts": [asdict(artifact) for artifact in latest],
         "history": [asdict(artifact) for artifact in history],
         "history_coverage_violations": [asdict(violation) for violation in coverage_violations],
         "sample_coverage_violations": [asdict(violation) for violation in sample_violations],
+        "timestamp_collisions": [asdict(finding) for finding in timestamp_collision_findings],
         "dry_run_coverage_violations": [
             asdict(violation) for violation in dry_run_coverage_violations
         ],
@@ -877,6 +979,7 @@ def write_manifest(
     history_csv_path = output_dir / "bench_artifact_manifest_history_latest.csv"
     history_coverage_csv_path = output_dir / "bench_artifact_manifest_history_coverage_latest.csv"
     sample_coverage_csv_path = output_dir / "bench_artifact_manifest_sample_coverage_latest.csv"
+    timestamp_collision_csv_path = output_dir / "bench_artifact_manifest_timestamp_collisions_latest.csv"
     dry_run_coverage_csv_path = output_dir / "bench_artifact_manifest_dry_run_coverage_latest.csv"
     environment_drift_csv_path = output_dir / "bench_artifact_manifest_environment_drift_latest.csv"
     freshness_failures_csv_path = output_dir / "bench_artifact_manifest_freshness_failures_latest.csv"
@@ -887,6 +990,7 @@ def write_manifest(
     write_csv(history, history_csv_path)
     write_history_coverage_csv(coverage_violations, history_coverage_csv_path)
     write_sample_coverage_csv(sample_violations, sample_coverage_csv_path)
+    write_timestamp_collision_csv(timestamp_collision_findings, timestamp_collision_csv_path)
     write_dry_run_coverage_csv(dry_run_coverage_violations, dry_run_coverage_csv_path)
     write_environment_drift_csv(environment_drift_findings, environment_drift_csv_path)
     write_freshness_failures_csv(history, freshness_failures_csv_path)
@@ -897,6 +1001,7 @@ def write_manifest(
         history,
         coverage_violations,
         sample_violations,
+        timestamp_collision_findings,
         dry_run_coverage_violations,
         environment_drift_findings,
     )
@@ -978,6 +1083,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Return non-zero if any measured qemu_prompt artifact lacks a matching dry-run launch plan",
     )
     parser.add_argument(
+        "--fail-on-timestamp-collision",
+        action="store_true",
+        help="Return non-zero if multiple artifacts for the same key share generated_at",
+    )
+    parser.add_argument(
         "--fail-on-environment-drift",
         action="store_true",
         help="Return non-zero if comparable benchmark artifacts have different host/QEMU environment hashes",
@@ -1026,6 +1136,7 @@ def main(argv: list[str] | None = None) -> int:
             artifacts,
             history_coverage,
             sample_coverage,
+            timestamp_collisions_report,
             dry_run_coverage,
             environment_drift,
         ) = write_manifest(
@@ -1036,6 +1147,7 @@ def main(argv: list[str] | None = None) -> int:
             min_total_tokens=args.min_total_tokens,
             require_dry_run_coverage=args.fail_on_missing_dry_run,
             require_environment_stability=args.fail_on_environment_drift,
+            require_unique_timestamps=args.fail_on_timestamp_collision,
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -1048,6 +1160,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"freshness_failures={sum(1 for artifact in artifacts if artifact.freshness_status == 'fail')}")
     print(f"history_coverage_violations={len(history_coverage)}")
     print(f"sample_coverage_violations={len(sample_coverage)}")
+    print(f"timestamp_collisions={len(timestamp_collisions_report)}")
     print(f"dry_run_coverage_violations={len(dry_run_coverage)}")
     print(f"environment_drift={len(environment_drift)}")
     if args.fail_on_airgap and has_airgap_failures(artifacts):
@@ -1065,6 +1178,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.fail_on_history_coverage and has_history_coverage_violations(history_coverage):
         return 1
     if args.fail_on_sample_coverage and has_sample_coverage_violations(sample_coverage):
+        return 1
+    if args.fail_on_timestamp_collision and has_timestamp_collisions(timestamp_collisions_report):
         return 1
     if args.fail_on_missing_dry_run and has_dry_run_coverage_violations(dry_run_coverage):
         return 1

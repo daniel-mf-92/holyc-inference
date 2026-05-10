@@ -1,0 +1,133 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-02T06:51:21Z",
+  "records": [
+    {
+      "dataset": "",
+      "derived_mean_nll": 0.3125,
+      "derived_perplexity": 1.3668379411737963,
+      "derived_total_nll": 1.25,
+      "logprob_count": 4,
+      "mean_nll": null,
+      "perplexity": null,
+      "record_id": "smoke-hellaswag-1",
+      "row": 1,
+      "source": "bench/eval/samples/holyc_smoke_logprobs.jsonl",
+      "split": "",
+      "token_count": 4,
+      "total_nll": null
+    },
+    {
+      "dataset": "",
+      "derived_mean_nll": 0.35000000000000003,
+      "derived_perplexity": 1.4190675485932573,
+      "derived_total_nll": 1.05,
+      "logprob_count": 0,
+      "mean_nll": null,
+      "perplexity": null,
+      "record_id": "smoke-arc-1",
+      "row": 2,
+      "source": "bench/eval/samples/holyc_smoke_logprobs.jsonl",
+      "split": "",
+      "token_count": 3,
+      "total_nll": 1.05
+    },
+    {
+      "dataset": "",
+      "derived_mean_nll": 0.42,
+      "derived_perplexity": 1.5219615556186337,
+      "derived_total_nll": 1.68,
+      "logprob_count": 0,
+      "mean_nll": 0.42,
+      "perplexity": null,
+      "record_id": "smoke-truthfulqa-1",
+      "row": 3,
+      "source": "bench/eval/samples/holyc_smoke_logprobs.jsonl",
+      "split": "",
+      "token_count": 4,
+      "total_nll": null
+    },
+    {
+      "dataset": "",
+      "derived_mean_nll": 0.3125,
+      "derived_perplexity": 1.3668379411737963,
+      "derived_total_nll": 1.25,
+      "logprob_count": 4,
+      "mean_nll": null,
+      "perplexity": null,
+      "record_id": "smoke-hellaswag-1",
+      "row": 1,
+      "source": "bench/eval/samples/llama_smoke_logprobs.jsonl",
+      "split": "",
+      "token_count": 4,
+      "total_nll": null
+    },
+    {
+      "dataset": "",
+      "derived_mean_nll": 0.34,
+      "derived_perplexity": 1.4049475905635938,
+      "derived_total_nll": 1.02,
+      "logprob_count": 0,
+      "mean_nll": null,
+      "perplexity": null,
+      "record_id": "smoke-arc-1",
+      "row": 2,
+      "source": "bench/eval/samples/llama_smoke_logprobs.jsonl",
+      "split": "",
+      "token_count": 3,
+      "total_nll": 1.02
+    },
+    {
+      "dataset": "",
+      "derived_mean_nll": 0.4125001356373084,
+      "derived_perplexity": 1.510589747199986,
+      "derived_total_nll": 1.6500005425492337,
+      "logprob_count": 0,
+      "mean_nll": null,
+      "perplexity": 1.510589747199986,
+      "record_id": "smoke-truthfulqa-1",
+      "row": 3,
+      "source": "bench/eval/samples/llama_smoke_logprobs.jsonl",
+      "split": "",
+      "token_count": 4,
+      "total_nll": null
+    }
+  ],
+  "sources": [
+    {
+      "datasets": "",
+      "duplicate_ids": 0,
+      "rows": 3,
+      "source": "bench/eval/samples/holyc_smoke_logprobs.jsonl",
+      "splits": "",
+      "token_count": 11,
+      "valid_rows": 3
+    },
+    {
+      "datasets": "",
+      "duplicate_ids": 0,
+      "rows": 3,
+      "source": "bench/eval/samples/llama_smoke_logprobs.jsonl",
+      "splits": "",
+      "token_count": 11,
+      "valid_rows": 3
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "records": 6,
+    "sources": 2,
+    "tokens": 22,
+    "valid_records": 6
+  },
+  "thresholds": {
+    "min_records": 6,
+    "min_records_per_source": 3,
+    "min_tokens": 22,
+    "min_tokens_per_source": 11,
+    "require_dataset": false,
+    "require_split": false,
+    "tolerance_pct": 0.001
+  }
+}

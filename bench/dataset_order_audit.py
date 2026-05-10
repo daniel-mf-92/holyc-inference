@@ -193,6 +193,41 @@ def build_order_stats(records: list[LoadedRecord], group_by: str) -> list[dict[s
     return [order_stats_for(scope, group) for scope, group in group_records(records, group_by).items()]
 
 
+def record_order_rows(records: list[LoadedRecord]) -> list[dict[str, Any]]:
+    runs = answer_runs(records)
+    rows: list[dict[str, Any]] = []
+    run_by_index: dict[int, tuple[int, dict[str, Any]]] = {}
+    for run_index, run in enumerate(runs):
+        for sequence_index in range(run["start_index"], run["end_index"] + 1):
+            run_by_index[sequence_index] = (run_index, run)
+
+    for sequence_index, loaded in enumerate(records):
+        record = loaded.record
+        previous_answer = records[sequence_index - 1].record.answer_index if sequence_index > 0 else None
+        next_answer = records[sequence_index + 1].record.answer_index if sequence_index + 1 < len(records) else None
+        run_index, run = run_by_index[sequence_index]
+        rows.append(
+            {
+                "sequence_index": sequence_index,
+                "source": source_ref(loaded),
+                "dataset": record.dataset,
+                "split": record.split,
+                "record_id": record.record_id,
+                "answer_index": record.answer_index,
+                "previous_answer_index": previous_answer,
+                "next_answer_index": next_answer,
+                "changed_from_previous": previous_answer is not None and previous_answer != record.answer_index,
+                "changes_to_next": next_answer is not None and next_answer != record.answer_index,
+                "run_index": run_index,
+                "run_position": sequence_index - run["start_index"],
+                "run_length": run["length"],
+                "is_leading_run": run_index == 0,
+                "is_trailing_run": run_index == len(runs) - 1,
+            }
+        )
+    return rows
+
+
 def add_gate_findings(
     stats: list[dict[str, Any]],
     findings: list[OrderFinding],
@@ -377,6 +412,32 @@ def write_findings_csv(report: dict[str, Any], path: Path) -> None:
             writer.writerow(finding)
 
 
+def write_record_csv(records: list[LoadedRecord], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "sequence_index",
+        "source",
+        "dataset",
+        "split",
+        "record_id",
+        "answer_index",
+        "previous_answer_index",
+        "next_answer_index",
+        "changed_from_previous",
+        "changes_to_next",
+        "run_index",
+        "run_position",
+        "run_length",
+        "is_leading_run",
+        "is_trailing_run",
+    ]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in record_order_rows(records):
+            writer.writerow(row)
+
+
 def write_junit(report: dict[str, Any], path: Path) -> None:
     error_findings = [finding for finding in report["findings"] if finding["severity"] == "error"]
     testcase_count = len(error_findings) + (1 if not error_findings else 0)
@@ -408,9 +469,11 @@ def write_junit(report: dict[str, Any], path: Path) -> None:
 
 def write_outputs(
     report: dict[str, Any],
+    records: list[LoadedRecord],
     output: Path,
     markdown: Path | None,
     csv_path: Path | None,
+    record_csv: Path | None,
     findings_csv: Path | None,
     junit: Path | None,
 ) -> None:
@@ -421,6 +484,8 @@ def write_outputs(
         markdown.write_text(markdown_report(report), encoding="utf-8")
     if csv_path:
         write_csv(report, csv_path)
+    if record_csv:
+        write_record_csv(records, record_csv)
     if findings_csv:
         write_findings_csv(report, findings_csv)
     if junit:
@@ -433,6 +498,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, required=True, help="Output JSON report")
     parser.add_argument("--markdown", type=Path, help="Optional Markdown report")
     parser.add_argument("--csv", type=Path, help="Optional CSV order-stats output")
+    parser.add_argument("--record-csv", type=Path, help="Optional per-record answer-order telemetry CSV")
     parser.add_argument("--findings-csv", type=Path, help="Optional CSV findings output")
     parser.add_argument("--junit", type=Path, help="Optional JUnit XML output")
     parser.add_argument("--default-dataset", default="eval", help="Dataset name for rows missing dataset")
@@ -477,13 +543,15 @@ def main(argv: list[str] | None = None) -> int:
         args.min_answer_switches,
     )
     report = build_report(inputs, records, args.group_by, findings)
-    write_outputs(report, args.output, args.markdown, args.csv, args.findings_csv, args.junit)
+    write_outputs(report, records, args.output, args.markdown, args.csv, args.record_csv, args.findings_csv, args.junit)
 
     print(f"wrote_report={args.output}")
     if args.markdown:
         print(f"wrote_markdown={args.markdown}")
     if args.csv:
         print(f"wrote_csv={args.csv}")
+    if args.record_csv:
+        print(f"wrote_record_csv={args.record_csv}")
     if args.findings_csv:
         print(f"wrote_findings_csv={args.findings_csv}")
     if args.junit:

@@ -1,0 +1,5 @@
+source,row,profile,model,quantization,prompt,commit,phase,exit_class,tokens,wall_elapsed_us,host_child_user_cpu_us,host_child_system_cpu_us,host_child_cpu_us,host_child_cpu_pct,host_child_tok_per_cpu_s,host_child_peak_rss_bytes,checks,findings
+bench/results/qemu_prompt_bench_latest.json,1,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,a70776642a09,measured,ok,32,236625.0,43016.0,24594.0,67610.0,28.572636027469624,473.302765863038,458752,3,0
+bench/results/qemu_prompt_bench_latest.json,2,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,a70776642a09,measured,ok,32,314053.0,42884.0,21116.0,64000.0,20.37872588384763,500.0,15007744,3,0
+bench/results/qemu_prompt_bench_latest.json,3,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,a70776642a09,measured,ok,48,129739.0,38976.0,19388.0,58364.0,44.98570206337339,822.4247824001096,196608,3,0
+bench/results/qemu_prompt_bench_latest.json,4,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,a70776642a09,measured,ok,48,164434.0,40891.0,20808.0,61699.0,37.522045319094595,777.9704695375938,163840,3,0

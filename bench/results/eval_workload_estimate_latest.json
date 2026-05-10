@@ -1,0 +1,82 @@
+{
+  "config": {
+    "bytes_per_token": 4.0,
+    "launch_mode": "per-record",
+    "qemu_launch_overhead_s": 0.25,
+    "tok_per_s": 100.0
+  },
+  "findings": [],
+  "generated_at": "2026-05-02T09:12:29Z",
+  "rows": [
+    {
+      "choice_bytes": 22,
+      "choice_tokens_est": 8,
+      "choices": 4,
+      "dataset": "arc_smoke",
+      "launches_est": 1,
+      "prompt_bytes": 41,
+      "prompt_tokens_est": 11,
+      "record_id": "arc-smoke-1",
+      "row": 1,
+      "scored_tokens_est": 52,
+      "source": "bench/fixtures/eval_workload_estimate/smoke.jsonl",
+      "split": "validation",
+      "wall_seconds_est": 0.77
+    },
+    {
+      "choice_bytes": 95,
+      "choice_tokens_est": 25,
+      "choices": 4,
+      "dataset": "truthfulqa_smoke",
+      "launches_est": 1,
+      "prompt_bytes": 78,
+      "prompt_tokens_est": 20,
+      "record_id": "truthfulqa-smoke-1",
+      "row": 2,
+      "scored_tokens_est": 105,
+      "source": "bench/fixtures/eval_workload_estimate/smoke.jsonl",
+      "split": "validation",
+      "wall_seconds_est": 1.3
+    }
+  ],
+  "scopes": [
+    {
+      "choice_bytes": 22,
+      "choice_tokens_est": 8,
+      "choices": 4,
+      "dataset": "arc_smoke",
+      "launches_est": 1,
+      "prompt_bytes": 41,
+      "prompt_tokens_est": 11,
+      "records": 1,
+      "scope": "arc_smoke:validation",
+      "scored_tokens_est": 52,
+      "split": "validation",
+      "wall_seconds_est": 0.77
+    },
+    {
+      "choice_bytes": 95,
+      "choice_tokens_est": 25,
+      "choices": 4,
+      "dataset": "truthfulqa_smoke",
+      "launches_est": 1,
+      "prompt_bytes": 78,
+      "prompt_tokens_est": 20,
+      "records": 1,
+      "scope": "truthfulqa_smoke:validation",
+      "scored_tokens_est": 105,
+      "split": "validation",
+      "wall_seconds_est": 1.3
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "choices": 8,
+    "findings": 0,
+    "launches_est": 2,
+    "records": 2,
+    "scopes": 2,
+    "scored_tokens_est": 157,
+    "wall_seconds_est": 2.0700000000000003
+  }
+}

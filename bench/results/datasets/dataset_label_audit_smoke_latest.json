@@ -1,0 +1,54 @@
+{
+  "error_count": 0,
+  "findings": [],
+  "generated_at": "2026-04-30T03:30:50Z",
+  "input": "bench/datasets/samples/smoke_eval.jsonl",
+  "records": [
+    {
+      "answer_label": "0",
+      "choice_count": 4,
+      "correct_label_count": null,
+      "dataset": "hellaswag-smoke",
+      "findings": "",
+      "raw_labels": "A,B,C,D",
+      "record_id": "smoke-hellaswag-1",
+      "row": 1,
+      "shape": "hellaswag",
+      "split": "validation",
+      "status": "pass"
+    },
+    {
+      "answer_label": "A",
+      "choice_count": 4,
+      "correct_label_count": null,
+      "dataset": "arc-smoke",
+      "findings": "",
+      "raw_labels": "A,B,C,D",
+      "record_id": "smoke-arc-1",
+      "row": 2,
+      "shape": "arc",
+      "split": "validation",
+      "status": "pass"
+    },
+    {
+      "answer_label": "",
+      "choice_count": 4,
+      "correct_label_count": 1,
+      "dataset": "truthfulqa-smoke",
+      "findings": "",
+      "raw_labels": "0,1,2,3",
+      "record_id": "smoke-truthfulqa-1",
+      "row": 3,
+      "shape": "truthfulqa",
+      "split": "validation",
+      "status": "pass"
+    }
+  ],
+  "rows": 3,
+  "shape_counts": {
+    "arc": 1,
+    "hellaswag": 1,
+    "truthfulqa": 1
+  },
+  "status": "pass"
+}

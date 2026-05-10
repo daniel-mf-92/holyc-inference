@@ -1,0 +1,2 @@
+source,status,suffix,size_bytes,row_count,max_serial_output_bytes,max_stdout_tail_bytes,max_stderr_tail_bytes,max_failure_reason_bytes
+bench/results/qemu_prompt_bench_latest.json,pass,.json,41776,4,215,215,0,0

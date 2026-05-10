@@ -1,0 +1,47 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-01T22:32:51Z",
+  "records": [
+    {
+      "env_count": 7,
+      "network_env_count": 0,
+      "row": 1,
+      "scope": "environment",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "url_value_count": 0
+    },
+    {
+      "env_count": 7,
+      "network_env_count": 0,
+      "row": 2,
+      "scope": "environment",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "url_value_count": 0
+    },
+    {
+      "env_count": 7,
+      "network_env_count": 0,
+      "row": 3,
+      "scope": "environment",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "url_value_count": 0
+    },
+    {
+      "env_count": 7,
+      "network_env_count": 0,
+      "row": 4,
+      "scope": "environment",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "url_value_count": 0
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "network_env_vars": 0,
+    "records": 4,
+    "status": "pass",
+    "url_values": 0
+  },
+  "tool": "qemu_host_env_policy_audit"
+}

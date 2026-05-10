@@ -1,0 +1,3 @@
+source,engine,record_count,scored_count,invalid_count,constant_count,min_choice_count,max_choice_count,min_span,mean_span,max_span,mean_abs_score,max_abs_score
+bench/eval/samples/holyc_smoke_scored_predictions.jsonl,holyc,3,3,0,0,4,4,4.75,4.916666666666667,5.0,1.5625,1.6875
+bench/eval/samples/llama_smoke_scored_predictions.jsonl,llama,3,3,0,0,4,4,5.0,5.1000000000000005,5.2,1.5999999999999999,1.725

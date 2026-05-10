@@ -1,0 +1,2 @@
+source,status,warmup_rows,measured_rows,planned_warmup_launches,planned_measured_launches,measured_tokens_total,warmup_tokens_total,suite_summary_total_tokens,phase_summary_warmup_rows,phase_summary_measured_rows
+bench/results/qemu_prompt_bench_latest.json,pass,2,4,2,4,160,80,160,2,4

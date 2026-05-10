@@ -1,0 +1,4 @@
+source,dataset,split,record_id,bucket,min_total_bytes,max_total_bytes,prompt_bytes,choice_bytes,total_bytes,choice_count,answer_index
+/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl:1,hellaswag-smoke,validation,smoke-hellaswag-1,161-256,161,256,69,166,235,4,0
+/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl:2,arc-smoke,validation,smoke-arc-1,0-96,0,96,51,28,79,4,0
+/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl:3,truthfulqa-smoke,validation,smoke-truthfulqa-1,161-256,161,256,62,133,195,4,0

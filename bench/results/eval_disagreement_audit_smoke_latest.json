@@ -1,0 +1,67 @@
+{
+  "error_count": 0,
+  "findings": [],
+  "generated_at": "2026-04-30T03:17:19Z",
+  "inputs": [
+    "bench/results/eval_compare_smoke_latest.json"
+  ],
+  "max_dataset_split_disagreement_pct": 0.0,
+  "max_disagreement_pct": 0.0,
+  "min_records": 3,
+  "scope_count": 4,
+  "scopes": [
+    {
+      "accuracy_delta_holyc_minus_llama": 0.0,
+      "agreement_count": 3,
+      "dataset": "smoke-eval",
+      "disagreement_count": 0,
+      "disagreement_pct": 0.0,
+      "holyc_accuracy": 1.0,
+      "llama_accuracy": 1.0,
+      "record_count": 3,
+      "scope": "overall",
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    },
+    {
+      "accuracy_delta_holyc_minus_llama": 0.0,
+      "agreement_count": 1,
+      "dataset": "arc-smoke",
+      "disagreement_count": 0,
+      "disagreement_pct": 0.0,
+      "holyc_accuracy": 1.0,
+      "llama_accuracy": 1.0,
+      "record_count": 1,
+      "scope": "dataset_split",
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    },
+    {
+      "accuracy_delta_holyc_minus_llama": 0.0,
+      "agreement_count": 1,
+      "dataset": "hellaswag-smoke",
+      "disagreement_count": 0,
+      "disagreement_pct": 0.0,
+      "holyc_accuracy": 1.0,
+      "llama_accuracy": 1.0,
+      "record_count": 1,
+      "scope": "dataset_split",
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    },
+    {
+      "accuracy_delta_holyc_minus_llama": 0.0,
+      "agreement_count": 1,
+      "dataset": "truthfulqa-smoke",
+      "disagreement_count": 0,
+      "disagreement_pct": 0.0,
+      "holyc_accuracy": 1.0,
+      "llama_accuracy": 1.0,
+      "record_count": 1,
+      "scope": "dataset_split",
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    }
+  ],
+  "status": "pass"
+}

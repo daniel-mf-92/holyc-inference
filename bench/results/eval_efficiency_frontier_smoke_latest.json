@@ -1,0 +1,67 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-02T04:00:34Z",
+  "rows": [
+    {
+      "cohort": "smoke-eval/validation",
+      "dataset": "smoke-eval",
+      "dominated_by": "",
+      "frontier": true,
+      "max_memory_bytes": 60000000,
+      "model": "synthetic-smoke",
+      "quality_metric": "holyc_accuracy",
+      "quality_value": 0.9,
+      "quantization": "Q2_K",
+      "records": 8,
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp0iskdqjx/scorecard.json",
+      "speed_metric": "median_wall_tok_per_s",
+      "speed_value": 120.0,
+      "split": "validation",
+      "status": "pass"
+    },
+    {
+      "cohort": "smoke-eval/validation",
+      "dataset": "smoke-eval",
+      "dominated_by": "",
+      "frontier": true,
+      "max_memory_bytes": 64000000,
+      "model": "synthetic-smoke",
+      "quality_metric": "holyc_accuracy",
+      "quality_value": 0.92,
+      "quantization": "Q4_0",
+      "records": 8,
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp0iskdqjx/scorecard.json",
+      "speed_metric": "median_wall_tok_per_s",
+      "speed_value": 180.0,
+      "split": "validation",
+      "status": "pass"
+    },
+    {
+      "cohort": "smoke-eval/validation",
+      "dataset": "smoke-eval",
+      "dominated_by": "",
+      "frontier": true,
+      "max_memory_bytes": 72000000,
+      "model": "synthetic-smoke",
+      "quality_metric": "holyc_accuracy",
+      "quality_value": 0.98,
+      "quantization": "Q8_0",
+      "records": 8,
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp0iskdqjx/scorecard.json",
+      "speed_metric": "median_wall_tok_per_s",
+      "speed_value": 130.0,
+      "split": "validation",
+      "status": "pass"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "dominated_rows": 0,
+    "findings": 0,
+    "frontier_rows": 3,
+    "memory_aware": true,
+    "quality_metric": "holyc_accuracy",
+    "rows": 3,
+    "speed_metric": "median_wall_tok_per_s"
+  }
+}

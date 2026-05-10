@@ -1,0 +1,3 @@
+source,prompt,measured_runs,successful_runs,failed_runs,warmup_runs,min_iteration,max_iteration,expected_successful_runs,successful_run_delta
+bench/results/qemu_prompt_bench_latest.json,smoke-code,2,2,0,0,1,2,2,0
+bench/results/qemu_prompt_bench_latest.json,smoke-short,2,2,0,0,1,2,2,0

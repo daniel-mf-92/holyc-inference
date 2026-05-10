@@ -1,0 +1,93 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-01T23:04:19Z",
+  "records": [
+    {
+      "invalid_fields": 0,
+      "missing_fields": 0,
+      "phase": "",
+      "present_fields": 10,
+      "prompt": "",
+      "required_fields": 10,
+      "row": 0,
+      "scope": "artifact",
+      "source": "bench/results/qemu_prompt_bench_latest.json"
+    },
+    {
+      "invalid_fields": 0,
+      "missing_fields": 0,
+      "phase": "warmup",
+      "present_fields": 19,
+      "prompt": "smoke-short",
+      "required_fields": 19,
+      "row": 1,
+      "scope": "warmups",
+      "source": "bench/results/qemu_prompt_bench_latest.json"
+    },
+    {
+      "invalid_fields": 0,
+      "missing_fields": 0,
+      "phase": "warmup",
+      "present_fields": 19,
+      "prompt": "smoke-code",
+      "required_fields": 19,
+      "row": 2,
+      "scope": "warmups",
+      "source": "bench/results/qemu_prompt_bench_latest.json"
+    },
+    {
+      "invalid_fields": 0,
+      "missing_fields": 0,
+      "phase": "measured",
+      "present_fields": 19,
+      "prompt": "smoke-short",
+      "required_fields": 19,
+      "row": 1,
+      "scope": "benchmarks",
+      "source": "bench/results/qemu_prompt_bench_latest.json"
+    },
+    {
+      "invalid_fields": 0,
+      "missing_fields": 0,
+      "phase": "measured",
+      "present_fields": 19,
+      "prompt": "smoke-short",
+      "required_fields": 19,
+      "row": 2,
+      "scope": "benchmarks",
+      "source": "bench/results/qemu_prompt_bench_latest.json"
+    },
+    {
+      "invalid_fields": 0,
+      "missing_fields": 0,
+      "phase": "measured",
+      "present_fields": 19,
+      "prompt": "smoke-code",
+      "required_fields": 19,
+      "row": 3,
+      "scope": "benchmarks",
+      "source": "bench/results/qemu_prompt_bench_latest.json"
+    },
+    {
+      "invalid_fields": 0,
+      "missing_fields": 0,
+      "phase": "measured",
+      "present_fields": 19,
+      "prompt": "smoke-code",
+      "required_fields": 19,
+      "row": 4,
+      "scope": "benchmarks",
+      "source": "bench/results/qemu_prompt_bench_latest.json"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "artifacts": 1,
+    "findings": 0,
+    "invalid_fields": 0,
+    "missing_fields": 0,
+    "records": 7,
+    "rows": 6
+  },
+  "tool": "qemu_artifact_schema_audit"
+}

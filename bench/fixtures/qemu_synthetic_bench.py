@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import sys
+import time
 
 
 TOKEN_COUNTS = {
@@ -27,6 +28,7 @@ def main() -> int:
     elapsed_us = tokens * 6250
     ttft_us = 10_000 + tokens * 50
     memory_bytes = 64 * 1024 * 1024 + tokens * 2048
+    time.sleep(elapsed_us / 1_000_000.0)
     print(
         "BENCH_RESULT: "
         + json.dumps(

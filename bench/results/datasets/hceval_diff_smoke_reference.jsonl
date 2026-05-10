@@ -1,0 +1,2 @@
+{"answer_index": 0, "choices": ["red", "blue", "green", "gray"], "dataset": "smoke-eval", "id": "smoke-1", "prompt": "Pick the warm color.", "provenance": "synthetic smoke", "split": "validation"}
+{"answer_index": 1, "choices": ["one", "two", "three", "five"], "dataset": "smoke-eval", "id": "smoke-2", "prompt": "Pick the even number.", "provenance": "synthetic smoke", "split": "validation"}

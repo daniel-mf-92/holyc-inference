@@ -1,0 +1,5 @@
+scope,dataset,split,records,choice_count_min,choice_count_max,answer_index_histogram,majority_answer_index,majority_correct,majority_accuracy,random_expected_correct,random_expected_accuracy
+overall,,,3,4,4,"{""0"":3}",0,3,1.0,0.75,0.25
+dataset_split,arc-smoke,validation,1,4,4,"{""0"":1}",0,1,1.0,0.25,0.25
+dataset_split,hellaswag-smoke,validation,1,4,4,"{""0"":1}",0,1,1.0,0.25,0.25
+dataset_split,truthfulqa-smoke,validation,1,4,4,"{""0"":1}",0,1,1.0,0.25,0.25

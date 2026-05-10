@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for host-side benchmark artifact air-gap auditing."""
+"""Tests for saved benchmark QEMU air-gap audits."""
 
 from __future__ import annotations
 
@@ -8,183 +8,104 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "bench"))
 
 import airgap_audit
 
 
-def test_audit_checks_warmup_commands(tmp_path: Path) -> None:
+def test_load_records_flattens_benchmark_commands(tmp_path: Path) -> None:
     report = tmp_path / "qemu_prompt_bench_latest.json"
     report.write_text(
         json.dumps(
             {
-                "warmups": [
-                    {
-                        "command": [
-                            "qemu-system-x86_64",
-                            "-nic",
-                            "user",
-                            "-drive",
-                            "file=TempleOS.img,format=raw,if=ide",
-                        ]
-                    }
+                "profile": "ci",
+                "command": ["qemu-system-x86_64", "-nic", "none"],
+                "benchmarks": [{"prompt": "p0", "phase": "measured"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    records = airgap_audit.load_records([report])
+
+    assert len(records) == 1
+    assert records[0].prompt == "p0"
+    assert records[0].command == ["qemu-system-x86_64", "-nic", "none"]
+
+
+def test_evaluate_flags_missing_nic_and_recorded_drift(tmp_path: Path) -> None:
+    report = tmp_path / "bench.jsonl"
+    report.write_text(
+        json.dumps(
+            {
+                "prompt": "bad",
+                "phase": "measured",
+                "command": ["qemu-system-x86_64", "-net", "none", "-device", "e1000"],
+                "command_airgap_ok": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    records = airgap_audit.load_records([report])
+    findings = airgap_audit.evaluate(records, min_commands=1)
+
+    assert {finding.kind for finding in findings} == {"airgap_violation", "recorded_airgap_drift"}
+    assert any("missing explicit `-nic none`" in finding.detail for finding in findings)
+    assert any("network device" in finding.detail for finding in findings)
+
+
+def test_evaluate_flags_tls_options_in_saved_commands(tmp_path: Path) -> None:
+    report = tmp_path / "bench.jsonl"
+    report.write_text(
+        json.dumps(
+            {
+                "prompt": "bad",
+                "phase": "measured",
+                "command": [
+                    "qemu-system-x86_64",
+                    "-nic",
+                    "none",
+                    "-object",
+                    "tls-creds-x509,id=tls0,endpoint=server,dir=/tmp/tls",
                 ],
-                "benchmarks": [
-                    {
-                        "command": [
-                            "qemu-system-x86_64",
-                            "-nic",
-                            "none",
-                            "-drive",
-                            "file=TempleOS.img,format=raw,if=ide",
-                        ]
-                    }
-                ],
             }
-        ),
+        )
+        + "\n",
         encoding="utf-8",
     )
 
-    commands_checked, findings = airgap_audit.audit([report])
+    records = airgap_audit.load_records([report])
+    findings = airgap_audit.evaluate(records, min_commands=1)
 
-    assert commands_checked == 2
-    assert len(findings) == 2
-    assert any("missing explicit `-nic none`" in finding.reason for finding in findings)
-    assert any("non-air-gapped" in finding.reason for finding in findings)
+    assert any("tls option" in finding.detail for finding in findings)
 
 
-def test_audit_checks_bench_matrix_cell_commands(tmp_path: Path) -> None:
-    report = tmp_path / "bench_matrix_latest.json"
+def test_cli_writes_json_markdown_csv_and_junit(tmp_path: Path) -> None:
+    report = tmp_path / "qemu_prompt_bench_latest.csv"
+    output_dir = tmp_path / "results"
     report.write_text(
-        json.dumps(
-            {
-                "cells": [
-                    {
-                        "profile": "unsafe",
-                        "command": [
-                            "qemu-system-x86_64",
-                            "-netdev",
-                            "user,id=n0",
-                            "-drive",
-                            "file=TempleOS.img,format=raw,if=ide",
-                        ],
-                    },
-                    {
-                        "profile": "safe",
-                        "command": [
-                            "qemu-system-x86_64",
-                            "-nic",
-                            "none",
-                            "-drive",
-                            "file=TempleOS.img,format=raw,if=ide",
-                        ],
-                    },
-                ]
-            }
+        "\n".join(
+            [
+                "prompt,phase,command,command_airgap_ok",
+                "p0,measured,\"qemu-system-x86_64 -nic none -serial stdio\",true",
+                "",
+            ]
         ),
         encoding="utf-8",
     )
 
-    commands_checked, findings = airgap_audit.audit([report])
+    status = airgap_audit.main([str(report), "--output-dir", str(output_dir), "--min-commands", "1"])
 
-    assert commands_checked == 2
-    assert len(findings) == 2
-    assert any("missing explicit `-nic none`" in finding.reason for finding in findings)
-    assert any("network backend" in finding.reason for finding in findings)
-
-
-def test_audit_checks_qemu_command_aliases(tmp_path: Path) -> None:
-    report = tmp_path / "artifact.json"
-    report.write_text(
-        json.dumps(
-            {
-                "results": [
-                    {
-                        "qemu_command": [
-                            "qemu-system-x86_64",
-                            "-drive",
-                            "file=TempleOS.img,format=raw,if=ide",
-                        ]
-                    },
-                    {
-                        "launch_command": [
-                            "qemu-system-x86_64",
-                            "-nic",
-                            "none",
-                            "-drive",
-                            "file=TempleOS.img,format=raw,if=ide",
-                        ]
-                    },
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    commands_checked, findings = airgap_audit.audit([report])
-
-    assert commands_checked == 2
-    assert len(findings) == 1
-    assert findings[0].reason == "missing explicit `-nic none`"
-
-
-def test_row_command_prefers_primary_command_field() -> None:
-    row = {
-        "command": ["qemu-system-x86_64", "-nic", "none"],
-        "qemu_command": ["qemu-system-x86_64", "-device", "rtl8139"],
-    }
-
-    assert airgap_audit.row_command(row) == ["qemu-system-x86_64", "-nic", "none"]
-
-
-def test_cli_writes_markdown_csv_and_junit_reports(tmp_path: Path) -> None:
-    report = tmp_path / "qemu_prompt_bench_latest.json"
-    report.write_text(
-        json.dumps(
-            {
-                "benchmarks": [
-                    {
-                        "command": [
-                            "qemu-system-x86_64",
-                            "-drive",
-                            "file=TempleOS.img,format=raw,if=ide",
-                        ]
-                    }
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-    output = tmp_path / "airgap.json"
-    markdown = tmp_path / "airgap.md"
-    csv_report = tmp_path / "airgap.csv"
-    junit = tmp_path / "airgap.xml"
-
-    status = airgap_audit.main(
-        [
-            "--input",
-            str(report),
-            "--output",
-            str(output),
-            "--markdown",
-            str(markdown),
-            "--csv",
-            str(csv_report),
-            "--junit",
-            str(junit),
-        ]
-    )
-
-    assert status == 1
-    payload = json.loads(output.read_text(encoding="utf-8"))
-    assert payload["status"] == "fail"
-    assert "Benchmark Air-Gap Audit" in markdown.read_text(encoding="utf-8")
-    assert "missing explicit `-nic none`" in csv_report.read_text(encoding="utf-8")
-    junit_root = ET.parse(junit).getroot()
-    assert junit_root.attrib["name"] == "holyc_benchmark_airgap_audit"
-    assert junit_root.attrib["tests"] == "1"
-    assert junit_root.attrib["failures"] == "1"
-    failure = junit_root.find("./testcase/failure")
-    assert failure is not None
-    assert "missing explicit `-nic none`" in (failure.text or "")
+    assert status == 0
+    payload = json.loads((output_dir / "airgap_audit_latest.json").read_text(encoding="utf-8"))
+    assert payload["status"] == "pass"
+    assert payload["summary"]["commands_with_explicit_nic_none"] == 1
+    assert "No air-gap findings." in (output_dir / "airgap_audit_latest.md").read_text(encoding="utf-8")
+    assert "severity" in (output_dir / "airgap_audit_latest.csv").read_text(encoding="utf-8")
+    junit_root = ET.parse(output_dir / "airgap_audit_latest_junit.xml").getroot()
+    assert junit_root.attrib["name"] == "holyc_airgap_audit"
+    assert junit_root.attrib["failures"] == "0"

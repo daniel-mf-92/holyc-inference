@@ -1,0 +1,161 @@
+{
+  "exit_classes": [
+    {
+      "exit_class": "launch_error",
+      "ok_metric_rows": 0,
+      "rows": 0,
+      "timed_out": 0,
+      "with_failure_reason": 0
+    },
+    {
+      "exit_class": "nonzero_exit",
+      "ok_metric_rows": 0,
+      "rows": 0,
+      "timed_out": 0,
+      "with_failure_reason": 0
+    },
+    {
+      "exit_class": "ok",
+      "ok_metric_rows": 6,
+      "rows": 6,
+      "timed_out": 0,
+      "with_failure_reason": 0
+    },
+    {
+      "exit_class": "timeout",
+      "ok_metric_rows": 0,
+      "rows": 0,
+      "timed_out": 0,
+      "with_failure_reason": 0
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-04-30T12:25:22Z",
+  "rows": [
+    {
+      "exit_class": "ok",
+      "failure_reason": "",
+      "iteration": 1,
+      "model": "synthetic-smoke",
+      "phase": "warmup",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "returncode": 0,
+      "row": 1,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "timed_out": false,
+      "tokens": 32,
+      "wall_elapsed_us": 153484.0,
+      "wall_tok_per_s": 208.4907873133356
+    },
+    {
+      "exit_class": "ok",
+      "failure_reason": "",
+      "iteration": 1,
+      "model": "synthetic-smoke",
+      "phase": "warmup",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "returncode": 0,
+      "row": 2,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "timed_out": false,
+      "tokens": 48,
+      "wall_elapsed_us": 148437.0,
+      "wall_tok_per_s": 323.36951029729784
+    },
+    {
+      "exit_class": "ok",
+      "failure_reason": "",
+      "iteration": 1,
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "returncode": 0,
+      "row": 3,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "timed_out": false,
+      "tokens": 32,
+      "wall_elapsed_us": 236625.0,
+      "wall_tok_per_s": 135.23507659799262
+    },
+    {
+      "exit_class": "ok",
+      "failure_reason": "",
+      "iteration": 2,
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "returncode": 0,
+      "row": 4,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "timed_out": false,
+      "tokens": 32,
+      "wall_elapsed_us": 314053.0,
+      "wall_tok_per_s": 101.89362941923815
+    },
+    {
+      "exit_class": "ok",
+      "failure_reason": "",
+      "iteration": 1,
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "returncode": 0,
+      "row": 5,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "timed_out": false,
+      "tokens": 48,
+      "wall_elapsed_us": 129739.0,
+      "wall_tok_per_s": 369.97356230586024
+    },
+    {
+      "exit_class": "ok",
+      "failure_reason": "",
+      "iteration": 2,
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "returncode": 0,
+      "row": 6,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "timed_out": false,
+      "tokens": 48,
+      "wall_elapsed_us": 164434.0,
+      "wall_tok_per_s": 291.9104321490689
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "failure_pct": 0.0,
+    "failure_rows": 0,
+    "findings": 0,
+    "models": [
+      "synthetic-smoke"
+    ],
+    "ok_rows": 6,
+    "profiles": [
+      "ci-airgap-smoke"
+    ],
+    "prompts": [
+      "smoke-code",
+      "smoke-short"
+    ],
+    "quantizations": [
+      "Q4_0"
+    ],
+    "rows": 6,
+    "timeout_pct": 0.0,
+    "timeout_rows": 0
+  }
+}

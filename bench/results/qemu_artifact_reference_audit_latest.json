@@ -1,0 +1,1374 @@
+{
+  "artifacts": [
+    {
+      "checked_strings": 104,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T182911Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 104,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 104,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T182911Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 104,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T182910Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 104,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T184001Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 104,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 104,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T184001Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 104,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T183959Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 106,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T200250Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 106,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 106,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T200250Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 106,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T200249Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 106,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T230734Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 106,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 106,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T230734Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 106,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T230733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 108,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260427T234738Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 108,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 108,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260427T234738Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 108,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260427T234738Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 108,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T000110Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 108,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 108,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T000111Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 108,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T000109Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 108,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T023336Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 108,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 108,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T023337Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 108,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T023335Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 108,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T035157Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T035203Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 108,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T035157Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 108,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T035157Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T035204Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 108,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T035157Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T062013Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T062014Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T062013Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T062013Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T062015Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T062013Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T105611Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T105613Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T105611Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T105611Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T105614Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T105611Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T132709Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T132718Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T132709Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T132709Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T132724Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T132709Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T133552Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T133553Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T133552Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T133552Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T133554Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T133552Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T143936Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T143938Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T143936Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T143936Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T143940Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T143936Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T144908Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T144909Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T144908Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T144908Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T144909Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T144908Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T150609Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T150611Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T150609Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T150609Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T150613Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T150609Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T152031Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T152031Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T152031Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T152031Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T152032Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T152031Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 91,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T172755Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T172755Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 91,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T172755Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 91,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T172755Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T172756Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 91,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T172755Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T200733Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T200733Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T200733Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T225257Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260428T225257Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T225257Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T225257Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260428T225257Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260428T225257Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 134,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260429T094455Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260429T094456Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 134,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260429T094455Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 134,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260429T094455Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260429T094456Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 134,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/bench_matrix_20260429T094455Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 80,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260427T144137Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 80,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260427T161259Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 80,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260427T170437Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 80,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260427T172021Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 106,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 8,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260427T180219Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 80,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260427T192232Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 82,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260427T200233Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 82,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260427T220828Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 82,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260427T221951Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 82,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260427T231904Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 84,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260427T233253Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 96,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260427T234033Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 84,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T000110Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 84,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T000650Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 84,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T024600Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 84,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T035203Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 84,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T044520Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 84,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T045336Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 84,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T051723Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 84,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T053208Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 91,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T061952Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 115,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T064752Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 91,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T124220Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 91,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T125149Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 91,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T134519Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 91,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T142810Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 91,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T143901Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 91,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T153243Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 91,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T223835Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 91,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T225239Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 137,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 8,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260428T231320Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 92,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T012002Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 92,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T015022Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 92,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T020052Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 92,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T024845Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 104,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T032337Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 104,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T041410Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 104,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T060039Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 42,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 2,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T062942Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 42,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 2,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T065359Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 110,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T102512Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 42,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 2,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T103312Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 122,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 6,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T143532Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 135,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 7,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T153144Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 135,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 7,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T160551Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 135,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 7,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T161025Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 135,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 7,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T170155Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 135,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 7,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T182259Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 135,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 7,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T185635Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 135,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 7,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T193606Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 135,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 7,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T194305Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 137,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 7,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T195949Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 139,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 7,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T200845Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 141,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 7,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T201750Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 141,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 7,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T202417Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 143,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 7,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T203225Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 143,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 7,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T203914Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 145,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 7,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_20260429T230149Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 13,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 1,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_dry_run_20260427T222713Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 15,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 1,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_dry_run_20260427T233252Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 16,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 1,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_dry_run_20260428T124108Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 14,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 1,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_dry_run_20260428T222213Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 30,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 1,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_dry_run_20260428T223047Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 34,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 1,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_dry_run_20260428T231332Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 27,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 1,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_dry_run_20260429T032337Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 27,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 1,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_dry_run_20260429T133647Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 31,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 1,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_dry_run_20260429T153218Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 31,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 1,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_dry_run_20260429T170331Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 31,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 1,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_dry_run_20260429T193620Z.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 31,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 1,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_dry_run_latest.json",
+      "status": "pass"
+    },
+    {
+      "checked_strings": 145,
+      "command_airgap_violation_count": 0,
+      "command_arrays_checked": 7,
+      "error": "",
+      "remote_reference_count": 0,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-01T12:17:41Z",
+  "status": "pass",
+  "summary": {
+    "artifacts": 151,
+    "checked_strings": 15217,
+    "command_airgap_violations": 0,
+    "command_arrays_checked": 854,
+    "findings": 0,
+    "remote_references": 0
+  }
+}

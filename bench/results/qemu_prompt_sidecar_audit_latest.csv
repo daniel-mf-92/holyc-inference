@@ -1,0 +1,7 @@
+source,status,sidecar_kind,sidecar_path,exists,size_bytes,error
+bench/results/qemu_prompt_bench_latest.json,pass,csv,bench/results/qemu_prompt_bench_latest.csv,True,3294,
+bench/results/qemu_prompt_bench_latest.json,pass,markdown,bench/results/qemu_prompt_bench_latest.md,True,8197,
+bench/results/qemu_prompt_bench_latest.json,pass,junit,bench/results/qemu_prompt_bench_junit_latest.xml,True,806,
+bench/results/qemu_prompt_bench_dry_run_latest.json,pass,csv,bench/results/qemu_prompt_bench_dry_run_latest.csv,True,1169,
+bench/results/qemu_prompt_bench_dry_run_latest.json,pass,markdown,bench/results/qemu_prompt_bench_dry_run_latest.md,True,1970,
+bench/results/qemu_prompt_bench_dry_run_latest.json,pass,junit,bench/results/qemu_prompt_bench_dry_run_junit_latest.xml,True,2004,

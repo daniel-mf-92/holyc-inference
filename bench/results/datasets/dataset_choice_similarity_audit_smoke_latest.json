@@ -1,0 +1,201 @@
+{
+  "error_count": 0,
+  "findings": [],
+  "format": "hceval-dataset-choice-similarity-audit",
+  "generated_at": "2026-05-02T03:59:40Z",
+  "inputs": [
+    {
+      "path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl",
+      "rows": 3,
+      "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+    }
+  ],
+  "record_count": 3,
+  "records": [
+    {
+      "choice_count": 4,
+      "dataset": "hellaswag-smoke",
+      "duplicate_choice_pairs": 0,
+      "max_choice_similarity": 0.4,
+      "normalized_choice_sha256": "17bb774b879e6767a9d6a860f1faf68e28055f14c0ac36c7068978e10942b890",
+      "pair_telemetry": [
+        {
+          "duplicate_normalized": false,
+          "left_index": 0,
+          "left_normalized": "the lights dim and the first chord rings out",
+          "right_index": 1,
+          "right_normalized": "a mechanic replaces the tire beside the road",
+          "similarity": 0.363636
+        },
+        {
+          "duplicate_normalized": false,
+          "left_index": 0,
+          "left_normalized": "the lights dim and the first chord rings out",
+          "right_index": 2,
+          "right_normalized": "the recipe calls for two cups of flour",
+          "similarity": 0.365854
+        },
+        {
+          "duplicate_normalized": false,
+          "left_index": 0,
+          "left_normalized": "the lights dim and the first chord rings out",
+          "right_index": 3,
+          "right_normalized": "the train leaves the station at dawn",
+          "similarity": 0.4
+        },
+        {
+          "duplicate_normalized": false,
+          "left_index": 1,
+          "left_normalized": "a mechanic replaces the tire beside the road",
+          "right_index": 2,
+          "right_normalized": "the recipe calls for two cups of flour",
+          "similarity": 0.146341
+        },
+        {
+          "duplicate_normalized": false,
+          "left_index": 1,
+          "left_normalized": "a mechanic replaces the tire beside the road",
+          "right_index": 3,
+          "right_normalized": "the train leaves the station at dawn",
+          "similarity": 0.4
+        },
+        {
+          "duplicate_normalized": false,
+          "left_index": 2,
+          "left_normalized": "the recipe calls for two cups of flour",
+          "right_index": 3,
+          "right_normalized": "the train leaves the station at dawn",
+          "similarity": 0.324324
+        }
+      ],
+      "record_id": "smoke-hellaswag-1",
+      "source": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl:1",
+      "split": "validation",
+      "unique_normalized_choices": 4
+    },
+    {
+      "choice_count": 4,
+      "dataset": "arc-smoke",
+      "duplicate_choice_pairs": 0,
+      "max_choice_similarity": 0.4,
+      "normalized_choice_sha256": "21a90a9348ab082588c68c8ca5bed57a4536027dd2ea976dc4a2320ac464e3f0",
+      "pair_telemetry": [
+        {
+          "duplicate_normalized": false,
+          "left_index": 0,
+          "left_normalized": "thermometer",
+          "right_index": 1,
+          "right_normalized": "ruler",
+          "similarity": 0.25
+        },
+        {
+          "duplicate_normalized": false,
+          "left_index": 0,
+          "left_normalized": "thermometer",
+          "right_index": 2,
+          "right_normalized": "scale",
+          "similarity": 0.125
+        },
+        {
+          "duplicate_normalized": false,
+          "left_index": 0,
+          "left_normalized": "thermometer",
+          "right_index": 3,
+          "right_normalized": "compass",
+          "similarity": 0.222222
+        },
+        {
+          "duplicate_normalized": false,
+          "left_index": 1,
+          "left_normalized": "ruler",
+          "right_index": 2,
+          "right_normalized": "scale",
+          "similarity": 0.4
+        },
+        {
+          "duplicate_normalized": false,
+          "left_index": 1,
+          "left_normalized": "ruler",
+          "right_index": 3,
+          "right_normalized": "compass",
+          "similarity": 0.0
+        },
+        {
+          "duplicate_normalized": false,
+          "left_index": 2,
+          "left_normalized": "scale",
+          "right_index": 3,
+          "right_normalized": "compass",
+          "similarity": 0.166667
+        }
+      ],
+      "record_id": "smoke-arc-1",
+      "source": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl:2",
+      "split": "validation",
+      "unique_normalized_choices": 4
+    },
+    {
+      "choice_count": 4,
+      "dataset": "truthfulqa-smoke",
+      "duplicate_choice_pairs": 0,
+      "max_choice_similarity": 0.323529,
+      "normalized_choice_sha256": "c362a630900ad5ffff6b6d92128fa44bb89f5cafa3848a3bcd04544cd1a53fac",
+      "pair_telemetry": [
+        {
+          "duplicate_normalized": false,
+          "left_index": 0,
+          "left_normalized": "check reliable sources before accepting it",
+          "right_index": 1,
+          "right_normalized": "assume it is true if repeated online",
+          "similarity": 0.179487
+        },
+        {
+          "duplicate_normalized": false,
+          "left_index": 0,
+          "left_normalized": "check reliable sources before accepting it",
+          "right_index": 2,
+          "right_normalized": "ignore all evidence",
+          "similarity": 0.262295
+        },
+        {
+          "duplicate_normalized": false,
+          "left_index": 0,
+          "left_normalized": "check reliable sources before accepting it",
+          "right_index": 3,
+          "right_normalized": "choose the most dramatic version",
+          "similarity": 0.27027
+        },
+        {
+          "duplicate_normalized": false,
+          "left_index": 1,
+          "left_normalized": "assume it is true if repeated online",
+          "right_index": 2,
+          "right_normalized": "ignore all evidence",
+          "similarity": 0.181818
+        },
+        {
+          "duplicate_normalized": false,
+          "left_index": 1,
+          "left_normalized": "assume it is true if repeated online",
+          "right_index": 3,
+          "right_normalized": "choose the most dramatic version",
+          "similarity": 0.323529
+        },
+        {
+          "duplicate_normalized": false,
+          "left_index": 2,
+          "left_normalized": "ignore all evidence",
+          "right_index": 3,
+          "right_normalized": "choose the most dramatic version",
+          "similarity": 0.313725
+        }
+      ],
+      "record_id": "smoke-truthfulqa-1",
+      "source": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl:3",
+      "split": "validation",
+      "unique_normalized_choices": 4
+    }
+  ],
+  "status": "pass",
+  "warning_count": 0
+}

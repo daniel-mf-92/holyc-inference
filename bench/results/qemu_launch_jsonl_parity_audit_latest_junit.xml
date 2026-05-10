@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="qemu_launch_jsonl_parity_audit" tests="1" failures="0" errors="0"><testcase classname="qemu_launch_jsonl_parity_audit" name="bench/results/qemu_prompt_bench_latest.json" /></testsuite>

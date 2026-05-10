@@ -196,6 +196,7 @@ def main() -> int:
         history_csv_path = safe_output_dir / "bench_artifact_manifest_history_latest.csv"
         history_coverage_csv_path = safe_output_dir / "bench_artifact_manifest_history_coverage_latest.csv"
         sample_coverage_csv_path = safe_output_dir / "bench_artifact_manifest_sample_coverage_latest.csv"
+        timestamp_collision_csv_path = safe_output_dir / "bench_artifact_manifest_timestamp_collisions_latest.csv"
         dry_run_coverage_csv_path = safe_output_dir / "bench_artifact_manifest_dry_run_coverage_latest.csv"
         environment_drift_csv_path = safe_output_dir / "bench_artifact_manifest_environment_drift_latest.csv"
         freshness_failures_csv_path = safe_output_dir / "bench_artifact_manifest_freshness_failures_latest.csv"
@@ -249,6 +250,12 @@ def main() -> int:
             not in sample_coverage_csv_path.read_text(encoding="utf-8")
         ):
             print("missing_manifest_sample_coverage_csv=true", file=sys.stderr)
+            return 1
+        if (
+            "key,generated_at,source_count,sources,sha256_count,sha256s"
+            not in timestamp_collision_csv_path.read_text(encoding="utf-8")
+        ):
+            print("missing_manifest_timestamp_collision_csv=true", file=sys.stderr)
             return 1
         if (
             "key,measured_source,generated_at"
@@ -385,6 +392,34 @@ def main() -> int:
         sample_junit = ET.parse(sample_output_dir / "bench_artifact_manifest_junit_latest.xml").getroot()
         if sample_junit.attrib.get("failures") != "1":
             print("unexpected_sample_coverage_junit_failures=true", file=sys.stderr)
+            return 1
+
+        timestamp_source_dir = tmp_path / "timestamp_sources"
+        timestamp_source_dir.mkdir()
+        timestamp = "2026-04-28T00:00:00Z"
+        write_qemu_report(timestamp_source_dir / "qemu_prompt_bench_collision_a.json", safe_command, timestamp)
+        write_qemu_report(timestamp_source_dir / "qemu_prompt_bench_collision_b.json", safe_command, timestamp)
+        timestamp_output_dir = tmp_path / "timestamp_manifest"
+        completed = run_manifest(timestamp_source_dir, timestamp_output_dir, "--fail-on-timestamp-collision")
+        if completed.returncode == 0:
+            print("timestamp_collision_manifest_not_rejected=true", file=sys.stderr)
+            return 1
+        timestamp_report = json.loads(
+            (timestamp_output_dir / "bench_artifact_manifest_latest.json").read_text(encoding="utf-8")
+        )
+        timestamp_collisions = timestamp_report["timestamp_collisions"]
+        if (
+            timestamp_report["status"] != "fail"
+            or len(timestamp_collisions) != 1
+            or len(timestamp_collisions[0]["sources"]) != 2
+        ):
+            print("unexpected_timestamp_collision_payload=true", file=sys.stderr)
+            return 1
+        timestamp_junit = ET.parse(
+            timestamp_output_dir / "bench_artifact_manifest_junit_latest.xml"
+        ).getroot()
+        if timestamp_junit.attrib.get("failures") != "1":
+            print("unexpected_timestamp_collision_junit_failures=true", file=sys.stderr)
             return 1
 
         env_drift_source_dir = tmp_path / "env_drift_sources"

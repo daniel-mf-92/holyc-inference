@@ -1,0 +1,149 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-02T00:14:49Z",
+  "gold": {
+    "answer_position_histogram": {
+      "0": 3
+    },
+    "choice_count_histogram": {
+      "4": 3
+    },
+    "duplicate_choice_rows": [],
+    "records": 3
+  },
+  "inputs": {
+    "dataset": "smoke-eval",
+    "gold": "bench/datasets/samples/smoke_eval.jsonl",
+    "holyc": "bench/eval/samples/holyc_smoke_predictions.jsonl",
+    "llama": "bench/eval/samples/llama_smoke_predictions.jsonl",
+    "split": "validation"
+  },
+  "rows": [
+    {
+      "answer_index": 0,
+      "choice_count": 4,
+      "correct": true,
+      "dataset": "hellaswag-smoke",
+      "has_scores": false,
+      "normalized_index": 0,
+      "raw_format": "index",
+      "raw_prediction": "0",
+      "record_id": "smoke-hellaswag-1",
+      "source": "holyc",
+      "split": "validation",
+      "valid": true
+    },
+    {
+      "answer_index": 0,
+      "choice_count": 4,
+      "correct": true,
+      "dataset": "arc-smoke",
+      "has_scores": true,
+      "normalized_index": 0,
+      "raw_format": "scores_only",
+      "raw_prediction": "",
+      "record_id": "smoke-arc-1",
+      "source": "holyc",
+      "split": "validation",
+      "valid": true
+    },
+    {
+      "answer_index": 0,
+      "choice_count": 4,
+      "correct": true,
+      "dataset": "truthfulqa-smoke",
+      "has_scores": false,
+      "normalized_index": 0,
+      "raw_format": "alpha",
+      "raw_prediction": "A",
+      "record_id": "smoke-truthfulqa-1",
+      "source": "holyc",
+      "split": "validation",
+      "valid": true
+    },
+    {
+      "answer_index": 0,
+      "choice_count": 4,
+      "correct": true,
+      "dataset": "hellaswag-smoke",
+      "has_scores": false,
+      "normalized_index": 0,
+      "raw_format": "index",
+      "raw_prediction": "0",
+      "record_id": "smoke-hellaswag-1",
+      "source": "llama.cpp",
+      "split": "validation",
+      "valid": true
+    },
+    {
+      "answer_index": 0,
+      "choice_count": 4,
+      "correct": true,
+      "dataset": "arc-smoke",
+      "has_scores": false,
+      "normalized_index": 0,
+      "raw_format": "alpha",
+      "raw_prediction": "A",
+      "record_id": "smoke-arc-1",
+      "source": "llama.cpp",
+      "split": "validation",
+      "valid": true
+    },
+    {
+      "answer_index": 0,
+      "choice_count": 4,
+      "correct": true,
+      "dataset": "truthfulqa-smoke",
+      "has_scores": true,
+      "normalized_index": 0,
+      "raw_format": "scores_only",
+      "raw_prediction": "",
+      "record_id": "smoke-truthfulqa-1",
+      "source": "llama.cpp",
+      "split": "validation",
+      "valid": true
+    }
+  ],
+  "schema_version": 1,
+  "status": "pass",
+  "summary": {
+    "holyc": {
+      "accuracy": 1.0,
+      "correct_rows": 3,
+      "dataset_split_histogram": {
+        "arc-smoke/validation": 1,
+        "hellaswag-smoke/validation": 1,
+        "truthfulqa-smoke/validation": 1
+      },
+      "format_histogram": {
+        "alpha": 1,
+        "index": 1,
+        "scores_only": 1
+      },
+      "rows": 3,
+      "scored_pct": 33.33333333333333,
+      "scored_rows": 1,
+      "valid_pct": 100.0,
+      "valid_rows": 3
+    },
+    "llama.cpp": {
+      "accuracy": 1.0,
+      "correct_rows": 3,
+      "dataset_split_histogram": {
+        "arc-smoke/validation": 1,
+        "hellaswag-smoke/validation": 1,
+        "truthfulqa-smoke/validation": 1
+      },
+      "format_histogram": {
+        "alpha": 1,
+        "index": 1,
+        "scores_only": 1
+      },
+      "rows": 3,
+      "scored_pct": 33.33333333333333,
+      "scored_rows": 1,
+      "valid_pct": 100.0,
+      "valid_rows": 3
+    }
+  }
+}

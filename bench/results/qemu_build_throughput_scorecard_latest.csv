@@ -1,0 +1,2 @@
+build,profile,model,quantization,source_count,measured_rows,total_tokens,mean_tok_per_s,median_tok_per_s,min_tok_per_s,max_tok_per_s,mean_wall_tok_per_s,total_elapsed_us,total_wall_elapsed_us
+a70776642a09,ci-airgap-smoke,synthetic-smoke,Q4_0,1,4,160,160.0,160.0,160.0,160.0,73.29859352528511,1000000,2164878

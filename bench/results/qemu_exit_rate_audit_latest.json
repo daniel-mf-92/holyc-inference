@@ -1,0 +1,31 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-01T14:19:25Z",
+  "groups": [
+    {
+      "failed_rows": 0,
+      "failure_pct": 0.0,
+      "launch_error_pct": 0.0,
+      "launch_error_rows": 0,
+      "model": "synthetic-smoke",
+      "nonzero_exit_pct": 0.0,
+      "nonzero_exit_rows": 0,
+      "ok_rows": 4,
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "quantization": "Q4_0",
+      "rows": 4,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "timeout_pct": 0.0,
+      "timeout_rows": 0
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "failed_rows": 0,
+    "findings": 0,
+    "groups": 1,
+    "rows": 4,
+    "timeout_rows": 0
+  }
+}

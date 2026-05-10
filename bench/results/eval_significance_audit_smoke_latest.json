@@ -1,0 +1,120 @@
+{
+  "findings": [
+    {
+      "dataset": "smoke-eval",
+      "detail": "McNemar evidence is uninformative because both engines have identical correctness on this scope",
+      "kind": "no_discordant_pairs",
+      "scope": "overall",
+      "severity": "warning",
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    },
+    {
+      "dataset": "arc-smoke",
+      "detail": "McNemar evidence is uninformative because both engines have identical correctness on this scope",
+      "kind": "no_discordant_pairs",
+      "scope": "dataset_split",
+      "severity": "warning",
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    },
+    {
+      "dataset": "hellaswag-smoke",
+      "detail": "McNemar evidence is uninformative because both engines have identical correctness on this scope",
+      "kind": "no_discordant_pairs",
+      "scope": "dataset_split",
+      "severity": "warning",
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    },
+    {
+      "dataset": "truthfulqa-smoke",
+      "detail": "McNemar evidence is uninformative because both engines have identical correctness on this scope",
+      "kind": "no_discordant_pairs",
+      "scope": "dataset_split",
+      "severity": "warning",
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    }
+  ],
+  "generated_at": "2026-05-01T14:39:35Z",
+  "inputs": [
+    "bench/results/eval_compare_smoke_latest.json"
+  ],
+  "max_holyc_loss_p": 0.05,
+  "min_reports": 1,
+  "scopes": [
+    {
+      "accuracy_delta_holyc_minus_llama": 0.0,
+      "dataset": "smoke-eval",
+      "discordant_count": 0,
+      "holyc_accuracy": 1.0,
+      "holyc_only_correct": 0,
+      "llama_accuracy": 1.0,
+      "llama_only_correct": 0,
+      "method": "exact_binomial_two_sided",
+      "p_value": 1.0,
+      "record_count": 3,
+      "scope": "overall",
+      "significant_holyc_loss": false,
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    },
+    {
+      "accuracy_delta_holyc_minus_llama": 0.0,
+      "dataset": "arc-smoke",
+      "discordant_count": 0,
+      "holyc_accuracy": 1.0,
+      "holyc_only_correct": 0,
+      "llama_accuracy": 1.0,
+      "llama_only_correct": 0,
+      "method": "exact_binomial_two_sided",
+      "p_value": 1.0,
+      "record_count": 1,
+      "scope": "dataset_split",
+      "significant_holyc_loss": false,
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    },
+    {
+      "accuracy_delta_holyc_minus_llama": 0.0,
+      "dataset": "hellaswag-smoke",
+      "discordant_count": 0,
+      "holyc_accuracy": 1.0,
+      "holyc_only_correct": 0,
+      "llama_accuracy": 1.0,
+      "llama_only_correct": 0,
+      "method": "exact_binomial_two_sided",
+      "p_value": 1.0,
+      "record_count": 1,
+      "scope": "dataset_split",
+      "significant_holyc_loss": false,
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    },
+    {
+      "accuracy_delta_holyc_minus_llama": 0.0,
+      "dataset": "truthfulqa-smoke",
+      "discordant_count": 0,
+      "holyc_accuracy": 1.0,
+      "holyc_only_correct": 0,
+      "llama_accuracy": 1.0,
+      "llama_only_correct": 0,
+      "method": "exact_binomial_two_sided",
+      "p_value": 1.0,
+      "record_count": 1,
+      "scope": "dataset_split",
+      "significant_holyc_loss": false,
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "error_count": 0,
+    "report_count": 1,
+    "scope_count": 4,
+    "significant_holyc_loss_count": 0,
+    "warning_count": 4
+  }
+}

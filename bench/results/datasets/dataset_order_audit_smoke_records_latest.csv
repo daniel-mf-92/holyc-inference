@@ -1,0 +1,4 @@
+sequence_index,source,dataset,split,record_id,answer_index,previous_answer_index,next_answer_index,changed_from_previous,changes_to_next,run_index,run_position,run_length,is_leading_run,is_trailing_run
+0,bench/datasets/samples/smoke_eval.jsonl:1,hellaswag-smoke,validation,smoke-hellaswag-1,0,,0,False,False,0,0,3,True,True
+1,bench/datasets/samples/smoke_eval.jsonl:2,arc-smoke,validation,smoke-arc-1,0,0,0,False,False,0,1,3,True,True
+2,bench/datasets/samples/smoke_eval.jsonl:3,truthfulqa-smoke,validation,smoke-truthfulqa-1,0,0,,False,False,0,2,3,True,True

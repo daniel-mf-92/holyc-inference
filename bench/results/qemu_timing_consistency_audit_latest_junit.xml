@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="qemu_timing_consistency_audit" tests="4" failures="0"><testcase name="qemu_prompt_bench_latest.json:3:smoke-short" /><testcase name="qemu_prompt_bench_latest.json:4:smoke-short" /><testcase name="qemu_prompt_bench_latest.json:5:smoke-code" /><testcase name="qemu_prompt_bench_latest.json:6:smoke-code" /></testsuite>

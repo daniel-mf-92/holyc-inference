@@ -1,0 +1,65 @@
+{
+  "created_at": "2026-05-02T05:26:00Z",
+  "findings": [],
+  "records": [
+    {
+      "choices_hash": "fb2010cdd0e8e891187adf1799aac31aba95bb8ec477bd63f576c91ec673e5ae",
+      "choices_hash_status": "missing",
+      "dataset": "hellaswag-smoke",
+      "input_hash": "32955588ff9b9cc7f72a58ffd492d8a61ef6447e5fad4562a6eb63cbe7173a0f",
+      "input_hash_status": "missing",
+      "prompt_hash": "b631e8be870dc90ba17df949abe6a73ed90fc4b665c7c6d97e24e119cae3eac2",
+      "prompt_hash_status": "missing",
+      "record_id": "smoke-hellaswag-1",
+      "row_number": 1,
+      "source": "bench/datasets/samples/smoke_eval.jsonl",
+      "split": "validation"
+    },
+    {
+      "choices_hash": "21a90a9348ab082588c68c8ca5bed57a4536027dd2ea976dc4a2320ac464e3f0",
+      "choices_hash_status": "missing",
+      "dataset": "arc-smoke",
+      "input_hash": "0619e6dc44e4e9721dbd795448f51865cb9017f4f46ff6c5dec2ee472e6c414f",
+      "input_hash_status": "missing",
+      "prompt_hash": "aee96409b65985c16af0e557d9113ab0e24d6e968aef17c7aaec9eb1711c9757",
+      "prompt_hash_status": "missing",
+      "record_id": "smoke-arc-1",
+      "row_number": 2,
+      "source": "bench/datasets/samples/smoke_eval.jsonl",
+      "split": "validation"
+    },
+    {
+      "choices_hash": "77f9797503897419f17674903948d6a25dc9d1893d779f326b43be1632dc7a23",
+      "choices_hash_status": "missing",
+      "dataset": "truthfulqa-smoke",
+      "input_hash": "885f443d1176c81cbe2019e98c0a1af87b438e2ed76c464a04347c476d3ddb74",
+      "input_hash_status": "missing",
+      "prompt_hash": "eba4f2a92b142a7cab2558acaf76977c3653905f091c098d8566b2f02bb6ba9b",
+      "prompt_hash_status": "missing",
+      "record_id": "smoke-truthfulqa-1",
+      "row_number": 3,
+      "source": "bench/datasets/samples/smoke_eval.jsonl",
+      "split": "validation"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "choices_hash": {
+      "match": 0,
+      "mismatch": 0,
+      "missing": 3
+    },
+    "input_count": 1,
+    "input_hash": {
+      "match": 0,
+      "mismatch": 0,
+      "missing": 3
+    },
+    "prompt_hash": {
+      "match": 0,
+      "mismatch": 0,
+      "missing": 3
+    },
+    "record_count": 3
+  }
+}

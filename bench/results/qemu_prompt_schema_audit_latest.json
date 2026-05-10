@@ -1,0 +1,33 @@
+{
+  "artifacts": [
+    {
+      "command_airgap_ok": true,
+      "error": "",
+      "failed_rows": 0,
+      "measured_rows": 4,
+      "model": "synthetic-smoke",
+      "ok_rows": 4,
+      "planned_measured_launches": 4,
+      "planned_total_launches": 6,
+      "planned_warmup_launches": 2,
+      "profile": "ci-airgap-smoke",
+      "quantization": "Q4_0",
+      "schema_fields_checked": 149,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "status": "pass",
+      "telemetry_fields_checked": 96,
+      "warmup_rows": 2
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-04-30T10:14:16Z",
+  "status": "pass",
+  "summary": {
+    "artifacts": 1,
+    "failed_rows": 0,
+    "findings": 0,
+    "measured_rows": 4,
+    "ok_rows": 4,
+    "warmup_rows": 2
+  }
+}

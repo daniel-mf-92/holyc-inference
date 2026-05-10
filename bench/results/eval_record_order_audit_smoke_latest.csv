@@ -1,0 +1,4 @@
+record_id,gold_position,holyc_position,llama_position,holyc_matches_gold,llama_matches_gold,engines_match
+smoke-hellaswag-1,1,1,1,True,True,True
+smoke-arc-1,2,2,2,True,True,True
+smoke-truthfulqa-1,3,3,3,True,True,True

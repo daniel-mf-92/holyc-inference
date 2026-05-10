@@ -1,0 +1,28 @@
+{
+  "benchmarks": [
+    {
+      "commit": "abc123",
+      "exit_class": "ok",
+      "model": "synthetic-smoke",
+      "output": "hello world",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "short",
+      "quantization": "Q4_0",
+      "seed": 0,
+      "tokens": 8
+    },
+    {
+      "commit": "abc123",
+      "exit_class": "ok",
+      "model": "synthetic-smoke",
+      "output": "hello world",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "short",
+      "quantization": "Q4_0",
+      "seed": 0,
+      "tokens": 8
+    }
+  ]
+}

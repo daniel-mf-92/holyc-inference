@@ -1,0 +1,38 @@
+{
+  "binary_sha256": "dd5b2252039e58b3e9aa2d3f821cfce4aee89143eef8edf3a4b26c3946f03c8d",
+  "dataset": "mixed-smoke",
+  "error_count": 0,
+  "exported_record_count": 2,
+  "findings": [],
+  "format": "hceval-export-roundtrip-audit",
+  "generated_at": "2026-05-02T04:00:56Z",
+  "input": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/hceval-export-roundtrip-uzuvxzfp/mixed.hceval",
+  "original_binary_layout": {
+    "binary_bytes": 361,
+    "body_bytes": 213,
+    "choice_length_prefix_bytes": 32,
+    "fixed_header_bytes": 52,
+    "metadata_bytes": 96,
+    "record_count": 2,
+    "record_header_bytes": 48,
+    "record_payload_bytes": 165
+  },
+  "pack_manifest": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/hceval-export-roundtrip-uzuvxzfp/mixed.hceval.manifest.json",
+  "record_count": 2,
+  "repacked_binary_layout": {
+    "binary_bytes": 361,
+    "body_bytes": 213,
+    "choice_length_prefix_bytes": 32,
+    "fixed_header_bytes": 52,
+    "metadata_bytes": 96,
+    "record_count": 2,
+    "record_header_bytes": 48,
+    "record_payload_bytes": 165
+  },
+  "repacked_binary_sha256": "dd5b2252039e58b3e9aa2d3f821cfce4aee89143eef8edf3a4b26c3946f03c8d",
+  "repacked_source_sha256": "bea3262fa8f19ddf3aadc05cb71c25dfcc32269ca52bb11174776d0ebe3699ed",
+  "source_sha256": "bea3262fa8f19ddf3aadc05cb71c25dfcc32269ca52bb11174776d0ebe3699ed",
+  "split": "validation",
+  "status": "pass",
+  "warning_count": 0
+}

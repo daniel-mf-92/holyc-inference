@@ -1,0 +1,44 @@
+{
+  "bucket_edges": [
+    128,
+    256,
+    512
+  ],
+  "buckets": [
+    {
+      "agreement": 1.0,
+      "agreement_count": 3,
+      "both_correct": 3,
+      "both_wrong": 0,
+      "bucket": "0-128",
+      "holyc_accuracy": 1.0,
+      "holyc_accuracy_delta_vs_llama": 0.0,
+      "holyc_correct": 3,
+      "holyc_only_correct": 0,
+      "llama_accuracy": 1.0,
+      "llama_correct": 3,
+      "llama_only_correct": 0,
+      "max_prompt_bytes": 128,
+      "min_prompt_bytes": 0,
+      "record_count": 3
+    }
+  ],
+  "dataset": "smoke-eval",
+  "findings": [],
+  "generated_at": "2026-05-02T04:00:37Z",
+  "inputs": {
+    "gold": "bench/datasets/samples/smoke_eval.jsonl",
+    "holyc_predictions": "bench/eval/samples/holyc_smoke_scored_predictions.jsonl",
+    "llama_predictions": "bench/eval/samples/llama_smoke_scored_predictions.jsonl"
+  },
+  "split": "validation",
+  "status": "pass",
+  "summary": {
+    "agreement": 1.0,
+    "buckets": 1,
+    "findings": 0,
+    "holyc_accuracy": 1.0,
+    "llama_accuracy": 1.0,
+    "paired_records": 3
+  }
+}

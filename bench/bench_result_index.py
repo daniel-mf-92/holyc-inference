@@ -39,6 +39,8 @@ class ArtifactSummary:
     prompt_suite_sha256: str
     command_sha256: str
     launch_plan_sha256: str
+    launch_plan_hash_status: str
+    launch_plan_hash_findings: list[str]
     environment_sha256: str
     host_platform: str
     host_machine: str
@@ -373,6 +375,11 @@ def command_hash(command: list[str]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def launch_plan_hash(plan: list[dict[str, Any]]) -> str:
+    encoded = json.dumps(plan, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def command_hash_status(
     artifact_type: str,
     hash_values: Iterable[Any],
@@ -398,6 +405,36 @@ def command_hash_status(
             )
     if findings:
         return "fail", recorded_hash, findings
+    return "pass", recorded_hash, []
+
+
+def launch_plan_hash_status(
+    artifact_type: str,
+    hash_values: Iterable[Any],
+    launch_plan: Any,
+) -> tuple[str, str, list[str]]:
+    hashes = sorted({str(value) for value in hash_values if value})
+    if not hashes:
+        return "unknown", "", [f"{artifact_type}: missing launch_plan_sha256 metadata"]
+    if len(hashes) > 1:
+        return "fail", ",".join(hashes), [f"{artifact_type}: mixed launch_plan_sha256 values: {','.join(hashes)}"]
+
+    recorded_hash = hashes[0]
+    if not isinstance(launch_plan, list):
+        return "unknown", recorded_hash, [f"{artifact_type}: missing embedded launch_plan for hash validation"]
+    if not all(isinstance(row, dict) for row in launch_plan):
+        return "fail", recorded_hash, [f"{artifact_type}: launch_plan contains non-object rows"]
+
+    actual_hash = launch_plan_hash(launch_plan)
+    if actual_hash != recorded_hash:
+        return (
+            "fail",
+            recorded_hash,
+            [
+                f"{artifact_type}: launch_plan_sha256 mismatch: "
+                f"recorded {recorded_hash}, computed {actual_hash}"
+            ],
+        )
     return "pass", recorded_hash, []
 
 
@@ -519,6 +556,11 @@ def summarize_qemu_report(
     )
     if command_hash_state == "fail":
         findings.extend(command_hash_findings)
+    launch_plan_hash_state, launch_plan_sha256, launch_plan_hash_findings = launch_plan_hash_status(
+        "qemu_prompt",
+        [report.get("launch_plan_sha256")],
+        report.get("launch_plan"),
+    )
     generated_at = str(report.get("generated_at", ""))
     generated_age = artifact_age_seconds(generated_at, now)
     fresh_state, fresh_findings = freshness_status(
@@ -539,7 +581,9 @@ def summarize_qemu_report(
         quantization=first_present(first_run, ("quantization",), str(report.get("quantization", ""))),
         prompt_suite_sha256=str(prompt_suite.get("suite_sha256", "")),
         command_sha256=command_sha256,
-        launch_plan_sha256=str(report.get("launch_plan_sha256", "")),
+        launch_plan_sha256=launch_plan_sha256,
+        launch_plan_hash_status=launch_plan_hash_state,
+        launch_plan_hash_findings=launch_plan_hash_findings,
         environment_sha256=environment_hash(environment),
         host_platform=environment_field(environment, "platform"),
         host_machine=environment_field(environment, "machine"),
@@ -616,6 +660,11 @@ def summarize_dry_run_report(
     )
     if command_hash_state == "fail":
         findings.extend(command_hash_findings)
+    launch_plan_hash_state, launch_plan_sha256, launch_plan_hash_findings = launch_plan_hash_status(
+        "qemu_prompt_dry_run",
+        [report.get("launch_plan_sha256")],
+        launch_plan,
+    )
 
     prompts = parse_int(prompt_suite.get("prompt_count"))
     if prompts is None:
@@ -647,7 +696,9 @@ def summarize_dry_run_report(
         quantization=str(report.get("quantization", "")),
         prompt_suite_sha256=str(prompt_suite.get("suite_sha256", "")),
         command_sha256=command_sha256,
-        launch_plan_sha256=str(report.get("launch_plan_sha256", "")),
+        launch_plan_sha256=launch_plan_sha256,
+        launch_plan_hash_status=launch_plan_hash_state,
+        launch_plan_hash_findings=launch_plan_hash_findings,
         environment_sha256=environment_hash(environment),
         host_platform=environment_field(environment, "platform"),
         host_machine=environment_field(environment, "machine"),
@@ -740,6 +791,11 @@ def summarize_matrix_report(
         )
         if command_hash_state == "fail":
             findings.extend(command_hash_findings)
+        launch_plan_hash_state, launch_plan_sha256, launch_plan_hash_findings = launch_plan_hash_status(
+            "bench_matrix_cell",
+            [cell.get("launch_plan_sha256")],
+            cell.get("launch_plan"),
+        )
         summaries.append(
             ArtifactSummary(
                 source=str(path),
@@ -752,7 +808,9 @@ def summarize_matrix_report(
                 quantization=str(cell.get("quantization", "")),
                 prompt_suite_sha256=str(cell.get("prompt_suite_sha256", "")),
                 command_sha256=command_sha256,
-                launch_plan_sha256=str(cell.get("launch_plan_sha256", "")),
+                launch_plan_sha256=launch_plan_sha256,
+                launch_plan_hash_status=launch_plan_hash_state,
+                launch_plan_hash_findings=launch_plan_hash_findings,
                 environment_sha256=environment_hash(environment),
                 host_platform=environment_field(environment, "platform"),
                 host_machine=environment_field(environment, "machine"),
@@ -852,6 +910,8 @@ def index_status(summaries: list[ArtifactSummary]) -> str:
         return "fail"
     if any(summary.command_hash_status == "fail" for summary in summaries):
         return "fail"
+    if any(summary.launch_plan_hash_status == "fail" for summary in summaries):
+        return "fail"
     if any(summary.freshness_status == "fail" for summary in summaries):
         return "fail"
     if any(summary.status == "fail" for summary in summaries):
@@ -873,6 +933,10 @@ def has_commit_metadata_failures(summaries: list[ArtifactSummary]) -> bool:
 
 def has_command_hash_metadata_failures(summaries: list[ArtifactSummary]) -> bool:
     return any(summary.command_hash_status == "fail" for summary in summaries)
+
+
+def has_launch_plan_hash_metadata_failures(summaries: list[ArtifactSummary]) -> bool:
+    return any(summary.launch_plan_hash_status == "fail" for summary in summaries)
 
 
 def has_freshness_failures(summaries: list[ArtifactSummary]) -> bool:
@@ -1355,6 +1419,7 @@ def junit_report(report: dict[str, Any]) -> str:
     telemetry_failures = [row for row in artifacts if row.get("telemetry_status") == "fail"]
     commit_failures = [row for row in artifacts if row.get("commit_status") == "fail"]
     command_hash_failures = [row for row in artifacts if row.get("command_hash_status") == "fail"]
+    launch_plan_hash_failures = [row for row in artifacts if row.get("launch_plan_hash_status") == "fail"]
     freshness_failures = [row for row in artifacts if row.get("freshness_status") == "fail"]
     failures = (
         int(bool(failed_artifacts))
@@ -1362,6 +1427,7 @@ def junit_report(report: dict[str, Any]) -> str:
         + int(bool(telemetry_failures))
         + int(bool(commit_failures))
         + int(bool(command_hash_failures))
+        + int(bool(launch_plan_hash_failures))
         + int(bool(freshness_failures))
         + int(bool(drift))
         + int(bool(command_drift_rows))
@@ -1375,7 +1441,7 @@ def junit_report(report: dict[str, Any]) -> str:
         "testsuite",
         {
             "name": "holyc_bench_result_index",
-            "tests": "12",
+            "tests": "13",
             "failures": str(failures),
         },
     )
@@ -1447,6 +1513,21 @@ def junit_report(report: dict[str, Any]) -> str:
         failure.text = "\n".join(
             f"{row.get('source', '')}: {json.dumps(row.get('command_hash_findings', []), separators=(',', ':'))}"
             for row in command_hash_failures
+        )
+
+    launch_plan_hash_case = ET.SubElement(suite, "testcase", {"name": "launch_plan_hash_metadata"})
+    if launch_plan_hash_failures:
+        failure = ET.SubElement(
+            launch_plan_hash_case,
+            "failure",
+            {
+                "type": "benchmark_launch_plan_hash_metadata_failure",
+                "message": f"{len(launch_plan_hash_failures)} benchmark artifact(s) have inconsistent launch-plan hashes",
+            },
+        )
+        failure.text = "\n".join(
+            f"{row.get('source', '')}: {json.dumps(row.get('launch_plan_hash_findings', []), separators=(',', ':'))}"
+            for row in launch_plan_hash_failures
         )
 
     freshness_case = ET.SubElement(suite, "testcase", {"name": "artifact_freshness"})
@@ -1557,6 +1638,8 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
         "prompt_suite_sha256",
         "command_sha256",
         "launch_plan_sha256",
+        "launch_plan_hash_status",
+        "launch_plan_hash_findings",
         "environment_sha256",
         "host_platform",
         "host_machine",
@@ -1613,6 +1696,9 @@ def write_csv(summaries: list[ArtifactSummary], path: Path) -> None:
             row = asdict(summary)
             row["telemetry_findings"] = json.dumps(summary.telemetry_findings, separators=(",", ":"))
             row["command_hash_findings"] = json.dumps(summary.command_hash_findings, separators=(",", ":"))
+            row["launch_plan_hash_findings"] = json.dumps(
+                summary.launch_plan_hash_findings, separators=(",", ":")
+            )
             row["command_findings"] = json.dumps(summary.command_findings, separators=(",", ":"))
             row["commit_findings"] = json.dumps(summary.commit_findings, separators=(",", ":"))
             row["freshness_findings"] = json.dumps(summary.freshness_findings, separators=(",", ":"))
@@ -1889,6 +1975,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Return non-zero if any artifact has inconsistent command_sha256 metadata",
     )
     parser.add_argument(
+        "--fail-on-launch-plan-hash-metadata",
+        action="store_true",
+        help="Return non-zero if any artifact has inconsistent launch_plan_sha256 metadata",
+    )
+    parser.add_argument(
         "--fail-on-drift",
         action="store_true",
         help="Return non-zero if comparable artifacts use different prompt-suite hashes",
@@ -1985,6 +2076,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"environment_drift={len(environment_drift_findings)}")
     print(f"dry_run_coverage_violations={len(dry_run_coverage_findings)}")
     print(f"history_coverage_violations={len(history_coverage_findings)}")
+    print(
+        "launch_plan_hash_failures="
+        f"{sum(1 for summary in summaries if summary.launch_plan_hash_status == 'fail')}"
+    )
     print(f"freshness_failures={sum(1 for summary in summaries if summary.freshness_status == 'fail')}")
     if args.fail_on_airgap and has_airgap_failures(summaries):
         return 1
@@ -1993,6 +2088,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.fail_on_commit_metadata and has_commit_metadata_failures(summaries):
         return 1
     if args.fail_on_command_hash_metadata and has_command_hash_metadata_failures(summaries):
+        return 1
+    if args.fail_on_launch_plan_hash_metadata and has_launch_plan_hash_metadata_failures(summaries):
         return 1
     if args.fail_on_drift and drift:
         return 1

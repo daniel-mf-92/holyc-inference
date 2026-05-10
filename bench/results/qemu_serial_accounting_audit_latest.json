@@ -1,0 +1,107 @@
+{
+  "findings": [],
+  "generated_at": "2026-04-30T19:06:01Z",
+  "rows": [
+    {
+      "checks": 1,
+      "commit": "a70776642a09",
+      "exit_class": "ok",
+      "expected_serial_output_bytes": 215,
+      "expected_serial_output_lines": null,
+      "findings": 0,
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "row": 1,
+      "serial_output_bytes": 215,
+      "serial_output_lines": 1,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "stderr_bytes": 0,
+      "stderr_lines": null,
+      "stdout_bytes": 215,
+      "stdout_lines": null
+    },
+    {
+      "checks": 1,
+      "commit": "a70776642a09",
+      "exit_class": "ok",
+      "expected_serial_output_bytes": 215,
+      "expected_serial_output_lines": null,
+      "findings": 0,
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "row": 2,
+      "serial_output_bytes": 215,
+      "serial_output_lines": 1,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "stderr_bytes": 0,
+      "stderr_lines": null,
+      "stdout_bytes": 215,
+      "stdout_lines": null
+    },
+    {
+      "checks": 1,
+      "commit": "a70776642a09",
+      "exit_class": "ok",
+      "expected_serial_output_bytes": 215,
+      "expected_serial_output_lines": null,
+      "findings": 0,
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "row": 3,
+      "serial_output_bytes": 215,
+      "serial_output_lines": 1,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "stderr_bytes": 0,
+      "stderr_lines": null,
+      "stdout_bytes": 215,
+      "stdout_lines": null
+    },
+    {
+      "checks": 1,
+      "commit": "a70776642a09",
+      "exit_class": "ok",
+      "expected_serial_output_bytes": 215,
+      "expected_serial_output_lines": null,
+      "findings": 0,
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "row": 4,
+      "serial_output_bytes": 215,
+      "serial_output_lines": 1,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "stderr_bytes": 0,
+      "stderr_lines": null,
+      "stdout_bytes": 215,
+      "stdout_lines": null
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "checks": 4,
+    "findings": 0,
+    "models": [
+      "synthetic-smoke"
+    ],
+    "profiles": [
+      "ci-airgap-smoke"
+    ],
+    "quantizations": [
+      "Q4_0"
+    ],
+    "rows": 4,
+    "serial_output_bytes_total": 860,
+    "serial_output_lines_total": 4
+  }
+}

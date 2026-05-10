@@ -1,0 +1,3 @@
+build,image,qemu_bin,profile,model,quantization,command_sha256,command_argc,command_airgap_ok,command_airgap_violations,prompt_count,warmup,repeat,launch_count,launch_plan_sha256
+baseline,/private/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpwuwpg288/baseline.img,qemu-system-x86_64,ci-smoke,synthetic,Q4_0,1b66b1774970811cc1821725b7d13833f8ee332796f2ed2f38bd4fc042a673b2,11,True,,2,1,2,6,8980baefe01b934dd8acc19006cdc6432910879ab87d7ca8c5b3a77609dfd811
+candidate,/private/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpwuwpg288/candidate.img,qemu-system-x86_64,ci-smoke,synthetic,Q4_0,6e28e0a66332d2ed7c2454ee729cd66483ad777ca9a3a2714eec9f27b4a1688a,11,True,,2,1,2,6,8980baefe01b934dd8acc19006cdc6432910879ab87d7ca8c5b3a77609dfd811

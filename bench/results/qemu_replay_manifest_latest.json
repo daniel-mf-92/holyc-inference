@@ -1,0 +1,54 @@
+{
+  "entries": [
+    {
+      "airgap_ok": true,
+      "argv": [
+        "bench/fixtures/qemu_synthetic_bench.py",
+        "-nic",
+        "none",
+        "-serial",
+        "stdio",
+        "-display",
+        "none",
+        "-drive",
+        "file=/tmp/TempleOS.synthetic.img,format=raw,if=ide",
+        "-m",
+        "256M"
+      ],
+      "command_argc": 11,
+      "command_sha256": "633b78c56d2f2d5c6739b10ca9b48d66a6bb83328887ac7aceabb4ab48fd1c96",
+      "commit": "a70776642a09",
+      "expected_launch_sequence_sha256": "b2700d55880665cd3be86418a939e5ca949f7df4e2ecc60705a1b3909c9f1f0d",
+      "explicit_nic_none": true,
+      "generated_at": "2026-05-01T23:04:12Z",
+      "key": "ci-airgap-smoke/synthetic-smoke/Q4_0/68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a/633b78c56d2f2d5c6739b10ca9b48d66a6bb83328887ac7aceabb4ab48fd1c96",
+      "launch_plan_entries": 6,
+      "launch_plan_sha256": "1984f18af8d221fea7e13bfa2403bd87662cb633f728095187b698a10b4f99c5",
+      "legacy_net_none": false,
+      "measured_rows": 4,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt_count": 2,
+      "prompt_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+      "prompt_suite_source": "bench/prompts/smoke.jsonl",
+      "qemu_bin": "bench/fixtures/qemu_synthetic_bench.py",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "source_mtime_ns": 1777676652113050667,
+      "source_sha256": "99470a855dffe58207e7e949cac666d532b87d2191a69fc668ab5660a2414fda",
+      "source_size_bytes": 41827,
+      "status": "pass"
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-02T01:56:44Z",
+  "status": "pass",
+  "summary": {
+    "airgap_ok_entries": 1,
+    "artifacts": 1,
+    "findings": 0,
+    "launch_plan_entries": 6,
+    "measured_rows": 4,
+    "unique_replay_keys": 1
+  }
+}

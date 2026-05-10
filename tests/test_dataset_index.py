@@ -34,7 +34,7 @@ def test_junit_report_marks_status_and_finding_failures() -> None:
     root = ET.fromstring(dataset_index.junit_report(report))
 
     assert root.attrib["name"] == "holyc_dataset_index"
-    assert root.attrib["tests"] == "2"
+    assert root.attrib["tests"] == "4"
     assert root.attrib["failures"] == "2"
     failures = root.findall("./testcase/failure")
     assert {failure.attrib["type"] for failure in failures} == {

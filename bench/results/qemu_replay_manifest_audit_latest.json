@@ -1,0 +1,29 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-02T01:56:44Z",
+  "manifests": [
+    {
+      "airgap_ok_entries": 1,
+      "argv_sidecar": "bench/results/qemu_replay_manifest_latest_argv.jsonl",
+      "argv_sidecar_rows": 1,
+      "entries": 1,
+      "findings": 0,
+      "launch_plan_entries": 6,
+      "measured_rows": 4,
+      "source": "bench/results/qemu_replay_manifest_latest.json",
+      "status": "pass",
+      "unique_replay_keys": 1
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "airgap_ok_entries": 1,
+    "argv_sidecar_rows": 1,
+    "entries": 1,
+    "findings": 0,
+    "launch_plan_entries": 6,
+    "manifests": 1,
+    "measured_rows": 4,
+    "unique_replay_keys": 1
+  }
+}

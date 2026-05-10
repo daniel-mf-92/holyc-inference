@@ -1,0 +1,54 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-02T06:07:03Z",
+  "rows": [
+    {
+      "commit": "abc123",
+      "exit_class": "ok",
+      "key": "ci-airgap-smoke|synthetic-smoke|Q4_0|short|abc123|0",
+      "model": "synthetic-smoke",
+      "output_sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+      "output_source": "output:derived",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "short",
+      "quantization": "Q4_0",
+      "row": 1,
+      "seed": "0",
+      "source": "bench/fixtures/qemu_output_determinism_audit/pass.json",
+      "tokens": 8
+    },
+    {
+      "commit": "abc123",
+      "exit_class": "ok",
+      "key": "ci-airgap-smoke|synthetic-smoke|Q4_0|short|abc123|0",
+      "model": "synthetic-smoke",
+      "output_sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+      "output_source": "output:derived",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "short",
+      "quantization": "Q4_0",
+      "row": 2,
+      "seed": "0",
+      "source": "bench/fixtures/qemu_output_determinism_audit/pass.json",
+      "tokens": 8
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "groups": 1,
+    "key_fields": [
+      "profile",
+      "model",
+      "quantization",
+      "prompt",
+      "commit",
+      "seed"
+    ],
+    "min_repeats": 2,
+    "min_rows": 1,
+    "rows": 2
+  }
+}

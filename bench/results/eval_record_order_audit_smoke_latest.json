@@ -1,0 +1,48 @@
+{
+  "findings": [],
+  "format": "eval-record-order-audit",
+  "generated_at": "2026-05-02T10:10:51Z",
+  "inputs": {
+    "gold": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl",
+    "holyc": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/holyc-eval-record-order-rgfy700t/holyc.jsonl",
+    "llama": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/holyc-eval-record-order-rgfy700t/llama.jsonl"
+  },
+  "rows": [
+    {
+      "engines_match": true,
+      "gold_position": 1,
+      "holyc_matches_gold": true,
+      "holyc_position": 1,
+      "llama_matches_gold": true,
+      "llama_position": 1,
+      "record_id": "smoke-hellaswag-1"
+    },
+    {
+      "engines_match": true,
+      "gold_position": 2,
+      "holyc_matches_gold": true,
+      "holyc_position": 2,
+      "llama_matches_gold": true,
+      "llama_position": 2,
+      "record_id": "smoke-arc-1"
+    },
+    {
+      "engines_match": true,
+      "gold_position": 3,
+      "holyc_matches_gold": true,
+      "holyc_position": 3,
+      "llama_matches_gold": true,
+      "llama_position": 3,
+      "record_id": "smoke-truthfulqa-1"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "gold_records": 3,
+    "holyc_records": 3,
+    "llama_records": 3,
+    "order_rows": 3,
+    "paired_records": 3
+  }
+}

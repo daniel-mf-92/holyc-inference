@@ -1,0 +1,5 @@
+exit_class,rows,timed_out,with_failure_reason,ok_metric_rows
+launch_error,0,0,0,0
+nonzero_exit,0,0,0,0
+ok,6,0,0,6
+timeout,0,0,0,0

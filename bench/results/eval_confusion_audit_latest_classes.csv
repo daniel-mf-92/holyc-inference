@@ -1,0 +1,9 @@
+source,scope,dataset,split,engine,answer_index,label,support,true_positive,false_positive,false_negative,precision,recall,f1
+bench/results/eval_compare_smoke_latest.json,overall,smoke-eval,validation,holyc,0,0,3,3,0,0,1.0,1.0,1.0
+bench/results/eval_compare_smoke_latest.json,overall,smoke-eval,validation,holyc,1,1,0,0,0,0,0.0,0.0,0.0
+bench/results/eval_compare_smoke_latest.json,overall,smoke-eval,validation,holyc,2,2,0,0,0,0,0.0,0.0,0.0
+bench/results/eval_compare_smoke_latest.json,overall,smoke-eval,validation,holyc,3,3,0,0,0,0,0.0,0.0,0.0
+bench/results/eval_compare_smoke_latest.json,overall,smoke-eval,validation,llama,0,0,3,3,0,0,1.0,1.0,1.0
+bench/results/eval_compare_smoke_latest.json,overall,smoke-eval,validation,llama,1,1,0,0,0,0,0.0,0.0,0.0
+bench/results/eval_compare_smoke_latest.json,overall,smoke-eval,validation,llama,2,2,0,0,0,0,0.0,0.0,0.0
+bench/results/eval_compare_smoke_latest.json,overall,smoke-eval,validation,llama,3,3,0,0,0,0,0.0,0.0,0.0

@@ -1,0 +1,72 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-01T11:21:30Z",
+  "inputs": [
+    {
+      "path": "bench/datasets/samples/smoke_eval.jsonl",
+      "rows": 3,
+      "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+    }
+  ],
+  "scopes": [
+    {
+      "answer_index_histogram": "0:3",
+      "choice_count_max": 4,
+      "choice_count_min": 4,
+      "dataset": "",
+      "distinct_answer_positions": 1,
+      "dominant_answer_count": 3,
+      "dominant_answer_index": 0,
+      "dominant_answer_pct": 100.0,
+      "record_count": 3,
+      "scope": "overall",
+      "split": ""
+    },
+    {
+      "answer_index_histogram": "0:1",
+      "choice_count_max": 4,
+      "choice_count_min": 4,
+      "dataset": "arc-smoke",
+      "distinct_answer_positions": 1,
+      "dominant_answer_count": 1,
+      "dominant_answer_index": 0,
+      "dominant_answer_pct": 100.0,
+      "record_count": 1,
+      "scope": "dataset_split",
+      "split": "validation"
+    },
+    {
+      "answer_index_histogram": "0:1",
+      "choice_count_max": 4,
+      "choice_count_min": 4,
+      "dataset": "hellaswag-smoke",
+      "distinct_answer_positions": 1,
+      "dominant_answer_count": 1,
+      "dominant_answer_index": 0,
+      "dominant_answer_pct": 100.0,
+      "record_count": 1,
+      "scope": "dataset_split",
+      "split": "validation"
+    },
+    {
+      "answer_index_histogram": "0:1",
+      "choice_count_max": 4,
+      "choice_count_min": 4,
+      "dataset": "truthfulqa-smoke",
+      "distinct_answer_positions": 1,
+      "dominant_answer_count": 1,
+      "dominant_answer_index": 0,
+      "dominant_answer_pct": 100.0,
+      "record_count": 1,
+      "scope": "dataset_split",
+      "split": "validation"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "inputs": 1,
+    "records": 3,
+    "scopes": 4
+  }
+}

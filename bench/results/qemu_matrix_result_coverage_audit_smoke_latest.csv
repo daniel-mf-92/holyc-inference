@@ -1,0 +1,2 @@
+command_sha256,build,profile,model,quantization,phase,prompt_id,prompt_sha256,iteration,planned,observed,status
+abc123,candidate,ci,synthetic,Q4_0,measured,tiny,ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff,1,1,1,pass

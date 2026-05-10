@@ -91,6 +91,12 @@ def main() -> int:
             "0",
             "--max-identical-block-run",
             "1",
+            "--min-scale-used-values",
+            "1",
+            "--max-duplicate-scale-pct",
+            "0",
+            "--max-identical-scale-run",
+            "1",
             "--min-q4-nibble-lane-used-quant-values",
             "16",
             "--min-quant-negative-count",
@@ -99,6 +105,8 @@ def main() -> int:
             "1",
             "--max-quant-sign-balance-delta",
             "2",
+            "--max-zero-quant-pct",
+            "10",
             "--output",
             str(pass_json),
             "--markdown",
@@ -134,11 +142,19 @@ def main() -> int:
                 return rc
             if rc := require(audit["quant_negative_count"] == 16, "missing_negative_quant_count"):
                 return rc
+            if rc := require(audit["quant_zero_pct"] <= 10.0, "unexpected_zero_quant_pct"):
+                return rc
             if rc := require(audit["duplicate_block_count"] == 0, "unexpected_duplicate_blocks"):
                 return rc
             if rc := require(audit["repeated_block_value_count"] == 0, "unexpected_repeated_block_values"):
                 return rc
             if rc := require(audit["max_identical_block_run"] == 1, "unexpected_identical_block_run"):
+                return rc
+            if rc := require(audit["scale_used_value_count"] == 1, "missing_scale_used_value_count"):
+                return rc
+            if rc := require(audit["duplicate_scale_count"] == 0, "unexpected_duplicate_scales"):
+                return rc
+            if rc := require(audit["max_identical_scale_run"] == 1, "unexpected_identical_scale_run"):
                 return rc
         q4_audit = next(audit for audit in report["block_audits"] if audit["format"] == "q4_0")
         if rc := require(q4_audit["quant_positive_count"] == 14, "missing_q4_positive_quant_count"):
@@ -157,6 +173,8 @@ def main() -> int:
         if rc := require(q8_audit["quant_sign_balance_delta"] == 1, "unexpected_q8_quant_sign_delta"):
             return rc
         if rc := require("Scale exponent min/max/under/over" in pass_md.read_text(encoding="utf-8"), "missing_markdown_exponent"):
+            return rc
+        if rc := require("Duplicate scales" in pass_md.read_text(encoding="utf-8"), "missing_markdown_duplicate_scales"):
             return rc
         if rc := require("Q4 low/high lane used values" in pass_md.read_text(encoding="utf-8"), "missing_markdown_q4_lane"):
             return rc
@@ -297,6 +315,60 @@ def main() -> int:
         ):
             return rc
 
+        repeated_scale_q8 = tmp_path / "q8_repeated_scales.bin"
+        repeated_scale_q8.write_bytes(
+            struct.pack("<H32b", 0x3C00, *range(-16, 16))
+            + struct.pack("<H32b", 0x3C00, *range(-15, 17))
+            + struct.pack("<H32b", 0x4000, *range(-14, 18))
+        )
+        repeated_scale_json = tmp_path / "bad_repeated_scale_quant_audit.json"
+        repeated_scale_command = [
+            sys.executable,
+            str(ROOT / "bench" / "quant_audit.py"),
+            "--source-root",
+            str(source_root),
+            "--format",
+            "q8_0",
+            "--block-file",
+            str(repeated_scale_q8),
+            "--min-scale-used-values",
+            "3",
+            "--max-duplicate-scale-pct",
+            "20",
+            "--max-identical-scale-run",
+            "1",
+            "--output",
+            str(repeated_scale_json),
+        ]
+        completed = subprocess.run(
+            repeated_scale_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("repeated_scales_not_rejected=true", file=sys.stderr)
+            return 1
+        repeated_scale_report = json.loads(repeated_scale_json.read_text(encoding="utf-8"))
+        repeated_scale_audit = repeated_scale_report["block_audits"][0]
+        if rc := require(repeated_scale_audit["scale_used_value_count"] == 2, "missing_repeated_scale_used_values"):
+            return rc
+        if rc := require(repeated_scale_audit["duplicate_scale_count"] == 1, "missing_duplicate_scale_count"):
+            return rc
+        if rc := require(repeated_scale_audit["max_identical_scale_run"] == 2, "missing_identical_scale_run"):
+            return rc
+        if rc := require(
+            any("duplicate fp16 scales 1/3" in finding for finding in repeated_scale_audit["findings"]),
+            "missing_duplicate_scale_finding",
+        ):
+            return rc
+        if rc := require(
+            any("identical fp16 scale run 2 exceeds limit 1" in finding for finding in repeated_scale_audit["findings"]),
+            "missing_identical_scale_finding",
+        ):
+            return rc
+
         bad_q4_lane = tmp_path / "q4_bad_nibble_lane.bin"
         bad_q4_lane.write_bytes(
             struct.pack("<H", 0x3C00)
@@ -394,6 +466,43 @@ def main() -> int:
         if rc := require(
             any("quant sign balance delta 31 exceeds limit 8" in finding for finding in bad_q8_unsigned_audit["findings"]),
             "missing_unsigned_quant_balance_finding",
+        ):
+            return rc
+
+        bad_q8_zero = tmp_path / "q8_bad_zero_payload.bin"
+        bad_q8_zero.write_bytes(struct.pack("<H32b", 0x3C00, *([0] * 32)))
+        bad_q8_zero_json = tmp_path / "bad_q8_zero_payload_quant_audit.json"
+        bad_q8_zero_command = [
+            sys.executable,
+            str(ROOT / "bench" / "quant_audit.py"),
+            "--source-root",
+            str(source_root),
+            "--format",
+            "q8_0",
+            "--block-file",
+            str(bad_q8_zero),
+            "--max-zero-quant-pct",
+            "50",
+            "--output",
+            str(bad_q8_zero_json),
+        ]
+        completed = subprocess.run(
+            bad_q8_zero_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("bad_q8_zero_payload_not_rejected=true", file=sys.stderr)
+            return 1
+        bad_q8_zero_report = json.loads(bad_q8_zero_json.read_text(encoding="utf-8"))
+        bad_q8_zero_audit = bad_q8_zero_report["block_audits"][0]
+        if rc := require(bad_q8_zero_audit["quant_zero_pct"] == 100.0, "missing_zero_quant_pct"):
+            return rc
+        if rc := require(
+            any("zero quant values 100.000% exceeds limit 50.000%" in finding for finding in bad_q8_zero_audit["findings"]),
+            "missing_zero_quant_finding",
         ):
             return rc
 

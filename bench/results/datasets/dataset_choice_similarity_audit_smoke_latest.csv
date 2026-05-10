@@ -1,0 +1,4 @@
+source,dataset,split,record_id,choice_count,unique_normalized_choices,duplicate_choice_pairs,max_choice_similarity,normalized_choice_sha256
+/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl:1,hellaswag-smoke,validation,smoke-hellaswag-1,4,4,0,0.4,17bb774b879e6767a9d6a860f1faf68e28055f14c0ac36c7068978e10942b890
+/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl:2,arc-smoke,validation,smoke-arc-1,4,4,0,0.4,21a90a9348ab082588c68c8ca5bed57a4536027dd2ea976dc4a2320ac464e3f0
+/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl:3,truthfulqa-smoke,validation,smoke-truthfulqa-1,4,4,0,0.323529,c362a630900ad5ffff6b6d92128fa44bb89f5cafa3848a3bcd04544cd1a53fac

@@ -194,6 +194,7 @@ def record_telemetry(
 ) -> dict[str, Any]:
     record = loaded.record
     choice_lengths = [len(choice.encode("utf-8")) for choice in record.choices]
+    answer_choice_bytes = choice_lengths[record.answer_index] if choice_lengths else 0
     stable_choices = [stable_text_key(choice) for choice in record.choices]
     prompt = stable_text_key(record.prompt)
     duplicate_groups = duplicate_choice_groups(record.choices)
@@ -214,9 +215,11 @@ def record_telemetry(
         "record_id": record.record_id,
         "choice_count": len(record.choices),
         "answer_index": record.answer_index,
+        "answer_choice_bytes": answer_choice_bytes,
         "min_choice_bytes": min_choice_bytes,
         "max_choice_bytes": max_choice_bytes,
         "total_choice_bytes": sum(choice_lengths),
+        "answer_choice_byte_pct": (answer_choice_bytes / sum(choice_lengths) * 100.0 if choice_lengths else None),
         "choice_length_ratio": choice_length_ratio(record.choices),
         "duplicate_choice_group_count": len(duplicate_groups),
         "duplicate_choice_text_count": sum(len(indexes) for indexes in duplicate_groups.values()),
@@ -429,9 +432,11 @@ def write_record_csv(records: list[dict[str, Any]], path: Path) -> None:
         "record_id",
         "choice_count",
         "answer_index",
+        "answer_choice_bytes",
         "min_choice_bytes",
         "max_choice_bytes",
         "total_choice_bytes",
+        "answer_choice_byte_pct",
         "choice_length_ratio",
         "duplicate_choice_group_count",
         "duplicate_choice_text_count",

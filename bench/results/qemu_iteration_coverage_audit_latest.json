@@ -1,0 +1,61 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-01T08:41:18Z",
+  "groups": [
+    {
+      "duplicate_iterations": "",
+      "list_name": "benchmarks",
+      "max_iteration": 2,
+      "min_iteration": 1,
+      "missing_iterations": "",
+      "ok_rows": 2,
+      "phase": "measured",
+      "prompt": "smoke-code",
+      "rows": 2,
+      "source": "bench/results/qemu_prompt_bench_latest.json"
+    },
+    {
+      "duplicate_iterations": "",
+      "list_name": "benchmarks",
+      "max_iteration": 2,
+      "min_iteration": 1,
+      "missing_iterations": "",
+      "ok_rows": 2,
+      "phase": "measured",
+      "prompt": "smoke-short",
+      "rows": 2,
+      "source": "bench/results/qemu_prompt_bench_latest.json"
+    },
+    {
+      "duplicate_iterations": "",
+      "list_name": "warmups",
+      "max_iteration": 1,
+      "min_iteration": 1,
+      "missing_iterations": "",
+      "ok_rows": 1,
+      "phase": "warmup",
+      "prompt": "smoke-code",
+      "rows": 1,
+      "source": "bench/results/qemu_prompt_bench_latest.json"
+    },
+    {
+      "duplicate_iterations": "",
+      "list_name": "warmups",
+      "max_iteration": 1,
+      "min_iteration": 1,
+      "missing_iterations": "",
+      "ok_rows": 1,
+      "phase": "warmup",
+      "prompt": "smoke-short",
+      "rows": 1,
+      "source": "bench/results/qemu_prompt_bench_latest.json"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "groups": 4,
+    "prompts": 2,
+    "rows": 6
+  }
+}

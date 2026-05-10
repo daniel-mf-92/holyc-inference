@@ -1,0 +1,30 @@
+{
+  "coverage": [
+    {
+      "build": "candidate",
+      "command_sha256": "abc123",
+      "iteration": 1,
+      "model": "synthetic",
+      "observed": 1,
+      "phase": "measured",
+      "planned": 1,
+      "profile": "ci",
+      "prompt_id": "tiny",
+      "prompt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "quantization": "Q4_0",
+      "status": "pass"
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-02T04:01:33Z",
+  "matrix": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpo47wg3zx/matrix.json",
+  "status": "pass",
+  "summary": {
+    "coverage_rows": 1,
+    "covered_launch_keys": 1,
+    "findings": 0,
+    "matrix_launch_keys": 1,
+    "result_files": 1,
+    "result_rows_scanned": 1
+  }
+}

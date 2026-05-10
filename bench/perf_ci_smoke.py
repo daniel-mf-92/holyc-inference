@@ -962,23 +962,20 @@ def main() -> int:
             print("missing_telemetry_coverage_csv=true", file=sys.stderr)
             return 1
 
-        audit_output = tmp_path / "airgap_audit.json"
-        audit_markdown = tmp_path / "airgap_audit.md"
-        audit_csv = tmp_path / "airgap_audit.csv"
-        audit_junit = tmp_path / "airgap_audit.xml"
+        audit_output_dir = tmp_path / "airgap_audit"
+        audit_stem = "airgap_audit"
+        audit_output = audit_output_dir / f"{audit_stem}.json"
+        audit_markdown = audit_output_dir / f"{audit_stem}.md"
+        audit_csv = audit_output_dir / f"{audit_stem}.csv"
+        audit_junit = audit_output_dir / f"{audit_stem}_junit.xml"
         audit_command = [
             sys.executable,
             str(ROOT / "bench" / "airgap_audit.py"),
-            "--input",
             str(RESULTS),
-            "--output",
-            str(audit_output),
-            "--markdown",
-            str(audit_markdown),
-            "--csv",
-            str(audit_csv),
-            "--junit",
-            str(audit_junit),
+            "--output-dir",
+            str(audit_output_dir),
+            "--output-stem",
+            audit_stem,
         ]
         completed = subprocess.run(
             audit_command,
@@ -996,17 +993,19 @@ def main() -> int:
         if audit_report["status"] != "pass":
             print(f"unexpected_airgap_status={audit_report['status']}", file=sys.stderr)
             return 1
-        if audit_report["commands_checked"] < 1:
+        if audit_report["summary"]["commands"] < 1:
             print("missing_qemu_command_audit=true", file=sys.stderr)
             return 1
-        if "Benchmark Air-Gap Audit" not in audit_markdown.read_text(encoding="utf-8"):
+        if "Airgap Audit" not in audit_markdown.read_text(encoding="utf-8"):
             print("missing_airgap_markdown=true", file=sys.stderr)
             return 1
-        if "source,row,reason,command" not in audit_csv.read_text(encoding="utf-8"):
+        if "source,row,severity,kind,prompt,phase,detail,command" not in audit_csv.read_text(
+            encoding="utf-8"
+        ):
             print("missing_airgap_csv=true", file=sys.stderr)
             return 1
         audit_junit_root = ET.parse(audit_junit).getroot()
-        if audit_junit_root.attrib.get("name") != "holyc_benchmark_airgap_audit":
+        if audit_junit_root.attrib.get("name") != "holyc_airgap_audit":
             print("missing_airgap_junit_suite=true", file=sys.stderr)
             return 1
         if audit_junit_root.attrib.get("failures") != "0":
@@ -1037,10 +1036,9 @@ def main() -> int:
         unsafe_command = [
             sys.executable,
             str(ROOT / "bench" / "airgap_audit.py"),
-            "--input",
             str(unsafe_fixture),
-            "--output",
-            str(tmp_path / "unsafe_airgap_audit.json"),
+            "--output-dir",
+            str(tmp_path / "unsafe_airgap_audit"),
         ]
         completed = subprocess.run(
             unsafe_command,

@@ -1,0 +1,41 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-02T07:16:34Z",
+  "records": [
+    {
+      "arg_count": 6,
+      "command_like": false,
+      "exists": true,
+      "explicit_nic_none": false,
+      "format": "shell-fragment",
+      "legacy_net_none": false,
+      "nic_none_count": 0,
+      "path": "bench/fixtures/qemu_args_policy/safe.args",
+      "sha256": "c58aae648dd7ff82ca391e35d858653a2d132cf41dc31859628a0802fd69191a",
+      "size_bytes": 29,
+      "violation_count": 0
+    },
+    {
+      "arg_count": 2,
+      "command_like": false,
+      "exists": true,
+      "explicit_nic_none": false,
+      "format": "json-array",
+      "legacy_net_none": false,
+      "nic_none_count": 0,
+      "path": "bench/fixtures/qemu_args_policy/safe.json",
+      "sha256": "9dd5beeb43de0162e7b69f2aa5d6ce2f4f7d44ec12f4d7b44d721ba6c90556a8",
+      "size_bytes": 22,
+      "violation_count": 0
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "duplicate_nic_none_fragments": 0,
+    "explicit_nic_none_fragments": 0,
+    "files_checked": 2,
+    "files_with_findings": 0,
+    "findings": 0,
+    "legacy_net_none_fragments": 0
+  }
+}

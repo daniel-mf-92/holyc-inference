@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="quant_block_compare" tests="1" failures="0"><testcase name="compare_q4_0" /></testsuite>

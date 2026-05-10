@@ -1,0 +1,4 @@
+bucket,min_bytes,max_bytes,rows,successful_rows,failed_rows,failure_pct,unique_prompts,tokens_total,prompt_bytes_min,prompt_bytes_max,wall_tok_per_s_p50,wall_tok_per_s_p05,ttft_us_p50,ttft_us_p95,sources
+short,0,255,4,4,0,0.0,2,160,49,71,74.52765713965621,65.34523416609689,12000.0,12400.0,bench/results/qemu_prompt_bench_latest.json
+medium,256,1023,0,0,0,0.0,0,0,,,,,,,
+long,1024,,0,0,0,0.0,0,0,,,,,,,

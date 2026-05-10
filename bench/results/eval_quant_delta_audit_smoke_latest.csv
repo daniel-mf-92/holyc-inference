@@ -1,0 +1,2 @@
+dataset,split,model,candidate_quantization,reference_quantization,candidate_source,reference_source,candidate_status,reference_status,candidate_records,reference_records,holyc_accuracy_drop,llama_accuracy_drop,agreement_delta,candidate_regressions,reference_regressions
+smoke-eval,validation,synthetic-smoke,Q4_0,Q8_0,/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpbsoxwgh5/q4.json,/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpbsoxwgh5/q8.json,pass,pass,4,4,0.020000000000000018,0.0,0.020000000000000018,0,0

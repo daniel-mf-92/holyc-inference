@@ -38,6 +38,8 @@ def test_smoke_prompt_audit_passes() -> None:
     assert report["summary"]["prompt_count"] == 2
     assert len(report["summary"]["suite_sha256"]) == 64
     assert report["summary"]["bytes_max"] <= 1024
+    assert report["summary"]["expected_token_prompts"] == 2
+    assert report["summary"]["expected_tokens_total"] == 80
     assert {row["prompt_id"] for row in report["prompts"]} == {"smoke-short", "smoke-code"}
 
 
@@ -86,6 +88,37 @@ def test_duplicate_prompt_text_can_be_warning_or_error(tmp_path: Path) -> None:
     assert error_report["error_count"] == 1
 
 
+def test_expected_token_gates_fail_missing_and_out_of_range(tmp_path: Path) -> None:
+    prompts = tmp_path / "prompts.jsonl"
+    prompts.write_text(
+        '{"prompt_id":"missing","prompt":"No expected token budget"}\n'
+        '{"prompt_id":"too-small","prompt":"Short","expected_tokens":1}\n'
+        '{"prompt_id":"too-large","prompt":"Long","expected_tokens":128}\n',
+        encoding="utf-8",
+    )
+
+    report = prompt_audit.build_report(
+        prompts,
+        min_prompts=1,
+        max_prompt_bytes=None,
+        fail_on_duplicate_text=False,
+        require_expected_tokens=True,
+        min_expected_token_prompts=3,
+        min_expected_tokens=8,
+        max_expected_tokens=64,
+    )
+
+    messages = [issue["message"] for issue in report["issues"]]
+    assert report["status"] == "fail"
+    assert report["summary"]["expected_token_prompts"] == 2
+    assert report["summary"]["expected_tokens_min"] == 1
+    assert report["summary"]["expected_tokens_max"] == 128
+    assert any("missing expected_tokens" in message for message in messages)
+    assert any("below min 8" in message for message in messages)
+    assert any("above max 64" in message for message in messages)
+    assert any("below required minimum 3" in message for message in messages)
+
+
 def test_cli_writes_json_and_markdown(tmp_path: Path) -> None:
     prompts = BENCH_PATH / "prompts" / "smoke.jsonl"
     output = tmp_path / "prompt_audit.json"
@@ -109,6 +142,13 @@ def test_cli_writes_json_and_markdown(tmp_path: Path) -> None:
             "2",
             "--max-prompt-bytes",
             "1024",
+            "--require-expected-tokens",
+            "--min-expected-token-prompts",
+            "2",
+            "--min-expected-tokens",
+            "16",
+            "--max-expected-tokens",
+            "64",
         ]
     )
 
@@ -118,12 +158,16 @@ def test_cli_writes_json_and_markdown(tmp_path: Path) -> None:
     csv_rows = list(csv.DictReader(csv_path.open(encoding="utf-8")))
     junit_root = ET.parse(junit).getroot()
     assert payload["status"] == "pass"
+    assert payload["limits"]["require_expected_tokens"] is True
     assert "Prompt Audit" in md
+    assert "Expected-token prompts" in md
     assert "smoke-short" in md
-    assert {row["prompt_id"] for row in csv_rows if row["row_type"] == "prompt"} == {
+    prompt_rows = [row for row in csv_rows if row["row_type"] == "prompt"]
+    assert {row["prompt_id"] for row in prompt_rows} == {
         "smoke-short",
         "smoke-code",
     }
+    assert {row["expected_tokens"] for row in prompt_rows} == {"32", "48"}
     assert junit_root.attrib["failures"] == "0"
     assert junit_root.find("testcase") is not None
 

@@ -1,0 +1,30 @@
+{
+  "counts_by_dataset_split": {
+    "arc-smoke": {
+      "validation": 1
+    },
+    "hellaswag-smoke": {
+      "validation": 1
+    },
+    "truthfulqa-smoke": {
+      "validation": 1
+    }
+  },
+  "duplicate_payload_record_count": 0,
+  "duplicate_prompt_record_count": 0,
+  "error_count": 0,
+  "findings": [],
+  "format": "hceval-dataset-duplicate-audit",
+  "generated_at": "2026-05-02T07:39:42Z",
+  "inputs": [
+    {
+      "path": "bench/datasets/samples/smoke_eval.jsonl",
+      "rows": 3,
+      "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+    }
+  ],
+  "record_count": 3,
+  "scope": "dataset_split",
+  "status": "pass",
+  "warning_count": 0
+}

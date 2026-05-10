@@ -1,0 +1,2 @@
+source,status,profile,model,quantization,measured_rows,warmup_rows,planned_measured_launches,planned_warmup_launches,planned_total_launches,ok_rows,failed_rows,command_airgap_ok,schema_fields_checked,telemetry_fields_checked,error
+bench/results/qemu_prompt_bench_latest.json,pass,ci-airgap-smoke,synthetic-smoke,Q4_0,4,2,4,2,6,4,0,True,149,96,

@@ -1,0 +1,5 @@
+source,scope,dataset,split,severity,kind,detail
+bench/results/eval_compare_smoke_latest.json,overall,smoke-eval,validation,warning,no_discordant_pairs,McNemar evidence is uninformative because both engines have identical correctness on this scope
+bench/results/eval_compare_smoke_latest.json,dataset_split,arc-smoke,validation,warning,no_discordant_pairs,McNemar evidence is uninformative because both engines have identical correctness on this scope
+bench/results/eval_compare_smoke_latest.json,dataset_split,hellaswag-smoke,validation,warning,no_discordant_pairs,McNemar evidence is uninformative because both engines have identical correctness on this scope
+bench/results/eval_compare_smoke_latest.json,dataset_split,truthfulqa-smoke,validation,warning,no_discordant_pairs,McNemar evidence is uninformative because both engines have identical correctness on this scope

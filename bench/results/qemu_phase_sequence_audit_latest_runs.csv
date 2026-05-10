@@ -1,0 +1,7 @@
+source,row,profile,model,quantization,prompt,commit,phase,iteration,exit_class
+bench/results/qemu_prompt_bench_latest.json,1,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,a70776642a09,warmup,1,ok
+bench/results/qemu_prompt_bench_latest.json,2,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,a70776642a09,warmup,1,ok
+bench/results/qemu_prompt_bench_latest.json,3,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,a70776642a09,measured,1,ok
+bench/results/qemu_prompt_bench_latest.json,4,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,a70776642a09,measured,2,ok
+bench/results/qemu_prompt_bench_latest.json,5,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,a70776642a09,measured,1,ok
+bench/results/qemu_prompt_bench_latest.json,6,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,a70776642a09,measured,2,ok

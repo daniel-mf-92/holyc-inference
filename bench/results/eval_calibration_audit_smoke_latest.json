@@ -1,0 +1,54 @@
+{
+  "engine_summaries": [
+    {
+      "accuracy_when_scored": 1.0,
+      "brier_score": 6.644734737210628e-07,
+      "dataset": "smoke-eval",
+      "ece": 0.0006969063049225843,
+      "engine": "holyc",
+      "mean_confidence": 0.9993030936950774,
+      "model": "synthetic-smoke",
+      "quantization": "Q4_0",
+      "score_coverage": 0.3333333333333333,
+      "scored_count": 1,
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation",
+      "total_count": 3
+    },
+    {
+      "accuracy_when_scored": 1.0,
+      "brier_score": 0.04316679346247537,
+      "dataset": "smoke-eval",
+      "ece": 0.16904733945604866,
+      "engine": "llama",
+      "mean_confidence": 0.8309526605439513,
+      "model": "synthetic-smoke",
+      "quantization": "Q4_0",
+      "score_coverage": 0.3333333333333333,
+      "scored_count": 1,
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation",
+      "total_count": 3
+    }
+  ],
+  "engine_summary_count": 2,
+  "findings": [],
+  "gates": {
+    "max_brier_score": 0.1,
+    "max_ece": 0.25,
+    "max_holyc_brier_delta": 0.05,
+    "max_holyc_ece_delta": 0.1,
+    "min_accuracy_when_scored": null,
+    "min_score_coverage": 0.3,
+    "min_scored_count": 1
+  },
+  "generated_at": "2026-04-30T04:07:01Z",
+  "inputs": [
+    {
+      "path": "bench/results/eval_compare_smoke_latest.json",
+      "sha256": "05bd08249eaa74d73dfb9fc6f7c1a5eca44f3822fa82f014d533b8eb4bfdb22b"
+    }
+  ],
+  "report_count": 1,
+  "status": "pass"
+}

@@ -1,0 +1,50 @@
+{
+  "artifacts": [
+    {
+      "compared_fields": 22,
+      "compared_values": 132,
+      "error": "",
+      "findings": 0,
+      "json_rows": 6,
+      "jsonl_path": "bench/results/qemu_prompt_bench_launches_latest.jsonl",
+      "jsonl_rows": 6,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    }
+  ],
+  "compare_fields": [
+    "benchmark",
+    "profile",
+    "model",
+    "quantization",
+    "phase",
+    "launch_index",
+    "iteration",
+    "prompt",
+    "prompt_sha256",
+    "tokens",
+    "elapsed_us",
+    "wall_elapsed_us",
+    "returncode",
+    "timed_out",
+    "exit_class",
+    "command_sha256",
+    "command_airgap_ok",
+    "command_has_explicit_nic_none",
+    "command_has_legacy_net_none",
+    "launch_plan_sha256",
+    "expected_launch_sequence_sha256",
+    "observed_launch_sequence_sha256"
+  ],
+  "findings": [],
+  "generated_at": "2026-05-02T05:35:58Z",
+  "status": "pass",
+  "summary": {
+    "artifacts": 1,
+    "failed": 0,
+    "findings": 0,
+    "json_rows": 6,
+    "jsonl_rows": 6,
+    "passed": 1
+  }
+}

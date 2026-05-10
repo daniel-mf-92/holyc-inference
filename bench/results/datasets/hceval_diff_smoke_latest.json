@@ -1,0 +1,57 @@
+{
+  "candidate": {
+    "dataset": "smoke-eval",
+    "path": "bench/results/datasets/hceval_diff_smoke_candidate.hceval",
+    "payload_sha256": "f4116c292a38f32da8ac87f1ad3f3229484a2c7e0f28f8d8a4206f7e02b6394b",
+    "record_count": 2,
+    "source_sha256": "6abc06bc3f93d581056d8bda0ce661c752eb832c3fd023a518a58469e8e318a8",
+    "split": "validation"
+  },
+  "config": {
+    "allow_order_changes": false
+  },
+  "findings": [],
+  "generated_at": "2026-05-02T04:00:55Z",
+  "records": [
+    {
+      "candidate_answer_payload_sha256": "41dc8f1a227137490788cef6b3d7ecf5ca0c70cb37005c44aee632e1ba20abd7",
+      "candidate_index": 0,
+      "candidate_input_sha256": "1e781112e8d03710e5b1b45293f32aaeca082399e6be02d3f77b8e0e9f52de31",
+      "changed_fields": "",
+      "record_id": "smoke-1",
+      "reference_answer_payload_sha256": "41dc8f1a227137490788cef6b3d7ecf5ca0c70cb37005c44aee632e1ba20abd7",
+      "reference_index": 0,
+      "reference_input_sha256": "1e781112e8d03710e5b1b45293f32aaeca082399e6be02d3f77b8e0e9f52de31",
+      "status": "unchanged"
+    },
+    {
+      "candidate_answer_payload_sha256": "e9b94297d9bf06e98eba0b9a3260b06bcdf6ef92bb472bcee28ca81043efdfde",
+      "candidate_index": 1,
+      "candidate_input_sha256": "6c8f9e55af8647f22f1c34084815017964f868c2f98b0ea86b3b40998712e42b",
+      "changed_fields": "",
+      "record_id": "smoke-2",
+      "reference_answer_payload_sha256": "e9b94297d9bf06e98eba0b9a3260b06bcdf6ef92bb472bcee28ca81043efdfde",
+      "reference_index": 1,
+      "reference_input_sha256": "6c8f9e55af8647f22f1c34084815017964f868c2f98b0ea86b3b40998712e42b",
+      "status": "unchanged"
+    }
+  ],
+  "reference": {
+    "dataset": "smoke-eval",
+    "path": "bench/results/datasets/hceval_diff_smoke_reference.hceval",
+    "payload_sha256": "f4116c292a38f32da8ac87f1ad3f3229484a2c7e0f28f8d8a4206f7e02b6394b",
+    "record_count": 2,
+    "source_sha256": "6abc06bc3f93d581056d8bda0ce661c752eb832c3fd023a518a58469e8e318a8",
+    "split": "validation"
+  },
+  "status": "pass",
+  "summary": {
+    "added": 0,
+    "changed": 0,
+    "findings": 0,
+    "records": 2,
+    "removed": 0,
+    "reordered": 0,
+    "unchanged": 2
+  }
+}

@@ -1,8 +1,12 @@
-# Benchmark Air-Gap Audit
+# Airgap Audit
 
-Generated: 2026-04-29T02:05:32Z
+Generated: 2026-04-30T04:24:13Z
 Status: pass
-QEMU commands checked: 679
+Commands checked: 6
+Commands with `-nic none`: 6
+Commands with legacy `-net none`: 0
 Findings: 0
 
-All recorded QEMU commands explicitly disable networking with `-nic none`.
+## Findings
+
+No air-gap findings.

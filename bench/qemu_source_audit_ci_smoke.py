@@ -78,11 +78,37 @@ def write_safe_sources(path: Path) -> None:
         ),
         encoding="utf-8",
     )
+    (path / "matrix.toml").write_text(
+        "\n".join(
+            [
+                "qemu_args_files = ['safe.args']",
+                "",
+                "[[profiles]]",
+                "name = 'safe'",
+                "qemu_args = ['-m', '512M']",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
 
 
 def write_unsafe_sources(path: Path) -> None:
     path.mkdir()
-    (path / "unsafe.args").write_text("-netdev user,id=n0\n", encoding="utf-8")
+    (path / "unsafe.args").write_text(
+        "\n".join(
+            [
+                "-netdev user,id=n0",
+                "@hidden-network.args",
+                "-readconfig machine.cfg",
+                "-chardev socket,id=mon,path=/tmp/qmp.sock",
+                "-display vnc=127.0.0.1:1",
+                "-object tls-creds-x509,id=tls0,endpoint=server,dir=/tmp/tls",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
     (path / "runbook.md").write_text(
         "qemu-system-x86_64 -display none -drive file=/tmp/TempleOS.img,format=raw,if=ide\n",
         encoding="utf-8",
@@ -91,6 +117,7 @@ def write_unsafe_sources(path: Path) -> None:
         json.dumps(
             {
                 "qemu_args": ["-netdev", "user,id=n0"],
+                "qemu_extra_args": ["-net", "none"],
                 "qemu_args_file": "unsafe.args",
             },
             indent=2,
@@ -106,6 +133,17 @@ def write_unsafe_sources(path: Path) -> None:
                 "  - e1000",
                 "qemu_args_files:",
                 "  - missing.args",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (path / "matrix.toml").write_text(
+        "\n".join(
+            [
+                "[[profiles]]",
+                "name = 'unsafe'",
+                "qemu_extra_args = ['-nic', 'user']",
                 "",
             ]
         ),
@@ -171,11 +209,18 @@ def main() -> int:
             require(unsafe_report["status"] == "fail", "unsafe_source_audit_not_fail=true"),
             require("missing explicit `-nic none`" in reasons, "unsafe_source_audit_missing_raw_qemu=true"),
             require("network backend `-netdev`" in reasons, "unsafe_source_audit_missing_json_fragment=true"),
+            require("legacy `-net none`" in reasons, "unsafe_source_audit_missing_legacy_fragment=true"),
             require("network device `e1000`" in reasons, "unsafe_source_audit_missing_yaml_fragment=true"),
+            require("non-air-gapped `-nic user`" in reasons, "unsafe_source_audit_missing_toml_fragment=true"),
             require(
                 "referenced qemu args file not found: missing.args" in reasons,
                 "unsafe_source_audit_missing_arg_file_ref=true",
             ),
+            require("nested qemu args include" in reasons, "unsafe_source_audit_missing_response_file=true"),
+            require("qemu config include" in reasons, "unsafe_source_audit_missing_config_include=true"),
+            require("socket endpoint `-chardev socket" in reasons, "unsafe_source_audit_missing_socket=true"),
+            require("remote display socket `-display vnc" in reasons, "unsafe_source_audit_missing_remote_display=true"),
+            require("tls option `-object tls-creds" in reasons, "unsafe_source_audit_missing_tls=true"),
             require(
                 int(unsafe_junit.attrib.get("failures", "0")) >= 4,
                 "unsafe_source_audit_junit_missing_failures=true",

@@ -1,0 +1,4 @@
+source,prompt_id,prompt_sha256,prompt_bytes,expected_tokens,bucket
+/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp2m5tixid/prompts.jsonl,short,b8e8b8a25cadcb8ecd893653ecaa9ec217c766de897529b93e308e057a8d1990,12,4,short
+/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp2m5tixid/prompts.jsonl,medium,b086c61a9d00d5586eb88e327dfe87ecf5f8ff2a561ddfaea159e675f146f8ab,180,16,medium
+/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp2m5tixid/prompts.jsonl,long,d59ecdb8886779fc64e9ef4c45260f03a3081dd49f1e39da7a41ccfb46089320,640,32,long

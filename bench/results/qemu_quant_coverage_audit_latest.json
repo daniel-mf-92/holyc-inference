@@ -1,0 +1,85 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-02T01:15:08Z",
+  "groups": [
+    {
+      "airgap_ok_rows": 4,
+      "explicit_nic_none_rows": 4,
+      "model": "synthetic-smoke",
+      "ok_rows": 4,
+      "profile": "ci-airgap-smoke",
+      "prompts": 2,
+      "quantization": "Q4_0",
+      "rows": 4,
+      "source": "bench/results/bench_matrix_20260502T011421Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260502T011425Z.json"
+    },
+    {
+      "airgap_ok_rows": 4,
+      "explicit_nic_none_rows": 4,
+      "model": "synthetic-smoke",
+      "ok_rows": 4,
+      "profile": "ci-airgap-smoke",
+      "prompts": 2,
+      "quantization": "Q4_0",
+      "rows": 4,
+      "source": "bench/results/bench_matrix_20260502T011421Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv"
+    },
+    {
+      "airgap_ok_rows": 4,
+      "explicit_nic_none_rows": 4,
+      "model": "synthetic-smoke",
+      "ok_rows": 4,
+      "profile": "ci-airgap-smoke",
+      "prompts": 2,
+      "quantization": "Q4_0",
+      "rows": 4,
+      "source": "bench/results/bench_matrix_20260502T011421Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json"
+    },
+    {
+      "airgap_ok_rows": 4,
+      "explicit_nic_none_rows": 4,
+      "model": "synthetic-smoke",
+      "ok_rows": 4,
+      "profile": "ci-airgap-smoke",
+      "prompts": 2,
+      "quantization": "Q8_0",
+      "rows": 4,
+      "source": "bench/results/bench_matrix_20260502T011421Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260502T011428Z.json"
+    },
+    {
+      "airgap_ok_rows": 4,
+      "explicit_nic_none_rows": 4,
+      "model": "synthetic-smoke",
+      "ok_rows": 4,
+      "profile": "ci-airgap-smoke",
+      "prompts": 2,
+      "quantization": "Q8_0",
+      "rows": 4,
+      "source": "bench/results/bench_matrix_20260502T011421Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv"
+    },
+    {
+      "airgap_ok_rows": 4,
+      "explicit_nic_none_rows": 4,
+      "model": "synthetic-smoke",
+      "ok_rows": 4,
+      "profile": "ci-airgap-smoke",
+      "prompts": 2,
+      "quantization": "Q8_0",
+      "rows": 4,
+      "source": "bench/results/bench_matrix_20260502T011421Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json"
+    }
+  ],
+  "required_quantizations": [
+    "Q4_0",
+    "Q8_0"
+  ],
+  "status": "pass",
+  "summary": {
+    "airgap_ok_rows": 24,
+    "explicit_nic_none_rows": 24,
+    "findings": 0,
+    "groups": 6,
+    "ok_rows": 24,
+    "rows": 24
+  }
+}

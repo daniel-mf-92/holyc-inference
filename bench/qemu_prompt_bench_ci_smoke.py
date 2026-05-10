@@ -80,6 +80,26 @@ def main() -> int:
         "network_nic_airgap_violation_detail",
     ):
         return rc
+    response_include_metadata = qemu_prompt_bench.command_airgap_metadata(
+        ["qemu-system-x86_64", "-nic", "none", "@hidden-networking.args"]
+    )
+    if rc := require(response_include_metadata["ok"] is False, "response_include_airgap_metadata_passed"):
+        return rc
+    if rc := require(
+        "nested qemu args include `@hidden-networking.args`" in response_include_metadata["violations"],
+        "response_include_airgap_violation_detail",
+    ):
+        return rc
+    readconfig_metadata = qemu_prompt_bench.command_airgap_metadata(
+        ["qemu-system-x86_64", "-nic", "none", "-readconfig", "machine.cfg"]
+    )
+    if rc := require(readconfig_metadata["ok"] is False, "readconfig_airgap_metadata_passed"):
+        return rc
+    if rc := require(
+        "qemu config include `-readconfig machine.cfg`" in readconfig_metadata["violations"],
+        "readconfig_airgap_violation_detail",
+    ):
+        return rc
 
     with tempfile.TemporaryDirectory(prefix="holyc-qemu-bench-ci-") as tmp:
         output_dir = Path(tmp) / "results"
@@ -144,12 +164,18 @@ def main() -> int:
         prompt_variability_csv_path = output_dir / "qemu_prompt_bench_prompt_variability_latest.csv"
         prompt_efficiency_csv_path = output_dir / "qemu_prompt_bench_prompt_efficiency_latest.csv"
         prompt_serial_output_csv_path = output_dir / "qemu_prompt_bench_prompt_serial_output_latest.csv"
+        prompt_failure_csv_path = output_dir / "qemu_prompt_bench_prompt_failures_latest.csv"
         launch_csv_path = output_dir / "qemu_prompt_bench_launches_latest.csv"
         launch_jsonl_path = output_dir / "qemu_prompt_bench_launches_latest.jsonl"
         junit_path = output_dir / "qemu_prompt_bench_junit_latest.xml"
         report = json.loads(report_path.read_text(encoding="utf-8"))
 
         if rc := require(report["status"] == "pass", "unexpected_qemu_bench_status"):
+            return rc
+        if rc := require(
+            report["artifact_schema_version"] == qemu_prompt_bench.ARTIFACT_SCHEMA_VERSION,
+            "missing_qemu_bench_artifact_schema_version",
+        ):
             return rc
         if rc := require(report["profile"] == "ci-airgap-smoke", "missing_top_level_profile"):
             return rc
@@ -328,6 +354,21 @@ def main() -> int:
             "missing_prompt_serial_output_bytes_total",
         ):
             return rc
+        if rc := require(
+            len(report["prompt_failure_rankings"]) == 2,
+            "unexpected_prompt_failure_rank_count",
+        ):
+            return rc
+        if rc := require(
+            report["prompt_failure_rankings"][0]["failure_rank"] == 1,
+            "missing_first_prompt_failure_rank",
+        ):
+            return rc
+        if rc := require(
+            report["prompt_failure_rankings"][0]["failed_runs"] == 0,
+            "unexpected_prompt_failure_failed_runs",
+        ):
+            return rc
 
         phases = {row["phase"]: row for row in report["phase_summaries"]}
         if rc := require(set(phases) == {"warmup", "measured", "all"}, "unexpected_phase_rows"):
@@ -472,6 +513,27 @@ def main() -> int:
                 "serial_output_lines_max",
             }.issubset(prompt_serial_output_rows[0].keys()),
             "missing_prompt_serial_output_csv_columns",
+        ):
+            return rc
+        prompt_failure_rows = list(csv.DictReader(prompt_failure_csv_path.open(encoding="utf-8", newline="")))
+        if rc := require(len(prompt_failure_rows) == 2, "unexpected_prompt_failure_csv_rows"):
+            return rc
+        if rc := require(
+            prompt_failure_rows[0]["failure_rank"] == "1",
+            "unexpected_prompt_failure_csv_rank",
+        ):
+            return rc
+        if rc := require(
+            {
+                "prompt_suite_sha256",
+                "command_sha256",
+                "failed_runs",
+                "ok_run_pct",
+                "exit_class_timeout_runs",
+                "exit_class_launch_error_runs",
+                "exit_class_nonzero_exit_runs",
+            }.issubset(prompt_failure_rows[0].keys()),
+            "missing_prompt_failure_csv_columns",
         ):
             return rc
 

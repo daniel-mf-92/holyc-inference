@@ -1,0 +1,3 @@
+source,row,list_name,phase,prompt,launch_index,command_argc,serial_stdio,nographic,socket_endpoint_count,endpoint_options
+bench/fixtures/qemu_serial_endpoint_audit/pass.json,0,artifact,artifact,-,,9,True,False,0,-serial stdio
+bench/fixtures/qemu_serial_endpoint_audit/pass.json,1,benchmarks,measured,smoke-short,1,9,True,False,0,-serial stdio

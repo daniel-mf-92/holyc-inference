@@ -55,6 +55,13 @@ def main() -> int:
             "1024",
             "--expect-suite-sha256",
             expected_suite,
+            "--require-expected-tokens",
+            "--min-expected-token-prompts",
+            "2",
+            "--min-expected-tokens",
+            "16",
+            "--max-expected-tokens",
+            "64",
         ]
         completed = subprocess.run(
             pass_command,
@@ -75,9 +82,26 @@ def main() -> int:
             return rc
         if rc := require(report["limits"]["expect_suite_sha256"] == expected_suite, "missing_suite_gate"):
             return rc
+        if rc := require(
+            report["summary"]["expected_token_prompts"] == 2,
+            "missing_expected_token_prompt_count",
+        ):
+            return rc
+        if rc := require(
+            report["summary"]["expected_tokens_total"] == 80,
+            "missing_expected_tokens_total",
+        ):
+            return rc
+        if rc := require(
+            report["limits"]["require_expected_tokens"] is True,
+            "missing_expected_token_gate",
+        ):
+            return rc
         if rc := require("Suite sha256" in markdown_path.read_text(encoding="utf-8"), "missing_markdown_summary"):
             return rc
-        if rc := require("row_type,prompt_id,sha256" in csv_path.read_text(encoding="utf-8"), "missing_csv_header"):
+        if rc := require("Expected tokens" in markdown_path.read_text(encoding="utf-8"), "missing_markdown_expected_tokens"):
+            return rc
+        if rc := require("expected_tokens" in csv_path.read_text(encoding="utf-8"), "missing_csv_expected_tokens"):
             return rc
         junit_root = ET.parse(junit_path).getroot()
         if rc := require(junit_root.attrib.get("name") == "holyc_prompt_audit", "missing_junit_suite"):
@@ -118,6 +142,39 @@ def main() -> int:
             return rc
         fail_junit_root = ET.parse(fail_junit_path).getroot()
         if rc := require(fail_junit_root.attrib.get("failures") == "1", "missing_failed_junit"):
+            return rc
+
+        missing_expected_tokens = tmp_path / "missing_expected_tokens.jsonl"
+        missing_expected_tokens.write_text(
+            '{"prompt_id":"missing","prompt":"No decode length declared"}\n',
+            encoding="utf-8",
+        )
+        missing_output_path = tmp_path / "prompt_audit_expected_tokens.json"
+        missing_command = [
+            sys.executable,
+            str(ROOT / "bench" / "prompt_audit.py"),
+            "--prompts",
+            str(missing_expected_tokens),
+            "--output",
+            str(missing_output_path),
+            "--require-expected-tokens",
+        ]
+        completed = subprocess.run(
+            missing_command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            print("expected_token_gate_did_not_fail=true", file=sys.stderr)
+            return 1
+        missing_report = json.loads(missing_output_path.read_text(encoding="utf-8"))
+        missing_messages = [issue["message"] for issue in missing_report["issues"]]
+        if rc := require(
+            any("missing expected_tokens" in message for message in missing_messages),
+            "missing_expected_token_gate_issue",
+        ):
             return rc
 
     print("prompt_audit_ci_smoke=pass")

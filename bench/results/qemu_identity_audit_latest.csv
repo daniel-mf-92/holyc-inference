@@ -1,0 +1,2 @@
+source,status,profile,model,quantization,commit,command_sha256,rows,warmup_rows,measured_rows,identity_fields_checked,command_hashes_checked,commit_fields_checked,error
+bench/results/qemu_prompt_bench_latest.json,pass,ci-airgap-smoke,synthetic-smoke,Q4_0,a70776642a09,633b78c56d2f2d5c6739b10ca9b48d66a6bb83328887ac7aceabb4ab48fd1c96,6,2,4,18,7,6,

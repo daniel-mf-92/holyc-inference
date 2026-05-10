@@ -1,0 +1,2 @@
+source,status,image_path,image_exists,image_size_bytes,image_sha256,command_arrays_checked,drive_references,distinct_drive_paths,violation_count,error
+bench/results/qemu_prompt_bench_20260501T230412Z.json,pass,/tmp/TempleOS.synthetic.img,False,,,7,7,1,0,

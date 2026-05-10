@@ -1,0 +1,4 @@
+record_id,holyc_row,llama_row,order_match,dataset,split,model,quantization,holyc_prediction,llama_prediction,holyc_score_count,llama_score_count
+smoke-hellaswag-1,1,1,True,,,,,0,0,0,0
+smoke-arc-1,2,2,True,,,,,0,A,4,0
+smoke-truthfulqa-1,3,3,True,,,,,A,0,0,4

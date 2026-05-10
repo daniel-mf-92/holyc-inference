@@ -72,6 +72,7 @@ def test_q4_0_block_audit_reports_signed_nibble_range(tmp_path: Path) -> None:
     assert audit.quant_histogram["0"] == 30
     assert audit.quant_histogram["7"] == 1
     assert audit.quant_nonzero_count == 2
+    assert audit.quant_zero_pct == 93.75
     assert audit.quant_used_value_count == 3
     assert audit.quant_saturation_count == 2
     assert audit.quant_saturation_pct == 6.25
@@ -283,6 +284,22 @@ def test_block_audit_checks_quant_distribution_gates(tmp_path: Path) -> None:
     assert "saturated quant values 100.000% exceeds limit 90.000%" in audit.findings
 
 
+def test_block_audit_can_gate_zero_quant_percentage(tmp_path: Path) -> None:
+    block_file = tmp_path / "q8.bin"
+    block_file.write_bytes(half_bits(1.0) + bytes([0] * 24 + list(range(1, 9))))
+
+    audit = quant_audit.audit_q8_0_blocks(
+        block_file,
+        allow_inf_nan_scale=False,
+        max_zero_quant_pct=50.0,
+    )
+
+    assert audit.quant_zero_count == 24
+    assert audit.quant_nonzero_count == 8
+    assert audit.quant_zero_pct == 75.0
+    assert "zero quant values 75.000% exceeds limit 50.000%" in audit.findings
+
+
 def test_block_audit_checks_per_block_distribution_gates(tmp_path: Path) -> None:
     block_file = tmp_path / "q8.bin"
     first_block = half_bits(1.0) + bytes([0] * 32)
@@ -336,6 +353,31 @@ def test_block_audit_checks_duplicate_complete_blocks(tmp_path: Path) -> None:
     assert "identical block run 3 exceeds limit 2 starting at block 0" in audit.findings
 
 
+def test_block_audit_checks_scale_repetition_gates(tmp_path: Path) -> None:
+    block_file = tmp_path / "q8.bin"
+    first_block = half_bits(1.0) + bytes(range(32))
+    second_block = half_bits(1.0) + bytes(range(1, 33))
+    third_block = half_bits(2.0) + bytes(range(2, 34))
+    block_file.write_bytes(first_block + second_block + third_block)
+
+    audit = quant_audit.audit_q8_0_blocks(
+        block_file,
+        allow_inf_nan_scale=False,
+        min_scale_used_values=3,
+        max_duplicate_scale_pct=20.0,
+        max_identical_scale_run=1,
+    )
+
+    assert audit.scale_used_value_count == 2
+    assert audit.duplicate_scale_count == 1
+    assert audit.duplicate_scale_pct == 100.0 / 3
+    assert audit.max_identical_scale_run == 2
+    assert audit.max_identical_scale_run_start == 0
+    assert "fp16 scale values 2 below minimum 3" in audit.findings
+    assert "duplicate fp16 scales 1/3 (33.333%) exceeds limit 20.000%" in audit.findings
+    assert "identical fp16 scale run 2 exceeds limit 1 starting at block 0" in audit.findings
+
+
 def test_cli_writes_pass_report(tmp_path: Path) -> None:
     source = tmp_path / "ok.HC"
     output = tmp_path / "report.json"
@@ -376,6 +418,8 @@ def test_cli_fails_on_q16_scale_limit(tmp_path: Path) -> None:
             "1",
             "--max-block-saturation-pct",
             "100",
+            "--max-zero-quant-pct",
+            "99",
             "--output",
             str(output),
             "--markdown",
@@ -393,14 +437,18 @@ def test_cli_fails_on_q16_scale_limit(tmp_path: Path) -> None:
     assert '"scale_q16_over_limit_count": 1' in report
     assert '"scale_positive_count": 1' in report
     assert '"scale_negative_count": 0' in report
+    assert '"quant_zero_pct": 100.0' in report
     assert '"min_block_used_quant_values": 1' in report
     assert '"worst_block_saturation_count": 0' in report
     markdown_text = markdown.read_text(encoding="utf-8")
     assert "Scale Q16 min/max/absmax/zero/overlimit" in markdown_text
+    assert "Scale values" in markdown_text
+    assert "Duplicate scales" in markdown_text
     assert "Scale sign +/-" in markdown_text
     assert "Padding elements/nonzero" in markdown_text
     assert "Zero-scale nonzero blocks/entries" in markdown_text
     assert "Used values" in markdown_text
+    assert "100.000% zero" in markdown_text
     assert "Min block used values" in markdown_text
     assert "block," in csv_report.read_text(encoding="utf-8")
     junit_root = ET.parse(junit).getroot()

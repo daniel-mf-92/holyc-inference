@@ -1,0 +1,4 @@
+source,dataset,split,record_id,choice_count,answer_index,answer_bytes,min_choice_bytes,max_choice_bytes,mean_distractor_bytes,answer_to_distractor_mean_ratio,answer_length_position
+bench/datasets/samples/smoke_eval.jsonl:1,hellaswag-smoke,validation,smoke-hellaswag-1,4,0,45,37,45,40.333333333333336,1.1157024793388428,tied_longest
+bench/datasets/samples/smoke_eval.jsonl:2,arc-smoke,validation,smoke-arc-1,4,0,11,5,11,5.666666666666667,1.9411764705882353,longest
+bench/datasets/samples/smoke_eval.jsonl:3,truthfulqa-smoke,validation,smoke-truthfulqa-1,4,0,43,20,43,30.0,1.4333333333333333,longest

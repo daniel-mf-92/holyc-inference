@@ -1,0 +1,34 @@
+{
+  "benchmarks": [
+    {
+      "exit_class": "ok",
+      "phase": "measured",
+      "prompt": "smoke-short",
+      "returncode": 0,
+      "timed_out": false
+    },
+    {
+      "exit_class": "ok",
+      "phase": "measured",
+      "prompt": "smoke-medium",
+      "returncode": 0,
+      "timed_out": false
+    }
+  ],
+  "command_airgap": {
+    "ok": true,
+    "violations": []
+  },
+  "generated_at": "2026-05-01T00:00:00Z",
+  "status": "pass",
+  "suite_summary": {
+    "failed_runs": 0,
+    "nonzero_exit_runs": 0,
+    "ok_runs": 2,
+    "runs": 2,
+    "timed_out_runs": 0
+  },
+  "telemetry_findings": [],
+  "variability_findings": [],
+  "warmups": []
+}

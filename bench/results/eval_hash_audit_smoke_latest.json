@@ -1,0 +1,26 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-01T23:14:20Z",
+  "reports": [
+    {
+      "dataset": "smoke-eval",
+      "error": "",
+      "gold_sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131",
+      "holyc_predictions_sha256": "61bb69247c6343f53493b5febb5636780ed8c5d99d6114976164e1c7ecd1c4e9",
+      "llama_predictions_sha256": "22a31f8ffa48784acd9645bf802ac0f3e0260d45e703a34c926a3331e643dfa1",
+      "model": "synthetic-smoke",
+      "quantization": "Q4_0",
+      "record_count": 3,
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation",
+      "status": "pass"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "dataset_splits": 1,
+    "findings": 0,
+    "reports": 1,
+    "rows": 3
+  }
+}

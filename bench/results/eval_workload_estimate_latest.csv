@@ -1,0 +1,3 @@
+scope,dataset,split,records,choices,prompt_bytes,choice_bytes,prompt_tokens_est,choice_tokens_est,scored_tokens_est,launches_est,wall_seconds_est
+arc_smoke:validation,arc_smoke,validation,1,4,41,22,11,8,52,1,0.77
+truthfulqa_smoke:validation,truthfulqa_smoke,validation,1,4,78,95,20,25,105,1,1.3

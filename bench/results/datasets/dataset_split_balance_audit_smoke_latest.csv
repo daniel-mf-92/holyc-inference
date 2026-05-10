@@ -1,0 +1,4 @@
+dataset,split,records,pct_of_dataset,pct_of_total
+arc-smoke,validation,1,100.0,33.333333
+hellaswag-smoke,validation,1,100.0,33.333333
+truthfulqa-smoke,validation,1,100.0,33.333333

@@ -1,0 +1,77 @@
+{
+  "artifacts": [
+    {
+      "command_rows": 4,
+      "error": "",
+      "findings": 0,
+      "forbidden_display_rows": 0,
+      "headless_rows": 4,
+      "source": "bench/fixtures/qemu_display_policy_audit/pass/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    }
+  ],
+  "commands": [
+    {
+      "command_argc": 9,
+      "display_value": "none",
+      "forbidden_display": false,
+      "headless_display": true,
+      "launch_index": null,
+      "list_name": "artifact",
+      "nographic": false,
+      "phase": "artifact",
+      "prompt": "-",
+      "row": 0,
+      "source": "bench/fixtures/qemu_display_policy_audit/pass/qemu_prompt_bench_latest.json"
+    },
+    {
+      "command_argc": 9,
+      "display_value": "none",
+      "forbidden_display": false,
+      "headless_display": true,
+      "launch_index": 0,
+      "list_name": "warmups",
+      "nographic": false,
+      "phase": "warmup",
+      "prompt": "smoke-short",
+      "row": 1,
+      "source": "bench/fixtures/qemu_display_policy_audit/pass/qemu_prompt_bench_latest.json"
+    },
+    {
+      "command_argc": 9,
+      "display_value": "none",
+      "forbidden_display": false,
+      "headless_display": true,
+      "launch_index": 1,
+      "list_name": "benchmarks",
+      "nographic": false,
+      "phase": "measured",
+      "prompt": "smoke-short",
+      "row": 2,
+      "source": "bench/fixtures/qemu_display_policy_audit/pass/qemu_prompt_bench_latest.json"
+    },
+    {
+      "command_argc": 8,
+      "display_value": "",
+      "forbidden_display": false,
+      "headless_display": true,
+      "launch_index": 2,
+      "list_name": "benchmarks",
+      "nographic": true,
+      "phase": "measured",
+      "prompt": "smoke-nographic",
+      "row": 3,
+      "source": "bench/fixtures/qemu_display_policy_audit/pass/qemu_prompt_bench_latest.json"
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-02T06:40:08Z",
+  "status": "pass",
+  "summary": {
+    "artifacts": 1,
+    "command_rows": 4,
+    "findings": 0,
+    "forbidden_display_rows": 0,
+    "headless_rows": 4
+  }
+}

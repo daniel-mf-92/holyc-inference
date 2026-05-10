@@ -1,0 +1,72 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-01T11:53:41Z",
+  "inputs": {
+    "gold": "bench/datasets/samples/smoke_eval.jsonl",
+    "holyc": "bench/eval/samples/holyc_smoke_scored_predictions.jsonl",
+    "llama": "bench/eval/samples/llama_smoke_scored_predictions.jsonl"
+  },
+  "pairs": [
+    {
+      "answer_index": 0,
+      "choice_count": 4,
+      "dataset": "arc-smoke",
+      "holyc_gold_in_topk": true,
+      "holyc_topk": "0,1",
+      "jaccard": 1.0,
+      "k": 2,
+      "llama_gold_in_topk": true,
+      "llama_topk": "0,1",
+      "overlap_count": 2,
+      "record_id": "smoke-arc-1",
+      "split": "validation",
+      "top1_match": true,
+      "topk_exact_match": true
+    },
+    {
+      "answer_index": 0,
+      "choice_count": 4,
+      "dataset": "hellaswag-smoke",
+      "holyc_gold_in_topk": true,
+      "holyc_topk": "0,1",
+      "jaccard": 1.0,
+      "k": 2,
+      "llama_gold_in_topk": true,
+      "llama_topk": "0,1",
+      "overlap_count": 2,
+      "record_id": "smoke-hellaswag-1",
+      "split": "validation",
+      "top1_match": true,
+      "topk_exact_match": true
+    },
+    {
+      "answer_index": 0,
+      "choice_count": 4,
+      "dataset": "truthfulqa-smoke",
+      "holyc_gold_in_topk": true,
+      "holyc_topk": "0,1",
+      "jaccard": 1.0,
+      "k": 2,
+      "llama_gold_in_topk": true,
+      "llama_topk": "0,1",
+      "overlap_count": 2,
+      "record_id": "smoke-truthfulqa-1",
+      "split": "validation",
+      "top1_match": true,
+      "topk_exact_match": true
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "avg_jaccard": 1.0,
+    "gold_records": 3,
+    "holyc_gold_in_topk_pct": 100.0,
+    "llama_gold_in_topk_pct": 100.0,
+    "pair_coverage_pct": 100.0,
+    "paired_scored_records": 3,
+    "top1_disagree_pct": 0.0,
+    "top1_match_pct": 100.0,
+    "topk_exact_match_pct": 100.0
+  },
+  "top_k": 2
+}

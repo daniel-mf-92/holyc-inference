@@ -1,0 +1,3 @@
+build,profile,model,quantization,phase,prompt_id,prompt_sha256,iteration,baseline_count,candidate_count,delta,status
+base,smoke,toy,Q8_0,measured,alpha,prompt-a,0,1,1,0,pass
+base,smoke,toy,Q8_0,measured,alpha,prompt-a,1,1,1,0,pass

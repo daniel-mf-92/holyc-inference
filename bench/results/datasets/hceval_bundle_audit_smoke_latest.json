@@ -1,0 +1,27 @@
+{
+  "datasets": [
+    "smoke-eval"
+  ],
+  "duplicates": [],
+  "findings": [],
+  "generated_at": "2026-05-02T04:00:54Z",
+  "record_count": 3,
+  "shard_count": 1,
+  "shards": [
+    {
+      "dataset": "smoke-eval",
+      "findings": [],
+      "manifest": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/results/hceval_span_smoke_latest.manifest.json",
+      "path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/results/hceval_span_smoke_latest.hceval",
+      "payload_sha256": "5d961b26360f3181caa5d0e05a4ba49fbb99ad53aa0b07bd56c742034d4f782f",
+      "record_count": 3,
+      "source_sha256": "454a4036ea4020c0c8a1ee3485ccfe07a53483dfbeb0600d78684b874ad56003",
+      "split": "validation",
+      "status": "pass"
+    }
+  ],
+  "splits": [
+    "validation"
+  ],
+  "status": "pass"
+}

@@ -1,0 +1,2 @@
+source,status,command_rows,headless_rows,forbidden_display_rows,findings,error
+bench/fixtures/qemu_display_policy_audit/pass/qemu_prompt_bench_latest.json,pass,4,4,0,0,

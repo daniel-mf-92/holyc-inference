@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="holyc_eval_calibration_audit" tests="1" failures="0" errors="0">
+  <testcase classname="eval_calibration_audit" name="calibration_gates" />
+</testsuite>

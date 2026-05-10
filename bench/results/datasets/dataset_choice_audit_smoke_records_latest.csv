@@ -1,4 +1,4 @@
-source,dataset,split,record_id,choice_count,answer_index,min_choice_bytes,max_choice_bytes,total_choice_bytes,choice_length_ratio,duplicate_choice_group_count,duplicate_choice_text_count,choice_overlap_pair_count,choice_label_prefix_count,prompt_contains_correct_choice,prompt_choice_leak_count,prompt_choice_leak_indexes
-bench/datasets/samples/smoke_eval.jsonl:1,hellaswag-smoke,validation,smoke-hellaswag-1,4,0,37,45,166,1.2162162162162162,0,0,0,0,False,0,
-bench/datasets/samples/smoke_eval.jsonl:2,arc-smoke,validation,smoke-arc-1,4,0,5,11,28,2.2,0,0,0,0,False,0,
-bench/datasets/samples/smoke_eval.jsonl:3,truthfulqa-smoke,validation,smoke-truthfulqa-1,4,0,20,43,133,2.15,0,0,0,0,False,0,
+source,dataset,split,record_id,choice_count,answer_index,answer_choice_bytes,min_choice_bytes,max_choice_bytes,total_choice_bytes,answer_choice_byte_pct,choice_length_ratio,duplicate_choice_group_count,duplicate_choice_text_count,choice_overlap_pair_count,choice_label_prefix_count,prompt_contains_correct_choice,prompt_choice_leak_count,prompt_choice_leak_indexes
+bench/datasets/samples/smoke_eval.jsonl:1,hellaswag-smoke,validation,smoke-hellaswag-1,4,0,45,37,45,166,27.10843373493976,1.2162162162162162,0,0,0,0,False,0,
+bench/datasets/samples/smoke_eval.jsonl:2,arc-smoke,validation,smoke-arc-1,4,0,11,5,11,28,39.285714285714285,2.2,0,0,0,0,False,0,
+bench/datasets/samples/smoke_eval.jsonl:3,truthfulqa-smoke,validation,smoke-truthfulqa-1,4,0,43,20,43,133,32.33082706766917,2.15,0,0,0,0,False,0,

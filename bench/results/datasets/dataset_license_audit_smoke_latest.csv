@@ -1,0 +1,2 @@
+source,status,source_name,source_version,license,normalized_license,source_url,source_url_scheme,source_url_host,record_count,dataset_count,split_count,finding_count
+/private/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp8dkexyrs/allowed.manifest.json,pass,synthetic-license-smoke,v1,Apache-2.0,apache-2.0,https://example.org/allowed,https,example.org,2,1,1,0

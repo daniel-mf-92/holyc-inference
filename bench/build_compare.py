@@ -211,6 +211,16 @@ def first_float(row: dict[str, Any], names: Iterable[str]) -> float | None:
     return None
 
 
+def row_is_ok(row: dict[str, Any]) -> bool:
+    exit_class = str(row.get("exit_class") or "").strip().lower()
+    if exit_class and exit_class not in {"ok", "pass", "passed", "success"}:
+        return False
+    if str(row.get("timed_out", "false")).strip().lower() in {"1", "true", "yes", "y"}:
+        return False
+    returncode = parse_int(row.get("returncode", 0))
+    return returncode == 0
+
+
 def prompt_suite_sha256(row: dict[str, Any]) -> str:
     suite = row.get("prompt_suite")
     if isinstance(suite, dict):
@@ -472,11 +482,7 @@ def metric_from_rows(build: str, source: Path, rows: list[dict[str, Any]]) -> li
             is not None
             and value >= 0
         ]
-        ok_runs = sum(
-            1
-            for row in key_rows
-            if parse_int(row.get("returncode", 0)) == 0 and str(row.get("timed_out", "false")).lower() != "true"
-        )
+        ok_runs = sum(1 for row in key_rows if row_is_ok(row))
         metrics.append(
             BuildMetric(
                 build=build,

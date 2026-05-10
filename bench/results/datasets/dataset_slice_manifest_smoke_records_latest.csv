@@ -1,0 +1,4 @@
+dataset,split,record_id,source,row_number,choice_count,answer_index,prompt_bytes,choices_bytes,payload_sha256
+arc-smoke,validation,smoke-arc-1,bench/datasets/samples/smoke_eval.jsonl,2,4,0,51,28,d5d8a346ce61a1efa09f63d11fb406b4b138ff4436cc5334124e31f3d03908f0
+hellaswag-smoke,validation,smoke-hellaswag-1,bench/datasets/samples/smoke_eval.jsonl,1,4,0,69,166,0da7c2245e00e1e246a3541939338f8c07c214a560ca14e1ac9cff349e5125e1
+truthfulqa-smoke,validation,smoke-truthfulqa-1,bench/datasets/samples/smoke_eval.jsonl,3,4,0,62,133,d60b3af37b0e35172c1bcba33d15c568d1af76c1f48c98310306a06c46de9f74

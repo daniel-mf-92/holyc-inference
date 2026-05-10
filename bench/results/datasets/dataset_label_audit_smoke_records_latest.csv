@@ -1,0 +1,4 @@
+row,record_id,dataset,split,shape,choice_count,raw_labels,answer_label,correct_label_count,status,findings
+1,smoke-hellaswag-1,hellaswag-smoke,validation,hellaswag,4,"A,B,C,D",0,,pass,
+2,smoke-arc-1,arc-smoke,validation,arc,4,"A,B,C,D",A,,pass,
+3,smoke-truthfulqa-1,truthfulqa-smoke,validation,truthfulqa,4,"0,1,2,3",,1,pass,

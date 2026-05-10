@@ -1,0 +1,20 @@
+{
+  "block_count_match": true,
+  "block_mismatch_count": 0,
+  "byte_size_match": true,
+  "candidate_blocks": 2,
+  "candidate_bytes": 36,
+  "candidate_path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/results/quant_block_compare_smoke_candidate_pass.q4_0",
+  "comparable_blocks": 2,
+  "findings": [],
+  "first_mismatch_block": null,
+  "format": "q4_0",
+  "mismatches": [],
+  "quant_mismatch_count": 0,
+  "quant_mismatch_pct": 0.0,
+  "reference_blocks": 2,
+  "reference_bytes": 36,
+  "reference_path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/results/quant_block_compare_smoke_reference.q4_0",
+  "scale_mismatch_count": 0,
+  "timestamp": "2026-05-02T04:02:09Z"
+}

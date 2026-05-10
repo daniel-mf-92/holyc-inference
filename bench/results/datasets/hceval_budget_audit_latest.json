@@ -1,0 +1,81 @@
+{
+  "artifacts": [
+    {
+      "binary_bytes": 343,
+      "body_bytes": 196,
+      "dataset": "smoke-eval",
+      "error": "",
+      "finding_count": 0,
+      "manifest": "bench/results/datasets/hceval_diff_smoke_candidate.manifest.json",
+      "max_choice_bytes": 5,
+      "max_prompt_bytes": 21,
+      "max_record_payload_bytes": 74,
+      "metadata_bytes": 95,
+      "record_count": 2,
+      "source": "bench/results/datasets/hceval_diff_smoke_candidate.hceval",
+      "split": "validation",
+      "status": "pass"
+    },
+    {
+      "binary_bytes": 343,
+      "body_bytes": 196,
+      "dataset": "smoke-eval",
+      "error": "",
+      "finding_count": 0,
+      "manifest": "bench/results/datasets/hceval_diff_smoke_reference.manifest.json",
+      "max_choice_bytes": 5,
+      "max_prompt_bytes": 21,
+      "max_record_payload_bytes": 74,
+      "metadata_bytes": 95,
+      "record_count": 2,
+      "source": "bench/results/datasets/hceval_diff_smoke_reference.hceval",
+      "split": "validation",
+      "status": "pass"
+    },
+    {
+      "binary_bytes": 925,
+      "body_bytes": 778,
+      "dataset": "smoke-eval",
+      "error": "",
+      "finding_count": 0,
+      "manifest": "bench/results/datasets/smoke_curated.hceval.manifest.json",
+      "max_choice_bytes": 45,
+      "max_prompt_bytes": 69,
+      "max_record_payload_bytes": 304,
+      "metadata_bytes": 95,
+      "record_count": 3,
+      "source": "bench/results/datasets/smoke_curated.hceval",
+      "split": "validation",
+      "status": "pass"
+    },
+    {
+      "binary_bytes": 925,
+      "body_bytes": 778,
+      "dataset": "smoke-eval",
+      "error": "",
+      "finding_count": 0,
+      "manifest": "bench/results/datasets/smoke_eval.manifest.json",
+      "max_choice_bytes": 45,
+      "max_prompt_bytes": 69,
+      "max_record_payload_bytes": 304,
+      "metadata_bytes": 95,
+      "record_count": 3,
+      "source": "bench/results/datasets/smoke_eval.hceval",
+      "split": "validation",
+      "status": "pass"
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-02T02:43:40Z",
+  "status": "pass",
+  "summary": {
+    "artifacts": 4,
+    "failing_artifacts": 0,
+    "findings": 0,
+    "max_binary_bytes": 925,
+    "max_record_payload_bytes": 304,
+    "passing_artifacts": 4,
+    "total_binary_bytes": 2536,
+    "total_records": 10
+  }
+}

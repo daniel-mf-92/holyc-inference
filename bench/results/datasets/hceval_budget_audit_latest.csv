@@ -1,0 +1,5 @@
+source,status,dataset,split,record_count,binary_bytes,metadata_bytes,body_bytes,max_prompt_bytes,max_choice_bytes,max_record_payload_bytes,manifest,finding_count,error
+bench/results/datasets/hceval_diff_smoke_candidate.hceval,pass,smoke-eval,validation,2,343,95,196,21,5,74,bench/results/datasets/hceval_diff_smoke_candidate.manifest.json,0,
+bench/results/datasets/hceval_diff_smoke_reference.hceval,pass,smoke-eval,validation,2,343,95,196,21,5,74,bench/results/datasets/hceval_diff_smoke_reference.manifest.json,0,
+bench/results/datasets/smoke_curated.hceval,pass,smoke-eval,validation,3,925,95,778,69,45,304,bench/results/datasets/smoke_curated.hceval.manifest.json,0,
+bench/results/datasets/smoke_eval.hceval,pass,smoke-eval,validation,3,925,95,778,69,45,304,bench/results/datasets/smoke_eval.manifest.json,0,

@@ -1,0 +1,77 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-01T11:08:40Z",
+  "inputs": [
+    {
+      "path": "bench/datasets/samples/smoke_eval.jsonl",
+      "rows": 3,
+      "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+    }
+  ],
+  "scopes": [
+    {
+      "answer_index_histogram": "0:1",
+      "choice_bytes_max": 11,
+      "choice_bytes_min": 5,
+      "choice_bytes_p50": 8.0,
+      "choice_bytes_p95": 10.7,
+      "choice_count_histogram": "4:1",
+      "choices_per_record_max": 4,
+      "choices_per_record_min": 4,
+      "choices_per_record_p50": 4.0,
+      "dataset": "arc-smoke",
+      "prompt_bytes_max": 51,
+      "prompt_bytes_min": 51,
+      "prompt_bytes_p50": 51.0,
+      "prompt_bytes_p95": 51.0,
+      "records": 1,
+      "scope": "arc-smoke:validation",
+      "split": "validation"
+    },
+    {
+      "answer_index_histogram": "0:1",
+      "choice_bytes_max": 45,
+      "choice_bytes_min": 37,
+      "choice_bytes_p50": 41.0,
+      "choice_bytes_p95": 44.6,
+      "choice_count_histogram": "4:1",
+      "choices_per_record_max": 4,
+      "choices_per_record_min": 4,
+      "choices_per_record_p50": 4.0,
+      "dataset": "hellaswag-smoke",
+      "prompt_bytes_max": 69,
+      "prompt_bytes_min": 69,
+      "prompt_bytes_p50": 69.0,
+      "prompt_bytes_p95": 69.0,
+      "records": 1,
+      "scope": "hellaswag-smoke:validation",
+      "split": "validation"
+    },
+    {
+      "answer_index_histogram": "0:1",
+      "choice_bytes_max": 43,
+      "choice_bytes_min": 20,
+      "choice_bytes_p50": 31.5,
+      "choice_bytes_p95": 41.85,
+      "choice_count_histogram": "4:1",
+      "choices_per_record_max": 4,
+      "choices_per_record_min": 4,
+      "choices_per_record_p50": 4.0,
+      "dataset": "truthfulqa-smoke",
+      "prompt_bytes_max": 62,
+      "prompt_bytes_min": 62,
+      "prompt_bytes_p50": 62.0,
+      "prompt_bytes_p95": 62.0,
+      "records": 1,
+      "scope": "truthfulqa-smoke:validation",
+      "split": "validation"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "inputs": 1,
+    "records": 3,
+    "scopes": 3
+  }
+}

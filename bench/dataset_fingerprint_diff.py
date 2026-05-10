@@ -258,6 +258,16 @@ def write_csv(path: Path, rows: list[DiffRow]) -> None:
             writer.writerow(asdict(row))
 
 
+def write_findings_csv(path: Path, findings: list[Finding]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fields = list(Finding.__dataclass_fields__)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for finding in findings:
+            writer.writerow(asdict(finding))
+
+
 def write_markdown(path: Path, report: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
@@ -311,6 +321,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--candidate", required=True, type=Path, help="Candidate dataset_fingerprint.py JSON report")
     parser.add_argument("--output", required=True, type=Path, help="Summary JSON output")
     parser.add_argument("--csv", type=Path, help="Optional row-level diff CSV")
+    parser.add_argument("--findings-csv", type=Path, help="Optional structured findings CSV")
     parser.add_argument("--markdown", type=Path, help="Optional Markdown summary")
     parser.add_argument("--junit", type=Path, help="Optional JUnit XML output")
     parser.add_argument("--key-field", default="record_id", help="Fingerprint row field used as the stable key")
@@ -372,6 +383,8 @@ def main(argv: list[str] | None = None) -> int:
     write_json(args.output, report)
     if args.csv:
         write_csv(args.csv, rows)
+    if args.findings_csv:
+        write_findings_csv(args.findings_csv, findings)
     if args.markdown:
         write_markdown(args.markdown, report)
     if args.junit:

@@ -1,0 +1,66 @@
+{
+  "artifacts": [
+    {
+      "accuracy_delta_holyc_minus_llama": 0.0,
+      "agreement": 1.0,
+      "artifact_type": "eval_compare",
+      "dataset": "smoke-eval",
+      "error": "",
+      "findings": 0,
+      "generated_at": "2026-04-30T01:41:14Z",
+      "gold_sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131",
+      "holyc_accuracy": 1.0,
+      "holyc_predictions_sha256": "61bb69247c6343f53493b5febb5636780ed8c5d99d6114976164e1c7ecd1c4e9",
+      "llama_accuracy": 1.0,
+      "llama_predictions_sha256": "22a31f8ffa48784acd9645bf802ac0f3e0260d45e703a34c926a3331e643dfa1",
+      "model": "synthetic-smoke",
+      "quantization": "Q4_0",
+      "record_count": 3,
+      "regressions": 0,
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation",
+      "status": "pass",
+      "suite_reports": 0
+    },
+    {
+      "accuracy_delta_holyc_minus_llama": null,
+      "agreement": 1.0,
+      "artifact_type": "eval_suite_summary",
+      "dataset": "",
+      "error": "",
+      "findings": 0,
+      "generated_at": "2026-04-30T09:55:58Z",
+      "gold_sha256": "",
+      "holyc_accuracy": 1.0,
+      "holyc_predictions_sha256": "",
+      "llama_accuracy": null,
+      "llama_predictions_sha256": "",
+      "model": "",
+      "quantization": "",
+      "record_count": 3,
+      "regressions": 0,
+      "source": "bench/results/eval_suite_summary_smoke_latest.json",
+      "split": "",
+      "status": "pass",
+      "suite_reports": 1
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-01T21:22:44Z",
+  "status": "pass",
+  "summary": {
+    "artifacts": 2,
+    "findings": 0,
+    "records": 6,
+    "regressions": 0,
+    "status_counts": {
+      "pass": 2
+    },
+    "type_counts": {
+      "eval_compare": 1,
+      "eval_suite_summary": 1
+    },
+    "weighted_agreement": 1.0,
+    "weighted_holyc_accuracy": 1.0
+  }
+}

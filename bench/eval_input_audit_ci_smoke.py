@@ -84,6 +84,10 @@ def main() -> int:
                 "4",
                 "--max-choices",
                 "4",
+                "--min-top-score-margin",
+                "0",
+                "--record-csv",
+                str(output_dir / f"{stem}_records.csv"),
             )
         )
         if completed.returncode != 0:
@@ -107,6 +111,7 @@ def main() -> int:
             f"{stem}.json",
             f"{stem}.md",
             f"{stem}.csv",
+            f"{stem}_records.csv",
             f"{stem}_junit.xml",
         ]
         if rc := require(all((output_dir / name).exists() for name in expected_files), "missing_audit_artifact"):
@@ -116,7 +121,27 @@ def main() -> int:
             "missing_audit_markdown",
         ):
             return rc
+        if rc := require(
+            "Score Margins" in (output_dir / f"{stem}.md").read_text(encoding="utf-8"),
+            "missing_score_margin_markdown",
+        ):
+            return rc
         if rc := require(load_csv_rows(output_dir / f"{stem}.csv") == [], "unexpected_pass_issue_rows"):
+            return rc
+        record_rows = load_csv_rows(output_dir / f"{stem}_records.csv")
+        if rc := require(len(record_rows) == 6, "unexpected_record_csv_rows"):
+            return rc
+        if rc := require({row["source"] for row in record_rows} == {"holyc", "llama.cpp"}, "unexpected_record_csv_sources"):
+            return rc
+        if rc := require(
+            all(row["valid"] == "True" and row["correct"] == "True" for row in record_rows),
+            "unexpected_record_csv_validity",
+        ):
+            return rc
+        if rc := require(
+            any(row["top_score_margin"] == "8.0" for row in record_rows),
+            "missing_record_csv_score_margin",
+        ):
             return rc
 
         junit_root = ET.parse(output_dir / f"{stem}_junit.xml").getroot()
@@ -149,6 +174,13 @@ def main() -> int:
             expected_failure=True,
         )
         if rc := require(invalid.returncode == 2, "expected_invalid_choice_gate_args"):
+            return rc
+
+        invalid_margin = run_command(
+            audit_command(output_dir, "eval_input_invalid_margin_gate", "--min-top-score-margin", "-0.1"),
+            expected_failure=True,
+        )
+        if rc := require(invalid_margin.returncode == 2, "expected_invalid_margin_gate_args"):
             return rc
 
     print("eval_input_audit_ci_smoke=pass")

@@ -1,0 +1,23 @@
+{
+  "artifacts": [
+    {
+      "airgap_ok_builds": 2,
+      "builds": 2,
+      "finding_count": 0,
+      "launches": 12,
+      "prompts": 2,
+      "source": "bench/results/qemu_benchmark_matrix_smoke_latest.json",
+      "status": "pass"
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-01T19:04:07Z",
+  "status": "pass",
+  "summary": {
+    "artifacts": 1,
+    "builds": 2,
+    "findings": 0,
+    "launches": 12,
+    "passing_artifacts": 1
+  }
+}

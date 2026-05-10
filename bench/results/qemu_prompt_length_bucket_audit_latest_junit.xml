@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="qemu_prompt_length_bucket_audit" tests="1" failures="0"><testcase name="prompt_length_bucket_audit_passed" /></testsuite>

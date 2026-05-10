@@ -1,0 +1,3 @@
+row_type,status,kind,prompt_id,detail,baseline_index,candidate_index,baseline_sha256,candidate_sha256,baseline_bytes,candidate_bytes,baseline_expected_tokens,candidate_expected_tokens,findings
+prompt,pass,,smoke-code,,1,1,587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091,587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091,71,71,48,48,
+prompt,pass,,smoke-short,,0,0,8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4,8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4,49,49,32,32,

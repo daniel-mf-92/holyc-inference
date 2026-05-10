@@ -1,0 +1,43 @@
+{
+  "baseline": "bench/prompts/smoke.jsonl",
+  "baseline_prompt_count": 2,
+  "baseline_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+  "candidate": "bench/prompts/smoke.jsonl",
+  "candidate_prompt_count": 2,
+  "candidate_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
+  "compared_prompt_count": 2,
+  "error_count": 0,
+  "findings": [],
+  "generated_at": "2026-04-30T03:02:41Z",
+  "ignore_expected_tokens": false,
+  "ignore_order": false,
+  "prompts": [
+    {
+      "baseline_bytes": 71,
+      "baseline_expected_tokens": 48,
+      "baseline_index": 1,
+      "baseline_sha256": "587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091",
+      "candidate_bytes": 71,
+      "candidate_expected_tokens": 48,
+      "candidate_index": 1,
+      "candidate_sha256": "587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091",
+      "findings": "",
+      "prompt_id": "smoke-code",
+      "status": "pass"
+    },
+    {
+      "baseline_bytes": 49,
+      "baseline_expected_tokens": 32,
+      "baseline_index": 0,
+      "baseline_sha256": "8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4",
+      "candidate_bytes": 49,
+      "candidate_expected_tokens": 32,
+      "candidate_index": 0,
+      "candidate_sha256": "8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4",
+      "findings": "",
+      "prompt_id": "smoke-short",
+      "status": "pass"
+    }
+  ],
+  "status": "pass"
+}

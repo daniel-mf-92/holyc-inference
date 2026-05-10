@@ -1,0 +1,3 @@
+source,row,profile,model,quantization,phase,prompt,prompt_sha256,launch_index,iteration
+/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/fixtures/qemu_prompt_id_audit/pass.json,1,ci-airgap-smoke,synthetic-smoke,Q4_0,measured,smoke-short,a23b821376b853c3447aa00fd79dd4d51dabf5d83acd7deb26d31655804b3f1b,1,1
+/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/fixtures/qemu_prompt_id_audit/pass.json,2,ci-airgap-smoke,synthetic-smoke,Q4_0,measured,smoke-code,200c0fa3277c1e9c8731a7671e2707947be0e0ab7d24eb9556dc478499c97d89,2,1

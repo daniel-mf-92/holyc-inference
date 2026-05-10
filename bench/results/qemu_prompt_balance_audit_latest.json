@@ -1,0 +1,64 @@
+{
+  "artifacts": [
+    {
+      "error": "",
+      "failed_runs": 0,
+      "max_successful_runs": 2,
+      "measured_runs": 4,
+      "min_successful_runs": 2,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompts": 2,
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "status": "pass",
+      "successful_run_delta": 0,
+      "successful_runs": 4
+    }
+  ],
+  "findings": [],
+  "gates": {
+    "fail_on_failed_runs": true,
+    "max_successful_run_delta": 0,
+    "min_artifacts": 1,
+    "min_measured_runs": 4,
+    "min_prompts": 2,
+    "min_successful_runs_per_prompt": 2
+  },
+  "generated_at": "2026-05-01T06:38:29Z",
+  "prompt_rows": [
+    {
+      "expected_successful_runs": 2,
+      "failed_runs": 0,
+      "max_iteration": 2,
+      "measured_runs": 2,
+      "min_iteration": 1,
+      "prompt": "smoke-code",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "successful_run_delta": 0,
+      "successful_runs": 2,
+      "warmup_runs": 0
+    },
+    {
+      "expected_successful_runs": 2,
+      "failed_runs": 0,
+      "max_iteration": 2,
+      "measured_runs": 2,
+      "min_iteration": 1,
+      "prompt": "smoke-short",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "successful_run_delta": 0,
+      "successful_runs": 2,
+      "warmup_runs": 0
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "artifacts": 1,
+    "failed_runs": 0,
+    "findings": 0,
+    "measured_runs": 4,
+    "prompts": 2,
+    "successful_runs": 4
+  }
+}

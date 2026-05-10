@@ -1,0 +1,37 @@
+{
+  "artifacts": [
+    {
+      "command_hashes_checked": 7,
+      "command_sha256": "633b78c56d2f2d5c6739b10ca9b48d66a6bb83328887ac7aceabb4ab48fd1c96",
+      "commit": "a70776642a09",
+      "commit_fields_checked": 6,
+      "error": "",
+      "identity_fields_checked": 18,
+      "measured_rows": 4,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "quantization": "Q4_0",
+      "rows": 6,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "status": "pass",
+      "warmup_rows": 2
+    }
+  ],
+  "findings": [],
+  "gates": {
+    "min_artifacts": 1,
+    "min_rows": 1
+  },
+  "generated_at": "2026-05-01T06:48:52Z",
+  "status": "pass",
+  "summary": {
+    "artifacts": 1,
+    "command_hashes_checked": 7,
+    "commit_fields_checked": 6,
+    "findings": 0,
+    "identity_fields_checked": 18,
+    "measured_rows": 4,
+    "rows": 6,
+    "warmup_rows": 2
+  }
+}

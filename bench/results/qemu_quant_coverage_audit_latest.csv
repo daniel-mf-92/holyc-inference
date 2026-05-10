@@ -1,0 +1,7 @@
+source,profile,model,quantization,rows,ok_rows,airgap_ok_rows,explicit_nic_none_rows,prompts
+bench/results/bench_matrix_20260502T011421Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_20260502T011425Z.json,ci-airgap-smoke,synthetic-smoke,Q4_0,4,4,4,4,2
+bench/results/bench_matrix_20260502T011421Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.csv,ci-airgap-smoke,synthetic-smoke,Q4_0,4,4,4,4,2
+bench/results/bench_matrix_20260502T011421Z/ci-airgap-smoke_synthetic-smoke_Q4_0/qemu_prompt_bench_latest.json,ci-airgap-smoke,synthetic-smoke,Q4_0,4,4,4,4,2
+bench/results/bench_matrix_20260502T011421Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_20260502T011428Z.json,ci-airgap-smoke,synthetic-smoke,Q8_0,4,4,4,4,2
+bench/results/bench_matrix_20260502T011421Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.csv,ci-airgap-smoke,synthetic-smoke,Q8_0,4,4,4,4,2
+bench/results/bench_matrix_20260502T011421Z/ci-airgap-smoke_synthetic-smoke_Q8_0/qemu_prompt_bench_latest.json,ci-airgap-smoke,synthetic-smoke,Q8_0,4,4,4,4,2

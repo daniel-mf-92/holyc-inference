@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Audit benchmark artifacts for explicit TempleOS guest air-gap settings.
+"""Audit saved benchmark QEMU commands for explicit air-gap enforcement.
 
-This host-side tool scans JSON/JSONL benchmark reports for recorded QEMU
-commands. Any command that looks like a QEMU launch must include `-nic none` or
-`-nic=none`, and must not include legacy `-net` networking, `-netdev`, or known
-virtual NIC devices.
+This host-side tool reads existing JSON/JSONL/CSV benchmark artifacts. It does
+not launch QEMU or touch the TempleOS guest.
 """
 
 from __future__ import annotations
@@ -20,42 +18,78 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-NETWORK_DEVICE_MARKERS = (
-    "e1000",
-    "eepro100",
-    "i825",
-    "ne2k",
-    "pcnet",
-    "rtl8139",
-    "spapr-vlan",
-    "sunhme",
-    "sungem",
-    "tulip",
-    "usb-net",
-    "virtio-net",
-    "vmxnet",
-    "xen_nic",
-)
+import qemu_prompt_bench
+
+
 COMMAND_KEYS = ("command", "qemu_command", "launch_command", "qemu_launch_command")
-RESULT_KEYS = ("benchmarks", "warmups", "cells", "results", "runs", "rows")
+RESULT_KEYS = ("benchmarks", "results", "runs", "rows", "warmups")
+
+
+@dataclass(frozen=True)
+class CommandRecord:
+    source: str
+    row: int
+    prompt: str
+    phase: str
+    command: list[str]
+    recorded_airgap_ok: bool | None
+    recorded_explicit_nic_none: bool | None
+    recorded_legacy_net_none: bool | None
 
 
 @dataclass(frozen=True)
 class Finding:
     source: str
     row: int
-    reason: str
-    command: list[str]
+    severity: str
+    kind: str
+    prompt: str
+    phase: str
+    detail: str
+    command: str
 
 
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def is_network_device_arg(value: str) -> bool:
-    lowered = value.lower()
-    return any(marker in lowered for marker in NETWORK_DEVICE_MARKERS)
+def as_bool(value: Any) -> bool | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"1", "true", "yes", "y", "pass", "ok"}:
+            return True
+        if lowered in {"0", "false", "no", "n", "fail"}:
+            return False
+    return None
+
+
+def parse_command(value: Any) -> list[str] | None:
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return list(value)
+    if isinstance(value, str) and value.strip():
+        stripped = value.strip()
+        if stripped.startswith("["):
+            try:
+                decoded = json.loads(stripped)
+            except json.JSONDecodeError:
+                decoded = None
+            if isinstance(decoded, list) and all(isinstance(item, str) for item in decoded):
+                return list(decoded)
+        try:
+            return shlex.split(stripped)
+        except ValueError:
+            return None
+    return None
+
+
+def normalize_command(value: Any) -> list[str] | None:
+    return parse_command(value)
 
 
 def qemu_like(command: list[str]) -> bool:
@@ -63,59 +97,20 @@ def qemu_like(command: list[str]) -> bool:
     return "qemu-system" in executable or any(arg.startswith("-drive") for arg in command)
 
 
-def has_explicit_nic_none(command: list[str]) -> bool:
-    for index, arg in enumerate(command):
-        if arg == "-nic" and index + 1 < len(command) and command[index + 1] == "none":
-            return True
-        if arg == "-nic=none":
-            return True
-    return False
+def is_network_device_arg(value: str) -> bool:
+    return qemu_prompt_bench.is_network_device_arg(value)
 
 
 def command_violations(command: list[str]) -> list[str]:
-    if not qemu_like(command):
-        return []
+    return qemu_prompt_bench.command_airgap_violations(command)
 
-    violations: list[str] = []
-    if not has_explicit_nic_none(command):
-        violations.append("missing explicit `-nic none`")
 
-    index = 0
-    while index < len(command):
-        arg = command[index]
-        next_arg = command[index + 1] if index + 1 < len(command) else ""
-
-        if arg == "-nic":
-            if next_arg != "none":
-                violations.append(f"non-air-gapped `-nic {next_arg}`")
-            index += 2
-            continue
-        if arg.startswith("-nic=") and arg != "-nic=none":
-            violations.append(f"non-air-gapped `{arg}`")
-
-        if arg == "-net":
-            if next_arg == "none":
-                violations.append("legacy `-net none` present; use `-nic none` in benchmark artifacts")
-            else:
-                violations.append(f"networking `-net {next_arg}`")
-            index += 2
-            continue
-        if arg.startswith("-net="):
-            if arg == "-net=none":
-                violations.append("legacy `-net=none` present; use `-nic none` in benchmark artifacts")
-            else:
-                violations.append(f"networking `{arg}`")
-
-        if arg == "-netdev" or arg.startswith("-netdev"):
-            violations.append(f"network backend `{arg}`")
-        if arg == "-device" and is_network_device_arg(next_arg):
-            violations.append(f"network device `{next_arg}`")
-        if arg.startswith("-device=") and is_network_device_arg(arg):
-            violations.append(f"network device `{arg}`")
-
-        index += 1
-
-    return violations
+def row_command(raw: dict[str, Any]) -> list[str] | None:
+    for key in COMMAND_KEYS:
+        command = parse_command(raw.get(key))
+        if command is not None:
+            return command
+    return None
 
 
 def flatten_json_payload(payload: Any) -> Iterable[dict[str, Any]]:
@@ -124,28 +119,27 @@ def flatten_json_payload(payload: Any) -> Iterable[dict[str, Any]]:
             if isinstance(item, dict):
                 yield item
         return
-
     if not isinstance(payload, dict):
         return
 
+    inherited = {key: value for key, value in payload.items() if key not in RESULT_KEYS}
     yielded = False
     for key in RESULT_KEYS:
-        nested = payload.get(key)
-        if isinstance(nested, list):
-            yielded = True
-            for item in nested:
-                if isinstance(item, dict):
-                    merged = {k: v for k, v in payload.items() if k not in RESULT_KEYS}
-                    merged.update(item)
-                    yield merged
-
+        rows = payload.get(key)
+        if not isinstance(rows, list):
+            continue
+        yielded = True
+        for row in rows:
+            if isinstance(row, dict):
+                merged = dict(inherited)
+                merged.update(row)
+                yield merged
     if not yielded:
         yield payload
 
 
 def load_json_records(path: Path) -> Iterable[dict[str, Any]]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    yield from flatten_json_payload(payload)
+    yield from flatten_json_payload(json.loads(path.read_text(encoding="utf-8")))
 
 
 def load_jsonl_records(path: Path) -> Iterable[dict[str, Any]]:
@@ -161,230 +155,244 @@ def load_jsonl_records(path: Path) -> Iterable[dict[str, Any]]:
             yield from flatten_json_payload(payload)
 
 
+def load_csv_records(path: Path) -> Iterable[dict[str, Any]]:
+    with path.open(encoding="utf-8", newline="") as handle:
+        yield from csv.DictReader(handle)
+
+
 def iter_input_files(paths: Iterable[Path]) -> Iterable[Path]:
     for path in paths:
         if path.is_dir():
             yield from sorted(
                 child
                 for child in path.rglob("*")
-                if child.is_file() and child.suffix.lower() in {".json", ".jsonl"}
+                if child.is_file() and child.suffix.lower() in {".json", ".jsonl", ".csv"}
             )
-        elif path.suffix.lower() in {".json", ".jsonl"}:
+        elif path.suffix.lower() in {".json", ".jsonl", ".csv"}:
             yield path
 
 
-def normalize_command(value: Any) -> list[str] | None:
-    if isinstance(value, list) and all(isinstance(item, str) for item in value):
-        return value
-    if isinstance(value, str):
-        return shlex.split(value)
-    return None
-
-
-def row_command(row: dict[str, Any]) -> list[str] | None:
-    for key in COMMAND_KEYS:
-        command = normalize_command(row.get(key))
-        if command is not None:
-            return command
-    return None
-
-
-def audit(paths: Iterable[Path]) -> tuple[int, list[Finding]]:
-    commands_checked = 0
-    findings: list[Finding] = []
+def load_records(paths: Iterable[Path]) -> list[CommandRecord]:
+    records: list[CommandRecord] = []
     for path in sorted(iter_input_files(paths)):
-        loader = load_jsonl_records if path.suffix.lower() == ".jsonl" else load_json_records
-        for row_number, row in enumerate(loader(path), 1):
-            command = row_command(row)
-            if command is None:
+        suffix = path.suffix.lower()
+        if suffix == ".json":
+            loader = load_json_records
+        elif suffix == ".jsonl":
+            loader = load_jsonl_records
+        else:
+            loader = load_csv_records
+
+        for row_number, raw in enumerate(loader(path), 1):
+            command = row_command(raw)
+            if command is None or not qemu_like(command):
                 continue
-            violations = command_violations(command)
-            if not qemu_like(command):
-                continue
-            commands_checked += 1
-            for violation in violations:
-                findings.append(
-                    Finding(source=str(path), row=row_number, reason=violation, command=command)
+            records.append(
+                CommandRecord(
+                    source=str(path),
+                    row=row_number,
+                    prompt=str(raw.get("prompt") or raw.get("prompt_id") or "-"),
+                    phase=str(raw.get("phase") or "-"),
+                    command=command,
+                    recorded_airgap_ok=as_bool(raw.get("command_airgap_ok")),
+                    recorded_explicit_nic_none=as_bool(raw.get("command_has_explicit_nic_none")),
+                    recorded_legacy_net_none=as_bool(raw.get("command_has_legacy_net_none")),
                 )
-    return commands_checked, findings
+            )
+    return records
+
+
+def command_string(command: list[str]) -> str:
+    return shlex.join(command)
+
+
+def evaluate(records: list[CommandRecord], min_commands: int) -> list[Finding]:
+    findings: list[Finding] = []
+    for record in records:
+        violations = qemu_prompt_bench.command_airgap_violations(record.command)
+        actual_ok = not violations
+        actual_explicit = qemu_prompt_bench.has_explicit_nic_none(record.command)
+        actual_legacy = qemu_prompt_bench.has_legacy_net_none(record.command)
+        rendered_command = command_string(record.command)
+
+        for violation in violations:
+            findings.append(
+                Finding(
+                    source=record.source,
+                    row=record.row,
+                    severity="error",
+                    kind="airgap_violation",
+                    prompt=record.prompt,
+                    phase=record.phase,
+                    detail=violation,
+                    command=rendered_command,
+                )
+            )
+
+        recorded_checks = (
+            ("command_airgap_ok", record.recorded_airgap_ok, actual_ok),
+            ("command_has_explicit_nic_none", record.recorded_explicit_nic_none, actual_explicit),
+            ("command_has_legacy_net_none", record.recorded_legacy_net_none, actual_legacy),
+        )
+        for field, recorded, actual in recorded_checks:
+            if recorded is not None and recorded != actual:
+                findings.append(
+                    Finding(
+                        source=record.source,
+                        row=record.row,
+                        severity="error",
+                        kind="recorded_airgap_drift",
+                        prompt=record.prompt,
+                        phase=record.phase,
+                        detail=f"{field} recorded={recorded} actual={actual}",
+                        command=rendered_command,
+                    )
+                )
+
+    if len(records) < min_commands:
+        findings.append(
+            Finding(
+                source="suite",
+                row=0,
+                severity="error",
+                kind="coverage",
+                prompt="-",
+                phase="-",
+                detail=f"commands {len(records)} < {min_commands}",
+                command="",
+            )
+        )
+    return findings
+
+
+def summarize(records: list[CommandRecord], findings: list[Finding]) -> dict[str, Any]:
+    commands_with_nic_none = sum(1 for record in records if qemu_prompt_bench.has_explicit_nic_none(record.command))
+    commands_with_legacy_net_none = sum(1 for record in records if qemu_prompt_bench.has_legacy_net_none(record.command))
+    violation_rows = {
+        (finding.source, finding.row)
+        for finding in findings
+        if finding.kind == "airgap_violation"
+    }
+    return {
+        "commands": len(records),
+        "commands_with_explicit_nic_none": commands_with_nic_none,
+        "commands_with_legacy_net_none": commands_with_legacy_net_none,
+        "airgap_violation_rows": len(violation_rows),
+        "findings": len(findings),
+        "sources": sorted({record.source for record in records}),
+    }
+
+
+def markdown_escape(value: Any) -> str:
+    return str(value).replace("|", "\\|").replace("\n", " ")
 
 
 def markdown_report(report: dict[str, Any]) -> str:
+    summary = report["summary"]
     lines = [
-        "# Benchmark Air-Gap Audit",
+        "# Airgap Audit",
         "",
         f"Generated: {report['generated_at']}",
         f"Status: {report['status']}",
-        f"QEMU commands checked: {report['commands_checked']}",
-        f"Findings: {len(report['findings'])}",
+        f"Commands checked: {summary['commands']}",
+        f"Commands with `-nic none`: {summary['commands_with_explicit_nic_none']}",
+        f"Commands with legacy `-net none`: {summary['commands_with_legacy_net_none']}",
+        f"Findings: {summary['findings']}",
+        "",
+        "## Findings",
         "",
     ]
-    findings = report["findings"]
-    if findings:
+    if not report["findings"]:
+        lines.append("No air-gap findings.")
+    else:
         lines.extend(
             [
-                "| Source | Row | Reason | Command |",
-                "| --- | ---: | --- | --- |",
+                "| Source | Row | Kind | Prompt | Phase | Detail |",
+                "| --- | ---: | --- | --- | --- | --- |",
             ]
         )
-        for finding in findings:
-            command = shlex.join(finding["command"])
+        for finding in report["findings"]:
             lines.append(
-                "| {source} | {row} | {reason} | `{command}` |".format(
-                    source=finding["source"],
-                    row=finding["row"],
-                    reason=finding["reason"].replace("|", "\\|"),
-                    command=command.replace("`", "\\`"),
+                "| {source} | {row} | {kind} | {prompt} | {phase} | {detail} |".format(
+                    **{key: markdown_escape(value) for key, value in finding.items()}
                 )
             )
-    else:
-        lines.append("All recorded QEMU commands explicitly disable networking with `-nic none`.")
-    return "\n".join(lines) + "\n"
+    lines.append("")
+    return "\n".join(lines)
 
 
-def write_csv(findings: list[Finding], path: Path) -> None:
-    fields = ["source", "row", "reason", "command"]
-    with path.open("w", newline="", encoding="utf-8") as handle:
+def write_csv(path: Path, findings: list[Finding]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fields = ["source", "row", "severity", "kind", "prompt", "phase", "detail", "command"]
+    with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
         for finding in findings:
-            writer.writerow(
-                {
-                    "source": finding.source,
-                    "row": finding.row,
-                    "reason": finding.reason,
-                    "command": shlex.join(finding.command),
-                }
-            )
+            writer.writerow(asdict(finding))
 
 
-def write_junit(report: dict[str, Any], path: Path) -> None:
-    findings_by_command: dict[tuple[str, int, tuple[str, ...]], list[str]] = {}
-    for finding in report["findings"]:
-        key = (finding["source"], finding["row"], tuple(finding["command"]))
-        findings_by_command.setdefault(key, []).append(finding["reason"])
-
-    passing_commands = max(0, int(report["commands_checked"]) - len(findings_by_command))
-    testcase_count = len(findings_by_command) + (1 if passing_commands else 0)
-    if testcase_count == 0:
-        testcase_count = 1
-
+def write_junit(path: Path, findings: list[Finding]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     suite = ET.Element(
         "testsuite",
         {
-            "name": "holyc_benchmark_airgap_audit",
-            "tests": str(testcase_count),
-            "failures": str(len(findings_by_command)),
-            "errors": "0",
+            "name": "holyc_airgap_audit",
+            "tests": "1",
+            "failures": str(len(findings)),
         },
     )
-
-    if passing_commands:
-        ET.SubElement(
-            suite,
-            "testcase",
-            {
-                "classname": "airgap_audit.commands",
-                "name": f"air_gapped_qemu_commands:{passing_commands}",
-            },
-        )
-    elif not findings_by_command:
-        ET.SubElement(
-            suite,
-            "testcase",
-            {
-                "classname": "airgap_audit.commands",
-                "name": "no_qemu_commands_checked",
-            },
-        )
-
-    for index, ((source, row, command), reasons) in enumerate(sorted(findings_by_command.items()), 1):
-        case = ET.SubElement(
-            suite,
-            "testcase",
-            {
-                "classname": "airgap_audit.commands",
-                "name": f"{Path(source).name}:{row}:{index}",
-            },
-        )
+    case = ET.SubElement(suite, "testcase", {"name": "airgap_audit"})
+    for finding in findings:
         failure = ET.SubElement(
             case,
             "failure",
-            {
-                "type": "benchmark_airgap_violation",
-                "message": "; ".join(reasons),
-            },
+            {"type": finding.kind, "message": finding.detail},
         )
-        failure.text = "\n".join(
-            [
-                f"source={source}",
-                f"row={row}",
-                f"command={shlex.join(list(command))}",
-                "reasons:",
-                *[f"- {reason}" for reason in reasons],
-            ]
-        )
-
-    ET.indent(suite)
+        failure.text = json.dumps(asdict(finding), sort_keys=True)
     ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
-    with path.open("ab") as handle:
-        handle.write(b"\n")
+
+
+def write_outputs(report: dict[str, Any], args: argparse.Namespace) -> tuple[Path, Path, Path, Path]:
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    json_path = args.output_dir / f"{args.output_stem}.json"
+    md_path = args.output_dir / f"{args.output_stem}.md"
+    csv_path = args.output_dir / f"{args.output_stem}.csv"
+    junit_path = args.output_dir / f"{args.output_stem}_junit.xml"
+
+    json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    md_path.write_text(markdown_report(report), encoding="utf-8")
+    write_csv(csv_path, [Finding(**finding) for finding in report["findings"]])
+    write_junit(junit_path, [Finding(**finding) for finding in report["findings"]])
+    return json_path, md_path, csv_path, junit_path
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--input",
-        type=Path,
-        action="append",
-        default=[],
-        help="Benchmark artifact file or directory; defaults to bench/results",
-    )
-    parser.add_argument("--output", type=Path, default=Path("bench/results/airgap_audit_latest.json"))
-    parser.add_argument("--markdown", type=Path, help="Optional Markdown audit report path")
-    parser.add_argument("--csv", type=Path, help="Optional CSV findings report path")
-    parser.add_argument("--junit", type=Path, help="Optional JUnit XML audit report path")
+    parser.add_argument("inputs", nargs="+", type=Path, help="Benchmark JSON/JSONL/CSV files or directories")
+    parser.add_argument("--output-dir", type=Path, default=Path("bench/results"))
+    parser.add_argument("--output-stem", default="airgap_audit_latest")
+    parser.add_argument("--min-commands", type=int, default=1)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    inputs = args.input or [Path("bench/results")]
-    commands_checked, findings = audit(inputs)
+    records = load_records(args.inputs)
+    findings = evaluate(records, args.min_commands)
     report = {
         "generated_at": iso_now(),
-        "status": "fail" if findings else "pass",
-        "commands_checked": commands_checked,
+        "status": "pass" if not findings else "fail",
+        "inputs": [str(path) for path in args.inputs],
+        "thresholds": {"min_commands": args.min_commands},
+        "summary": summarize(records, findings),
         "findings": [asdict(finding) for finding in findings],
     }
-
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    if args.markdown:
-        args.markdown.parent.mkdir(parents=True, exist_ok=True)
-        args.markdown.write_text(markdown_report(report), encoding="utf-8")
-    if args.csv:
-        args.csv.parent.mkdir(parents=True, exist_ok=True)
-        write_csv(findings, args.csv)
-    if args.junit:
-        args.junit.parent.mkdir(parents=True, exist_ok=True)
-        write_junit(report, args.junit)
-    print(f"wrote_json={args.output}")
-    if args.markdown:
-        print(f"wrote_markdown={args.markdown}")
-    if args.csv:
-        print(f"wrote_csv={args.csv}")
-    if args.junit:
-        print(f"wrote_junit={args.junit}")
-    print(f"status={report['status']}")
-    print(f"commands_checked={commands_checked}")
-    if findings:
-        for finding in findings[:20]:
-            print(f"{finding.source}:{finding.row}: {finding.reason}", file=sys.stderr)
-        if len(findings) > 20:
-            print(f"... {len(findings) - 20} more findings", file=sys.stderr)
-        return 1
-    return 0
+    json_path, md_path, csv_path, junit_path = write_outputs(report, args)
+    print(f"wrote_json={json_path}")
+    print(f"wrote_markdown={md_path}")
+    print(f"wrote_csv={csv_path}")
+    print(f"wrote_junit={junit_path}")
+    return 1 if findings else 0
 
 
 if __name__ == "__main__":

@@ -1,6 +1,21 @@
 {
-  "commands_checked": 679,
   "findings": [],
-  "generated_at": "2026-04-29T02:05:32Z",
-  "status": "pass"
+  "generated_at": "2026-04-30T04:24:13Z",
+  "inputs": [
+    "bench/results/qemu_prompt_bench_latest.json"
+  ],
+  "status": "pass",
+  "summary": {
+    "airgap_violation_rows": 0,
+    "commands": 6,
+    "commands_with_explicit_nic_none": 6,
+    "commands_with_legacy_net_none": 0,
+    "findings": 0,
+    "sources": [
+      "bench/results/qemu_prompt_bench_latest.json"
+    ]
+  },
+  "thresholds": {
+    "min_commands": 4
+  }
 }

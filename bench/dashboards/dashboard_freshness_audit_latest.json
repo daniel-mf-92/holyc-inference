@@ -1,0 +1,55 @@
+{
+  "dashboards": [
+    {
+      "age_hours": 44.372,
+      "error": "",
+      "generated_at": "2026-04-30T05:57:15Z",
+      "source": "bench/dashboards/bench_trend_export_latest.json",
+      "status": "pass"
+    },
+    {
+      "age_hours": 46.518,
+      "error": "",
+      "generated_at": "2026-04-30T03:48:29Z",
+      "source": "bench/dashboards/dashboard_digest_latest.json",
+      "status": "pass"
+    },
+    {
+      "age_hours": 43.559,
+      "error": "",
+      "generated_at": "2026-04-30T06:45:59Z",
+      "source": "bench/dashboards/dashboard_sidecar_audit_latest.json",
+      "status": "pass"
+    },
+    {
+      "age_hours": 17.029,
+      "error": "",
+      "generated_at": "2026-05-01T09:17:49Z",
+      "source": "bench/dashboards/perf_ci_gate_latest.json",
+      "status": "pass"
+    },
+    {
+      "age_hours": 55.154,
+      "error": "",
+      "generated_at": "2026-04-29T19:10:17Z",
+      "source": "bench/dashboards/perf_regression_latest.json",
+      "status": "pass"
+    },
+    {
+      "age_hours": 50.279,
+      "error": "",
+      "generated_at": "2026-04-30T00:02:49Z",
+      "source": "bench/dashboards/perf_slo_audit_latest.json",
+      "status": "pass"
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-02T02:19:32Z",
+  "status": "pass",
+  "summary": {
+    "dashboards": 6,
+    "findings": 0,
+    "max_age_hours": 96.0,
+    "stale_dashboards": 0
+  }
+}

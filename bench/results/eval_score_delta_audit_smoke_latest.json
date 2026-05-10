@@ -1,0 +1,68 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-02T04:00:43Z",
+  "inputs": {
+    "gold": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl",
+    "holyc": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/eval/samples/holyc_smoke_scored_predictions.jsonl",
+    "llama": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/eval/samples/llama_smoke_scored_predictions.jsonl"
+  },
+  "pairs": [
+    {
+      "choice_count": 4,
+      "dataset": "arc-smoke",
+      "gold_score_abs_delta": 0.09999999999999964,
+      "holyc_top_index": 0,
+      "llama_top_index": 0,
+      "max_abs_delta": 0.09999999999999964,
+      "mean_abs_delta": 0.02499999999999991,
+      "record_id": "smoke-arc-1",
+      "split": "validation",
+      "top_index_match": true,
+      "top_score_abs_delta": 0.09999999999999964
+    },
+    {
+      "choice_count": 4,
+      "dataset": "hellaswag-smoke",
+      "gold_score_abs_delta": 0.20000000000000018,
+      "holyc_top_index": 0,
+      "llama_top_index": 0,
+      "max_abs_delta": 0.20000000000000018,
+      "mean_abs_delta": 0.11250000000000006,
+      "record_id": "smoke-hellaswag-1",
+      "split": "validation",
+      "top_index_match": true,
+      "top_score_abs_delta": 0.20000000000000018
+    },
+    {
+      "choice_count": 4,
+      "dataset": "truthfulqa-smoke",
+      "gold_score_abs_delta": 0.20000000000000018,
+      "holyc_top_index": 0,
+      "llama_top_index": 0,
+      "max_abs_delta": 0.20000000000000018,
+      "mean_abs_delta": 0.050000000000000044,
+      "record_id": "smoke-truthfulqa-1",
+      "split": "validation",
+      "top_index_match": true,
+      "top_score_abs_delta": 0.20000000000000018
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "gold_records": 3,
+    "max_abs_delta": 0.20000000000000018,
+    "max_gold_score_abs_delta": 0.20000000000000018,
+    "max_top_score_abs_delta": 0.20000000000000018,
+    "mean_abs_delta": 0.0625,
+    "pair_coverage_pct": 100.0,
+    "paired_scored_records": 3,
+    "top_index_match_pct": 100.0
+  },
+  "thresholds": {
+    "max_abs_delta": 0.25,
+    "max_mean_abs_delta": 0.125,
+    "max_top_score_abs_delta": 0.25,
+    "min_pair_coverage_pct": 100.0,
+    "min_top_index_match_pct": 100.0
+  }
+}

@@ -118,6 +118,7 @@ def main() -> int:
         report_path = pass_dir / "dataset_provenance_audit_latest.json"
         markdown_path = pass_dir / "dataset_provenance_audit_latest.md"
         csv_path = pass_dir / "dataset_provenance_audit_latest.csv"
+        record_csv_path = pass_dir / "dataset_provenance_audit_records_latest.csv"
         junit_path = pass_dir / "dataset_provenance_audit_junit_latest.xml"
         report = json.loads(report_path.read_text(encoding="utf-8"))
         if rc := require(report["status"] == "pass", "unexpected_provenance_status"):
@@ -141,6 +142,15 @@ def main() -> int:
         if rc := require(len(csv_rows) == 1, "unexpected_csv_rows"):
             return rc
         if rc := require(csv_rows[0]["source_url_host"] == "datasets.example", "unexpected_csv_source_host"):
+            return rc
+        record_rows = list(csv.DictReader(record_csv_path.open(encoding="utf-8", newline="")))
+        if rc := require(len(record_rows) == 3, "unexpected_record_csv_rows"):
+            return rc
+        if rc := require(record_rows[0]["input_sha256"], "missing_record_input_sha256"):
+            return rc
+        if rc := require(record_rows[0]["record_payload_bytes"], "missing_record_payload_bytes"):
+            return rc
+        if rc := require(record_rows[0]["provenance_pct"], "missing_record_provenance_pct"):
             return rc
         junit_root = ET.parse(junit_path).getroot()
         if rc := require(junit_root.attrib.get("name") == "holyc_dataset_provenance_audit", "missing_junit"):

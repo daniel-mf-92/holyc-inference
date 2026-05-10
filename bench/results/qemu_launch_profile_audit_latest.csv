@@ -1,0 +1,8 @@
+source,json_path,executable,machine,cpu,accelerator,memory,violation_count
+bench/results/qemu_prompt_bench_latest.json,$.command,qemu_synthetic_bench.py,,,,256M,0
+bench/results/qemu_prompt_bench_latest.json,$.warmups[0].command,qemu_synthetic_bench.py,,,,256M,0
+bench/results/qemu_prompt_bench_latest.json,$.warmups[1].command,qemu_synthetic_bench.py,,,,256M,0
+bench/results/qemu_prompt_bench_latest.json,$.benchmarks[0].command,qemu_synthetic_bench.py,,,,256M,0
+bench/results/qemu_prompt_bench_latest.json,$.benchmarks[1].command,qemu_synthetic_bench.py,,,,256M,0
+bench/results/qemu_prompt_bench_latest.json,$.benchmarks[2].command,qemu_synthetic_bench.py,,,,256M,0
+bench/results/qemu_prompt_bench_latest.json,$.benchmarks[3].command,qemu_synthetic_bench.py,,,,256M,0

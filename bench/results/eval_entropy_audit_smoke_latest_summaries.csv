@@ -1,0 +1,3 @@
+source,engine,record_count,scored_count,invalid_count,min_normalized_entropy,mean_normalized_entropy,max_normalized_entropy,mean_top_probability,mean_effective_choices
+bench/eval/samples/holyc_smoke_scored_predictions.jsonl,holyc,3,3,0,0.1411602460200315,0.19643916246058815,0.2240786206808665,0.9413537430459917,1.3149141550906467
+bench/eval/samples/llama_smoke_scored_predictions.jsonl,llama,3,3,0,0.12109850093131112,0.17449656475082476,0.2085266421992316,0.9494212576401561,1.275440832571854

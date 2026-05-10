@@ -188,6 +188,18 @@ def majority_answers_by_dataset_split(
     }
 
 
+def dataset_split_answer_label_counts(
+    histograms: dict[str, dict[str, dict[str, int]]]
+) -> dict[str, dict[str, int]]:
+    return {
+        dataset: {
+            split: len(histogram)
+            for split, histogram in sorted(split_histograms.items())
+        }
+        for dataset, split_histograms in sorted(histograms.items())
+    }
+
+
 def nested_counts(records: list[LoadedRecord]) -> dict[str, dict[str, int]]:
     counts: dict[str, dict[str, int]] = {}
     for loaded in records:
@@ -248,6 +260,8 @@ def apply_record_gates(
     max_prompt_bytes: int | None,
     max_choice_bytes: int | None,
     max_record_payload_bytes: int | None,
+    min_answer_labels: int | None,
+    min_dataset_split_answer_labels: int | None,
     max_majority_answer_pct: float | None,
     max_dataset_split_majority_answer_pct: float | None,
     fail_on_duplicate_ids: bool,
@@ -318,6 +332,15 @@ def apply_record_gates(
         append_finding(findings, "error", "byte_limit", "records", message)
 
     overall_majority = majority_answer(answer_histogram([loaded.record for loaded in records]))
+    overall_answer_labels = len(answer_histogram([loaded.record for loaded in records]))
+    if min_answer_labels is not None and overall_answer_labels < min_answer_labels:
+        append_finding(
+            findings,
+            "error",
+            "too_few_answer_labels",
+            "records",
+            f"{overall_answer_labels} answer labels present, below {min_answer_labels} gate",
+        )
     if (
         max_majority_answer_pct is not None
         and overall_majority["pct"] is not None
@@ -334,9 +357,25 @@ def apply_record_gates(
             ),
         )
 
-    for dataset, split_majorities in majority_answers_by_dataset_split(
-        answer_histograms_by_dataset_split(records)
-    ).items():
+    dataset_split_histograms = answer_histograms_by_dataset_split(records)
+    for dataset, split_counts in dataset_split_answer_label_counts(dataset_split_histograms).items():
+        for split, answer_label_count in split_counts.items():
+            if (
+                min_dataset_split_answer_labels is not None
+                and answer_label_count < min_dataset_split_answer_labels
+            ):
+                append_finding(
+                    findings,
+                    "error",
+                    "dataset_split_too_few_answer_labels",
+                    f"{dataset}:{split}",
+                    (
+                        f"{answer_label_count} answer labels present in {dataset}/{split}, "
+                        f"below {min_dataset_split_answer_labels} gate"
+                    ),
+                )
+
+    for dataset, split_majorities in majority_answers_by_dataset_split(dataset_split_histograms).items():
         for split, majority in split_majorities.items():
             if (
                 max_dataset_split_majority_answer_pct is not None
@@ -375,16 +414,42 @@ def build_report(
         "dataset_split_counts": nested_counts(records),
         "choice_count_histogram": sorted_counts(len(record.choices) for record in normalized),
         "answer_histogram": answer_histogram(normalized),
+        "answer_label_count": len(answer_histogram(normalized)),
         "majority_answer": majority_answer(answer_histogram(normalized)),
         "dataset_split_answer_histograms": dataset_split_answer_histograms,
+        "dataset_split_answer_label_counts": dataset_split_answer_label_counts(dataset_split_answer_histograms),
         "dataset_split_majority_answers": majority_answers_by_dataset_split(dataset_split_answer_histograms),
         "byte_stats": dataset_pack.byte_stats(normalized),
         "duplicate_record_ids": duplicate_ids(records),
         "duplicate_payloads": duplicate_payloads(records),
+        "record_telemetry": record_telemetry(records),
         "error_count": error_count,
         "warning_count": warning_count,
         "findings": [asdict(finding) for finding in findings],
     }
+
+
+def record_telemetry(records: list[LoadedRecord]) -> list[dict[str, Any]]:
+    telemetry: list[dict[str, Any]] = []
+    for loaded in records:
+        record = loaded.record
+        choice_lengths = [len(choice.encode("utf-8")) for choice in record.choices]
+        telemetry.append(
+            {
+                "source": source_ref(Path(loaded.source), loaded.row_number),
+                "dataset": record.dataset,
+                "split": record.split,
+                "record_id": record.record_id,
+                "choice_count": len(record.choices),
+                "answer_index": record.answer_index,
+                "prompt_bytes": len(record.prompt.encode("utf-8")),
+                "total_choice_bytes": sum(choice_lengths),
+                "max_choice_bytes": max(choice_lengths, default=0),
+                "record_payload_bytes": dataset_pack.record_payload_bytes(record),
+                "payload_key_sha256": payload_key(record),
+            }
+        )
+    return telemetry
 
 
 def markdown_report(report: dict[str, Any]) -> str:
@@ -413,6 +478,7 @@ def markdown_report(report: dict[str, Any]) -> str:
             "",
             f"- Choice counts: `{json.dumps(report['choice_count_histogram'], sort_keys=True)}`",
             f"- Answer indexes: `{json.dumps(report['answer_histogram'], sort_keys=True)}`",
+            f"- Answer label count: {report['answer_label_count']}",
             f"- Majority answer: `{json.dumps(report['majority_answer'], sort_keys=True)}`",
             f"- Duplicate payload groups: {len(report['duplicate_payloads'])}",
             "",
@@ -438,6 +504,27 @@ def write_csv(report: dict[str, Any], path: Path) -> None:
         writer.writeheader()
         for finding in report["findings"]:
             writer.writerow(finding)
+
+
+def write_record_csv(report: dict[str, Any], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "source",
+        "dataset",
+        "split",
+        "record_id",
+        "choice_count",
+        "answer_index",
+        "prompt_bytes",
+        "total_choice_bytes",
+        "max_choice_bytes",
+        "record_payload_bytes",
+        "payload_key_sha256",
+    ]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(report["record_telemetry"])
 
 
 def write_junit(report: dict[str, Any], path: Path) -> None:
@@ -478,6 +565,7 @@ def write_outputs(
     output: Path,
     markdown: Path | None,
     csv_path: Path | None,
+    record_csv: Path | None,
     junit: Path | None,
 ) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -487,6 +575,8 @@ def write_outputs(
         markdown.write_text(markdown_report(report), encoding="utf-8")
     if csv_path:
         write_csv(report, csv_path)
+    if record_csv:
+        write_record_csv(report, record_csv)
     if junit:
         write_junit(report, junit)
 
@@ -497,6 +587,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, required=True, help="Output JSON report")
     parser.add_argument("--markdown", type=Path, help="Optional Markdown report")
     parser.add_argument("--csv", type=Path, help="Optional CSV findings output")
+    parser.add_argument("--record-csv", type=Path, help="Optional per-record telemetry CSV output")
     parser.add_argument("--junit", type=Path, help="Optional JUnit XML output")
     parser.add_argument("--default-dataset", default="eval", help="Dataset name for rows missing dataset")
     parser.add_argument("--default-split", default="validation", help="Split name for rows missing split")
@@ -509,6 +600,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-record-payload-bytes",
         type=int,
         help="Fail if any record payload excluding the fixed record header exceeds this byte limit",
+    )
+    parser.add_argument(
+        "--min-answer-labels",
+        type=int,
+        help="Fail if fewer than this many answer indexes are present across all normalized records",
+    )
+    parser.add_argument(
+        "--min-dataset-split-answer-labels",
+        type=int,
+        help="Fail if fewer than this many answer indexes are present within any dataset/split group",
     )
     parser.add_argument(
         "--max-majority-answer-pct",
@@ -542,6 +643,11 @@ def main(argv: list[str] | None = None) -> int:
         if value is not None and not 0.0 <= value <= 100.0:
             print(f"error: --{name.replace('_', '-')} must be between 0 and 100", file=sys.stderr)
             return 2
+    for name in ("min_answer_labels", "min_dataset_split_answer_labels"):
+        value = getattr(args, name)
+        if value is not None and value < 1:
+            print(f"error: --{name.replace('_', '-')} must be >= 1", file=sys.stderr)
+            return 2
 
     findings: list[Finding] = []
     records, inputs = load_records(
@@ -558,6 +664,8 @@ def main(argv: list[str] | None = None) -> int:
         args.max_prompt_bytes,
         args.max_choice_bytes,
         args.max_record_payload_bytes,
+        args.min_answer_labels,
+        args.min_dataset_split_answer_labels,
         args.max_majority_answer_pct,
         args.max_dataset_split_majority_answer_pct,
         args.fail_on_duplicate_ids,
@@ -566,13 +674,15 @@ def main(argv: list[str] | None = None) -> int:
         findings,
     )
     report = build_report(inputs, records, findings)
-    write_outputs(report, args.output, args.markdown, args.csv, args.junit)
+    write_outputs(report, args.output, args.markdown, args.csv, args.record_csv, args.junit)
 
     print(f"wrote_report={args.output}")
     if args.markdown:
         print(f"wrote_markdown={args.markdown}")
     if args.csv:
         print(f"wrote_csv={args.csv}")
+    if args.record_csv:
+        print(f"wrote_record_csv={args.record_csv}")
     if args.junit:
         print(f"wrote_junit={args.junit}")
     print(f"status={report['status']}")

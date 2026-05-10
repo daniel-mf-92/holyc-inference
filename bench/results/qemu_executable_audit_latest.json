@@ -1,0 +1,41 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-02T08:48:37Z",
+  "records": [
+    {
+      "absolute_argv0": true,
+      "argv0": "/opt/homebrew/bin/qemu-system-x86_64",
+      "argv0_basename": "qemu-system-x86_64",
+      "environment_qemu_bin": "qemu-system-x86_64",
+      "environment_qemu_path": "/opt/homebrew/bin/qemu-system-x86_64",
+      "phase": "top",
+      "prompt": "",
+      "row": 0,
+      "scope": "artifact",
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/holyc-qemu-executable-audit-xe_t83bo/qemu_prompt_bench_pass.json"
+    },
+    {
+      "absolute_argv0": true,
+      "argv0": "/opt/homebrew/bin/qemu-system-x86_64",
+      "argv0_basename": "qemu-system-x86_64",
+      "environment_qemu_bin": "qemu-system-x86_64",
+      "environment_qemu_path": "/opt/homebrew/bin/qemu-system-x86_64",
+      "phase": "measured",
+      "prompt": "smoke-short",
+      "row": 1,
+      "scope": "benchmarks",
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/holyc-qemu-executable-audit-xe_t83bo/qemu_prompt_bench_pass.json"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "absolute_commands": 2,
+    "artifacts": 1,
+    "commands": 2,
+    "findings": 0,
+    "row_commands": 1,
+    "unique_qemu_basenames": [
+      "qemu-system-x86_64"
+    ]
+  }
+}

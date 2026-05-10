@@ -1,0 +1,5 @@
+source,scope,dataset,split,record_count,both_correct,holyc_only_correct,llama_only_correct,both_wrong_same,both_wrong_disagree,holyc_accuracy,llama_accuracy,llama_only_correct_pct,both_wrong_pct
+bench/results/eval_compare_smoke_latest.json,overall,smoke-eval,validation,3,3,0,0,0,0,1.0,1.0,0.0,0.0
+bench/results/eval_compare_smoke_latest.json,dataset_split,arc-smoke,validation,1,1,0,0,0,0,1.0,1.0,0.0,0.0
+bench/results/eval_compare_smoke_latest.json,dataset_split,hellaswag-smoke,validation,1,1,0,0,0,0,1.0,1.0,0.0,0.0
+bench/results/eval_compare_smoke_latest.json,dataset_split,truthfulqa-smoke,validation,1,1,0,0,0,0,1.0,1.0,0.0,0.0

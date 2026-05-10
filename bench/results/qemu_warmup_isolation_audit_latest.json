@@ -1,0 +1,28 @@
+{
+  "artifacts": [
+    {
+      "measured_rows": 4,
+      "measured_tokens_total": 160,
+      "phase_summary_measured_rows": 4,
+      "phase_summary_warmup_rows": 2,
+      "planned_measured_launches": 4,
+      "planned_warmup_launches": 2,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "status": "pass",
+      "suite_summary_total_tokens": 160,
+      "warmup_rows": 2,
+      "warmup_tokens_total": 80
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-01T00:40:33Z",
+  "status": "pass",
+  "summary": {
+    "artifacts": 1,
+    "findings": 0,
+    "measured_rows": 4,
+    "measured_tokens_total": 160,
+    "warmup_rows": 2,
+    "warmup_tokens_total": 80
+  }
+}

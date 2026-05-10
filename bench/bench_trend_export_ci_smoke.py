@@ -206,6 +206,22 @@ def main() -> int:
         if report["trend_keys"] != 1 or report["trend_points"] != 3:
             print("unexpected_trend_counts=true", file=sys.stderr)
             return 1
+        summary = report["summary"]
+        if summary["trend_keys"] != 1 or summary["trend_points"] != 3:
+            print("unexpected_summary_trend_counts=true", file=sys.stderr)
+            return 1
+        if summary["findings"] != 0 or summary["drift_keys"] != 0:
+            print("unexpected_summary_findings_or_drift=true", file=sys.stderr)
+            return 1
+        if summary["status_counts"] != {"pass": 3}:
+            print("unexpected_summary_status_counts=true", file=sys.stderr)
+            return 1
+        if summary["command_airgap_status_counts"] != {"pass": 3}:
+            print("unexpected_summary_airgap_counts=true", file=sys.stderr)
+            return 1
+        if summary["telemetry_status_counts"] != {"pass": 3}:
+            print("unexpected_summary_telemetry_counts=true", file=sys.stderr)
+            return 1
         latest = report["latest"][0]
         if latest["latest_commit"] != "trend-newer":
             print("latest_commit_not_head=true", file=sys.stderr)
@@ -338,6 +354,9 @@ def main() -> int:
         )
         if finding_gates(empty_report) != {"empty"}:
             print("missing_empty_structured_finding=true", file=sys.stderr)
+            return 1
+        if empty_report["summary"]["findings"] != 1 or empty_report["summary"]["trend_points"] != 0:
+            print("missing_empty_summary_counts=true", file=sys.stderr)
             return 1
 
         regression_dir = tmp_path / "regression_results"
@@ -553,6 +572,16 @@ def main() -> int:
         drift_gates = finding_gates(drift_report)
         if not {"command_drift", "launch_plan_drift", "environment_drift"}.issubset(drift_gates):
             print("missing_drift_structured_findings=true", file=sys.stderr)
+            return 1
+        if drift_report["summary"]["drift"] != {
+            "command_sha256": 1,
+            "launch_plan_sha256": 1,
+            "environment_sha256": 1,
+        }:
+            print("missing_drift_summary_counts=true", file=sys.stderr)
+            return 1
+        if drift_report["summary"]["drift_keys"] != 3:
+            print("missing_drift_summary_total=true", file=sys.stderr)
             return 1
         drift_outputs = (tmp_path / "drift_dashboards" / "bench_trend_export_drift_latest.csv").read_text(
             encoding="utf-8"

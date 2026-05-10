@@ -1,0 +1,64 @@
+{
+  "command": [
+    "qemu-system-x86_64",
+    "-display",
+    "none",
+    "-nic",
+    "none",
+    "-serial",
+    "stdio",
+    "-m",
+    "512M"
+  ],
+  "warmups": [
+    {
+      "phase": "warmup",
+      "prompt": "smoke-short",
+      "launch_index": 0,
+      "command": [
+        "qemu-system-x86_64",
+        "-display",
+        "none",
+        "-nic",
+        "none",
+        "-serial",
+        "stdio",
+        "-m",
+        "512M"
+      ]
+    }
+  ],
+  "benchmarks": [
+    {
+      "phase": "measured",
+      "prompt": "smoke-short",
+      "launch_index": 1,
+      "command": [
+        "qemu-system-x86_64",
+        "-display",
+        "none",
+        "-nic",
+        "none",
+        "-serial",
+        "stdio",
+        "-m",
+        "512M"
+      ]
+    },
+    {
+      "phase": "measured",
+      "prompt": "smoke-nographic",
+      "launch_index": 2,
+      "command": [
+        "qemu-system-x86_64",
+        "-nographic",
+        "-nic",
+        "none",
+        "-serial",
+        "stdio",
+        "-m",
+        "512M"
+      ]
+    }
+  ]
+}

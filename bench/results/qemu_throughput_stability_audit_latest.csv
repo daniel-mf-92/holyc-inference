@@ -1,0 +1,3 @@
+profile,model,quantization,prompt,samples,tokens_total,wall_tok_per_s_min,wall_tok_per_s_mean,wall_tok_per_s_median,wall_tok_per_s_max,wall_tok_per_s_cv,tok_per_s_median,sources
+ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,2,96,291.9104321490689,330.9419972274646,330.9419972274646,369.97356230586024,0.11794080354077364,160.0,bench/results/qemu_prompt_bench_latest.json
+ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,2,64,101.89362941923815,118.56435300861538,118.56435300861538,135.23507659799262,0.1406048543795104,160.0,bench/results/qemu_prompt_bench_latest.json

@@ -1,0 +1,51 @@
+{
+  "artifacts": [
+    {
+      "command_rows": 2,
+      "error": "",
+      "findings": 0,
+      "serial_stdio_rows": 2,
+      "socket_endpoint_rows": 0,
+      "source": "bench/fixtures/qemu_serial_endpoint_audit/pass.json",
+      "status": "pass"
+    }
+  ],
+  "commands": [
+    {
+      "command_argc": 9,
+      "endpoint_options": "-serial stdio",
+      "launch_index": null,
+      "list_name": "artifact",
+      "nographic": false,
+      "phase": "artifact",
+      "prompt": "-",
+      "row": 0,
+      "serial_stdio": true,
+      "socket_endpoint_count": 0,
+      "source": "bench/fixtures/qemu_serial_endpoint_audit/pass.json"
+    },
+    {
+      "command_argc": 9,
+      "endpoint_options": "-serial stdio",
+      "launch_index": 1,
+      "list_name": "benchmarks",
+      "nographic": false,
+      "phase": "measured",
+      "prompt": "smoke-short",
+      "row": 1,
+      "serial_stdio": true,
+      "socket_endpoint_count": 0,
+      "source": "bench/fixtures/qemu_serial_endpoint_audit/pass.json"
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-02T03:46:19Z",
+  "status": "pass",
+  "summary": {
+    "artifacts": 1,
+    "command_rows": 2,
+    "findings": 0,
+    "serial_stdio_rows": 2,
+    "socket_endpoint_rows": 0
+  }
+}

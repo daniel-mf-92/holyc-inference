@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="holyc_hceval_choice_semantics_audit" tests="3" failures="0" errors="0" timestamp="2026-05-02T09:50:52Z">
+  <testcase classname="hceval_choice_semantics_audit" name="bench/results/datasets/smoke_eval.hceval::smoke-hellaswag-1" />
+  <testcase classname="hceval_choice_semantics_audit" name="bench/results/datasets/smoke_eval.hceval::smoke-arc-1" />
+  <testcase classname="hceval_choice_semantics_audit" name="bench/results/datasets/smoke_eval.hceval::smoke-truthfulqa-1" />
+</testsuite>

@@ -1,0 +1,67 @@
+{
+  "coverage": [
+    {
+      "dataset": "arc-smoke",
+      "gold_records": 1,
+      "holyc_coverage_pct": 100.0,
+      "holyc_records": 1,
+      "llama_coverage_pct": 100.0,
+      "llama_records": 1,
+      "missing_holyc_records": 0,
+      "missing_llama_records": 0,
+      "paired_coverage_pct": 100.0,
+      "paired_records": 1,
+      "split": "validation"
+    },
+    {
+      "dataset": "hellaswag-smoke",
+      "gold_records": 1,
+      "holyc_coverage_pct": 100.0,
+      "holyc_records": 1,
+      "llama_coverage_pct": 100.0,
+      "llama_records": 1,
+      "missing_holyc_records": 0,
+      "missing_llama_records": 0,
+      "paired_coverage_pct": 100.0,
+      "paired_records": 1,
+      "split": "validation"
+    },
+    {
+      "dataset": "truthfulqa-smoke",
+      "gold_records": 1,
+      "holyc_coverage_pct": 100.0,
+      "holyc_records": 1,
+      "llama_coverage_pct": 100.0,
+      "llama_records": 1,
+      "missing_holyc_records": 0,
+      "missing_llama_records": 0,
+      "paired_coverage_pct": 100.0,
+      "paired_records": 1,
+      "split": "validation"
+    }
+  ],
+  "findings": [],
+  "gates": {
+    "min_coverage_pct": 100.0,
+    "min_gold_records": 3,
+    "min_slice_coverage_pct": 100.0
+  },
+  "generated_at": "2026-05-02T04:00:41Z",
+  "inputs": {
+    "gold": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl",
+    "holyc": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/holyc-eval-prediction-coverage-wz2emi8_/holyc.jsonl",
+    "llama": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/holyc-eval-prediction-coverage-wz2emi8_/llama.jsonl"
+  },
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "gold_records": 3,
+    "holyc_coverage_pct": 100.0,
+    "holyc_records": 3,
+    "llama_coverage_pct": 100.0,
+    "llama_records": 3,
+    "paired_coverage_pct": 100.0,
+    "paired_records": 3,
+    "slice_count": 3
+  }
+}

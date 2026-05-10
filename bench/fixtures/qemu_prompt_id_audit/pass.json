@@ -1,0 +1,33 @@
+{
+  "benchmarks": [
+    {
+      "benchmark": "qemu_prompt",
+      "exit_class": "ok",
+      "iteration": 1,
+      "launch_index": 1,
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_sha256": "a23b821376b853c3447aa00fd79dd4d51dabf5d83acd7deb26d31655804b3f1b",
+      "quantization": "Q4_0",
+      "returncode": 0,
+      "timed_out": false
+    },
+    {
+      "benchmark": "qemu_prompt",
+      "exit_class": "ok",
+      "iteration": 1,
+      "launch_index": 2,
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "prompt_sha256": "200c0fa3277c1e9c8731a7671e2707947be0e0ab7d24eb9556dc478499c97d89",
+      "quantization": "Q4_0",
+      "returncode": 0,
+      "timed_out": false
+    }
+  ],
+  "status": "pass"
+}

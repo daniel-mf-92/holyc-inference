@@ -1,0 +1,66 @@
+{
+  "cell_count": 2,
+  "error_count": 0,
+  "generated_at": "2026-04-30T06:57:28Z",
+  "matrices": [
+    {
+      "axis_counts": {
+        "models": 1,
+        "profiles": 1,
+        "quantizations": 2
+      },
+      "cell_count": 2,
+      "cells": [
+        {
+          "command_airgap_ok": true,
+          "command_airgap_violations": [],
+          "command_has_explicit_nic_none": true,
+          "command_has_legacy_net_none": false,
+          "command_sha256": "b9be9bb048be4bf27f179ec73019754dd945d4c113f0a28a4ca266b00b458b85",
+          "model": "synthetic-smoke",
+          "profile": "ci-airgap-smoke",
+          "qemu_arg_count": 4,
+          "quantization": "Q4_0",
+          "slug": "ci-airgap-smoke_synthetic-smoke_Q4_0"
+        },
+        {
+          "command_airgap_ok": true,
+          "command_airgap_violations": [],
+          "command_has_explicit_nic_none": true,
+          "command_has_legacy_net_none": false,
+          "command_sha256": "b9be9bb048be4bf27f179ec73019754dd945d4c113f0a28a4ca266b00b458b85",
+          "model": "synthetic-smoke",
+          "profile": "ci-airgap-smoke",
+          "qemu_arg_count": 4,
+          "quantization": "Q8_0",
+          "slug": "ci-airgap-smoke_synthetic-smoke_Q8_0"
+        }
+      ],
+      "coverage_gates": {
+        "expect_cells": 2,
+        "min_cells": null,
+        "min_models": 1,
+        "min_profiles": 1,
+        "min_quantizations": 2,
+        "require_quantization": [
+          "Q4_0",
+          "Q8_0"
+        ]
+      },
+      "error_count": 0,
+      "findings": [],
+      "generated_at": "2026-04-30T06:57:28Z",
+      "matrix": "bench/fixtures/bench_matrix_smoke.json",
+      "matrix_name": "synthetic-smoke-matrix",
+      "prompt_suite": {
+        "exists": true,
+        "path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/prompts/smoke.jsonl",
+        "prompt_count": 2,
+        "suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a"
+      },
+      "status": "pass"
+    }
+  ],
+  "matrix_count": 1,
+  "status": "pass"
+}

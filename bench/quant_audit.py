@@ -77,11 +77,17 @@ class BlockAudit:
     scale_exponent_under_limit_count: int
     scale_exponent_over_limit_count: int
     scale_exponent_histogram: dict[str, int]
+    scale_used_value_count: int
+    duplicate_scale_count: int
+    duplicate_scale_pct: float
+    max_identical_scale_run: int
+    max_identical_scale_run_start: int
     zero_scale_nonzero_quant_block_count: int
     zero_scale_nonzero_quant_entry_count: int
     quant_min: int
     quant_max: int
     quant_zero_count: int
+    quant_zero_pct: float
     quant_negative_count: int
     quant_positive_count: int
     quant_sign_balance_delta: int
@@ -428,6 +434,38 @@ def analyze_block_repetition(data: bytes, block_size: int) -> tuple[int, int, in
     return duplicate_block_count, repeated_block_value_count, max_run, max_run_start
 
 
+def analyze_scale_repetition(data: bytes, block_size: int) -> tuple[int, int, float, int, int]:
+    block_count = len(data) // block_size
+    if block_count == 0:
+        return 0, 0, 0.0, 0, -1
+
+    scale_counts: dict[int, int] = {}
+    max_run = 1
+    max_run_start = 0
+    current_run = 1
+    current_run_start = 0
+    previous: int | None = None
+
+    for block_index in range(block_count):
+        offset = block_index * block_size
+        scale_bits = int.from_bytes(data[offset : offset + 2], "little")
+        scale_counts[scale_bits] = scale_counts.get(scale_bits, 0) + 1
+
+        if previous is not None and scale_bits == previous:
+            current_run += 1
+        else:
+            current_run = 1
+            current_run_start = block_index
+        if current_run > max_run:
+            max_run = current_run
+            max_run_start = current_run_start
+        previous = scale_bits
+
+    duplicate_scale_count = sum(count - 1 for count in scale_counts.values() if count > 1)
+    duplicate_scale_pct = duplicate_scale_count * 100.0 / block_count
+    return len(scale_counts), duplicate_scale_count, duplicate_scale_pct, max_run, max_run_start
+
+
 def check_block_repetition_gates(
     findings: list[str],
     block_count: int,
@@ -463,18 +501,64 @@ def check_block_repetition_gates(
         )
 
 
+def check_scale_repetition_gates(
+    findings: list[str],
+    block_count: int,
+    scale_used_value_count: int,
+    duplicate_scale_count: int,
+    duplicate_scale_pct: float,
+    max_identical_scale_run: int,
+    max_identical_scale_run_start: int,
+    min_scale_used_values: int | None,
+    max_duplicate_scale_pct: float | None,
+    max_identical_scale_run_limit: int | None,
+) -> None:
+    if min_scale_used_values is not None and scale_used_value_count < min_scale_used_values:
+        findings.append(
+            "fp16 scale values {actual} below minimum {limit}".format(
+                actual=scale_used_value_count,
+                limit=min_scale_used_values,
+            )
+        )
+    if (
+        max_duplicate_scale_pct is not None
+        and duplicate_scale_pct > max_duplicate_scale_pct
+    ):
+        findings.append(
+            "duplicate fp16 scales {count}/{total} ({pct:.3f}%) exceeds limit {limit:.3f}%".format(
+                count=duplicate_scale_count,
+                total=block_count,
+                pct=duplicate_scale_pct,
+                limit=max_duplicate_scale_pct,
+            )
+        )
+    if (
+        max_identical_scale_run_limit is not None
+        and max_identical_scale_run > max_identical_scale_run_limit
+    ):
+        findings.append(
+            "identical fp16 scale run {run} exceeds limit {limit} starting at block {start}".format(
+                run=max_identical_scale_run,
+                limit=max_identical_scale_run_limit,
+                start=max_identical_scale_run_start,
+            )
+        )
+
+
 def check_quant_distribution(
     findings: list[str],
     quant_histogram: dict[str, int],
     saturation_values: tuple[int, int],
     min_used_quant_values: int | None,
     max_saturation_pct: float | None,
-) -> tuple[int, int, int, float]:
+) -> tuple[int, float, int, int, float]:
     used_value_count = sum(1 for count in quant_histogram.values() if count)
     nonzero_count = sum(
         count for value, count in quant_histogram.items() if int(value) != 0
     )
     total_count = sum(quant_histogram.values())
+    zero_count = quant_histogram.get("0", 0)
+    zero_pct = (zero_count * 100.0 / total_count) if total_count else 0.0
     saturation_count = sum(quant_histogram[str(value)] for value in saturation_values)
     saturation_pct = (saturation_count * 100.0 / total_count) if total_count else 0.0
 
@@ -490,7 +574,21 @@ def check_quant_distribution(
             )
         )
 
-    return nonzero_count, used_value_count, saturation_count, saturation_pct
+    return nonzero_count, zero_pct, used_value_count, saturation_count, saturation_pct
+
+
+def check_quant_zero_gate(
+    findings: list[str],
+    quant_zero_pct: float,
+    max_zero_quant_pct: float | None,
+) -> None:
+    if max_zero_quant_pct is not None and quant_zero_pct > max_zero_quant_pct:
+        findings.append(
+            "zero quant values {pct:.3f}% exceeds limit {limit:.3f}%".format(
+                pct=quant_zero_pct,
+                limit=max_zero_quant_pct,
+            )
+        )
 
 
 def check_quant_sign_distribution(
@@ -630,10 +728,14 @@ def audit_q4_0_blocks(
     max_scale_exponent: int | None = None,
     max_duplicate_block_pct: float | None = None,
     max_identical_block_run: int | None = None,
+    min_scale_used_values: int | None = None,
+    max_duplicate_scale_pct: float | None = None,
+    max_identical_scale_run: int | None = None,
     min_q4_nibble_lane_used_quant_values: int | None = None,
     min_quant_negative_count: int | None = None,
     min_quant_positive_count: int | None = None,
     max_quant_sign_balance_delta: int | None = None,
+    max_zero_quant_pct: float | None = None,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -660,6 +762,25 @@ def audit_q4_0_blocks(
         max_identical_block_run_start,
         max_duplicate_block_pct,
         max_identical_block_run,
+    )
+    (
+        scale_used_value_count,
+        duplicate_scale_count,
+        duplicate_scale_pct,
+        max_identical_scale_run_seen,
+        max_identical_scale_run_start,
+    ) = analyze_scale_repetition(data, Q4_0_BLOCK_BYTES)
+    check_scale_repetition_gates(
+        findings,
+        block_count,
+        scale_used_value_count,
+        duplicate_scale_count,
+        duplicate_scale_pct,
+        max_identical_scale_run_seen,
+        max_identical_scale_run_start,
+        min_scale_used_values,
+        max_duplicate_scale_pct,
+        max_identical_scale_run,
     )
     counts = {"zero": 0, "subnormal": 0, "normal": 0, "inf_nan": 0}
     sign_counts = {"positive": 0, "negative": 0}
@@ -807,6 +928,7 @@ def audit_q4_0_blocks(
 
     (
         quant_nonzero_count,
+        quant_zero_pct,
         quant_used_value_count,
         quant_saturation_count,
         quant_saturation_pct,
@@ -817,6 +939,7 @@ def audit_q4_0_blocks(
         min_used_quant_values,
         max_saturation_pct,
     )
+    check_quant_zero_gate(findings, quant_zero_pct, max_zero_quant_pct)
     (
         quant_negative_count,
         quant_positive_count,
@@ -863,11 +986,17 @@ def audit_q4_0_blocks(
         scale_exponent_under_limit_count=scale_exponent_stats["under_limit_count"],
         scale_exponent_over_limit_count=scale_exponent_stats["over_limit_count"],
         scale_exponent_histogram=dict(sorted(scale_exponent_stats["histogram"].items(), key=lambda item: int(item[0]))),
+        scale_used_value_count=scale_used_value_count,
+        duplicate_scale_count=duplicate_scale_count,
+        duplicate_scale_pct=duplicate_scale_pct,
+        max_identical_scale_run=max_identical_scale_run_seen,
+        max_identical_scale_run_start=max_identical_scale_run_start,
         zero_scale_nonzero_quant_block_count=zero_scale_nonzero_quant_block_count,
         zero_scale_nonzero_quant_entry_count=zero_scale_nonzero_quant_entry_count,
         quant_min=int(quant_min),
         quant_max=int(quant_max),
         quant_zero_count=quant_zero_count,
+        quant_zero_pct=quant_zero_pct,
         quant_negative_count=quant_negative_count,
         quant_positive_count=quant_positive_count,
         quant_sign_balance_delta=quant_sign_balance_delta,
@@ -914,10 +1043,14 @@ def audit_q8_0_blocks(
     max_scale_exponent: int | None = None,
     max_duplicate_block_pct: float | None = None,
     max_identical_block_run: int | None = None,
+    min_scale_used_values: int | None = None,
+    max_duplicate_scale_pct: float | None = None,
+    max_identical_scale_run: int | None = None,
     min_q4_nibble_lane_used_quant_values: int | None = None,
     min_quant_negative_count: int | None = None,
     min_quant_positive_count: int | None = None,
     max_quant_sign_balance_delta: int | None = None,
+    max_zero_quant_pct: float | None = None,
 ) -> BlockAudit:
     data = path.read_bytes()
     findings: list[str] = []
@@ -944,6 +1077,25 @@ def audit_q8_0_blocks(
         max_identical_block_run_start,
         max_duplicate_block_pct,
         max_identical_block_run,
+    )
+    (
+        scale_used_value_count,
+        duplicate_scale_count,
+        duplicate_scale_pct,
+        max_identical_scale_run_seen,
+        max_identical_scale_run_start,
+    ) = analyze_scale_repetition(data, Q8_0_BLOCK_BYTES)
+    check_scale_repetition_gates(
+        findings,
+        block_count,
+        scale_used_value_count,
+        duplicate_scale_count,
+        duplicate_scale_pct,
+        max_identical_scale_run_seen,
+        max_identical_scale_run_start,
+        min_scale_used_values,
+        max_duplicate_scale_pct,
+        max_identical_scale_run,
     )
     counts = {"zero": 0, "subnormal": 0, "normal": 0, "inf_nan": 0}
     sign_counts = {"positive": 0, "negative": 0}
@@ -1081,6 +1233,7 @@ def audit_q8_0_blocks(
 
     (
         quant_nonzero_count,
+        quant_zero_pct,
         quant_used_value_count,
         quant_saturation_count,
         quant_saturation_pct,
@@ -1091,6 +1244,7 @@ def audit_q8_0_blocks(
         min_used_quant_values,
         max_saturation_pct,
     )
+    check_quant_zero_gate(findings, quant_zero_pct, max_zero_quant_pct)
     (
         quant_negative_count,
         quant_positive_count,
@@ -1127,11 +1281,17 @@ def audit_q8_0_blocks(
         scale_exponent_under_limit_count=scale_exponent_stats["under_limit_count"],
         scale_exponent_over_limit_count=scale_exponent_stats["over_limit_count"],
         scale_exponent_histogram=dict(sorted(scale_exponent_stats["histogram"].items(), key=lambda item: int(item[0]))),
+        scale_used_value_count=scale_used_value_count,
+        duplicate_scale_count=duplicate_scale_count,
+        duplicate_scale_pct=duplicate_scale_pct,
+        max_identical_scale_run=max_identical_scale_run_seen,
+        max_identical_scale_run_start=max_identical_scale_run_start,
         zero_scale_nonzero_quant_block_count=zero_scale_nonzero_quant_block_count,
         zero_scale_nonzero_quant_entry_count=zero_scale_nonzero_quant_entry_count,
         quant_min=int(quant_min),
         quant_max=int(quant_max),
         quant_zero_count=quant_zero_count,
+        quant_zero_pct=quant_zero_pct,
         quant_negative_count=quant_negative_count,
         quant_positive_count=quant_positive_count,
         quant_sign_balance_delta=quant_sign_balance_delta,
@@ -1179,10 +1339,14 @@ def audit_blocks(
     max_scale_exponent: int | None = None,
     max_duplicate_block_pct: float | None = None,
     max_identical_block_run: int | None = None,
+    min_scale_used_values: int | None = None,
+    max_duplicate_scale_pct: float | None = None,
+    max_identical_scale_run: int | None = None,
     min_q4_nibble_lane_used_quant_values: int | None = None,
     min_quant_negative_count: int | None = None,
     min_quant_positive_count: int | None = None,
     max_quant_sign_balance_delta: int | None = None,
+    max_zero_quant_pct: float | None = None,
 ) -> BlockAudit:
     if quant_format == "q4_0":
         return audit_q4_0_blocks(
@@ -1204,10 +1368,14 @@ def audit_blocks(
             max_scale_exponent,
             max_duplicate_block_pct,
             max_identical_block_run,
+            min_scale_used_values,
+            max_duplicate_scale_pct,
+            max_identical_scale_run,
             min_q4_nibble_lane_used_quant_values,
             min_quant_negative_count,
             min_quant_positive_count,
             max_quant_sign_balance_delta,
+            max_zero_quant_pct,
         )
     if quant_format == "q8_0":
         return audit_q8_0_blocks(
@@ -1229,10 +1397,14 @@ def audit_blocks(
             max_scale_exponent,
             max_duplicate_block_pct,
             max_identical_block_run,
+            min_scale_used_values,
+            max_duplicate_scale_pct,
+            max_identical_scale_run,
             min_q4_nibble_lane_used_quant_values,
             min_quant_negative_count,
             min_quant_positive_count,
             max_quant_sign_balance_delta,
+            max_zero_quant_pct,
         )
     raise ValueError(f"unsupported quant format: {quant_format}")
 
@@ -1263,9 +1435,9 @@ def markdown_report(report: dict) -> str:
         lines.extend(
             [
                 "| Format | Path | Blocks | Capacity | Scale zero/subnormal/normal/inf_nan "
-                "| Scale sign +/- | Padding elements/nonzero | Scale Q16 min/max/absmax/zero/overlimit | Scale exponent min/max/under/over | Zero-scale nonzero blocks/entries | Quant min/max | Used values | Zero/nonzero quants "
+                "| Scale sign +/- | Padding elements/nonzero | Scale Q16 min/max/absmax/zero/overlimit | Scale exponent min/max/under/over | Scale values | Duplicate scales | Max scale run | Zero-scale nonzero blocks/entries | Quant min/max | Used values | Zero/nonzero quants "
                 "| Saturated quants | Quant sign -/+ delta | Min block used values | Worst block saturation | Duplicate blocks | Max identical run | Q4 low/high lane used values | Findings |",
-                "| --- | --- | ---: | ---: | --- | ---: | ---: | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| --- | --- | ---: | ---: | --- | ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
         for audit in block_audits:
@@ -1299,9 +1471,12 @@ def markdown_report(report: dict) -> str:
                 (
                     "| {format} | `{path}` | {block_count} | {element_capacity} | "
                     "{scales} | {scale_sign} | {padding_element_count}/{padding_nonzero_count} | "
-                    "{scale_q16} | {scale_exponent} | {zero_scale_nonzero_quant_block_count}/{zero_scale_nonzero_quant_entry_count} | "
+                    "{scale_q16} | {scale_exponent} | {scale_used_value_count} | "
+                    "{duplicate_scale_count} ({duplicate_scale_pct:.3f}%) | "
+                    "{max_identical_scale_run} @ {max_identical_scale_run_start} | "
+                    "{zero_scale_nonzero_quant_block_count}/{zero_scale_nonzero_quant_entry_count} | "
                     "{quant_min}/{quant_max} | {quant_used_value_count} | "
-                    "{quant_zero_count}/{quant_nonzero_count} | {quant_saturation_count} ({quant_saturation_pct:.3f}%) | "
+                    "{quant_zero_count}/{quant_nonzero_count} ({quant_zero_pct:.3f}% zero) | {quant_saturation_count} ({quant_saturation_pct:.3f}%) | "
                     "{quant_negative_count}/{quant_positive_count} delta {quant_sign_balance_delta} | "
                     "{min_block_used_quant_values} @ {min_block_used_quant_values_index} | "
                     "{worst_block_saturation_count} ({worst_block_saturation_pct:.3f}%) @ {worst_block_saturation_index} | "
@@ -1320,6 +1495,13 @@ def markdown_report(report: dict) -> str:
                     scale_q16=scale_q16,
                     scale_exponent=scale_exponent,
                     scale_sign=scale_sign,
+                    scale_used_value_count=audit["scale_used_value_count"],
+                    duplicate_scale_count=audit["duplicate_scale_count"],
+                    duplicate_scale_pct=audit["duplicate_scale_pct"],
+                    max_identical_scale_run=audit["max_identical_scale_run"],
+                    max_identical_scale_run_start=audit[
+                        "max_identical_scale_run_start"
+                    ],
                     zero_scale_nonzero_quant_block_count=audit[
                         "zero_scale_nonzero_quant_block_count"
                     ],
@@ -1330,6 +1512,7 @@ def markdown_report(report: dict) -> str:
                     quant_max=audit["quant_max"],
                     quant_used_value_count=audit["quant_used_value_count"],
                     quant_zero_count=audit["quant_zero_count"],
+                    quant_zero_pct=audit["quant_zero_pct"],
                     quant_nonzero_count=audit["quant_nonzero_count"],
                     quant_negative_count=audit["quant_negative_count"],
                     quant_positive_count=audit["quant_positive_count"],
@@ -1615,6 +1798,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail raw block streams with more than this many identical complete blocks in a row",
     )
     parser.add_argument(
+        "--min-scale-used-values",
+        type=int,
+        help="Fail block streams whose fp16 scale fields use fewer distinct bit patterns than this",
+    )
+    parser.add_argument(
+        "--max-duplicate-scale-pct",
+        type=float,
+        help="Fail block streams whose repeated fp16 scale percentage exceeds this limit",
+    )
+    parser.add_argument(
+        "--max-identical-scale-run",
+        type=int,
+        help="Fail block streams with more than this many identical fp16 scale fields in a row",
+    )
+    parser.add_argument(
         "--min-q4-nibble-lane-used-quant-values",
         type=int,
         help="Fail Q4_0 block streams when either low- or high-nibble lane uses fewer distinct quant values than this",
@@ -1633,6 +1831,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-quant-sign-balance-delta",
         type=int,
         help="Fail block streams whose absolute negative-vs-positive payload count delta exceeds this",
+    )
+    parser.add_argument(
+        "--max-zero-quant-pct",
+        type=float,
+        help="Fail block streams whose zero quant payload entries exceed this percentage",
     )
     parser.add_argument("--allow-inf-nan-scale", action="store_true", help="Do not fail on fp16 inf/nan scales")
     parser.add_argument("--output", type=Path, help="Write JSON report to this path")
@@ -1672,10 +1875,14 @@ def main(argv: list[str] | None = None) -> int:
             args.max_scale_exponent,
             args.max_duplicate_block_pct,
             args.max_identical_block_run,
+            args.min_scale_used_values,
+            args.max_duplicate_scale_pct,
+            args.max_identical_scale_run,
             args.min_q4_nibble_lane_used_quant_values,
             args.min_quant_negative_count,
             args.min_quant_positive_count,
             args.max_quant_sign_balance_delta,
+            args.max_zero_quant_pct,
         )
         for path, quant_format in block_specs
     ]

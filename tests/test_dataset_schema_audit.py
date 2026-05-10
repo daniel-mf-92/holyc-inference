@@ -70,9 +70,84 @@ def test_duplicate_payload_and_conflicting_answer_gates() -> None:
         assert report["status"] == "fail"
         assert report["duplicate_payloads"][0]["conflicting_answers"] is True
         assert report["duplicate_payloads"][0]["answer_histogram"] == {"0": 1, "1": 1}
+        assert len(report["record_telemetry"]) == 2
+        assert report["record_telemetry"][0]["choice_count"] == 4
+        assert report["record_telemetry"][0]["record_payload_bytes"] > report["record_telemetry"][0]["prompt_bytes"]
+        assert report["record_telemetry"][0]["payload_key_sha256"] == report["duplicate_payloads"][0]["key_sha256"]
         assert kinds == {"duplicate_payload", "conflicting_payload_answers"}
+
+
+def test_answer_label_coverage_gates() -> None:
+    rows = [
+        {
+            "id": "arc-a",
+            "dataset": "arc",
+            "split": "validation",
+            "prompt": "ARC question A",
+            "choices": ["A", "B", "C", "D"],
+            "answer_index": 0,
+            "provenance": "synthetic label coverage test",
+        },
+        {
+            "id": "arc-b",
+            "dataset": "arc",
+            "split": "validation",
+            "prompt": "ARC question B",
+            "choices": ["A", "B", "C", "D"],
+            "answer_index": 1,
+            "provenance": "synthetic label coverage test",
+        },
+        {
+            "id": "truthfulqa-a",
+            "dataset": "truthfulqa",
+            "split": "validation",
+            "prompt": "TruthfulQA question A",
+            "choices": ["A", "B", "C", "D"],
+            "answer_index": 0,
+            "provenance": "synthetic label coverage test",
+        },
+        {
+            "id": "truthfulqa-b",
+            "dataset": "truthfulqa",
+            "split": "validation",
+            "prompt": "TruthfulQA question B",
+            "choices": ["A", "B", "C", "D"],
+            "answer_index": 0,
+            "provenance": "synthetic label coverage test",
+        },
+    ]
+    with tempfile.TemporaryDirectory() as tmp:
+        source = Path(tmp) / "labels.jsonl"
+        output = Path(tmp) / "schema.json"
+        write_jsonl(source, rows)
+
+        status = dataset_schema_audit.main(
+            [
+                "--input",
+                str(source),
+                "--output",
+                str(output),
+                "--min-answer-labels",
+                "3",
+                "--min-dataset-split-answer-labels",
+                "2",
+                "--fail-on-findings",
+            ]
+        )
+
+        report = json.loads(output.read_text(encoding="utf-8"))
+        kinds = {finding["kind"] for finding in report["findings"]}
+        assert status == 1
+        assert report["status"] == "fail"
+        assert report["answer_label_count"] == 2
+        assert report["dataset_split_answer_label_counts"] == {
+            "arc": {"validation": 2},
+            "truthfulqa": {"validation": 1},
+        }
+        assert kinds == {"too_few_answer_labels", "dataset_split_too_few_answer_labels"}
 
 
 if __name__ == "__main__":
     test_duplicate_payload_and_conflicting_answer_gates()
+    test_answer_label_coverage_gates()
     print("dataset_schema_audit_tests=ok")

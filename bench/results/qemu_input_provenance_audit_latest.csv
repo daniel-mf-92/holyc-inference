@@ -1,0 +1,2 @@
+source,status,prompt_source,prompt_count,prompt_suite_sha256,prompt_live_checked,image_path,image_exists_recorded,image_live_checked,qemu_args_files,qemu_args_live_checked,findings
+bench/results/qemu_prompt_bench_latest.json,pass,bench/prompts/smoke.jsonl,2,68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a,True,/tmp/TempleOS.synthetic.img,False,False,0,0,0

@@ -579,6 +579,51 @@ def test_cli_can_gate_ok_run_coverage(tmp_path: Path) -> None:
     assert "Coverage violations: 2" in (output_dir / "build_compare_latest.md").read_text(encoding="utf-8")
 
 
+def test_exit_class_failures_do_not_count_as_ok_runs(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    candidate = tmp_path / "candidate.json"
+    output_dir = tmp_path / "results"
+    write_report(baseline, "base", 100.0, 200000)
+    write_metric_rows_report(
+        candidate,
+        "head",
+        [
+            {
+                "tok_per_s": 100.0,
+                "exit_class": "nonzero_exit",
+                "returncode": None,
+                "failure_reason": "guest exited before BENCH_RESULT",
+            }
+        ],
+    )
+
+    status = build_compare.main(
+        [
+            "--input",
+            f"base={baseline}",
+            "--input",
+            f"head={candidate}",
+            "--output-dir",
+            str(output_dir),
+            "--min-ok-runs-per-build",
+            "1",
+            "--fail-on-coverage",
+        ]
+    )
+
+    payload = json.loads((output_dir / "build_compare_latest.json").read_text(encoding="utf-8"))
+    coverage_rows = list(
+        csv.DictReader((output_dir / "build_compare_coverage_violations_latest.csv").open(newline="", encoding="utf-8"))
+    )
+    junit_root = ET.parse(output_dir / "build_compare_junit_latest.xml").getroot()
+
+    assert status == 1
+    assert payload["deltas"][0]["candidate_ok_runs"] == 0
+    assert payload["coverage_violations"][0]["build"] == "head"
+    assert coverage_rows[0]["ok_runs"] == "0"
+    assert junit_root.find("./testcase/failure").attrib["type"] == "build_compare_sample_coverage"
+
+
 def test_cli_can_gate_prompt_suite_drift(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     candidate = tmp_path / "candidate.json"
@@ -713,6 +758,7 @@ if __name__ == "__main__":
         test_cli_can_gate_ttft_growth(tmp_path)
         test_cli_can_gate_host_latency_cpu_and_rss_drift(tmp_path)
         test_cli_can_gate_ok_run_coverage(tmp_path)
+        test_exit_class_failures_do_not_count_as_ok_runs(tmp_path)
         test_cli_can_gate_prompt_suite_drift(tmp_path)
         test_cli_can_gate_command_drift(tmp_path)
         test_cli_can_fail_on_throughput_regression(tmp_path)

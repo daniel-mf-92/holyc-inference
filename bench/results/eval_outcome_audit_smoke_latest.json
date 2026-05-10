@@ -1,0 +1,80 @@
+{
+  "error_count": 0,
+  "findings": [],
+  "generated_at": "2026-04-30T07:45:44Z",
+  "inputs": [
+    "bench/results/eval_compare_smoke_latest.json"
+  ],
+  "max_both_wrong_pct": 0.0,
+  "max_dataset_split_llama_only_correct_pct": 0.0,
+  "max_llama_only_correct_pct": 0.0,
+  "min_records": 3,
+  "scope_count": 4,
+  "scopes": [
+    {
+      "both_correct": 3,
+      "both_wrong_disagree": 0,
+      "both_wrong_pct": 0.0,
+      "both_wrong_same": 0,
+      "dataset": "smoke-eval",
+      "holyc_accuracy": 1.0,
+      "holyc_only_correct": 0,
+      "llama_accuracy": 1.0,
+      "llama_only_correct": 0,
+      "llama_only_correct_pct": 0.0,
+      "record_count": 3,
+      "scope": "overall",
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    },
+    {
+      "both_correct": 1,
+      "both_wrong_disagree": 0,
+      "both_wrong_pct": 0.0,
+      "both_wrong_same": 0,
+      "dataset": "arc-smoke",
+      "holyc_accuracy": 1.0,
+      "holyc_only_correct": 0,
+      "llama_accuracy": 1.0,
+      "llama_only_correct": 0,
+      "llama_only_correct_pct": 0.0,
+      "record_count": 1,
+      "scope": "dataset_split",
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    },
+    {
+      "both_correct": 1,
+      "both_wrong_disagree": 0,
+      "both_wrong_pct": 0.0,
+      "both_wrong_same": 0,
+      "dataset": "hellaswag-smoke",
+      "holyc_accuracy": 1.0,
+      "holyc_only_correct": 0,
+      "llama_accuracy": 1.0,
+      "llama_only_correct": 0,
+      "llama_only_correct_pct": 0.0,
+      "record_count": 1,
+      "scope": "dataset_split",
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    },
+    {
+      "both_correct": 1,
+      "both_wrong_disagree": 0,
+      "both_wrong_pct": 0.0,
+      "both_wrong_same": 0,
+      "dataset": "truthfulqa-smoke",
+      "holyc_accuracy": 1.0,
+      "holyc_only_correct": 0,
+      "llama_accuracy": 1.0,
+      "llama_only_correct": 0,
+      "llama_only_correct_pct": 0.0,
+      "record_count": 1,
+      "scope": "dataset_split",
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    }
+  ],
+  "status": "pass"
+}

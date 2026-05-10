@@ -1,0 +1,111 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-02T05:46:39Z",
+  "inputs": {
+    "holyc": {
+      "path": "bench/eval/samples/holyc_smoke_scored_predictions.jsonl",
+      "sha256": "53e80ac19fe2c308d5b679f54f489145f27d9d760207ab94a9a580259abe0a83"
+    },
+    "llama": {
+      "path": "bench/eval/samples/llama_smoke_scored_predictions.jsonl",
+      "sha256": "1f34bee992b32ee6468489b90186ceae8f3621e618804fb4b456275aff27b8f8"
+    }
+  },
+  "records": [
+    {
+      "choice_count": 4,
+      "effective_choices": 1.216149418525219,
+      "engine": "holyc",
+      "entropy": 0.19568965307186614,
+      "normalized_entropy": 0.1411602460200315,
+      "record_id": "smoke-hellaswag-1",
+      "source": "bench/eval/samples/holyc_smoke_scored_predictions.jsonl",
+      "top_probability": 0.9633202978368793
+    },
+    {
+      "choice_count": 4,
+      "effective_choices": 1.3642965233733606,
+      "engine": "holyc",
+      "entropy": 0.31063892829740813,
+      "normalized_entropy": 0.2240786206808665,
+      "record_id": "smoke-arc-1",
+      "source": "bench/eval/samples/holyc_smoke_scored_predictions.jsonl",
+      "top_probability": 0.9303704656505479
+    },
+    {
+      "choice_count": 4,
+      "effective_choices": 1.3642965233733606,
+      "engine": "holyc",
+      "entropy": 0.31063892829740813,
+      "normalized_entropy": 0.2240786206808665,
+      "record_id": "smoke-truthfulqa-1",
+      "source": "bench/eval/samples/holyc_smoke_scored_predictions.jsonl",
+      "top_probability": 0.9303704656505479
+    },
+    {
+      "choice_count": 4,
+      "effective_choices": 1.1827925010539864,
+      "engine": "llama",
+      "entropy": 0.16787816898114843,
+      "normalized_entropy": 0.12109850093131112,
+      "record_id": "smoke-hellaswag-1",
+      "source": "bench/eval/samples/llama_smoke_scored_predictions.jsonl",
+      "top_probability": 0.9694240086147208
+    },
+    {
+      "choice_count": 4,
+      "effective_choices": 1.3351976164812922,
+      "engine": "llama",
+      "entropy": 0.28907930822405975,
+      "normalized_entropy": 0.2085266421992316,
+      "record_id": "smoke-arc-1",
+      "source": "bench/eval/samples/llama_smoke_scored_predictions.jsonl",
+      "top_probability": 0.9365763387321515
+    },
+    {
+      "choice_count": 4,
+      "effective_choices": 1.3083323801802833,
+      "engine": "llama",
+      "entropy": 0.2687533340413725,
+      "normalized_entropy": 0.1938645511219316,
+      "record_id": "smoke-truthfulqa-1",
+      "source": "bench/eval/samples/llama_smoke_scored_predictions.jsonl",
+      "top_probability": 0.9422634255735961
+    }
+  ],
+  "status": "pass",
+  "summaries": [
+    {
+      "engine": "holyc",
+      "invalid_count": 0,
+      "max_normalized_entropy": 0.2240786206808665,
+      "mean_effective_choices": 1.3149141550906467,
+      "mean_normalized_entropy": 0.19643916246058815,
+      "mean_top_probability": 0.9413537430459917,
+      "min_normalized_entropy": 0.1411602460200315,
+      "record_count": 3,
+      "scored_count": 3,
+      "source": "bench/eval/samples/holyc_smoke_scored_predictions.jsonl"
+    },
+    {
+      "engine": "llama",
+      "invalid_count": 0,
+      "max_normalized_entropy": 0.2085266421992316,
+      "mean_effective_choices": 1.275440832571854,
+      "mean_normalized_entropy": 0.17449656475082476,
+      "mean_top_probability": 0.9494212576401561,
+      "min_normalized_entropy": 0.12109850093131112,
+      "record_count": 3,
+      "scored_count": 3,
+      "source": "bench/eval/samples/llama_smoke_scored_predictions.jsonl"
+    }
+  ],
+  "thresholds": {
+    "max_mean_entropy_delta": 0.25,
+    "max_normalized_entropy": 1.0,
+    "max_record_entropy_delta": 0.5,
+    "min_choices": 2,
+    "min_normalized_entropy": 0.0,
+    "min_records": 3
+  }
+}

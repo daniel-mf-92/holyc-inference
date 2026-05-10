@@ -1,0 +1,2 @@
+source,row,profile,model,quantization,prompt,commit,phase,exit_class,tokens,memory_bytes,memory_bytes_per_token,host_child_peak_rss_bytes,host_rss_bytes_per_token,host_rss_over_guest_ratio,checks,findings
+/tmp/holyc-memory-audit.hHZVte/qemu_prompt_bench_memory_smoke.json,1,ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,smoke,measured,ok,32,1024,32.0,4096,128.0,4.0,4,0

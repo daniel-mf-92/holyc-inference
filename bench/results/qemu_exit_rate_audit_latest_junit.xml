@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="holyc_qemu_exit_rate_audit" tests="1" failures="0" errors="0">
+  <testcase classname="qemu_exit_rate_audit" name="exit_rates" />
+</testsuite>

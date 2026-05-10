@@ -1,0 +1,70 @@
+{
+  "artifacts": [
+    {
+      "inconsistent_keys": [],
+      "metadata": {
+        "max_tokens": [
+          "16"
+        ],
+        "seed": [
+          "1234"
+        ],
+        "temperature": [
+          "0"
+        ],
+        "top_k": [
+          "1"
+        ],
+        "top_p": [
+          "1"
+        ]
+      },
+      "missing_counts": {
+        "max_tokens": 0,
+        "seed": 0,
+        "temperature": 0,
+        "top_k": 0,
+        "top_p": 0
+      },
+      "rows": 2,
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpnm3eszti/holyc.jsonl"
+    },
+    {
+      "inconsistent_keys": [],
+      "metadata": {
+        "max_tokens": [
+          "16"
+        ],
+        "seed": [
+          "1234"
+        ],
+        "temperature": [
+          "0"
+        ],
+        "top_k": [
+          "1"
+        ],
+        "top_p": [
+          "1"
+        ]
+      },
+      "missing_counts": {
+        "max_tokens": 0,
+        "seed": 0,
+        "temperature": 0,
+        "top_k": 0,
+        "top_p": 0
+      },
+      "rows": 2,
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpnm3eszti/llama.jsonl"
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-02T04:00:42Z",
+  "status": "pass",
+  "summary": {
+    "artifacts": 2,
+    "findings": 0,
+    "rows": 4
+  }
+}

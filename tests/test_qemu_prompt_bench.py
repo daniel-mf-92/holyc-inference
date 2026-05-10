@@ -41,7 +41,7 @@ def test_network_args_are_rejected(tmp_path: Path) -> None:
     else:
         raise AssertionError("expected network device rejection")
 
-    for device in ("ne2k_pci", "pcnet", "usb-net", "e1000e"):
+    for device in ("ne2k_pci", "pcnet", "usb-net", "e1000e", "igb", "vhost-vsock-pci", "rocker"):
         try:
             qemu_prompt_bench.build_command("qemu-system-x86_64", image, ["-device", device])
         except ValueError as exc:
@@ -55,6 +55,19 @@ def test_network_args_are_rejected(tmp_path: Path) -> None:
         assert "network device" in str(exc)
     else:
         raise AssertionError("expected network device rejection")
+
+    for extra_args in (
+        ["--netdev", "user,id=n0"],
+        ["--netdev=user,id=n0"],
+        ["--device", "e1000"],
+        ["--device=virtio-net-pci"],
+    ):
+        try:
+            qemu_prompt_bench.build_command("qemu-system-x86_64", image, extra_args)
+        except ValueError as exc:
+            assert "not allowed" in str(exc) or "network device" in str(exc)
+        else:
+            raise AssertionError(f"expected long-option network rejection for {extra_args}")
 
 
 def test_legacy_net_none_is_rejected_for_artifact_consistency(tmp_path: Path) -> None:
@@ -78,6 +91,135 @@ def test_legacy_net_none_is_rejected_for_artifact_consistency(tmp_path: Path) ->
         assert "legacy `-net=none`" in str(exc)
     else:
         raise AssertionError("expected legacy -net=none rejection")
+
+    metadata = qemu_prompt_bench.command_airgap_metadata(["qemu-system-x86_64", "--nic", "none", "--net=none"])
+    assert metadata["ok"] is False
+    assert metadata["explicit_nic_none"] is True
+    assert "legacy `-net=none` present; benchmark artifacts must use `-nic none`" in metadata["violations"]
+
+
+def test_duplicate_nic_none_is_rejected_for_launcher_consistency(tmp_path: Path) -> None:
+    image = tmp_path / "temple.img"
+
+    metadata = qemu_prompt_bench.command_airgap_metadata(
+        ["qemu-system-x86_64", "-nic", "none", "-display", "none", "-nic=none"]
+    )
+
+    assert metadata["ok"] is False
+    assert "duplicate explicit `-nic none` entries: 2" in metadata["violations"]
+
+    for extra_args in (["-nic", "none"], ["-nic=none"]):
+        try:
+            qemu_prompt_bench.build_command("qemu-system-x86_64", image, extra_args)
+        except ValueError as exc:
+            assert "benchmark launcher injects" in str(exc)
+        else:
+            raise AssertionError(f"expected duplicate -nic none rejection for {extra_args}")
+
+
+def test_socket_endpoints_are_rejected_for_air_gap(tmp_path: Path) -> None:
+    image = tmp_path / "temple.img"
+
+    metadata = qemu_prompt_bench.command_airgap_metadata(
+        ["qemu-system-x86_64", "-nic", "none", "-chardev", "socket,id=mon,path=/tmp/qmp.sock"]
+    )
+    assert metadata["ok"] is False
+    assert any("socket endpoint" in violation for violation in metadata["violations"])
+
+    for extra_args in (
+        ["-chardev", "socket,id=mon,path=/tmp/qmp.sock"],
+        ["-serial", "tcp:127.0.0.1:4444,server=on"],
+        ["-monitor", "udp:127.0.0.1:4444"],
+        ["--serial", "tcp:127.0.0.1:4444,server=on"],
+        ["-vnc", ":1"],
+        ["--vnc", ":2"],
+        ["-display", "vnc=127.0.0.1:1"],
+        ["--display=vnc=127.0.0.1:1"],
+        ["-display=spice-app"],
+        ["-spice", "port=5900,addr=127.0.0.1"],
+        ["-nic", "user,hostfwd=tcp::2222-:22"],
+    ):
+        try:
+            qemu_prompt_bench.build_command("qemu-system-x86_64", image, extra_args)
+        except ValueError as exc:
+            assert "socket" in str(exc) or "networking" in str(exc) or "-nic arguments" in str(exc)
+        else:
+            raise AssertionError(f"expected socket endpoint rejection for {extra_args}")
+
+
+def test_user_mode_network_services_are_rejected_for_air_gap(tmp_path: Path) -> None:
+    image = tmp_path / "temple.img"
+
+    metadata = qemu_prompt_bench.command_airgap_metadata(["qemu-system-x86_64", "-nic", "none", "-smb", "/tmp/share"])
+
+    assert metadata["ok"] is False
+    assert any("user-mode network service" in violation for violation in metadata["violations"])
+
+    for extra_args in (
+        ["-smb", "/tmp/share"],
+        ["-tftp", "/tmp/tftp"],
+        ["-bootp", "pxelinux.0"],
+        ["-redir", "tcp:2222::22"],
+        ["-tftp=/tmp/tftp"],
+    ):
+        try:
+            qemu_prompt_bench.build_command("qemu-system-x86_64", image, extra_args)
+        except ValueError as exc:
+            assert "user-mode network service" in str(exc)
+        else:
+            raise AssertionError(f"expected user-mode network service rejection for {extra_args}")
+
+
+def test_tls_options_are_rejected_for_air_gap(tmp_path: Path) -> None:
+    image = tmp_path / "temple.img"
+
+    metadata = qemu_prompt_bench.command_airgap_metadata(
+        ["qemu-system-x86_64", "-nic", "none", "-object", "tls-creds-x509,id=tls0,endpoint=server,dir=/tmp/tls"]
+    )
+
+    assert metadata["ok"] is False
+    assert any("tls option" in violation for violation in metadata["violations"])
+
+    for extra_args in (
+        ["-object", "tls-creds-x509,id=tls0,endpoint=server,dir=/tmp/tls"],
+        ["-object=tls-creds-psk,id=tls0,dir=/tmp/tls"],
+        ["-chardev", "socket,id=mon,path=/tmp/qmp.sock,tls-creds=tls0"],
+        ["-display", "none,tls-creds=tls0"],
+    ):
+        try:
+            qemu_prompt_bench.build_command("qemu-system-x86_64", image, extra_args)
+        except ValueError as exc:
+            assert "TLS is not allowed" in str(exc)
+        else:
+            raise AssertionError(f"expected TLS rejection for {extra_args}")
+
+
+def test_qemu_include_args_are_rejected_for_air_gap(tmp_path: Path) -> None:
+    image = tmp_path / "temple.img"
+
+    response_metadata = qemu_prompt_bench.command_airgap_metadata(
+        ["qemu-system-x86_64", "-nic", "none", "@hidden-networking.args"]
+    )
+    readconfig_metadata = qemu_prompt_bench.command_airgap_metadata(
+        ["qemu-system-x86_64", "-nic", "none", "-readconfig", "machine.cfg"]
+    )
+
+    assert response_metadata["ok"] is False
+    assert "nested qemu args include `@hidden-networking.args`" in response_metadata["violations"]
+    assert readconfig_metadata["ok"] is False
+    assert "qemu config include `-readconfig machine.cfg`" in readconfig_metadata["violations"]
+
+    for extra_args in (
+        ["@hidden-networking.args"],
+        ["-readconfig", "machine.cfg"],
+        ["-readconfig=machine.cfg"],
+    ):
+        try:
+            qemu_prompt_bench.build_command("qemu-system-x86_64", image, extra_args)
+        except ValueError as exc:
+            assert "not allowed" in str(exc)
+        else:
+            raise AssertionError(f"expected QEMU include rejection for {extra_args}")
 
 
 def test_qemu_args_file_parsing_and_air_gap_validation(tmp_path: Path) -> None:
@@ -214,6 +356,7 @@ def test_cli_dry_run_validates_without_launching_qemu(tmp_path: Path, capsys) ->
     report = json.loads((output_dir / "qemu_prompt_bench_dry_run_latest.json").read_text(encoding="utf-8"))
     markdown = (output_dir / "qemu_prompt_bench_dry_run_latest.md").read_text(encoding="utf-8")
     assert payload["prompt_count"] == 1
+    assert payload["artifact_schema_version"] == qemu_prompt_bench.ARTIFACT_SCHEMA_VERSION
     assert payload["prompt_suite"]["prompt_count"] == 1
     assert payload["prompt_suite"]["prompt_bytes_total"] == 1
     assert len(payload["prompt_suite"]["suite_sha256"]) == 64
@@ -233,10 +376,12 @@ def test_cli_dry_run_validates_without_launching_qemu(tmp_path: Path, capsys) ->
     assert payload["environment"]["python"]
     assert payload["dry_run_report"] == str(output_dir / "qemu_prompt_bench_dry_run_latest.json")
     assert report["status"] == "planned"
+    assert report["artifact_schema_version"] == qemu_prompt_bench.ARTIFACT_SCHEMA_VERSION
     assert report["command"][1:3] == ["-nic", "none"]
     assert report["command_sha256"] == payload["command_sha256"]
     assert report["environment"]["qemu_bin"] == "qemu-system-x86_64"
     assert "QEMU Prompt Benchmark Dry Run" in markdown
+    assert f"Artifact schema: {qemu_prompt_bench.ARTIFACT_SCHEMA_VERSION}" in markdown
     assert f"Command SHA256: {payload['command_sha256']}" in markdown
     assert "Total launches: 3" in markdown
     assert "Prompt count floor: 1" in markdown
@@ -341,6 +486,7 @@ print("tokens=32 elapsed_us=100000 memory_kib=8192")
     assert status == 0
     report = json.loads((output_dir / "qemu_prompt_bench_latest.json").read_text(encoding="utf-8"))
     assert report["status"] == "pass"
+    assert report["artifact_schema_version"] == qemu_prompt_bench.ARTIFACT_SCHEMA_VERSION
     assert report["prompt_suite"]["source"] == str(prompts)
     assert report["prompt_suite"]["prompt_count"] == 1
     assert report["prompt_suite"]["prompt_bytes_total"] == 20

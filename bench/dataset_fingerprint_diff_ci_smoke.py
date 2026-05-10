@@ -62,6 +62,7 @@ def main() -> int:
 
         pass_json = tmp_path / "dataset_fingerprint_diff_smoke_latest.json"
         pass_csv = tmp_path / "dataset_fingerprint_diff_smoke_latest.csv"
+        pass_findings_csv = tmp_path / "dataset_fingerprint_diff_smoke_findings_latest.csv"
         pass_md = tmp_path / "dataset_fingerprint_diff_smoke_latest.md"
         pass_junit = tmp_path / "dataset_fingerprint_diff_smoke_latest_junit.xml"
         pass_command = [
@@ -75,6 +76,8 @@ def main() -> int:
             str(pass_json),
             "--csv",
             str(pass_csv),
+            "--findings-csv",
+            str(pass_findings_csv),
             "--markdown",
             str(pass_md),
             "--junit",
@@ -96,6 +99,9 @@ def main() -> int:
         if rc := require("Eval Dataset Fingerprint Diff" in pass_md.read_text(encoding="utf-8"), "missing_markdown"):
             return rc
         if rc := require(len(list(csv.DictReader(pass_csv.open(encoding="utf-8", newline="")))) == 0, "unexpected_csv_rows"):
+            return rc
+        pass_findings = list(csv.DictReader(pass_findings_csv.open(encoding="utf-8", newline="")))
+        if rc := require(pass_findings == [], "unexpected_pass_findings_csv_rows"):
             return rc
         junit_root = ET.parse(pass_junit).getroot()
         if rc := require(junit_root.attrib.get("name") == "holyc_dataset_fingerprint_diff", "missing_junit_name"):
@@ -127,6 +133,7 @@ def main() -> int:
             return 1
 
         fail_json = tmp_path / "dataset_fingerprint_diff_changed.json"
+        fail_findings_csv = tmp_path / "dataset_fingerprint_diff_changed_findings.csv"
         fail_command = [
             sys.executable,
             str(ROOT / "bench" / "dataset_fingerprint_diff.py"),
@@ -136,6 +143,8 @@ def main() -> int:
             str(changed_fingerprint),
             "--output",
             str(fail_json),
+            "--findings-csv",
+            str(fail_findings_csv),
             "--fail-on-added",
             "--fail-on-content-changes",
             "--fail-on-answer-changes",
@@ -154,6 +163,10 @@ def main() -> int:
             return rc
         kinds = {finding["kind"] for finding in fail_report["findings"]}
         if rc := require({"added", "content_changed", "answer_changed"}.issubset(kinds), "missing_gate_findings"):
+            return rc
+        finding_rows = list(csv.DictReader(fail_findings_csv.open(encoding="utf-8", newline="")))
+        csv_kinds = {row["kind"] for row in finding_rows}
+        if rc := require(kinds == csv_kinds, "findings_csv_kind_mismatch"):
             return rc
 
     print("dataset_fingerprint_diff_ci_smoke=pass")

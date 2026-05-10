@@ -1,0 +1,81 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-01T11:30:23Z",
+  "rows": [
+    {
+      "elapsed_us": 200000.0,
+      "exit_class": "ok",
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_bytes": 49,
+      "prompt_bytes_per_s": 245.0,
+      "quantization": "Q4_0",
+      "row": 1,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "tokens": 32,
+      "tokens_per_prompt_byte": 0.6530612244897959,
+      "wall_elapsed_us": 236625.0,
+      "wall_prompt_bytes_per_s": 207.07871104067618
+    },
+    {
+      "elapsed_us": 200000.0,
+      "exit_class": "ok",
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "prompt_bytes": 49,
+      "prompt_bytes_per_s": 245.0,
+      "quantization": "Q4_0",
+      "row": 2,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "tokens": 32,
+      "tokens_per_prompt_byte": 0.6530612244897959,
+      "wall_elapsed_us": 314053.0,
+      "wall_prompt_bytes_per_s": 156.02462004820842
+    },
+    {
+      "elapsed_us": 300000.0,
+      "exit_class": "ok",
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "prompt_bytes": 71,
+      "prompt_bytes_per_s": 236.66666666666666,
+      "quantization": "Q4_0",
+      "row": 3,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "tokens": 48,
+      "tokens_per_prompt_byte": 0.676056338028169,
+      "wall_elapsed_us": 129739.0,
+      "wall_prompt_bytes_per_s": 547.2525609107516
+    },
+    {
+      "elapsed_us": 300000.0,
+      "exit_class": "ok",
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "prompt_bytes": 71,
+      "prompt_bytes_per_s": 236.66666666666666,
+      "quantization": "Q4_0",
+      "row": 4,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "tokens": 48,
+      "tokens_per_prompt_byte": 0.676056338028169,
+      "wall_elapsed_us": 164434.0,
+      "wall_prompt_bytes_per_s": 431.78418088716444
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "min_tokens_per_prompt_byte": 0.0,
+    "min_wall_prompt_bytes_per_s": 0.0,
+    "rows": 4
+  }
+}

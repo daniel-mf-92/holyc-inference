@@ -1,0 +1,89 @@
+{
+  "findings": [],
+  "generated_at": "2026-04-30T00:02:49Z",
+  "inputs": [
+    "bench/results/qemu_prompt_bench_latest.json"
+  ],
+  "status": "pass",
+  "summary": {
+    "commits": [
+      "a70776642a09"
+    ],
+    "failed_rows": 0,
+    "failure_pct": 0.0,
+    "findings": 0,
+    "metrics": {
+      "host_child_peak_rss_bytes": {
+        "count": 4,
+        "max": 15007744.0,
+        "mean": 3956736.0,
+        "min": 163840.0
+      },
+      "memory_bytes": {
+        "count": 4,
+        "max": 67207168.0,
+        "mean": 67190784.0,
+        "min": 67174400.0
+      },
+      "memory_bytes_per_token": {
+        "count": 4,
+        "max": 2099200.0,
+        "mean": 1749674.666667,
+        "min": 1400149.3333333333
+      },
+      "tok_per_s": {
+        "count": 4,
+        "max": 160.0,
+        "mean": 160.0,
+        "min": 160.0
+      },
+      "ttft_us": {
+        "count": 4,
+        "max": 12400.0,
+        "mean": 12000.0,
+        "min": 11600.0
+      },
+      "us_per_token": {
+        "count": 4,
+        "max": 6250.0,
+        "mean": 6250.0,
+        "min": 6250.0
+      },
+      "wall_tok_per_s": {
+        "count": 4,
+        "max": 369.97356230586024,
+        "mean": 224.753175,
+        "min": 101.89362941923815
+      },
+      "wall_us_per_token": {
+        "count": 4,
+        "max": 9814.15625,
+        "mean": 5834.322917,
+        "min": 2702.8958333333335
+      }
+    },
+    "models": [
+      "synthetic-smoke"
+    ],
+    "profiles": [
+      "ci-airgap-smoke"
+    ],
+    "quantizations": [
+      "Q4_0"
+    ],
+    "rows": 4
+  },
+  "thresholds": {
+    "max_failure_pct": 0.0,
+    "max_host_child_peak_rss_bytes": 20000000.0,
+    "max_memory_bytes": 80000000.0,
+    "max_memory_bytes_per_token": 3000000.0,
+    "max_ttft_us": 20000.0,
+    "max_us_per_token": 10000.0,
+    "max_wall_us_per_token": 12000.0,
+    "min_rows": 4,
+    "min_tok_per_s": 100.0,
+    "min_wall_tok_per_s": 100.0,
+    "require_success": true
+  }
+}

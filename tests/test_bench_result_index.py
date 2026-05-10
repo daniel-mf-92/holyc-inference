@@ -438,6 +438,65 @@ def test_qemu_prompt_report_recomputes_command_hash_metadata(tmp_path: Path) -> 
     assert bench_result_index.index_status([summary]) == "fail"
 
 
+def test_dry_run_report_recomputes_launch_plan_hash_metadata(tmp_path: Path) -> None:
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    input_dir.mkdir()
+    launch_plan = [
+        {
+            "launch_index": 1,
+            "phase": "measured",
+            "prompt_index": 1,
+            "prompt_id": "one",
+            "prompt_sha256": "a" * 64,
+            "prompt_bytes": 5,
+            "expected_tokens": 2,
+            "iteration": 1,
+        }
+    ]
+    report = input_dir / "qemu_prompt_bench_dry_run_latest.json"
+    report.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-04-27T20:00:00Z",
+                "status": "planned",
+                "command": ["qemu-system-x86_64", "-nic", "none"],
+                "command_sha256": bench_result_index.command_hash(["qemu-system-x86_64", "-nic", "none"]),
+                "launch_plan_sha256": "0" * 64,
+                "launch_plan": launch_plan,
+                "prompt_suite": {"suite_sha256": "1" * 64, "prompt_count": 1},
+                "planned_warmup_launches": 0,
+                "planned_measured_launches": 1,
+                "planned_total_launches": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summary = bench_result_index.load_summaries([input_dir])[0]
+
+    assert summary.launch_plan_hash_status == "fail"
+    assert summary.launch_plan_sha256 == "0" * 64
+    assert any("launch_plan_sha256 mismatch" in finding for finding in summary.launch_plan_hash_findings)
+    assert bench_result_index.index_status([summary]) == "fail"
+    assert (
+        bench_result_index.main(
+            [
+                "--input",
+                str(input_dir),
+                "--output-dir",
+                str(output_dir),
+                "--fail-on-launch-plan-hash-metadata",
+            ]
+        )
+        == 1
+    )
+    payload = json.loads((output_dir / "bench_result_index_latest.json").read_text(encoding="utf-8"))
+    assert payload["artifacts"][0]["launch_plan_hash_status"] == "fail"
+    junit = ET.fromstring((output_dir / "bench_result_index_junit_latest.xml").read_text(encoding="utf-8"))
+    assert junit.find("./testcase[@name='launch_plan_hash_metadata']/failure") is not None
+
+
 def test_qemu_prompt_report_marks_stale_commit_and_cli_can_fail(tmp_path: Path) -> None:
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"

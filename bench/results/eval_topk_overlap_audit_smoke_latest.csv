@@ -1,0 +1,4 @@
+record_id,dataset,split,choice_count,answer_index,k,holyc_topk,llama_topk,overlap_count,jaccard,topk_exact_match,top1_match,holyc_gold_in_topk,llama_gold_in_topk
+smoke-arc-1,arc-smoke,validation,4,0,2,"0,1","0,1",2,1.0,True,True,True,True
+smoke-hellaswag-1,hellaswag-smoke,validation,4,0,2,"0,1","0,1",2,1.0,True,True,True,True
+smoke-truthfulqa-1,truthfulqa-smoke,validation,4,0,2,"0,1","0,1",2,1.0,True,True,True,True

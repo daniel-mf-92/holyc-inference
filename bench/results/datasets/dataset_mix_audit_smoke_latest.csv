@@ -1,0 +1,8 @@
+scope,dataset,split,records,pct_of_total
+dataset,arc-smoke,,1,33.33333333333333
+dataset,hellaswag-smoke,,1,33.33333333333333
+dataset,truthfulqa-smoke,,1,33.33333333333333
+split,,validation,3,100.0
+dataset_split,arc-smoke,validation,1,33.33333333333333
+dataset_split,hellaswag-smoke,validation,1,33.33333333333333
+dataset_split,truthfulqa-smoke,validation,1,33.33333333333333

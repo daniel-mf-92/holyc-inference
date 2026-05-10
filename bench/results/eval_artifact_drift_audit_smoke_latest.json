@@ -1,0 +1,40 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-02T04:00:29Z",
+  "reports": [
+    {
+      "dataset": "smoke-eval",
+      "error": "",
+      "gold_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "holyc_predictions_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "llama_predictions_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "model": "synthetic-smoke",
+      "quantization": "Q4_0",
+      "record_count": 3,
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpcgl6l5jn/eval_q4.json",
+      "split": "validation",
+      "status": "pass"
+    },
+    {
+      "dataset": "smoke-eval",
+      "error": "",
+      "gold_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "holyc_predictions_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "llama_predictions_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "model": "synthetic-smoke",
+      "quantization": "Q8_0",
+      "record_count": 3,
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpcgl6l5jn/eval_q8.json",
+      "split": "validation",
+      "status": "pass"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "dataset_splits": 1,
+    "findings": 0,
+    "records": 6,
+    "report_keys": 2,
+    "reports": 2
+  }
+}

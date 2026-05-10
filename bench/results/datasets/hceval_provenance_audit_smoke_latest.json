@@ -1,0 +1,34 @@
+{
+  "dataset_counts": {
+    "provenance-smoke": 1
+  },
+  "findings": [],
+  "format": "hceval-provenance-audit",
+  "generated_at": "2026-05-02T09:24:03Z",
+  "input_count": 1,
+  "inputs": [
+    "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/hceval-provenance-audit-oovtjn8r/provenance.hceval"
+  ],
+  "provenance_coverage_pct": 100.0,
+  "record_count": 1,
+  "records_with_provenance": 1,
+  "rows": [
+    {
+      "dataset": "provenance-smoke",
+      "distinct_provenance_count": 1,
+      "input": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/hceval-provenance-audit-oovtjn8r/provenance.hceval",
+      "manifest": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/hceval-provenance-audit-oovtjn8r/provenance.hceval.manifest.json",
+      "max_provenance_bytes": 33,
+      "mean_provenance_bytes": 33.0,
+      "min_provenance_bytes": 33,
+      "missing_provenance_count": 0,
+      "payload_sha256": "c6e6e196b952d11c4b712cd6ab581bd66f4b7f943c4e308c31bd6564fbe0fb42",
+      "record_count": 1,
+      "records_with_provenance": 1,
+      "source_sha256": "74c9a9f8f3571d903ca685f1f7cc4a6bae7ef6380c0ea2db47b9ba32347ac35a",
+      "split": "validation",
+      "status": "pass"
+    }
+  ],
+  "status": "pass"
+}

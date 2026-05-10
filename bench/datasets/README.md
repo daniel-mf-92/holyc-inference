@@ -25,6 +25,7 @@ python3 bench/dataset_schema_audit.py \
   --output bench/results/datasets/dataset_schema_audit_smoke_latest.json \
   --markdown bench/results/datasets/dataset_schema_audit_smoke_latest.md \
   --csv bench/results/datasets/dataset_schema_audit_smoke_latest.csv \
+  --record-csv bench/results/datasets/dataset_schema_audit_smoke_records_latest.csv \
   --junit bench/results/datasets/dataset_schema_audit_smoke_latest_junit.xml \
   --require-provenance \
   --min-choices 4 \
@@ -32,13 +33,22 @@ python3 bench/dataset_schema_audit.py \
   --max-prompt-bytes 4096 \
   --max-choice-bytes 1024 \
   --max-record-payload-bytes 8192 \
-  --max-majority-answer-pct 80 \
-  --max-dataset-split-majority-answer-pct 90 \
+  --min-answer-labels 1 \
+  --min-dataset-split-answer-labels 1 \
+  --max-majority-answer-pct 100 \
+  --max-dataset-split-majority-answer-pct 100 \
   --fail-on-duplicate-ids \
   --fail-on-duplicate-payloads \
   --fail-on-conflicting-payload-answers \
   --fail-on-findings
 ```
+
+The optional `--record-csv` export writes one row per normalized eval record
+with prompt bytes, choice bytes, record payload bytes, answer index, and a
+stable prompt+choices payload hash for review before packing.
+Use `--min-answer-labels` and `--min-dataset-split-answer-labels` when a
+promoted subset must exercise at least N answer indexes overall or within every
+dataset/split bucket.
 
 Run `bench/dataset_choice_audit.py` after schema validation when reviewing a
 local multiple-choice subset for option-quality issues. It flags duplicate
@@ -66,8 +76,150 @@ python3 bench/dataset_choice_audit.py \
 ```
 
 The optional `--record-csv` export writes one row per normalized eval record
-with choice byte ranges, duplicate/overlap counts, label-prefix counts, and
-prompt leak telemetry for quick review before packing.
+with choice byte ranges, correct-answer byte share, duplicate/overlap counts,
+label-prefix counts, and prompt leak telemetry for quick review before packing.
+
+Run `bench/dataset_text_audit.py` before packing promoted subsets when prompt
+and choice strings need loader-safe byte telemetry. It flags blank normalized
+text, disallowed C0 controls, Unicode replacement markers, and prompt/choice or
+line byte-budget overruns:
+
+```bash
+python3 bench/dataset_text_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_text_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_text_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_text_audit_smoke_latest.csv \
+  --record-csv bench/results/datasets/dataset_text_audit_smoke_records_latest.csv \
+  --junit bench/results/datasets/dataset_text_audit_smoke_latest_junit.xml \
+  --max-prompt-bytes 4096 \
+  --max-choice-bytes 1024 \
+  --max-line-bytes 4096 \
+  --fail-on-control-chars \
+  --fail-on-replacement-chars \
+  --fail-on-blank-text \
+  --fail-on-findings
+```
+
+Run `bench/dataset_provenance_balance_audit.py` before packing promoted subsets
+that combine multiple staged local sources. It checks non-empty provenance,
+required source coverage, minimum source cardinality, and dominant provenance
+share overall or within each dataset/split bucket:
+
+```bash
+python3 bench/dataset_provenance_balance_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_provenance_balance_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_provenance_balance_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_provenance_balance_audit_smoke_latest.csv \
+  --record-csv bench/results/datasets/dataset_provenance_balance_audit_smoke_records_latest.csv \
+  --findings-csv bench/results/datasets/dataset_provenance_balance_audit_smoke_latest_findings.csv \
+  --junit bench/results/datasets/dataset_provenance_balance_audit_smoke_latest_junit.xml \
+  --require-provenance \
+  --min-provenance-sources 3 \
+  --max-provenance-pct 34
+```
+
+Run `bench/dataset_split_overlap_audit.py` before packing promoted subsets that
+mix train/dev/test style splits. It hashes normalized prompts and prompt+choice
+payloads, then flags rows reused across splits within the same dataset, with an
+optional global scope for cross-dataset suites:
+
+```bash
+python3 bench/dataset_split_overlap_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_split_overlap_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_split_overlap_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_split_overlap_audit_smoke_latest.csv \
+  --record-csv bench/results/datasets/dataset_split_overlap_audit_smoke_records_latest.csv \
+  --junit bench/results/datasets/dataset_split_overlap_audit_smoke_latest_junit.xml \
+  --fail-on-prompt-overlap \
+  --fail-on-payload-overlap \
+  --fail-on-findings
+```
+
+Run `bench/dataset_duplicate_audit.py` before packing promoted subsets when
+exact repeated examples should be reviewed within a split, dataset, or full
+suite. It hashes normalized prompts and prompt+choice payloads, emits
+per-record duplicate counts, and can fail duplicate groups whose answer indexes
+conflict:
+
+```bash
+python3 bench/dataset_duplicate_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_duplicate_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_duplicate_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_duplicate_audit_smoke_latest_findings.csv \
+  --record-csv bench/results/datasets/dataset_duplicate_audit_smoke_records_latest.csv \
+  --junit bench/results/datasets/dataset_duplicate_audit_smoke_latest_junit.xml \
+  --scope dataset_split \
+  --fail-on-duplicate-prompts \
+  --fail-on-duplicate-payloads \
+  --fail-on-conflicting-answers \
+  --fail-on-findings
+```
+
+Run `bench/dataset_split_balance_audit.py` before packing mixed-split subsets
+when CI should enforce split coverage and prevent one split from dominating a
+dataset. It emits per-dataset and per-dataset/split CSV sidecars plus JSON,
+Markdown, and JUnit reports:
+
+```bash
+python3 bench/dataset_split_balance_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output-dir bench/results/datasets \
+  --output-stem dataset_split_balance_audit_smoke_latest \
+  --require-split validation \
+  --require-dataset-split arc-smoke:validation \
+  --min-records 3 \
+  --max-largest-split-pct 100
+```
+
+Run `bench/dataset_answer_bias_audit.py` after choice-quality review to catch
+multiple-choice subsets where the correct option is systematically the longest
+or shortest answer. It emits aggregate and dataset/split answer-position
+histograms plus per-record answer/distractor byte telemetry:
+
+```bash
+python3 bench/dataset_answer_bias_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_answer_bias_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_answer_bias_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_answer_bias_audit_smoke_latest.csv \
+  --record-csv bench/results/datasets/dataset_answer_bias_audit_smoke_records_latest.csv \
+  --junit bench/results/datasets/dataset_answer_bias_audit_smoke_latest_junit.xml \
+  --max-answer-longest-pct 100 \
+  --max-answer-shortest-pct 100 \
+  --min-mean-answer-distractor-ratio 0.01 \
+  --max-mean-answer-distractor-ratio 100 \
+  --check-dataset-splits \
+  --fail-on-findings
+```
+
+Use the longest/shortest percentage gates and mean answer/distractor byte-ratio
+gates before promoting a local subset whose answer text length could leak the
+label independent of model quality.
+
+Run `bench/dataset_id_audit.py` before packing promoted subsets when stable
+record IDs matter for reproducible manifests and HolyC eval artifacts. It
+emits duplicate-ID rollups plus per-record ID telemetry, and can require
+explicit lowercase slug IDs scoped by dataset and split:
+
+```bash
+python3 bench/dataset_id_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_id_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_id_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_id_audit_smoke_latest.csv \
+  --record-csv bench/results/datasets/dataset_id_audit_smoke_records_latest.csv \
+  --junit bench/results/datasets/dataset_id_audit_smoke_latest_junit.xml \
+  --require-explicit-id \
+  --max-record-id-bytes 64 \
+  --id-pattern '[a-z0-9-]+' \
+  --fail-duplicate-record-ids \
+  --fail-duplicate-dataset-split-record-ids \
+  --fail-on-findings
+```
 
 Run `bench/dataset_order_audit.py` before packing promoted subsets when source
 row order could bias evaluation. It records answer-index sequences, transition
@@ -81,6 +233,7 @@ python3 bench/dataset_order_audit.py \
   --output bench/results/datasets/dataset_order_audit_smoke_latest.json \
   --markdown bench/results/datasets/dataset_order_audit_smoke_latest.md \
   --csv bench/results/datasets/dataset_order_audit_smoke_latest.csv \
+  --record-csv bench/results/datasets/dataset_order_audit_smoke_records_latest.csv \
   --findings-csv bench/results/datasets/dataset_order_audit_smoke_latest_findings.csv \
   --junit bench/results/datasets/dataset_order_audit_smoke_latest_junit.xml \
   --group-by overall \
@@ -89,6 +242,25 @@ python3 bench/dataset_order_audit.py \
   --max-edge-answer-run 3 \
   --min-answer-switches 0 \
   --fail-on-findings
+```
+
+Use `--record-csv` to emit the source-order answer sequence with previous/next
+answer indexes and run membership for diagnosing long-block or low-transition
+gate failures.
+
+Run `bench/dataset_contamination_audit.py` on mixed eval suites to catch local
+cross-dataset contamination before packing. It detects normalized prompt reuse,
+prompt+choice payload reuse, and conflicting answer labels across dataset
+families without fetching remote data:
+
+```bash
+python3 bench/dataset_contamination_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_contamination_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_contamination_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_contamination_audit_smoke_latest.csv \
+  --junit bench/results/datasets/dataset_contamination_audit_smoke_latest_junit.xml \
+  --fail-on-contamination
 ```
 
 Run `bench/dataset_fingerprint.py` when a curated JSONL needs stable prompt,
@@ -106,6 +278,20 @@ python3 bench/dataset_fingerprint.py \
   --junit bench/results/datasets/dataset_fingerprint_smoke_latest_junit.xml \
   --fail-on-duplicate-ids \
   --fail-on-conflicting-input-answers \
+  --fail-on-findings
+```
+
+Compare two fingerprint reports with `bench/dataset_fingerprint_diff.py` and
+archive both row-level changes and structured gate findings:
+
+```bash
+python3 bench/dataset_fingerprint_diff.py \
+  --baseline bench/results/datasets/dataset_fingerprint_smoke_latest.json \
+  --candidate bench/results/datasets/dataset_fingerprint_smoke_latest.json \
+  --output bench/results/datasets/dataset_fingerprint_diff_smoke_latest.json \
+  --csv bench/results/datasets/dataset_fingerprint_diff_smoke_latest.csv \
+  --findings-csv bench/results/datasets/dataset_fingerprint_diff_smoke_findings_latest.csv \
+  --fail-on-any-change \
   --fail-on-findings
 ```
 
@@ -206,6 +392,9 @@ python3 bench/dataset_index.py \
 Use the artifact-type coverage gate when promoting packed eval bundles so CI
 fails if the curated JSONL manifest, packed `.hceval` manifest, or binary
 inspection report is absent from the local artifact set.
+Run `python3 bench/dataset_index_ci_smoke.py` for a focused stdlib-only smoke
+gate that checks the passing rollup plus missing artifact-type and dataset/split
+coverage failures.
 
 ## Provenance Audit
 
@@ -216,6 +405,10 @@ overall/per-dataset/per-split/per-dataset-split answer histograms. Curated
 manifests also record per-provenance contribution counts, and
 `--max-provenance-pct` can fail CI when one staged local source dominates a
 compact subset.
+The audit also writes
+`bench/results/datasets/dataset_provenance_audit_records_latest.csv` with one
+row per selected eval record: record ID, dataset, split, provenance contribution
+percentage, answer index, byte budgets, and a stable prompt+choices input hash.
 Synthetic smoke manifests are allowed to omit `source_url`; real dataset
 manifests should record one, and `--require-source-url` turns that policy into a
 hard gate. Repeat `--allow-license` or `--deny-license` to enforce exact
@@ -259,6 +452,7 @@ python3 bench/dataset_leak_audit.py \
   --csv bench/results/datasets/dataset_leak_audit_smoke_latest.csv \
   --junit bench/results/datasets/dataset_leak_audit_smoke_latest_junit.xml \
   --fail-on-leaks
+python3 bench/dataset_leak_audit_ci_smoke.py
 ```
 
 ## Provenance

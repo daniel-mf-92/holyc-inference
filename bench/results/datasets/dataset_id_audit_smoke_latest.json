@@ -1,0 +1,56 @@
+{
+  "duplicate_dataset_split_record_id_count": 0,
+  "duplicate_dataset_split_record_ids": {},
+  "duplicate_record_id_count": 0,
+  "duplicate_record_ids": {},
+  "explicit_id_count": 3,
+  "findings": [],
+  "generated_at": "2026-04-30T01:06:24Z",
+  "id_class_histogram": {
+    "ok": 3
+  },
+  "implicit_id_count": 0,
+  "inputs": [
+    {
+      "path": "bench/datasets/samples/smoke_eval.jsonl",
+      "rows": 3,
+      "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+    }
+  ],
+  "max_record_id_bytes": 18,
+  "record_count": 3,
+  "record_telemetry": [
+    {
+      "dataset": "hellaswag-smoke",
+      "dataset_split_record_key": "hellaswag-smoke:validation:smoke-hellaswag-1",
+      "explicit_id": true,
+      "id_class": "ok",
+      "record_id": "smoke-hellaswag-1",
+      "record_id_bytes": 17,
+      "source": "bench/datasets/samples/smoke_eval.jsonl:1",
+      "split": "validation"
+    },
+    {
+      "dataset": "arc-smoke",
+      "dataset_split_record_key": "arc-smoke:validation:smoke-arc-1",
+      "explicit_id": true,
+      "id_class": "ok",
+      "record_id": "smoke-arc-1",
+      "record_id_bytes": 11,
+      "source": "bench/datasets/samples/smoke_eval.jsonl:2",
+      "split": "validation"
+    },
+    {
+      "dataset": "truthfulqa-smoke",
+      "dataset_split_record_key": "truthfulqa-smoke:validation:smoke-truthfulqa-1",
+      "explicit_id": true,
+      "id_class": "ok",
+      "record_id": "smoke-truthfulqa-1",
+      "record_id_bytes": 18,
+      "source": "bench/datasets/samples/smoke_eval.jsonl:3",
+      "split": "validation"
+    }
+  ],
+  "status": "pass",
+  "unique_record_id_count": 3
+}

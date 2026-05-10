@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="holyc_hceval_export_roundtrip_audit" tests="1" failures="0" errors="0" timestamp="2026-05-02T04:00:56Z">
+  <testcase classname="hceval_export_roundtrip_audit" name="/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/hceval-export-roundtrip-uzuvxzfp/mixed.hceval" />
+</testsuite>

@@ -120,13 +120,30 @@ def test_provenance_audit_reports_dataset_answer_histograms() -> None:
         csv_rows = list(
             csv.DictReader((output_dir / "dataset_provenance_audit_latest.csv").open(newline="", encoding="utf-8"))
         )
+        record_rows = list(
+            csv.DictReader(
+                (output_dir / "dataset_provenance_audit_records_latest.csv").open(newline="", encoding="utf-8")
+            )
+        )
 
         assert artifact["answer_histogram"] == {"0": 2, "1": 2}
         assert artifact["dataset_answer_histograms"] == {"arc": {"0": 2}, "truthfulqa": {"1": 2}}
         assert artifact["split_answer_histograms"] == {"validation": {"0": 2, "1": 2}}
         assert artifact["dataset_majority_answers"]["arc"]["pct"] == 100.0
+        assert "record_telemetry" not in artifact
         assert json.loads(csv_rows[0]["dataset_answer_histograms"]) == {"arc": {"0": 2}, "truthfulqa": {"1": 2}}
         assert json.loads(csv_rows[0]["split_answer_histograms"]) == {"validation": {"0": 2, "1": 2}}
+        assert len(record_rows) == 4
+        assert record_rows[0]["artifact_source"] == str(manifest)
+        assert record_rows[0]["record_id"] == "arc-0"
+        assert record_rows[0]["dataset"] == "arc"
+        assert record_rows[0]["split"] == "validation"
+        assert record_rows[0]["provenance"] == "synthetic provenance audit test"
+        assert record_rows[0]["provenance_count"] == "4"
+        assert record_rows[0]["provenance_pct"] == "100.0"
+        assert record_rows[0]["choice_bytes"] == "[1,1]"
+        assert record_rows[0]["record_payload_bytes"]
+        assert len(record_rows[0]["input_sha256"]) == 64
 
 
 def test_per_dataset_majority_answer_gate_fails_skewed_dataset() -> None:

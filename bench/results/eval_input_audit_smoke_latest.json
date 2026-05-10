@@ -20,7 +20,7 @@
       "sha256": "22a31f8ffa48784acd9645bf802ac0f3e0260d45e703a34c926a3331e643dfa1"
     }
   },
-  "generated_at": "2026-04-29T11:02:55Z",
+  "generated_at": "2026-04-30T02:54:43Z",
   "gold_choice_gates": {
     "max_choices": 4,
     "min_choices": 4
@@ -49,10 +49,13 @@
       "input_hash_matches": 0,
       "input_hash_mismatches": 0,
       "input_hash_missing": 3,
+      "low_top_score_margin_pct": 0.0,
+      "low_top_score_margins": 0,
       "majority_prediction": "0",
       "majority_prediction_count": 3,
       "majority_prediction_pct": 100.0,
       "metadata": {},
+      "min_top_score_margin": 8.0,
       "missing_ids": [],
       "prediction_histogram": {
         "0": 3
@@ -60,6 +63,59 @@
       "prompt_hash_matches": 0,
       "prompt_hash_mismatches": 0,
       "prompt_hash_missing": 3,
+      "records": [
+        {
+          "answer_index": 0,
+          "choices_hash_status": "missing",
+          "correct": true,
+          "has_scores": false,
+          "input_hash_status": "missing",
+          "issue": "",
+          "predicted_index": 0,
+          "prompt_hash_status": "missing",
+          "record_id": "smoke-hellaswag-1",
+          "row_number": 1,
+          "score_count": 0,
+          "source": "holyc",
+          "top_score_margin": "",
+          "top_score_tie_count": "",
+          "valid": true
+        },
+        {
+          "answer_index": 0,
+          "choices_hash_status": "missing",
+          "correct": true,
+          "has_scores": true,
+          "input_hash_status": "missing",
+          "issue": "",
+          "predicted_index": 0,
+          "prompt_hash_status": "missing",
+          "record_id": "smoke-arc-1",
+          "row_number": 2,
+          "score_count": 4,
+          "source": "holyc",
+          "top_score_margin": 8.0,
+          "top_score_tie_count": 1,
+          "valid": true
+        },
+        {
+          "answer_index": 0,
+          "choices_hash_status": "missing",
+          "correct": true,
+          "has_scores": false,
+          "input_hash_status": "missing",
+          "issue": "",
+          "predicted_index": 0,
+          "prompt_hash_status": "missing",
+          "record_id": "smoke-truthfulqa-1",
+          "row_number": 3,
+          "score_count": 0,
+          "source": "holyc",
+          "top_score_margin": "",
+          "top_score_tie_count": "",
+          "valid": true
+        }
+      ],
       "rows": 3,
       "score_coverage_pct": 33.33333333333333,
       "score_length_histogram": {
@@ -80,10 +136,13 @@
       "input_hash_matches": 0,
       "input_hash_mismatches": 0,
       "input_hash_missing": 3,
+      "low_top_score_margin_pct": 0.0,
+      "low_top_score_margins": 0,
       "majority_prediction": "0",
       "majority_prediction_count": 3,
       "majority_prediction_pct": 100.0,
       "metadata": {},
+      "min_top_score_margin": 2.0,
       "missing_ids": [],
       "prediction_histogram": {
         "0": 3
@@ -91,6 +150,59 @@
       "prompt_hash_matches": 0,
       "prompt_hash_mismatches": 0,
       "prompt_hash_missing": 3,
+      "records": [
+        {
+          "answer_index": 0,
+          "choices_hash_status": "missing",
+          "correct": true,
+          "has_scores": false,
+          "input_hash_status": "missing",
+          "issue": "",
+          "predicted_index": 0,
+          "prompt_hash_status": "missing",
+          "record_id": "smoke-hellaswag-1",
+          "row_number": 1,
+          "score_count": 0,
+          "source": "llama.cpp",
+          "top_score_margin": "",
+          "top_score_tie_count": "",
+          "valid": true
+        },
+        {
+          "answer_index": 0,
+          "choices_hash_status": "missing",
+          "correct": true,
+          "has_scores": false,
+          "input_hash_status": "missing",
+          "issue": "",
+          "predicted_index": 0,
+          "prompt_hash_status": "missing",
+          "record_id": "smoke-arc-1",
+          "row_number": 2,
+          "score_count": 0,
+          "source": "llama.cpp",
+          "top_score_margin": "",
+          "top_score_tie_count": "",
+          "valid": true
+        },
+        {
+          "answer_index": 0,
+          "choices_hash_status": "missing",
+          "correct": true,
+          "has_scores": true,
+          "input_hash_status": "missing",
+          "issue": "",
+          "predicted_index": 0,
+          "prompt_hash_status": "missing",
+          "record_id": "smoke-truthfulqa-1",
+          "row_number": 3,
+          "score_count": 4,
+          "source": "llama.cpp",
+          "top_score_margin": 2.0,
+          "top_score_tie_count": 1,
+          "valid": true
+        }
+      ],
       "rows": 3,
       "score_coverage_pct": 33.33333333333333,
       "score_length_histogram": {

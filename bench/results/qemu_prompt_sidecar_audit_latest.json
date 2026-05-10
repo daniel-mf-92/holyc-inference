@@ -1,0 +1,68 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-01T13:06:09Z",
+  "sidecars": [
+    {
+      "error": "",
+      "exists": true,
+      "sidecar_kind": "csv",
+      "sidecar_path": "bench/results/qemu_prompt_bench_latest.csv",
+      "size_bytes": 3294,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "error": "",
+      "exists": true,
+      "sidecar_kind": "markdown",
+      "sidecar_path": "bench/results/qemu_prompt_bench_latest.md",
+      "size_bytes": 8197,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "error": "",
+      "exists": true,
+      "sidecar_kind": "junit",
+      "sidecar_path": "bench/results/qemu_prompt_bench_junit_latest.xml",
+      "size_bytes": 806,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "status": "pass"
+    },
+    {
+      "error": "",
+      "exists": true,
+      "sidecar_kind": "csv",
+      "sidecar_path": "bench/results/qemu_prompt_bench_dry_run_latest.csv",
+      "size_bytes": 1169,
+      "source": "bench/results/qemu_prompt_bench_dry_run_latest.json",
+      "status": "pass"
+    },
+    {
+      "error": "",
+      "exists": true,
+      "sidecar_kind": "markdown",
+      "sidecar_path": "bench/results/qemu_prompt_bench_dry_run_latest.md",
+      "size_bytes": 1970,
+      "source": "bench/results/qemu_prompt_bench_dry_run_latest.json",
+      "status": "pass"
+    },
+    {
+      "error": "",
+      "exists": true,
+      "sidecar_kind": "junit",
+      "sidecar_path": "bench/results/qemu_prompt_bench_dry_run_junit_latest.xml",
+      "size_bytes": 2004,
+      "source": "bench/results/qemu_prompt_bench_dry_run_latest.json",
+      "status": "pass"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "artifacts": 2,
+    "empty_sidecars": 0,
+    "findings": 0,
+    "missing_sidecars": 0,
+    "sidecars_checked": 6
+  }
+}

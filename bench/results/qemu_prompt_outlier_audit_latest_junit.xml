@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="holyc_qemu_prompt_outlier_audit" tests="1" failures="0"><testcase name="prompt_outliers" /></testsuite>

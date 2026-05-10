@@ -1,0 +1,5 @@
+scope,dataset,split,record_count,choice_count_min,choice_count_max,distinct_answer_positions,dominant_answer_index,dominant_answer_count,dominant_answer_pct,answer_index_histogram
+overall,,,3,4,4,1,0,3,100.0,0:3
+dataset_split,arc-smoke,validation,1,4,4,1,0,1,100.0,0:1
+dataset_split,hellaswag-smoke,validation,1,4,4,1,0,1,100.0,0:1
+dataset_split,truthfulqa-smoke,validation,1,4,4,1,0,1,100.0,0:1

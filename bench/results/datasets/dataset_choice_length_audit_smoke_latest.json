@@ -1,0 +1,76 @@
+{
+  "answer_length_rank_histogram": {
+    "longest": 2,
+    "middle_or_tied": 1
+  },
+  "error_count": 0,
+  "findings": [],
+  "format": "hceval-choice-length-audit",
+  "generated_at": "2026-05-02T03:59:40Z",
+  "inputs": [
+    {
+      "path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl",
+      "rows": 3,
+      "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+    }
+  ],
+  "max_answer_delta_bytes": 6,
+  "max_answer_to_mean_other_ratio": 1.941176,
+  "max_choice_byte_span": 23,
+  "min_answer_to_mean_other_ratio": 1.115702,
+  "record_count": 3,
+  "record_telemetry": [
+    {
+      "answer_choice_bytes": 45,
+      "answer_index": 0,
+      "answer_length_rank": "middle_or_tied",
+      "answer_to_mean_other_ratio": 1.115702,
+      "choice_byte_span": 8,
+      "choice_bytes": "45,45,39,37",
+      "choice_count": 4,
+      "dataset": "hellaswag-smoke",
+      "max_choice_bytes": 45,
+      "max_to_min_ratio": 1.216216,
+      "min_choice_bytes": 37,
+      "nearest_other_delta_bytes": 0,
+      "record_id": "smoke-hellaswag-1",
+      "source": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl:1",
+      "split": "validation"
+    },
+    {
+      "answer_choice_bytes": 11,
+      "answer_index": 0,
+      "answer_length_rank": "longest",
+      "answer_to_mean_other_ratio": 1.941176,
+      "choice_byte_span": 6,
+      "choice_bytes": "11,5,5,7",
+      "choice_count": 4,
+      "dataset": "arc-smoke",
+      "max_choice_bytes": 11,
+      "max_to_min_ratio": 2.2,
+      "min_choice_bytes": 5,
+      "nearest_other_delta_bytes": 4,
+      "record_id": "smoke-arc-1",
+      "source": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl:2",
+      "split": "validation"
+    },
+    {
+      "answer_choice_bytes": 43,
+      "answer_index": 0,
+      "answer_length_rank": "longest",
+      "answer_to_mean_other_ratio": 1.433333,
+      "choice_byte_span": 23,
+      "choice_bytes": "43,37,20,33",
+      "choice_count": 4,
+      "dataset": "truthfulqa-smoke",
+      "max_choice_bytes": 43,
+      "max_to_min_ratio": 2.15,
+      "min_choice_bytes": 20,
+      "nearest_other_delta_bytes": 6,
+      "record_id": "smoke-truthfulqa-1",
+      "source": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl:3",
+      "split": "validation"
+    }
+  ],
+  "status": "pass"
+}

@@ -69,6 +69,9 @@ class PerplexityRegression:
     value: float
     threshold: float
     message: str
+    scope: str = "overall"
+    dataset: str = ""
+    split: str = ""
 
 
 def iso_now() -> str:
@@ -197,6 +200,12 @@ def parse_float_list(value: Any, row_label: str, field: str) -> list[float] | No
     return [parse_float(item, row_label, field) for item in value]
 
 
+def validate_token_logprobs(values: list[float], row_label: str) -> None:
+    for index, value in enumerate(values):
+        if value > 0.0:
+            raise ValueError(f"{row_label}: token_logprobs[{index}] must be <= 0")
+
+
 def normalize_record(row: dict[str, Any], source: Path, index: int) -> PerplexityRecord:
     row_label = f"{source}:{index + 1}"
     record_id = case_id(row, row_label)
@@ -206,6 +215,7 @@ def normalize_record(row: dict[str, Any], source: Path, index: int) -> Perplexit
     token_count = parse_int(first_present(row, TOKEN_COUNT_KEYS), row_label, "token_count")
 
     if logprobs is not None:
+        validate_token_logprobs(logprobs, row_label)
         if token_count is not None and token_count != len(logprobs):
             raise ValueError(
                 f"{row_label}: token_count {token_count} does not match {len(logprobs)} logprobs"
@@ -250,8 +260,8 @@ def normalize_record(row: dict[str, Any], source: Path, index: int) -> Perplexit
     perplexity_value = first_present(row, PERPLEXITY_KEYS)
     if perplexity_value is not None:
         perplexity = parse_float(perplexity_value, row_label, "perplexity")
-        if perplexity <= 0:
-            raise ValueError(f"{row_label}: perplexity must be positive")
+        if perplexity < 1.0:
+            raise ValueError(f"{row_label}: perplexity must be >= 1")
         return PerplexityRecord(
             record_id=record_id,
             token_count=token_count,
@@ -427,8 +437,11 @@ def breakdown_rows(rows: list[CompareRow], default_dataset: str, default_split: 
 def find_regressions(
     summary: dict[str, Any],
     *,
+    breakdowns: list[dict[str, Any]] | None = None,
     min_record_count: int | None = None,
     min_token_count: int | None = None,
+    min_dataset_split_record_count: int | None = None,
+    min_dataset_split_token_count: int | None = None,
     max_nll_delta: float | None = None,
     max_perplexity_ratio: float | None = None,
     max_p95_abs_record_nll_delta: float | None = None,
@@ -462,6 +475,44 @@ def find_regressions(
                     ),
                 )
             )
+    if min_dataset_split_record_count is not None:
+        for row in breakdowns or []:
+            record_count = int(row["record_count"])
+            if record_count < min_dataset_split_record_count:
+                regressions.append(
+                    PerplexityRegression(
+                        metric="dataset_split_record_count",
+                        value=float(record_count),
+                        threshold=float(min_dataset_split_record_count),
+                        message=(
+                            f"Dataset/split {row['dataset'] or '-'}:{row['split'] or '-'} "
+                            f"record count {record_count} is below minimum "
+                            f"{min_dataset_split_record_count}"
+                        ),
+                        scope="dataset_split",
+                        dataset=str(row["dataset"]),
+                        split=str(row["split"]),
+                    )
+                )
+    if min_dataset_split_token_count is not None:
+        for row in breakdowns or []:
+            engine_token_count = min(int(row["holyc_token_count"]), int(row["llama_token_count"]))
+            if engine_token_count < min_dataset_split_token_count:
+                regressions.append(
+                    PerplexityRegression(
+                        metric="dataset_split_token_count",
+                        value=float(engine_token_count),
+                        threshold=float(min_dataset_split_token_count),
+                        message=(
+                            f"Dataset/split {row['dataset'] or '-'}:{row['split'] or '-'} "
+                            f"minimum engine token count {engine_token_count} is below minimum "
+                            f"{min_dataset_split_token_count}"
+                        ),
+                        scope="dataset_split",
+                        dataset=str(row["dataset"]),
+                        split=str(row["split"]),
+                    )
+                )
     if max_nll_delta is not None and summary["nll_delta_holyc_minus_llama"] > max_nll_delta:
         regressions.append(
             PerplexityRegression(
@@ -571,11 +622,13 @@ def markdown_report(report: dict[str, Any]) -> str:
         "",
     ]
     if report["regressions"]:
-        lines.append("| Metric | Value | Threshold | Finding |")
-        lines.append("| --- | ---: | ---: | --- |")
+        lines.append("| Scope | Dataset | Split | Metric | Value | Threshold | Finding |")
+        lines.append("| --- | --- | --- | --- | ---: | ---: | --- |")
         for regression in report["regressions"]:
             lines.append(
-                f"| {regression['metric']} | {regression['value']:.6f} | "
+                f"| {regression.get('scope', 'overall')} | {regression.get('dataset', '') or '-'} | "
+                f"{regression.get('split', '') or '-'} | {regression['metric']} | "
+                f"{regression['value']:.6f} | "
                 f"{regression['threshold']:.6f} | {regression['message']} |"
             )
     else:
@@ -666,6 +719,25 @@ def write_breakdown_csv(path: Path, rows: list[dict[str, Any]]) -> None:
             writer.writerow(row)
 
 
+def write_regression_csv(path: Path, regressions: list[PerplexityRegression]) -> None:
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "scope",
+                "dataset",
+                "split",
+                "metric",
+                "value",
+                "threshold",
+                "message",
+            ],
+        )
+        writer.writeheader()
+        for regression in regressions:
+            writer.writerow(asdict(regression))
+
+
 def write_junit(regressions: list[PerplexityRegression], path: Path) -> None:
     suite = ET.Element(
         "testsuite",
@@ -702,19 +774,22 @@ def write_report(
     args: argparse.Namespace,
     holyc_path: Path,
     llama_path: Path,
-) -> tuple[Path, Path, Path, Path, Path]:
+) -> tuple[Path, Path, Path, Path, Path, Path]:
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    breakdowns = breakdown_rows(rows, args.dataset, args.split)
     regressions = find_regressions(
         summary,
+        breakdowns=breakdowns,
         min_record_count=args.min_record_count,
         min_token_count=args.min_token_count,
+        min_dataset_split_record_count=args.min_dataset_split_record_count,
+        min_dataset_split_token_count=args.min_dataset_split_token_count,
         max_nll_delta=args.max_nll_delta,
         max_perplexity_ratio=args.max_perplexity_ratio,
         max_p95_abs_record_nll_delta=args.max_p95_abs_record_nll_delta,
         max_p95_record_nll_delta=args.max_p95_record_nll_delta,
         max_record_nll_delta=args.max_record_nll_delta,
     )
-    breakdowns = breakdown_rows(rows, args.dataset, args.split)
     report = {
         "breakdowns": breakdowns,
         "dataset": args.dataset,
@@ -723,6 +798,8 @@ def write_report(
         "llama_sha256": file_sha256(llama_path),
         "min_record_count": args.min_record_count,
         "min_token_count": args.min_token_count,
+        "min_dataset_split_record_count": args.min_dataset_split_record_count,
+        "min_dataset_split_token_count": args.min_dataset_split_token_count,
         "max_nll_delta": args.max_nll_delta,
         "max_perplexity_ratio": args.max_perplexity_ratio,
         "max_p95_abs_record_nll_delta": args.max_p95_abs_record_nll_delta,
@@ -741,13 +818,15 @@ def write_report(
     md_path = args.output_dir / f"{args.output_stem}.md"
     csv_path = args.output_dir / f"{args.output_stem}.csv"
     breakdown_csv_path = args.output_dir / f"{args.output_stem}_breakdown.csv"
+    regression_csv_path = args.output_dir / f"{args.output_stem}_regressions.csv"
     junit_path = args.output_dir / f"{args.output_stem}_junit.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
     write_csv_report(csv_path, rows)
     write_breakdown_csv(breakdown_csv_path, breakdowns)
+    write_regression_csv(regression_csv_path, regressions)
     write_junit(regressions, junit_path)
-    return json_path, md_path, csv_path, breakdown_csv_path, junit_path
+    return json_path, md_path, csv_path, breakdown_csv_path, regression_csv_path, junit_path
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -768,6 +847,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--min-token-count",
         type=int,
         help="Minimum token count required for both engines before CI gate failure",
+    )
+    parser.add_argument(
+        "--min-dataset-split-record-count",
+        type=int,
+        help="Minimum aligned record count required for every dataset/split breakdown row",
+    )
+    parser.add_argument(
+        "--min-dataset-split-token-count",
+        type=int,
+        help="Minimum token count required for both engines in every dataset/split breakdown row",
     )
     parser.add_argument(
         "--max-nll-delta",
@@ -806,7 +895,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    for field_name in ("min_record_count", "min_token_count"):
+    for field_name in (
+        "min_record_count",
+        "min_token_count",
+        "min_dataset_split_record_count",
+        "min_dataset_split_token_count",
+    ):
         value = getattr(args, field_name)
         if value is not None and value <= 0:
             print(f"error: --{field_name.replace('_', '-')} must be positive", file=sys.stderr)
@@ -815,7 +909,7 @@ def main(argv: list[str] | None = None) -> int:
         holyc = load_records(args.holyc)
         llama = load_records(args.llama)
         rows, summary = compare(holyc, llama, args.allow_token_count_mismatch)
-        json_path, md_path, csv_path, breakdown_csv_path, junit_path = write_report(
+        json_path, md_path, csv_path, breakdown_csv_path, regression_csv_path, junit_path = write_report(
             rows, summary, args, args.holyc, args.llama
         )
     except ValueError as exc:
@@ -826,14 +920,19 @@ def main(argv: list[str] | None = None) -> int:
     print(f"wrote_markdown={md_path}")
     print(f"wrote_csv={csv_path}")
     print(f"wrote_breakdown_csv={breakdown_csv_path}")
+    print(f"wrote_regression_csv={regression_csv_path}")
     print(f"wrote_junit={junit_path}")
     print(f"holyc_perplexity={summary['holyc']['perplexity']:.6f}")
     print(f"llama_perplexity={summary['llama']['perplexity']:.6f}")
     print(f"ppl_delta_holyc_minus_llama={summary['perplexity_delta_holyc_minus_llama']:.6f}")
+    breakdowns = breakdown_rows(rows, args.dataset, args.split)
     regressions = find_regressions(
         summary,
+        breakdowns=breakdowns,
         min_record_count=args.min_record_count,
         min_token_count=args.min_token_count,
+        min_dataset_split_record_count=args.min_dataset_split_record_count,
+        min_dataset_split_token_count=args.min_dataset_split_token_count,
         max_nll_delta=args.max_nll_delta,
         max_perplexity_ratio=args.max_perplexity_ratio,
         max_p95_abs_record_nll_delta=args.max_p95_abs_record_nll_delta,

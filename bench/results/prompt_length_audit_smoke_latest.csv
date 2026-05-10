@@ -1,0 +1,2 @@
+source,status,prompts,prompt_bytes_min,prompt_bytes_max,prompt_bytes_total,prompt_bytes_avg,duplicate_prompt_sha256,suite_sha256,bucket_counts_json,error
+/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp2m5tixid/prompts.jsonl,pass,3,12,640,832,277.3333333333333,0,7312e9c1797b2fd02084b3f19f49336cf36dee72bd54373673fb4b7cf7061159,"{""long"": 1, ""medium"": 1, ""short"": 1, ""unbucketed"": 0}",

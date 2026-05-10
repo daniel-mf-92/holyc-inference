@@ -1,0 +1,7 @@
+scope,dataset,split,provenance,records,pct_of_scope
+provenance,,,synthetic ARC-shaped smoke row,1,33.33333333333333
+provenance,,,synthetic HellaSwag-shaped smoke row,1,33.33333333333333
+provenance,,,synthetic TruthfulQA-shaped smoke row,1,33.33333333333333
+dataset_split_provenance,arc-smoke,validation,synthetic ARC-shaped smoke row,1,100.0
+dataset_split_provenance,hellaswag-smoke,validation,synthetic HellaSwag-shaped smoke row,1,100.0
+dataset_split_provenance,truthfulqa-smoke,validation,synthetic TruthfulQA-shaped smoke row,1,100.0

@@ -1,0 +1,4 @@
+source,dataset,split,record_id,prompt_bytes,choice_count,choice_bytes_min,choice_bytes_max,answer_index,answer_choice_bytes
+bench/datasets/samples/smoke_eval.jsonl:1,hellaswag-smoke,validation,smoke-hellaswag-1,69,4,37,45,0,45
+bench/datasets/samples/smoke_eval.jsonl:2,arc-smoke,validation,smoke-arc-1,51,4,5,11,0,11
+bench/datasets/samples/smoke_eval.jsonl:3,truthfulqa-smoke,validation,smoke-truthfulqa-1,62,4,20,43,0,43

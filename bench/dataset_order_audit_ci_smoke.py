@@ -65,6 +65,7 @@ def main() -> int:
         output = tmp_path / "dataset_order_audit_smoke_latest.json"
         markdown = tmp_path / "dataset_order_audit_smoke_latest.md"
         csv_path = tmp_path / "dataset_order_audit_smoke_latest.csv"
+        record_csv = tmp_path / "dataset_order_audit_smoke_records_latest.csv"
         findings_csv = tmp_path / "dataset_order_audit_smoke_latest_findings.csv"
         junit = tmp_path / "dataset_order_audit_smoke_latest_junit.xml"
         command = [
@@ -78,6 +79,8 @@ def main() -> int:
             str(markdown),
             "--csv",
             str(csv_path),
+            "--record-csv",
+            str(record_csv),
             "--findings-csv",
             str(findings_csv),
             "--junit",
@@ -116,6 +119,17 @@ def main() -> int:
         if rc := require(len(csv_rows) == 1, "unexpected_order_csv_rows"):
             return rc
         if rc := require(csv_rows[0]["transition_count"] == "3", "unexpected_order_csv_transition_count"):
+            return rc
+        record_rows = list(csv.DictReader(record_csv.open(encoding="utf-8", newline="")))
+        if rc := require(len(record_rows) == 4, "unexpected_order_record_csv_rows"):
+            return rc
+        if rc := require(record_rows[0]["previous_answer_index"] == "", "unexpected_first_previous_answer"):
+            return rc
+        if rc := require(record_rows[0]["next_answer_index"] == "1", "unexpected_first_next_answer"):
+            return rc
+        if rc := require(record_rows[1]["changed_from_previous"] == "True", "unexpected_changed_from_previous"):
+            return rc
+        if rc := require(record_rows[3]["is_trailing_run"] == "True", "unexpected_trailing_run"):
             return rc
         if rc := require(
             "severity,kind,scope,source,detail" in findings_csv.read_text(encoding="utf-8"),

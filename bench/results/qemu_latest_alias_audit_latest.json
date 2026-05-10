@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "artifact_group": "qemu_prompt_bench",
+      "error": "",
+      "latest_generated_at": "2026-05-01T10:00:00Z",
+      "latest_sha256": "c3212597c21463d2f6cc79793f98ed2df2a774b63979a3e37fdf83086177883d",
+      "latest_source": "bench/fixtures/qemu_latest_alias_audit/pass/qemu_prompt_bench_latest.json",
+      "stamped_candidates": 1,
+      "stamped_generated_at": "2026-05-01T10:00:00Z",
+      "stamped_sha256": "c3212597c21463d2f6cc79793f98ed2df2a774b63979a3e37fdf83086177883d",
+      "stamped_source": "bench/fixtures/qemu_latest_alias_audit/pass/qemu_prompt_bench_20260501T100000Z.json",
+      "status": "pass"
+    }
+  ],
+  "config": {
+    "min_latest": 1,
+    "patterns": [
+      "qemu_prompt_bench*_latest.json"
+    ]
+  },
+  "findings": [],
+  "generated_at": "2026-05-02T00:31:44Z",
+  "status": "pass",
+  "summary": {
+    "failing_aliases": 0,
+    "findings": 0,
+    "latest_artifacts": 1,
+    "passing_aliases": 1
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "checks": {
+    "answer_conflicts": true,
+    "payload_reuse": true,
+    "prompt_reuse": true
+  },
+  "counts_by_dataset_split": {
+    "arc-smoke": {
+      "validation": 1
+    },
+    "hellaswag-smoke": {
+      "validation": 1
+    },
+    "truthfulqa-smoke": {
+      "validation": 1
+    }
+  },
+  "dataset_count": 3,
+  "error_count": 0,
+  "finding_count": 0,
+  "findings": [],
+  "format": "hceval-contamination-audit",
+  "generated_at": "2026-04-29T23:41:23Z",
+  "inputs": [
+    {
+      "path": "bench/datasets/samples/smoke_eval.jsonl",
+      "rows": 3,
+      "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+    }
+  ],
+  "record_count": 3,
+  "split_count": 1,
+  "status": "pass",
+  "unique_answer_payload_count": 3,
+  "unique_payload_count": 3,
+  "unique_prompt_count": 3
+}

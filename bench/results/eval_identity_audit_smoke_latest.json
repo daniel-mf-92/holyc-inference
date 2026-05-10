@@ -1,0 +1,78 @@
+{
+  "artifacts": [
+    {
+      "inconsistent_keys": [],
+      "metadata": {
+        "model": [
+          "smoke-model"
+        ],
+        "model_sha256": [
+          "9f4b79a6f9c8d58d13ef5f8bb6c24739021d09fc6d1f3d3f07380f6c31f0c05a"
+        ],
+        "prompt_template_sha256": [
+          "44a1c57bd64dc8801d3a615559f6eb5420dfaa900d227dd7747a46c86d3f9c3e"
+        ],
+        "quantization": [
+          "Q4_0"
+        ],
+        "tokenizer_sha256": [
+          "ec1c742f6b98c5c6cc938acdf58edb7e3aef3a7423dfbe24f2a5d820f4f4d2bb"
+        ]
+      },
+      "missing_counts": {
+        "model": 0,
+        "model_sha256": 0,
+        "prompt_template_sha256": 0,
+        "quantization": 0,
+        "tokenizer_sha256": 0
+      },
+      "rows": 3,
+      "source": "bench/eval/samples/holyc_smoke_identity_predictions.jsonl"
+    },
+    {
+      "inconsistent_keys": [],
+      "metadata": {
+        "model": [
+          "smoke-model"
+        ],
+        "model_sha256": [
+          "9f4b79a6f9c8d58d13ef5f8bb6c24739021d09fc6d1f3d3f07380f6c31f0c05a"
+        ],
+        "prompt_template_sha256": [
+          "44a1c57bd64dc8801d3a615559f6eb5420dfaa900d227dd7747a46c86d3f9c3e"
+        ],
+        "quantization": [
+          "Q4_0"
+        ],
+        "tokenizer_sha256": [
+          "ec1c742f6b98c5c6cc938acdf58edb7e3aef3a7423dfbe24f2a5d820f4f4d2bb"
+        ]
+      },
+      "missing_counts": {
+        "model": 0,
+        "model_sha256": 0,
+        "prompt_template_sha256": 0,
+        "quantization": 0,
+        "tokenizer_sha256": 0
+      },
+      "rows": 3,
+      "source": "bench/eval/samples/llama_smoke_identity_predictions.jsonl"
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-01T12:55:41Z",
+  "identity_keys": [
+    "model",
+    "model_sha256",
+    "tokenizer_sha256",
+    "quantization",
+    "prompt_template_sha256"
+  ],
+  "status": "pass",
+  "summary": {
+    "artifacts": 2,
+    "artifacts_with_inconsistent_identity": 0,
+    "findings": 0,
+    "rows": 6
+  }
+}

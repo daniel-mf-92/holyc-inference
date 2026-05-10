@@ -1,0 +1,7 @@
+source,row_number,record_id,valid,answer_index,predicted_index,correct,has_scores,score_count,top_score_tie_count,top_score_margin,prompt_hash_status,choices_hash_status,input_hash_status,issue
+holyc,1,smoke-hellaswag-1,True,0,0,True,False,0,,,missing,missing,missing,
+holyc,2,smoke-arc-1,True,0,0,True,True,4,1,8.0,missing,missing,missing,
+holyc,3,smoke-truthfulqa-1,True,0,0,True,False,0,,,missing,missing,missing,
+llama.cpp,1,smoke-hellaswag-1,True,0,0,True,False,0,,,missing,missing,missing,
+llama.cpp,2,smoke-arc-1,True,0,0,True,False,0,,,missing,missing,missing,
+llama.cpp,3,smoke-truthfulqa-1,True,0,0,True,True,4,1,2.0,missing,missing,missing,

@@ -78,6 +78,7 @@
 2026-04-28T02:36:16Z | Added benchmark artifact commit metadata and opt-in stale-commit gating with refreshed matrix/index artifacts.
 2026-04-28T02:47:15Z | Added opt-in QEMU prompt benchmark telemetry gates with refreshed synthetic smoke/index artifacts.
 2026-04-28T02:55:32Z | Added benchmark artifact manifest commit provenance and opt-in stale-commit gating with refreshed manifest artifacts.
+2026-05-02T08:07:22Z | Added offline HolyC/llama.cpp perplexity pairing audit with metadata/token-count gates, smoke coverage, docs, and refreshed reports.
 2026-04-28T05:43:50Z | Added opt-in benchmark result freshness gating with age telemetry, JUnit coverage, docs, and refreshed index artifacts.
 2026-04-28T03:21:49Z | Hardened benchmark result index gates for commit metadata, telemetry-only failures, and refreshed result/manifest artifacts.
 2026-04-28T03:01:36Z | Added perf regression telemetry coverage gates with CSV/JUnit/dashboard output and refreshed smoke artifacts.
@@ -118,6 +119,7 @@
 2026-04-28T10:15:29Z | Added perf regression baseline/candidate comparison CSV dashboards with docs, smoke checks, and refreshed artifacts.
 2026-04-28T10:28:58Z | Added perf regression QEMU host-overhead telemetry, comparison deltas, opt-in gating, smoke checks, and refreshed dashboards.
 2026-04-28T10:57:07Z | Added matrix/result-index latency and host-overhead rollups with smoke coverage and refreshed benchmark artifacts.
+2026-04-30T07:28:39Z | Added QEMU benchmark latest/history retention audit with SHA256 alias checks, smoke coverage, docs, and refreshed result artifacts.
 2026-04-29T00:31:55Z | Added perf regression host/QEMU environment drift reporting with opt-in CI gating and refreshed dashboard artifacts.
 2026-04-28T22:12:06Z | Added dataset/split answer-skew telemetry and gates to provenance audits with smoke coverage and refreshed dataset artifacts.
 2026-04-28T11:10:38Z | Added eval dataset choice-count curation filters with smoke gate coverage and refreshed dataset artifacts.
@@ -138,6 +140,7 @@
 2026-04-28T13:38:25Z | Added benchmark matrix prompt-byte rollups with smoke coverage and refreshed matrix artifacts.
 2026-04-28T13:46:24Z | Added QEMU prompt benchmark aggregate summary CSV output with smoke artifact refresh and coverage.
 2026-04-28T14:14:50Z | Added perf regression guest/wall us-per-token telemetry gates with smoke coverage and refreshed dashboards.
+2026-04-30T05:58:48Z | Added bench trend export summary rollups for dashboard digests with smoke coverage and refreshed dashboard artifacts.
 2026-04-28T14:20:41Z | Added eval_compare engine-disagreement CSV output with smoke artifact refresh and coverage.
 2026-04-28T14:28:25Z | Added qemu_prompt_bench host child CPU efficiency telemetry/gate with smoke artifact refresh and coverage.
 2026-04-28T14:40:50Z | Added qemu_prompt_bench host child peak RSS telemetry/gates with matrix rollups and refreshed smoke artifacts.
@@ -216,7 +219,10 @@
 2026-04-29T06:01:22Z | Added qemu_prompt_bench guest memory-per-token telemetry/gating with smoke coverage and refreshed benchmark artifacts.
 2026-04-29T06:10:02Z | Added qemu_prompt_bench suite-level total-token gating with smoke coverage and README documentation.
 2026-04-29T06:21:23Z | Added benchmark artifact manifest dry-run coverage gate with smoke coverage and refreshed manifest artifacts.
+2026-05-02T04:43:09Z | Added direct unit coverage for eval score sparsity audits and refreshed the latest score sparsity artifact.
+2026-05-02T04:32:58Z | Added QEMU prompt source audit for row-level prompt-suite hash/byte/token parity with smoke coverage and latest artifacts.
 2026-04-29T06:32:42Z | Added qemu_prompt_bench guest prompt SHA256 match telemetry/gating with smoke coverage and refreshed benchmark artifacts.
+2026-04-30T06:43:18Z | Added dashboard sidecar audit for perf CI artifacts with smoke coverage and refreshed dashboard outputs.
 2026-04-29T06:39:29Z | Added benchmark artifact manifest environment-drift CSV/JUnit reporting and opt-in stability gate.
 2026-04-29T06:47:12Z | Added benchmark trend recent-window stats with CSV/JSON dashboard output and smoke coverage.
 2026-04-29T06:54:05Z | Added qemu_prompt_bench guest prompt byte-count match telemetry/gating with smoke coverage and refreshed benchmark artifacts.
@@ -278,3 +284,226 @@
 2026-04-29T21:05:43Z | Added prompt-byte efficiency telemetry to benchmark result index with smoke coverage and refreshed index artifacts.
 2026-04-29T21:16:26Z | Added per-record choice telemetry CSV export to dataset choice audit with smoke coverage and refreshed artifacts.
 2026-04-29T21:24:03Z | Added bench_result_index freshness-failure CSV output with smoke coverage and latest CSV artifact.
+2026-04-29T22:10:52Z | Added per-record schema telemetry CSV export to dataset schema audit with smoke coverage and refreshed artifacts.
+2026-04-29T22:46:18Z | Added standalone dataset leak audit CI smoke coverage and refreshed leak audit artifacts.
+2026-04-29T23:02:09Z | Added QEMU prompt benchmark failure ranking export with smoke coverage and refreshed synthetic artifacts.
+2026-04-29T23:19:57Z | Added quant-audit zero-payload percentage telemetry and max-zero gate with smoke coverage.
+2026-04-29T23:27:10Z | Added dataset mix audit for curated eval suite dominance gates with smoke coverage and refreshed artifacts.
+2026-04-29T23:34:40Z | Added benchmark artifact manifest timestamp-collision gating with CSV/JUnit smoke coverage and refreshed manifest artifacts.
+2026-04-29T23:42:11Z | Added dataset contamination audit for cross-dataset prompt/payload reuse with smoke coverage and refreshed artifacts.
+2026-04-29T23:50:08Z | Added dataset answer-length bias audit with smoke coverage and refreshed artifacts.
+2026-04-29T23:56:46Z | Added dataset schema answer-label coverage gates with smoke coverage and refreshed schema artifacts.
+2026-04-30T00:03:02Z | Added absolute perf SLO audit for benchmark artifacts with smoke coverage and refreshed dashboard outputs.
+2026-04-30T00:14:34Z | Added quant-audit repeated fp16 scale telemetry and gates with smoke coverage.
+2026-04-30T00:23:47Z | Added dataset provenance per-record telemetry CSV export with smoke coverage and refreshed artifacts.
+2026-04-30T00:29:56Z | Added dataset/split scoped answer-length bias gates with smoke coverage and refreshed artifacts.
+2026-04-30T00:34:56Z | Added dataset order per-record telemetry CSV export with smoke coverage and refreshed artifacts.
+2026-04-30T00:39:16Z | Added dataset order telemetry unit coverage and refreshed per-record order audit artifacts.
+2026-04-30T00:47:18Z | Added dataset mix per-record telemetry CSV export with smoke coverage and refreshed artifacts.
+2026-04-30T00:53:46Z | Added dataset choice answer-byte telemetry with unit/smoke coverage and refreshed choice audit artifacts.
+2026-04-30T01:07:12Z | Added dataset ID audit for explicit, bounded, unique eval record IDs with smoke coverage and refreshed artifacts.
+2026-04-30T01:14:05Z | Added dataset manifest audit for curated JSONL and HCEval pack consistency with smoke coverage and refreshed artifacts.
+2026-04-30T01:27:55Z | Added JSONL-to-HCEval roundtrip audit with unit/smoke coverage and refreshed artifacts.
+2026-04-30T01:33:12Z | Added direct dataset mix audit unit coverage with smoke verification and refreshed artifacts.
+2026-04-30T01:41:27Z | Added eval_compare score-rank CSV output with smoke coverage and refreshed comparison artifacts.
+2026-04-30T01:47:13Z | Added raw Q4_0/Q8_0 quant block comparator with smoke artifacts and direct test coverage.
+2026-04-30T01:53:37Z | Added dataset/split slice manifest coverage tool with smoke artifacts and direct test coverage.
+2026-04-30T02:00:55Z | Added dataset text loader-safety audit with byte/control-character gates, smoke artifacts, and direct test coverage.
+2026-04-30T02:07:48Z | Added dataset split-overlap audit for prompt/payload leakage across splits with smoke artifacts and direct test coverage.
+2026-04-30T02:15:45Z | Added prompt expected-token metadata gates with smoke artifacts and direct test coverage.
+2026-04-30T02:23:43Z | Added perplexity dataset/split coverage gates with smoke artifacts and direct test coverage.
+2026-04-30T02:28:20Z | Added perplexity regression CSV output for dashboard-friendly quality gate findings with smoke artifacts and direct test coverage.
+2026-04-30T02:43:40Z | Added eval input per-record telemetry CSV export with smoke artifacts and direct test coverage.
+2026-04-30T02:54:47Z | Added eval input top-score margin telemetry and gate with smoke artifacts and direct test coverage.
+2026-04-30T03:02:52Z | Added prompt suite parity comparer with smoke artifacts and direct stdlib test coverage.
+2026-04-30T03:18:45Z | Added eval disagreement audit gates for HolyC-vs-llama reports with smoke artifacts and direct stdlib test coverage.
+2026-04-30T03:31:01Z | Added dataset raw label-integrity audit with smoke artifacts and direct stdlib test coverage.
+2026-04-30T03:46:12Z | Added dashboard digest gate for CI summary artifacts with smoke and direct stdlib test coverage.
+2026-04-30T03:58:27Z | Added benchmark launch-plan hash validation to the result indexer with smoke coverage and refreshed index artifacts.
+2026-04-30T04:07:07Z | Added eval calibration audit gates for score coverage, ECE, Brier, and HolyC-vs-llama deltas with smoke artifacts.
+2026-04-30T04:14:15Z | Added direct dataset fingerprint and fingerprint-diff regression coverage with smoke verification.
+2026-04-30T04:21:35Z | Added saved QEMU command air-gap audit with smoke coverage and refreshed benchmark artifact outputs.
+2026-04-30T04:43:26Z | Restored shared QEMU air-gap audit helpers so source and result index smoke gates pass together.
+2026-04-30T04:50:50Z | Added dataset license/source policy audit with smoke artifacts and direct stdlib test coverage.
+2026-04-30T04:57:20Z | Added eval suite summary aggregator for HolyC-vs-llama reports with smoke artifacts and direct stdlib test coverage.
+2026-04-30T05:10:02Z | Added dataset provenance-balance audit with smoke artifacts and direct stdlib test coverage.
+2026-04-30T05:18:30Z | Added eval slice coverage audit for required dataset/split HolyC-vs-llama reports with smoke artifacts and direct stdlib test coverage.
+2026-04-30T05:27:38Z | Added structured findings CSV output for dataset fingerprint diff gates with smoke and direct test coverage.
+2026-04-30T05:36:25Z | Tightened QEMU source audit to reject legacy -net none fragments with smoke artifacts and direct stdlib test coverage.
+2026-04-30T05:45:02Z | Added TOML qemu_args source audit coverage with args-file resolution, smoke validation, and refreshed air-gap artifacts.
+2026-04-30T06:33:01Z | Added dataset prompt/choice overlap audit with smoke artifacts and direct stdlib test coverage.
+2026-04-30T06:57:45Z | Added host-side benchmark matrix audit for cell coverage and air-gap-safe QEMU argument fragments with smoke coverage and result artifacts.
+2026-04-30T07:06:58Z | Tightened build benchmark compare OK-run accounting to reject non-ok exit_class rows with direct and smoke coverage.
+2026-04-30T07:44:12Z | Added eval outcome bucket audit for HolyC-vs-llama paired correctness gates with smoke artifacts and direct stdlib test coverage.
+2026-04-30T07:56:10Z | Added eval report consistency audit for stale summary metrics with smoke artifacts and direct stdlib test coverage.
+2026-04-30T08:26:46Z | Added focused dataset index CI smoke gate for artifact-type and dataset/split coverage failures.
+2026-04-30T09:05:25Z | Added QEMU prompt coverage audit gates with smoke coverage and refreshed benchmark coverage artifacts.
+2026-04-30T09:23:34Z | Added prompt length-bucket coverage audit with smoke artifacts and direct stdlib test coverage.
+2026-04-30T09:46:58Z | Added eval suite coverage gates for required dataset, split, model, and quantization reports with smoke artifact refresh.
+2026-04-30T10:10:53Z | Added QEMU prompt schema/telemetry audit with air-gap command checks, smoke coverage, and refreshed benchmark schema artifacts.
+2026-04-30T10:28:31Z | Added QEMU summary consistency audit to catch stale suite/prompt aggregates with smoke artifacts and direct stdlib test coverage.
+2026-04-30T10:44:15Z | Added eval/perf scorecard joining HolyC-vs-llama quality reports with air-gapped QEMU throughput artifacts.
+2026-04-30T10:55:07Z | Added eval artifact drift audit for gold/prediction hash consistency with smoke artifacts and direct stdlib test coverage.
+2026-04-30T11:01:50Z | Added eval quantization delta audit for Q4_0-vs-Q8_0 quality drift with smoke artifacts and direct stdlib test coverage.
+2026-04-30T11:11:38Z | Added eval efficiency frontier audit for quality-vs-throughput scorecards with smoke artifacts and direct stdlib test coverage.
+2026-04-30T11:23:20Z | Added dataset choice-length cue audit with smoke artifacts and direct stdlib test coverage.
+2026-04-30T11:32:10Z | Added eval reproducibility metadata audit for HolyC-vs-llama seed/decoding parity with smoke artifacts and direct stdlib test coverage.
+2026-04-30T11:42:31Z | Added HCEval export/repack roundtrip audit for packed dataset digest parity with smoke artifacts and direct stdlib test coverage.
+2026-04-30T11:55:20Z | Added QEMU benchmark environment provenance audit with smoke coverage and refreshed result artifacts.
+2026-04-30T11:58:46Z | Added QEMU resource telemetry coverage audit with smoke artifacts and direct stdlib test coverage.
+2026-04-30T12:05:43Z | Added QEMU latency distribution audit with percentile gates, smoke artifacts, and direct stdlib test coverage.
+2026-04-30T12:14:20Z | Added QEMU phase sequence audit for warmup/measured coverage, ordering, and measured success gates with smoke artifacts and direct stdlib test coverage.
+2026-04-30T12:30:44Z | Added QEMU failure taxonomy audit for exit_class, timeout, return-code, and OK metric consistency with smoke artifacts and direct stdlib test coverage.
+2026-04-30T12:46:54Z | Added QEMU args policy audit for reusable air-gapped benchmark argument fragments with smoke artifacts and direct stdlib coverage.
+2026-04-30T13:03:25Z | Added QEMU timestamp chronology audit for generated_at, filename stamps, row monotonicity, and row skew with smoke artifacts and direct stdlib coverage.
+2026-04-30T13:26:02Z | Added QEMU artifact budget audit for bounded benchmark files, serial output, tails, and failure reasons with smoke and direct stdlib coverage.
+2026-04-30T13:45:53Z | Added QEMU throughput stability audit for per-prompt wall tok/s floors and variability with smoke artifacts and direct stdlib coverage.
+2026-04-30T14:38:53Z | Added QEMU replay manifest export for air-gapped benchmark argv/provenance capture with smoke artifacts and direct stdlib coverage.
+2026-04-30T14:54:39Z | Added QEMU replay manifest audit for argv sidecar parity, command hash drift, and explicit air-gap replay checks.
+2026-04-30T15:09:46Z | Added curated dataset manifest row-count and dataset/split coverage consistency gates with smoke artifacts and direct stdlib coverage.
+2026-04-30T15:54:56Z | Added QEMU token accounting audit for tok/s, us/token, ratio, memory/token, and expected-token consistency with smoke and direct stdlib coverage.
+2026-04-30T16:46:15Z | Added QEMU CPU accounting audit for child CPU, CPU percent, and tok/CPU-second consistency with smoke artifacts and direct stdlib coverage.
+2026-04-30T17:33:28Z | Added eval pairing audit for HolyC-vs-llama prediction stream parity with smoke artifacts and direct stdlib coverage.
+2026-04-30T17:55:27Z | Added QEMU prompt echo audit for host/guest prompt byte and SHA parity with smoke artifacts and direct stdlib coverage.
+2026-04-30T18:30:15Z | Added HCEval suite audit for packed dataset manifest and byte-budget validation with smoke artifacts and direct stdlib coverage.
+2026-04-30T19:08:51Z | Added QEMU serial accounting audit for stdout/stderr-to-serial telemetry parity with smoke artifacts and direct stdlib coverage.
+2026-04-30T20:12:54Z | Added QEMU timeout margin audit for wall-time timeout headroom with smoke artifacts and direct stdlib coverage.
+2026-04-30T20:45:41Z | Added HCEval bundle audit for packed shard manifest parity and duplicate record/fingerprint detection with smoke artifacts.
+2026-04-30T21:06:39Z | Added QEMU host overhead accounting audit for wall-vs-guest timing drift with smoke artifacts and direct stdlib coverage.
+2026-04-30T21:16:13Z | Hardened QEMU args policy audit against nested response/config includes that could bypass air-gap checks.
+2026-04-30T21:34:19Z | Hardened quant block compare so raw Q4_0/Q8_0 scale or payload mismatches fail by default, with explicit telemetry-only opt-out.
+2026-04-30T21:53:58Z | Added QEMU launch integrity audit for launch-plan hashes, observed sequence parity, and stored integrity drift with smoke artifacts.
+2026-04-30T22:05:45Z | Added QEMU result retention findings CSV export with smoke/direct coverage and refreshed retention artifacts.
+2026-05-01T00:41:08Z | Added QEMU warmup isolation audit for measured/warmup row separation with smoke/direct coverage and refreshed result artifacts.
+2026-05-01T01:10:43Z | Added QEMU launch order audit for contiguous launch indices, warmup-before-measured ordering, and timestamp monotonicity with smoke/direct coverage.
+2026-05-01T01:21:20Z | Added QEMU command fingerprint audit for per-row command hash parity, explicit air-gap flags, and drift detection with smoke/direct coverage.
+2026-05-01T01:33:41Z | Added QEMU CPU accounting budget gates for host CPU percent and tok/CPU-s with smoke coverage and refreshed audit artifacts.
+2026-05-01T01:48:00Z | Added QEMU input provenance audit for prompt-suite, image, and args-file metadata drift with smoke coverage.
+2026-05-01T01:58:36Z | Added QEMU timing consistency audit for derived elapsed/wall timing metrics with smoke coverage and refreshed audit artifacts.
+2026-05-01T02:19:04Z | Added QEMU stdio hygiene audit for OK stderr noise, silent failures, and stdout/stderr byte-counter drift with smoke coverage.
+2026-05-01T02:41:11Z | Added eval margin audit for scored HolyC-vs-llama choice margin gates with smoke/direct coverage.
+2026-05-01T02:59:10Z | Added QEMU status consistency audit for stale pass/fail artifacts with smoke/direct coverage and refreshed result artifacts.
+2026-05-01T03:50:57Z | Added eval score parity audit for HolyC-vs-llama paired score-vector coverage/shape gates with smoke/direct coverage.
+2026-05-01T04:10:52Z | Hardened QEMU benchmark air-gap validation against socket endpoints and remote display transports with smoke/direct coverage.
+2026-05-01T04:23:43Z | Added eval choice distribution audit for HolyC-vs-llama prediction collapse and gold alignment checks with smoke/direct coverage.
+2026-05-01T04:35:33Z | Added build pair selector for latest comparable QEMU benchmark baseline/candidate artifacts with JSON/CSV/Markdown/JUnit sidecars.
+2026-05-01T05:06:24Z | Added eval rank audit for scored top-k/MRR HolyC-vs-llama gates with smoke coverage and refreshed rank artifacts.
+2026-05-01T06:09:58Z | Added QEMU NIC cardinality audit for exactly-one -nic none enforcement with smoke/direct coverage and refreshed result artifacts.
+2026-05-01T06:21:58Z | Added eval score-parity top-score tie gates with smoke/direct coverage and refreshed parity artifacts.
+2026-05-01T06:38:17Z | Added QEMU prompt balance audit for balanced successful samples per prompt with smoke/direct coverage and refreshed result artifacts.
+2026-05-01T06:48:58Z | Added QEMU identity audit for artifact-vs-row profile/model/quantization, commit, and command-hash drift with smoke/direct coverage.
+2026-05-01T07:19:57Z | Added QEMU serial BENCH_RESULT payload audit for captured metric parity with smoke/direct coverage and refreshed result artifacts.
+2026-05-01T07:31:38Z | Added QEMU failure-reason audit for exit_class/returncode/timed_out/failure_reason consistency with smoke/direct coverage and refreshed result artifacts.
+2026-05-01T07:43:50Z | Added eval prompt-length bucket report for HolyC-vs-llama accuracy/agreement slices with smoke artifacts and coverage.
+2026-05-01T07:52:29Z | Tightened QEMU args policy audit to reject remote-display sockets with smoke coverage and refreshed result artifacts.
+2026-05-01T08:01:40Z | Added QEMU stdio byte/tail budget gates with direct smoke coverage and refreshed hygiene artifacts.
+2026-05-01T08:12:50Z | Tightened QEMU prompt launcher air-gap checks to reject remote-display sockets before VM launch with smoke/direct coverage.
+2026-05-01T08:41:24Z | Added QEMU iteration coverage audit for prompt warmup/measured iteration gaps and duplicates with smoke/direct artifacts.
+2026-05-01T08:50:47Z | Added QEMU input provenance audit direct coverage and generated latest saved-artifact provenance sidecars.
+2026-05-01T08:59:12Z | Added QEMU result retention CI smoke coverage for matching latest/history, missing history, and hash mismatch cases.
+2026-05-01T09:08:26Z | Added QEMU memory accounting host-RSS/guest-memory ratio gate with smoke/direct coverage and refreshed audit artifacts.
+2026-05-01T09:17:56Z | Added perf CI gate for saved regression/SLO dashboard status and sidecar coverage with smoke/direct artifacts.
+2026-05-01T09:42:11Z | Added QEMU prompt-length bucket audit for saved benchmark artifacts with smoke coverage and refreshed result sidecars.
+2026-05-01T09:58:34Z | Tightened QEMU timeout margin audit with timeout-row underuse gates, smoke/direct coverage, and refreshed result sidecars.
+2026-05-01T10:10:14Z | Added QEMU replay manifest source artifact SHA256/size provenance with audit coverage and refreshed reports.
+2026-05-01T10:20:34Z | Tightened QEMU replay manifest audit to reject duplicate manifest and argv-sidecar replay keys with direct/smoke coverage.
+2026-05-01T10:29:21Z | Hardened host-side QEMU air-gap checks to reject user-mode network service flags in benchmark commands and args fragments.
+2026-05-01T10:38:58Z | Added dataset text audit gate for raw choice label prefixes with direct/smoke coverage and refreshed smoke artifacts.
+2026-05-01T11:08:53Z | Added normalized dataset stats report with byte/choice/answer histograms, smoke/direct coverage, and refreshed smoke artifacts.
+2026-05-01T11:21:10Z | Added dataset answer-position distribution audit with smoke/direct coverage and refreshed curation artifacts.
+2026-05-01T11:30:28Z | Added QEMU prompt efficiency audit for prompt byte/token derived metrics with smoke/direct coverage and refreshed result sidecars.
+2026-05-01T11:39:40Z | Added eval confusion-matrix audit for macro-F1/per-answer gates with smoke/direct coverage and refreshed result sidecars.
+2026-05-01T11:54:02Z | Added eval top-k overlap audit for HolyC-vs-llama scored rankings with smoke/direct coverage and refreshed result sidecars.
+2026-05-01T12:17:13Z | Added QEMU artifact reference audit for local/offline resource paths and command air-gap drift with smoke/direct coverage.
+2026-05-01T12:44:22Z | Hardened QEMU air-gap validation against modern NIC/vsock device aliases with focused command and args-policy smoke coverage.
+2026-05-01T12:55:46Z | Added eval model/tokenizer identity audit with smoke fixtures, direct tests, and refreshed comparison artifacts.
+2026-05-01T13:05:15Z | Added QEMU prompt benchmark sidecar audit for JSON/CSV/Markdown/JUnit artifact completeness with smoke/direct coverage.
+2026-05-01T13:13:53Z | Tightened QEMU token accounting to fail recorded expected-token mismatches with direct/smoke coverage and refreshed results.
+2026-05-01T13:43:51Z | Added QEMU host-overhead median/p95 summaries with direct/smoke coverage and refreshed result sidecars.
+2026-05-01T13:50:59Z | Tightened dataset manifest audit to verify selected_record_ids against curated JSONL record order with direct/smoke coverage.
+2026-05-01T14:19:26Z | Added QEMU exit-rate audit for failure/timeout/nonzero/launch-error percentage gates with direct/smoke coverage and refreshed result sidecars.
+2026-05-01T14:29:34Z | Added QEMU exit-class consistency audit for returncode/timed_out/failure telemetry with direct/smoke coverage and refreshed result sidecars.
+2026-05-01T14:39:53Z | Added eval significance audit for paired McNemar HolyC-vs-llama losses with smoke/direct coverage and refreshed result sidecars.
+2026-05-01T14:52:18Z | Hardened QEMU source air-gap fragment audits against response/config includes, sockets, remote displays, and embedded launch commands.
+2026-05-01T15:32:00Z | Hardened QEMU air-gap audits and launcher validation to reject TLS credential options with focused smoke coverage.
+2026-05-01T15:54:07Z | Added QEMU prompt outlier audit for repeated prompt latency/throughput drift with smoke/direct coverage and refreshed result sidecars.
+2026-05-01T16:16:25Z | Tightened eval pairing audit to compare nested identity metadata fields with direct/smoke coverage.
+2026-05-01T16:37:12Z | Added memory-aware eval efficiency frontier mode with direct/smoke coverage and refreshed frontier artifacts.
+2026-05-01T16:57:31Z | Added QEMU token-latency consistency audit with direct/smoke coverage and refreshed result sidecars.
+2026-05-01T17:17:06Z | Tightened QEMU timing consistency to reject wall-clock elapsed time below guest elapsed time with direct/smoke coverage.
+2026-05-01T17:49:33Z | Added eval score-scale audit for paired HolyC-vs-llama scored predictions with smoke coverage and refreshed result sidecars.
+2026-05-01T18:11:19Z | Added QEMU CSV parity audit for JSON-vs-CSV benchmark artifacts with smoke coverage and refreshed result sidecars.
+2026-05-01T18:48:27Z | Added QEMU benchmark matrix planner for air-gapped build/prompt launch manifests with direct/smoke coverage and result sidecars.
+2026-05-01T19:06:11Z | Added QEMU benchmark matrix artifact audit for air-gap/hash/launch-plan drift with direct/smoke coverage and result sidecars.
+2026-05-01T19:34:45Z | Added QEMU matrix result coverage audit for planned-vs-observed launch completeness with direct/smoke coverage and result sidecars.
+2026-05-01T19:58:57Z | Added QEMU result freshness audit for latest benchmark artifacts with direct/smoke coverage and refreshed result sidecars.
+2026-05-01T20:24:07Z | Added deterministic offline dataset subset selector with balanced per-slice selection, direct/smoke coverage, and smoke result artifacts.
+2026-05-01T20:38:29Z | Added QEMU environment row command provenance gating with direct/smoke coverage and refreshed result sidecars.
+2026-05-01T20:51:30Z | Added host-side QEMU prompt budget audit with token/prompt ceilings, guest echo checks, CI smoke coverage, and latest result artifacts.
+2026-05-01T21:03:58Z | Added direct coverage for QEMU prompt-length bucket audit and refreshed latest bucket sidecars.
+2026-05-01T21:12:54Z | Verified staged host-side bench/eval/dataset audit stack with direct changed-test runners and focused QEMU smoke coverage before commit.
+2026-05-01T21:22:51Z | Added eval result index for compare/suite artifacts with direct/smoke coverage and refreshed result sidecars.
+2026-05-01T21:40:05Z | Tightened QEMU result freshness audit to reject future-dated artifacts with direct/smoke coverage and refreshed result sidecars.
+2026-05-01T21:55:52Z | Tightened QEMU timestamp audit to flag stale row timestamps before artifact generation with direct/smoke coverage and refreshed sidecars.
+2026-05-01T22:04:52Z | Tightened QEMU command fingerprint audit with an opt-in single-command-hash gate, direct/smoke coverage, and refreshed result sidecars.
+2026-05-01T22:13:24Z | Added QEMU build throughput scorecard for saved prompt benchmark artifacts with direct/smoke coverage and refreshed result sidecars.
+2026-05-01T22:21:52Z | Added raw eval prediction coverage audit with per-slice gates, smoke artifacts, docs, and host-side tests.
+2026-05-01T22:33:09Z | Added QEMU host environment policy audit for captured proxy/URL env vars with smoke/direct coverage and latest result sidecars.
+2026-05-01T22:42:54Z | Added QEMU artifact schema completeness audit for saved prompt benchmark rows with direct/smoke coverage and latest result sidecars.
+2026-05-01T22:52:28Z | Added QEMU result uniqueness audit to catch duplicate benchmark row identities with direct/smoke coverage and latest result sidecars.
+2026-05-01T23:04:26Z | Added QEMU prompt benchmark artifact schema version markers with schema-audit validation and refreshed synthetic result artifacts.
+2026-05-01T23:14:07Z | Added eval hash audit for canonical eval_compare fingerprints with smoke coverage and refreshed result sidecars.
+2026-05-01T23:22:17Z | Added HCEval binary diff tooling for offline dataset promotion review with direct/smoke coverage and latest result sidecars.
+2026-05-01T23:33:30Z | Added QEMU benchmark matrix budget audit for planned launch/prompt-byte/expected-token gates with smoke coverage and result sidecars.
+2026-05-01T23:53:50Z | Added build-pair manifest audit for regression pair sanity gates with direct/smoke coverage and latest result sidecars.
+2026-05-02T00:14:23Z | Added eval choice-map audit for HolyC/llama prediction label-format parity with direct/smoke coverage and latest result sidecars.
+2026-05-02T00:22:51Z | Tightened perplexity comparator probability telemetry validation for positive token logprobs and subunit perplexity with direct/smoke coverage.
+2026-05-02T00:31:48Z | Added QEMU latest-alias audit to verify *_latest.json artifacts match newest stamped siblings, with tests, smoke gate, deterministic fixture, and bench/results outputs.
+2026-05-02T00:41:36Z | Added offline dataset length-bucket coverage audit with direct/smoke coverage and refreshed dataset result sidecars.
+2026-05-02T00:53:12Z | Tightened QEMU prompt benchmark air-gap policy to reject response-file and readconfig includes with smoke coverage.
+2026-05-02T01:03:49Z | Added QEMU quantization coverage audit for Q4_0/Q8_0 benchmark result sets with direct/smoke coverage and latest result sidecars.
+2026-05-02T01:15:18Z | Tightened QEMU quantization coverage audit with per-row air-gap command telemetry gates and refreshed matrix-backed sidecars.
+2026-05-02T01:26:29Z | Added QEMU quant pairing audit for per-prompt Q4_0/Q8_0 matrix parity with smoke/direct coverage and latest result sidecars.
+2026-05-02T01:36:01Z | Added offline dataset choice-similarity audit for duplicate/near-duplicate options with direct/smoke coverage and latest dataset sidecars.
+2026-05-02T01:46:36Z | Added QEMU timeout recommendation reporting from saved wall-time artifacts with direct/smoke coverage and latest result sidecars.
+2026-05-02T01:56:52Z | Tightened QEMU replay manifest argv sidecar hash and air-gap validation with focused coverage and refreshed replay audit artifacts.
+2026-05-02T02:09:27Z | Added HolyC-vs-llama eval score-delta audit with focused tests, smoke gate, docs, and latest result sidecars.
+2026-05-02T02:19:36Z | Added dashboard freshness audit for stale/future perf dashboard timestamps with direct/smoke coverage and latest dashboard sidecars.
+2026-05-02T02:29:19Z | Added QEMU prompt identity audit for prompt/hash drift and collision checks with direct/smoke coverage and latest result sidecars.
+2026-05-02T02:43:00Z | Added host-side HCEval binary budget audit with smoke gate, tests, docs, and latest dataset reports.
+2026-05-02T02:56:47Z | Added eval top-choice tie audit for HolyC-vs-llama scored predictions with smoke/direct coverage and latest result sidecars.
+2026-05-02T03:10:22Z | Tightened QEMU args policy audit to reject duplicate -nic none fragments with direct/smoke coverage and refreshed result sidecars.
+2026-05-02T03:22:43Z | Added QEMU matrix plan diff gate for command/launch drift with smoke/direct coverage and latest result sidecars.
+2026-05-02T03:35:18Z | Added offline eval majority/random baseline reports with smoke/direct coverage and latest result sidecars.
+2026-05-02T03:46:23Z | Added QEMU serial endpoint audit for stdio-only command telemetry with smoke/direct coverage and latest result sidecars.
+2026-05-02T04:02:15Z | Fixed perf CI smoke coverage for current air-gap audit sidecar outputs and verified all bench smoke gates.
+2026-05-02T04:11:34Z | Verified staged host-side bench/eval/dataset infrastructure smoke gates and prepared the gpt-5.5 bench branch commit.
+2026-05-02T04:20:37Z | Added eval score sparsity audit for degenerate scored prediction vectors with smoke coverage and latest result sidecars.
+2026-05-02T04:53:27Z | Added eval score-order audit for prediction/top-score drift with smoke/direct coverage and latest result sidecars.
+2026-05-02T05:03:06Z | Added QEMU image reference audit for artifact image.path vs recorded drive arguments with smoke coverage and latest result sidecars.
+2026-05-02T05:14:03Z | Added QEMU launch profile audit for machine/CPU/accelerator/memory drift with smoke/manual coverage and latest result sidecars.
+2026-05-02T05:24:58Z | Added dataset content-hash audit for row-level prompt/choices/input SHA-256 metadata with smoke/direct coverage and latest result sidecars.
+2026-05-02T05:36:05Z | Added QEMU launch JSONL parity audit for warmup/measured sidecar drift with smoke coverage and latest result sidecars.
+2026-05-02T05:46:56Z | Added eval entropy audit for HolyC-vs-llama scored prediction confidence collapse/drift with smoke/direct coverage and latest result sidecars.
+2026-05-02T05:56:46Z | Added quant manifest audit for Q4_0/Q8_0 artifact SHA-256, byte, block, and element-count validation with smoke/direct coverage.
+2026-05-02T06:07:08Z | Added QEMU output determinism audit for repeated-run generated hash/token drift with smoke/direct coverage and latest result sidecars.
+2026-05-02T06:19:13Z | Added bench smoke manifest index for host-side CI smoke coverage with smoke/direct coverage and latest result sidecars.
+2026-05-02T06:30:20Z | Tightened QEMU prompt benchmark launcher to reject user-supplied duplicate NIC disablement with direct/smoke coverage.
+2026-05-02T06:40:06Z | Added QEMU display policy audit for headless benchmark command telemetry with smoke/direct coverage and latest result sidecars.
+2026-05-02T06:50:50Z | Added offline perplexity input audit with smoke gate, docs, and latest bench/results artifacts.
+2026-05-02T07:05:01Z | Tightened QEMU launch profile audit with cross-artifact profile drift gating and refreshed latest result sidecars.
+2026-05-02T07:16:39Z | Tightened QEMU benchmark air-gap checks for double-dash network/display/socket options with direct/smoke coverage and refreshed result sidecars.
+2026-05-02T07:27:22Z | Added offline dataset split-balance audit with CI smoke coverage, docs, and latest dataset result sidecars.
+2026-05-02T07:39:47Z | Added offline dataset duplicate audit with CI smoke coverage, docs, and latest dataset result sidecars.
+2026-05-02T07:53:48Z | Added eval prompt-hash audit for HolyC-vs-llama prompt/choice/input fingerprint parity with smoke coverage and latest result sidecars.
+2026-05-02T08:20:59Z | Added QEMU seed metadata audit for deterministic benchmark rows with smoke/direct coverage and latest result sidecars.
+2026-05-02T08:33:37Z | Added QEMU TTFT telemetry audit with smoke/direct coverage and latest result sidecars.
+2026-05-02T08:48:18Z | Added QEMU executable provenance audit for direct qemu-system command/path drift with smoke/direct coverage and latest result sidecars.
+2026-05-02T09:00:37Z | Added offline eval workload estimator for token/run/time projection with smoke coverage and latest result sidecars.
+2026-05-02T09:12:37Z | Tightened offline eval workload estimator with per-record choice/token/launch/wall-time budget gates and refreshed latest result sidecars.
+2026-05-02T09:24:17Z | Added HCEval provenance audit for packed dataset source coverage with smoke/direct coverage and latest dataset result sidecars.
+2026-05-02T09:37:45Z | Tightened QEMU NIC cardinality audit to count long-form --nic none/--nic=none air-gap disablement with direct/smoke coverage.
+2026-05-02T09:50:56Z | Added packed HCEval choice semantics audit for duplicate choices, answer aliases, and prompt-choice leakage with smoke artifacts.
+2026-05-02T10:03:12Z | Added CI smoke gate for packed HCEval choice semantics audit clean/failing fixtures.
+2026-05-02T10:07:06Z | Added packed HCEval metadata audit for canonical metadata/header consistency with smoke coverage and latest dataset sidecars.
+2026-05-02T10:11:01Z | Added eval record-order audit for HolyC/llama/gold stream parity with smoke coverage and latest result sidecars.

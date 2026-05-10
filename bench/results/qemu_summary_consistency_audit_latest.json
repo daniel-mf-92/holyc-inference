@@ -1,0 +1,28 @@
+{
+  "artifacts": [
+    {
+      "checked_fields": 176,
+      "error": "",
+      "expected_prompt_summaries": 2,
+      "measured_rows": 4,
+      "mismatched_fields": 0,
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "quantization": "Q4_0",
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "status": "pass",
+      "stored_prompt_summaries": 2
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-04-30T10:28:16Z",
+  "status": "pass",
+  "summary": {
+    "artifacts": 1,
+    "checked_fields": 176,
+    "failing_artifacts": 0,
+    "findings": 0,
+    "measured_rows": 4,
+    "passing_artifacts": 1
+  }
+}

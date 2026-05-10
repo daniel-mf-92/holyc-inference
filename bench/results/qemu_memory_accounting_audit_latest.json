@@ -1,0 +1,46 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-01T09:08:10Z",
+  "rows": [
+    {
+      "checks": 4,
+      "commit": "smoke",
+      "exit_class": "ok",
+      "findings": 0,
+      "host_child_peak_rss_bytes": 4096,
+      "host_rss_bytes_per_token": 128.0,
+      "host_rss_over_guest_ratio": 4.0,
+      "memory_bytes": 1024,
+      "memory_bytes_per_token": 32.0,
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "row": 1,
+      "source": "/tmp/holyc-memory-audit.hHZVte/qemu_prompt_bench_memory_smoke.json",
+      "tokens": 32
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "checks": 4,
+    "findings": 0,
+    "host_child_peak_rss_bytes_max": 4096,
+    "host_rss_over_guest_ratio_max": 4.0,
+    "memory_bytes_max": 1024,
+    "models": [
+      "synthetic-smoke"
+    ],
+    "profiles": [
+      "ci-airgap-smoke"
+    ],
+    "prompts": [
+      "smoke-short"
+    ],
+    "quantizations": [
+      "Q4_0"
+    ],
+    "rows": 1
+  }
+}

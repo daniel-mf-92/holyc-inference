@@ -1,0 +1,4 @@
+source,report_status,dataset,split,model,quantization,record_count,holyc_accuracy,llama_accuracy,agreement,regressions
+bench/results/eval_compare_smoke_latest.json,pass,arc-smoke,validation,synthetic-smoke,Q4_0,1,1.0,1.0,1.0,0
+bench/results/eval_compare_smoke_latest.json,pass,hellaswag-smoke,validation,synthetic-smoke,Q4_0,1,1.0,1.0,1.0,0
+bench/results/eval_compare_smoke_latest.json,pass,truthfulqa-smoke,validation,synthetic-smoke,Q4_0,1,1.0,1.0,1.0,0

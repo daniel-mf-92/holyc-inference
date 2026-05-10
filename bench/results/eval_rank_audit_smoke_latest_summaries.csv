@@ -1,0 +1,9 @@
+source,scope,dataset,split,engine,scored_count,total_count,score_coverage,top_1_accuracy,top_2_accuracy,top_3_accuracy,mean_gold_rank,mean_reciprocal_rank
+bench/results/eval_compare_smoke_latest.json,overall,smoke-eval,validation,holyc,1,3,0.3333333333333333,1.0,1.0,1.0,1.0,1.0
+bench/results/eval_compare_smoke_latest.json,overall,smoke-eval,validation,llama,1,3,0.3333333333333333,1.0,1.0,1.0,1.0,1.0
+bench/results/eval_compare_smoke_latest.json,dataset,arc-smoke,validation,holyc,1,1,1.0,1.0,1.0,1.0,1.0,1.0
+bench/results/eval_compare_smoke_latest.json,dataset,arc-smoke,validation,llama,0,1,0.0,0.0,0.0,0.0,0.0,0.0
+bench/results/eval_compare_smoke_latest.json,dataset,hellaswag-smoke,validation,holyc,0,1,0.0,0.0,0.0,0.0,0.0,0.0
+bench/results/eval_compare_smoke_latest.json,dataset,hellaswag-smoke,validation,llama,0,1,0.0,0.0,0.0,0.0,0.0,0.0
+bench/results/eval_compare_smoke_latest.json,dataset,truthfulqa-smoke,validation,holyc,0,1,0.0,0.0,0.0,0.0,0.0,0.0
+bench/results/eval_compare_smoke_latest.json,dataset,truthfulqa-smoke,validation,llama,1,1,1.0,1.0,1.0,1.0,1.0,1.0

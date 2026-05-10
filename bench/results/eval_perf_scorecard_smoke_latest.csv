@@ -1,0 +1,2 @@
+model,quantization,dataset,split,eval_source,perf_source,status,records,holyc_accuracy,llama_accuracy,agreement,regressions,prompt_count,ok_runs,min_tok_per_s,median_tok_per_s,min_wall_tok_per_s,median_wall_tok_per_s,max_memory_bytes,airgap_violations
+synthetic-smoke,Q4_0,smoke-eval,validation,/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp2t_2g109/eval_compare_smoke.json,/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp2t_2g109/qemu_prompt_bench_smoke.json,pass,3,1.0,1.0,1.0,0,2,2,150.0,155.0,115.0,117.5,67174400,0

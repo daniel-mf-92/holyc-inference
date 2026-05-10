@@ -1,0 +1,10 @@
+{
+  "benchmarks": [
+    {
+      "phase": "measured",
+      "prompt": "smoke"
+    }
+  ],
+  "generated_at": "2026-05-01T10:00:00Z",
+  "status": "pass"
+}

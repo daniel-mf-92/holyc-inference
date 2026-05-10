@@ -1,0 +1,3 @@
+source,row,dataset,split,record_id,choices,prompt_bytes,choice_bytes,prompt_tokens_est,choice_tokens_est,scored_tokens_est,launches_est,wall_seconds_est
+bench/fixtures/eval_workload_estimate/smoke.jsonl,1,arc_smoke,validation,arc-smoke-1,4,41,22,11,8,52,1,0.77
+bench/fixtures/eval_workload_estimate/smoke.jsonl,2,truthfulqa_smoke,validation,truthfulqa-smoke-1,4,78,95,20,25,105,1,1.3

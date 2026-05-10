@@ -1,0 +1,50 @@
+{
+  "choice_byte_histogram": {
+    "11": 1,
+    "20": 1,
+    "33": 1,
+    "37": 2,
+    "39": 1,
+    "43": 1,
+    "45": 2,
+    "5": 2,
+    "7": 1
+  },
+  "choice_byte_max": 45,
+  "choice_label_prefix_field_count": 0,
+  "control_char_field_count": 0,
+  "counts_by_dataset_split": {
+    "arc-smoke": {
+      "validation": 1
+    },
+    "hellaswag-smoke": {
+      "validation": 1
+    },
+    "truthfulqa-smoke": {
+      "validation": 1
+    }
+  },
+  "error_count": 0,
+  "findings": [],
+  "format": "hceval-dataset-text-audit",
+  "generated_at": "2026-05-02T04:00:27Z",
+  "inputs": [
+    {
+      "path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl",
+      "rows": 3,
+      "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+    }
+  ],
+  "line_byte_max": 69,
+  "prompt_byte_histogram": {
+    "51": 1,
+    "62": 1,
+    "69": 1
+  },
+  "prompt_byte_max": 69,
+  "record_count": 3,
+  "replacement_char_field_count": 0,
+  "status": "pass",
+  "text_field_count": 15,
+  "warning_count": 0
+}

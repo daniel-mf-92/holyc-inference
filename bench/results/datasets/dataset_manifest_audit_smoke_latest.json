@@ -1,0 +1,75 @@
+{
+  "created_at": "2026-05-02T04:00:10Z",
+  "curated_output": {
+    "actual_dataset_counts": {
+      "arc-smoke": 1,
+      "hellaswag-smoke": 1,
+      "truthfulqa-smoke": 1
+    },
+    "actual_dataset_split_counts": {
+      "arc-smoke": {
+        "validation": 1
+      },
+      "hellaswag-smoke": {
+        "validation": 1
+      },
+      "truthfulqa-smoke": {
+        "validation": 1
+      }
+    },
+    "actual_normalized_sha256": "a1389d4ed5197eb9db0bd39b60137dc3750e2ba9a9c1a151d836e9f0a28094f3",
+    "actual_record_count": 3,
+    "actual_record_ids": [
+      "smoke-arc-1",
+      "smoke-hellaswag-1",
+      "smoke-truthfulqa-1"
+    ],
+    "actual_split_counts": {
+      "validation": 3
+    },
+    "bytes": 1106,
+    "expected_normalized_sha256": "a1389d4ed5197eb9db0bd39b60137dc3750e2ba9a9c1a151d836e9f0a28094f3",
+    "file_sha256": "7c91711f474ad69828cf404fd905f716e55275619a17252028588046b1e31162",
+    "path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/results/datasets/smoke_curated.jsonl"
+  },
+  "dataset_counts": {
+    "arc-smoke": 1,
+    "hellaswag-smoke": 1,
+    "truthfulqa-smoke": 1
+  },
+  "findings": [],
+  "format": "hceval-curated-jsonl",
+  "license": "synthetic-smoke",
+  "manifest_path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/results/datasets/smoke_curated.manifest.json",
+  "pack_manifest": {
+    "binary_sha256": "7673822187499c96fc823bf5ab164e118a99b0d796c7460f47060b426af5aac4",
+    "format": "hceval-mc",
+    "manifest_path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/results/datasets/smoke_curated.hceval.manifest.json",
+    "pack_output": {
+      "actual_sha256": "7673822187499c96fc823bf5ab164e118a99b0d796c7460f47060b426af5aac4",
+      "bytes": 925,
+      "expected_sha256": "7673822187499c96fc823bf5ab164e118a99b0d796c7460f47060b426af5aac4",
+      "path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/results/datasets/smoke_curated.hceval"
+    },
+    "record_count": 3,
+    "records": [
+      "smoke-arc-1",
+      "smoke-hellaswag-1",
+      "smoke-truthfulqa-1"
+    ],
+    "source_sha256": "a1389d4ed5197eb9db0bd39b60137dc3750e2ba9a9c1a151d836e9f0a28094f3"
+  },
+  "record_count": 3,
+  "source": {
+    "actual_sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131",
+    "bytes": 1134,
+    "expected_sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131",
+    "path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl"
+  },
+  "source_name": "smoke-eval",
+  "source_version": "synthetic",
+  "split_counts": {
+    "validation": 3
+  },
+  "status": "pass"
+}

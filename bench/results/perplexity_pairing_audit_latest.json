@@ -1,0 +1,67 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-02T08:09:02Z",
+  "pairs": [
+    {
+      "dataset": "",
+      "dataset_match": true,
+      "holyc_token_count": 3,
+      "llama_token_count": 3,
+      "record_id": "smoke-arc-1",
+      "split": "",
+      "split_match": true,
+      "token_count_match": true
+    },
+    {
+      "dataset": "",
+      "dataset_match": true,
+      "holyc_token_count": 4,
+      "llama_token_count": 4,
+      "record_id": "smoke-hellaswag-1",
+      "split": "",
+      "split_match": true,
+      "token_count_match": true
+    },
+    {
+      "dataset": "",
+      "dataset_match": true,
+      "holyc_token_count": 4,
+      "llama_token_count": 4,
+      "record_id": "smoke-truthfulqa-1",
+      "split": "",
+      "split_match": true,
+      "token_count_match": true
+    }
+  ],
+  "sources": [
+    {
+      "datasets": "",
+      "duplicate_ids": 0,
+      "engine": "holyc",
+      "rows": 3,
+      "source": "bench/eval/samples/holyc_smoke_logprobs.jsonl",
+      "splits": "",
+      "token_count": 11,
+      "unique_records": 3
+    },
+    {
+      "datasets": "",
+      "duplicate_ids": 0,
+      "engine": "llama",
+      "rows": 3,
+      "source": "bench/eval/samples/llama_smoke_logprobs.jsonl",
+      "splits": "",
+      "token_count": 11,
+      "unique_records": 3
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "holyc_rows": 3,
+    "llama_rows": 3,
+    "metadata_mismatches": 0,
+    "paired_rows": 3,
+    "token_count_mismatches": 0
+  }
+}

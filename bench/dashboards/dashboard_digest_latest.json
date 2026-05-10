@@ -1,0 +1,42 @@
+{
+  "dashboards": [
+    {
+      "error": "",
+      "findings": 0,
+      "generated_at": "2026-04-29T19:10:17Z",
+      "name": "perf_regression",
+      "source": "bench/dashboards/perf_regression_latest.json",
+      "status": "pass",
+      "summary_keys": ""
+    },
+    {
+      "error": "",
+      "findings": 0,
+      "generated_at": "2026-04-30T00:02:49Z",
+      "name": "perf_slo_audit",
+      "source": "bench/dashboards/perf_slo_audit_latest.json",
+      "status": "pass",
+      "summary_keys": "commits,failed_rows,failure_pct,findings,metrics,models,profiles,quantizations,rows"
+    },
+    {
+      "error": "",
+      "findings": 0,
+      "generated_at": "2026-04-29T13:50:27Z",
+      "name": "bench_trend_export",
+      "source": "bench/dashboards/bench_trend_export_latest.json",
+      "status": "pass",
+      "summary_keys": ""
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-04-30T03:48:29Z",
+  "status": "pass",
+  "summary": {
+    "dashboards": 3,
+    "findings": 0,
+    "status_counts": {
+      "pass": 3
+    },
+    "total_dashboard_findings": 0
+  }
+}

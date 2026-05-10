@@ -15,6 +15,7 @@ import csv
 import json
 import shlex
 import sys
+import tomllib
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -24,6 +25,7 @@ from typing import Any, Iterable
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import airgap_audit
+import qemu_prompt_bench
 
 
 TEXT_SUFFIXES = {
@@ -34,6 +36,7 @@ TEXT_SUFFIXES = {
     ".json",
     ".md",
     ".sh",
+    ".toml",
     ".txt",
     ".yaml",
     ".yml",
@@ -144,10 +147,34 @@ def fragment_violations(args: list[str]) -> list[str]:
     launcher injects it. They still must not add any networking back in.
     """
     violations: list[str] = []
+    if args and Path(args[0].strip("'\"`")).name.lower().startswith("qemu-system"):
+        violations.append("embedded qemu-system executable; args fragments must not contain launch commands")
+
     index = 0
     while index < len(args):
         arg = args[index]
         next_arg = args[index + 1] if index + 1 < len(args) else ""
+        previous_arg = args[index - 1] if index else ""
+
+        if arg in qemu_prompt_bench.TLS_VALUE_OPTIONS and qemu_prompt_bench.is_tls_arg(next_arg):
+            violations.append(f"tls option `{arg} {next_arg}`")
+        if previous_arg not in qemu_prompt_bench.TLS_VALUE_OPTIONS and qemu_prompt_bench.is_tls_arg(arg):
+            violations.append(f"tls option `{arg}`")
+
+        if arg.startswith("@") and len(arg) > 1:
+            violations.append(f"nested qemu args include `{arg}`")
+
+        if arg == "-readconfig":
+            detail = (
+                f"qemu config include `-readconfig {next_arg}`"
+                if next_arg
+                else "qemu config include `-readconfig`"
+            )
+            violations.append(detail)
+            index += 2
+            continue
+        if arg.startswith("-readconfig="):
+            violations.append(f"qemu config include `{arg}`")
 
         if arg == "-nic":
             if next_arg != "none":
@@ -158,19 +185,60 @@ def fragment_violations(args: list[str]) -> list[str]:
             violations.append(f"non-air-gapped `{arg}`")
 
         if arg == "-net":
-            if next_arg != "none":
+            if next_arg == "none":
+                violations.append("legacy `-net none` present; benchmark fragments must use injected `-nic none`")
+            else:
                 violations.append(f"networking `-net {next_arg}`")
             index += 2
             continue
-        if arg.startswith("-net=") and arg != "-net=none":
-            violations.append(f"networking `{arg}`")
+        if arg.startswith("-net="):
+            if arg == "-net=none":
+                violations.append("legacy `-net=none` present; benchmark fragments must use injected `-nic none`")
+            else:
+                violations.append(f"networking `{arg}`")
 
         if arg == "-netdev" or arg.startswith("-netdev"):
             violations.append(f"network backend `{arg}`")
+        if arg in qemu_prompt_bench.USER_NET_SERVICE_OPTIONS or any(
+            arg.startswith(f"{option}=") for option in qemu_prompt_bench.USER_NET_SERVICE_OPTIONS
+        ):
+            violations.append(f"user-mode network service `{arg}`")
         if arg == "-device" and airgap_audit.is_network_device_arg(next_arg):
             violations.append(f"network device `{next_arg}`")
         if arg.startswith("-device=") and airgap_audit.is_network_device_arg(arg):
             violations.append(f"network device `{arg}`")
+        if arg == "-vnc" and next_arg != "none":
+            violations.append(f"remote display socket `-vnc {next_arg}`")
+            index += 2
+            continue
+        if arg.startswith("-vnc=") and arg != "-vnc=none":
+            violations.append(f"remote display socket `{arg}`")
+        if arg == "-display" and qemu_prompt_bench.is_remote_display_arg(next_arg):
+            violations.append(f"remote display socket `-display {next_arg}`")
+            index += 2
+            continue
+        if arg.startswith("-display=") and qemu_prompt_bench.is_remote_display_arg(arg):
+            violations.append(f"remote display socket `{arg}`")
+        if arg == "-spice":
+            violations.append(f"remote display socket `-spice {next_arg}`")
+            index += 2
+            continue
+        if arg.startswith("-spice"):
+            violations.append(f"remote display socket `{arg}`")
+        if (
+            arg in qemu_prompt_bench.SOCKET_TRANSPORT_OPTIONS
+            and qemu_prompt_bench.is_socket_endpoint_arg(next_arg)
+        ):
+            violations.append(f"socket endpoint `{arg} {next_arg}`")
+            index += 2
+            continue
+        if (
+            any(arg.startswith(f"{option}=") for option in qemu_prompt_bench.SOCKET_TRANSPORT_OPTIONS)
+            and qemu_prompt_bench.is_socket_endpoint_arg(arg)
+        ):
+            violations.append(f"socket endpoint `{arg}`")
+        if qemu_prompt_bench.is_socket_endpoint_arg(arg) and ("hostfwd=" in arg.lower() or "guestfwd=" in arg.lower()):
+            violations.append(f"forwarded socket endpoint `{arg}`")
 
         index += 1
     return violations
@@ -246,6 +314,45 @@ def audit_json_arg_file_refs(
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
+        return 0, []
+    return audit_arg_file_refs(path, iter_json_arg_file_refs(payload), audited_args_files)
+
+
+def load_toml_payload(path: Path) -> Any | None:
+    try:
+        return tomllib.loads(path.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError:
+        return None
+
+
+def audit_toml_arg_fragments(path: Path) -> tuple[int, list[SourceFinding]]:
+    payload = load_toml_payload(path)
+    if payload is None:
+        return 0, []
+
+    fragments_checked = 0
+    findings: list[SourceFinding] = []
+    for toml_path, args in iter_json_arg_fragments(payload):
+        fragments_checked += 1
+        for violation in fragment_violations(args):
+            findings.append(
+                SourceFinding(
+                    source=str(path),
+                    line=1,
+                    reason=f"{toml_path}: {violation}",
+                    command=args,
+                    text=json.dumps(args, separators=(",", ":")),
+                )
+            )
+    return fragments_checked, findings
+
+
+def audit_toml_arg_file_refs(
+    path: Path,
+    audited_args_files: set[Path],
+) -> tuple[int, list[SourceFinding]]:
+    payload = load_toml_payload(path)
+    if payload is None:
         return 0, []
     return audit_arg_file_refs(path, iter_json_arg_file_refs(payload), audited_args_files)
 
@@ -517,6 +624,13 @@ def audit(paths: Iterable[Path], excludes: set[str]) -> tuple[int, list[SourceFi
             commands_checked += fragments_checked
             findings.extend(yaml_findings)
             ref_fragments_checked, ref_findings = audit_yaml_arg_file_refs(path, audited_args_files)
+            commands_checked += ref_fragments_checked
+            findings.extend(ref_findings)
+        elif path.suffix.lower() == ".toml":
+            fragments_checked, toml_findings = audit_toml_arg_fragments(path)
+            commands_checked += fragments_checked
+            findings.extend(toml_findings)
+            ref_fragments_checked, ref_findings = audit_toml_arg_file_refs(path, audited_args_files)
             commands_checked += ref_fragments_checked
             findings.extend(ref_findings)
         elif path.suffix.lower() == ".args":

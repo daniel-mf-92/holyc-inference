@@ -4,7 +4,12 @@ This directory is for host-side benchmarking, evaluation, dataset, and quantizat
 validation infrastructure around the HolyC inference engine. Tools here must keep
 TempleOS air-gapped; any QEMU command added under this tree must pass `-nic none`.
 Benchmark artifacts should not add legacy `-net none`; the launcher injects
-`-nic none`, and downstream audits treat legacy `-net` flags as drift.
+`-nic none`, and downstream audits treat legacy `-net` flags as drift. QEMU TLS
+credential options are also rejected by the launcher and source/artifact audits.
+Do not include `-nic none` in reusable launcher arg fragments; `qemu_prompt_bench.py`
+owns that injection so final benchmark commands contain exactly one NIC disablement.
+Reusable QEMU argument fragments are also gated against duplicate `-nic none`
+entries so final launch commands keep exactly one explicit NIC disablement.
 
 ## Quantization Audit
 
@@ -19,9 +24,10 @@ Benchmark artifacts should not add legacy `-net none`; the launcher injects
   gates, zero-scale/nonzero-payload counts, quant ranges,
   quant histograms, signed quant payload coverage, expected-element tail padding, and optional
   packing-distribution gates for distinct quant values, saturated payloads,
-  duplicate complete blocks, identical block runs, non-canonical zero-scale
+  duplicate complete blocks, identical block runs, repeated fp16 scale fields, non-canonical zero-scale
   blocks, nonzero padding quants, minimum negative/positive quant payload counts,
-  signed quant payload balance, Q4_0 low/high nibble-lane diversity, and
+  signed quant payload balance, zero-quant payload percentage gates,
+  Q4_0 low/high nibble-lane diversity, and
   zero or subnormal fp16 scale fields.
 
 Example:
@@ -48,9 +54,11 @@ python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --fai
 python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --fail-negative-scales
 python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin --expect-elements 4095 --fail-nonzero-padding-quants
 python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --max-duplicate-block-pct 5 --max-identical-block-run 2
+python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --min-scale-used-values 16 --max-duplicate-scale-pct 75 --max-identical-scale-run 8
 python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --min-quant-negative-count 1 --min-quant-positive-count 1
 python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --max-quant-sign-balance-delta 1024
 python3 bench/quant_audit.py --format q4_0 --block-file path/to/blocks.bin --min-q4-nibble-lane-used-quant-values 8
+python3 bench/quant_audit.py --format q8_0 --block-file path/to/blocks.bin --max-zero-quant-pct 95
 ```
 
 Mixed-format audits can validate Q4_0 and Q8_0 streams in one report:
@@ -63,11 +71,1359 @@ python3 bench/quant_audit.py \
 
 `quant_audit_ci_smoke.py` creates temporary Q4_0/Q8_0 block fixtures and checks
 the raw-block, scale-exponent, scale-sign, duplicate-block/run, signed
-quant-payload coverage and balance, Q4_0 nibble-lane diversity, Markdown, CSV,
-and JUnit paths:
+quant-payload coverage and balance, repeated-scale, zero-quant percentage,
+Q4_0 nibble-lane diversity, Markdown, CSV, and JUnit paths:
 
 ```bash
 python3 bench/quant_audit_ci_smoke.py
+```
+
+`quant_block_compare.py` compares two raw Q4_0/Q8_0 block streams for
+deterministic packing. By default, any scale or quant payload mismatch fails the
+run; use `--allow-mismatches` only when collecting telemetry without gating.
+
+```bash
+python3 bench/quant_block_compare.py \
+  --format q4_0 \
+  --reference bench/results/reference.q4_0 \
+  --candidate bench/results/candidate.q4_0 \
+  --output bench/results/quant_block_compare_latest.json \
+  --csv bench/results/quant_block_compare_latest.csv \
+  --markdown bench/results/quant_block_compare_latest.md \
+  --junit bench/results/quant_block_compare_latest_junit.xml
+```
+
+`quant_manifest_audit.py` checks saved quant block manifests against local
+Q4_0/Q8_0 artifacts. It verifies artifact existence, SHA-256, byte counts, block
+counts, and element counts without launching QEMU.
+
+```bash
+python3 bench/quant_manifest_audit.py \
+  --manifest bench/results/quant_blocks.manifest.json \
+  --root bench/results \
+  --output bench/results/quant_manifest_audit_latest.json \
+  --csv bench/results/quant_manifest_audit_latest.csv \
+  --markdown bench/results/quant_manifest_audit_latest.md \
+  --junit bench/results/quant_manifest_audit_latest_junit.xml \
+  --fail-on-findings
+```
+
+Its smoke gate builds temporary Q4_0/Q8_0 block fixtures and exercises passing
+and failing manifest metadata paths:
+
+```bash
+python3 bench/quant_manifest_audit_ci_smoke.py
+```
+
+## Perf SLO Audit
+
+`perf_slo_audit.py` checks existing benchmark JSON/JSONL/CSV artifacts against
+absolute CI gates for token throughput, latency, memory, prompt failures, and
+minimum measured-row coverage. It is host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/perf_slo_audit.py bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/dashboards \
+  --output-stem perf_slo_audit_latest \
+  --min-rows 4 \
+  --require-success \
+  --max-failure-pct 0 \
+  --min-tok-per-s 100 \
+  --min-wall-tok-per-s 100 \
+  --max-ttft-us 20000 \
+  --max-memory-bytes 80000000
+```
+
+The tool writes JSON, Markdown, CSV findings, and JUnit outputs. Its smoke gate
+builds temporary benchmark artifacts and exercises both passing and failing SLO
+paths:
+
+```bash
+python3 bench/perf_slo_audit_ci_smoke.py
+```
+
+`qemu_exit_rate_audit.py` aggregates saved QEMU prompt benchmark rows by
+profile/model/quantization/phase and gates failure, timeout, nonzero-exit, and
+launch-error percentages. It reads artifacts only and does not launch QEMU.
+
+```bash
+python3 bench/qemu_exit_rate_audit.py bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_exit_rate_audit_latest \
+  --min-rows 4 \
+  --max-failure-pct 0 \
+  --max-timeout-pct 0 \
+  --max-nonzero-exit-pct 0 \
+  --max-launch-error-pct 0
+```
+
+Its smoke gate covers passing and failing exit-rate thresholds:
+
+```bash
+python3 bench/qemu_exit_rate_audit_ci_smoke.py
+```
+
+`dashboard_freshness_audit.py` checks saved dashboard JSON artifacts for
+missing, stale, or future `generated_at` timestamps. It is host-side only and
+does not launch QEMU.
+
+```bash
+python3 bench/dashboard_freshness_audit.py bench/dashboards \
+  --output-dir bench/dashboards \
+  --output-stem dashboard_freshness_audit_latest \
+  --max-age-hours 96 \
+  --min-dashboards 1
+```
+
+Its smoke gate covers fresh, stale, and future-dated dashboard artifacts:
+
+```bash
+python3 bench/dashboard_freshness_audit_ci_smoke.py
+```
+
+`qemu_quant_coverage_audit.py` checks saved QEMU prompt benchmark artifacts for
+required quantization coverage across a profile/model result set. By default it
+requires both Q4_0 and Q8_0 rows and can gate rows, successful rows, and unique
+prompts per quantization. It reads artifacts only and does not launch QEMU.
+
+```bash
+python3 bench/qemu_quant_coverage_audit.py bench/results/bench_matrix_20260428T150609Z \
+  --output-dir bench/results \
+  --output-stem qemu_quant_coverage_audit_latest \
+  --min-rows-per-quant 1 \
+  --min-ok-rows-per-quant 1 \
+  --min-prompts-per-quant 1 \
+  --require-airgap-command
+```
+
+Its smoke gate covers passing Q4_0/Q8_0 coverage plus missing-quantization and
+low-success-count failures:
+
+```bash
+python3 bench/qemu_quant_coverage_audit_ci_smoke.py
+```
+
+`qemu_quant_pairing_audit.py` checks saved QEMU prompt benchmark artifacts for
+per-prompt Q4_0/Q8_0 pairing. It groups rows by profile, model, prompt, phase,
+iteration, and commit so matrix comparisons cannot silently compare different
+prompt/build rows. It reads artifacts only and does not launch QEMU.
+
+```bash
+python3 bench/qemu_quant_pairing_audit.py bench/results/bench_matrix_20260428T200733Z \
+  --output-dir bench/results \
+  --output-stem qemu_quant_pairing_audit_latest \
+  --require-success
+```
+
+Its smoke gate covers passing pairs, missing quantization pairs, failed pair
+members, and the older `returncode=0` success fallback:
+
+```bash
+python3 bench/qemu_quant_pairing_audit_ci_smoke.py
+```
+
+`qemu_prompt_id_audit.py` checks saved QEMU prompt benchmark artifacts for
+non-empty prompt identities, SHA-256 prompt hashes, and one-to-one prompt/hash
+mappings so replay and quantization comparisons cannot silently mix prompts.
+It reads artifacts only and does not launch QEMU.
+
+```bash
+python3 bench/qemu_prompt_id_audit.py bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_prompt_id_audit_latest \
+  --min-rows 1
+```
+
+Its smoke gate covers passing prompt identities, prompt/hash drift, prompt/hash
+collisions, missing prompts, malformed hashes, and result sidecars:
+
+```bash
+python3 bench/qemu_prompt_id_audit_ci_smoke.py
+```
+
+`qemu_prompt_source_audit.py` checks saved QEMU prompt benchmark rows against
+the artifact's declared local prompt suite source. It validates prompt IDs,
+prompt SHA-256 values, prompt byte counts, and optionally expected-token fields.
+It reads artifacts and prompt files only and does not launch QEMU.
+
+```bash
+python3 bench/qemu_prompt_source_audit.py bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_prompt_source_audit_latest \
+  --require-expected-tokens
+```
+
+Its smoke gate covers passing row/source parity plus prompt-hash drift and
+unknown prompt IDs:
+
+```bash
+python3 bench/qemu_prompt_source_audit_ci_smoke.py
+```
+
+`qemu_exit_class_audit.py` checks row-level consistency between `returncode`,
+`timed_out`, `exit_class`, `failure_reason`, and success telemetry in saved
+benchmark artifacts. It reads artifacts only and does not launch QEMU.
+
+```bash
+python3 bench/qemu_exit_class_audit.py bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_exit_class_audit_latest \
+  --require-success-telemetry \
+  --require-failure-reason
+```
+
+Its smoke gate covers passing, mismatched exit-class, stale failure-reason, and
+missing success-telemetry cases:
+
+```bash
+python3 bench/qemu_exit_class_audit_ci_smoke.py
+```
+
+`eval_score_sparsity_audit.py` checks local HolyC and llama.cpp scored
+prediction JSONL files for degenerate score vectors, including too few nonzero
+or unique scores and excessive zero-score percentage. It is host-side only and
+does not launch QEMU.
+
+```bash
+python3 bench/eval_score_sparsity_audit.py \
+  --holyc bench/eval/samples/holyc_smoke_scored_predictions.jsonl \
+  --llama bench/eval/samples/llama_smoke_scored_predictions.jsonl \
+  --output-dir bench/results \
+  --output-stem eval_score_sparsity_audit_latest \
+  --min-nonzero-scores-per-record 2 \
+  --min-unique-scores-per-record 2 \
+  --max-zero-score-pct 75
+```
+
+Its smoke gate covers passing dense score vectors and failing sparse/constant
+vectors:
+
+```bash
+python3 bench/eval_score_sparsity_audit_ci_smoke.py
+```
+
+`eval_score_order_audit.py` checks local scored prediction artifacts for
+declared-prediction vs score-vector ordering drift. It validates that each
+declared prediction index matches the top score, flags out-of-range predictions
+and ambiguous top-score ties, and can require every row to carry both fields.
+It is host-side only and does not launch QEMU.
+
+```bash
+python3 bench/eval_score_order_audit.py \
+  --predictions holyc=bench/eval/samples/holyc_smoke_scored_predictions.jsonl \
+  --predictions llama=bench/eval/samples/llama_smoke_scored_predictions.jsonl \
+  --output-dir bench/results \
+  --output-stem eval_score_order_audit_latest \
+  --require-both \
+  --min-checked-records 3
+```
+
+Its smoke gate covers matching rows plus prediction/top-score mismatches and
+top-score ties:
+
+```bash
+python3 bench/eval_score_order_audit_ci_smoke.py
+```
+
+`qemu_environment_audit.py` checks host environment provenance in saved QEMU
+benchmark artifacts. Use `--require-row-command-provenance` to require every
+benchmark row to carry command hash and air-gap metadata derived from its saved
+command.
+
+```bash
+python3 bench/qemu_environment_audit.py bench/results/qemu_prompt_bench_latest.json \
+  --require-qemu-path \
+  --require-qemu-version \
+  --require-row-command-provenance
+```
+
+`qemu_latest_alias_audit.py` checks saved QEMU `*_latest.json` aliases against
+the newest stamped sibling artifact in the same directory. It flags stale alias
+payloads, `generated_at` drift, missing stamped siblings, and invalid JSON while
+reading artifacts only.
+
+```bash
+python3 bench/qemu_latest_alias_audit.py bench/results \
+  --output-dir bench/results \
+  --output-stem qemu_latest_alias_audit_latest
+```
+
+## Eval Score Parity Audit
+
+`eval_score_parity_audit.py` checks HolyC and llama.cpp prediction streams
+against the same local gold dataset before `eval_compare.py` consumes them. It
+verifies record-id coverage and paired score-vector presence/shape parity, with
+optional gates requiring scores on every paired row and bounding top-score ties.
+
+```bash
+python3 bench/eval_score_parity_audit.py \
+  --gold bench/datasets/samples/smoke_eval.jsonl \
+  --holyc bench/eval/samples/holyc_smoke_scored_predictions.jsonl \
+  --llama bench/eval/samples/llama_smoke_scored_predictions.jsonl \
+  --dataset smoke-eval \
+  --split validation \
+  --require-scores \
+  --min-score-parity-pct 100 \
+  --max-top-score-tie-pct 0 \
+  --output-dir bench/results \
+  --output-stem eval_score_parity_audit_smoke_latest
+```
+
+The tool writes JSON, Markdown, findings CSV, per-record pair CSV, and JUnit
+outputs. Its smoke gate exercises passing score parity plus missing-score,
+missing-row, extra-row, and tied-top-score failures:
+
+```bash
+python3 bench/eval_score_parity_audit_ci_smoke.py
+```
+
+## Eval Score Delta Audit
+
+`eval_score_delta_audit.py` checks paired HolyC and llama.cpp score vectors
+against the same local gold dataset and gates absolute score drift before
+quality reports consume the predictions. It reports pair coverage, top-index
+match rate, max/mean absolute deltas, top-score deltas, and gold-choice score
+deltas.
+
+```bash
+python3 bench/eval_score_delta_audit.py \
+  --gold bench/datasets/samples/smoke_eval.jsonl \
+  --holyc bench/eval/samples/holyc_smoke_scored_predictions.jsonl \
+  --llama bench/eval/samples/llama_smoke_scored_predictions.jsonl \
+  --dataset smoke-eval \
+  --split validation \
+  --min-pair-coverage-pct 100 \
+  --min-top-index-match-pct 100 \
+  --max-abs-delta 0.25 \
+  --max-mean-abs-delta 0.125 \
+  --max-top-score-abs-delta 0.25 \
+  --output-dir bench/results \
+  --output-stem eval_score_delta_audit_smoke_latest
+```
+
+The smoke gate exercises the local scored eval fixtures and refreshes JSON,
+Markdown, CSV, findings CSV, and JUnit sidecars:
+
+```bash
+python3 bench/eval_score_delta_audit_ci_smoke.py
+```
+
+## Eval Prediction Coverage Audit
+
+`eval_prediction_coverage_audit.py` checks raw HolyC and llama.cpp prediction
+artifacts against a local gold JSONL dataset before comparison. It reports
+global and per dataset/split coverage, flags missing/extra/duplicate prediction
+ids, and writes JSON, Markdown, CSV, findings CSV, and JUnit outputs.
+
+```bash
+python3 bench/eval_prediction_coverage_audit.py \
+  --gold bench/datasets/samples/smoke_eval.jsonl \
+  --holyc bench/eval/samples/holyc_smoke_predictions.jsonl \
+  --llama bench/eval/samples/llama_smoke_predictions.jsonl \
+  --dataset smoke-eval \
+  --split validation \
+  --min-coverage-pct 100 \
+  --min-slice-coverage-pct 100 \
+  --output-dir bench/results \
+  --output-stem eval_prediction_coverage_audit_smoke_latest
+```
+
+The smoke gate refreshes the sample report artifacts:
+
+```bash
+python3 bench/eval_prediction_coverage_audit_ci_smoke.py
+```
+
+## Eval Prompt Hash Audit
+
+`eval_prompt_hash_audit.py` checks HolyC and llama.cpp prediction artifacts
+against the local gold dataset's `prompt_sha256`, `choices_sha256`, and
+`input_sha256` fingerprints. Use `--require-hashes` to fail stale or incomplete
+prediction streams before `eval_compare.py` computes quality metrics.
+
+```bash
+python3 bench/eval_prompt_hash_audit.py \
+  --gold bench/datasets/samples/smoke_eval.jsonl \
+  --holyc bench/eval/samples/holyc_smoke_hashed_predictions.jsonl \
+  --llama bench/eval/samples/llama_smoke_hashed_predictions.jsonl \
+  --dataset smoke-eval \
+  --split validation \
+  --require-hashes \
+  --min-hashed-rows 6 \
+  --output-dir bench/results \
+  --output-stem eval_prompt_hash_audit_smoke_latest
+```
+
+The smoke gate covers matching hashes, missing hash metadata, stale input hashes,
+and extra/missing prediction rows:
+
+```bash
+python3 bench/eval_prompt_hash_audit_ci_smoke.py
+```
+
+## Eval Choice Map Audit
+
+`eval_choice_map_audit.py` checks HolyC and llama.cpp prediction label mapping
+against the same local gold dataset before comparison. It reports raw answer
+formats (`index`, `alpha`, `choice_text`, or `scores_only`), validates each
+normalized prediction against the gold choice count, detects duplicate gold
+choice text, and can gate mixed formats or HolyC/llama format drift.
+
+```bash
+python3 bench/eval_choice_map_audit.py \
+  --gold bench/datasets/samples/smoke_eval.jsonl \
+  --holyc bench/eval/samples/holyc_smoke_predictions.jsonl \
+  --llama bench/eval/samples/llama_smoke_predictions.jsonl \
+  --dataset smoke-eval \
+  --split validation \
+  --min-valid-pct 100 \
+  --require-engine-format-parity \
+  --output-dir bench/results \
+  --output-stem eval_choice_map_audit_smoke_latest
+```
+
+The smoke gate exercises the local smoke eval inputs:
+
+```bash
+python3 bench/eval_choice_map_audit_ci_smoke.py
+```
+
+## Eval Pairing Audit
+
+`eval_pairing_audit.py` checks HolyC and llama.cpp prediction streams before
+comparison. It verifies record pairing, optional row order, prediction presence,
+score-vector shape, and matching top-level or nested `metadata` identity fields
+including model/tokenizer hashes and prompt-template/input hashes.
+
+```bash
+python3 bench/eval_pairing_audit.py \
+  --holyc bench/eval/samples/holyc_smoke_predictions.jsonl \
+  --llama bench/eval/samples/llama_smoke_predictions.jsonl \
+  --min-records 3 \
+  --require-same-order \
+  --require-predictions \
+  --fail-on-findings
+```
+
+The smoke gate covers passing pair streams plus ordering, counterpart, top-level
+metadata, and nested identity-metadata drift:
+
+```bash
+python3 bench/eval_pairing_audit_ci_smoke.py
+```
+
+## Eval Identity Audit
+
+`eval_identity_audit.py` checks HolyC and llama.cpp prediction artifacts for
+apples-to-apples model identity metadata before quality metrics consume them.
+It summarizes per-row `model`, `model_sha256`, `tokenizer_sha256`,
+`quantization`, and `prompt_template_sha256` values, can require complete
+identity metadata, and can gate cross-engine equality for selected keys.
+
+```bash
+python3 bench/eval_identity_audit.py \
+  bench/eval/samples/holyc_smoke_identity_predictions.jsonl \
+  bench/eval/samples/llama_smoke_identity_predictions.jsonl \
+  --require-identity \
+  --compare-key model_sha256 \
+  --compare-key tokenizer_sha256 \
+  --compare-key quantization \
+  --compare-key prompt_template_sha256 \
+  --output-dir bench/results \
+  --output-stem eval_identity_audit_smoke_latest
+```
+
+The smoke gate exercises passing identity parity plus cross-engine model-hash
+drift:
+
+```bash
+python3 bench/eval_identity_audit_ci_smoke.py
+```
+
+## Eval Top-k Overlap Audit
+
+`eval_topk_overlap_audit.py` checks scored HolyC and llama.cpp multiple-choice
+prediction streams for paired top-k ranking overlap. It reports pair coverage,
+top-k exact-match rate, top-1 disagreement, average Jaccard overlap, and whether
+the gold answer is inside each engine's top-k set.
+
+```bash
+python3 bench/eval_topk_overlap_audit.py \
+  --gold bench/datasets/samples/smoke_eval.jsonl \
+  --holyc bench/eval/samples/holyc_smoke_scored_predictions.jsonl \
+  --llama bench/eval/samples/llama_smoke_scored_predictions.jsonl \
+  --dataset smoke-eval \
+  --split validation \
+  --top-k 2 \
+  --min-pair-coverage-pct 100 \
+  --min-topk-exact-match-pct 100 \
+  --min-avg-jaccard 1 \
+  --max-top1-disagree-pct 0 \
+  --output-dir bench/results \
+  --output-stem eval_topk_overlap_audit_smoke_latest
+```
+
+The smoke gate exercises passing top-k overlap plus failing top-1/top-k drift:
+
+```bash
+python3 bench/eval_topk_overlap_audit_ci_smoke.py
+```
+
+## QEMU Resource Coverage Audit
+
+`qemu_resource_coverage_audit.py` checks saved QEMU benchmark artifacts for
+resource telemetry coverage before perf dashboards or regressions consume them.
+It verifies measured OK rows include host child RSS, child CPU, token/CPU, guest
+memory, and memory-per-token telemetry. It is host-side only and does not launch
+QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_resource_coverage_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_resource_coverage_audit_latest \
+  --min-rows 4
+```
+
+The tool writes JSON, Markdown, CSV records, CSV findings, and JUnit outputs.
+Its smoke gate builds temporary passing and failing benchmark artifacts:
+
+```bash
+python3 bench/qemu_resource_coverage_audit_ci_smoke.py
+```
+
+## QEMU Prompt Length Bucket Audit
+
+`qemu_prompt_length_bucket_audit.py` checks saved QEMU prompt benchmark
+artifacts for prompt-size coverage. It buckets measured rows by `prompt_bytes`
+and reports per-bucket success counts, unique prompt counts, token totals, p50
+wall tok/s, low-tail wall tok/s, and p95 first-token latency. This keeps
+benchmark comparisons from silently relying on only one prompt length class.
+
+```bash
+python3 bench/qemu_prompt_length_bucket_audit.py bench/results \
+  --require-buckets \
+  --min-successful-samples-per-bucket 1 \
+  --min-prompts-per-bucket 1 \
+  --max-failure-pct 25 \
+  --output-dir bench/results \
+  --output-stem qemu_prompt_length_bucket_audit_latest
+```
+
+Custom prompt byte buckets use `name:min:max`; leave `max` empty for the final
+open-ended bucket:
+
+```bash
+python3 bench/qemu_prompt_length_bucket_audit.py bench/results \
+  --bucket short:0:255 \
+  --bucket medium:256:1023 \
+  --bucket long:1024:
+```
+
+The smoke gate builds temporary passing and failing artifacts and verifies JSON,
+Markdown, CSV, findings CSV, and JUnit outputs:
+
+```bash
+python3 bench/qemu_prompt_length_bucket_audit_ci_smoke.py
+```
+
+## QEMU CPU Accounting Audit
+
+`qemu_cpu_accounting_audit.py` checks saved QEMU benchmark artifacts for host
+child CPU telemetry consistency before perf dashboards consume them. It verifies
+child CPU microseconds equal user plus system CPU, CPU percentage matches wall
+time, and token-per-CPU-second metrics match token counts. It is host-side only
+and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_cpu_accounting_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_cpu_accounting_audit_latest \
+  --min-rows 4 \
+  --require-cpu-metrics
+```
+
+The tool writes JSON, Markdown, CSV rows, CSV findings, and JUnit outputs. Its
+smoke gate builds temporary passing and failing benchmark artifacts:
+
+```bash
+python3 bench/qemu_cpu_accounting_audit_ci_smoke.py
+```
+
+## QEMU Memory Accounting Audit
+
+`qemu_memory_accounting_audit.py` checks saved QEMU benchmark artifacts for
+memory telemetry consistency before perf dashboards consume them. It verifies
+guest memory bytes/token and host child peak RSS bytes/token accounting, and can
+optionally require guest-reported memory to stay within host child peak RSS. It
+is host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_memory_accounting_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_memory_accounting_audit_latest \
+  --min-rows 4 \
+  --require-memory-bytes \
+  --require-host-rss \
+  --require-guest-memory-within-host-rss \
+  --max-host-rss-over-guest-ratio 4
+```
+
+The tool writes JSON, Markdown, CSV rows, CSV findings, and JUnit outputs. Its
+smoke gate builds temporary passing and failing benchmark artifacts:
+
+```bash
+python3 bench/qemu_memory_accounting_audit_ci_smoke.py
+```
+
+## QEMU Serial Accounting Audit
+
+`qemu_serial_accounting_audit.py` checks saved QEMU benchmark artifacts for
+serial output telemetry consistency before perf dashboards consume them. It
+verifies stdout/stderr byte counters sum to `serial_output_bytes`, and verifies
+stdout/stderr line counters when those component line counters are present. It
+is host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_serial_accounting_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_serial_accounting_audit_latest \
+  --min-rows 4 \
+  --require-metrics
+```
+
+The tool writes JSON, Markdown, CSV rows, CSV findings, and JUnit outputs. Its
+smoke gate builds temporary passing and failing benchmark artifacts:
+
+```bash
+python3 bench/qemu_serial_accounting_audit_ci_smoke.py
+```
+
+## QEMU Serial Payload Audit
+
+`qemu_serial_payload_audit.py` checks saved QEMU benchmark artifacts for
+BENCH_RESULT extraction integrity. It verifies OK rows still contain a captured
+serial payload and that payload fields match normalized row metrics for tokens,
+elapsed time, TTFT, memory, prompt bytes, and prompt SHA. It is host-side only
+and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_serial_payload_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_serial_payload_audit_latest \
+  --min-rows 4
+```
+
+The tool writes JSON, Markdown, CSV rows, CSV findings, and JUnit outputs. Its
+smoke gate builds temporary passing and failing benchmark artifacts, then
+refreshes the latest serial payload audit artifacts:
+
+```bash
+python3 bench/qemu_serial_payload_audit_ci_smoke.py
+```
+
+## QEMU Timeout Margin Audit
+
+`qemu_timeout_margin_audit.py` checks saved QEMU benchmark artifacts for timeout
+headroom before perf dashboards consume them. It verifies timeout telemetry is
+present, `wall_timeout_pct` matches wall elapsed time over timeout budget, and
+OK rows do not run too close to their timeout limit. Timeout rows are also
+checked for near-budget wall time so early exits cannot be mislabeled as guest
+timeouts. It is host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_timeout_margin_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_timeout_margin_audit_latest \
+  --min-rows 4 \
+  --max-ok-timeout-pct 90 \
+  --min-timeout-timeout-pct 90
+```
+
+The tool writes JSON, Markdown, CSV rows, CSV findings, and JUnit outputs. Its
+smoke gate builds temporary passing and failing benchmark artifacts:
+
+```bash
+python3 bench/qemu_timeout_margin_audit_ci_smoke.py
+```
+
+## QEMU Timeout Recommendations
+
+`qemu_timeout_recommend.py` reads saved QEMU prompt benchmark artifacts and
+groups successful measured rows by benchmark/profile/model/quantization to
+recommend launch timeout budgets from P95 wall time plus configurable headroom.
+It is host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_timeout_recommend.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_timeout_recommend_latest \
+  --min-samples 2 \
+  --require-timeout-telemetry
+```
+
+The tool writes JSON, Markdown, CSV rows, CSV findings, and JUnit outputs. Its
+smoke gate builds a temporary passing benchmark artifact and refreshes latest
+recommendation sidecars when a local latest QEMU benchmark result exists:
+
+```bash
+python3 bench/qemu_timeout_recommend_ci_smoke.py
+```
+
+## QEMU Host Overhead Audit
+
+`qemu_host_overhead_audit.py` checks saved QEMU benchmark artifacts for
+host-side timing overhead accounting before perf dashboards consume them. It
+verifies `host_overhead_us` and `host_overhead_pct` match wall elapsed time
+minus guest-reported elapsed time, reports max/median/p95 overhead percentages,
+and provides an optional negative-overhead gate for non-synthetic runs. It is
+host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_host_overhead_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_host_overhead_audit_latest \
+  --min-rows 4 \
+  --max-ok-host-overhead-pct 50
+```
+
+The tool writes JSON, Markdown, CSV rows, CSV findings, and JUnit outputs. Its
+smoke gate builds temporary passing and failing benchmark artifacts:
+
+```bash
+python3 bench/qemu_host_overhead_audit_ci_smoke.py
+```
+
+## QEMU TTFT Audit
+
+`qemu_ttft_audit.py` checks saved QEMU prompt benchmark artifacts for
+time-to-first-token telemetry before dashboards compare prompt responsiveness.
+It verifies measured OK rows include non-negative `ttft_us`, that TTFT does not
+exceed guest or wall elapsed time, and reports min/median/p95/max TTFT plus the
+maximum TTFT share of guest elapsed time. It is host-side only and does not
+launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_ttft_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_ttft_audit_latest \
+  --min-rows 4 \
+  --max-ttft-elapsed-pct 100
+```
+
+The tool writes JSON, Markdown, CSV rows, CSV findings, and JUnit outputs. Its
+smoke gate builds temporary passing and failing benchmark artifacts:
+
+```bash
+python3 bench/qemu_ttft_audit_ci_smoke.py
+```
+
+## QEMU Latency Distribution Audit
+
+`qemu_latency_distribution_audit.py` checks saved QEMU benchmark artifacts for
+latency distribution telemetry before perf dashboards consume them. It groups
+measured OK rows by profile, model, quantization, and prompt, then reports p50
+and p95 wall latency, TTFT, wall us/token, and wall tok/s. It is host-side only
+and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_latency_distribution_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_latency_distribution_audit_latest \
+  --min-rows 4 \
+  --min-samples-per-group 2 \
+  --max-p95-wall-us-per-token 10000 \
+  --min-p50-wall-tok-per-s 100
+```
+
+The tool writes JSON, Markdown, CSV group rows, CSV sample rows, CSV findings,
+and JUnit outputs. Its smoke gate builds temporary passing and failing benchmark
+artifacts:
+
+```bash
+python3 bench/qemu_latency_distribution_audit_ci_smoke.py
+```
+
+## QEMU Token Accounting Audit
+
+`qemu_token_accounting_audit.py` checks saved QEMU benchmark artifacts for
+token-derived metric consistency before benchmark dashboards consume them. It
+verifies tok/s, us/token, prompt-byte ratios, memory/token ratios, and optional
+expected-token contracts from measured OK rows. With
+`--require-expected-tokens-match`, the audit fails both stale match flags and
+honestly recorded token-count mismatches. It is host-side only and does not
+launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_token_accounting_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_token_accounting_audit_latest \
+  --min-rows 4 \
+  --require-expected-tokens \
+  --require-expected-tokens-match
+```
+
+The tool writes JSON, Markdown, CSV rows, CSV findings, and JUnit outputs. Its
+smoke gate builds temporary passing and failing benchmark artifacts:
+
+```bash
+python3 bench/qemu_token_accounting_audit_ci_smoke.py
+```
+
+## QEMU Timing Consistency Audit
+
+`qemu_timing_consistency_audit.py` checks saved QEMU benchmark artifacts for
+derived timing metric consistency before result dashboards consume them. It
+verifies elapsed/wall rates, us/token ratios, host overhead math, timeout
+percentages, TTFT bounds, and child CPU totals. It is host-side only and does
+not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_timing_consistency_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_timing_consistency_audit_latest \
+  --measured-only
+```
+
+The tool writes JSON, Markdown, CSV rows, CSV findings, and JUnit outputs. Its
+smoke gate builds temporary passing and failing benchmark artifacts:
+
+```bash
+python3 bench/qemu_timing_consistency_audit_ci_smoke.py
+```
+
+## QEMU Prompt Echo Audit
+
+`qemu_prompt_echo_audit.py` checks saved QEMU benchmark artifacts for host/guest
+prompt identity parity. It verifies measured OK rows have matching host prompt
+bytes, guest-reported prompt bytes, host prompt SHA-256, guest-reported prompt
+SHA-256, and match flags before throughput or eval reports trust a guest run.
+It is host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_prompt_echo_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_prompt_echo_audit_latest \
+  --min-rows 4
+```
+
+The tool writes JSON, Markdown, CSV rows, CSV findings, and JUnit outputs. Its
+smoke gate builds temporary passing and failing benchmark artifacts:
+
+```bash
+python3 bench/qemu_prompt_echo_audit_ci_smoke.py
+```
+
+## QEMU Seed Audit
+
+`qemu_seed_audit.py` checks saved QEMU prompt benchmark artifacts for deterministic
+seed metadata before repeatability audits compare outputs across runs. It
+requires measured OK rows to carry an integer `seed`, `rng_seed`, or
+`sampler_seed`, rejects negative or malformed seeds, and can gate seed drift
+within the same profile/model/quantization/prompt/iteration/commit group. It is
+host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_seed_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_seed_audit_latest \
+  --min-rows 4
+```
+
+The tool writes JSON, Markdown, CSV rows, CSV findings, and JUnit outputs. Its
+smoke gate builds temporary passing and failing benchmark artifacts:
+
+```bash
+python3 bench/qemu_seed_audit_ci_smoke.py
+```
+
+## QEMU Output Determinism Audit
+
+`qemu_output_determinism_audit.py` checks saved QEMU prompt benchmark artifacts
+for repeated-run output drift. It groups measured OK rows by profile, model,
+quantization, prompt, commit, and seed, then verifies each group has enough
+repeats plus stable generated output hashes and token counts. It is host-side
+only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_output_determinism_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_output_determinism_audit_latest \
+  --require-output-hash \
+  --require-tokens \
+  --min-repeats 2
+```
+
+The tool writes JSON, Markdown, CSV rows, CSV findings, and JUnit outputs. Its
+smoke gate builds temporary passing and failing benchmark artifacts:
+
+```bash
+python3 bench/qemu_output_determinism_audit_ci_smoke.py
+```
+
+## QEMU Throughput Stability Audit
+
+`qemu_throughput_stability_audit.py` checks saved QEMU benchmark artifacts for
+per-prompt wall tok/s floors and variability before perf dashboards consume
+them. It groups measured OK rows by profile, model, quantization, and prompt,
+then reports min/mean/median/max wall tok/s plus coefficient of variation. It is
+host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_throughput_stability_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_throughput_stability_audit_latest \
+  --min-rows 4 \
+  --min-samples-per-group 2 \
+  --min-wall-tok-per-s 100 \
+  --max-wall-tok-per-s-cv 0.10
+```
+
+The tool writes JSON, Markdown, CSV group rows, CSV sample rows, CSV findings,
+and JUnit outputs. Its smoke gate builds temporary passing and failing benchmark
+artifacts:
+
+```bash
+python3 bench/qemu_throughput_stability_audit_ci_smoke.py
+```
+
+## QEMU Phase Sequence Audit
+
+`qemu_phase_sequence_audit.py` checks saved QEMU benchmark artifacts for expected
+warmup/measured phase structure before benchmark dashboards consume them. It
+verifies per-prompt warmup and measured row coverage, rejects warmups recorded
+after measured rows, duplicate per-phase iterations, unknown phases, and measured
+rows that did not complete successfully when requested. It is host-side only and
+does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_phase_sequence_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_phase_sequence_audit_latest \
+  --min-rows 4 \
+  --min-warmups-per-group 1 \
+  --min-measured-per-group 2 \
+  --require-measured-ok
+```
+
+The tool writes JSON, Markdown, CSV group rows, CSV run rows, CSV findings, and
+JUnit outputs. Its smoke gate builds temporary passing and failing benchmark
+artifacts:
+
+```bash
+python3 bench/qemu_phase_sequence_audit_ci_smoke.py
+```
+
+## QEMU Launch Order Audit
+
+`qemu_launch_order_audit.py` checks saved QEMU benchmark artifacts for launch
+index integrity before dashboards or regression gates consume them. It verifies
+unique contiguous launch indices, planned launch counts, warmups before measured
+runs, row timestamps, and optional interval-overlap checks with a default
+tolerance for second-resolution timestamps. It is host-side only and does not
+launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_launch_order_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_launch_order_audit_latest
+```
+
+The tool writes JSON, Markdown, CSV artifact rows, CSV launch rows, CSV
+findings, and JUnit outputs. Its smoke gate builds temporary passing and failing
+benchmark artifacts:
+
+```bash
+python3 bench/qemu_launch_order_audit_ci_smoke.py
+```
+
+## QEMU Failure Taxonomy Audit
+
+`qemu_failure_audit.py` checks saved QEMU benchmark artifacts for consistent
+failure accounting before dashboards or regression gates consume them. It
+validates known `exit_class` values, timeout flag parity, failure reasons,
+return-code consistency, OK-row timing/token metrics, and optional aggregate
+failure/timeout percentage gates. It is host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_failure_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_failure_audit_latest \
+  --min-rows 4 \
+  --max-failure-pct 0 \
+  --max-timeout-pct 0
+```
+
+The tool writes JSON, Markdown, CSV exit-class summaries, CSV row details, CSV
+findings, and JUnit outputs. Its smoke gate builds temporary passing and failing
+benchmark artifacts:
+
+```bash
+python3 bench/qemu_failure_audit_ci_smoke.py
+```
+
+## QEMU Launch Integrity Audit
+
+`qemu_launch_integrity_audit.py` checks saved QEMU benchmark artifacts for
+launch-plan integrity before dashboards or regression gates consume them. It
+recomputes launch-plan hashes, expected/observed launch sequence hashes, and
+stored launch-sequence integrity metadata when present. Legacy artifacts without
+launch-plan telemetry are tolerated unless `--require-launch-plan` is set. It
+is host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_launch_integrity_audit.py \
+  bench/results \
+  --output-dir bench/results \
+  --output-stem qemu_launch_integrity_audit_latest \
+  --require-match
+```
+
+The tool writes JSON, Markdown, CSV artifact rows, CSV findings, and JUnit
+outputs. Its smoke gate builds temporary passing and failing benchmark
+artifacts:
+
+```bash
+python3 bench/qemu_launch_integrity_audit_ci_smoke.py
+```
+
+## QEMU Artifact Budget Audit
+
+`qemu_artifact_budget_audit.py` checks saved QEMU benchmark artifacts for
+bounded file sizes, captured serial output, stdout/stderr tails, and failure
+reason payloads before dashboards consume them. It is host-side only and does
+not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_artifact_budget_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_artifact_budget_audit_latest \
+  --max-file-bytes 2000000 \
+  --max-serial-output-bytes 131072 \
+  --max-stdout-tail-bytes 4096
+```
+
+The tool writes JSON, Markdown, CSV artifact rows, CSV findings, and JUnit
+outputs. Its smoke gate builds temporary passing and failing benchmark
+artifacts:
+
+```bash
+python3 bench/qemu_artifact_budget_audit_ci_smoke.py
+```
+
+## QEMU Artifact Reference Audit
+
+`qemu_artifact_reference_audit.py` checks saved QEMU benchmark artifacts for
+remote URLs, network shares, scp-style remote paths, and QEMU command arrays
+that drift from the air-gap contract. It is host-side only and does not launch
+QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_artifact_reference_audit.py bench/results \
+  --output-dir bench/results \
+  --output-stem qemu_artifact_reference_audit_latest \
+  --min-artifacts 1
+```
+
+The tool writes JSON, Markdown, CSV artifact rows, CSV findings, and JUnit
+outputs. Its smoke gate builds a temporary synthetic benchmark artifact and
+checks both passing local references and failing remote/network references:
+
+```bash
+python3 bench/qemu_artifact_reference_audit_ci_smoke.py
+```
+
+## QEMU Image Reference Audit
+
+`qemu_image_reference_audit.py` checks saved QEMU benchmark artifacts for drift
+between declared `image.path` metadata and disk image references recorded in
+QEMU command arrays. It is host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_image_reference_audit.py bench/results \
+  --output-dir bench/results \
+  --output-stem qemu_image_reference_audit_latest \
+  --require-drive-reference \
+  --require-single-drive-path
+```
+
+The tool writes JSON, Markdown, CSV artifact rows, CSV findings, and JUnit
+outputs. Its smoke gate builds temporary passing and failing benchmark
+artifacts:
+
+```bash
+python3 bench/qemu_image_reference_audit_ci_smoke.py
+```
+
+## QEMU Launch Profile Audit
+
+`qemu_launch_profile_audit.py` checks saved QEMU benchmark artifacts for drift
+between the top-level launch command and warmup/measured command arrays. It
+compares executable, machine, CPU, accelerator, and memory settings, and can
+require specific fields such as `-m`. Use `--fail-on-cross-artifact-drift`
+when a matrix must compare artifacts with the same executable, machine, CPU,
+accelerator, and memory profile. It is host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_launch_profile_audit.py bench/results \
+  --output-dir bench/results \
+  --output-stem qemu_launch_profile_audit_latest \
+  --require-memory \
+  --fail-on-cross-artifact-drift
+```
+
+The tool writes JSON, Markdown, CSV profile rows, CSV findings, and JUnit
+outputs. Its smoke gate builds temporary passing and failing benchmark
+artifacts:
+
+```bash
+python3 bench/qemu_launch_profile_audit_ci_smoke.py
+```
+
+## QEMU Command Fingerprint Audit
+
+`qemu_command_fingerprint_audit.py` checks saved QEMU benchmark artifacts for
+recomputable command SHA256s, explicit `-nic none`, legacy `-net none` drift,
+and row-vs-top-level command hash consistency. It is host-side only and does
+not launch QEMU. Use `--require-single-command-hash` when a benchmark artifact
+must prove all measured and warmup rows used exactly the same launch command.
+
+Example:
+
+```bash
+python3 bench/qemu_command_fingerprint_audit.py bench/results \
+  --output-dir bench/results \
+  --output-stem qemu_command_fingerprint_audit_latest \
+  --require-top-command \
+  --require-single-command-hash
+```
+
+The tool writes JSON, Markdown, CSV row records, CSV findings, and JUnit
+outputs. Its smoke gate exercises passing hashes plus hash drift, air-gap
+violations, row-command drift, and multi-command rejection:
+
+```bash
+python3 bench/qemu_command_fingerprint_audit_ci_smoke.py
+```
+
+## QEMU Replay Manifest
+
+`qemu_replay_manifest.py` builds a replay manifest from saved
+`qemu_prompt_bench.py` JSON artifacts. It captures the benchmark argv, prompt
+suite hash, launch-plan hashes, measured-row counts, and provenance needed to
+replay a run while auditing that each recorded command remains air-gapped with
+explicit `-nic none`. It is host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_replay_manifest.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_replay_manifest_latest
+```
+
+The tool writes JSON, Markdown, CSV replay rows, JSONL argv records, CSV
+findings, and JUnit outputs. Its smoke gate builds a temporary passing replay
+artifact:
+
+```bash
+python3 bench/qemu_replay_manifest_ci_smoke.py
+```
+
+## QEMU Replay Manifest Audit
+
+`qemu_replay_manifest_audit.py` checks exported replay manifests and argv
+sidecars for schema parity, recomputed command hashes, sidecar hash drift,
+source artifact presence, and explicit `-nic none` air-gap metadata. It is
+host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/qemu_replay_manifest_audit.py \
+  bench/results/qemu_replay_manifest_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_replay_manifest_audit_latest
+```
+
+The tool writes JSON, Markdown, CSV manifest rows, CSV findings, and JUnit
+outputs. Its smoke gate builds a temporary replay manifest and audits it:
+
+```bash
+python3 bench/qemu_replay_manifest_audit_ci_smoke.py
+```
+
+## QEMU Input Provenance Audit
+
+`qemu_input_provenance_audit.py` checks saved QEMU benchmark artifacts for
+prompt-suite, image, and QEMU args-file provenance drift. It recomputes local
+prompt-suite hashes when the recorded prompt source is present, verifies
+recorded file metadata shape, and can gate live file size/SHA drift without
+launching QEMU or touching the TempleOS guest.
+
+Example:
+
+```bash
+python3 bench/qemu_input_provenance_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_input_provenance_audit_latest \
+  --require-live-inputs \
+  --require-file-sha256
+```
+
+The tool writes JSON, Markdown, CSV records, CSV findings, and JUnit outputs.
+Its smoke gate builds temporary prompt/image/args fixtures and exercises both
+passing and drift-detection paths:
+
+```bash
+python3 bench/qemu_input_provenance_audit_ci_smoke.py
+```
+
+## Airgap Audit
+
+`airgap_audit.py` checks saved benchmark command artifacts for the TempleOS
+air-gap policy. It reads existing JSON/JSONL/CSV results, verifies every saved
+QEMU command has explicit `-nic none`, rejects legacy `-net none` drift and
+network devices/backends, and cross-checks recorded command air-gap telemetry.
+It is host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/airgap_audit.py bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem airgap_audit_latest \
+  --min-commands 4
+```
+
+The tool writes JSON, Markdown, CSV findings, and JUnit outputs. Its smoke gate
+builds temporary passing/failing command artifacts:
+
+```bash
+python3 bench/airgap_audit_ci_smoke.py
+```
+
+## Dashboard Digest
+
+`dashboard_digest.py` summarizes existing dashboard JSON artifacts into a
+single CI-friendly status digest. It is host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/dashboard_digest.py \
+  bench/dashboards/perf_regression_latest.json \
+  bench/dashboards/perf_slo_audit_latest.json \
+  bench/dashboards/bench_trend_export_latest.json \
+  --output-dir bench/dashboards \
+  --output-stem dashboard_digest_latest \
+  --min-dashboards 3 \
+  --fail-on-missing \
+  --fail-on-fail-status
+```
+
+The tool writes JSON, Markdown, CSV, and JUnit outputs. Its smoke gate builds
+temporary dashboard artifacts and verifies aggregate status/finding counts:
+
+```bash
+python3 bench/dashboard_digest_ci_smoke.py
+```
+
+## Dashboard Sidecar Audit
+
+`dashboard_sidecar_audit.py` verifies that dashboard JSON artifacts have CSV,
+Markdown, and JUnit sidecars for CI upload and review. It accepts both exact
+`*_latest.csv` sidecars and metric-specific `*_*_latest.csv` exports. It is
+host-side only and does not launch QEMU.
+
+Example:
+
+```bash
+python3 bench/dashboard_sidecar_audit.py \
+  bench/dashboards/perf_regression_latest.json \
+  bench/dashboards/perf_slo_audit_latest.json \
+  bench/dashboards/bench_trend_export_latest.json \
+  --output-dir bench/dashboards \
+  --output-stem dashboard_sidecar_audit_latest \
+  --min-dashboards 3
+```
+
+The tool writes JSON, Markdown, CSV, and JUnit outputs. Its smoke gate builds
+temporary passing and failing dashboard artifacts:
+
+```bash
+python3 bench/dashboard_sidecar_audit_ci_smoke.py
 ```
 
 ## Offline Eval Dataset Packer
@@ -76,7 +1432,8 @@ python3 bench/quant_audit_ci_smoke.py
 packing. It normalizes the same HellaSwag-, ARC-, TruthfulQA-, and normalized
 row shapes accepted by the packer, reports dataset/split counts, answer and
 choice histograms, byte telemetry, duplicate IDs, and optional provenance or
-loader-size gate findings. It never fetches remote datasets.
+loader-size and answer-label coverage gate findings. It never fetches remote
+datasets.
 
 ```bash
 python3 bench/dataset_schema_audit.py \
@@ -84,6 +1441,7 @@ python3 bench/dataset_schema_audit.py \
   --output bench/results/datasets/dataset_schema_audit_smoke_latest.json \
   --markdown bench/results/datasets/dataset_schema_audit_smoke_latest.md \
   --csv bench/results/datasets/dataset_schema_audit_smoke_latest.csv \
+  --record-csv bench/results/datasets/dataset_schema_audit_smoke_records_latest.csv \
   --junit bench/results/datasets/dataset_schema_audit_smoke_latest_junit.xml \
   --require-provenance \
   --min-choices 4 \
@@ -91,10 +1449,31 @@ python3 bench/dataset_schema_audit.py \
   --max-prompt-bytes 4096 \
   --max-choice-bytes 1024 \
   --max-record-payload-bytes 8192 \
+  --min-answer-labels 1 \
+  --min-dataset-split-answer-labels 1 \
   --fail-on-duplicate-ids \
   --fail-on-duplicate-payloads \
   --fail-on-conflicting-payload-answers \
   --fail-on-findings
+```
+
+Use `--record-csv` to emit per-record normalized telemetry for loader-bound
+checks, including prompt bytes, total/max choice bytes, record payload bytes,
+answer index, and stable normalized prompt+choices payload hashes.
+Use `--min-answer-labels` and `--min-dataset-split-answer-labels` when a subset
+must exercise at least N answer indexes overall or in every dataset/split group.
+
+`dataset_content_hash_audit.py` verifies optional row-level prompt, choices,
+and combined input SHA-256 metadata against normalized eval JSONL content. Use
+`--require-all-hashes` in CI for promoted curated slices; without it, the audit
+still emits canonical hashes for rows that do not yet carry hash metadata.
+
+```bash
+python3 bench/dataset_content_hash_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output-dir bench/results/datasets \
+  --output-stem dataset_content_hash_audit_latest
+python3 bench/dataset_content_hash_audit_ci_smoke.py
 ```
 
 `dataset_curate.py` prepares deterministic, local-only evaluation subsets before
@@ -140,6 +1519,215 @@ Use `--dedupe-within-split-payloads` to collapse repeated normalized
 dataset/split/prompt/choices/answer rows before caps and sampling. If duplicate
 within-split prompt/choices payloads disagree on the answer index, curation
 fails instead of silently choosing one label.
+
+`dataset_manifest_audit.py` validates curated JSONL provenance manifests before
+publishing packed eval artifacts. It checks local source and output digests,
+derives actual curated row counts plus dataset/split coverage from JSONL, and
+verifies optional `.hceval` pack manifests preserve source digest, record count,
+record ID order, and binary digest.
+
+Example:
+
+```bash
+python3 bench/dataset_manifest_audit.py \
+  --manifest bench/results/datasets/smoke_curated.manifest.json \
+  --pack-manifest bench/results/datasets/smoke_curated.hceval.manifest.json \
+  --root . \
+  --output bench/results/datasets/dataset_manifest_audit_smoke_latest.json \
+  --csv bench/results/datasets/dataset_manifest_audit_smoke_latest.csv \
+  --markdown bench/results/datasets/dataset_manifest_audit_smoke_latest.md \
+  --junit bench/results/datasets/dataset_manifest_audit_smoke_latest_junit.xml \
+  --require-pack-manifest \
+  --fail-on-findings
+```
+
+`dataset_contamination_audit.py` checks mixed local eval suites for
+cross-dataset contamination before packing. It normalizes rows through the
+packer schema, then flags normalized prompt reuse, prompt+choice payload reuse,
+and conflicting answer indexes across dataset families:
+
+```bash
+python3 bench/dataset_contamination_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_contamination_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_contamination_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_contamination_audit_smoke_latest.csv \
+  --junit bench/results/datasets/dataset_contamination_audit_smoke_latest_junit.xml \
+  --fail-on-contamination
+```
+
+`dataset_prompt_choice_overlap_audit.py` checks local eval JSONL for prompt
+templates that already contain answer or distractor choice text. It normalizes
+rows through the packer schema, writes per-record overlap telemetry, and can
+fail only answer leaks or any prompt/choice overlap before packing:
+
+```bash
+python3 bench/dataset_prompt_choice_overlap_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_prompt_choice_overlap_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_prompt_choice_overlap_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_prompt_choice_overlap_audit_smoke_latest.csv \
+  --record-csv bench/results/datasets/dataset_prompt_choice_overlap_audit_smoke_records_latest.csv \
+  --junit bench/results/datasets/dataset_prompt_choice_overlap_audit_smoke_latest_junit.xml \
+  --fail-on-answer-overlap
+```
+
+`dataset_mix_audit.py` checks that curated local eval suites are not dominated
+by one dataset, split, or dataset/split bucket before packing. It writes
+aggregate distribution CSVs plus optional per-record telemetry so each bucket
+can be traced back to source rows:
+
+```bash
+python3 bench/dataset_mix_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_mix_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_mix_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_mix_audit_smoke_latest.csv \
+  --record-csv bench/results/datasets/dataset_mix_audit_smoke_records_latest.csv \
+  --findings-csv bench/results/datasets/dataset_mix_audit_smoke_latest_findings.csv \
+  --junit bench/results/datasets/dataset_mix_audit_smoke_latest_junit.xml \
+  --min-datasets 3 \
+  --max-dataset-pct 34 \
+  --max-dataset-split-pct 34
+```
+
+`dataset_provenance_balance_audit.py` checks that local eval JSONL rows carry
+non-empty provenance/source strings and that no single staged source dominates
+the overall subset or a dataset/split bucket. It writes aggregate distribution
+CSVs plus optional per-record provenance telemetry for review before packing:
+
+```bash
+python3 bench/dataset_provenance_balance_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_provenance_balance_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_provenance_balance_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_provenance_balance_audit_smoke_latest.csv \
+  --record-csv bench/results/datasets/dataset_provenance_balance_audit_smoke_records_latest.csv \
+  --findings-csv bench/results/datasets/dataset_provenance_balance_audit_smoke_latest_findings.csv \
+  --junit bench/results/datasets/dataset_provenance_balance_audit_smoke_latest_junit.xml \
+  --require-provenance \
+  --min-provenance-sources 3 \
+  --max-provenance-pct 34
+```
+
+`dataset_id_audit.py` checks local eval JSONL record IDs before packing. It
+normalizes rows through the packer schema, then gates missing explicit IDs,
+overlong IDs, format mismatches, duplicate raw IDs, and duplicate
+dataset/split-scoped IDs:
+
+```bash
+python3 bench/dataset_id_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_id_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_id_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_id_audit_smoke_latest.csv \
+  --record-csv bench/results/datasets/dataset_id_audit_smoke_records_latest.csv \
+  --junit bench/results/datasets/dataset_id_audit_smoke_latest_junit.xml \
+  --require-explicit-id \
+  --max-record-id-bytes 64 \
+  --id-pattern '[a-z0-9-]+' \
+  --fail-duplicate-record-ids \
+  --fail-duplicate-dataset-split-record-ids \
+  --fail-on-findings
+```
+
+`dataset_text_audit.py` checks normalized prompt and choice text for
+loader-hostile content before curation or packing. It gates blank text,
+disallowed C0 control characters, Unicode replacement markers, prompt/choice
+byte budgets, line-byte budgets, and raw choice label prefixes such as `A.` or
+`1)`, then writes optional per-field telemetry:
+
+```bash
+python3 bench/dataset_text_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_text_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_text_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_text_audit_smoke_latest.csv \
+  --record-csv bench/results/datasets/dataset_text_audit_smoke_records_latest.csv \
+  --junit bench/results/datasets/dataset_text_audit_smoke_latest_junit.xml \
+  --max-prompt-bytes 4096 \
+  --max-choice-bytes 1024 \
+  --max-line-bytes 4096 \
+  --fail-on-control-chars \
+  --fail-on-replacement-chars \
+  --fail-on-blank-text \
+  --fail-on-choice-label-prefixes \
+  --fail-on-findings
+```
+
+`dataset_choice_length_audit.py` checks individual multiple-choice records for
+answer-length cue artifacts before packing. It reports choice byte spans,
+answer-to-distractor ratios, unique longest/shortest answers, and writes
+optional per-record length telemetry:
+
+```bash
+python3 bench/dataset_choice_length_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_choice_length_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_choice_length_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_choice_length_audit_smoke_latest.csv \
+  --record-csv bench/results/datasets/dataset_choice_length_audit_smoke_records_latest.csv \
+  --junit bench/results/datasets/dataset_choice_length_audit_smoke_latest_junit.xml \
+  --max-choice-byte-span 128 \
+  --max-answer-delta-bytes 128 \
+  --max-answer-to-mean-other-ratio 8.0 \
+  --min-answer-to-mean-other-ratio 0.125 \
+  --fail-on-findings
+```
+
+`dataset_choice_similarity_audit.py` checks individual multiple-choice records
+for duplicate or near-duplicate choices after case/spacing/punctuation
+normalization. It writes per-record and per-choice-pair telemetry so ambiguous
+curated examples can be rejected before packing:
+
+```bash
+python3 bench/dataset_choice_similarity_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_choice_similarity_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_choice_similarity_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_choice_similarity_audit_smoke_latest.csv \
+  --pair-csv bench/results/datasets/dataset_choice_similarity_audit_smoke_pairs_latest.csv \
+  --findings-csv bench/results/datasets/dataset_choice_similarity_audit_smoke_latest_findings.csv \
+  --junit bench/results/datasets/dataset_choice_similarity_audit_smoke_latest_junit.xml \
+  --min-unique-choices 4 \
+  --max-pair-similarity 0.95 \
+  --fail-duplicate-normalized
+```
+
+`dataset_answer_bias_audit.py` checks curated multiple-choice subsets for
+answer-length artifacts before packing. It reports whether correct answers are
+overrepresented as the longest or shortest option overall and per dataset/split,
+then writes optional per-record answer/distractor byte telemetry:
+
+```bash
+python3 bench/dataset_answer_bias_audit.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_answer_bias_audit_smoke_latest.json \
+  --markdown bench/results/datasets/dataset_answer_bias_audit_smoke_latest.md \
+  --csv bench/results/datasets/dataset_answer_bias_audit_smoke_latest.csv \
+  --record-csv bench/results/datasets/dataset_answer_bias_audit_smoke_records_latest.csv \
+  --junit bench/results/datasets/dataset_answer_bias_audit_smoke_latest_junit.xml \
+  --max-answer-longest-pct 100 \
+  --max-answer-shortest-pct 100 \
+  --min-mean-answer-distractor-ratio 0.01 \
+  --max-mean-answer-distractor-ratio 100 \
+  --check-dataset-splits \
+  --fail-on-findings
+```
+
+`dataset_answer_position_audit.py` checks curated multiple-choice subsets for
+correct-answer position concentration. It reports answer-index histograms,
+dominant answer positions, and distinct answer-position coverage overall and
+per dataset/split:
+
+```bash
+python3 bench/dataset_answer_position_audit.py \
+  bench/datasets/samples/smoke_eval.jsonl \
+  --output-dir bench/results/datasets \
+  --output-stem dataset_answer_position_audit_smoke_latest \
+  --min-records 3 \
+  --max-dominant-answer-pct 100
+```
 
 `dataset_pack.py` converts local JSONL multiple-choice evaluation rows into a
 deterministic HolyC-loadable binary plus a provenance manifest. It accepts a
@@ -192,6 +1780,54 @@ python3 bench/hceval_inspect.py \
   --max-choice-bytes 1024
 ```
 
+`hceval_metadata_audit.py` checks packed `.hceval` metadata without launching
+QEMU. It verifies the canonical compact metadata bytes produced by
+`dataset_pack.py`, expected metadata keys, non-empty dataset/split fields,
+format/version values, and header/metadata/parsed record-count consistency:
+
+```bash
+python3 bench/hceval_metadata_audit.py \
+  --input bench/results/datasets/smoke_eval.hceval \
+  --output bench/results/datasets/hceval_metadata_audit_latest.json \
+  --markdown bench/results/datasets/hceval_metadata_audit_latest.md \
+  --csv bench/results/datasets/hceval_metadata_audit_latest.csv \
+  --findings-csv bench/results/datasets/hceval_metadata_audit_latest_findings.csv \
+  --junit bench/results/datasets/hceval_metadata_audit_latest_junit.xml \
+  --fail-on-findings
+```
+
+`hceval_budget_audit.py` scans existing `.hceval` artifacts and gates suite-level
+binary layout budgets without unpacking data through QEMU. It can require
+companion manifests, enforce minimum/maximum record counts, and cap binary,
+metadata, body, prompt, choice, and per-record payload bytes across a directory:
+
+```bash
+python3 bench/hceval_budget_audit.py bench/results/datasets \
+  --output-dir bench/results/datasets \
+  --output-stem hceval_budget_audit_latest \
+  --require-manifest \
+  --max-binary-bytes 1048576 \
+  --max-metadata-bytes 4096 \
+  --max-record-payload-bytes 8192
+```
+
+`hceval_choice_semantics_audit.py` scans packed `.hceval` files for semantic
+choice hazards that can survive structural packing: duplicate normalized
+choices, answer aliases, and candidate choice text already present in the
+prompt. It stays host-side and emits JSON, Markdown, CSV, findings CSV, and
+JUnit artifacts:
+
+```bash
+python3 bench/hceval_choice_semantics_audit.py \
+  --input bench/results/datasets/smoke_eval.hceval \
+  --output bench/results/datasets/hceval_choice_semantics_audit_smoke_latest.json \
+  --markdown bench/results/datasets/hceval_choice_semantics_audit_smoke_latest.md \
+  --csv bench/results/datasets/hceval_choice_semantics_audit_smoke_latest.csv \
+  --findings-csv bench/results/datasets/hceval_choice_semantics_audit_smoke_latest_findings.csv \
+  --junit bench/results/datasets/hceval_choice_semantics_audit_smoke_latest_junit.xml \
+  --fail-on-findings
+```
+
 `hceval_export.py` converts a packed `.hceval` file back into normalized JSONL
 for `eval_compare.py` gold inputs and `eval_input_audit.py` hash-parity checks.
 Pass the pack manifest when exporting mixed-dataset packs so per-record
@@ -205,6 +1841,23 @@ python3 bench/hceval_export.py \
   --output bench/results/datasets/smoke_eval.export.jsonl \
   --manifest bench/results/datasets/smoke_eval.export.manifest.json \
   --pack-manifest bench/results/datasets/smoke_eval.manifest.json
+```
+
+`hceval_export_roundtrip_audit.py` checks that a packed `.hceval` artifact can
+be exported through the normalized JSONL path and repacked to the same source
+digest, binary digest, record fingerprints, and binary layout. Pass the pack
+manifest for mixed-dataset packs so per-record dataset/split metadata is
+restored before the repack.
+
+```bash
+python3 bench/hceval_export_roundtrip_audit.py \
+  --input bench/results/datasets/smoke_eval.hceval \
+  --pack-manifest bench/results/datasets/smoke_eval.manifest.json \
+  --output bench/results/datasets/hceval_export_roundtrip_audit_smoke_latest.json \
+  --markdown bench/results/datasets/hceval_export_roundtrip_audit_smoke_latest.md \
+  --csv bench/results/datasets/hceval_export_roundtrip_audit_smoke_latest.csv \
+  --junit bench/results/datasets/hceval_export_roundtrip_audit_smoke_latest_junit.xml \
+  --fail-on-findings
 ```
 
 `dataset_fingerprint.py` writes stable prompt, choice, input, answer, and full
@@ -231,12 +1884,36 @@ python3 bench/dataset_fingerprint_diff.py \
   --candidate bench/results/datasets/dataset_fingerprint_smoke_latest.json \
   --output bench/results/datasets/dataset_fingerprint_diff_smoke_latest.json \
   --csv bench/results/datasets/dataset_fingerprint_diff_smoke_latest.csv \
+  --findings-csv bench/results/datasets/dataset_fingerprint_diff_smoke_findings_latest.csv \
   --markdown bench/results/datasets/dataset_fingerprint_diff_smoke_latest.md \
   --junit bench/results/datasets/dataset_fingerprint_diff_smoke_latest_junit.xml \
   --fail-on-any-change \
   --fail-on-findings
 
 python3 bench/dataset_fingerprint_diff_ci_smoke.py
+```
+
+`dataset_slice_manifest.py` emits deterministic dataset/split coverage
+manifests for local eval JSONL files before curation, packing, or comparison.
+It records per-slice answer histograms, byte totals, stable slice hashes, and
+optional gates for required slices or minimum records per slice:
+
+```bash
+python3 bench/dataset_slice_manifest.py \
+  --input bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/datasets/dataset_slice_manifest_smoke_latest.json \
+  --csv bench/results/datasets/dataset_slice_manifest_smoke_latest.csv \
+  --record-csv bench/results/datasets/dataset_slice_manifest_smoke_records_latest.csv \
+  --markdown bench/results/datasets/dataset_slice_manifest_smoke_latest.md \
+  --junit bench/results/datasets/dataset_slice_manifest_smoke_latest_junit.xml \
+  --require-slice arc-smoke:validation \
+  --require-slice hellaswag-smoke:validation \
+  --require-slice truthfulqa-smoke:validation \
+  --min-total-slices 3 \
+  --min-records-per-slice 1 \
+  --fail-on-findings
+
+python3 bench/dataset_slice_manifest_ci_smoke.py
 ```
 
 `dataset_index.py` scans curated manifests, packed `.hceval` manifests, and
@@ -258,6 +1935,13 @@ python3 bench/dataset_index.py \
   --fail-on-findings
 ```
 
+The focused smoke gate checks passing artifact-type and dataset/split coverage,
+then verifies both missing-artifact and missing-slice failures:
+
+```bash
+python3 bench/dataset_index_ci_smoke.py
+```
+
 `dataset_ci_smoke.py` is a stdlib-only CI gate for the offline dataset pipeline.
 It curates the synthetic sample, packs and inspects the `.hceval` binary, runs
 the split-leakage audit, indexes the generated artifacts, and checks that a
@@ -271,7 +1955,7 @@ python3 bench/dataset_ci_smoke.py
 artifacts, including memory-per-token and serial-output telemetry when present,
 and can gate air-gap status, telemetry, commit metadata, command hashes,
 artifact freshness, per-key history coverage, minimum measured runs/tokens,
-matching dry-run launch plans, and comparable host/QEMU environment stability. Use
+matching dry-run launch plans, duplicate key/timestamp artifacts, and comparable host/QEMU environment stability. Use
 `--fail-on-environment-drift` when CI should reject throughput comparisons whose
 profile/model/quantization/prompt-suite/command/launch-plan keys span multiple
 environment fingerprints. `bench_artifact_manifest_ci_smoke.py` is a
@@ -281,6 +1965,50 @@ that stale artifacts and a NIC-enabled QEMU command are rejected:
 
 ```bash
 python3 bench/bench_artifact_manifest_ci_smoke.py
+```
+
+`qemu_result_retention_audit.py` checks QEMU prompt benchmark latest JSON
+aliases against their immutable timestamped siblings. It derives the expected
+history filename from each artifact's `generated_at`, verifies the timestamped
+file exists, and checks that the latest alias has the same SHA256 as that
+history artifact. It writes JSON, Markdown, record CSV, findings CSV, and JUnit
+outputs. It is host-side only and does not launch QEMU:
+
+```bash
+python3 bench/qemu_result_retention_audit.py bench/results \
+  --output-dir bench/results \
+  --output-stem qemu_result_retention_audit_latest \
+  --min-latest 2 \
+  --min-history-per-latest 1
+```
+
+The stdlib-only smoke gate exercises passing, missing-history, and
+latest/history mismatch cases:
+
+```bash
+python3 bench/qemu_result_retention_audit_ci_smoke.py
+```
+
+`qemu_timestamp_audit.py` checks saved QEMU prompt benchmark JSON artifacts for
+timestamp hygiene before dashboards or regression gates consume them. It
+validates artifact `generated_at` parseability, optional timestamped filename
+stamps, row timestamp parseability, row timestamp monotonicity, future skew, and
+row timestamps that appear too far before or after artifact generation. It is
+host-side only and does not launch QEMU:
+
+```bash
+python3 bench/qemu_timestamp_audit.py bench/results \
+  --output-dir bench/results \
+  --output-stem qemu_timestamp_audit_latest \
+  --max-row-before-generated-at-seconds 3600 \
+  --require-rows
+```
+
+The stdlib-only smoke gate exercises passing chronology plus filename-stamp,
+row-regression, stale-row, and row-skew failure cases:
+
+```bash
+python3 bench/qemu_timestamp_audit_ci_smoke.py
 ```
 
 `bench_result_index.py` also records measured-run dry-run coverage. A measured
@@ -302,7 +2030,8 @@ python3 bench/bench_result_index.py \
 `bench_trend_export.py` turns existing benchmark JSON artifacts into compact
 dashboard trend files without launching QEMU. It groups comparable
 profile/model/quantization/prompt-suite points, records latest-vs-previous
-throughput and memory deltas, and writes JSON, Markdown, CSV, point-history CSV,
+throughput and memory deltas, a machine-readable JSON `summary` block for
+dashboard digests, and writes JSON, Markdown, CSV, point-history CSV,
 recent-window CSV, drift CSV, findings CSV, and JUnit XML under
 `bench/dashboards/`. Optional threshold gates fail CI when latest guest tok/s or
 host wall-clock tok/s falls below an absolute floor, when latest guest tok/s,
@@ -362,12 +2091,16 @@ python3 bench/dataset_leak_audit.py \
   --csv bench/results/datasets/dataset_leak_audit_smoke_latest.csv \
   --junit bench/results/datasets/dataset_leak_audit_smoke_latest_junit.xml \
   --fail-on-leaks
+python3 bench/dataset_leak_audit_ci_smoke.py
 ```
 
 `dataset_provenance_audit.py` checks curated JSONL manifests for source/license
 metadata, source and output hashes, selected IDs, dataset/split counts, and
 answer histograms. Reports include provenance/source contribution counts plus
 overall, per-dataset, per-split, and per-dataset/split answer-majority telemetry;
+the sidecar `dataset_provenance_audit_records_latest.csv` adds per-record
+provenance percentages, byte budgets, and stable prompt+choices hashes for
+review before packing.
 `--max-majority-answer-pct`,
 `--max-provenance-pct`, `--max-dataset-majority-answer-pct`, and
 `--max-split-majority-answer-pct`,
@@ -403,12 +2136,31 @@ failure paths without fetching any remote data:
 python3 bench/dataset_provenance_audit_ci_smoke.py
 ```
 
+## Offline Eval Workload Estimate
+
+`eval_workload_estimate.py` projects local multiple-choice eval JSONL files
+before QEMU runs. It estimates prompt, choice, scored-token, launch, and wall
+time budgets by dataset/split and per record, with row-level gates to catch one
+oversized prompt or choice set before it dominates an air-gapped benchmark job.
+
+```bash
+python3 bench/eval_workload_estimate.py bench/fixtures/eval_workload_estimate/smoke.jsonl \
+  --output-dir bench/results \
+  --output-stem eval_workload_estimate_latest \
+  --tok-per-s 100 \
+  --qemu-launch-overhead-s 0.25 \
+  --max-record-scored-tokens 4096 \
+  --max-record-launches 8 \
+  --max-choices-per-record 8 \
+  --max-scored-tokens 65536
+```
+
 ## Offline Eval Comparator
 
 `eval_compare.py` compares local HolyC and llama.cpp multiple-choice predictions
 against the same gold JSONL and writes JSON, Markdown, per-record CSV,
 per-dataset/split breakdown CSV, confusion-matrix CSV, calibration-bin CSV, and
-score-NLL CSV, score-tie CSV, engine-disagreement CSV, and JUnit XML reports.
+score-NLL CSV, score-rank CSV, score-tie CSV, engine-disagreement CSV, and JUnit XML reports.
 Optional quality gates can fail CI when HolyC accuracy, engine agreement,
 accuracy delta versus llama.cpp, or a paired exact McNemar loss falls outside
 configured bounds.
@@ -420,6 +2172,9 @@ answer index before quality metrics are computed.
 It also records per-engine score-vector coverage and can fail early with
 `--min-score-coverage-pct` when calibration/ranking evals require logprob-style
 choice scores from both engines.
+For scored prediction rows, it also records predicted-vs-runner-up score
+margins and can fail early with `--min-top-score-margin` when either engine
+emits under-separated best choices before the comparator runs.
 When score vectors are present, reports include per-row confidence/margin plus
 score coverage, mean confidence, Brier score, expected calibration error, mean
 gold-answer negative log likelihood, and choice-set perplexity.
@@ -458,12 +2213,206 @@ python3 bench/eval_compare.py \
 python3 bench/eval_compare_ci_smoke.py
 ```
 
+`eval_length_bucket_report.py` groups the same local gold/prediction inputs by
+normalized prompt byte length. It reports per-bucket HolyC accuracy, llama.cpp
+accuracy, agreement, paired outcome counts, CSV/Markdown/JUnit sidecars, and
+optional gates for sparse buckets or HolyC accuracy loss on long-context slices.
+
+```bash
+python3 bench/eval_length_bucket_report.py \
+  --gold bench/datasets/samples/smoke_eval.jsonl \
+  --holyc bench/eval/samples/holyc_smoke_scored_predictions.jsonl \
+  --llama bench/eval/samples/llama_smoke_scored_predictions.jsonl \
+  --dataset smoke-eval \
+  --split validation \
+  --bucket-edges 128,256,512 \
+  --min-records-per-bucket 1 \
+  --min-holyc-accuracy 0.95 \
+  --max-holyc-accuracy-loss 0.05
+
+python3 bench/eval_length_bucket_report_ci_smoke.py
+```
+
+`eval_margin_audit.py` gates existing `eval_compare.py` JSON reports for scored
+multiple-choice margin health. It checks score coverage, scored-row counts,
+mean/p10/min top-1 margins, low-margin rates, and HolyC margin loss versus
+llama.cpp. It is host-side only and reads saved artifacts.
+
+```bash
+python3 bench/eval_margin_audit.py \
+  bench/results/eval_compare_smoke_latest.json \
+  --output-dir bench/results \
+  --output-stem eval_margin_audit_smoke_latest \
+  --min-score-coverage 0.95 \
+  --min-mean-margin 0.20 \
+  --min-p10-margin 0.05 \
+  --max-holyc-mean-margin-loss 0.05 \
+  --fail-on-findings
+
+python3 bench/eval_margin_audit_ci_smoke.py
+```
+
+`eval_suite_summary.py` aggregates existing `eval_compare.py` JSON reports into
+a suite-level CI artifact. It is useful when multiple datasets, splits,
+quantizations, or model builds are compared separately but CI needs one summary
+for total record coverage, weighted HolyC accuracy, weighted engine agreement,
+failed reports, per-report regressions, and required dataset/split/model/quant
+coverage.
+
+```bash
+python3 bench/eval_suite_summary.py \
+  bench/results/eval_compare_smoke_latest.json \
+  --output-dir bench/results \
+  --output-stem eval_suite_summary_smoke_latest \
+  --min-reports 1 \
+  --min-records 3 \
+  --min-holyc-accuracy 0.95 \
+  --min-agreement 0.95 \
+  --require-dataset smoke-eval \
+  --require-split validation \
+  --require-model synthetic-smoke \
+  --require-quantization Q4_0 \
+  --fail-on-failed-reports \
+  --fail-on-regressions
+
+python3 bench/eval_suite_summary_ci_smoke.py
+```
+
+`eval_result_index.py` indexes existing `eval_compare.py` reports and
+`eval_suite_summary.py` outputs into one CI/dashboard rollup. It extracts
+artifact type, status, dataset/split/model/quant metadata, record counts,
+weighted HolyC accuracy, HolyC-vs-llama agreement, regressions, and result
+hashes without rerunning either engine.
+
+```bash
+python3 bench/eval_result_index.py \
+  bench/results \
+  --output-dir bench/results \
+  --output-stem eval_result_index_latest \
+  --min-artifacts 1 \
+  --min-records 3 \
+  --require-dataset smoke-eval \
+  --require-quantization Q8_0 \
+  --min-holyc-accuracy 0.95 \
+  --min-agreement 0.95 \
+  --fail-on-failed \
+  --fail-on-regressions
+
+python3 bench/eval_result_index_ci_smoke.py
+```
+
+`eval_report_audit.py` validates existing `eval_compare.py` JSON reports for
+internal consistency without rerunning either engine. It recomputes core
+summary counters from rows, checks metric bounds, rejects pass-status reports
+that still contain regression entries, and writes JSON, Markdown, report CSV,
+findings CSV, and JUnit XML outputs:
+
+```bash
+python3 bench/eval_report_audit.py \
+  bench/results/eval_compare_smoke_latest.json \
+  --output bench/results/eval_report_audit_smoke_latest.json \
+  --markdown bench/results/eval_report_audit_smoke_latest.md \
+  --csv bench/results/eval_report_audit_smoke_latest.csv \
+  --findings-csv bench/results/eval_report_audit_smoke_findings_latest.csv \
+  --junit bench/results/eval_report_audit_smoke_latest_junit.xml \
+  --fail-on-findings
+
+python3 bench/eval_report_audit_ci_smoke.py
+```
+
+`eval_hash_audit.py` validates `eval_compare.py` report fingerprints for
+reproducible apples-to-apples eval runs. It checks canonical SHA-256 formatting
+for gold/HolyC/llama artifacts, can compare `gold_sha256` against a local gold
+dataset file, and writes JSON, Markdown, CSV, findings CSV, and JUnit outputs:
+
+```bash
+python3 bench/eval_hash_audit.py \
+  bench/results/eval_compare_smoke_latest.json \
+  --gold-path bench/datasets/samples/smoke_eval.jsonl \
+  --output bench/results/eval_hash_audit_smoke_latest.json \
+  --markdown bench/results/eval_hash_audit_smoke_latest.md \
+  --csv bench/results/eval_hash_audit_smoke_latest.csv \
+  --findings-csv bench/results/eval_hash_audit_smoke_latest_findings.csv \
+  --junit bench/results/eval_hash_audit_smoke_latest_junit.xml \
+  --fail-on-findings
+
+python3 bench/eval_hash_audit_ci_smoke.py
+```
+
+`eval_slice_coverage_audit.py` gates existing `eval_compare.py` JSON artifacts
+for required dataset/split coverage without rerunning either engine. It writes
+JSON, Markdown, slice CSV, findings CSV, and JUnit XML reports:
+
+```bash
+python3 bench/eval_slice_coverage_audit.py \
+  bench/results/eval_compare_smoke_latest.json \
+  --output-dir bench/results \
+  --output-stem eval_slice_coverage_audit_smoke_latest \
+  --require-slice arc-smoke:validation \
+  --require-slice hellaswag-smoke:validation \
+  --require-slice truthfulqa-smoke:validation \
+  --min-slices 3 \
+  --min-records-per-slice 1 \
+  --min-slice-holyc-accuracy 0.95 \
+  --min-slice-agreement 0.95 \
+  --fail-on-failed-reports \
+  --fail-on-regressions
+
+python3 bench/eval_slice_coverage_audit_ci_smoke.py
+```
+
+`eval_disagreement_audit.py` gates existing `eval_compare.py` JSON artifacts
+for aggregate and dataset/split HolyC-vs-llama disagreement rates without
+rerunning either engine. It writes JSON, Markdown, scope CSV, findings CSV, and
+JUnit XML reports:
+
+```bash
+python3 bench/eval_disagreement_audit.py \
+  bench/results/eval_compare_smoke_latest.json \
+  --output bench/results/eval_disagreement_audit_smoke_latest.json \
+  --markdown bench/results/eval_disagreement_audit_smoke_latest.md \
+  --csv bench/results/eval_disagreement_audit_smoke_latest.csv \
+  --findings-csv bench/results/eval_disagreement_audit_smoke_findings_latest.csv \
+  --junit bench/results/eval_disagreement_audit_smoke_junit_latest.xml \
+  --min-records 3 \
+  --max-disagreement-pct 0 \
+  --max-dataset-split-disagreement-pct 0 \
+  --fail-on-findings
+
+python3 bench/eval_disagreement_audit_ci_smoke.py
+```
+
+`eval_outcome_audit.py` gates existing `eval_compare.py` JSON artifacts by
+paired correctness buckets, including both-correct, HolyC-only-correct,
+llama-only-correct, and both-wrong rows. It is useful for catching asymmetric
+llama.cpp wins even when aggregate accuracy still passes. It writes JSON,
+Markdown, scope CSV, findings CSV, and JUnit XML reports:
+
+```bash
+python3 bench/eval_outcome_audit.py \
+  bench/results/eval_compare_smoke_latest.json \
+  --output bench/results/eval_outcome_audit_smoke_latest.json \
+  --markdown bench/results/eval_outcome_audit_smoke_latest.md \
+  --csv bench/results/eval_outcome_audit_smoke_latest.csv \
+  --findings-csv bench/results/eval_outcome_audit_smoke_findings_latest.csv \
+  --junit bench/results/eval_outcome_audit_smoke_junit_latest.xml \
+  --min-records 3 \
+  --max-llama-only-correct-pct 0 \
+  --max-dataset-split-llama-only-correct-pct 0 \
+  --max-both-wrong-pct 0 \
+  --fail-on-findings
+
+python3 bench/eval_outcome_audit_ci_smoke.py
+```
+
 `perplexity_compare.py` also supports opt-in quality gates for full-token
 logprob/perplexity comparisons. Use `--max-p95-record-nll-delta` when CI should
 catch the P95 positive HolyC-minus-llama per-record NLL tail while ignoring
 records where HolyC improves over llama.cpp; use
 `--max-p95-abs-record-nll-delta` when any large per-record divergence should
-fail.
+fail. Use `--min-dataset-split-record-count` and
+`--min-dataset-split-token-count` when every dataset/split breakdown row needs
+its own minimum coverage gate.
 
 ## QEMU Prompt Benchmark
 
@@ -500,6 +2449,12 @@ serial output, extracts token timing records, and writes normalized JSON to
 `bench/results/`. The runner always injects `-nic none` and rejects conflicting
 network flags such as `-netdev` or virtual NIC devices, including legacy QEMU
 NIC models such as e1000, ne2k, pcnet, rtl8139, usb-net, virtio-net, and vmxnet.
+Dry-run and measured JSON/Markdown reports include
+`artifact_schema_version` so downstream dashboards and audits can distinguish
+benchmark format changes from throughput changes.
+It also rejects socket-style QEMU endpoints such as `-chardev socket`, TCP/UDP
+serial or monitor transports, forwarded host/guest sockets, and remote VNC
+display sockets so benchmark launches remain fully air-gapped.
 Extra QEMU options can be passed one token at a time with `--qemu-arg`, after
 `--`, or from local `--qemu-args-file` files. Argument files are offline-only:
 `.json` files must contain a string array, while other files use shell-style
@@ -555,7 +2510,9 @@ slowest-prompt triage and `qemu_prompt_bench_prompt_variability_latest.csv`
 for prompts with the highest wall tok/s IQR or P05-to-P95 spread. They also
 write `qemu_prompt_bench_prompt_efficiency_latest.csv` to rank prompts by
 median wall prompt-bytes/s, tokens per prompt byte, and wall tok/s so prompt
-length effects are visible without parsing raw launch rows.
+length effects are visible without parsing raw launch rows. Prompt reliability
+triage is exported as `qemu_prompt_bench_prompt_failures_latest.csv`, sorted by
+failed launches, timeouts, nonzero guest exits, and OK-run percentage.
 JSON and Markdown reports also include
 host provenance for reproducibility: platform, machine, Python version, CPU
 count, QEMU binary/path, QEMU version when discoverable, and a stable SHA256
@@ -658,6 +2615,103 @@ fixture and does not boot a guest:
 python3 bench/qemu_prompt_bench_ci_smoke.py
 ```
 
+`qemu_prompt_coverage_audit.py` reads existing prompt benchmark JSON artifacts
+and verifies that every prompt declared in `prompt_suite.source` was measured,
+that the recorded prompt-suite SHA256 still matches the suite file, and that
+each expected prompt has a minimum number of successful measured runs. It is
+host-side only and does not launch QEMU.
+
+```bash
+python3 bench/qemu_prompt_coverage_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_prompt_coverage_audit_latest \
+  --require-suite-file \
+  --require-success \
+  --fail-on-unexpected-prompts \
+  --min-artifacts 1 \
+  --min-prompts 2 \
+  --min-runs-per-prompt 2
+```
+
+The smoke gate builds a synthetic air-gapped benchmark artifact and checks the
+coverage audit pass path, minimum-run failure path, and empty-input failure
+path:
+
+```bash
+python3 bench/qemu_prompt_coverage_audit_ci_smoke.py
+```
+
+`qemu_prompt_balance_audit.py` reads existing prompt benchmark JSON artifacts
+and verifies that measured successful samples are balanced across prompts. It
+can require a minimum prompt count, minimum measured rows, minimum successful
+runs per prompt, zero successful-run skew, and no failed measured rows. It is
+host-side only and does not launch QEMU.
+
+```bash
+python3 bench/qemu_prompt_balance_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_prompt_balance_audit_latest \
+  --min-prompts 2 \
+  --min-measured-runs 4 \
+  --min-successful-runs-per-prompt 2 \
+  --max-successful-run-delta 0 \
+  --fail-on-failed-runs
+```
+
+The smoke gate checks the balanced prompt pass path against the synthetic
+air-gapped benchmark artifact:
+
+```bash
+python3 bench/qemu_prompt_balance_audit_ci_smoke.py
+```
+
+`qemu_prompt_schema_audit.py` reads existing prompt benchmark JSON artifacts and
+verifies the artifact schema, per-row timing/throughput telemetry, launch-count
+consistency, command hashes, and saved QEMU air-gap telemetry. It is host-side
+only and does not launch QEMU.
+
+```bash
+python3 bench/qemu_prompt_schema_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_prompt_schema_audit_latest \
+  --min-artifacts 1 \
+  --min-measured-rows 2 \
+  --require-success \
+  --require-ok-telemetry ttft_us \
+  --require-ok-telemetry memory_bytes
+```
+
+The smoke gate builds a synthetic air-gapped benchmark artifact and checks the
+schema audit pass path plus a legacy-network-command failure path:
+
+```bash
+python3 bench/qemu_prompt_schema_audit_ci_smoke.py
+```
+
+`qemu_summary_consistency_audit.py` reads existing prompt benchmark JSON
+artifacts and recomputes suite and per-prompt summaries from raw benchmark rows
+to catch stale or hand-edited aggregate metrics before dashboards consume them.
+It is host-side only and does not launch QEMU.
+
+```bash
+python3 bench/qemu_summary_consistency_audit.py \
+  bench/results/qemu_prompt_bench_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_summary_consistency_audit_latest \
+  --min-artifacts 1 \
+  --min-measured-rows 2
+```
+
+The smoke gate builds a synthetic air-gapped benchmark artifact and checks the
+summary consistency pass path plus stale suite/prompt summary failure paths:
+
+```bash
+python3 bench/qemu_summary_consistency_audit_ci_smoke.py
+```
+
 Example:
 
 ```bash
@@ -721,13 +2775,14 @@ launch plans reproducible before a VM is started.
 for literal `qemu-system*` launch snippets and applies the same air-gap command
 rules. This catches unsafe copied commands before they become benchmark scripts
 or operator runbooks. It also checks JSON `qemu_args`/`qemu_extra_args`/
-`qemu_flags` fragments, standalone JSON QEMU args arrays, YAML
+`qemu_flags` fragments, standalone JSON QEMU args arrays, YAML and TOML
 `qemu_args`/`qemu_extra_args`/`qemu_flags` fragments, `qemu_args_file`/
 `qemu_args_files` references resolved relative to the config file that names
 them, and `.args` files for network-enabling options such as `-netdev`,
-non-`none` `-nic`, and virtual NIC devices. Fragment audits do not require
-`-nic none` because the launcher injects it; they only reject options that
-re-enable networking. Raw QEMU examples must keep `-nic none` explicit:
+non-`none` `-nic`, legacy `-net none`, and virtual NIC devices. Fragment audits
+do not require `-nic none` because the launcher injects it; they reject options
+that re-enable networking or drift back to legacy network-disabling flags. Raw
+QEMU examples must keep `-nic none` explicit:
 
 ```bash
 qemu-system-x86_64 \
@@ -823,6 +2878,109 @@ python3 bench/bench_matrix.py \
   --dry-run
 ```
 
+Audit matrix coverage and air-gap-safe QEMU argument fragments without
+launching QEMU:
+
+```bash
+python3 bench/bench_matrix_audit.py bench/fixtures/bench_matrix_smoke.json \
+  --output-dir bench/results \
+  --output-stem bench_matrix_audit_latest \
+  --expect-cells 2 \
+  --require-quantization Q4_0 \
+  --require-quantization Q8_0
+```
+
+The audit writes JSON, Markdown, CSV, and JUnit outputs. Its smoke gate checks
+passing coverage plus rejection of legacy `-net none` drift:
+
+```bash
+python3 bench/bench_matrix_audit_ci_smoke.py
+```
+
+`qemu_benchmark_matrix.py` plans air-gapped QEMU command/launch matrices
+without launching QEMU. `qemu_benchmark_matrix_audit.py` audits the saved
+planner JSON for argv hash drift, explicit `-nic none` air-gap compliance,
+per-build launch-count formulas, warmup/measured phase counts, contiguous
+launch indexes, and summary rollup drift:
+
+```bash
+python3 bench/qemu_benchmark_matrix_audit.py \
+  bench/results/qemu_benchmark_matrix_smoke_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_benchmark_matrix_audit_latest
+```
+
+Its smoke gate builds a synthetic local planner artifact and audits it without
+starting QEMU:
+
+```bash
+python3 bench/qemu_benchmark_matrix_audit_ci_smoke.py
+```
+
+`qemu_matrix_budget_audit.py` reads saved `qemu_benchmark_matrix.py` planner
+artifacts and gates the planned launch volume before a benchmark job spends VM
+time. It reports global and per-build launch counts, warmup/measured counts,
+prompt bytes, expected-token totals, missing expected-token coverage, and
+air-gap status without launching QEMU:
+
+```bash
+python3 bench/qemu_matrix_budget_audit.py \
+  bench/results/qemu_benchmark_matrix_smoke_latest.json \
+  --output-dir bench/results \
+  --output-stem qemu_matrix_budget_audit_latest \
+  --max-launches 64 \
+  --max-launches-per-build 16 \
+  --max-prompt-bytes-per-build 65536 \
+  --require-expected-tokens \
+  --require-airgap
+```
+
+The smoke gate covers passing budget reports plus launch-budget and
+expected-token failures:
+
+```bash
+python3 bench/qemu_matrix_budget_audit_ci_smoke.py
+```
+
+`qemu_matrix_plan_diff.py` compares two saved `qemu_benchmark_matrix.py`
+planner JSON artifacts and gates command-hash, build, launch-count, and
+per-prompt launch-key drift before benchmark VM time is spent. It reads saved
+artifacts only and never launches QEMU:
+
+```bash
+python3 bench/qemu_matrix_plan_diff.py \
+  bench/results/qemu_benchmark_matrix_baseline.json \
+  bench/results/qemu_benchmark_matrix_candidate.json \
+  --output-dir bench/results \
+  --output-stem qemu_matrix_plan_diff_latest
+```
+
+The smoke gate covers identical plans plus command and launch drift failures:
+
+```bash
+python3 bench/qemu_matrix_plan_diff_ci_smoke.py
+```
+
+`bench_smoke_manifest.py` scans host-side `*_ci_smoke.py` scripts and writes a
+dashboard-friendly coverage manifest with paired-tool status, script metadata,
+area rollups, findings CSV, and JUnit output. It never runs smoke scripts and
+never launches QEMU:
+
+```bash
+python3 bench/bench_smoke_manifest.py bench \
+  --output-dir bench/results \
+  --output-stem bench_smoke_manifest_latest \
+  --require-paired-tools \
+  --min-smokes 100
+```
+
+Its own smoke gate covers paired coverage and malformed/unpaired script
+failures:
+
+```bash
+python3 bench/bench_smoke_manifest_ci_smoke.py
+```
+
 `bench_result_index.py` scans existing QEMU prompt, QEMU prompt dry-run, and
 matrix JSON reports, rolls their tok/s, wall-clock tok/s, TTFT, host-overhead,
 per-token latency, host child CPU efficiency/RSS, memory, memory-per-token,
@@ -831,8 +2989,8 @@ elapsed-time, and run-count metadata into a single JSON/Markdown/CSV/JUnit XML
 index, and checks each
 recorded QEMU command for explicit `-nic none` air-gap compliance. Dry-run
 reports are indexed as planned launch artifacts: their command hash is
-recomputed, planned warmup/measured
-launch counts are checked against the launch plan, and they are excluded from
+recomputed, their launch-plan hash is recomputed from the embedded launch plan,
+planned warmup/measured launch counts are checked against the launch plan, and they are excluded from
 latest comparable throughput rollups because they have no measured tok/s. It
 also carries `expected_token_prompts`, `expected_tokens_total`,
 `expected_tokens_matches`, and `expected_tokens_mismatches` through the full
@@ -873,7 +3031,10 @@ command hash metadata, prompt drift, command drift, environment drift, and
 history coverage failures as CI test failures. It
 also recomputes `command_sha256` from each recorded command and treats mismatches
 as inconsistent command hash metadata, which catches stale or hand-edited
-benchmark artifacts before they reach dashboards. It
+benchmark artifacts before they reach dashboards. It also recomputes
+`launch_plan_sha256` when an artifact embeds a launch plan and treats mismatches
+as inconsistent launch-plan hash metadata before throughput dashboards compare
+different planned prompt sequences. It
 never launches QEMU. The index also records per-artifact commit metadata and can
 optionally fail when benchmark artifacts were produced from a different commit
 than the current checkout. It can also enforce freshness with
@@ -881,7 +3042,7 @@ than the current checkout. It can also enforce freshness with
 timestamp is too old and exporting stale rows to
 `bench_result_index_freshness_failures_latest.csv`. Use `--fail-on-airgap`, `--fail-on-telemetry`,
 `--fail-on-commit-metadata`, `--fail-on-command-hash-metadata`,
-`--fail-on-drift`, `--fail-on-command-drift`,
+`--fail-on-launch-plan-hash-metadata`, `--fail-on-drift`, `--fail-on-command-drift`,
 `--fail-on-environment-drift`, `--fail-on-history-coverage`, and
 `--fail-on-stale-artifact` to gate those failure classes independently.
 
@@ -914,9 +3075,10 @@ python3 bench/bench_result_index.py \
 `bench_result_index_ci_smoke.py` is a stdlib-only CI gate for the indexer. It
 builds synthetic QEMU prompt, dry-run, and matrix reports, verifies the JSON,
 Markdown, CSV, latest-comparable CSV, launch-plan drift CSV, freshness-failure
-CSV, and JUnit outputs, and checks that command-hash mismatches, NIC-enabled QEMU commands, stale
-artifacts, environment drift, and insufficient comparable history are rejected
-by their opt-in gates:
+CSV, and JUnit outputs, and checks that command-hash mismatches,
+launch-plan-hash mismatches, NIC-enabled QEMU commands, stale artifacts,
+environment drift, and insufficient comparable history are rejected by their
+opt-in gates:
 
 ```bash
 python3 bench/bench_result_index_ci_smoke.py
@@ -930,14 +3092,14 @@ key, preserves prompt count, wall-clock throughput, TTFT, host overhead,
 host child CPU/RSS, emitted-token totals, elapsed guest time, and guest/wall
 per-token latency telemetry, writes
 latest-key, full-history, missing dry-run coverage, environment drift, and
-freshness-failure CSV exports, keeps the same recorded-command
+freshness-failure CSV exports plus timestamp-collision CSV exports, keeps the same recorded-command
 air-gap, command SHA256, and commit
 metadata checks while preserving environment fingerprints, and writes
 `bench_artifact_manifest_junit_latest.xml` so CI can
 surface failed artifacts, air-gap violations, missing telemetry, stale
 artifacts, inconsistent command hashes, inconsistent commit metadata, sparse
 per-key history, sample coverage failures, missing measured-run dry-run plans,
-and empty manifests directly. Empty manifests are marked failed so missing benchmark
+duplicate key/timestamp artifacts, and empty manifests directly. Empty manifests are marked failed so missing benchmark
 uploads do not pass silently. For current-job manifests,
 `--fail-on-stale-commit` returns non-zero when any artifact was produced from a
 different commit than the current checkout. `--max-artifact-age-hours` records
@@ -953,7 +3115,9 @@ must have enough measured samples before dashboard consumers ingest them. Use
 `--fail-on-missing-dry-run` when measured QEMU prompt artifacts must have a
 matching reviewed dry-run launch plan with the same profile, model,
 quantization, prompt-suite hash, command hash, launch-plan hash, and
-environment hash.
+environment hash. Use `--fail-on-timestamp-collision` when CI should reject
+multiple artifacts for the same profile/model/quantization/prompt-suite key
+with the same `generated_at` timestamp.
 
 ```bash
 python3 bench/bench_artifact_manifest.py \
@@ -968,9 +3132,28 @@ python3 bench/bench_artifact_manifest.py \
   --min-total-tokens 512 \
   --fail-on-sample-coverage \
   --fail-on-missing-dry-run \
+  --fail-on-timestamp-collision \
   --fail-on-airgap \
   --fail-on-telemetry \
   --fail-on-command-hash-metadata
+```
+
+## Eval Efficiency Frontier
+
+`eval_efficiency_frontier.py` reads saved eval perf scorecards and marks
+non-dominated model/quantization rows by quality and throughput. Use
+`--memory-aware` to include `max_memory_bytes` as a lower-is-better Pareto
+dimension, which keeps low-memory builds visible when they trade quality or
+speed for footprint.
+
+```bash
+python3 bench/eval_efficiency_frontier.py bench/results/eval_perf_scorecard_smoke_latest.json \
+  --output-dir bench/results \
+  --output-stem eval_efficiency_frontier_latest \
+  --quality-metric holyc_accuracy \
+  --speed-metric median_wall_tok_per_s \
+  --memory-aware \
+  --fail-on-missing-metrics
 ```
 
 ## Perf Regression Dashboard
@@ -1164,6 +3347,20 @@ python3 bench/build_compare.py \
   --fail-on-environment-drift
 ```
 
+`build_pair_manifest_audit.py` gates the `build_pair_select.py` output before
+perf CI consumes it. It verifies that baseline/candidate sources and commits are
+distinct, candidate timestamps are not older than baselines, both sides have the
+required measured-run count, and the emitted `build_compare.py` arguments still
+reference both selected artifacts.
+
+```bash
+python3 bench/build_pair_manifest_audit.py bench/results/build_pair_select_latest.json \
+  --output-dir bench/results \
+  --output-stem build_pair_manifest_audit_latest \
+  --min-measured-runs 4
+python3 bench/build_pair_manifest_audit_ci_smoke.py
+```
+
 ## HolyC vs llama.cpp Eval Compare
 
 `eval_compare.py` compares offline multiple-choice predictions from HolyC and
@@ -1171,7 +3368,7 @@ llama.cpp against the same local gold JSONL dataset. It aligns by record id,
 supports prediction indexes, labels, exact choice text, or score arrays, and
 writes JSON, Markdown, per-record CSV, per-dataset/split breakdown CSV,
 confusion-matrix CSV, calibration-bin CSV, score-margin CSV,
-score-NLL CSV, score-tie CSV, engine-disagreement CSV, and JUnit XML reports to `bench/results/`.
+score-NLL CSV, score-rank CSV, score-tie CSV, engine-disagreement CSV, and JUnit XML reports to `bench/results/`.
 Reports include accuracy, agreement, macro-F1, per-answer F1,
 per-dataset/split breakdowns, and confusion matrices for each engine.
 Score-vector reports include calibration, gold-rank, mean gold-answer NLL,
@@ -1196,11 +3393,15 @@ gold file is too label-skewed for a useful paired comparison. Use
 multiple-choice rows before prediction files are scored. It also records
 score-vector coverage and top-score ties; use `--min-score-coverage-pct` and
 `--max-top-score-tie-pct` to catch missing or ambiguous score vectors before
-running quality comparisons. Prediction rows may also carry `prompt_sha256`,
+running quality comparisons. Use `--min-top-score-margin` to gate scored rows
+whose top choice barely beats the runner-up. Prediction rows may also carry `prompt_sha256`,
 `choices_sha256`, and `input_sha256` either at top level or under `metadata`;
 `--require-input-hashes` fails the audit unless those hashes match the normalized
-gold prompt and choices used for comparison. The audit writes JSON, Markdown,
-CSV, and JUnit XML reports and exits non-zero when it finds errors:
+gold prompt and choices used for comparison. Add `--record-csv` to export
+per-engine row telemetry with normalized predictions, correctness, score-vector
+coverage, top-score tie counts, score margins, and input-hash status for dashboards. The audit
+writes JSON, Markdown, CSV, and JUnit XML reports and exits non-zero when it
+finds errors:
 
 ```bash
 python3 bench/eval_input_audit.py \
@@ -1214,7 +3415,27 @@ python3 bench/eval_input_audit.py \
   --max-majority-gold-answer-pct 100 \
   --min-choices 4 \
   --max-choices 4 \
+  --min-top-score-margin 0 \
+  --record-csv bench/results/eval_input_audit_smoke_records_latest.csv \
   --output-stem eval_input_audit_smoke_latest
+```
+
+`eval_repro_audit.py` checks existing HolyC and llama.cpp prediction artifacts
+for deterministic decoding metadata parity before quality numbers are compared.
+It validates seed, temperature, top-k, top-p, and max-token metadata at the top
+level or under `metadata`, can require temperature-0 seeded runs, and writes
+JSON, Markdown, CSV, findings CSV, and JUnit XML reports:
+
+```bash
+python3 bench/eval_repro_audit.py \
+  bench/eval/samples/holyc_smoke_predictions.jsonl \
+  bench/eval/samples/llama_smoke_predictions.jsonl \
+  --output-dir bench/results \
+  --output-stem eval_repro_audit_latest \
+  --require-metadata \
+  --require-deterministic \
+  --expect seed=1234 \
+  --expect temperature=0
 ```
 
 Example:
@@ -1232,17 +3453,106 @@ python3 bench/eval_compare.py \
   --output-stem eval_compare_smoke_latest
 ```
 
+`eval_artifact_drift_audit.py` checks existing eval_compare JSON reports for
+artifact drift before suite summaries are trusted. It verifies required
+gold/HolyC/llama SHA256 fields, flags multiple gold hashes for the same
+dataset/split, and can reject duplicate dataset/split/model/quantization report
+keys with different artifact signatures:
+
+```bash
+python3 bench/eval_artifact_drift_audit.py bench/results \
+  --output-dir bench/results \
+  --output-stem eval_artifact_drift_audit_latest \
+  --min-reports 2 \
+  --require-hashes \
+  --fail-on-failed-reports \
+  --fail-on-duplicate-key-drift
+```
+
+`eval_rank_audit.py` gates scored multiple-choice rank metrics from existing
+`eval_compare.py` JSON reports. It checks score-vector coverage, top-k accuracy,
+mean reciprocal rank, and HolyC rank loss versus llama.cpp, with optional
+dataset/split breakdown gates:
+
+```bash
+python3 bench/eval_rank_audit.py bench/results/eval_compare_smoke_latest.json \
+  --output-dir bench/results \
+  --output-stem eval_rank_audit_smoke_latest \
+  --min-score-coverage 0.3 \
+  --min-top-1-accuracy 0.5 \
+  --min-mean-reciprocal-rank 0.5 \
+  --max-holyc-top-1-loss 0.25 \
+  --max-holyc-mrr-loss 0.25 \
+  --fail-on-findings
+```
+
+`eval_rank_audit_ci_smoke.py` exercises pass and failure paths without launching
+QEMU:
+
+```bash
+python3 bench/eval_rank_audit_ci_smoke.py
+```
+
+`perplexity_input_audit.py` validates offline token logprob or aggregate NLL
+artifacts before HolyC-vs-llama comparison. It accepts JSON, JSONL, and CSV
+records, rejects duplicate ids, positive logprobs, invalid token counts,
+NLL/perplexity formula drift, and optional missing dataset/split metadata, then
+writes JSON, Markdown, record CSV, source summary CSV, findings CSV, and JUnit
+reports without launching QEMU.
+
+```bash
+python3 bench/perplexity_input_audit.py \
+  bench/eval/samples/holyc_smoke_logprobs.jsonl \
+  bench/eval/samples/llama_smoke_logprobs.jsonl \
+  --output-dir bench/results \
+  --output-stem perplexity_input_audit_latest \
+  --min-records 6 \
+  --min-records-per-source 3 \
+  --min-tokens 22 \
+  --min-tokens-per-source 11
+```
+
+`perplexity_input_audit_ci_smoke.py` exercises passing input artifacts and
+positive-logprob/missing-metadata failure paths:
+
+```bash
+python3 bench/perplexity_input_audit_ci_smoke.py
+```
+
+`perplexity_pairing_audit.py` checks HolyC and llama.cpp logprob/perplexity
+artifacts before comparison to ensure record ids, token counts, dataset
+metadata, and split metadata are paired one-to-one. It reads local JSON, JSONL,
+or CSV inputs and writes JSON, Markdown, pair CSV, findings CSV, and JUnit
+reports without launching QEMU.
+
+```bash
+python3 bench/perplexity_pairing_audit.py \
+  --holyc bench/eval/samples/holyc_smoke_logprobs.jsonl \
+  --llama bench/eval/samples/llama_smoke_logprobs.jsonl \
+  --output-dir bench/results \
+  --output-stem perplexity_pairing_audit_latest \
+  --min-pairs 3
+```
+
+`perplexity_pairing_audit_ci_smoke.py` exercises passing pair coverage plus
+duplicate-id, missing-record, token-count, and metadata mismatch failures:
+
+```bash
+python3 bench/perplexity_pairing_audit_ci_smoke.py
+```
+
 `perplexity_compare.py` compares offline token logprob or aggregate NLL outputs
 from HolyC and llama.cpp. It aligns rows by record id, computes token-weighted
 NLL/token and perplexity, writes JSON, Markdown, per-record CSV,
-dataset/split breakdown CSV, and JUnit XML reports, and fails on token-count
+dataset/split breakdown CSV, regression CSV, and JUnit XML reports, and fails on token-count
 mismatches unless `--allow-token-count-mismatch` is passed. If both engine
 outputs include `dataset`/`split` metadata for an id, conflicting metadata is
 rejected before reporting. Optional quality gates can fail CI when aggregate
 NLL drift, HolyC/llama.cpp perplexity ratio, or per-record NLL delta
 distribution bounds exceed configured thresholds. Use `--min-record-count` and
 `--min-token-count` to prevent accidentally promoting tiny perplexity runs with
-too little coverage.
+too little coverage, and use `--min-dataset-split-record-count` or
+`--min-dataset-split-token-count` to gate each dataset/split breakdown row.
 
 Example:
 
@@ -1256,6 +3566,8 @@ python3 bench/perplexity_compare.py \
   --quantization Q4_0 \
   --min-record-count 3 \
   --min-token-count 11 \
+  --min-dataset-split-record-count 3 \
+  --min-dataset-split-token-count 11 \
   --max-nll-delta 0.02 \
   --max-perplexity-ratio 1.05 \
   --max-p95-abs-record-nll-delta 0.05 \
@@ -1265,7 +3577,7 @@ python3 bench/perplexity_compare.py \
 ```
 
 `perplexity_compare_ci_smoke.py` exercises JSON, Markdown, CSV, breakdown CSV,
-JUnit, and coverage-gate failure paths without launching QEMU:
+regression CSV, JUnit, and coverage-gate failure paths without launching QEMU:
 
 ```bash
 python3 bench/perplexity_compare_ci_smoke.py
@@ -1350,6 +3662,44 @@ python3 bench/perf_regression.py \
   --baseline-commit "$BASE_SHA" \
   --candidate-commit "$GITHUB_SHA" \
   --fail-on-regression
+```
+
+`qemu_serial_endpoint_audit.py` checks saved QEMU benchmark command telemetry
+for stdio-only serial routing. It rejects socket/TCP/UDP serial, monitor, QMP,
+gdb, and chardev endpoints and, by default, requires `-serial stdio`,
+`-serial mon:stdio`, or `-nographic`:
+
+```bash
+python3 bench/qemu_serial_endpoint_audit.py bench/results \
+  --output-dir bench/results \
+  --output-stem qemu_serial_endpoint_audit_latest \
+  --require-top-command
+```
+
+`qemu_display_policy_audit.py` checks saved QEMU benchmark command telemetry
+for repeatable headless display routing. It requires `-display none` or
+`-nographic`, and rejects GUI/remote display backends such as GTK, SDL, Cocoa,
+VNC, and SPICE:
+
+```bash
+python3 bench/qemu_display_policy_audit.py bench/results \
+  --output-dir bench/results \
+  --output-stem qemu_display_policy_audit_latest \
+  --require-top-command
+```
+
+`qemu_stdio_hygiene_audit.py` checks saved QEMU benchmark artifacts for noisy
+OK rows, silent failures, byte-counter drift, and bounded stdout/stderr/tail
+payloads before dashboards ingest them:
+
+```bash
+python3 bench/qemu_stdio_hygiene_audit.py bench/results \
+  --output-dir bench/results \
+  --output-stem qemu_stdio_hygiene_audit_latest \
+  --max-stdout-bytes 1048576 \
+  --max-stderr-bytes 65536 \
+  --max-stdout-tail-bytes 8192 \
+  --max-stderr-tail-bytes 8192
 ```
 
 `airgap_audit.py` scans benchmark artifacts, including benchmark-matrix cells,

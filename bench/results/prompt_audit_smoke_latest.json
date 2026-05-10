@@ -1,17 +1,22 @@
 {
   "error_count": 0,
-  "generated_at": "2026-04-29T10:47:59Z",
+  "generated_at": "2026-04-30T02:15:40Z",
   "issues": [],
   "limits": {
     "expect_suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a",
     "fail_on_duplicate_text": false,
+    "max_expected_tokens": 64,
     "max_prompt_bytes": 1024,
-    "min_prompts": 2
+    "min_expected_token_prompts": 2,
+    "min_expected_tokens": 16,
+    "min_prompts": 2,
+    "require_expected_tokens": true
   },
   "prompts": [
     {
       "bytes": 49,
       "chars": 49,
+      "expected_tokens": 32,
       "lines": 1,
       "prompt_id": "smoke-short",
       "sha256": "8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4"
@@ -19,18 +24,23 @@
     {
       "bytes": 71,
       "chars": 71,
+      "expected_tokens": 48,
       "lines": 1,
       "prompt_id": "smoke-code",
       "sha256": "587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091"
     }
   ],
-  "source": "bench/prompts/smoke.jsonl",
+  "source": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/prompts/smoke.jsonl",
   "status": "pass",
   "summary": {
     "bytes_max": 71,
     "bytes_median": 60.0,
     "bytes_min": 49,
     "bytes_p95": 69.9,
+    "expected_token_prompts": 2,
+    "expected_tokens_max": 48,
+    "expected_tokens_min": 32,
+    "expected_tokens_total": 80,
     "lines_max": 1,
     "prompt_count": 2,
     "suite_sha256": "68fc621f9f3916e73aa05b83ba0fa8da9f3cffad22a1c29f5acf8980d8dd743a"

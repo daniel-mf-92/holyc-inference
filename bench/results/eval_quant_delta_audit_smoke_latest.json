@@ -1,0 +1,63 @@
+{
+  "comparisons": [
+    {
+      "agreement_delta": 0.020000000000000018,
+      "candidate_quantization": "Q4_0",
+      "candidate_records": 4,
+      "candidate_regressions": 0,
+      "candidate_source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpbsoxwgh5/q4.json",
+      "candidate_status": "pass",
+      "dataset": "smoke-eval",
+      "holyc_accuracy_drop": 0.020000000000000018,
+      "llama_accuracy_drop": 0.0,
+      "model": "synthetic-smoke",
+      "reference_quantization": "Q8_0",
+      "reference_records": 4,
+      "reference_regressions": 0,
+      "reference_source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpbsoxwgh5/q8.json",
+      "reference_status": "pass",
+      "split": "validation"
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-02T04:00:41Z",
+  "pairs": [
+    "Q4_0:Q8_0"
+  ],
+  "reports": [
+    {
+      "agreement": 0.98,
+      "dataset": "smoke-eval",
+      "error": "",
+      "holyc_accuracy": 0.98,
+      "llama_accuracy": 1.0,
+      "model": "synthetic-smoke",
+      "quantization": "Q4_0",
+      "records": 4,
+      "regressions": 0,
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpbsoxwgh5/q4.json",
+      "split": "validation",
+      "status": "pass"
+    },
+    {
+      "agreement": 1.0,
+      "dataset": "smoke-eval",
+      "error": "",
+      "holyc_accuracy": 1.0,
+      "llama_accuracy": 1.0,
+      "model": "synthetic-smoke",
+      "quantization": "Q8_0",
+      "records": 4,
+      "regressions": 0,
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpbsoxwgh5/q8.json",
+      "split": "validation",
+      "status": "pass"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "comparisons": 1,
+    "findings": 0,
+    "reports": 2
+  }
+}

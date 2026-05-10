@@ -1,0 +1,33 @@
+{
+  "dashboards": [
+    {
+      "generated_at": "2026-04-29T19:10:17Z",
+      "name": "perf_regression",
+      "sidecars_checked": 3,
+      "sidecars_missing": 0,
+      "source": "bench/dashboards/perf_regression_latest.json",
+      "status": "pass",
+      "summary_findings": null,
+      "summary_rows": null
+    },
+    {
+      "generated_at": "2026-04-30T00:02:49Z",
+      "name": "perf_slo_audit",
+      "sidecars_checked": 3,
+      "sidecars_missing": 0,
+      "source": "bench/dashboards/perf_slo_audit_latest.json",
+      "status": "pass",
+      "summary_findings": 0,
+      "summary_rows": 4
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-01T09:17:49Z",
+  "status": "pass",
+  "summary": {
+    "dashboards": 2,
+    "findings": 0,
+    "sidecars_checked": 6,
+    "sidecars_missing": 0
+  }
+}

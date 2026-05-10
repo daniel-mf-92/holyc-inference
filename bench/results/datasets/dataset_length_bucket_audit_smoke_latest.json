@@ -1,0 +1,46 @@
+{
+  "bucket_edges": [
+    96,
+    160,
+    256
+  ],
+  "buckets": [
+    {
+      "answer_index_histogram": "0:1",
+      "bucket": "0-96",
+      "choice_count_histogram": "4:1",
+      "dataset_split_count": 1,
+      "datasets": "arc-smoke:validation",
+      "max_total_bytes": 96,
+      "min_total_bytes": 0,
+      "record_count": 1
+    },
+    {
+      "answer_index_histogram": "0:2",
+      "bucket": "161-256",
+      "choice_count_histogram": "4:2",
+      "dataset_split_count": 2,
+      "datasets": "hellaswag-smoke:validation,truthfulqa-smoke:validation",
+      "max_total_bytes": 256,
+      "min_total_bytes": 161,
+      "record_count": 2
+    }
+  ],
+  "findings": [],
+  "format": "hceval-dataset-length-bucket-audit",
+  "generated_at": "2026-05-02T04:00:09Z",
+  "inputs": [
+    {
+      "path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl",
+      "rows": 3,
+      "sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "buckets": 2,
+    "findings": 0,
+    "largest_bucket_pct": 66.666667,
+    "records": 3
+  }
+}

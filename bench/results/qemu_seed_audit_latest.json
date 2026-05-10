@@ -1,0 +1,47 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-02T08:20:28Z",
+  "rows": [
+    {
+      "commit": "abc1234",
+      "exit_class": "ok",
+      "iteration": "1",
+      "key": "ci-airgap-smoke|synthetic-smoke|Q4_0|smoke-short|1|abc1234",
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "row": 1,
+      "seed": 42,
+      "seed_source": "seed",
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/holyc-qemu-seed-audit-nblq346j/qemu_prompt_bench_pass.json"
+    },
+    {
+      "commit": "abc1234",
+      "exit_class": "ok",
+      "iteration": "2",
+      "key": "ci-airgap-smoke|synthetic-smoke|Q4_0|smoke-code|2|abc1234",
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "row": 2,
+      "seed": 99,
+      "seed_source": "rng_seed",
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/holyc-qemu-seed-audit-nblq346j/qemu_prompt_bench_pass.json"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "invalid_seed_rows": 0,
+    "missing_seed_rows": 0,
+    "negative_seed_rows": 0,
+    "rows": 2,
+    "seed_drift_groups": 0,
+    "seeded_rows": 2,
+    "unique_seeds": 2
+  }
+}

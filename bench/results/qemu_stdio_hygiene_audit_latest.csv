@@ -1,0 +1,12 @@
+metric,value
+rows,4
+ok_rows,4
+failure_rows,0
+rows_with_stderr,0
+silent_failure_rows,0
+max_stdout_tail_bytes,215
+max_stderr_tail_bytes,0
+findings,0
+profiles,ci-airgap-smoke
+models,synthetic-smoke
+quantizations,Q4_0

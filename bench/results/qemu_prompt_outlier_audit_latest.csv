@@ -1,0 +1,3 @@
+profile,model,quantization,prompt,samples,ok_samples,wall_elapsed_us_median,wall_elapsed_us_mad,wall_tok_per_s_median,wall_tok_per_s_mad,host_overhead_pct_median,host_overhead_pct_mad
+ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-code,2,2,147086.5,17347.5,330.9419972274646,39.03156507839566,-50.97116666666667,5.782499999999999
+ci-airgap-smoke,synthetic-smoke,Q4_0,smoke-short,2,2,275339.0,38714.0,118.56435300861538,16.670723589377232,37.6695,19.357

@@ -16,7 +16,7 @@
   "error_count": 0,
   "findings": [],
   "format": "hceval-choice-audit",
-  "generated_at": "2026-04-29T21:15:52Z",
+  "generated_at": "2026-04-30T00:57:11Z",
   "inputs": [
     {
       "path": "bench/datasets/samples/smoke_eval.jsonl",
@@ -27,6 +27,8 @@
   "record_count": 3,
   "record_telemetry": [
     {
+      "answer_choice_byte_pct": 27.10843373493976,
+      "answer_choice_bytes": 45,
       "answer_index": 0,
       "choice_count": 4,
       "choice_label_prefix_count": 0,
@@ -46,6 +48,8 @@
       "total_choice_bytes": 166
     },
     {
+      "answer_choice_byte_pct": 39.285714285714285,
+      "answer_choice_bytes": 11,
       "answer_index": 0,
       "choice_count": 4,
       "choice_label_prefix_count": 0,
@@ -65,6 +69,8 @@
       "total_choice_bytes": 28
     },
     {
+      "answer_choice_byte_pct": 32.33082706766917,
+      "answer_choice_bytes": 43,
       "answer_index": 0,
       "choice_count": 4,
       "choice_label_prefix_count": 0,

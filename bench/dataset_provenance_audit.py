@@ -67,6 +67,7 @@ class ProvenanceArtifact:
     split_majority_answers: dict[str, dict[str, Any]]
     dataset_split_majority_answers: dict[str, dict[str, dict[str, Any]]]
     findings: list[ProvenanceFinding]
+    record_telemetry: list[dict[str, Any]]
 
 
 def iso_now() -> str:
@@ -261,6 +262,49 @@ def majority_answers_by_dataset_split(
             }
         majorities[dataset] = split_majorities
     return majorities
+
+
+def input_payload_sha256(record: dataset_pack.EvalRecord) -> str:
+    payload = {
+        "choices": [dataset_pack.clean_text(choice) for choice in record.choices],
+        "prompt": dataset_pack.clean_text(record.prompt),
+    }
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def record_telemetry_rows(
+    artifact_source: str,
+    output: str,
+    records: list[dataset_pack.EvalRecord],
+    provenance_counts: dict[str, int],
+) -> list[dict[str, Any]]:
+    total = len(records)
+    rows: list[dict[str, Any]] = []
+    for index, record in enumerate(records, start=1):
+        provenance_count = provenance_counts.get(record.provenance, 0)
+        choice_bytes = [len(choice.encode("utf-8")) for choice in record.choices]
+        rows.append(
+            {
+                "artifact_source": artifact_source,
+                "output": output,
+                "row_number": index,
+                "record_id": record.record_id,
+                "dataset": record.dataset,
+                "split": record.split,
+                "provenance": record.provenance,
+                "provenance_count": provenance_count,
+                "provenance_pct": (provenance_count / total * 100.0) if total else None,
+                "answer_index": record.answer_index,
+                "choice_count": len(record.choices),
+                "prompt_bytes": len(record.prompt.encode("utf-8")),
+                "choice_bytes": json.dumps(choice_bytes, separators=(",", ":")),
+                "choice_bytes_total": sum(choice_bytes),
+                "record_payload_bytes": dataset_pack.record_payload_bytes(record),
+                "input_sha256": input_payload_sha256(record),
+            }
+        )
+    return rows
 
 
 def load_records(path: Path) -> list[dataset_pack.EvalRecord]:
@@ -533,6 +577,7 @@ def audit_manifest(
     observed_dataset_majority_answers: dict[str, dict[str, Any]] = {}
     observed_split_majority_answers: dict[str, dict[str, Any]] = {}
     observed_dataset_split_majority_answers: dict[str, dict[str, dict[str, Any]]] = {}
+    observed_record_telemetry: list[dict[str, Any]] = []
     curated_output = output_path(manifest, path)
     if curated_output is None:
         findings.append(finding(path, "error", "missing_output_path", "output is missing"))
@@ -583,6 +628,12 @@ def audit_manifest(
             observed_provenance_counts = count_by(records, "provenance")
             majority_answer_index, majority_answer_pct = majority_answer(observed_answer_histogram)
             majority_provenance, majority_provenance_pct = majority_answer(observed_provenance_counts)
+            observed_record_telemetry = record_telemetry_rows(
+                str(path),
+                clean(manifest.get("output")),
+                records,
+                observed_provenance_counts,
+            )
             observed_dataset_majority_answers = majority_answers_by_dataset(observed_dataset_answer_histograms)
             observed_split_majority_answers = majority_answers_by_split(observed_split_answer_histograms)
             observed_dataset_split_majority_answers = majority_answers_by_dataset_split(
@@ -762,6 +813,7 @@ def audit_manifest(
         split_majority_answers=observed_split_majority_answers,
         dataset_split_majority_answers=observed_dataset_split_majority_answers,
         findings=findings,
+        record_telemetry=observed_record_telemetry,
     )
 
 
@@ -817,6 +869,7 @@ def report_status(artifacts: list[ProvenanceArtifact]) -> str:
 def artifact_dict(artifact: ProvenanceArtifact) -> dict[str, Any]:
     row = asdict(artifact)
     row["findings"] = [asdict(item) for item in artifact.findings]
+    row.pop("record_telemetry", None)
     return row
 
 
@@ -926,6 +979,33 @@ def write_csv(artifacts: list[ProvenanceArtifact], path: Path) -> None:
             writer.writerow({field: row[field] for field in fields})
 
 
+def write_record_csv(artifacts: list[ProvenanceArtifact], path: Path) -> None:
+    fields = [
+        "artifact_source",
+        "output",
+        "row_number",
+        "record_id",
+        "dataset",
+        "split",
+        "provenance",
+        "provenance_count",
+        "provenance_pct",
+        "answer_index",
+        "choice_count",
+        "prompt_bytes",
+        "choice_bytes",
+        "choice_bytes_total",
+        "record_payload_bytes",
+        "input_sha256",
+    ]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for artifact in artifacts:
+            for row in artifact.record_telemetry:
+                writer.writerow({field: row[field] for field in fields})
+
+
 def junit_report(report: dict[str, Any]) -> str:
     artifacts = [row for row in report["artifacts"] if isinstance(row, dict)]
     failing = [row for row in artifacts if row.get("status") == "fail"]
@@ -966,10 +1046,12 @@ def write_report(artifacts: list[ProvenanceArtifact], output_dir: Path) -> Path:
     json_path = output_dir / "dataset_provenance_audit_latest.json"
     md_path = output_dir / "dataset_provenance_audit_latest.md"
     csv_path = output_dir / "dataset_provenance_audit_latest.csv"
+    record_csv_path = output_dir / "dataset_provenance_audit_records_latest.csv"
     junit_path = output_dir / "dataset_provenance_audit_junit_latest.xml"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(markdown_report(report), encoding="utf-8")
     write_csv(artifacts, csv_path)
+    write_record_csv(artifacts, record_csv_path)
     junit_path.write_text(junit_report(report), encoding="utf-8")
     return json_path
 

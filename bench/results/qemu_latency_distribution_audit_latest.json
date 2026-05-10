@@ -1,0 +1,137 @@
+{
+  "findings": [],
+  "generated_at": "2026-04-30T12:05:38Z",
+  "groups": [
+    {
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "samples": 2,
+      "sources": "bench/results/qemu_prompt_bench_latest.json",
+      "tokens_total": 96,
+      "ttft_us_p50": 12400.0,
+      "ttft_us_p95": 12400.0,
+      "wall_elapsed_us_p50": 147086.5,
+      "wall_elapsed_us_p95": 162699.25,
+      "wall_tok_per_s_p05": 295.81358865690845,
+      "wall_tok_per_s_p50": 330.9419972274646,
+      "wall_us_per_token_p50": 3064.3020833333335,
+      "wall_us_per_token_p95": 3389.5677083333335
+    },
+    {
+      "model": "synthetic-smoke",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "samples": 2,
+      "sources": "bench/results/qemu_prompt_bench_latest.json",
+      "tokens_total": 64,
+      "ttft_us_p50": 11600.0,
+      "ttft_us_p95": 11600.0,
+      "wall_elapsed_us_p50": 275339.0,
+      "wall_elapsed_us_p95": 310181.6,
+      "wall_tok_per_s_p05": 103.56070177817587,
+      "wall_tok_per_s_p50": 118.56435300861538,
+      "wall_us_per_token_p50": 8604.34375,
+      "wall_us_per_token_p95": 9693.175
+    }
+  ],
+  "samples": [
+    {
+      "commit": "a70776642a09",
+      "elapsed_us": 200000.0,
+      "exit_class": "ok",
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "row": 1,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "tok_per_s": 160.0,
+      "tokens": 32,
+      "ttft_us": 11600.0,
+      "us_per_token": 6250.0,
+      "wall_elapsed_us": 236625.0,
+      "wall_tok_per_s": 135.23507659799262,
+      "wall_us_per_token": 7394.53125
+    },
+    {
+      "commit": "a70776642a09",
+      "elapsed_us": 200000.0,
+      "exit_class": "ok",
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "row": 2,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "tok_per_s": 160.0,
+      "tokens": 32,
+      "ttft_us": 11600.0,
+      "us_per_token": 6250.0,
+      "wall_elapsed_us": 314053.0,
+      "wall_tok_per_s": 101.89362941923815,
+      "wall_us_per_token": 9814.15625
+    },
+    {
+      "commit": "a70776642a09",
+      "elapsed_us": 300000.0,
+      "exit_class": "ok",
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "row": 3,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "tok_per_s": 160.0,
+      "tokens": 48,
+      "ttft_us": 12400.0,
+      "us_per_token": 6250.0,
+      "wall_elapsed_us": 129739.0,
+      "wall_tok_per_s": 369.97356230586024,
+      "wall_us_per_token": 2702.8958333333335
+    },
+    {
+      "commit": "a70776642a09",
+      "elapsed_us": 300000.0,
+      "exit_class": "ok",
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "row": 4,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "tok_per_s": 160.0,
+      "tokens": 48,
+      "ttft_us": 12400.0,
+      "us_per_token": 6250.0,
+      "wall_elapsed_us": 164434.0,
+      "wall_tok_per_s": 291.9104321490689,
+      "wall_us_per_token": 3425.7083333333335
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "groups": 2,
+    "models": [
+      "synthetic-smoke"
+    ],
+    "profiles": [
+      "ci-airgap-smoke"
+    ],
+    "quantizations": [
+      "Q4_0"
+    ],
+    "rows": 4,
+    "tokens_total": 160,
+    "ttft_us_p95": 12400.0,
+    "wall_tok_per_s_median": 213.57275437353076,
+    "wall_us_per_token_p95": 9451.212499999998
+  }
+}

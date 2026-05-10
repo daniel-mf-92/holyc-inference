@@ -1,0 +1,103 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-02T04:33:11Z",
+  "rows": [
+    {
+      "checks": 3,
+      "expected_prompt_bytes": 49,
+      "expected_prompt_sha256": "8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4",
+      "expected_tokens": 32,
+      "findings": 0,
+      "list_name": "warmups",
+      "phase": "warmup",
+      "prompt": "smoke-short",
+      "prompt_bytes": 49,
+      "prompt_sha256": "8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4",
+      "row": 1,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "suite_expected_tokens": 32
+    },
+    {
+      "checks": 3,
+      "expected_prompt_bytes": 71,
+      "expected_prompt_sha256": "587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091",
+      "expected_tokens": 48,
+      "findings": 0,
+      "list_name": "warmups",
+      "phase": "warmup",
+      "prompt": "smoke-code",
+      "prompt_bytes": 71,
+      "prompt_sha256": "587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091",
+      "row": 2,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "suite_expected_tokens": 48
+    },
+    {
+      "checks": 3,
+      "expected_prompt_bytes": 49,
+      "expected_prompt_sha256": "8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4",
+      "expected_tokens": 32,
+      "findings": 0,
+      "list_name": "benchmarks",
+      "phase": "measured",
+      "prompt": "smoke-short",
+      "prompt_bytes": 49,
+      "prompt_sha256": "8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4",
+      "row": 3,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "suite_expected_tokens": 32
+    },
+    {
+      "checks": 3,
+      "expected_prompt_bytes": 49,
+      "expected_prompt_sha256": "8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4",
+      "expected_tokens": 32,
+      "findings": 0,
+      "list_name": "benchmarks",
+      "phase": "measured",
+      "prompt": "smoke-short",
+      "prompt_bytes": 49,
+      "prompt_sha256": "8b1a97085df1b00a3d726b492997598fd4bd640080566602f9de113f29a4e7d4",
+      "row": 4,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "suite_expected_tokens": 32
+    },
+    {
+      "checks": 3,
+      "expected_prompt_bytes": 71,
+      "expected_prompt_sha256": "587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091",
+      "expected_tokens": 48,
+      "findings": 0,
+      "list_name": "benchmarks",
+      "phase": "measured",
+      "prompt": "smoke-code",
+      "prompt_bytes": 71,
+      "prompt_sha256": "587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091",
+      "row": 5,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "suite_expected_tokens": 48
+    },
+    {
+      "checks": 3,
+      "expected_prompt_bytes": 71,
+      "expected_prompt_sha256": "587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091",
+      "expected_tokens": 48,
+      "findings": 0,
+      "list_name": "benchmarks",
+      "phase": "measured",
+      "prompt": "smoke-code",
+      "prompt_bytes": 71,
+      "prompt_sha256": "587c04a07a905d3852e39d6ac74a8db16c707622e7db66c642ee841caaab9091",
+      "row": 6,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "suite_expected_tokens": 48
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "checks": 18,
+    "findings": 0,
+    "row_findings": 0,
+    "rows": 6
+  }
+}

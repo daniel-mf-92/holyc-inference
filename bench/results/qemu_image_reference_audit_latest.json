@@ -1,0 +1,26 @@
+{
+  "artifacts": [
+    {
+      "command_arrays_checked": 7,
+      "distinct_drive_paths": 1,
+      "drive_references": 7,
+      "error": "",
+      "image_exists": false,
+      "image_path": "/tmp/TempleOS.synthetic.img",
+      "image_sha256": null,
+      "image_size_bytes": null,
+      "source": "bench/results/qemu_prompt_bench_20260501T230412Z.json",
+      "status": "pass",
+      "violation_count": 0
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-02T05:02:55Z",
+  "status": "pass",
+  "summary": {
+    "artifacts": 1,
+    "command_arrays_checked": 7,
+    "drive_references": 7,
+    "findings": 0
+  }
+}

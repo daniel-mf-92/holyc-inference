@@ -1,0 +1,57 @@
+{
+  "findings": [],
+  "generated_at": "2026-04-30T05:18:43Z",
+  "slices": [
+    {
+      "agreement": 1.0,
+      "dataset": "arc-smoke",
+      "holyc_accuracy": 1.0,
+      "llama_accuracy": 1.0,
+      "model": "synthetic-smoke",
+      "quantization": "Q4_0",
+      "record_count": 1,
+      "regressions": 0,
+      "report_status": "pass",
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    },
+    {
+      "agreement": 1.0,
+      "dataset": "hellaswag-smoke",
+      "holyc_accuracy": 1.0,
+      "llama_accuracy": 1.0,
+      "model": "synthetic-smoke",
+      "quantization": "Q4_0",
+      "record_count": 1,
+      "regressions": 0,
+      "report_status": "pass",
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    },
+    {
+      "agreement": 1.0,
+      "dataset": "truthfulqa-smoke",
+      "holyc_accuracy": 1.0,
+      "llama_accuracy": 1.0,
+      "model": "synthetic-smoke",
+      "quantization": "Q4_0",
+      "record_count": 1,
+      "regressions": 0,
+      "report_status": "pass",
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "records": 3,
+    "reports": 1,
+    "slice_counts": {
+      "arc-smoke:validation": 1,
+      "hellaswag-smoke:validation": 1,
+      "truthfulqa-smoke:validation": 1
+    },
+    "slices": 3
+  }
+}

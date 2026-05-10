@@ -1,0 +1,75 @@
+{
+  "buckets": [
+    {
+      "bucket": "short",
+      "failed_rows": 0,
+      "failure_pct": 0.0,
+      "max_bytes": 255,
+      "min_bytes": 0,
+      "prompt_bytes_max": 71,
+      "prompt_bytes_min": 49,
+      "rows": 4,
+      "sources": "bench/results/qemu_prompt_bench_latest.json",
+      "successful_rows": 4,
+      "tokens_total": 160,
+      "ttft_us_p50": 12000.0,
+      "ttft_us_p95": 12400.0,
+      "unique_prompts": 2,
+      "wall_tok_per_s_p05": 65.34523416609689,
+      "wall_tok_per_s_p50": 74.52765713965621
+    },
+    {
+      "bucket": "medium",
+      "failed_rows": 0,
+      "failure_pct": 0.0,
+      "max_bytes": 1023,
+      "min_bytes": 256,
+      "prompt_bytes_max": null,
+      "prompt_bytes_min": null,
+      "rows": 0,
+      "sources": "",
+      "successful_rows": 0,
+      "tokens_total": 0,
+      "ttft_us_p50": null,
+      "ttft_us_p95": null,
+      "unique_prompts": 0,
+      "wall_tok_per_s_p05": null,
+      "wall_tok_per_s_p50": null
+    },
+    {
+      "bucket": "long",
+      "failed_rows": 0,
+      "failure_pct": 0.0,
+      "max_bytes": null,
+      "min_bytes": 1024,
+      "prompt_bytes_max": null,
+      "prompt_bytes_min": null,
+      "rows": 0,
+      "sources": "",
+      "successful_rows": 0,
+      "tokens_total": 0,
+      "ttft_us_p50": null,
+      "ttft_us_p95": null,
+      "unique_prompts": 0,
+      "wall_tok_per_s_p05": null,
+      "wall_tok_per_s_p50": null
+    }
+  ],
+  "config": {
+    "include_warmups": false,
+    "max_failure_pct": 100.0,
+    "min_prompts_per_bucket": 0,
+    "min_successful_samples_per_bucket": 0
+  },
+  "findings": [],
+  "generated_at": "2026-05-01T21:03:58Z",
+  "status": "pass",
+  "summary": {
+    "buckets": 3,
+    "failed_samples": 0,
+    "findings": 0,
+    "nonempty_buckets": 1,
+    "samples": 4,
+    "successful_samples": 4
+  }
+}

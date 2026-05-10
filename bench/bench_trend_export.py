@@ -202,6 +202,14 @@ def drift_rows(grouped: dict[str, list[TrendPoint]], field: str) -> list[dict[st
     return rows
 
 
+def count_by(values: list[str]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for value in values:
+        key = value or "-"
+        counts[key] = counts.get(key, 0) + 1
+    return dict(sorted(counts.items()))
+
+
 def window_rows(grouped: dict[str, list[TrendPoint]], window_points: int) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for key, points in sorted(grouped.items()):
@@ -567,9 +575,28 @@ def build_report(
         or max_window_memory_cv_pct is not None
     )
     status = "fail" if findings and enabled_failure_gate else "pass"
+    drift_summary = {
+        "command_sha256": len(command_drift),
+        "launch_plan_sha256": len(launch_plan_drift),
+        "environment_sha256": len(environment_drift),
+    }
+    summary = {
+        "trend_keys": len(grouped),
+        "trend_points": len(all_points),
+        "latest_rows": len(latest),
+        "window_rows": len(windows),
+        "findings": len(findings),
+        "drift_keys": sum(drift_summary.values()),
+        "status_counts": count_by([point.status for point in all_points]),
+        "latest_status_counts": count_by([str(row.get("latest_status") or "-") for row in latest]),
+        "command_airgap_status_counts": count_by([point.command_airgap_status for point in all_points]),
+        "telemetry_status_counts": count_by([point.telemetry_status for point in all_points]),
+        "drift": drift_summary,
+    }
     return {
         "generated_at": iso_now(),
         "status": status,
+        "summary": summary,
         "findings": findings,
         "finding_rows": [asdict(row) for row in finding_rows],
         "thresholds": {

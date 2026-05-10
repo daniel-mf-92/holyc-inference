@@ -99,6 +99,7 @@ def test_cli_writes_json_and_markdown_report() -> None:
             csv.DictReader((Path(tmp) / "smoke_calibration_bins.csv").open(newline="", encoding="utf-8"))
         )
         margin_rows = list(csv.DictReader((Path(tmp) / "smoke_margins.csv").open(newline="", encoding="utf-8")))
+        rank_rows = list(csv.DictReader((Path(tmp) / "smoke_rank.csv").open(newline="", encoding="utf-8")))
         tie_rows = list(csv.DictReader((Path(tmp) / "smoke_score_ties.csv").open(newline="", encoding="utf-8")))
         disagreement_rows = list(
             csv.DictReader((Path(tmp) / "smoke_disagreements.csv").open(newline="", encoding="utf-8"))
@@ -135,11 +136,16 @@ def test_cli_writes_json_and_markdown_report() -> None:
         assert len(breakdown_rows) == 3
         assert len(calibration_rows) == 20
         assert len(margin_rows) == 8
+        assert len(rank_rows) == 8
         assert len(tie_rows) == 8
         assert {row["engine"] for row in calibration_rows} == {"holyc", "llama"}
         assert margin_rows[0]["scope"] == "overall"
         assert margin_rows[0]["engine"] == "holyc"
         assert margin_rows[0]["scored_count"] == "1"
+        assert rank_rows[0]["scope"] == "overall"
+        assert rank_rows[0]["engine"] == "holyc"
+        assert rank_rows[0]["top_1_accuracy"] == "1.0"
+        assert rank_rows[0]["mean_reciprocal_rank"] == "1.0"
         assert tie_rows[0]["scope"] == "overall"
         assert tie_rows[0]["engine"] == "holyc"
         assert tie_rows[0]["tie_rate"] == "0.0"

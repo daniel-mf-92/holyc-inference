@@ -142,6 +142,7 @@ def main() -> int:
             f"{stem}_calibration_bins.csv",
             f"{stem}_margins.csv",
             f"{stem}_nll.csv",
+            f"{stem}_rank.csv",
             f"{stem}_score_ties.csv",
             f"{stem}_disagreements.csv",
             f"{stem}_junit.xml",
@@ -175,6 +176,14 @@ def main() -> int:
 
         nll_csv = load_csv_rows(output_dir / f"{stem}_nll.csv")
         if rc := require(any(row["engine"] == "holyc" for row in nll_csv), "missing_holyc_nll_csv"):
+            return rc
+        rank_csv = load_csv_rows(output_dir / f"{stem}_rank.csv")
+        if rc := require(any(row["engine"] == "holyc" for row in rank_csv), "missing_holyc_rank_csv"):
+            return rc
+        if rc := require(
+            any(row["scope"] == "dataset_split" and row["dataset"] == "arc-smoke" for row in rank_csv),
+            "missing_dataset_rank_csv",
+        ):
             return rc
         ties_csv = load_csv_rows(output_dir / f"{stem}_score_ties.csv")
         if rc := require(any(row["engine"] == "llama" for row in ties_csv), "missing_llama_tie_csv"):

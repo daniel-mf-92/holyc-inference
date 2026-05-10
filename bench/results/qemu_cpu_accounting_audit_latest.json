@@ -1,0 +1,110 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-01T01:35:06Z",
+  "rows": [
+    {
+      "checks": 3,
+      "commit": "a70776642a09",
+      "exit_class": "ok",
+      "findings": 0,
+      "host_child_cpu_pct": 28.572636027469624,
+      "host_child_cpu_us": 67610.0,
+      "host_child_peak_rss_bytes": 458752,
+      "host_child_system_cpu_us": 24594.0,
+      "host_child_tok_per_cpu_s": 473.302765863038,
+      "host_child_user_cpu_us": 43016.0,
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "row": 1,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "tokens": 32,
+      "wall_elapsed_us": 236625.0
+    },
+    {
+      "checks": 3,
+      "commit": "a70776642a09",
+      "exit_class": "ok",
+      "findings": 0,
+      "host_child_cpu_pct": 20.37872588384763,
+      "host_child_cpu_us": 64000.0,
+      "host_child_peak_rss_bytes": 15007744,
+      "host_child_system_cpu_us": 21116.0,
+      "host_child_tok_per_cpu_s": 500.0,
+      "host_child_user_cpu_us": 42884.0,
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-short",
+      "quantization": "Q4_0",
+      "row": 2,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "tokens": 32,
+      "wall_elapsed_us": 314053.0
+    },
+    {
+      "checks": 3,
+      "commit": "a70776642a09",
+      "exit_class": "ok",
+      "findings": 0,
+      "host_child_cpu_pct": 44.98570206337339,
+      "host_child_cpu_us": 58364.0,
+      "host_child_peak_rss_bytes": 196608,
+      "host_child_system_cpu_us": 19388.0,
+      "host_child_tok_per_cpu_s": 822.4247824001096,
+      "host_child_user_cpu_us": 38976.0,
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "row": 3,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "tokens": 48,
+      "wall_elapsed_us": 129739.0
+    },
+    {
+      "checks": 3,
+      "commit": "a70776642a09",
+      "exit_class": "ok",
+      "findings": 0,
+      "host_child_cpu_pct": 37.522045319094595,
+      "host_child_cpu_us": 61699.0,
+      "host_child_peak_rss_bytes": 163840,
+      "host_child_system_cpu_us": 20808.0,
+      "host_child_tok_per_cpu_s": 777.9704695375938,
+      "host_child_user_cpu_us": 40891.0,
+      "model": "synthetic-smoke",
+      "phase": "measured",
+      "profile": "ci-airgap-smoke",
+      "prompt": "smoke-code",
+      "quantization": "Q4_0",
+      "row": 4,
+      "source": "bench/results/qemu_prompt_bench_latest.json",
+      "tokens": 48,
+      "wall_elapsed_us": 164434.0
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "checks": 12,
+    "cpu_us_total": 251673.0,
+    "findings": 0,
+    "models": [
+      "synthetic-smoke"
+    ],
+    "profiles": [
+      "ci-airgap-smoke"
+    ],
+    "prompts": [
+      "smoke-code",
+      "smoke-short"
+    ],
+    "quantizations": [
+      "Q4_0"
+    ],
+    "rows": 4
+  }
+}

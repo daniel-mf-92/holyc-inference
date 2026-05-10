@@ -1,0 +1,59 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-01T16:17:18Z",
+  "inputs": {
+    "holyc": "bench/eval/samples/holyc_smoke_predictions.jsonl",
+    "llama": "bench/eval/samples/llama_smoke_predictions.jsonl"
+  },
+  "pairs": [
+    {
+      "dataset": "",
+      "holyc_prediction": "0",
+      "holyc_row": 1,
+      "holyc_score_count": 0,
+      "llama_prediction": "0",
+      "llama_row": 1,
+      "llama_score_count": 0,
+      "model": "",
+      "order_match": true,
+      "quantization": "",
+      "record_id": "smoke-hellaswag-1",
+      "split": ""
+    },
+    {
+      "dataset": "",
+      "holyc_prediction": "0",
+      "holyc_row": 2,
+      "holyc_score_count": 4,
+      "llama_prediction": "A",
+      "llama_row": 2,
+      "llama_score_count": 0,
+      "model": "",
+      "order_match": true,
+      "quantization": "",
+      "record_id": "smoke-arc-1",
+      "split": ""
+    },
+    {
+      "dataset": "",
+      "holyc_prediction": "A",
+      "holyc_row": 3,
+      "holyc_score_count": 0,
+      "llama_prediction": "0",
+      "llama_row": 3,
+      "llama_score_count": 4,
+      "model": "",
+      "order_match": true,
+      "quantization": "",
+      "record_id": "smoke-truthfulqa-1",
+      "split": ""
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "holyc_records": 3,
+    "llama_records": 3,
+    "paired_records": 3
+  }
+}

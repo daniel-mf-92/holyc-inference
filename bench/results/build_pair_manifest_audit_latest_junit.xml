@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="holyc_build_pair_manifest_audit" tests="1" failures="0"><testcase name="bench/fixtures/build_pair_manifest_audit/pass.json:1" classname="build_pair_manifest_audit" /></testsuite>

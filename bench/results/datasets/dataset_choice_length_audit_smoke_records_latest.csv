@@ -1,0 +1,4 @@
+source,dataset,split,record_id,choice_count,answer_index,answer_choice_bytes,min_choice_bytes,max_choice_bytes,choice_byte_span,nearest_other_delta_bytes,answer_to_mean_other_ratio,max_to_min_ratio,answer_length_rank,choice_bytes
+/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl:1,hellaswag-smoke,validation,smoke-hellaswag-1,4,0,45,37,45,8,0,1.115702,1.216216,middle_or_tied,"45,45,39,37"
+/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl:2,arc-smoke,validation,smoke-arc-1,4,0,11,5,11,6,4,1.941176,2.2,longest,"11,5,5,7"
+/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl:3,truthfulqa-smoke,validation,smoke-truthfulqa-1,4,0,43,20,43,23,6,1.433333,2.15,longest,"43,37,20,33"

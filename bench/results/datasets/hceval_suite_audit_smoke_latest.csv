@@ -1,0 +1,2 @@
+input,manifest,dataset,split,record_count,binary_bytes,max_prompt_bytes,max_choice_bytes,max_record_payload_bytes,payload_sha256,source_sha256,status,finding_count
+/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/hceval-suite-audit-vmedwq42/suite.hceval,/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/hceval-suite-audit-vmedwq42/suite.hceval.manifest.json,suite-smoke,validation,1,268,27,8,96,b9f424f552614a9586ad2722ae63c446a2c9e5ecae279a70d94054548ba928ec,11c207216eda1c94bb7a45822c8cc9baf62919f3a421fd22ab89c3f17acc7639,pass,0

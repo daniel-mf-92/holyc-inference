@@ -1,6 +1,6 @@
 # Eval Input Audit
 
-Generated: 2026-04-29T11:02:55Z
+Generated: 2026-04-30T02:54:43Z
 Status: pass
 Dataset: smoke-eval
 Split: validation
@@ -38,6 +38,13 @@ Choice gates: min=4, max=4
 | --- | ---: | ---: | ---: | ---: | --- |
 | holyc | 1/3 | 33.33 | 0 | 0.00 | {"4": 1} |
 | llama | 1/3 | 33.33 | 0 | 0.00 | {"4": 1} |
+
+## Score Margins
+
+| Engine | Min margin | Low margins | Low margin % |
+| --- | ---: | ---: | ---: |
+| holyc | 8 | 0 | 0.00 |
+| llama | 2 | 0 | 0.00 |
 
 ## Input Hash Parity
 

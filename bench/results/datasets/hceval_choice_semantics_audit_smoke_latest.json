@@ -1,0 +1,97 @@
+{
+  "finding_count": 0,
+  "findings": [],
+  "format": "hceval-choice-semantics-audit",
+  "generated_at": "2026-05-02T09:50:52Z",
+  "input_count": 1,
+  "input_reports": [
+    {
+      "dataset": "smoke-eval",
+      "findings": [],
+      "input": "bench/results/datasets/smoke_eval.hceval",
+      "record_count": 3,
+      "rows": [
+        {
+          "answer_alias_count": 1,
+          "answer_index": 0,
+          "choice_count": 4,
+          "duplicate_choice_indexes": "",
+          "input": "bench/results/datasets/smoke_eval.hceval",
+          "prompt_overlap_choice_indexes": "",
+          "record_id": "smoke-hellaswag-1",
+          "status": "pass",
+          "unique_normalized_choices": 4
+        },
+        {
+          "answer_alias_count": 1,
+          "answer_index": 0,
+          "choice_count": 4,
+          "duplicate_choice_indexes": "",
+          "input": "bench/results/datasets/smoke_eval.hceval",
+          "prompt_overlap_choice_indexes": "",
+          "record_id": "smoke-arc-1",
+          "status": "pass",
+          "unique_normalized_choices": 4
+        },
+        {
+          "answer_alias_count": 1,
+          "answer_index": 0,
+          "choice_count": 4,
+          "duplicate_choice_indexes": "",
+          "input": "bench/results/datasets/smoke_eval.hceval",
+          "prompt_overlap_choice_indexes": "",
+          "record_id": "smoke-truthfulqa-1",
+          "status": "pass",
+          "unique_normalized_choices": 4
+        }
+      ],
+      "split": "validation",
+      "status": "pass"
+    }
+  ],
+  "inputs": [
+    "bench/results/datasets/smoke_eval.hceval"
+  ],
+  "record_count": 3,
+  "rows": [
+    {
+      "answer_alias_count": 1,
+      "answer_index": 0,
+      "choice_count": 4,
+      "duplicate_choice_indexes": "",
+      "input": "bench/results/datasets/smoke_eval.hceval",
+      "prompt_overlap_choice_indexes": "",
+      "record_id": "smoke-hellaswag-1",
+      "status": "pass",
+      "unique_normalized_choices": 4
+    },
+    {
+      "answer_alias_count": 1,
+      "answer_index": 0,
+      "choice_count": 4,
+      "duplicate_choice_indexes": "",
+      "input": "bench/results/datasets/smoke_eval.hceval",
+      "prompt_overlap_choice_indexes": "",
+      "record_id": "smoke-arc-1",
+      "status": "pass",
+      "unique_normalized_choices": 4
+    },
+    {
+      "answer_alias_count": 1,
+      "answer_index": 0,
+      "choice_count": 4,
+      "duplicate_choice_indexes": "",
+      "input": "bench/results/datasets/smoke_eval.hceval",
+      "prompt_overlap_choice_indexes": "",
+      "record_id": "smoke-truthfulqa-1",
+      "status": "pass",
+      "unique_normalized_choices": 4
+    }
+  ],
+  "settings": {
+    "glob": "**/*.hceval",
+    "min_overlap_chars": 12,
+    "strip_choice_labels": false
+  },
+  "status": "pass"
+}

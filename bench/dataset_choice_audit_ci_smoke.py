@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import subprocess
 import sys
@@ -101,6 +102,11 @@ def main() -> int:
             "source,dataset,split,record_id,choice_count,answer_index" in pass_record_csv.read_text(encoding="utf-8"),
             "missing_record_csv_header",
         ):
+            return rc
+        record_rows = list(csv.DictReader(pass_record_csv.open(encoding="utf-8", newline="")))
+        if rc := require(record_rows[0]["answer_choice_bytes"] == "45", "unexpected_answer_choice_bytes"):
+            return rc
+        if rc := require(float(record_rows[0]["answer_choice_byte_pct"]) > 25.0, "missing_answer_choice_byte_pct"):
             return rc
         junit_root = ET.parse(pass_junit).getroot()
         if rc := require(junit_root.attrib.get("name") == "holyc_dataset_choice_audit", "missing_junit_name"):

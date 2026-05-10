@@ -1,0 +1,33 @@
+{
+  "benchmarks": [
+    {
+      "command": [
+        "qemu-system-x86_64",
+        "-display",
+        "none",
+        "-nic",
+        "none",
+        "-serial",
+        "stdio",
+        "-m",
+        "512M"
+      ],
+      "launch_index": 1,
+      "phase": "measured",
+      "prompt": "smoke-short"
+    }
+  ],
+  "command": [
+    "qemu-system-x86_64",
+    "-display",
+    "none",
+    "-nic",
+    "none",
+    "-serial",
+    "stdio",
+    "-m",
+    "512M"
+  ],
+  "status": "pass",
+  "warmups": []
+}

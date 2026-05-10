@@ -80,6 +80,10 @@ def main() -> int:
                 "3",
                 "--min-token-count",
                 "11",
+                "--min-dataset-split-record-count",
+                "3",
+                "--min-dataset-split-token-count",
+                "11",
                 "--max-nll-delta",
                 "0.02",
                 "--max-perplexity-ratio",
@@ -122,12 +126,23 @@ def main() -> int:
             return rc
         if rc := require(report["min_token_count"] == 11, "missing_min_token_count_gate"):
             return rc
+        if rc := require(
+            report["min_dataset_split_record_count"] == 3,
+            "missing_min_dataset_split_record_count_gate",
+        ):
+            return rc
+        if rc := require(
+            report["min_dataset_split_token_count"] == 11,
+            "missing_min_dataset_split_token_count_gate",
+        ):
+            return rc
 
         expected_files = [
             f"{stem}.json",
             f"{stem}.md",
             f"{stem}.csv",
             f"{stem}_breakdown.csv",
+            f"{stem}_regressions.csv",
             f"{stem}_junit.xml",
         ]
         if rc := require(all((output_dir / name).exists() for name in expected_files), "missing_perplexity_artifact"):
@@ -146,6 +161,9 @@ def main() -> int:
             return rc
         if rc := require(breakdown_csv[0]["dataset"] == "smoke-eval", "unexpected_perplexity_breakdown_dataset"):
             return rc
+        regression_csv = load_csv_rows(output_dir / f"{stem}_regressions.csv")
+        if rc := require(regression_csv == [], "unexpected_perplexity_regression_rows"):
+            return rc
 
         junit_root = ET.parse(output_dir / f"{stem}_junit.xml").getroot()
         if rc := require(junit_root.attrib.get("name") == "holyc_perplexity_compare", "missing_perplexity_junit"):
@@ -158,8 +176,8 @@ def main() -> int:
             perplexity_command(
                 output_dir,
                 fail_stem,
-                "--min-record-count",
-                "4",
+                "--min-dataset-split-token-count",
+                "12",
                 "--fail-on-regression",
             ),
             expected_failure=True,
@@ -170,8 +188,16 @@ def main() -> int:
         if rc := require(failed_report["status"] == "fail", "unexpected_failed_perplexity_status"):
             return rc
         if rc := require(
-            failed_report["regressions"][0]["metric"] == "record_count",
+            failed_report["regressions"][0]["metric"] == "dataset_split_token_count",
             "unexpected_failed_perplexity_metric",
+        ):
+            return rc
+        failed_regressions = load_csv_rows(output_dir / f"{fail_stem}_regressions.csv")
+        if rc := require(len(failed_regressions) == 1, "unexpected_failed_perplexity_regression_rows"):
+            return rc
+        if rc := require(
+            failed_regressions[0]["metric"] == "dataset_split_token_count",
+            "unexpected_failed_perplexity_regression_csv_metric",
         ):
             return rc
         failed_junit = ET.parse(output_dir / f"{fail_stem}_junit.xml").getroot()

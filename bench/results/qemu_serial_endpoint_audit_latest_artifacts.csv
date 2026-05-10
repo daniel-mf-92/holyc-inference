@@ -1,0 +1,2 @@
+source,status,command_rows,serial_stdio_rows,socket_endpoint_rows,findings,error
+bench/fixtures/qemu_serial_endpoint_audit/pass.json,pass,2,2,0,0,

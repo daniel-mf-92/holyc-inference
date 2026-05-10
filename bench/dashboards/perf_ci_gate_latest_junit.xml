@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="holyc_perf_ci_gate" tests="2" failures="0"><testcase classname="perf_ci_gate" name="perf_regression" /><testcase classname="perf_ci_gate" name="perf_slo_audit" /></testsuite>

@@ -1,0 +1,56 @@
+{
+  "config": {
+    "max_expected_tokens_per_build": null,
+    "max_launches": 6,
+    "max_launches_per_build": 3,
+    "max_prompt_bytes": null,
+    "max_prompt_bytes_per_build": 60,
+    "min_builds": 2,
+    "require_airgap": true,
+    "require_expected_tokens": true
+  },
+  "findings": [],
+  "generated_at": "2026-05-02T04:01:33Z",
+  "rows": [
+    {
+      "build": "baseline",
+      "command_airgap_ok": true,
+      "expected_tokens_total": 24,
+      "launches": 3,
+      "measured_launches": 2,
+      "missing_expected_tokens": 0,
+      "model": "synthetic",
+      "profile": "ci-smoke",
+      "prompt_bytes_total": 54,
+      "quantization": "Q4_0",
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmphb6m84rr/qemu_benchmark_matrix_ok.json",
+      "warmup_launches": 1
+    },
+    {
+      "build": "candidate",
+      "command_airgap_ok": true,
+      "expected_tokens_total": 24,
+      "launches": 3,
+      "measured_launches": 2,
+      "missing_expected_tokens": 0,
+      "model": "synthetic",
+      "profile": "ci-smoke",
+      "prompt_bytes_total": 54,
+      "quantization": "Q4_0",
+      "source": "/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmphb6m84rr/qemu_benchmark_matrix_ok.json",
+      "warmup_launches": 1
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "builds": 2,
+    "expected_tokens_total": 48,
+    "findings": 0,
+    "launches": 6,
+    "measured_launches": 4,
+    "missing_expected_tokens": 0,
+    "prompt_bytes_total": 108,
+    "sources": 1,
+    "warmup_launches": 2
+  }
+}

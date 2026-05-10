@@ -49,7 +49,13 @@ def main() -> int:
         schema_json = datasets_dir / "dataset_schema_audit_smoke_latest.json"
         schema_md = datasets_dir / "dataset_schema_audit_smoke_latest.md"
         schema_csv = datasets_dir / "dataset_schema_audit_smoke_latest.csv"
+        schema_record_csv = datasets_dir / "dataset_schema_audit_smoke_records_latest.csv"
         schema_junit = datasets_dir / "dataset_schema_audit_smoke_latest_junit.xml"
+        id_json = datasets_dir / "dataset_id_audit_smoke_latest.json"
+        id_md = datasets_dir / "dataset_id_audit_smoke_latest.md"
+        id_csv = datasets_dir / "dataset_id_audit_smoke_latest.csv"
+        id_record_csv = datasets_dir / "dataset_id_audit_smoke_records_latest.csv"
+        id_junit = datasets_dir / "dataset_id_audit_smoke_latest_junit.xml"
         inspect_json = datasets_dir / "smoke_curated.inspect.json"
         inspect_md = datasets_dir / "smoke_curated.inspect.md"
         inspect_csv = datasets_dir / "smoke_curated.inspect.csv"
@@ -86,6 +92,8 @@ def main() -> int:
             str(schema_md),
             "--csv",
             str(schema_csv),
+            "--record-csv",
+            str(schema_record_csv),
             "--junit",
             str(schema_junit),
             "--require-provenance",
@@ -99,6 +107,10 @@ def main() -> int:
             "1024",
             "--max-record-payload-bytes",
             "8192",
+            "--min-answer-labels",
+            "1",
+            "--min-dataset-split-answer-labels",
+            "1",
             "--max-majority-answer-pct",
             "100",
             "--max-dataset-split-majority-answer-pct",
@@ -126,6 +138,8 @@ def main() -> int:
             "unexpected_schema_majority_answer",
         ):
             return rc
+        if rc := require(schema_report["answer_label_count"] == 1, "unexpected_schema_answer_label_count"):
+            return rc
         if rc := require(
             schema_report["dataset_split_answer_histograms"] == {
                 "arc-smoke": {"validation": {"0": 1}},
@@ -135,7 +149,23 @@ def main() -> int:
             "unexpected_schema_dataset_split_answer_histograms",
         ):
             return rc
+        if rc := require(
+            schema_report["dataset_split_answer_label_counts"] == {
+                "arc-smoke": {"validation": 1},
+                "hellaswag-smoke": {"validation": 1},
+                "truthfulqa-smoke": {"validation": 1},
+            },
+            "unexpected_schema_dataset_split_answer_label_counts",
+        ):
+            return rc
         if rc := require(schema_report["duplicate_payloads"] == [], "unexpected_schema_duplicate_payloads"):
+            return rc
+        if rc := require(len(schema_report["record_telemetry"]) == 3, "unexpected_schema_record_telemetry"):
+            return rc
+        schema_record_rows = list(csv.DictReader(schema_record_csv.open(encoding="utf-8", newline="")))
+        if rc := require(len(schema_record_rows) == 3, "unexpected_schema_record_csv_rows"):
+            return rc
+        if rc := require(schema_record_rows[0]["payload_key_sha256"], "missing_schema_payload_key"):
             return rc
         if rc := require(
             "Eval Dataset Schema Audit" in schema_md.read_text(encoding="utf-8"),
@@ -151,6 +181,60 @@ def main() -> int:
         if rc := require(schema_root.attrib.get("name") == "holyc_dataset_schema_audit", "missing_schema_junit"):
             return rc
         if rc := require(schema_root.attrib.get("failures") == "0", "unexpected_schema_junit_failures"):
+            return rc
+
+        id_command = [
+            sys.executable,
+            str(ROOT / "bench" / "dataset_id_audit.py"),
+            "--input",
+            str(SAMPLE),
+            "--output",
+            str(id_json),
+            "--markdown",
+            str(id_md),
+            "--csv",
+            str(id_csv),
+            "--record-csv",
+            str(id_record_csv),
+            "--junit",
+            str(id_junit),
+            "--require-explicit-id",
+            "--max-record-id-bytes",
+            "64",
+            "--id-pattern",
+            r"[a-z0-9-]+",
+            "--fail-duplicate-record-ids",
+            "--fail-duplicate-dataset-split-record-ids",
+            "--fail-on-findings",
+        ]
+        completed = run_command(id_command)
+        if completed.returncode != 0:
+            return completed.returncode
+
+        id_report = json.loads(id_json.read_text(encoding="utf-8"))
+        if rc := require(id_report["status"] == "pass", "unexpected_id_status"):
+            return rc
+        if rc := require(id_report["record_count"] == 3, "unexpected_id_record_count"):
+            return rc
+        if rc := require(id_report["explicit_id_count"] == 3, "unexpected_id_explicit_count"):
+            return rc
+        if rc := require(id_report["duplicate_record_id_count"] == 0, "unexpected_id_duplicate_count"):
+            return rc
+        if rc := require(id_report["id_class_histogram"] == {"ok": 3}, "unexpected_id_class_histogram"):
+            return rc
+        id_record_rows = list(csv.DictReader(id_record_csv.open(encoding="utf-8", newline="")))
+        if rc := require(len(id_record_rows) == 3, "unexpected_id_record_csv_rows"):
+            return rc
+        if rc := require(id_record_rows[0]["dataset_split_record_key"], "missing_id_record_key"):
+            return rc
+        if rc := require("Dataset ID Audit" in id_md.read_text(encoding="utf-8"), "missing_id_markdown"):
+            return rc
+        if rc := require("severity,kind,scope,detail" in id_csv.read_text(encoding="utf-8"), "missing_id_csv_header"):
+            return rc
+        id_root = ET.parse(id_junit).getroot()
+        if rc := require(id_root.attrib.get("name") == "holyc_dataset_id_audit", "missing_id_junit"):
+            return rc
+        if rc := require(id_root.attrib.get("failures") == "0", "unexpected_id_junit_failures"):
             return rc
 
         fingerprint_command = [

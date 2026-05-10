@@ -36,22 +36,61 @@ except ImportError:  # pragma: no cover - resource is Unix-only.
 
 
 DEFAULT_TIMEOUT_SECONDS = 300.0
+ARTIFACT_SCHEMA_VERSION = "qemu-prompt-bench/v1"
 NETWORK_DEVICE_MARKERS = (
+    "dp8393x",
     "e1000",
     "eepro100",
+    "ftgmac100",
+    "igb",
+    "igbvf",
     "i825",
+    "lan9118",
+    "lance",
+    "mcf_fec",
     "ne2k",
     "pcnet",
+    "rocker",
     "rtl8139",
+    "smc91c111",
     "spapr-vlan",
     "sunhme",
     "sungem",
     "tulip",
     "usb-net",
     "virtio-net",
+    "virtio-vsock",
+    "vhost-vsock",
     "vmxnet",
+    "xgmac",
+    "xlnx-ethlite",
     "xen_nic",
 )
+SOCKET_ENDPOINT_MARKERS = (
+    "guestfwd=",
+    "hostfwd=",
+    "socket,",
+    "tcp:",
+    "telnet:",
+    "tftp=",
+    "udp:",
+    "unix:",
+    "websocket",
+)
+SOCKET_TRANSPORT_OPTIONS = {"-chardev", "-gdb", "-incoming", "-monitor", "-qmp", "-qmp-pretty", "-serial", "-vnc"}
+USER_NET_SERVICE_OPTIONS = {"-bootp", "-redir", "-smb", "-tftp"}
+REMOTE_DISPLAY_MARKERS = ("spice", "vnc")
+TLS_OPTION_MARKERS = ("tls-creds", "tlsauthz", "tls-cipher-suites")
+TLS_VALUE_OPTIONS = {
+    "-chardev",
+    "-display",
+    "-monitor",
+    "-object",
+    "-qmp",
+    "-qmp-pretty",
+    "-serial",
+    "-vnc",
+}
 EXIT_CLASSES = ("ok", "timeout", "launch_error", "nonzero_exit")
 RESULT_LINE_RE = re.compile(r"(?:BENCH_RESULT|bench_result)\s*[:=]\s*(\{.*\})")
 KV_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)=([^,\s]+)")
@@ -450,20 +489,54 @@ def is_network_device_arg(value: str) -> bool:
     return any(marker in lowered for marker in NETWORK_DEVICE_MARKERS)
 
 
+def is_socket_endpoint_arg(value: str) -> bool:
+    lowered = value.lower()
+    return any(marker in lowered for marker in SOCKET_ENDPOINT_MARKERS)
+
+
+def is_remote_display_arg(value: str) -> bool:
+    lowered = value.lower()
+    return any(marker in lowered for marker in REMOTE_DISPLAY_MARKERS)
+
+
+def is_tls_arg(value: str) -> bool:
+    lowered = value.lower()
+    return any(marker in lowered for marker in TLS_OPTION_MARKERS)
+
+
+def canonical_qemu_option(arg: str) -> str:
+    if arg.startswith("--") and len(arg) > 2:
+        return "-" + arg[2:]
+    return arg
+
+
 def has_explicit_nic_none(args: list[str]) -> bool:
     for index, arg in enumerate(args):
-        if arg == "-nic" and index + 1 < len(args) and args[index + 1] == "none":
+        option = canonical_qemu_option(arg)
+        if option == "-nic" and index + 1 < len(args) and args[index + 1] == "none":
             return True
-        if arg == "-nic=none":
+        if option == "-nic=none":
             return True
     return False
 
 
+def nic_none_count(args: list[str]) -> int:
+    count = 0
+    for index, arg in enumerate(args):
+        option = canonical_qemu_option(arg)
+        if option == "-nic" and index + 1 < len(args) and args[index + 1] == "none":
+            count += 1
+        if option == "-nic=none":
+            count += 1
+    return count
+
+
 def has_legacy_net_none(args: list[str]) -> bool:
     for index, arg in enumerate(args):
-        if arg == "-net" and index + 1 < len(args) and args[index + 1] == "none":
+        option = canonical_qemu_option(arg)
+        if option == "-net" and index + 1 < len(args) and args[index + 1] == "none":
             return True
-        if arg == "-net=none":
+        if option == "-net=none":
             return True
     return False
 
@@ -472,39 +545,87 @@ def command_airgap_violations(args: list[str]) -> list[str]:
     violations: list[str] = []
     if not has_explicit_nic_none(args):
         violations.append("missing explicit `-nic none`")
+    disabled_nics = nic_none_count(args)
+    if disabled_nics > 1:
+        violations.append(f"duplicate explicit `-nic none` entries: {disabled_nics}")
 
     index = 0
     while index < len(args):
         arg = args[index]
+        option = canonical_qemu_option(arg)
         next_arg = args[index + 1] if index + 1 < len(args) else ""
+        previous_arg = canonical_qemu_option(args[index - 1]) if index else ""
 
-        if arg == "-nic":
+        if option in TLS_VALUE_OPTIONS and is_tls_arg(next_arg):
+            violations.append(f"tls option `{arg} {next_arg}`")
+        if previous_arg not in TLS_VALUE_OPTIONS and is_tls_arg(arg):
+            violations.append(f"tls option `{arg}`")
+
+        if arg.startswith("@") and len(arg) > 1:
+            violations.append(f"nested qemu args include `{arg}`")
+        if option == "-readconfig":
+            detail = f"`-readconfig {next_arg}`" if next_arg else "`-readconfig`"
+            violations.append(f"qemu config include {detail}")
+            index += 2
+            continue
+        if option.startswith("-readconfig="):
+            violations.append(f"qemu config include `{arg}`")
+
+        if option == "-nic":
             if next_arg != "none":
                 violations.append(f"non-air-gapped `-nic {next_arg}`")
             index += 2
             continue
-        if arg.startswith("-nic=") and arg != "-nic=none":
+        if option.startswith("-nic=") and option != "-nic=none":
             violations.append(f"non-air-gapped `{arg}`")
 
-        if arg == "-net":
+        if option == "-net":
             if next_arg == "none":
                 violations.append("legacy `-net none` present; benchmark artifacts must use `-nic none`")
             else:
                 violations.append(f"networking `-net {next_arg}`")
             index += 2
             continue
-        if arg.startswith("-net="):
-            if arg == "-net=none":
+        if option.startswith("-net="):
+            if option == "-net=none":
                 violations.append("legacy `-net=none` present; benchmark artifacts must use `-nic none`")
             else:
                 violations.append(f"networking `{arg}`")
 
-        if arg == "-netdev" or arg.startswith("-netdev"):
+        if option == "-netdev" or option.startswith("-netdev"):
             violations.append(f"network backend `{arg}`")
-        if arg == "-device" and is_network_device_arg(next_arg):
+        if option in USER_NET_SERVICE_OPTIONS or any(option.startswith(f"{service}=") for service in USER_NET_SERVICE_OPTIONS):
+            violations.append(f"user-mode network service `{arg}`")
+        if option == "-device" and is_network_device_arg(next_arg):
             violations.append(f"network device `{next_arg}`")
-        if arg.startswith("-device=") and is_network_device_arg(arg):
+        if option.startswith("-device=") and is_network_device_arg(option):
             violations.append(f"network device `{arg}`")
+        if option == "-vnc" and next_arg != "none":
+            violations.append(f"remote display socket `-vnc {next_arg}`")
+            index += 2
+            continue
+        if option.startswith("-vnc=") and option != "-vnc=none":
+            violations.append(f"remote display socket `{arg}`")
+        if option == "-display" and is_remote_display_arg(next_arg):
+            violations.append(f"remote display socket `-display {next_arg}`")
+            index += 2
+            continue
+        if option.startswith("-display=") and is_remote_display_arg(option):
+            violations.append(f"remote display socket `{arg}`")
+        if option == "-spice":
+            violations.append(f"remote display socket `-spice {next_arg}`")
+            index += 2
+            continue
+        if option.startswith("-spice"):
+            violations.append(f"remote display socket `{arg}`")
+        if option in SOCKET_TRANSPORT_OPTIONS and is_socket_endpoint_arg(next_arg):
+            violations.append(f"socket endpoint `{arg} {next_arg}`")
+            index += 2
+            continue
+        if any(option.startswith(f"{socket_option}=") for socket_option in SOCKET_TRANSPORT_OPTIONS) and is_socket_endpoint_arg(option):
+            violations.append(f"socket endpoint `{arg}`")
+        if is_socket_endpoint_arg(arg) and ("hostfwd=" in arg.lower() or "guestfwd=" in arg.lower()):
+            violations.append(f"forwarded socket endpoint `{arg}`")
 
         index += 1
 
@@ -525,33 +646,71 @@ def reject_network_args(args: list[str]) -> None:
     index = 0
     while index < len(args):
         arg = args[index]
+        option = canonical_qemu_option(arg)
         next_arg = args[index + 1] if index + 1 < len(args) else ""
+        previous_arg = canonical_qemu_option(args[index - 1]) if index else ""
 
-        if arg == "-nic":
-            if next_arg != "none":
-                raise ValueError("-nic arguments must be exactly `-nic none`")
+        if option in TLS_VALUE_OPTIONS and is_tls_arg(next_arg):
+            raise ValueError(f"TLS is not allowed for air-gapped benchmark runs: {arg} {next_arg}")
+        if previous_arg not in TLS_VALUE_OPTIONS and is_tls_arg(arg):
+            raise ValueError(f"TLS is not allowed for air-gapped benchmark runs: {arg}")
+
+        if arg.startswith("@") and len(arg) > 1:
+            raise ValueError(f"QEMU response files are not allowed for air-gapped benchmark runs: {arg}")
+        if option == "-readconfig":
+            detail = f"{arg} {next_arg}" if next_arg else arg
+            raise ValueError(f"QEMU config includes are not allowed for air-gapped benchmark runs: {detail}")
+        if option.startswith("-readconfig="):
+            raise ValueError(f"QEMU config includes are not allowed for air-gapped benchmark runs: {arg}")
+
+        if option == "-nic":
+            if next_arg == "none":
+                raise ValueError("extra QEMU args must not include `-nic none`; the benchmark launcher injects it")
+            raise ValueError("-nic arguments must be exactly `-nic none`")
             index += 2
             continue
-        if arg.startswith("-nic=") and arg != "-nic=none":
+        if option == "-nic=none":
+            raise ValueError("extra QEMU args must not include `-nic=none`; the benchmark launcher injects `-nic none`")
+        if option.startswith("-nic="):
             raise ValueError("-nic arguments must disable networking")
 
-        if arg == "-net":
+        if option == "-net":
             if next_arg == "none":
                 raise ValueError("legacy `-net none` is redundant; benchmark runs must use injected `-nic none`")
             raise ValueError("-net arguments must not enable networking")
             index += 2
             continue
-        if arg.startswith("-net="):
-            if arg == "-net=none":
+        if option.startswith("-net="):
+            if option == "-net=none":
                 raise ValueError("legacy `-net=none` is redundant; benchmark runs must use injected `-nic none`")
             raise ValueError("-net arguments must not enable networking")
 
-        if arg == "-netdev" or arg.startswith("-netdev"):
+        if option == "-netdev" or option.startswith("-netdev"):
             raise ValueError("-netdev is not allowed for air-gapped benchmark runs")
-        if arg == "-device" and is_network_device_arg(next_arg):
+        if option in USER_NET_SERVICE_OPTIONS or any(option.startswith(f"{service}=") for service in USER_NET_SERVICE_OPTIONS):
+            raise ValueError(f"user-mode network service is not allowed: {arg}")
+        if option == "-device" and is_network_device_arg(next_arg):
             raise ValueError(f"network device is not allowed: {next_arg}")
-        if arg.startswith("-device=") and is_network_device_arg(arg):
+        if option.startswith("-device=") and is_network_device_arg(option):
             raise ValueError(f"network device is not allowed: {arg}")
+        if option == "-vnc" and next_arg != "none":
+            raise ValueError(f"remote display socket is not allowed: -vnc {next_arg}")
+        if option.startswith("-vnc=") and option != "-vnc=none":
+            raise ValueError(f"remote display socket is not allowed: {arg}")
+        if option == "-display" and is_remote_display_arg(next_arg):
+            raise ValueError(f"remote display socket is not allowed: -display {next_arg}")
+        if option.startswith("-display=") and is_remote_display_arg(option):
+            raise ValueError(f"remote display socket is not allowed: {arg}")
+        if option == "-spice":
+            raise ValueError(f"remote display socket is not allowed: -spice {next_arg}")
+        if option.startswith("-spice"):
+            raise ValueError(f"remote display socket is not allowed: {arg}")
+        if option in SOCKET_TRANSPORT_OPTIONS and is_socket_endpoint_arg(next_arg):
+            raise ValueError(f"socket endpoint is not allowed: {arg} {next_arg}")
+        if any(option.startswith(f"{socket_option}=") for socket_option in SOCKET_TRANSPORT_OPTIONS) and is_socket_endpoint_arg(option):
+            raise ValueError(f"socket endpoint is not allowed: {arg}")
+        if is_socket_endpoint_arg(arg) and ("hostfwd=" in arg.lower() or "guestfwd=" in arg.lower()):
+            raise ValueError(f"forwarded socket endpoint is not allowed: {arg}")
 
         index += 1
 
@@ -1894,6 +2053,42 @@ def prompt_serial_output_rank_rows(summaries: list[dict[str, Any]]) -> list[dict
     return rows
 
 
+def prompt_failure_rank_rows(summaries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def failure_key(row: dict[str, Any]) -> tuple[float, float, float, float, str]:
+        failed_runs = parse_float(row.get("failed_runs")) or 0.0
+        timed_out_runs = parse_float(row.get("timed_out_runs")) or 0.0
+        nonzero_exit_runs = parse_float(row.get("nonzero_exit_runs")) or 0.0
+        ok_run_pct = parse_float(row.get("ok_run_pct"))
+        ok_sort = ok_run_pct if ok_run_pct is not None else 100.0
+        return (-failed_runs, -timed_out_runs, -nonzero_exit_runs, ok_sort, str(row.get("prompt", "")))
+
+    rows: list[dict[str, Any]] = []
+    for rank, summary in enumerate(sorted(summaries, key=failure_key), 1):
+        rows.append(
+            {
+                "failure_rank": rank,
+                "prompt": summary.get("prompt"),
+                "prompt_bytes": summary.get("prompt_bytes"),
+                "runs": summary.get("runs"),
+                "ok_runs": summary.get("ok_runs"),
+                "failed_runs": summary.get("failed_runs"),
+                "ok_run_pct": summary.get("ok_run_pct"),
+                "timed_out_runs": summary.get("timed_out_runs"),
+                "nonzero_exit_runs": summary.get("nonzero_exit_runs"),
+                "exit_class_ok_runs": summary.get("exit_class_ok_runs"),
+                "exit_class_timeout_runs": summary.get("exit_class_timeout_runs"),
+                "exit_class_launch_error_runs": summary.get("exit_class_launch_error_runs"),
+                "exit_class_nonzero_exit_runs": summary.get("exit_class_nonzero_exit_runs"),
+                "tokens_median": summary.get("tokens_median"),
+                "wall_elapsed_us_median": summary.get("wall_elapsed_us_median"),
+                "wall_tok_per_s_median": summary.get("wall_tok_per_s_median"),
+                "serial_output_bytes_total": summary.get("serial_output_bytes_total"),
+                "serial_output_lines_total": summary.get("serial_output_lines_total"),
+            }
+        )
+    return rows
+
+
 def report_status(all_runs: list[BenchRun], findings: list[dict[str, Any]]) -> str:
     runs_ok = all(run.returncode == 0 and not run.timed_out for run in all_runs)
     return "pass" if runs_ok and not findings else "fail"
@@ -1906,6 +2101,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         "# QEMU Prompt Benchmark",
         "",
         f"Generated: {report['generated_at']}",
+        f"Artifact schema: {format_summary_value(report.get('artifact_schema_version'))}",
         f"Status: {report['status']}",
         f"Prompt suite: {report.get('prompt_suite', {}).get('suite_sha256', '-')}",
         f"Command SHA256: {report.get('command_sha256', '-')}",
@@ -2074,6 +2270,27 @@ def markdown_report(report: dict[str, Any]) -> str:
                         **{key: format_summary_value(value) for key, value in row.items()}
                     )
                 )
+        failure_ranks = (
+            report.get("prompt_failure_rankings")
+            if isinstance(report.get("prompt_failure_rankings"), list)
+            else []
+        )
+        if failure_ranks:
+            lines.extend(
+                [
+                    "",
+                    "## Prompt Failure Ranking",
+                    "",
+                    "| Rank | Prompt | Runs | OK | Failed | OK % | Timed out | Nonzero exit | Launch errors | Serial output bytes total |",
+                    "| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                ]
+            )
+            for row in failure_ranks[:10]:
+                lines.append(
+                    "| {failure_rank} | {prompt} | {runs} | {ok_runs} | {failed_runs} | {ok_run_pct} | {timed_out_runs} | {nonzero_exit_runs} | {exit_class_launch_error_runs} | {serial_output_bytes_total} |".format(
+                        **{key: format_summary_value(value) for key, value in row.items()}
+                    )
+                )
         lines.extend(
             [
                 "",
@@ -2207,6 +2424,7 @@ def markdown_dry_run_report(report: dict[str, Any]) -> str:
         "# QEMU Prompt Benchmark Dry Run",
         "",
         f"Generated: {report['generated_at']}",
+        f"Artifact schema: {format_summary_value(report.get('artifact_schema_version'))}",
         f"Status: {report['status']}",
         f"Profile: {format_summary_value(report.get('profile'))}",
         f"Model: {format_summary_value(report.get('model'))}",
@@ -2338,6 +2556,7 @@ def dry_run_payload(
     launch_sequence = launch_sequence_from_plan(plan)
     return {
         "generated_at": iso_now(),
+        "artifact_schema_version": ARTIFACT_SCHEMA_VERSION,
         "status": "planned",
         "command": command,
         "command_sha256": command_hash(command),
@@ -2659,6 +2878,7 @@ def write_report(
     prompt_variability_rankings = prompt_variability_rank_rows(summaries)
     prompt_efficiency_rankings = prompt_efficiency_rank_rows(summaries)
     prompt_serial_output_rankings = prompt_serial_output_rank_rows(summaries)
+    prompt_failure_rankings = prompt_failure_rank_rows(summaries)
     expected_launch_sequence = launch_sequence_from_plan(launch_plan or [])
     observed_launch_sequence = launch_sequence_from_runs(all_runs)
     launch_integrity = launch_sequence_integrity(expected_launch_sequence, observed_launch_sequence)
@@ -2703,6 +2923,7 @@ def write_report(
     all_findings = findings + telemetry + launch_findings
     report = {
         "generated_at": iso_now(),
+        "artifact_schema_version": ARTIFACT_SCHEMA_VERSION,
         "status": report_status(all_runs, all_findings),
         "command": all_runs[0].command if all_runs else [],
         "prompt_suite": prompt_suite or {},
@@ -2733,6 +2954,7 @@ def write_report(
         "prompt_variability_rankings": prompt_variability_rankings,
         "prompt_efficiency_rankings": prompt_efficiency_rankings,
         "prompt_serial_output_rankings": prompt_serial_output_rankings,
+        "prompt_failure_rankings": prompt_failure_rankings,
         "phase_summaries": phase_summaries(warmup_runs, runs),
         "variability_gates": {
             "max_suite_cv_pct": max_suite_cv_pct,
@@ -2781,6 +3003,7 @@ def write_report(
     latest_prompt_variability_csv = output_dir / "qemu_prompt_bench_prompt_variability_latest.csv"
     latest_prompt_efficiency_csv = output_dir / "qemu_prompt_bench_prompt_efficiency_latest.csv"
     latest_prompt_serial_output_csv = output_dir / "qemu_prompt_bench_prompt_serial_output_latest.csv"
+    latest_prompt_failure_csv = output_dir / "qemu_prompt_bench_prompt_failures_latest.csv"
     latest_launch_csv = output_dir / "qemu_prompt_bench_launches_latest.csv"
     latest_junit = output_dir / "qemu_prompt_bench_junit_latest.xml"
     latest.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -2792,6 +3015,7 @@ def write_report(
     write_prompt_variability_csv_report(report, latest_prompt_variability_csv)
     write_prompt_efficiency_csv_report(report, latest_prompt_efficiency_csv)
     write_prompt_serial_output_csv_report(report, latest_prompt_serial_output_csv)
+    write_prompt_failure_csv_report(report, latest_prompt_failure_csv)
     write_launch_csv_report(report, latest_launch_csv)
     write_launch_jsonl_report(report, output_dir / "qemu_prompt_bench_launches_latest.jsonl")
     write_junit_report(runs, warmup_runs, findings, telemetry, launch_findings, latest_junit)
@@ -3196,6 +3420,56 @@ def write_prompt_serial_output_csv_report(report: dict[str, Any], path: Path) ->
     rows = (
         report.get("prompt_serial_output_rankings")
         if isinstance(report.get("prompt_serial_output_rankings"), list)
+        else []
+    )
+    base = {
+        "generated_at": report.get("generated_at"),
+        "profile": report.get("profile"),
+        "model": report.get("model"),
+        "quantization": report.get("quantization"),
+        "commit": report.get("commit"),
+        "prompt_suite_sha256": prompt_suite.get("suite_sha256"),
+        "command_sha256": report.get("command_sha256"),
+    }
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: {**base, **row}.get(field) for field in fields})
+
+
+def write_prompt_failure_csv_report(report: dict[str, Any], path: Path) -> None:
+    fields = [
+        "generated_at",
+        "profile",
+        "model",
+        "quantization",
+        "commit",
+        "prompt_suite_sha256",
+        "command_sha256",
+        "failure_rank",
+        "prompt",
+        "prompt_bytes",
+        "runs",
+        "ok_runs",
+        "failed_runs",
+        "ok_run_pct",
+        "timed_out_runs",
+        "nonzero_exit_runs",
+        "exit_class_ok_runs",
+        "exit_class_timeout_runs",
+        "exit_class_launch_error_runs",
+        "exit_class_nonzero_exit_runs",
+        "tokens_median",
+        "wall_elapsed_us_median",
+        "wall_tok_per_s_median",
+        "serial_output_bytes_total",
+        "serial_output_lines_total",
+    ]
+    prompt_suite = report.get("prompt_suite") or {}
+    rows = (
+        report.get("prompt_failure_rankings")
+        if isinstance(report.get("prompt_failure_rankings"), list)
         else []
     )
     base = {

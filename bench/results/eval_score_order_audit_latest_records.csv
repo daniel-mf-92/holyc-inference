@@ -1,0 +1,7 @@
+source,engine,row_number,record_id,prediction_index,score_count,top_score_index,top_score,runner_up_score,top_margin,top_tie_count,checked,matches_top_score
+bench/eval/samples/holyc_smoke_scored_predictions.jsonl,holyc,1,smoke-hellaswag-1,0,4,0,5.0,1.0,4.0,1,True,True
+bench/eval/samples/holyc_smoke_scored_predictions.jsonl,holyc,2,smoke-arc-1,0,4,0,4.0,1.0,3.0,1,True,True
+bench/eval/samples/holyc_smoke_scored_predictions.jsonl,holyc,3,smoke-truthfulqa-1,0,4,0,3.0,0.0,3.0,1,True,True
+bench/eval/samples/llama_smoke_scored_predictions.jsonl,llama,1,smoke-hellaswag-1,0,4,0,5.2,1.1,4.1,1,True,True
+bench/eval/samples/llama_smoke_scored_predictions.jsonl,llama,2,smoke-arc-1,0,4,0,4.1,1.0,3.0999999999999996,1,True,True
+bench/eval/samples/llama_smoke_scored_predictions.jsonl,llama,3,smoke-truthfulqa-1,0,4,0,3.2,0.0,3.2,1,True,True

@@ -1,0 +1,41 @@
+{
+  "findings": [],
+  "generated_at": "2026-05-02T04:02:00Z",
+  "recommendations": [
+    {
+      "benchmark": "qemu_prompt",
+      "current_timeout_headroom_pct": 85.95765999999999,
+      "current_timeout_s": 5.0,
+      "max_wall_s": 0.702117,
+      "median_wall_s": 0.5864425,
+      "min_wall_s": 0.552609,
+      "model": "synthetic-smoke",
+      "p95_wall_s": 0.68742705,
+      "profile": "ci-airgap-smoke",
+      "prompts": 2,
+      "quantization": "Q4_0",
+      "recommendation_delta_s": 25.0,
+      "recommended_timeout_s": 30,
+      "samples": 4,
+      "sources": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/results/qemu_prompt_bench_latest.json",
+      "timeout_samples": 4
+    }
+  ],
+  "settings": {
+    "additive_seconds": 5.0,
+    "fail_if_current_below_recommended": false,
+    "min_samples": 1,
+    "min_timeout_seconds": 30.0,
+    "p95_multiplier": 3.0,
+    "phase": "measured",
+    "require_success": true,
+    "require_timeout_telemetry": false
+  },
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "groups": 1,
+    "max_recommended_timeout_s": 30,
+    "samples": 4
+  }
+}

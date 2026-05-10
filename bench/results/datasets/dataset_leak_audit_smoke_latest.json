@@ -13,9 +13,9 @@
   "error_count": 0,
   "findings": [],
   "format": "hceval-leak-audit",
-  "generated_at": "2026-04-29T00:06:26Z",
+  "generated_at": "2026-04-29T22:45:06Z",
   "inputs": [
-    "bench/results/datasets/smoke_curated.jsonl"
+    "bench/datasets/samples/smoke_eval.jsonl"
   ],
   "record_count": 3,
   "status": "pass",

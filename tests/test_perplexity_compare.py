@@ -69,6 +69,7 @@ def test_cli_writes_json_and_markdown_report() -> None:
         payload = json.loads((Path(tmp) / "ppl.json").read_text(encoding="utf-8"))
         csv_rows = list(csv.DictReader((Path(tmp) / "ppl.csv").open(newline="", encoding="utf-8")))
         breakdown_rows = list(csv.DictReader((Path(tmp) / "ppl_breakdown.csv").open(newline="", encoding="utf-8")))
+        regression_rows = list(csv.DictReader((Path(tmp) / "ppl_regressions.csv").open(newline="", encoding="utf-8")))
         junit_root = ET.parse(Path(tmp) / "ppl_junit.xml").getroot()
         assert payload["summary"]["record_count"] == 3
         assert payload["status"] == "pass"
@@ -84,6 +85,7 @@ def test_cli_writes_json_and_markdown_report() -> None:
         assert "nll_delta_holyc_minus_llama" in csv_rows[0]
         assert len(breakdown_rows) == 1
         assert breakdown_rows[0]["dataset"] == "smoke-eval"
+        assert regression_rows == []
         assert junit_root.attrib["name"] == "holyc_perplexity_compare"
         assert junit_root.attrib["failures"] == "0"
 
@@ -215,6 +217,68 @@ def test_cli_can_fail_on_perplexity_quality_gate_regression(tmp_path: Path) -> N
     assert junit_root.find("./testcase/failure") is not None
 
 
+def test_dataset_split_minimum_gates_fail_per_undercovered_slice(tmp_path: Path) -> None:
+    holyc = tmp_path / "holyc.jsonl"
+    llama = tmp_path / "llama.jsonl"
+    holyc.write_text(
+        "\n".join(
+            [
+                '{"id":"arc-one","dataset":"arc","split":"validation","token_count":2,"mean_nll":0.50}',
+                '{"id":"truth-one","dataset":"truthfulqa","split":"validation","token_count":3,"mean_nll":0.75}',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    llama.write_text(
+        "\n".join(
+            [
+                '{"id":"arc-one","dataset":"arc","split":"validation","token_count":2,"mean_nll":0.50}',
+                '{"id":"truth-one","dataset":"truthfulqa","split":"validation","token_count":3,"mean_nll":0.75}',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    status = perplexity_compare.main(
+        [
+            "--holyc",
+            str(holyc),
+            "--llama",
+            str(llama),
+            "--output-dir",
+            str(tmp_path),
+            "--output-stem",
+            "slice_gated",
+            "--min-dataset-split-record-count",
+            "2",
+            "--min-dataset-split-token-count",
+            "4",
+            "--fail-on-regression",
+        ]
+    )
+    payload = json.loads((tmp_path / "slice_gated.json").read_text(encoding="utf-8"))
+    markdown = (tmp_path / "slice_gated.md").read_text(encoding="utf-8")
+    regression_rows = list(csv.DictReader((tmp_path / "slice_gated_regressions.csv").open(newline="", encoding="utf-8")))
+
+    assert status == 1
+    assert payload["status"] == "fail"
+    assert payload["min_dataset_split_record_count"] == 2
+    assert payload["min_dataset_split_token_count"] == 4
+    assert {row["metric"] for row in payload["regressions"]} == {
+        "dataset_split_record_count",
+        "dataset_split_token_count",
+    }
+    assert all(row["scope"] == "dataset_split" for row in payload["regressions"])
+    assert {row["metric"] for row in regression_rows} == {
+        "dataset_split_record_count",
+        "dataset_split_token_count",
+    }
+    assert all(row["scope"] == "dataset_split" for row in regression_rows)
+    assert "Dataset/split arc:validation" in markdown
+
+
 def test_signed_p95_record_nll_gate_ignores_improvements(tmp_path: Path) -> None:
     holyc = tmp_path / "holyc.jsonl"
     llama = tmp_path / "llama.jsonl"
@@ -286,6 +350,18 @@ def test_token_count_mismatch_fails_by_default(tmp_path: Path) -> None:
     )
 
 
+def test_invalid_probability_telemetry_is_rejected(tmp_path: Path) -> None:
+    holyc = tmp_path / "holyc.jsonl"
+    llama = tmp_path / "llama.jsonl"
+    llama.write_text('{"id":"one","token_logprobs":[-0.1,-0.2]}\n', encoding="utf-8")
+
+    holyc.write_text('{"id":"one","token_logprobs":[-0.1,0.2]}\n', encoding="utf-8")
+    assert perplexity_compare.main(["--holyc", str(holyc), "--llama", str(llama), "--output-dir", str(tmp_path)]) == 2
+
+    holyc.write_text('{"id":"one","token_count":2,"perplexity":0.99}\n', encoding="utf-8")
+    assert perplexity_compare.main(["--holyc", str(holyc), "--llama", str(llama), "--output-dir", str(tmp_path)]) == 2
+
+
 if __name__ == "__main__":
     test_smoke_logprobs_compare_cleanly()
     test_cli_writes_json_and_markdown_report()
@@ -294,7 +370,11 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory() as tmp:
         test_cli_can_fail_on_perplexity_quality_gate_regression(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:
+        test_dataset_split_minimum_gates_fail_per_undercovered_slice(Path(tmp))
+    with tempfile.TemporaryDirectory() as tmp:
         test_signed_p95_record_nll_gate_ignores_improvements(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:
         test_token_count_mismatch_fails_by_default(Path(tmp))
+    with tempfile.TemporaryDirectory() as tmp:
+        test_invalid_probability_telemetry_is_rejected(Path(tmp))
     print("perplexity_compare_tests=ok")

@@ -25,6 +25,11 @@ def command_sha256(command: list[str]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def launch_plan_sha256(launch_plan: list[dict[str, object]]) -> str:
+    encoded = json.dumps(launch_plan, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def environment_sha256(environment: dict[str, object]) -> str:
     normalized = {
         key: environment[key]
@@ -50,7 +55,7 @@ def write_qemu_report(
     *,
     generated_at: str | None = None,
     suite: str = "index-suite",
-    launch_plan: str = "launch-plan-a",
+    launch_plan: str | None = None,
     environment: dict[str, object] | None = None,
     command_hash: str | None = None,
 ) -> None:
@@ -62,6 +67,12 @@ def write_qemu_report(
         "qemu_version": "synthetic",
     }
     command_hash = command_hash or command_sha256(command)
+    launch_plan = launch_plan or launch_plan_sha256(
+        [
+            {"phase": "warmup", "prompt_id": "index-smoke"},
+            {"phase": "measured", "prompt_id": "index-smoke"},
+        ]
+    )
     path.write_text(
         json.dumps(
             {
@@ -161,6 +172,10 @@ def write_qemu_report(
 
 def write_dry_run_report(path: Path, command: list[str]) -> None:
     command_hash = command_sha256(command)
+    launch_plan = [
+        {"phase": "warmup", "prompt_id": "index-smoke"},
+        {"phase": "measured", "prompt_id": "index-smoke"},
+    ]
     path.write_text(
         json.dumps(
             {
@@ -178,14 +193,11 @@ def write_dry_run_report(path: Path, command: list[str]) -> None:
                     "prompt_count": 1,
                     "suite_sha256": "index-suite",
                 },
-                "launch_plan_sha256": "launch-plan-a",
+                "launch_plan_sha256": launch_plan_sha256(launch_plan),
                 "planned_warmup_launches": 1,
                 "planned_measured_launches": 1,
                 "planned_total_launches": 2,
-                "launch_plan": [
-                    {"phase": "warmup", "prompt_id": "index-smoke"},
-                    {"phase": "measured", "prompt_id": "index-smoke"},
-                ],
+                "launch_plan": launch_plan,
                 "environment": {
                     "platform": "ci-smoke",
                     "machine": "host",
@@ -426,6 +438,35 @@ def main() -> int:
         )
         if bad_hash_report["artifacts"][0]["command_hash_status"] != "fail":
             print("bad_hash_status_not_fail=true", file=sys.stderr)
+            return 1
+
+        bad_launch_plan_source = tmp_path / "bad_launch_plan_source"
+        bad_launch_plan_source.mkdir()
+        write_dry_run_report(
+            bad_launch_plan_source / "qemu_prompt_bench_dry_run_bad_launch_plan.json",
+            safe_command,
+        )
+        bad_launch_plan_path = bad_launch_plan_source / "qemu_prompt_bench_dry_run_bad_launch_plan.json"
+        bad_launch_plan_report = json.loads(bad_launch_plan_path.read_text(encoding="utf-8"))
+        bad_launch_plan_report["launch_plan_sha256"] = "0" * 64
+        bad_launch_plan_path.write_text(
+            json.dumps(bad_launch_plan_report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        bad_launch_plan_output = tmp_path / "bad_launch_plan_index"
+        completed = run_index(
+            bad_launch_plan_source,
+            bad_launch_plan_output,
+            "--fail-on-launch-plan-hash-metadata",
+        )
+        if completed.returncode == 0:
+            print("bad_launch_plan_hash_not_rejected=true", file=sys.stderr)
+            return 1
+        bad_launch_plan_index = json.loads(
+            (bad_launch_plan_output / "bench_result_index_latest.json").read_text(encoding="utf-8")
+        )
+        if bad_launch_plan_index["artifacts"][0]["launch_plan_hash_status"] != "fail":
+            print("bad_launch_plan_hash_status_not_fail=true", file=sys.stderr)
             return 1
 
         unsafe_source = tmp_path / "unsafe_source"

@@ -1,0 +1,5 @@
+source,row,list_name,phase,prompt,launch_index,command_argc,headless_display,nographic,display_value,forbidden_display
+bench/fixtures/qemu_display_policy_audit/pass/qemu_prompt_bench_latest.json,0,artifact,artifact,-,,9,True,False,none,False
+bench/fixtures/qemu_display_policy_audit/pass/qemu_prompt_bench_latest.json,1,warmups,warmup,smoke-short,0,9,True,False,none,False
+bench/fixtures/qemu_display_policy_audit/pass/qemu_prompt_bench_latest.json,2,benchmarks,measured,smoke-short,1,9,True,False,none,False
+bench/fixtures/qemu_display_policy_audit/pass/qemu_prompt_bench_latest.json,3,benchmarks,measured,smoke-nographic,2,8,True,True,,False

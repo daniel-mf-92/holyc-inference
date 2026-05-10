@@ -1,0 +1,31 @@
+{
+  "findings": [],
+  "generated_at": "2026-04-30T07:55:57Z",
+  "reports": [
+    {
+      "agreement": 1.0,
+      "dataset": "smoke-eval",
+      "error": "",
+      "holyc_accuracy": 1.0,
+      "llama_accuracy": 1.0,
+      "model": "synthetic-smoke",
+      "quantization": "Q4_0",
+      "recomputed_agreement": 1.0,
+      "recomputed_holyc_accuracy": 1.0,
+      "recomputed_llama_accuracy": 1.0,
+      "regressions": 0,
+      "row_count": 3,
+      "source": "bench/results/eval_compare_smoke_latest.json",
+      "split": "validation",
+      "status": "pass",
+      "summary_record_count": 3
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "findings": 0,
+    "invalid_reports": 0,
+    "reports": 1,
+    "rows": 3
+  }
+}

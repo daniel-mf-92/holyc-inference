@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="holyc_eval_significance_audit" tests="4" failures="0"><testcase name="no_discordant_pairs_1" /><testcase name="no_discordant_pairs_2" /><testcase name="no_discordant_pairs_3" /><testcase name="no_discordant_pairs_4" /></testsuite>

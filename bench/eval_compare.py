@@ -640,11 +640,13 @@ def dataset_breakdown(rows: list[EvalRow]) -> list[dict[str, Any]]:
                 "holyc_correct": holyc_correct,
                 "holyc_margin_metrics": margin_metrics(group_rows, "holyc"),
                 "holyc_nll_metrics": holyc_nll,
+                "holyc_rank_metrics": rank_metrics(group_rows, "holyc"),
                 "holyc_tie_metrics": tie_metrics(group_rows, "holyc"),
                 "llama_accuracy": accuracy(llama_correct, total),
                 "llama_correct": llama_correct,
                 "llama_margin_metrics": margin_metrics(group_rows, "llama"),
                 "llama_nll_metrics": llama_nll,
+                "llama_rank_metrics": rank_metrics(group_rows, "llama"),
                 "llama_tie_metrics": tie_metrics(group_rows, "llama"),
                 "mean_gold_nll_delta_holyc_minus_llama": holyc_nll["mean_gold_nll"]
                 - llama_nll["mean_gold_nll"],
@@ -1451,6 +1453,67 @@ def write_nll_csv_report(path: Path, summary: dict[str, Any]) -> None:
             writer.writerow({field: row.get(field, "") for field in fields})
 
 
+def write_rank_csv_report(path: Path, summary: dict[str, Any]) -> None:
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        fields = [
+            "scope",
+            "dataset",
+            "split",
+            "engine",
+            "total_count",
+            "scored_count",
+            "score_coverage",
+            "top_1_accuracy",
+            "top_2_accuracy",
+            "top_3_accuracy",
+            "mean_gold_rank",
+            "mean_reciprocal_rank",
+        ]
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        rows: list[dict[str, Any]] = [
+            {"scope": "overall", "dataset": "", "split": "", "engine": "holyc", **summary["holyc_rank_metrics"]},
+            {"scope": "overall", "dataset": "", "split": "", "engine": "llama", **summary["llama_rank_metrics"]},
+        ]
+        for item in summary.get("dataset_breakdown", []):
+            rows.append(
+                {
+                    "scope": "dataset_split",
+                    "dataset": item.get("dataset", ""),
+                    "split": item.get("split", ""),
+                    "engine": "holyc",
+                    **rank_metrics_for_breakdown(item, "holyc"),
+                }
+            )
+            rows.append(
+                {
+                    "scope": "dataset_split",
+                    "dataset": item.get("dataset", ""),
+                    "split": item.get("split", ""),
+                    "engine": "llama",
+                    **rank_metrics_for_breakdown(item, "llama"),
+                }
+            )
+        for row in rows:
+            writer.writerow({field: row.get(field, "") for field in fields})
+
+
+def rank_metrics_for_breakdown(item: dict[str, Any], engine: str) -> dict[str, Any]:
+    key = f"{engine}_rank_metrics"
+    if key in item:
+        return item[key]
+    return {
+        "mean_gold_rank": "",
+        "mean_reciprocal_rank": "",
+        "score_coverage": "",
+        "scored_count": "",
+        "top_1_accuracy": "",
+        "top_2_accuracy": "",
+        "top_3_accuracy": "",
+        "total_count": "",
+    }
+
+
 def write_ties_csv_report(path: Path, summary: dict[str, Any]) -> None:
     with path.open("w", newline="", encoding="utf-8") as handle:
         fields = [
@@ -1532,7 +1595,7 @@ def write_report(
     gold_path: Path,
     holyc_path: Path,
     llama_path: Path,
-) -> tuple[Path, Path, Path, Path, Path, Path, Path, Path, Path, Path]:
+) -> tuple[Path, Path, Path, Path, Path, Path, Path, Path, Path, Path, Path]:
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     regressions = find_all_regressions(summary, args)
@@ -1570,6 +1633,7 @@ def write_report(
     calibration_bins_csv_path = output_dir / f"{stem}_calibration_bins.csv"
     margin_csv_path = output_dir / f"{stem}_margins.csv"
     nll_csv_path = output_dir / f"{stem}_nll.csv"
+    rank_csv_path = output_dir / f"{stem}_rank.csv"
     ties_csv_path = output_dir / f"{stem}_score_ties.csv"
     disagreements_csv_path = output_dir / f"{stem}_disagreements.csv"
     junit_path = output_dir / f"{stem}_junit.xml"
@@ -1581,6 +1645,7 @@ def write_report(
     write_calibration_bins_csv_report(calibration_bins_csv_path, summary)
     write_margin_csv_report(margin_csv_path, summary)
     write_nll_csv_report(nll_csv_path, summary)
+    write_rank_csv_report(rank_csv_path, summary)
     write_ties_csv_report(ties_csv_path, summary)
     write_disagreements_csv_report(disagreements_csv_path, rows)
     write_junit(regressions, junit_path)
@@ -1593,6 +1658,7 @@ def write_report(
         calibration_bins_csv_path,
         margin_csv_path,
         nll_csv_path,
+        rank_csv_path,
         ties_csv_path,
         disagreements_csv_path,
     )
@@ -1703,6 +1769,7 @@ def main(argv: list[str] | None = None) -> int:
             calibration_bins_csv_path,
             margin_csv_path,
             nll_csv_path,
+            rank_csv_path,
             ties_csv_path,
             disagreements_csv_path,
         ) = write_report(
@@ -1720,6 +1787,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"wrote_calibration_bins_csv={calibration_bins_csv_path}")
     print(f"wrote_margin_csv={margin_csv_path}")
     print(f"wrote_nll_csv={nll_csv_path}")
+    print(f"wrote_rank_csv={rank_csv_path}")
     print(f"wrote_score_ties_csv={ties_csv_path}")
     print(f"wrote_disagreements_csv={disagreements_csv_path}")
     print(f"holyc_accuracy={summary['holyc_accuracy']:.4f}")

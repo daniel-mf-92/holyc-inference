@@ -1,0 +1,2 @@
+benchmark,profile,model,quantization,samples,prompts,timeout_samples,min_wall_s,median_wall_s,p95_wall_s,max_wall_s,current_timeout_s,current_timeout_headroom_pct,recommended_timeout_s,recommendation_delta_s,sources
+qemu_prompt,ci-airgap-smoke,synthetic-smoke,Q4_0,4,2,4,0.552609,0.5864425,0.68742705,0.702117,5.0,85.95765999999999,30,25.0,/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/results/qemu_prompt_bench_latest.json

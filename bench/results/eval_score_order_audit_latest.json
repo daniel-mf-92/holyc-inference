@@ -1,0 +1,140 @@
+{
+  "engine_summaries": [
+    {
+      "checked_count": 3,
+      "engine": "holyc",
+      "invalid_count": 0,
+      "match_count": 3,
+      "match_rate": 1.0,
+      "mean_top_margin": 3.3333333333333335,
+      "min_top_margin": 3.0,
+      "mismatch_count": 0,
+      "missing_prediction_count": 0,
+      "missing_scores_count": 0,
+      "record_count": 3,
+      "source": "bench/eval/samples/holyc_smoke_scored_predictions.jsonl",
+      "top_tie_count": 0
+    },
+    {
+      "checked_count": 3,
+      "engine": "llama",
+      "invalid_count": 0,
+      "match_count": 3,
+      "match_rate": 1.0,
+      "mean_top_margin": 3.4666666666666663,
+      "min_top_margin": 3.0999999999999996,
+      "mismatch_count": 0,
+      "missing_prediction_count": 0,
+      "missing_scores_count": 0,
+      "record_count": 3,
+      "source": "bench/eval/samples/llama_smoke_scored_predictions.jsonl",
+      "top_tie_count": 0
+    }
+  ],
+  "findings": [],
+  "generated_at": "2026-05-02T04:53:16Z",
+  "records": [
+    {
+      "checked": true,
+      "engine": "holyc",
+      "matches_top_score": true,
+      "prediction_index": 0,
+      "record_id": "smoke-hellaswag-1",
+      "row_number": 1,
+      "runner_up_score": 1.0,
+      "score_count": 4,
+      "source": "bench/eval/samples/holyc_smoke_scored_predictions.jsonl",
+      "top_margin": 4.0,
+      "top_score": 5.0,
+      "top_score_index": 0,
+      "top_tie_count": 1
+    },
+    {
+      "checked": true,
+      "engine": "holyc",
+      "matches_top_score": true,
+      "prediction_index": 0,
+      "record_id": "smoke-arc-1",
+      "row_number": 2,
+      "runner_up_score": 1.0,
+      "score_count": 4,
+      "source": "bench/eval/samples/holyc_smoke_scored_predictions.jsonl",
+      "top_margin": 3.0,
+      "top_score": 4.0,
+      "top_score_index": 0,
+      "top_tie_count": 1
+    },
+    {
+      "checked": true,
+      "engine": "holyc",
+      "matches_top_score": true,
+      "prediction_index": 0,
+      "record_id": "smoke-truthfulqa-1",
+      "row_number": 3,
+      "runner_up_score": 0.0,
+      "score_count": 4,
+      "source": "bench/eval/samples/holyc_smoke_scored_predictions.jsonl",
+      "top_margin": 3.0,
+      "top_score": 3.0,
+      "top_score_index": 0,
+      "top_tie_count": 1
+    },
+    {
+      "checked": true,
+      "engine": "llama",
+      "matches_top_score": true,
+      "prediction_index": 0,
+      "record_id": "smoke-hellaswag-1",
+      "row_number": 1,
+      "runner_up_score": 1.1,
+      "score_count": 4,
+      "source": "bench/eval/samples/llama_smoke_scored_predictions.jsonl",
+      "top_margin": 4.1,
+      "top_score": 5.2,
+      "top_score_index": 0,
+      "top_tie_count": 1
+    },
+    {
+      "checked": true,
+      "engine": "llama",
+      "matches_top_score": true,
+      "prediction_index": 0,
+      "record_id": "smoke-arc-1",
+      "row_number": 2,
+      "runner_up_score": 1.0,
+      "score_count": 4,
+      "source": "bench/eval/samples/llama_smoke_scored_predictions.jsonl",
+      "top_margin": 3.0999999999999996,
+      "top_score": 4.1,
+      "top_score_index": 0,
+      "top_tie_count": 1
+    },
+    {
+      "checked": true,
+      "engine": "llama",
+      "matches_top_score": true,
+      "prediction_index": 0,
+      "record_id": "smoke-truthfulqa-1",
+      "row_number": 3,
+      "runner_up_score": 0.0,
+      "score_count": 4,
+      "source": "bench/eval/samples/llama_smoke_scored_predictions.jsonl",
+      "top_margin": 3.2,
+      "top_score": 3.2,
+      "top_score_index": 0,
+      "top_tie_count": 1
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "checked_count": 6,
+    "engines": [
+      "holyc",
+      "llama"
+    ],
+    "finding_count": 0,
+    "mismatch_count": 0,
+    "record_count": 6
+  },
+  "tool": "eval_score_order_audit"
+}

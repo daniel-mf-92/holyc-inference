@@ -1,0 +1,115 @@
+{
+  "findings": [],
+  "gates": {
+    "min_hashed_rows": 6,
+    "require_hashes": true
+  },
+  "generated_at": "2026-05-02T07:53:43Z",
+  "inputs": {
+    "gold": "bench/datasets/samples/smoke_eval.jsonl",
+    "holyc": "bench/eval/samples/holyc_smoke_hashed_predictions.jsonl",
+    "llama": "bench/eval/samples/llama_smoke_hashed_predictions.jsonl"
+  },
+  "rows": [
+    {
+      "choices_hash_ok": true,
+      "dataset": "hellaswag-smoke",
+      "expected_choices_sha256": "fb2010cdd0e8e891187adf1799aac31aba95bb8ec477bd63f576c91ec673e5ae",
+      "expected_input_sha256": "32955588ff9b9cc7f72a58ffd492d8a61ef6447e5fad4562a6eb63cbe7173a0f",
+      "expected_prompt_sha256": "b631e8be870dc90ba17df949abe6a73ed90fc4b665c7c6d97e24e119cae3eac2",
+      "input_hash_ok": true,
+      "observed_choices_sha256": "fb2010cdd0e8e891187adf1799aac31aba95bb8ec477bd63f576c91ec673e5ae",
+      "observed_input_sha256": "32955588ff9b9cc7f72a58ffd492d8a61ef6447e5fad4562a6eb63cbe7173a0f",
+      "observed_prompt_sha256": "b631e8be870dc90ba17df949abe6a73ed90fc4b665c7c6d97e24e119cae3eac2",
+      "prompt_hash_ok": true,
+      "record_id": "smoke-hellaswag-1",
+      "source": "holyc",
+      "split": "validation"
+    },
+    {
+      "choices_hash_ok": true,
+      "dataset": "arc-smoke",
+      "expected_choices_sha256": "21a90a9348ab082588c68c8ca5bed57a4536027dd2ea976dc4a2320ac464e3f0",
+      "expected_input_sha256": "0619e6dc44e4e9721dbd795448f51865cb9017f4f46ff6c5dec2ee472e6c414f",
+      "expected_prompt_sha256": "aee96409b65985c16af0e557d9113ab0e24d6e968aef17c7aaec9eb1711c9757",
+      "input_hash_ok": true,
+      "observed_choices_sha256": "21a90a9348ab082588c68c8ca5bed57a4536027dd2ea976dc4a2320ac464e3f0",
+      "observed_input_sha256": "0619e6dc44e4e9721dbd795448f51865cb9017f4f46ff6c5dec2ee472e6c414f",
+      "observed_prompt_sha256": "aee96409b65985c16af0e557d9113ab0e24d6e968aef17c7aaec9eb1711c9757",
+      "prompt_hash_ok": true,
+      "record_id": "smoke-arc-1",
+      "source": "holyc",
+      "split": "validation"
+    },
+    {
+      "choices_hash_ok": true,
+      "dataset": "truthfulqa-smoke",
+      "expected_choices_sha256": "77f9797503897419f17674903948d6a25dc9d1893d779f326b43be1632dc7a23",
+      "expected_input_sha256": "885f443d1176c81cbe2019e98c0a1af87b438e2ed76c464a04347c476d3ddb74",
+      "expected_prompt_sha256": "eba4f2a92b142a7cab2558acaf76977c3653905f091c098d8566b2f02bb6ba9b",
+      "input_hash_ok": true,
+      "observed_choices_sha256": "77f9797503897419f17674903948d6a25dc9d1893d779f326b43be1632dc7a23",
+      "observed_input_sha256": "885f443d1176c81cbe2019e98c0a1af87b438e2ed76c464a04347c476d3ddb74",
+      "observed_prompt_sha256": "eba4f2a92b142a7cab2558acaf76977c3653905f091c098d8566b2f02bb6ba9b",
+      "prompt_hash_ok": true,
+      "record_id": "smoke-truthfulqa-1",
+      "source": "holyc",
+      "split": "validation"
+    },
+    {
+      "choices_hash_ok": true,
+      "dataset": "hellaswag-smoke",
+      "expected_choices_sha256": "fb2010cdd0e8e891187adf1799aac31aba95bb8ec477bd63f576c91ec673e5ae",
+      "expected_input_sha256": "32955588ff9b9cc7f72a58ffd492d8a61ef6447e5fad4562a6eb63cbe7173a0f",
+      "expected_prompt_sha256": "b631e8be870dc90ba17df949abe6a73ed90fc4b665c7c6d97e24e119cae3eac2",
+      "input_hash_ok": true,
+      "observed_choices_sha256": "fb2010cdd0e8e891187adf1799aac31aba95bb8ec477bd63f576c91ec673e5ae",
+      "observed_input_sha256": "32955588ff9b9cc7f72a58ffd492d8a61ef6447e5fad4562a6eb63cbe7173a0f",
+      "observed_prompt_sha256": "b631e8be870dc90ba17df949abe6a73ed90fc4b665c7c6d97e24e119cae3eac2",
+      "prompt_hash_ok": true,
+      "record_id": "smoke-hellaswag-1",
+      "source": "llama.cpp",
+      "split": "validation"
+    },
+    {
+      "choices_hash_ok": true,
+      "dataset": "arc-smoke",
+      "expected_choices_sha256": "21a90a9348ab082588c68c8ca5bed57a4536027dd2ea976dc4a2320ac464e3f0",
+      "expected_input_sha256": "0619e6dc44e4e9721dbd795448f51865cb9017f4f46ff6c5dec2ee472e6c414f",
+      "expected_prompt_sha256": "aee96409b65985c16af0e557d9113ab0e24d6e968aef17c7aaec9eb1711c9757",
+      "input_hash_ok": true,
+      "observed_choices_sha256": "21a90a9348ab082588c68c8ca5bed57a4536027dd2ea976dc4a2320ac464e3f0",
+      "observed_input_sha256": "0619e6dc44e4e9721dbd795448f51865cb9017f4f46ff6c5dec2ee472e6c414f",
+      "observed_prompt_sha256": "aee96409b65985c16af0e557d9113ab0e24d6e968aef17c7aaec9eb1711c9757",
+      "prompt_hash_ok": true,
+      "record_id": "smoke-arc-1",
+      "source": "llama.cpp",
+      "split": "validation"
+    },
+    {
+      "choices_hash_ok": true,
+      "dataset": "truthfulqa-smoke",
+      "expected_choices_sha256": "77f9797503897419f17674903948d6a25dc9d1893d779f326b43be1632dc7a23",
+      "expected_input_sha256": "885f443d1176c81cbe2019e98c0a1af87b438e2ed76c464a04347c476d3ddb74",
+      "expected_prompt_sha256": "eba4f2a92b142a7cab2558acaf76977c3653905f091c098d8566b2f02bb6ba9b",
+      "input_hash_ok": true,
+      "observed_choices_sha256": "77f9797503897419f17674903948d6a25dc9d1893d779f326b43be1632dc7a23",
+      "observed_input_sha256": "885f443d1176c81cbe2019e98c0a1af87b438e2ed76c464a04347c476d3ddb74",
+      "observed_prompt_sha256": "eba4f2a92b142a7cab2558acaf76977c3653905f091c098d8566b2f02bb6ba9b",
+      "prompt_hash_ok": true,
+      "record_id": "smoke-truthfulqa-1",
+      "source": "llama.cpp",
+      "split": "validation"
+    }
+  ],
+  "status": "pass",
+  "summary": {
+    "audited_prediction_rows": 6,
+    "findings": 0,
+    "gold_records": 3,
+    "hashed_prediction_rows": 6,
+    "matched_hash_fields": 18,
+    "mismatched_hash_fields": 0,
+    "missing_hash_fields": 0
+  }
+}

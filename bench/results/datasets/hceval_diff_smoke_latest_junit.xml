@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="holyc_hceval_diff" tests="1" failures="0" errors="0" timestamp="2026-05-02T04:00:55Z">
+  <testcase classname="hceval_diff" name="dataset_diff" />
+</testsuite>
