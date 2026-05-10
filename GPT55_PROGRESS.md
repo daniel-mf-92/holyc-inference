@@ -531,3 +531,4 @@
 2026-05-10T17:37:50Z | Extended QEMU artifact budget audit with stdout/stderr tail-retention consistency checks, smoke coverage, and refreshed latest results.
 2026-05-10T17:44:25Z | Added QEMU host filesystem share audit for forbidden virtfs/fsdev/virtio-fs passthrough with smoke coverage and refreshed reports.
 2026-05-10T17:51:55Z | Added QEMU phase summary consistency audit with smoke coverage and refreshed latest reports.
+2026-05-10T17:58:27Z | Extended QEMU artifact secret audit to catch Authorization and Cookie header leaks with smoke coverage and refreshed reports.

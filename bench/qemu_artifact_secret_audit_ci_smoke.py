@@ -90,6 +90,8 @@ def main() -> int:
             {
                 "stdout_tail": "auth failed for sk-proj-abcdefghijklmnopqrstuvwxyz123456",
                 "stderr_tail": (
+                    "Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456; "
+                    "Cookie: session=abcdefghijklmnopqrstuvwxyz123456; "
                     "clone https://user:pass@example.invalid/repo.git failed; "
                     "model fetch used hf_abcdefghijklmnopqrstuvwxyz1234567890"
                 ),
@@ -114,6 +116,8 @@ def main() -> int:
             require(unsafe_report["status"] == "fail", "unsafe_secret_audit_not_fail=true"),
             require("openai_api_key" in kinds, "unsafe_secret_audit_missing_openai=true"),
             require("anthropic_api_key" in kinds, "unsafe_secret_audit_missing_anthropic=true"),
+            require("authorization_header" in kinds, "unsafe_secret_audit_missing_authorization_header=true"),
+            require("cookie_header" in kinds, "unsafe_secret_audit_missing_cookie_header=true"),
             require("github_token" in kinds, "unsafe_secret_audit_missing_github=true"),
             require("huggingface_token" in kinds, "unsafe_secret_audit_missing_huggingface=true"),
             require("url_embedded_credentials" in kinds, "unsafe_secret_audit_missing_url_creds=true"),
