@@ -63,7 +63,7 @@
   "error_count": 0,
   "findings": [],
   "format": "hceval-dataset-provenance-balance-audit",
-  "generated_at": "2026-05-02T04:00:20Z",
+  "generated_at": "2026-05-10T16:32:50Z",
   "inputs": [
     {
       "path": "/Users/danielmatthews-ferrero/Documents/worktrees/holyc-gpt55/bench/datasets/samples/smoke_eval.jsonl",
