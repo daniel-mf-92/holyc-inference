@@ -3768,6 +3768,24 @@ python3 bench/qemu_stdio_hygiene_audit.py bench/results \
   --max-stderr-tail-bytes 8192
 ```
 
+`qemu_artifact_secret_audit.py` scans saved QEMU benchmark artifacts for
+high-confidence secret-like text in commands, captured stdio tails, failure
+reasons, and environment maps before result bundles are retained or uploaded.
+It emits JSON, Markdown, CSV, findings CSV, and JUnit sidecars:
+
+```bash
+python3 bench/qemu_artifact_secret_audit.py bench/results \
+  --output-dir bench/results \
+  --output-stem qemu_artifact_secret_audit_latest
+```
+
+`qemu_artifact_secret_audit_ci_smoke.py` exercises clean artifacts plus
+OpenAI/GitHub token, credential-bearing URL, and sensitive-field failure paths:
+
+```bash
+python3 bench/qemu_artifact_secret_audit_ci_smoke.py
+```
+
 `airgap_audit.py` scans benchmark artifacts, including benchmark-matrix cells,
 for recorded QEMU commands and fails if any QEMU-like command is missing
 `-nic none` or includes networking flags/devices. It writes JSON, and can also
