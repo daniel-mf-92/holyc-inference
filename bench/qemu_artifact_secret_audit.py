@@ -31,7 +31,9 @@ SENSITIVE_KEY_RE = re.compile(
 SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("private_key_block", re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----")),
     ("openai_api_key", re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b")),
+    ("anthropic_api_key", re.compile(r"\bsk-ant-api\d{2}-[A-Za-z0-9_-]{20,}\b")),
     ("github_token", re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{20,}\b")),
+    ("huggingface_token", re.compile(r"\bhf_[A-Za-z0-9]{30,}\b")),
     ("stripe_secret_key", re.compile(r"\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}\b")),
     ("slack_token", re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{20,}\b")),
     ("aws_access_key", re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b")),

@@ -514,3 +514,4 @@
 2026-05-10T14:24:18Z | Added packed HCEval record identity audit for duplicate IDs and payloads with smoke coverage and latest dataset sidecars.
 2026-05-10T14:42:42Z | Added eval error-overlap audit for shared versus engine-unique HolyC/llama misses with smoke coverage and latest result sidecars.
 2026-05-10T14:55:48Z | Added QEMU artifact secret-leak audit for captured commands/tails/env text with smoke coverage and latest result sidecars.
+2026-05-10T15:12:52Z | Extended QEMU artifact secret-leak audit with Anthropic and HuggingFace token detectors plus smoke coverage.

@@ -84,8 +84,12 @@ def main() -> int:
         unsafe_row.update(
             {
                 "stdout_tail": "auth failed for sk-proj-abcdefghijklmnopqrstuvwxyz123456",
-                "stderr_tail": "clone https://user:pass@example.invalid/repo.git failed",
+                "stderr_tail": (
+                    "clone https://user:pass@example.invalid/repo.git failed; "
+                    "model fetch used hf_abcdefghijklmnopqrstuvwxyz1234567890"
+                ),
                 "api_token": "ghp_abcdefghijklmnopqrstuvwxyz123456",
+                "anthropic_key": "sk-ant-api03-abcdefghijklmnopqrstuvwxyz1234567890",
             }
         )
         write_artifact(unsafe, unsafe_row)
@@ -100,7 +104,9 @@ def main() -> int:
         checks = [
             require(unsafe_report["status"] == "fail", "unsafe_secret_audit_not_fail=true"),
             require("openai_api_key" in kinds, "unsafe_secret_audit_missing_openai=true"),
+            require("anthropic_api_key" in kinds, "unsafe_secret_audit_missing_anthropic=true"),
             require("github_token" in kinds, "unsafe_secret_audit_missing_github=true"),
+            require("huggingface_token" in kinds, "unsafe_secret_audit_missing_huggingface=true"),
             require("url_embedded_credentials" in kinds, "unsafe_secret_audit_missing_url_creds=true"),
             require("sensitive_field_populated" in kinds, "unsafe_secret_audit_missing_sensitive_field=true"),
             require(int(unsafe_junit.attrib.get("failures", "0")) >= 1, "unsafe_secret_audit_junit_failures=true"),
