@@ -33,18 +33,23 @@ REQUIRED_ENTRY_FIELDS = {
     "source_size_bytes",
     "source_mtime_ns",
     "source_sha256",
+    "generated_at",
     "status",
+    "commit",
     "profile",
     "model",
     "quantization",
+    "prompt_suite_source",
     "prompt_suite_sha256",
     "launch_plan_sha256",
     "expected_launch_sequence_sha256",
     "command_sha256",
     "command_argc",
+    "qemu_bin",
     "explicit_nic_none",
     "legacy_net_none",
     "airgap_ok",
+    "prompt_count",
     "launch_plan_entries",
     "measured_rows",
     "argv",
@@ -138,6 +143,10 @@ def int_value(value: Any) -> int | None:
     if isinstance(value, bool):
         return None
     return value if isinstance(value, int) else None
+
+
+def text_value(value: Any) -> str:
+    return value if isinstance(value, str) else ""
 
 
 def sibling_argv_path(manifest_path: Path) -> Path:
@@ -283,9 +292,38 @@ def check_entry(
     else:
         findings.append(ManifestFinding(str(source), row_name, "error", "key_type", "key", "key must be a string"))
 
-    for field in ("source", "profile", "model", "quantization", "prompt_suite_sha256", "launch_plan_sha256"):
+    for field in (
+        "source",
+        "generated_at",
+        "commit",
+        "profile",
+        "model",
+        "quantization",
+        "prompt_suite_source",
+        "prompt_suite_sha256",
+        "launch_plan_sha256",
+        "expected_launch_sequence_sha256",
+        "qemu_bin",
+    ):
         if not isinstance(entry.get(field), str) or not entry.get(field):
             findings.append(ManifestFinding(str(source), row_name, "error", "blank_field", field, "field must be non-empty"))
+
+    for field in ("prompt_count", "launch_plan_entries", "measured_rows", "command_argc"):
+        if int_value(entry.get(field)) is None:
+            findings.append(ManifestFinding(str(source), row_name, "error", "integer_field", field, "field must be an integer"))
+
+    qemu_bin = text_value(entry.get("qemu_bin"))
+    if argv and qemu_bin and qemu_bin != argv[0]:
+        findings.append(
+            ManifestFinding(
+                str(source),
+                row_name,
+                "error",
+                "qemu_bin_drift",
+                "qemu_bin",
+                f"stored qemu_bin {qemu_bin!r} does not match argv[0] {argv[0]!r}",
+            )
+        )
 
     source_path = resolve_source_path(str(entry.get("source") or ""), manifest_path)
     if args.require_existing_source and source_path is None:

@@ -1401,8 +1401,9 @@ python3 bench/qemu_replay_manifest_ci_smoke.py
 
 `qemu_replay_manifest_audit.py` checks exported replay manifests and argv
 sidecars for schema parity, recomputed command hashes, sidecar hash drift,
-source artifact presence, and explicit `-nic none` air-gap metadata. It is
-host-side only and does not launch QEMU.
+source artifact presence, replay provenance fields, `qemu_bin`/argv parity, and
+explicit `-nic none` air-gap metadata. It is host-side only and does not launch
+QEMU.
 
 Example:
 

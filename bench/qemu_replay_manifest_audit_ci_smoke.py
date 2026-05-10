@@ -74,6 +74,32 @@ def main() -> int:
         if bad_status == 0:
             print("source_sha256_drift_not_detected=true", file=sys.stderr)
             return 1
+
+        bad_qemu_bin = manifest_dir / "qemu_replay_manifest_bad_qemu_bin.json"
+        bad_qemu_bin.write_text(
+            (manifest_dir / "qemu_replay_manifest_smoke.json").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        qemu_bin_payload = qemu_replay_manifest.load_json_object(bad_qemu_bin)[0]
+        if qemu_bin_payload is None:
+            print("bad_qemu_bin_load_failed=true", file=sys.stderr)
+            return 1
+        qemu_bin_payload["entries"][0]["qemu_bin"] = "qemu-system-drift"
+        bad_qemu_bin.write_text(json.dumps(qemu_bin_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        bad_qemu_bin_status = qemu_replay_manifest_audit.main(
+            [
+                str(bad_qemu_bin),
+                "--argv-jsonl",
+                str(manifest_dir / "qemu_replay_manifest_smoke_argv.jsonl"),
+                "--output-dir",
+                str(output_dir),
+                "--output-stem",
+                "qemu_replay_manifest_audit_bad_qemu_bin",
+            ]
+        )
+        if bad_qemu_bin_status == 0:
+            print("qemu_bin_drift_not_detected=true", file=sys.stderr)
+            return 1
         return 0
 
 
