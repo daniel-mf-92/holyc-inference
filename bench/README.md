@@ -2283,6 +2283,12 @@ python3 bench/eval_workload_estimate.py bench/fixtures/eval_workload_estimate/sm
   --max-scored-tokens 65536
 ```
 
+CI smoke coverage for pass/fail budget paths:
+
+```bash
+python3 bench/eval_workload_estimate_ci_smoke.py
+```
+
 ## Offline Eval Comparator
 
 `eval_compare.py` compares local HolyC and llama.cpp multiple-choice predictions
