@@ -1,20 +1,20 @@
 {
   "dataset": "smoke-eval",
   "gate_dataset_breakdowns": false,
-  "generated_at": "2026-04-30T01:41:14Z",
+  "generated_at": "2026-05-10T19:57:00Z",
   "gold_sha256": "5fd3b33ebb3e9fb47220068ae61cbbf0ed9f773fdf15d4817e951b7bd023e131",
   "holyc_predictions_sha256": "61bb69247c6343f53493b5febb5636780ed8c5d99d6114976164e1c7ecd1c4e9",
   "llama_predictions_sha256": "22a31f8ffa48784acd9645bf802ac0f3e0260d45e703a34c926a3331e643dfa1",
-  "max_accuracy_drop": 0.02,
-  "max_holyc_mean_nll": null,
-  "max_holyc_nll_delta": 0.05,
-  "max_holyc_score_tie_rate": 0.01,
+  "max_accuracy_drop": 0.0,
+  "max_holyc_mean_nll": 0.01,
+  "max_holyc_nll_delta": 0.0,
+  "max_holyc_score_tie_rate": 0.0,
   "max_mcnemar_loss_p": 0.05,
-  "min_agreement": 0.95,
-  "min_holyc_accuracy": 0.95,
+  "min_agreement": 1.0,
+  "min_holyc_accuracy": 1.0,
   "min_holyc_margin_coverage": null,
   "min_holyc_mean_margin": null,
-  "min_holyc_nll_coverage": 0.3,
+  "min_holyc_nll_coverage": null,
   "model": "synthetic-smoke",
   "quantization": "Q4_0",
   "regressions": [],
@@ -89,6 +89,7 @@
     "accuracy_delta_holyc_minus_llama": 0.0,
     "agreement": 1.0,
     "agreement_count": 3,
+    "balanced_accuracy_delta_holyc_minus_llama": 0.0,
     "class_count": 4,
     "confidence_intervals": {
       "agreement": {
@@ -126,6 +127,7 @@
         "agreement_count": 1,
         "dataset": "arc-smoke",
         "holyc_accuracy": 1.0,
+        "holyc_balanced_accuracy": 1.0,
         "holyc_correct": 1,
         "holyc_margin_metrics": {
           "low_margin_count": 0,
@@ -170,6 +172,7 @@
           "total_count": 1
         },
         "llama_accuracy": 1.0,
+        "llama_balanced_accuracy": 1.0,
         "llama_correct": 1,
         "llama_margin_metrics": {
           "low_margin_count": 0,
@@ -236,6 +239,7 @@
         "agreement_count": 1,
         "dataset": "hellaswag-smoke",
         "holyc_accuracy": 1.0,
+        "holyc_balanced_accuracy": 1.0,
         "holyc_correct": 1,
         "holyc_margin_metrics": {
           "low_margin_count": 0,
@@ -280,6 +284,7 @@
           "total_count": 1
         },
         "llama_accuracy": 1.0,
+        "llama_balanced_accuracy": 1.0,
         "llama_correct": 1,
         "llama_margin_metrics": {
           "low_margin_count": 0,
@@ -346,6 +351,7 @@
         "agreement_count": 1,
         "dataset": "truthfulqa-smoke",
         "holyc_accuracy": 1.0,
+        "holyc_balanced_accuracy": 1.0,
         "holyc_correct": 1,
         "holyc_margin_metrics": {
           "low_margin_count": 0,
@@ -390,6 +396,7 @@
           "total_count": 1
         },
         "llama_accuracy": 1.0,
+        "llama_balanced_accuracy": 1.0,
         "llama_correct": 1,
         "llama_margin_metrics": {
           "low_margin_count": 0,
@@ -452,6 +459,7 @@
       }
     ],
     "holyc_accuracy": 1.0,
+    "holyc_balanced_accuracy": 1.0,
     "holyc_calibration": {
       "accuracy_when_scored": 1.0,
       "brier_score": 6.644734737210628e-07,
@@ -660,6 +668,7 @@
       "total_count": 3
     },
     "llama_accuracy": 1.0,
+    "llama_balanced_accuracy": 1.0,
     "llama_calibration": {
       "accuracy_when_scored": 1.0,
       "brier_score": 0.04316679346247537,

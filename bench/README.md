@@ -2321,6 +2321,8 @@ emits under-separated best choices before the comparator runs.
 When score vectors are present, reports include per-row confidence/margin plus
 score coverage, mean confidence, Brier score, expected calibration error, mean
 gold-answer negative log likelihood, and choice-set perplexity.
+Reports include balanced accuracy alongside raw accuracy so skewed answer
+distributions cannot hide per-class recall loss.
 Reports also rank the gold answer within each score vector and summarize top-1,
 top-2, top-3, mean gold rank, and mean reciprocal rank for each engine.
 Reports also count top-score ties in scored rows, and
@@ -3518,7 +3520,7 @@ supports prediction indexes, labels, exact choice text, or score arrays, and
 writes JSON, Markdown, per-record CSV, per-dataset/split breakdown CSV,
 confusion-matrix CSV, calibration-bin CSV, score-margin CSV,
 score-NLL CSV, score-rank CSV, score-tie CSV, engine-disagreement CSV, and JUnit XML reports to `bench/results/`.
-Reports include accuracy, agreement, macro-F1, per-answer F1,
+Reports include accuracy, balanced accuracy, agreement, macro-F1, per-answer F1,
 per-dataset/split breakdowns, and confusion matrices for each engine.
 Score-vector reports include calibration, gold-rank, mean gold-answer NLL,
 choice-set perplexity, and predicted-vs-runner-up margin telemetry; use

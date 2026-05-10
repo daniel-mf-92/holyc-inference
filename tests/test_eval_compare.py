@@ -40,6 +40,8 @@ def test_smoke_predictions_compare_cleanly() -> None:
     assert summary["llama_accuracy"] == 1.0
     assert summary["holyc_macro_f1"] == 1.0
     assert summary["llama_macro_f1"] == 1.0
+    assert summary["holyc_balanced_accuracy"] == 1.0
+    assert summary["llama_balanced_accuracy"] == 1.0
     assert summary["agreement"] == 1.0
     assert summary["holyc_confusion_matrix"]["matrix"][0][0] == 3
     assert summary["holyc_calibration"]["scored_count"] == 1
@@ -109,6 +111,8 @@ def test_cli_writes_json_and_markdown_report() -> None:
         assert payload["status"] == "pass"
         assert payload["regressions"] == []
         assert payload["summary"]["class_count"] == 4
+        assert payload["summary"]["holyc_balanced_accuracy"] == 1.0
+        assert payload["summary"]["balanced_accuracy_delta_holyc_minus_llama"] == 0.0
         assert payload["summary"]["holyc_calibration"]["scored_count"] == 1
         assert payload["summary"]["llama_calibration"]["score_coverage"] == 1 / 3
         assert payload["summary"]["holyc_tie_metrics"]["tie_rate"] == 0.0
@@ -153,6 +157,7 @@ def test_cli_writes_json_and_markdown_report() -> None:
         assert calibration_rows[-1]["bin_index"] == "9"
         assert breakdown_rows[0]["dataset"] == "arc-smoke"
         assert breakdown_rows[0]["record_count"] == "1"
+        assert breakdown_rows[0]["holyc_balanced_accuracy"] == "1.0"
         assert disagreement_rows == []
         assert csv_rows[0]["record_id"] == "smoke-arc-1"
         assert csv_rows[0]["holyc_correct"] == "True"
@@ -185,6 +190,9 @@ def test_compare_reports_macro_f1_and_confusion_matrix() -> None:
 
     assert round(summary["holyc_macro_f1"], 4) == 0.6667
     assert round(summary["llama_macro_f1"], 4) == 0.4
+    assert round(summary["holyc_balanced_accuracy"], 4) == 0.75
+    assert round(summary["llama_balanced_accuracy"], 4) == 0.5
+    assert round(summary["balanced_accuracy_delta_holyc_minus_llama"], 4) == 0.25
     assert summary["holyc_confusion_matrix"]["matrix"] == [[1, 1], [0, 1]]
     assert summary["llama_confusion_matrix"]["matrix"] == [[2, 0], [1, 0]]
     assert summary["holyc_calibration"]["scored_count"] == 0

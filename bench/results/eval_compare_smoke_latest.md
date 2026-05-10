@@ -1,6 +1,6 @@
 # Eval Compare Report
 
-Generated: 2026-04-30T01:41:14Z
+Generated: 2026-05-10T19:57:00Z
 Dataset: smoke-eval
 Split: validation
 Quantization: Q4_0
@@ -15,6 +15,9 @@ Status: pass
 | HolyC accuracy | 1.0000 |
 | llama.cpp accuracy | 1.0000 |
 | Accuracy delta | 0.0000 |
+| HolyC balanced accuracy | 1.0000 |
+| llama.cpp balanced accuracy | 1.0000 |
+| Balanced accuracy delta | 0.0000 |
 | HolyC macro F1 | 1.0000 |
 | llama.cpp macro F1 | 1.0000 |
 | Macro F1 delta | 0.0000 |
@@ -64,11 +67,11 @@ Status: pass
 
 ## Dataset Breakdown
 
-| Dataset | Split | Records | HolyC accuracy | llama.cpp accuracy | Accuracy delta | Agreement |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| arc-smoke | validation | 1 | 1.0000 | 1.0000 | 0.0000 | 1.0000 |
-| hellaswag-smoke | validation | 1 | 1.0000 | 1.0000 | 0.0000 | 1.0000 |
-| truthfulqa-smoke | validation | 1 | 1.0000 | 1.0000 | 0.0000 | 1.0000 |
+| Dataset | Split | Records | HolyC accuracy | llama.cpp accuracy | Accuracy delta | HolyC balanced acc. | llama.cpp balanced acc. | Agreement |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| arc-smoke | validation | 1 | 1.0000 | 1.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 |
+| hellaswag-smoke | validation | 1 | 1.0000 | 1.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 |
+| truthfulqa-smoke | validation | 1 | 1.0000 | 1.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 |
 
 ## Confidence Intervals
 

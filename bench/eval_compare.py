@@ -364,6 +364,7 @@ def classification_metrics(rows: list[EvalRow], engine: str, labels: list[int]) 
         matrix[gold_offset][pred_offset] += 1
 
     per_answer_index: list[dict[str, Any]] = []
+    supported_recalls: list[float] = []
     supported_f1: list[float] = []
     for label in labels:
         offset = label_to_offset[label]
@@ -374,6 +375,7 @@ def classification_metrics(rows: list[EvalRow], engine: str, labels: list[int]) 
         recall = safe_div(true_positive, support)
         f1 = f1_score(precision, recall)
         if support:
+            supported_recalls.append(recall)
             supported_f1.append(f1)
         per_answer_index.append(
             {
@@ -388,6 +390,7 @@ def classification_metrics(rows: list[EvalRow], engine: str, labels: list[int]) 
         )
 
     return {
+        "balanced_accuracy": sum(supported_recalls) / len(supported_recalls) if supported_recalls else 0.0,
         "confusion_matrix": {
             "labels": labels,
             "matrix": matrix,
@@ -627,6 +630,13 @@ def dataset_breakdown(rows: list[EvalRow]) -> list[dict[str, Any]]:
         both_wrong = sum(1 for row in group_rows if not row.holyc_correct and not row.llama_correct)
         holyc_only_correct = sum(1 for row in group_rows if row.holyc_correct and not row.llama_correct)
         llama_only_correct = sum(1 for row in group_rows if row.llama_correct and not row.holyc_correct)
+        labels = sorted(
+            {row.answer_index for row in group_rows}
+            | {row.holyc_prediction for row in group_rows}
+            | {row.llama_prediction for row in group_rows}
+        )
+        holyc_metrics = classification_metrics(group_rows, "holyc", labels)
+        llama_metrics = classification_metrics(group_rows, "llama", labels)
         holyc_nll = nll_metrics(group_rows, "holyc")
         llama_nll = nll_metrics(group_rows, "llama")
         breakdown.append(
@@ -637,12 +647,14 @@ def dataset_breakdown(rows: list[EvalRow]) -> list[dict[str, Any]]:
                 "agreement_count": agreement_count,
                 "dataset": dataset,
                 "holyc_accuracy": accuracy(holyc_correct, total),
+                "holyc_balanced_accuracy": holyc_metrics["balanced_accuracy"],
                 "holyc_correct": holyc_correct,
                 "holyc_margin_metrics": margin_metrics(group_rows, "holyc"),
                 "holyc_nll_metrics": holyc_nll,
                 "holyc_rank_metrics": rank_metrics(group_rows, "holyc"),
                 "holyc_tie_metrics": tie_metrics(group_rows, "holyc"),
                 "llama_accuracy": accuracy(llama_correct, total),
+                "llama_balanced_accuracy": llama_metrics["balanced_accuracy"],
                 "llama_correct": llama_correct,
                 "llama_margin_metrics": margin_metrics(group_rows, "llama"),
                 "llama_nll_metrics": llama_nll,
@@ -723,6 +735,7 @@ def compare(
         "class_count": len(labels),
         "dataset_breakdown": dataset_breakdown(rows),
         "holyc_accuracy": accuracy(holyc_correct, total),
+        "holyc_balanced_accuracy": holyc_metrics["balanced_accuracy"],
         "holyc_calibration": holyc_calibration,
         "holyc_confusion_matrix": holyc_metrics["confusion_matrix"],
         "holyc_correct": holyc_correct,
@@ -733,6 +746,7 @@ def compare(
         "holyc_rank_metrics": rank_metrics(rows, "holyc"),
         "holyc_tie_metrics": tie_metrics(rows, "holyc"),
         "llama_accuracy": accuracy(llama_correct, total),
+        "llama_balanced_accuracy": llama_metrics["balanced_accuracy"],
         "llama_calibration": llama_calibration,
         "llama_confusion_matrix": llama_metrics["confusion_matrix"],
         "llama_correct": llama_correct,
@@ -752,6 +766,9 @@ def compare(
         "record_count": total,
     }
     summary["accuracy_delta_holyc_minus_llama"] = summary["holyc_accuracy"] - summary["llama_accuracy"]
+    summary["balanced_accuracy_delta_holyc_minus_llama"] = (
+        summary["holyc_balanced_accuracy"] - summary["llama_balanced_accuracy"]
+    )
     summary["macro_f1_delta_holyc_minus_llama"] = summary["holyc_macro_f1"] - summary["llama_macro_f1"]
     summary["mean_gold_nll_delta_holyc_minus_llama"] = (
         summary["holyc_nll_metrics"]["mean_gold_nll"] - summary["llama_nll_metrics"]["mean_gold_nll"]
@@ -779,6 +796,9 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"| HolyC accuracy | {summary['holyc_accuracy']:.4f} |",
         f"| llama.cpp accuracy | {summary['llama_accuracy']:.4f} |",
         f"| Accuracy delta | {summary['accuracy_delta_holyc_minus_llama']:.4f} |",
+        f"| HolyC balanced accuracy | {summary['holyc_balanced_accuracy']:.4f} |",
+        f"| llama.cpp balanced accuracy | {summary['llama_balanced_accuracy']:.4f} |",
+        f"| Balanced accuracy delta | {summary['balanced_accuracy_delta_holyc_minus_llama']:.4f} |",
         f"| HolyC macro F1 | {summary['holyc_macro_f1']:.4f} |",
         f"| llama.cpp macro F1 | {summary['llama_macro_f1']:.4f} |",
         f"| Macro F1 delta | {summary['macro_f1_delta_holyc_minus_llama']:.4f} |",
@@ -892,15 +912,17 @@ def markdown_report(report: dict[str, Any]) -> str:
             [
                 "## Dataset Breakdown",
                 "",
-                "| Dataset | Split | Records | HolyC accuracy | llama.cpp accuracy | Accuracy delta | Agreement |",
-                "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
+                "| Dataset | Split | Records | HolyC accuracy | llama.cpp accuracy | Accuracy delta | HolyC balanced acc. | llama.cpp balanced acc. | Agreement |",
+                "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
         for item in breakdown:
             lines.append(
                 f"| {item['dataset']} | {item['split']} | {item['record_count']} | "
                 f"{item['holyc_accuracy']:.4f} | {item['llama_accuracy']:.4f} | "
-                f"{item['accuracy_delta_holyc_minus_llama']:.4f} | {item['agreement']:.4f} |"
+                f"{item['accuracy_delta_holyc_minus_llama']:.4f} | "
+                f"{item['holyc_balanced_accuracy']:.4f} | {item['llama_balanced_accuracy']:.4f} | "
+                f"{item['agreement']:.4f} |"
             )
         lines.append("")
     intervals = summary.get("confidence_intervals", {})
@@ -1301,6 +1323,8 @@ def write_breakdown_csv_report(path: Path, breakdown: list[dict[str, Any]]) -> N
             "holyc_accuracy",
             "llama_accuracy",
             "accuracy_delta_holyc_minus_llama",
+            "holyc_balanced_accuracy",
+            "llama_balanced_accuracy",
             "agreement",
         ]
         writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
