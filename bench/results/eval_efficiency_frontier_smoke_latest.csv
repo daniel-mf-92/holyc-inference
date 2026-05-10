@@ -1,4 +1,5 @@
-source,cohort,model,quantization,dataset,split,status,records,quality_metric,quality_value,speed_metric,speed_value,max_memory_bytes,frontier,dominated_by
-/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp0iskdqjx/scorecard.json,smoke-eval/validation,synthetic-smoke,Q2_K,smoke-eval,validation,pass,8,holyc_accuracy,0.9,median_wall_tok_per_s,120.0,60000000,True,
-/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp0iskdqjx/scorecard.json,smoke-eval/validation,synthetic-smoke,Q4_0,smoke-eval,validation,pass,8,holyc_accuracy,0.92,median_wall_tok_per_s,180.0,64000000,True,
-/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmp0iskdqjx/scorecard.json,smoke-eval/validation,synthetic-smoke,Q8_0,smoke-eval,validation,pass,8,holyc_accuracy,0.98,median_wall_tok_per_s,130.0,72000000,True,
+source,cohort,model,quantization,dataset,split,status,records,quality_metric,quality_value,speed_metric,speed_value,max_memory_bytes,frontier,dominated_by,quality_gap_to_frontier,speed_gap_to_frontier,memory_bytes_gap_to_frontier
+/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpj6_q4ql2/scorecard.json,smoke-eval/validation,synthetic-smoke,Q2_K,smoke-eval,validation,pass,8,holyc_accuracy,0.9,median_wall_tok_per_s,120.0,60000000,True,,,,
+/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpj6_q4ql2/scorecard.json,smoke-eval/validation,synthetic-smoke,Q4_0,smoke-eval,validation,pass,8,holyc_accuracy,0.92,median_wall_tok_per_s,180.0,64000000,True,,,,
+/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpj6_q4ql2/scorecard.json,smoke-eval/validation,synthetic-smoke,Q8_0,smoke-eval,validation,pass,8,holyc_accuracy,0.98,median_wall_tok_per_s,130.0,72000000,True,,,,
+/var/folders/4j/3p5ff_fx0z919sk7msl_kgh40000gn/T/tmpj6_q4ql2/scorecard.json,smoke-eval/validation,synthetic-smoke,Q3_0,smoke-eval,validation,pass,8,holyc_accuracy,0.91,median_wall_tok_per_s,150.0,68000000,False,synthetic-smoke:Q4_0:smoke-eval/validation,0.010000000000000009,30.0,4000000

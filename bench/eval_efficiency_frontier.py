@@ -36,6 +36,9 @@ class FrontierRow:
     max_memory_bytes: int | None
     frontier: bool
     dominated_by: str
+    quality_gap_to_frontier: float | None
+    speed_gap_to_frontier: float | None
+    memory_bytes_gap_to_frontier: int | None
 
 
 @dataclass(frozen=True)
@@ -144,6 +147,9 @@ def load_rows(paths: Iterable[Path], quality_metric: str, speed_metric: str) -> 
                     max_memory_bytes=as_int(row.get("max_memory_bytes")) or None,
                     frontier=False,
                     dominated_by="",
+                    quality_gap_to_frontier=None,
+                    speed_gap_to_frontier=None,
+                    memory_bytes_gap_to_frontier=None,
                 )
             )
     return rows
@@ -151,6 +157,16 @@ def load_rows(paths: Iterable[Path], quality_metric: str, speed_metric: str) -> 
 
 def row_key(row: FrontierRow) -> str:
     return f"{row.model}:{row.quantization}:{row.dataset}/{row.split}"
+
+
+def dominance_sort_key(candidate: FrontierRow, other: FrontierRow) -> tuple[float, float, int]:
+    quality_gap = abs((candidate.quality_value or 0.0) - (other.quality_value or 0.0))
+    speed_gap = abs((candidate.speed_value or 0.0) - (other.speed_value or 0.0))
+    if candidate.max_memory_bytes is None or other.max_memory_bytes is None:
+        memory_gap = 0
+    else:
+        memory_gap = abs(candidate.max_memory_bytes - other.max_memory_bytes)
+    return (quality_gap, speed_gap, memory_gap)
 
 
 def dominates(candidate: FrontierRow, other: FrontierRow, *, memory_aware: bool = False) -> bool:
@@ -178,16 +194,32 @@ def mark_frontier(rows: list[FrontierRow], *, memory_aware: bool = False) -> lis
     marked: list[FrontierRow] = []
     for cohort_rows in by_cohort.values():
         for row in cohort_rows:
-            dominator = next(
-                (candidate for candidate in cohort_rows if candidate is not row and dominates(candidate, row, memory_aware=memory_aware)),
-                None,
-            )
+            dominators = [
+                candidate
+                for candidate in cohort_rows
+                if candidate is not row and dominates(candidate, row, memory_aware=memory_aware)
+            ]
+            dominator = min(dominators, key=lambda candidate: dominance_sort_key(candidate, row)) if dominators else None
+            memory_gap = None
+            if dominator and row.max_memory_bytes is not None and dominator.max_memory_bytes is not None:
+                memory_gap = row.max_memory_bytes - dominator.max_memory_bytes
             marked.append(
                 FrontierRow(
                     **{
                         **asdict(row),
                         "frontier": dominator is None and row.quality_value is not None and row.speed_value is not None,
                         "dominated_by": row_key(dominator) if dominator else "",
+                        "quality_gap_to_frontier": (
+                            dominator.quality_value - row.quality_value
+                            if dominator and dominator.quality_value is not None and row.quality_value is not None
+                            else None
+                        ),
+                        "speed_gap_to_frontier": (
+                            dominator.speed_value - row.speed_value
+                            if dominator and dominator.speed_value is not None and row.speed_value is not None
+                            else None
+                        ),
+                        "memory_bytes_gap_to_frontier": memory_gap,
                     }
                 )
             )
@@ -232,6 +264,38 @@ def evaluate(rows: list[FrontierRow], args: argparse.Namespace) -> list[Finding]
                     "memory-aware frontier row is missing max_memory_bytes",
                 )
             )
+        if (
+            args.max_dominated_quality_gap is not None
+            and row.quality_gap_to_frontier is not None
+            and row.quality_gap_to_frontier > args.max_dominated_quality_gap
+        ):
+            findings.append(
+                Finding(
+                    "max_dominated_quality_gap",
+                    row.cohort,
+                    row.model,
+                    row.quantization,
+                    row.quality_gap_to_frontier,
+                    args.max_dominated_quality_gap,
+                    "dominated row quality gap exceeds gate",
+                )
+            )
+        if (
+            args.max_dominated_speed_gap is not None
+            and row.speed_gap_to_frontier is not None
+            and row.speed_gap_to_frontier > args.max_dominated_speed_gap
+        ):
+            findings.append(
+                Finding(
+                    "max_dominated_speed_gap",
+                    row.cohort,
+                    row.model,
+                    row.quantization,
+                    row.speed_gap_to_frontier,
+                    args.max_dominated_speed_gap,
+                    "dominated row speed gap exceeds gate",
+                )
+            )
     for required in args.require_frontier_quantization:
         if not any(row.quantization == required and row.frontier for row in frontier_rows):
             findings.append(
@@ -245,7 +309,7 @@ def write_csv(path: Path, rows: list[Any]) -> None:
     dictionaries = [asdict(row) for row in rows]
     fieldnames = list(dictionaries[0]) if dictionaries else []
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         writer.writerows(dictionaries)
 
@@ -261,12 +325,12 @@ def write_markdown(path: Path, payload: dict[str, Any]) -> None:
         f"- Memory-aware: {payload['summary']['memory_aware']}",
         f"- Findings: {payload['summary']['findings']}",
         "",
-        "| cohort | model | quantization | quality | speed | max memory bytes | frontier | dominated by |",
-        "| --- | --- | --- | ---: | ---: | ---: | --- | --- |",
+        "| cohort | model | quantization | quality | speed | max memory bytes | frontier | dominated by | quality gap | speed gap | memory gap bytes |",
+        "| --- | --- | --- | ---: | ---: | ---: | --- | --- | ---: | ---: | ---: |",
     ]
     for row in payload["rows"]:
         lines.append(
-            "| {cohort} | {model} | {quantization} | {quality_value} | {speed_value} | {max_memory_bytes} | {frontier} | {dominated_by} |".format(
+            "| {cohort} | {model} | {quantization} | {quality_value} | {speed_value} | {max_memory_bytes} | {frontier} | {dominated_by} | {quality_gap_to_frontier} | {speed_gap_to_frontier} | {memory_bytes_gap_to_frontier} |".format(
                 **{key: ("" if value is None else value) for key, value in row.items()}
             )
         )
@@ -303,6 +367,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--min-rows", type=int, default=1)
     parser.add_argument("--min-frontier-rows", type=int, default=1)
     parser.add_argument("--require-frontier-quantization", action="append", default=[])
+    parser.add_argument("--max-dominated-quality-gap", type=float)
+    parser.add_argument("--max-dominated-speed-gap", type=float)
     parser.add_argument("--fail-on-failed-scorecard", action="store_true")
     parser.add_argument("--fail-on-missing-metrics", action="store_true")
     parser.add_argument(

@@ -50,6 +50,17 @@ def write_scorecard(path: Path) -> None:
             "median_wall_tok_per_s": 120.0,
             "max_memory_bytes": 60000000,
         },
+        {
+            "status": "pass",
+            "model": "synthetic-smoke",
+            "quantization": "Q3_0",
+            "dataset": "smoke-eval",
+            "split": "validation",
+            "records": 8,
+            "holyc_accuracy": 0.91,
+            "median_wall_tok_per_s": 150.0,
+            "max_memory_bytes": 68000000,
+        },
     ]
     path.write_text(json.dumps({"status": "pass", "scorecard": rows}, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -67,7 +78,7 @@ def main() -> int:
                 "--output-stem",
                 "eval_efficiency_frontier_smoke_latest",
                 "--min-rows",
-                "3",
+                "4",
                 "--min-frontier-rows",
                 "2",
                 "--require-frontier-quantization",

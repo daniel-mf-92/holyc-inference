@@ -77,9 +77,13 @@ def test_frontier_marks_non_dominated_rows(tmp_path: Path) -> None:
     )
 
     frontier = {row.quantization for row in rows if row.frontier}
-    dominated = {row.quantization: row.dominated_by for row in rows if row.dominated_by}
+    dominated = {row.quantization: row for row in rows if row.dominated_by}
     assert frontier == {"Q4_0", "Q8_0"}
-    assert dominated["Q2_K"].startswith("synthetic-smoke:Q4_0:")
+    assert dominated["Q2_K"].dominated_by.startswith("synthetic-smoke:Q4_0:")
+    assert dominated["Q2_K"].quality_gap_to_frontier is not None
+    assert abs(dominated["Q2_K"].quality_gap_to_frontier - 0.02) < 0.000001
+    assert dominated["Q2_K"].speed_gap_to_frontier == 60.0
+    assert dominated["Q2_K"].memory_bytes_gap_to_frontier == -4000000
 
 
 def test_memory_aware_frontier_preserves_lower_memory_tradeoff(tmp_path: Path) -> None:
@@ -115,6 +119,27 @@ def test_evaluate_flags_missing_metrics_and_required_quantization(tmp_path: Path
     assert {"missing_metric", "require_frontier_quantization"}.issubset({finding.gate for finding in findings})
 
 
+def test_evaluate_flags_dominated_gap_gates(tmp_path: Path) -> None:
+    scorecard = tmp_path / "scorecard.json"
+    write_scorecard(scorecard)
+    rows = eval_efficiency_frontier.mark_frontier(
+        eval_efficiency_frontier.load_rows([scorecard], "holyc_accuracy", "median_wall_tok_per_s")
+    )
+    args = eval_efficiency_frontier.parse_args(
+        [
+            str(scorecard),
+            "--max-dominated-quality-gap",
+            "0.01",
+            "--max-dominated-speed-gap",
+            "50",
+        ]
+    )
+
+    findings = eval_efficiency_frontier.evaluate(rows, args)
+
+    assert {"max_dominated_quality_gap", "max_dominated_speed_gap"}.issubset({finding.gate for finding in findings})
+
+
 def test_cli_writes_frontier_artifacts(tmp_path: Path) -> None:
     scorecard = tmp_path / "scorecard.json"
     output_dir = tmp_path / "out"
@@ -146,10 +171,12 @@ def test_cli_writes_frontier_artifacts(tmp_path: Path) -> None:
     assert payload["status"] == "pass"
     assert payload["summary"]["frontier_rows"] == 3
     assert payload["summary"]["memory_aware"] is True
+    assert {"quality_gap_to_frontier", "speed_gap_to_frontier", "memory_bytes_gap_to_frontier"}.issubset(payload["rows"][0])
     rows = list(csv.DictReader((output_dir / "frontier.csv").open(encoding="utf-8")))
     assert {row["quantization"] for row in rows if row["frontier"] == "True"} == {"Q4_0", "Q8_0", "Q2_K"}
     markdown = (output_dir / "frontier.md").read_text(encoding="utf-8")
     assert "Eval Efficiency Frontier" in markdown
+    assert "quality gap" in markdown
     junit_root = ET.parse(output_dir / "frontier_junit.xml").getroot()
     assert junit_root.attrib["failures"] == "0"
 
@@ -161,6 +188,8 @@ def main() -> int:
         test_memory_aware_frontier_preserves_lower_memory_tradeoff(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:
         test_evaluate_flags_missing_metrics_and_required_quantization(Path(tmp))
+    with tempfile.TemporaryDirectory() as tmp:
+        test_evaluate_flags_dominated_gap_gates(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:
         test_cli_writes_frontier_artifacts(Path(tmp))
     return 0

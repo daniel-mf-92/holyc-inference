@@ -509,3 +509,4 @@
 2026-05-02T10:11:01Z | Added eval record-order audit for HolyC/llama/gold stream parity with smoke coverage and latest result sidecars.
 2026-05-10T13:40:26Z | Added a global expected-token budget gate to QEMU matrix planning audits with smoke coverage and refreshed results.
 2026-05-10T13:57:39Z | Added QEMU block-device policy audit for canonical raw IDE drives, remote transport rejection, smoke coverage, and refreshed reports.
+2026-05-10T14:10:38Z | Added eval efficiency frontier dominance-gap telemetry and optional gates with smoke coverage and refreshed reports.
