@@ -517,3 +517,4 @@
 2026-05-10T15:12:52Z | Extended QEMU artifact secret-leak audit with Anthropic and HuggingFace token detectors plus smoke coverage.
 2026-05-10T15:22:03Z | Added QEMU artifact host-path portability audit with CI smoke coverage and latest result sidecars.
 2026-05-10T15:31:08Z | Added eval calibration engine summary CSV artifacts with smoke gate coverage and refreshed latest reports.
+2026-05-10T15:40:26Z | Hardened QEMU artifact secret audit for authorization/cookie-style fields with stdlib test coverage and refreshed latest result.

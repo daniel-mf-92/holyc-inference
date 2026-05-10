@@ -24,8 +24,10 @@ from urllib.parse import urlsplit
 DEFAULT_PATTERNS = ("qemu_prompt_bench*.json", "qemu_benchmark_matrix*.json")
 ROW_KEYS = ("benchmarks", "results", "runs", "rows", "cells", "warmups")
 SENSITIVE_KEY_RE = re.compile(
-    r"(?:^|[_\-.])(api[-_]?key|auth|bearer|client[-_]?secret|credential|password|private[-_]?key|secret|"
-    r"(?:access|api|id|refresh|session)[-_]?token)(?:$|[_\-.])",
+    r"(?:^|[_\-.])("
+    r"api[-_]?key|auth|authorization|bearer|client[-_]?secret|cookie|credential|password|private[-_]?key|secret|"
+    r"(?:access|api|id|refresh|session)[-_]?token|set[-_]?cookie|x[-_]?api[-_]?key"
+    r")(?:$|[_\-.])",
     re.IGNORECASE,
 )
 SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
