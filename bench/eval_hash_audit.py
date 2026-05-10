@@ -165,19 +165,29 @@ def evaluate(records: list[HashRecord], args: argparse.Namespace) -> list[Findin
                     "HolyC and llama prediction artifacts have identical hashes",
                 )
             )
-    if args.fail_on_warnings:
+    return findings
+
+
+def blocking_findings(findings: list[Finding], *, fail_on_warnings: bool) -> list[Finding]:
+    if fail_on_warnings:
         return findings
     return [finding for finding in findings if finding.severity == "error"]
 
 
-def build_report(records: list[HashRecord], findings: list[Finding]) -> dict[str, Any]:
+def build_report(records: list[HashRecord], findings: list[Finding], *, fail_on_warnings: bool = False) -> dict[str, Any]:
+    errors = [finding for finding in findings if finding.severity == "error"]
+    warnings = [finding for finding in findings if finding.severity == "warning"]
+    blocking = blocking_findings(findings, fail_on_warnings=fail_on_warnings)
     return {
         "generated_at": iso_now(),
-        "status": "fail" if findings else "pass",
+        "status": "fail" if blocking else "pass",
         "summary": {
             "reports": len(records),
             "rows": sum(record.record_count for record in records),
             "findings": len(findings),
+            "errors": len(errors),
+            "warnings": len(warnings),
+            "blocking_findings": len(blocking),
             "dataset_splits": len({(record.dataset, record.split) for record in records if record.dataset or record.split}),
         },
         "reports": [asdict(record) for record in records],
@@ -230,13 +240,14 @@ def write_markdown(path: Path, report: dict[str, Any]) -> None:
 def write_junit(path: Path, report: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     findings = report["findings"]
+    blocking_count = int(report["summary"].get("blocking_findings", len(findings)))
     suite = ET.Element(
         "testsuite",
-        {"name": "holyc_eval_hash_audit", "tests": "1", "failures": str(int(bool(findings))), "errors": "0"},
+        {"name": "holyc_eval_hash_audit", "tests": "1", "failures": str(int(bool(blocking_count))), "errors": "0"},
     )
     case = ET.SubElement(suite, "testcase", {"name": "eval_hash_fingerprints"})
-    if findings:
-        failure = ET.SubElement(case, "failure", {"type": "eval_hash_audit", "message": f"{len(findings)} finding(s)"})
+    if blocking_count:
+        failure = ET.SubElement(case, "failure", {"type": "eval_hash_audit", "message": f"{blocking_count} blocking finding(s)"})
         failure.text = "\n".join(f"{finding['source']}: {finding['gate']}: {finding['message']}" for finding in findings)
     ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
 
@@ -262,7 +273,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
     records = [load_record(path) for path in iter_input_files(args.inputs)]
     findings = evaluate(records, args)
-    report = build_report(records, findings)
+    report = build_report(records, findings, fail_on_warnings=args.fail_on_warnings)
     write_json(args.output, report)
     write_markdown(args.markdown, report)
     write_csv(args.csv, [asdict(record) for record in records], list(HashRecord.__dataclass_fields__))
@@ -271,7 +282,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"status={report['status']}")
     print(f"reports={report['summary']['reports']}")
     print(f"findings={report['summary']['findings']}")
-    return 1 if args.fail_on_findings and findings else 0
+    return 1 if args.fail_on_findings and blocking_findings(findings, fail_on_warnings=args.fail_on_warnings) else 0
 
 
 if __name__ == "__main__":

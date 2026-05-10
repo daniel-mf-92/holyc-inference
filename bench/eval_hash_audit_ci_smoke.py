@@ -8,7 +8,6 @@ import json
 import subprocess
 import sys
 import tempfile
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -34,7 +33,13 @@ def sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def write_eval_report(path: Path, *, gold_sha256: str, bad_hash: bool = False) -> None:
+def junit_text_has(path: Path, *needles: str) -> bool:
+    text = path.read_text(encoding="utf-8")
+    return all(needle in text for needle in needles)
+
+
+def write_eval_report(path: Path, *, gold_sha256: str, bad_hash: bool = False, identical_hashes: bool = False) -> None:
+    holyc_hash = sha256_bytes(b"holyc-predictions")
     payload = {
         "dataset": "smoke-eval",
         "split": "validation",
@@ -42,8 +47,8 @@ def write_eval_report(path: Path, *, gold_sha256: str, bad_hash: bool = False) -
         "quantization": "Q4_0",
         "status": "pass",
         "gold_sha256": gold_sha256,
-        "holyc_predictions_sha256": "not-a-sha" if bad_hash else sha256_bytes(b"holyc-predictions"),
-        "llama_predictions_sha256": sha256_bytes(b"llama-predictions"),
+        "holyc_predictions_sha256": "not-a-sha" if bad_hash else holyc_hash,
+        "llama_predictions_sha256": holyc_hash if identical_hashes else sha256_bytes(b"llama-predictions"),
         "rows": [],
         "summary": {"record_count": 3, "holyc_accuracy": 1.0, "llama_accuracy": 1.0, "agreement": 1.0},
         "regressions": [],
@@ -90,10 +95,76 @@ def main() -> int:
             return rc
         if rc := require("Eval Hash Audit" in (output_dir / "eval_hash_audit_smoke.md").read_text(encoding="utf-8"), "missing_markdown"):
             return rc
-        junit = ET.parse(output_dir / "eval_hash_audit_smoke_junit.xml").getroot()
-        if rc := require(junit.attrib.get("name") == "holyc_eval_hash_audit", "missing_junit"):
+        if rc := require(
+            junit_text_has(output_dir / "eval_hash_audit_smoke_junit.xml", 'name="holyc_eval_hash_audit"', 'failures="0"'),
+            "unexpected_junit",
+        ):
             return rc
-        if rc := require(junit.attrib.get("failures") == "0", "unexpected_junit_failure"):
+
+        warning_only = tmp_path / "eval_compare_warning.json"
+        write_eval_report(warning_only, gold_sha256=gold_hash, identical_hashes=True)
+        warning_out = output_dir / "warning"
+        warning = run_command(
+            [
+                sys.executable,
+                str(ROOT / "bench" / "eval_hash_audit.py"),
+                str(warning_only),
+                "--gold-path",
+                str(gold),
+                "--output",
+                str(warning_out / "eval_hash_audit_warning.json"),
+                "--markdown",
+                str(warning_out / "eval_hash_audit_warning.md"),
+                "--csv",
+                str(warning_out / "eval_hash_audit_warning.csv"),
+                "--findings-csv",
+                str(warning_out / "eval_hash_audit_warning_findings.csv"),
+                "--junit",
+                str(warning_out / "eval_hash_audit_warning_junit.xml"),
+                "--fail-on-findings",
+            ]
+        )
+        if warning.returncode != 0:
+            return warning.returncode
+        warning_report = json.loads((warning_out / "eval_hash_audit_warning.json").read_text(encoding="utf-8"))
+        if rc := require(warning_report["status"] == "pass", "warning_only_status_failed"):
+            return rc
+        if rc := require(warning_report["summary"]["warnings"] == 1, "warning_not_reported"):
+            return rc
+        if rc := require(warning_report["summary"]["blocking_findings"] == 0, "warning_marked_blocking"):
+            return rc
+        if rc := require(
+            junit_text_has(warning_out / "eval_hash_audit_warning_junit.xml", 'name="holyc_eval_hash_audit"', 'failures="0"'),
+            "warning_junit_failed",
+        ):
+            return rc
+
+        warning_fatal = run_command(
+            [
+                sys.executable,
+                str(ROOT / "bench" / "eval_hash_audit.py"),
+                str(warning_only),
+                "--gold-path",
+                str(gold),
+                "--output",
+                str(warning_out / "eval_hash_audit_warning_fatal.json"),
+                "--markdown",
+                str(warning_out / "eval_hash_audit_warning_fatal.md"),
+                "--csv",
+                str(warning_out / "eval_hash_audit_warning_fatal.csv"),
+                "--findings-csv",
+                str(warning_out / "eval_hash_audit_warning_fatal_findings.csv"),
+                "--junit",
+                str(warning_out / "eval_hash_audit_warning_fatal_junit.xml"),
+                "--fail-on-findings",
+                "--fail-on-warnings",
+            ],
+            expected_failure=True,
+        )
+        if rc := require(warning_fatal.returncode == 1, "warning_fatal_not_rejected"):
+            return rc
+        warning_fatal_report = json.loads((warning_out / "eval_hash_audit_warning_fatal.json").read_text(encoding="utf-8"))
+        if rc := require(warning_fatal_report["summary"]["blocking_findings"] == 1, "warning_fatal_not_blocking"):
             return rc
 
         failing = tmp_path / "eval_compare_fail.json"

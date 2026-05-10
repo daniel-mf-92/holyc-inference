@@ -1,6 +1,6 @@
 {
   "findings": [],
-  "generated_at": "2026-05-01T23:14:20Z",
+  "generated_at": "2026-05-10T17:13:07Z",
   "reports": [
     {
       "dataset": "smoke-eval",
@@ -18,9 +18,12 @@
   ],
   "status": "pass",
   "summary": {
+    "blocking_findings": 0,
     "dataset_splits": 1,
+    "errors": 0,
     "findings": 0,
     "reports": 1,
-    "rows": 3
+    "rows": 3,
+    "warnings": 0
   }
 }

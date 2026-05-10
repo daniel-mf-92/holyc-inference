@@ -2411,7 +2411,8 @@ python3 bench/eval_report_audit_ci_smoke.py
 `eval_hash_audit.py` validates `eval_compare.py` report fingerprints for
 reproducible apples-to-apples eval runs. It checks canonical SHA-256 formatting
 for gold/HolyC/llama artifacts, can compare `gold_sha256` against a local gold
-dataset file, and writes JSON, Markdown, CSV, findings CSV, and JUnit outputs:
+dataset file, reports identical HolyC/llama prediction hashes as a nonblocking
+warning by default, and writes JSON, Markdown, CSV, findings CSV, and JUnit outputs:
 
 ```bash
 python3 bench/eval_hash_audit.py \
