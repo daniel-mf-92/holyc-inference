@@ -1,0 +1,2 @@
+source,status,dataset,split,record_count,unique_record_ids,unique_input_payloads,unique_answer_payloads,finding_count,error
+bench/results/datasets/smoke_curated.hceval,pass,smoke-eval,validation,3,3,3,3,0,

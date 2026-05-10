@@ -1,0 +1,83 @@
+{
+  "artifacts": [
+    {
+      "dataset": "smoke-eval",
+      "error": "",
+      "finding_count": 0,
+      "record_count": 3,
+      "source": "bench/results/datasets/smoke_curated.hceval",
+      "split": "validation",
+      "status": "pass",
+      "unique_answer_payloads": 3,
+      "unique_input_payloads": 3,
+      "unique_record_ids": 3
+    }
+  ],
+  "findings": [],
+  "format": "hceval-record-identity-audit",
+  "generated_at": "2026-05-10T14:22:41Z",
+  "records": [
+    {
+      "answer_index": 0,
+      "answer_payload_sha256": "920e15c9ce26a25ff0c48b4df39628c6919e20923f2671b89e64e0fcdbed9db9",
+      "choice_count": 4,
+      "choices_sha256": "21a90a9348ab082588c68c8ca5bed57a4536027dd2ea976dc4a2320ac464e3f0",
+      "dataset": "smoke-eval",
+      "full_payload_sha256": "004734e34c811fd66a6d9e7a46cedcf8309f2f292d11a0f4fb0b6bc40a0d88e2",
+      "input_sha256": "0619e6dc44e4e9721dbd795448f51865cb9017f4f46ff6c5dec2ee472e6c414f",
+      "prompt_sha256": "aee96409b65985c16af0e557d9113ab0e24d6e968aef17c7aaec9eb1711c9757",
+      "provenance": "synthetic ARC-shaped smoke row",
+      "record_id": "smoke-arc-1",
+      "row": 1,
+      "source": "bench/results/datasets/smoke_curated.hceval",
+      "split": "validation"
+    },
+    {
+      "answer_index": 0,
+      "answer_payload_sha256": "4b0d40446d0610440fc88d02c9e53a1fc2c0d435de4ade7c4d9a89138d5cf38b",
+      "choice_count": 4,
+      "choices_sha256": "fb2010cdd0e8e891187adf1799aac31aba95bb8ec477bd63f576c91ec673e5ae",
+      "dataset": "smoke-eval",
+      "full_payload_sha256": "3b9d34a5e4ce56366fd43f008feb5c6d1d08d0223f437b25e773ef49906cc6cd",
+      "input_sha256": "32955588ff9b9cc7f72a58ffd492d8a61ef6447e5fad4562a6eb63cbe7173a0f",
+      "prompt_sha256": "b631e8be870dc90ba17df949abe6a73ed90fc4b665c7c6d97e24e119cae3eac2",
+      "provenance": "synthetic HellaSwag-shaped smoke row",
+      "record_id": "smoke-hellaswag-1",
+      "row": 2,
+      "source": "bench/results/datasets/smoke_curated.hceval",
+      "split": "validation"
+    },
+    {
+      "answer_index": 0,
+      "answer_payload_sha256": "9fe1907c0d0c824a635a15c46ca42f60ace19e8403f150473f6ace5e0ac189a8",
+      "choice_count": 4,
+      "choices_sha256": "77f9797503897419f17674903948d6a25dc9d1893d779f326b43be1632dc7a23",
+      "dataset": "smoke-eval",
+      "full_payload_sha256": "41fc5af22d6cd378fceda2ec426420d341250f4cfb00acb081d1f2acfee1bc18",
+      "input_sha256": "885f443d1176c81cbe2019e98c0a1af87b438e2ed76c464a04347c476d3ddb74",
+      "prompt_sha256": "eba4f2a92b142a7cab2558acaf76977c3653905f091c098d8566b2f02bb6ba9b",
+      "provenance": "synthetic TruthfulQA-shaped smoke row",
+      "record_id": "smoke-truthfulqa-1",
+      "row": 3,
+      "source": "bench/results/datasets/smoke_curated.hceval",
+      "split": "validation"
+    }
+  ],
+  "settings": {
+    "min_artifacts": 1,
+    "patterns": [
+      "*.hceval"
+    ]
+  },
+  "status": "pass",
+  "summary": {
+    "artifacts": 1,
+    "failing_artifacts": 0,
+    "findings": 0,
+    "passing_artifacts": 1,
+    "records": 3,
+    "unique_answer_payloads": 3,
+    "unique_input_payloads": 3,
+    "unique_record_ids": 3
+  }
+}

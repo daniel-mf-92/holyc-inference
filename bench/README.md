@@ -1847,6 +1847,23 @@ python3 bench/hceval_choice_semantics_audit.py \
   --fail-on-findings
 ```
 
+`hceval_record_identity_audit.py` scans packed `.hceval` files for record ID
+collisions and duplicate prompt/choice/answer payloads after binary packing, so
+curated subsets cannot silently carry repeated eval rows into HolyC or
+llama.cpp comparisons:
+
+```bash
+python3 bench/hceval_record_identity_audit.py \
+  --input bench/results/datasets/smoke_curated.hceval \
+  --output bench/results/datasets/hceval_record_identity_audit_smoke_latest.json \
+  --markdown bench/results/datasets/hceval_record_identity_audit_smoke_latest.md \
+  --csv bench/results/datasets/hceval_record_identity_audit_smoke_latest.csv \
+  --artifacts-csv bench/results/datasets/hceval_record_identity_audit_smoke_artifacts_latest.csv \
+  --findings-csv bench/results/datasets/hceval_record_identity_audit_smoke_findings_latest.csv \
+  --junit bench/results/datasets/hceval_record_identity_audit_smoke_latest_junit.xml \
+  --fail-on-findings
+```
+
 `hceval_export.py` converts a packed `.hceval` file back into normalized JSONL
 for `eval_compare.py` gold inputs and `eval_input_audit.py` hash-parity checks.
 Pass the pack manifest when exporting mixed-dataset packs so per-record
