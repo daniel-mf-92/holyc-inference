@@ -159,6 +159,7 @@
 2026-04-28T18:33:49Z | Added eval_compare paired McNemar loss gating with smoke artifact refresh and coverage.
 2026-04-28T18:50:28Z | Added eval dataset schema audit gate with smoke reports and dataset CI coverage.
 2026-05-10T15:04:30Z | Added weighted guest/wall tok/s metrics to the QEMU build throughput scorecard with smoke coverage and refreshed reports.
+2026-05-10T16:12:30Z | Tightened QEMU args-file audit to reject embedded `-nic none` fragments with smoke coverage and refreshed reports.
 2026-04-28T19:05:57Z | Added build_compare QEMU command hash drift gate with CSV/JUnit/Markdown coverage.
 2026-04-28T19:12:07Z | Added eval dataset schema answer-skew telemetry/gates with smoke coverage and refreshed schema artifacts.
 2026-04-28T19:18:48Z | Added HellaSwag ctx_a/ctx_b prompt normalization for offline eval dataset packing with smoke coverage.

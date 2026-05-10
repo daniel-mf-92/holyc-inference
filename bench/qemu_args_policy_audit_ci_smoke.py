@@ -117,6 +117,7 @@ def main() -> int:
             require("socket endpoint" in reasons, "unsafe_args_policy_missing_socket_endpoint=true"),
             require("remote display socket" in reasons, "unsafe_args_policy_missing_remote_display=true"),
             require("tls option" in reasons, "unsafe_args_policy_missing_tls_option=true"),
+            require("fragment includes -nic none" in reasons, "unsafe_args_policy_missing_fragment_nic=true"),
             require("duplicate -nic none" in reasons, "unsafe_args_policy_missing_duplicate_nic=true"),
             require(int(unsafe_junit.attrib.get("failures", "0")) >= 12, "unsafe_args_policy_junit_failures=true"),
         ]

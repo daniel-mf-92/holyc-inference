@@ -194,6 +194,19 @@ def iter_input_files(paths: Iterable[Path]) -> Iterable[Path]:
 def audit_args(path: Path, args: list[str]) -> list[Finding]:
     findings: list[Finding] = []
     disabled_nics = nic_none_count(args)
+    if disabled_nics:
+        findings.append(
+            Finding(
+                str(path),
+                "fragment includes -nic none",
+                None,
+                "",
+                (
+                    "QEMU args fragments must not include explicit `-nic none`; "
+                    "the benchmark launcher injects exactly one NIC disablement."
+                ),
+            )
+        )
     if disabled_nics > 1:
         findings.append(
             Finding(

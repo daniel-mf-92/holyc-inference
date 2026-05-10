@@ -8,8 +8,9 @@ Benchmark artifacts should not add legacy `-net none`; the launcher injects
 credential options are also rejected by the launcher and source/artifact audits.
 Do not include `-nic none` in reusable launcher arg fragments; `qemu_prompt_bench.py`
 owns that injection so final benchmark commands contain exactly one NIC disablement.
-Reusable QEMU argument fragments are also gated against duplicate `-nic none`
-entries so final launch commands keep exactly one explicit NIC disablement.
+Reusable QEMU argument fragments are also gated against any embedded `-nic none`
+entries so final launch commands keep exactly one explicit launcher-owned NIC
+disablement.
 
 ## Quantization Audit
 

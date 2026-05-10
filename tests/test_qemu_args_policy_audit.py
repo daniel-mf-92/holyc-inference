@@ -56,6 +56,7 @@ def test_audit_rejects_networking_fragments_and_commands(tmp_path: Path) -> None
     assert "network backend" in reasons
     assert "networking -net" in reasons
     assert "network device" in reasons
+    assert "fragment includes -nic none" in reasons
     assert "duplicate -nic none" in reasons
     assert "qemu executable embedded in args file" in reasons
     assert "nested qemu args include" in reasons
